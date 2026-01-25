@@ -36,44 +36,39 @@ jobs:
           docker compose version
           command -v rsync || true
 
-      - name: Sync repo to /opt/roehub
+      - name: Assert server prerequisites
         run: |
-          set -euo pipefail
+          set -euxo pipefail
+          test -s /etc/roehub/roehub.env
           test -d /opt/roehub
           test -w /opt/roehub
 
+      - name: Sync deploy bundle to /opt/roehub
+        run: |
+          set -euxo pipefail
+
           if command -v rsync >/dev/null 2>&1; then
-            rsync -a --delete \
-              --exclude '.git/' \
-              --exclude '.venv/' \
-              --exclude '__pycache__/' \
-              --exclude '.pytest_cache/' \
-              --exclude '.mypy_cache/' \
-              --exclude '.ruff_cache/' \
-              --exclude '.DS_Store' \
-              ./ /opt/roehub/
+            rsync -a --delete ./deploy/ /opt/roehub/
           else
             rm -rf /opt/roehub/*
-            tar --exclude=.git --exclude=.venv --exclude=__pycache__ \
-                --exclude=.pytest_cache --exclude=.mypy_cache --exclude=.ruff_cache \
-                -cf - . | tar -C /opt/roehub -xf -
+            tar -C deploy -cf - . | tar -C /opt/roehub -xf -
           fi
 
           test -s /opt/roehub/docker-compose.yml
-          test -s /opt/roehub/Dockerfile.api
-          ls -la /opt/roehub | head
+          test -s /opt/roehub/monitoring/prometheus/prometheus.yml
+          test -s /opt/roehub/monitoring/blackbox/blackbox.yml
+          ls -la /opt/roehub | head -n 50
 
       - name: Validate compose
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env config >/dev/null
 
-      - name: Build & deploy
+      - name: Deploy via Docker Compose
         env:
           COMPOSE_PROJECT_NAME: roehub
         run: |
-          set -euo pipefail
-          # обновим базовые образы (clickhouse/postgres/grafana), roehub-api соберём локально
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env pull --ignore-pull-failures
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
+          set -euxo pipefail
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env pull
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps
