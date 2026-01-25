@@ -18,7 +18,7 @@ jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: [self-hosted, Linux, X64, roehub, prod]
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     defaults:
       run:
@@ -34,29 +34,46 @@ jobs:
           id
           docker --version
           docker compose version
+          command -v rsync || true
 
-      - name: Sync deploy bundle to /opt/roehub (atomic)
+      - name: Sync repo to /opt/roehub
         run: |
           set -euo pipefail
           test -d /opt/roehub
-          stage="/opt/roehub/.staging-${GITHUB_SHA}"
-          rm -rf "$stage"
-          mkdir -p "$stage"
-          rsync -a --delete ./deploy/ "$stage"/
-          test -s "$stage/docker-compose.yml"
-          mv -f "$stage/docker-compose.yml" /opt/roehub/docker-compose.yml
-          rm -rf "$stage"
-          ls -la /opt/roehub
+          test -w /opt/roehub
+
+          if command -v rsync >/dev/null 2>&1; then
+            rsync -a --delete \
+              --exclude '.git/' \
+              --exclude '.venv/' \
+              --exclude '__pycache__/' \
+              --exclude '.pytest_cache/' \
+              --exclude '.mypy_cache/' \
+              --exclude '.ruff_cache/' \
+              --exclude '.DS_Store' \
+              ./ /opt/roehub/
+          else
+            rm -rf /opt/roehub/*
+            tar --exclude=.git --exclude=.venv --exclude=__pycache__ \
+                --exclude=.pytest_cache --exclude=.mypy_cache --exclude=.ruff_cache \
+                -cf - . | tar -C /opt/roehub -xf -
+          fi
+
+          test -s /opt/roehub/docker-compose.yml
+          test -s /opt/roehub/Dockerfile.api
+          ls -la /opt/roehub | head
 
       - name: Validate compose
         run: |
           set -euo pipefail
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env config >/dev/null
 
-      - name: Deploy via Docker Compose
+      - name: Build & deploy
         env:
           COMPOSE_PROJECT_NAME: roehub
         run: |
           set -euo pipefail
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans
+          # обновим базовые образы (clickhouse/postgres/grafana), roehub-api соберём локально
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env pull --ignore-pull-failures
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps

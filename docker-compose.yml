@@ -1,0 +1,69 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: roehub-api:latest
+    container_name: roehub-api-1
+    restart: unless-stopped
+    ports:
+      - "0.0.0.0:${APP_PORT:-8000}:8000"
+    env_file:
+      - /etc/roehub/roehub.env
+    depends_on:
+      - postgres
+      - clickhouse
+    command: >
+      python -m uvicorn ${UVICORN_APP:-app.main:app}
+      --host 0.0.0.0 --port 8000
+
+  postgres:
+    image: postgres:16
+    container_name: roehub-postgres-1
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-roehub}
+      POSTGRES_USER: ${POSTGRES_USER:-roehub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: roehub-clickhouse-1
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8123:8123"
+      - "127.0.0.1:9000:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DB:-roehub}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-roe}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - ch_data:/var/lib/clickhouse
+      - ch_logs:/var/log/clickhouse-server
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SERVER_ROOT_URL: ${GF_SERVER_ROOT_URL}
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  pg_data: {}
+  ch_data: {}
+  ch_logs: {}
+  grafana_data:
+    external: true
