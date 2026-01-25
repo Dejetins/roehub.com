@@ -14,7 +14,8 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, linux, roehub]
+    runs-on: [self-hosted, linux, roehub, prod]
+    timeout-minutes: 15
 
     defaults:
       run:
@@ -30,16 +31,32 @@ jobs:
           id
           docker --version
           docker compose version
+          pwd
+          ls -la
 
-      # Кладём deploy-файлы в постоянную директорию на сервере
-      - name: Sync deploy bundle to /opt/roehub
+      # Кладём на сервер только deploy-артефакты, атомарно
+      - name: Install deploy files to /opt/roehub
         run: |
-          rsync -a --delete ./deploy/ /opt/roehub/
+          set -euo pipefail
+          sudo mkdir -p /opt/roehub
+          # rsync в staging, потом атомарный move
+          rsync -a --delete ./deploy/ /opt/roehub/.staging-deploy/
+          test -f /opt/roehub/.staging-deploy/docker-compose.yml
+          mv -f /opt/roehub/.staging-deploy/docker-compose.yml /opt/roehub/docker-compose.yml
+          rm -rf /opt/roehub/.staging-deploy
           ls -la /opt/roehub
+          echo "Compose path: /opt/roehub/docker-compose.yml"
+
+      - name: Validate compose
+        run: |
+          set -euo pipefail
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env config >/dev/null
 
       - name: Deploy via Docker Compose
         env:
           COMPOSE_PROJECT_NAME: roehub
         run: |
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
+          set -euo pipefail
+          # ВАЖНО: без --build, пока нет гарантированного Dockerfile/контекста сборки на сервере
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps
