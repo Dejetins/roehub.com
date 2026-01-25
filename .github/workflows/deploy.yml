@@ -1,0 +1,45 @@
+name: Deploy (self-hosted)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux, roehub]
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Show context
+        run: |
+          whoami
+          id
+          docker --version
+          docker compose version
+
+      # Кладём deploy-файлы в постоянную директорию на сервере
+      - name: Sync deploy bundle to /opt/roehub
+        run: |
+          rsync -a --delete ./deploy/ /opt/roehub/
+          ls -la /opt/roehub
+
+      - name: Deploy via Docker Compose
+        env:
+          COMPOSE_PROJECT_NAME: roehub
+        run: |
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps

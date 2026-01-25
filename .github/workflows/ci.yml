@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Assert lockfiles exist
+        run: |
+          test -f pyproject.toml || (echo "pyproject.toml not found in repo root" && exit 1)
+          test -f uv.lock || (echo "uv.lock not found. Run locally: uv lock && git add uv.lock" && exit 1)
+          test -f .python-version || (echo ".python-version not found. Run locally: uv python pin 3.12" && exit 1)
+          echo ".python-version=$(cat .python-version)"
+
+      - name: Ensure Python 3.12
+        run: |
+          uv python install 3.12
+          uv run python -V
+
+      - name: Sync venv from uv.lock (ALL groups)
+        run: |
+          uv sync --locked --all-groups
+          uv run python -V
+
+      - name: Lint
+        run: |
+          uv run ruff check .
+
+      - name: Tests
+        run: |
+          uv run pytest -q
