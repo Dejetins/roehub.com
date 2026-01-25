@@ -69,6 +69,6 @@ jobs:
           COMPOSE_PROJECT_NAME: roehub
         run: |
           set -euxo pipefail
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env pull
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env pull postgres clickhouse grafana prometheus blackbox
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps
