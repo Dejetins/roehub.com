@@ -14,3 +14,7 @@ deploy/.env
 deploy/.env.*
 !deploy/.env.example
 
+# notebooks / experiments
+test/
+jup_tests/
+*.ipynb
