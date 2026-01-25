@@ -1,8 +1,10 @@
 name: Deploy (self-hosted)
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
     branches: ["main"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +16,8 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, linux, roehub, prod]
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: [self-hosted, Linux, X64, roehub, prod]
     timeout-minutes: 15
 
     defaults:
@@ -31,21 +34,19 @@ jobs:
           id
           docker --version
           docker compose version
-          pwd
-          ls -la
 
-      # Кладём на сервер только deploy-артефакты, атомарно
-      - name: Install deploy files to /opt/roehub
+      - name: Sync deploy bundle to /opt/roehub (atomic)
         run: |
           set -euo pipefail
-          sudo mkdir -p /opt/roehub
-          # rsync в staging, потом атомарный move
-          rsync -a --delete ./deploy/ /opt/roehub/.staging-deploy/
-          test -f /opt/roehub/.staging-deploy/docker-compose.yml
-          mv -f /opt/roehub/.staging-deploy/docker-compose.yml /opt/roehub/docker-compose.yml
-          rm -rf /opt/roehub/.staging-deploy
+          test -d /opt/roehub
+          stage="/opt/roehub/.staging-${GITHUB_SHA}"
+          rm -rf "$stage"
+          mkdir -p "$stage"
+          rsync -a --delete ./deploy/ "$stage"/
+          test -s "$stage/docker-compose.yml"
+          mv -f "$stage/docker-compose.yml" /opt/roehub/docker-compose.yml
+          rm -rf "$stage"
           ls -la /opt/roehub
-          echo "Compose path: /opt/roehub/docker-compose.yml"
 
       - name: Validate compose
         run: |
@@ -57,6 +58,5 @@ jobs:
           COMPOSE_PROJECT_NAME: roehub
         run: |
           set -euo pipefail
-          # ВАЖНО: без --build, пока нет гарантированного Dockerfile/контекста сборки на сервере
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps
