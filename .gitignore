@@ -5,8 +5,9 @@ __pycache__/
 .ruff_cache/
 .dist/
 .build/
-
+.data_load/*
 # Secrets / env files
+/data_load
 .env
 .env.*
 !.env.example
