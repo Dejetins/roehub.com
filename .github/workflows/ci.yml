@@ -5,6 +5,7 @@ on:
     branches: ["main"]
   pull_request:
   workflow_dispatch:
+
 permissions:
   contents: read
 
@@ -32,15 +33,16 @@ jobs:
 
       - name: Assert lockfiles exist
         run: |
+          set -euxo pipefail
           test -f pyproject.toml || (echo "pyproject.toml not found in repo root" && exit 1)
           test -f uv.lock || (echo "uv.lock not found. Run locally: uv lock && git add uv.lock" && exit 1)
           test -f .python-version || (echo ".python-version not found. Run locally: uv python pin 3.12" && exit 1)
           echo ".python-version=$(cat .python-version)"
 
-      - name: Ensure Python 3.12
-        run: |
-          uv python install 3.12
-          uv run python -V
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
 
       - name: Sync venv from uv.lock (ALL groups)
         run: |
