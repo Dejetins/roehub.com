@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Show context
         run: |
@@ -46,10 +46,15 @@ jobs:
       - name: Sync deploy bundle to /opt/roehub
         run: |
           set -euxo pipefail
+
+          # ensure target dirs exist
           install -d /opt/roehub
-          install -m 0644 infra/docker/docker-compose.yml /opt/roehub/docker-compose.yml
           install -d /opt/roehub/monitoring
 
+          # 1) compose -> /opt/roehub/docker-compose.yml
+          install -m 0644 infra/docker/docker-compose.yml /opt/roehub/docker-compose.yml
+
+          # 2) monitoring -> /opt/roehub/monitoring/
           if command -v rsync >/dev/null 2>&1; then
             rsync -a --delete infra/monitoring/monitoring/ /opt/roehub/monitoring/
           else
@@ -57,6 +62,7 @@ jobs:
             tar -C infra/monitoring/monitoring -cf - . | tar -C /opt/roehub/monitoring -xf -
           fi
 
+          # checks
           test -s /opt/roehub/docker-compose.yml
           test -s /opt/roehub/monitoring/prometheus/prometheus.yml
           test -s /opt/roehub/monitoring/blackbox/blackbox.yml
