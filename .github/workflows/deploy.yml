@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Show context
         run: |
@@ -46,18 +46,26 @@ jobs:
       - name: Sync deploy bundle to /opt/roehub
         run: |
           set -euxo pipefail
+          install -d /opt/roehub
+          install -m 0644 infra/docker/docker-compose.yml /opt/roehub/docker-compose.yml
+          install -d /opt/roehub/monitoring
 
           if command -v rsync >/dev/null 2>&1; then
-            rsync -a --delete ./deploy/ /opt/roehub/
+            rsync -a --delete infra/monitoring/monitoring/ /opt/roehub/monitoring/
           else
-            rm -rf /opt/roehub/*
-            tar -C deploy -cf - . | tar -C /opt/roehub -xf -
+            rm -rf /opt/roehub/monitoring/*
+            tar -C infra/monitoring/monitoring -cf - . | tar -C /opt/roehub/monitoring -xf -
           fi
 
           test -s /opt/roehub/docker-compose.yml
           test -s /opt/roehub/monitoring/prometheus/prometheus.yml
           test -s /opt/roehub/monitoring/blackbox/blackbox.yml
           ls -la /opt/roehub | head -n 50
+
+      - name: Ensure external Docker volumes
+        run: |
+          set -euxo pipefail
+          docker volume inspect grafana_data >/dev/null 2>&1 || docker volume create grafana_data
 
       - name: Validate compose
         run: |
