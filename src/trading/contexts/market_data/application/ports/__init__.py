@@ -1,0 +1,1 @@
+# Пакет ports — контракты application-слоя для bounded context market_data.
