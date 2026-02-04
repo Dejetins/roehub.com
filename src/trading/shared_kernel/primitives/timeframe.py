@@ -5,7 +5,6 @@ from datetime import datetime, timedelta, timezone
 
 from .utc_timestamp import UtcTimestamp
 
-
 # Базовый таймфрейм-источник правды (в БД хранится только 1m canonical).
 _BASE_CODE = "1m"
 
