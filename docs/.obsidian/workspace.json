@@ -224,6 +224,7 @@
   },
   "active": "5f3fea111ea6020c",
   "lastOpenFiles": [
+    "architecture/market_data/market-data-use-case-backfill-1m.md",
     "architecture/market_data/market-data-application-ports.md",
     "architecture/market_data",
     "architecture/shared-kernel-primitives.md"
