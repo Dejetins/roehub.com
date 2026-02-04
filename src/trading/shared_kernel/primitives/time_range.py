@@ -1,0 +1,2 @@
+class TimeRange():
+    pass
