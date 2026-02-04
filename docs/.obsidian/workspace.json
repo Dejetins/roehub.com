@@ -1,0 +1,229 @@
+{
+  "main": {
+    "id": "001fad170aa41167",
+    "type": "split",
+    "children": [
+      {
+        "id": "dc9a47360392b4a6",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "5f3fea111ea6020c",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "architecture/shared-kernel-primitives.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "shared-kernel-primitives"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "602e01a248ce1d57",
+    "type": "split",
+    "children": [
+      {
+        "id": "dc463d86e0bd5ed7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c8c220942ab298f7",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Файловый менеджер"
+            }
+          },
+          {
+            "id": "ff7ae3d28ae6d733",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Поиск"
+            }
+          },
+          {
+            "id": "1dc3f9c6c2836def",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Закладки"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "4e3392a94b373936",
+    "type": "split",
+    "children": [
+      {
+        "id": "00735a948a719a90",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "312b5c6fef4c7b9f",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "architecture/shared-kernel-primitives.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Обратные ссылки для shared-kernel-primitives"
+            }
+          },
+          {
+            "id": "1a77a9819d429d41",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "architecture/shared-kernel-primitives.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Исходящие ссылки из shared-kernel-primitives"
+            }
+          },
+          {
+            "id": "225a131e5712d614",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Теги"
+            }
+          },
+          {
+            "id": "02fd385c3e2a699e",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Все свойства"
+            }
+          },
+          {
+            "id": "814a2e7e1e4d91d1",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "architecture/shared-kernel-primitives.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Структура shared-kernel-primitives"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Меню быстрого перехода": false,
+      "graph:Граф": false,
+      "canvas:Создать новый холст": false,
+      "daily-notes:Сегодняшняя заметка": false,
+      "templates:Вставить шаблон": false,
+      "command-palette:Открыть палитру команд": false,
+      "bases:Создать новую базу": false
+    }
+  },
+  "floating": {
+    "id": "4e144b4c8b49f35b",
+    "type": "floating",
+    "children": [
+      {
+        "id": "0fbc14562becc106",
+        "type": "window",
+        "children": [
+          {
+            "id": "5e1990dee5e94b8a",
+            "type": "tabs",
+            "children": [
+              {
+                "id": "5420687ebde13508",
+                "type": "leaf",
+                "state": {
+                  "type": "markdown",
+                  "state": {
+                    "file": "architecture/shared-kernel-primitives.md",
+                    "mode": "source",
+                    "source": false
+                  },
+                  "icon": "lucide-file",
+                  "title": "shared-kernel-primitives"
+                }
+              }
+            ]
+          }
+        ],
+        "direction": "vertical",
+        "x": 594,
+        "y": 130,
+        "width": 680,
+        "height": 760,
+        "maximize": false,
+        "zoom": 0
+      }
+    ]
+  },
+  "active": "5f3fea111ea6020c",
+  "lastOpenFiles": [
+    "architecture/shared-kernel-primitives.md"
+  ]
+}
