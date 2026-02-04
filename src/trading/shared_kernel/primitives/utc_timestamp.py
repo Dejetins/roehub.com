@@ -23,7 +23,7 @@ class UtcTimestamp:
         # 1) Запрещаем naive datetime:
         # tzinfo может быть не None, но utcoffset() всё равно может вернуть None.
         if dt.tzinfo is None or dt.utcoffset() is None:
-            raise ValueError("UtcTimestamp requires a timezone-aware datetime (naive datetime is forbidden)")
+            raise ValueError("UtcTimestamp requires a timezone-aware datetime (naive datetime is forbidden)")  # noqa: E501
 
         # 2) Приводим к UTC (разрешаем любой timezone-aware вход, но внутри всегда UTC).
         dt_utc = dt.astimezone(timezone.utc)

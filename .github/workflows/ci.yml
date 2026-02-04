@@ -55,4 +55,4 @@ jobs:
 
       - name: Tests
         run: |
-          uv run pytest -q
+          uv run pytest -q -ra
