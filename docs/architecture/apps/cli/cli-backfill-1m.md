@@ -29,15 +29,18 @@ CLI передаёт `InstrumentId(market_id, symbol)` в use-case.
 
 CLI не содержит знания о DDL и не встраивает детали маршрутизации.
 
-### 2) `--batch-size` по умолчанию `None`
+### 2) `--batch-size` по умолчанию включает batching (рекомендуемое v1)
 Семантика batching в walking skeleton v1:
 
-- `--batch-size None` (default):
-  use-case пишет данные “одним батчем” (одним вызовом `RawKlineWriter.write_1m(...)`).
-  Это даёт максимальную простоту, но может требовать значительной памяти при больших файлах.
+- `--batch-size 10000` (default):
+  use-case буферизует до `N` строк и делает запись батчами (несколько insert).
+  Это снижает потребление памяти и делает большие диапазоны эксплуатационно пригодными.
 
 - `--batch-size N`:
-  use-case буферизует до `N` строк и делает запись батчами (несколько insert).
+  тот же механизм batching с указанным размером.
+
+(В v1 не закрепляем “выключение батчинга” как часть CLI-контракта.
+Если нужно “одним батчем” — это отдельное решение/флаг в будущем.)
 
 ### 3) Отчёт выполнения пишется в лог, не в stdout print
 CLI не печатает `report` напрямую.
@@ -60,23 +63,23 @@ CLI не содержит fallback или перекрытия параметр�
 Запустить backfill 1m свечей из parquet в ClickHouse raw таблицы (canonical появится через MV автоматически).
 
 **Arguments (required)**
-- `--market-id <int>`  
+- `--market-id <int>`
   Допустимые значения: `1..4` согласно `market_data.ref_market`.
-- `--symbol <str>`  
+- `--symbol <str>`
   Например `BTCUSDT`.
-- `--start <ISO-UTC>`  
+- `--start <ISO-UTC>`
   Начало диапазона (UTC, timezone-aware). Формат: ISO с `Z`.
-- `--end <ISO-UTC>`  
+- `--end <ISO-UTC>`
   Конец диапазона (UTC, timezone-aware). Формат: ISO с `Z`.
-- `--parquet <path>`  
+- `--parquet <path>`
   Путь к `.parquet` файлу или директории. Аргумент может повторяться.
 
 **Arguments (optional)**
-- `--batch-size <int | None>`  
-  Default: `None` (один батч).  
-  Если задано число — use-case пишет батчами.
-- `--report-format <text|json>`  
-  Default: `text`.  
+- `--batch-size <int>`
+  Default: `10000`.
+  Если задано число — use-case пишет батчами по `N` строк.
+- `--report-format <text|json>`
+  Default: `text`.
   Формат логируемого отчёта.
 
 **TimeRange semantics**
@@ -93,13 +96,13 @@ CLI не содержит fallback или перекрытия параметр�
 
 CLI использует следующие переменные окружения:
 
-- `CH_HOST` (default: `localhost`)
-- `CH_PORT` (default: `8123`)
-- `CH_USER` (default: `default`)
-- `CH_PASSWORD` (default: empty)
-- `CH_DATABASE` (default: `market_data`)
-- `CH_SECURE` (default: `0`)
-- `CH_VERIFY` (default: `1`)
+- `CH_HOST`
+- `CH_PORT`
+- `CH_USER`
+- `CH_PASSWORD`
+- `CH_DATABASE`
+- `CH_SECURE`
+- `CH_VERIFY`
 
 Замечание:
 - пароль всегда рекомендуется задавать через env/секреты окружения.
@@ -113,7 +116,11 @@ CLI wiring собирает следующий граф зависимостей
 
 2) Parquet source:
 - `scanner = PyArrowParquetScanner(paths=[--parquet...])`
-- `source = ParquetCandleIngestSource(scanner=scanner, clock=clock, batch_size=<batch-size or internal default>)`
+- `source = ParquetCandleIngestSource(scanner=scanner, clock=clock, batch_size=scanner_batch_size)`
+
+Примечание:
+- batching чтения parquet (scanner batch_size) — internal detail источника.
+- `--batch-size` управляет batching записи use-case.
 
 3) ClickHouse:
 - `client = clickhouse_connect.get_client(host=..., port=..., username=..., password=..., secure=..., verify=...)`
@@ -153,7 +160,7 @@ CLI и use-case намеренно не делают:
 
 ## File placement
 
-- `apps/cli/main.py` — entrypoint
+- `apps/cli/main/main.py` — entrypoint
 - `apps/cli/commands/backfill_1m.py` — реализация команды
 - `apps/cli/wiring/modules/market_data.py` — сборка use-case и адаптеров
 - `apps/cli/wiring/db/clickhouse.py` — создание CH client/gateway

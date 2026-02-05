@@ -191,7 +191,7 @@ class Backfill1mCli:
             help="Path to parquet file or directory. Can be passed multiple times.",
         )
 
-        p.add_argument("--batch-size", default=None, type=str, help="Positive int or None (default None)") # noqa: E501
+        p.add_argument("--batch-size", default='10000', type=str, help="Positive int or None (default None)") # noqa: E501
         p.add_argument(
             "--report-format",
             default="text",
