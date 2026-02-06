@@ -83,4 +83,4 @@ target-version = "py312"
 select = ["E", "F", "I"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/trading"]
+packages = ["src/trading", "apps"]
