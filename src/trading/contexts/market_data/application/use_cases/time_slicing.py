@@ -33,7 +33,7 @@ def slice_time_range_by_utc_days(time_range: TimeRange, *, max_days: int = 7) ->
 
     Примечание:
     - Резка делается по UTC-дням независимо от исходной минутной/секундной компоненты `start`.
-    """ # noqa: E501
+    """  # noqa: E501
     if max_days <= 0 or max_days > 7:
         raise ValueError(f"max_days must be in [1, 7], got {max_days}")
 

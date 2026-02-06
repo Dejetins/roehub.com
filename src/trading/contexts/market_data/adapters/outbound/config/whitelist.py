@@ -115,3 +115,13 @@ def _parse_enabled(v: object, *, line: int) -> bool:
             raise ValueError(f"is_enabled must be 0 or 1, got {v!r}")
         return v == 1
     raise ValueError(f"is_enabled must be 0/1, got {type(v).__name__}")
+
+
+def load_whitelist_rows_from_csv(path: str | Path) -> list[WhitelistRow]:
+    """
+    Load whitelist CSV and return ALL rows (including disabled), applying last-win semantics.
+
+    This function is used by EPIC 1 reference data sync (ref_instruments).
+    """
+    return _load_whitelist_rows(path)
+

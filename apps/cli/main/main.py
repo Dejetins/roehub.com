@@ -4,6 +4,7 @@ import logging
 import sys
 
 from apps.cli.commands.backfill_1m import Backfill1mCli
+from apps.cli.commands.sync_instruments import SyncInstrumentsCli
 
 
 def _configure_logging() -> None:
@@ -16,6 +17,10 @@ def _configure_logging() -> None:
 def main(argv: list[str] | None = None) -> int:
     _configure_logging()
     args = argv if argv is not None else sys.argv[1:]
+
+    if args and args[0] == "sync-instruments":
+        return SyncInstrumentsCli().run(args[1:])
+
     return Backfill1mCli().run(args)
 
 
