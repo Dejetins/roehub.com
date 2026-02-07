@@ -2,4 +2,4 @@ market_id,symbol,is_enabled
 1,BTCUSDT,1
 1,ETHUSDT,1
 2,BTCUSDT,1
-3,BTCUSDT,0
+3,BTCUSDT,1
