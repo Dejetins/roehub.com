@@ -42,6 +42,7 @@ class SyncInstrumentsReport:
     ref_market_inserted: int
     ref_instruments_rows_total: int
     ref_instruments_upserted: int
+    ref_instruments_skipped_unchanged: int
     enabled_count: int
     disabled_count: int
 
@@ -73,7 +74,10 @@ class SyncInstrumentsCli:
 
         # 2) sync whitelist -> ref_instruments (including disabled)
         wl_rows = load_whitelist_rows_from_csv(whitelist_path)
-        rows = [WhitelistInstrumentRow(instrument_id=r.instrument_id, is_enabled=r.is_enabled) for r in wl_rows]  # noqa: E501
+        rows = [
+            WhitelistInstrumentRow(instrument_id=r.instrument_id, is_enabled=r.is_enabled)
+            for r in wl_rows
+        ]
 
         sync_uc = SyncWhitelistToRefInstrumentsUseCase(
             writer=instr_writer,
@@ -86,6 +90,7 @@ class SyncInstrumentsCli:
             ref_market_inserted=seed_report.inserted,
             ref_instruments_rows_total=sync_report.rows_total,
             ref_instruments_upserted=sync_report.rows_upserted,
+            ref_instruments_skipped_unchanged=sync_report.rows_skipped_unchanged,
             enabled_count=sync_report.enabled_count,
             disabled_count=sync_report.disabled_count,
         )
@@ -98,6 +103,7 @@ class SyncInstrumentsCli:
                 f"- ref_market inserted: {report.ref_market_inserted}\n"
                 f"- ref_instruments rows_total: {report.ref_instruments_rows_total}\n"
                 f"- ref_instruments upserted: {report.ref_instruments_upserted}\n"
+                f"- ref_instruments skipped_unchanged: {report.ref_instruments_skipped_unchanged}\n"
                 f"- enabled: {report.enabled_count}\n"
                 f"- disabled: {report.disabled_count}\n"
             )
