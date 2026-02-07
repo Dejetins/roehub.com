@@ -76,7 +76,7 @@ def test_seed_ref_market_inserts_only_missing() -> None:
 def test_sync_whitelist_inserts_only_new_rows() -> None:
     clock = _FakeClock(UtcTimestamp(datetime(2026, 2, 5, 0, 0, tzinfo=timezone.utc)))
     writer = _FakeInstrumentWriter(existing={})
-    uc = SyncWhitelistToRefInstrumentsUseCase(writer=writer, clock=clock, known_market_ids={1, 2, 3, 4})
+    uc = SyncWhitelistToRefInstrumentsUseCase(writer=writer, clock=clock, known_market_ids={1, 2, 3, 4})  # noqa: E501
 
     rows = [
         WhitelistInstrumentRow(InstrumentId(MarketId(1), Symbol("BTCUSDT")), True),
@@ -101,7 +101,7 @@ def test_sync_whitelist_skips_unchanged_rows() -> None:
     }
     writer = _FakeInstrumentWriter(existing=existing)
 
-    uc = SyncWhitelistToRefInstrumentsUseCase(writer=writer, clock=clock, known_market_ids={1, 2, 3, 4})
+    uc = SyncWhitelistToRefInstrumentsUseCase(writer=writer, clock=clock, known_market_ids={1, 2, 3, 4})  # noqa: E501
 
     rows = [
         WhitelistInstrumentRow(InstrumentId(MarketId(1), Symbol("BTCUSDT")), True),
@@ -124,7 +124,7 @@ def test_sync_whitelist_updates_changed_rows() -> None:
     }
     writer = _FakeInstrumentWriter(existing=existing)
 
-    uc = SyncWhitelistToRefInstrumentsUseCase(writer=writer, clock=clock, known_market_ids={1, 2, 3, 4})
+    uc = SyncWhitelistToRefInstrumentsUseCase(writer=writer, clock=clock, known_market_ids={1, 2, 3, 4})  # noqa: E501
 
     rows = [
         WhitelistInstrumentRow(InstrumentId(MarketId(1), Symbol("BTCUSDT")), False),
