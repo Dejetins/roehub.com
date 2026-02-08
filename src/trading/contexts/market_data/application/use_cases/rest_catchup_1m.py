@@ -125,6 +125,25 @@ class RestCatchUp1mUseCase:
         self._ingest_id = ingest_id
 
     def run(self, instrument_id: InstrumentId) -> RestCatchUp1mReport:
+        """
+        Execute tail catch-up and historical gap fill for one instrument.
+
+        Parameters:
+        - instrument_id: instrument for which catch-up and gap repair should be performed.
+
+        Returns:
+        - Aggregated report with tail and gap-fill counters.
+
+        Assumptions/Invariants:
+        - Time ranges follow half-open semantics `[start, end)`.
+        - Tail and gap ranges operate on minute buckets in UTC.
+
+        Errors/Exceptions:
+        - Raises `ValueError` if canonical seed candles are absent.
+
+        Side effects:
+        - Reads canonical index and writes rows into raw storage through writer port.
+        """
         end_dt = _floor_to_minute_utc(self._clock.now().value)
         end = UtcTimestamp(end_dt)
 
@@ -135,7 +154,7 @@ class RestCatchUp1mUseCase:
                 "Run initial backfill first (or seed history), then rest-catchup can maintain tail/gaps."  # noqa: E501
             )
 
-        tail_start_dt = _ensure_tz_utc(last.value) + timedelta(minutes=1)
+        tail_start_dt = _floor_to_minute_utc(last.value) + timedelta(minutes=1)
         tail_start = UtcTimestamp(tail_start_dt)
 
         tail_rows_read = tail_rows_written = tail_batches = 0
@@ -154,8 +173,8 @@ class RestCatchUp1mUseCase:
         bounds = self._index.bounds(instrument_id)
         if bounds is not None:
             b_first, _b_last = bounds
-            scan_start_dt = _ensure_tz_utc(b_first.value)
-            scan_end_dt = _ensure_tz_utc(tail_start.value)
+            scan_start_dt = _floor_to_minute_utc(b_first.value)
+            scan_end_dt = _floor_to_minute_utc(tail_start.value)
 
             if scan_start_dt < scan_end_dt:
                 gap_scan_start = UtcTimestamp(scan_start_dt)
@@ -194,10 +213,39 @@ class RestCatchUp1mUseCase:
         *,
         instrument_id: InstrumentId,
         time_range: TimeRange,
+        dedup_existing: bool = False,
     ) -> tuple[int, int, int]:
+        """
+        Ingest one time range into raw storage with optional pre-write dedup filtering.
+
+        Parameters:
+        - instrument_id: instrument being ingested.
+        - time_range: UTC half-open range `[start, end)` to ingest.
+        - dedup_existing: when true, skip rows whose minute already exists in canonical index.
+
+        Returns:
+        - Tuple `(rows_read, rows_written, batches_written)`.
+
+        Assumptions/Invariants:
+        - Source emits 1m closed candles for requested range.
+        - Writer performs append-only writes to raw tables.
+
+        Errors/Exceptions:
+        - Propagates source/index/writer errors.
+
+        Side effects:
+        - Reads source and canonical index, writes to raw storage.
+        """
         rows_read = rows_written = batches = 0
 
         for chunk in slice_time_range_by_utc_days(time_range=time_range, max_days=self._max_days):
+            existing_minute_keys: set[int] = set()
+            if dedup_existing:
+                existing_minute_keys = self._existing_minute_keys(
+                    instrument_id=instrument_id,
+                    time_range=chunk,
+                )
+
             batch: list[CandleWithMeta] = []
 
             for row in self._source.stream_1m(instrument_id, chunk):
@@ -214,8 +262,16 @@ class RestCatchUp1mUseCase:
                     ),
                 )
 
-                batch.append(fixed)
                 rows_read += 1
+                minute_key = _minute_key(fixed.candle.ts_open.value)
+
+                if dedup_existing and minute_key in existing_minute_keys:
+                    continue
+
+                if dedup_existing:
+                    existing_minute_keys.add(minute_key)
+
+                batch.append(fixed)
 
                 if len(batch) >= self._batch_size:
                     self._writer.write_1m(batch)
@@ -230,18 +286,70 @@ class RestCatchUp1mUseCase:
 
         return rows_read, rows_written, batches
 
+    def _existing_minute_keys(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> set[int]:
+        """
+        Load existing canonical minute keys for one instrument and one range.
+
+        Parameters:
+        - instrument_id: instrument id used in canonical index query.
+        - time_range: UTC half-open range `[start, end)` for key lookup.
+
+        Returns:
+        - Set of integer minute keys (`epoch_seconds // 60`).
+
+        Assumptions/Invariants:
+        - Index returns UTC timestamps for existing candles.
+
+        Errors/Exceptions:
+        - Propagates index reader errors.
+
+        Side effects:
+        - Reads canonical index storage through port.
+        """
+        existing = self._index.distinct_ts_opens(
+            instrument_id=instrument_id,
+            time_range=time_range,
+        )
+        return {_minute_key(v.value) for v in existing}
+
     def _fill_gaps_in_range(
         self,
         *,
         instrument_id: InstrumentId,
         time_range: TimeRange,
     ) -> tuple[int, int, int, int, int, int]:
+        """
+        Detect missing minute windows and ingest only those windows for one historical range.
+
+        Parameters:
+        - instrument_id: instrument for which gaps are repaired.
+        - time_range: historical scan range in UTC half-open semantics `[start, end)`.
+
+        Returns:
+        - Tuple with counters:
+          `(days_scanned, days_with_gaps, ranges_filled, rows_read, rows_written, batches)`.
+
+        Assumptions/Invariants:
+        - Day-level counts and distinct timestamps come from canonical index.
+        - Missing-range reconstruction operates on minute buckets.
+
+        Errors/Exceptions:
+        - Propagates index/source/writer errors.
+
+        Side effects:
+        - Reads canonical index and writes repaired rows to raw storage.
+        """
         # day -> count (IMPORTANT: day is datetime.date from ClickHouse)
         day_counts = self._index.daily_counts(instrument_id=instrument_id, time_range=time_range)
         counts_map = {r.day: int(r.count) for r in day_counts}
 
-        scan_start = _ensure_tz_utc(time_range.start.value)
-        scan_end = _ensure_tz_utc(time_range.end.value)
+        scan_start = _floor_to_minute_utc(time_range.start.value)
+        scan_end = _floor_to_minute_utc(time_range.end.value)
 
         day_cursor = scan_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -254,7 +362,7 @@ class RestCatchUp1mUseCase:
             day_start = max(day_cursor, scan_start)
             day_end = min(next_day, scan_end)
 
-            expected = int((day_end - day_start).total_seconds() // 60)
+            expected = _minute_key(day_end) - _minute_key(day_start)
             if expected <= 0:
                 day_cursor = next_day
                 continue
@@ -262,7 +370,7 @@ class RestCatchUp1mUseCase:
             days_scanned += 1
             actual = counts_map.get(day_cursor.date(), 0)
 
-            if actual == expected:
+            if actual >= expected:
                 day_cursor = next_day
                 continue
 
@@ -275,7 +383,11 @@ class RestCatchUp1mUseCase:
             missing_ranges = _missing_ranges_for_day(existing=existing, start=day_start, end=day_end)  # noqa: E501
 
             for mr in missing_ranges:
-                rr, rw, bb = self._ingest_time_range(instrument_id=instrument_id, time_range=mr)
+                rr, rw, bb = self._ingest_time_range(
+                    instrument_id=instrument_id,
+                    time_range=mr,
+                    dedup_existing=True,
+                )
                 rows_read += rr
                 rows_written += rw
                 batches += bb
@@ -292,40 +404,149 @@ def _missing_ranges_for_day(
     start: datetime,
     end: datetime,
 ) -> list[TimeRange]:
-    # existing: отсортированные ts_open (уже distinct) внутри [start,end)
-    existing_set = {e.value for e in existing}
+    """
+    Reconstruct missing minute ranges from existing canonical timestamps.
 
+    Parameters:
+    - existing: distinct canonical `ts_open` values observed inside `[start, end)`.
+    - start: day-window start in UTC.
+    - end: day-window end in UTC.
+
+    Returns:
+    - List of missing sub-ranges in half-open semantics `[start, end)`.
+
+    Assumptions/Invariants:
+    - Missing detection is minute-based and ignores second/millisecond noise.
+    - Returned ranges align to exact minute boundaries.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    start_key = _minute_key(start)
+    end_key = _minute_key(end)
+    if end_key <= start_key:
+        return []
+
+    existing_set = {_minute_key(e.value) for e in existing}
     out: list[TimeRange] = []
-    cursor = start
-    missing_start: datetime | None = None
+    missing_start_key: int | None = None
 
-    while cursor < end:
-        if cursor not in existing_set:
-            if missing_start is None:
-                missing_start = cursor
-        else:
-            if missing_start is not None:
-                out.append(
-                    TimeRange(
-                        start=UtcTimestamp(missing_start),
-                        end=UtcTimestamp(cursor),
-                    )
+    for minute_key in range(start_key, end_key):
+        if minute_key not in existing_set:
+            if missing_start_key is None:
+                missing_start_key = minute_key
+            continue
+
+        if missing_start_key is not None:
+            out.append(
+                TimeRange(
+                    start=UtcTimestamp(_minute_start_from_key(missing_start_key)),
+                    end=UtcTimestamp(_minute_start_from_key(minute_key)),
                 )
-                missing_start = None
-        cursor += timedelta(minutes=1)
+            )
+            missing_start_key = None
 
-    if missing_start is not None:
-        out.append(TimeRange(start=UtcTimestamp(missing_start), end=UtcTimestamp(end)))
+    if missing_start_key is not None:
+        out.append(
+            TimeRange(
+                start=UtcTimestamp(_minute_start_from_key(missing_start_key)),
+                end=UtcTimestamp(_minute_start_from_key(end_key)),
+            )
+        )
 
     return out
 
 
+def _minute_key(dt: datetime) -> int:
+    """
+    Convert datetime into a stable minute-level integer key in UTC.
+
+    Parameters:
+    - dt: timestamp to convert.
+
+    Returns:
+    - Integer minute key (`epoch_seconds // 60`).
+
+    Assumptions/Invariants:
+    - Input can be naive or aware; naive is treated as UTC.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    dt_utc = _ensure_tz_utc(dt)
+    return int(dt_utc.timestamp() // 60)
+
+
+def _minute_start_from_key(key: int) -> datetime:
+    """
+    Convert minute key back to UTC minute-start datetime.
+
+    Parameters:
+    - key: minute key produced by `_minute_key(...)`.
+
+    Returns:
+    - UTC datetime aligned to minute start (`...:ss=00,us=000000`).
+
+    Assumptions/Invariants:
+    - `key` represents minutes since Unix epoch.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    return datetime.fromtimestamp(key * 60, tz=timezone.utc)
+
+
 def _floor_to_minute_utc(dt: datetime) -> datetime:
+    """
+    Floor datetime to minute precision in UTC.
+
+    Parameters:
+    - dt: timestamp to normalize.
+
+    Returns:
+    - UTC datetime rounded down to the minute.
+
+    Assumptions/Invariants:
+    - Naive input is interpreted as UTC.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
     dt_utc = _ensure_tz_utc(dt)
     return dt_utc.replace(second=0, microsecond=0)
 
 
 def _ensure_tz_utc(dt: datetime) -> datetime:
+    """
+    Normalize datetime to timezone-aware UTC.
+
+    Parameters:
+    - dt: datetime value from external adapters or storage.
+
+    Returns:
+    - Timezone-aware UTC datetime.
+
+    Assumptions/Invariants:
+    - Naive datetime values are interpreted as UTC.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
     if dt.tzinfo is None or dt.utcoffset() is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)

@@ -26,10 +26,28 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
             raise ValueError("ClickHouseCanonicalCandleIndexReader requires non-empty database")
 
     def bounds(self, instrument_id: InstrumentId) -> tuple[UtcTimestamp, UtcTimestamp] | None:
+        """
+        Return first and last available minute buckets for one instrument.
+
+        Parameters:
+        - instrument_id: instrument whose canonical bounds are requested.
+
+        Returns:
+        - Tuple `(first_ts_open, last_ts_open)` in UTC or `None` when no rows exist.
+
+        Assumptions/Invariants:
+        - Bounds are computed on minute buckets via `toStartOfMinute(ts_open)`.
+
+        Errors/Exceptions:
+        - Propagates gateway/storage errors.
+
+        Side effects:
+        - Executes one ClickHouse SELECT query.
+        """
         q = f"""
         SELECT
-            min(ts_open) AS first,
-            max(ts_open) AS last
+            min(toStartOfMinute(ts_open)) AS first,
+            max(toStartOfMinute(ts_open)) AS last
         FROM {self._table()}
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
@@ -47,9 +65,28 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
         return (UtcTimestamp(_ensure_tz_utc(first)), UtcTimestamp(_ensure_tz_utc(last)))
 
     def max_ts_open_lt(self, *, instrument_id: InstrumentId, before: UtcTimestamp) -> UtcTimestamp | None:  # noqa: E501
+        """
+        Return latest canonical minute strictly before `before`.
+
+        Parameters:
+        - instrument_id: instrument whose latest known minute is requested.
+        - before: upper bound (exclusive).
+
+        Returns:
+        - Latest minute in UTC or `None` when no qualifying rows exist.
+
+        Assumptions/Invariants:
+        - Result is normalized to minute bucket via `toStartOfMinute(ts_open)`.
+
+        Errors/Exceptions:
+        - Propagates gateway/storage errors.
+
+        Side effects:
+        - Executes one ClickHouse SELECT query.
+        """
         q = f"""
         SELECT
-            max(ts_open) AS last
+            max(toStartOfMinute(ts_open)) AS last
         FROM {self._table()}
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
@@ -71,10 +108,30 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
         return UtcTimestamp(_ensure_tz_utc(last))
 
     def daily_counts(self, *, instrument_id: InstrumentId, time_range: TimeRange) -> Sequence[DailyTsOpenCount]:  # noqa: E501
+        """
+        Return per-day counts of distinct canonical minute buckets for one range.
+
+        Parameters:
+        - instrument_id: instrument being aggregated.
+        - time_range: UTC half-open range `[start, end)` for aggregation.
+
+        Returns:
+        - Sequence of `(day, count)` rows.
+
+        Assumptions/Invariants:
+        - Distinctness is measured on `toStartOfMinute(ts_open)` to ignore sub-minute noise.
+
+        Errors/Exceptions:
+        - Raises `RuntimeError` on unexpected day value types from gateway.
+        - Propagates gateway/storage errors.
+
+        Side effects:
+        - Executes one ClickHouse SELECT query.
+        """
         q = f"""
         SELECT
             toDate(ts_open) AS day,
-            countDistinct(ts_open) AS cnt
+            uniqExact(toStartOfMinute(ts_open)) AS cnt
         FROM {self._table()}
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
@@ -107,9 +164,28 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
         return out
 
     def distinct_ts_opens(self, *, instrument_id: InstrumentId, time_range: TimeRange) -> Sequence[UtcTimestamp]:  # noqa: E501
+        """
+        Return distinct canonical minute starts for one instrument and one range.
+
+        Parameters:
+        - instrument_id: instrument being queried.
+        - time_range: UTC half-open range `[start, end)`.
+
+        Returns:
+        - Sorted sequence of UTC minute starts.
+
+        Assumptions/Invariants:
+        - Timestamps are normalized with `toStartOfMinute(ts_open)` in SQL.
+
+        Errors/Exceptions:
+        - Propagates gateway/storage errors.
+
+        Side effects:
+        - Executes one ClickHouse SELECT query.
+        """
         q = f"""
         SELECT DISTINCT
-            ts_open
+            toStartOfMinute(ts_open) AS ts_open
         FROM {self._table()}
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
@@ -133,6 +209,24 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
 
 
 def _ensure_tz_utc(dt) -> Any:
+    """
+    Normalize adapter timestamp value to timezone-aware UTC.
+
+    Parameters:
+    - dt: datetime-like value returned by ClickHouse driver.
+
+    Returns:
+    - UTC-aware datetime.
+
+    Assumptions/Invariants:
+    - Naive datetimes are interpreted as UTC.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
     if getattr(dt, "tzinfo", None) is None or dt.utcoffset() is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)

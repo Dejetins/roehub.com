@@ -25,6 +25,15 @@ class FakeGateway:
 
 
 def test_bounds_returns_min_max():
+    """
+    Ensure bounds query requests minute-normalized first/last values.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+    """
     dt1 = datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)
     dt2 = datetime(2026, 2, 2, 0, 0, tzinfo=timezone.utc)
 
@@ -39,13 +48,23 @@ def test_bounds_returns_min_max():
     assert str(b[1]) == str(UtcTimestamp(dt2))
 
     assert gw.last_query is not None
-    assert "min(ts_open)" in gw.last_query
+    assert "min(toStartOfMinute(ts_open))" in gw.last_query
+    assert "max(toStartOfMinute(ts_open))" in gw.last_query
 
     assert gw.last_params is not None
     assert int(gw.last_params["market_id"]) == 1
 
 
 def test_max_ts_open_lt():
+    """
+    Ensure latest-ts query uses minute-normalized max expression.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+    """
     dt = datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc)
     gw = FakeGateway([{"last": dt}])
     r = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
@@ -58,13 +77,22 @@ def test_max_ts_open_lt():
     assert str(out) == str(UtcTimestamp(dt))
 
     assert gw.last_query is not None
-    assert "max(ts_open)" in gw.last_query
+    assert "max(toStartOfMinute(ts_open))" in gw.last_query
 
     assert gw.last_params is not None
     assert int(gw.last_params["market_id"]) == 1
 
 
 def test_distinct_ts_opens():
+    """
+    Ensure distinct-ts query deduplicates on minute buckets.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+    """
     dt1 = datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)
     dt2 = datetime(2026, 2, 1, 0, 1, tzinfo=timezone.utc)
     gw = FakeGateway([{"ts_open": dt1}, {"ts_open": dt2}])
@@ -83,3 +111,30 @@ def test_distinct_ts_opens():
 
     assert gw.last_query is not None
     assert "SELECT DISTINCT" in gw.last_query
+    assert "toStartOfMinute(ts_open) AS ts_open" in gw.last_query
+
+
+def test_daily_counts_uses_distinct_minute_buckets() -> None:
+    """
+    Ensure daily-count query aggregates unique minute buckets, not raw timestamps.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+    """
+    gw = FakeGateway([{"day": "2026-02-01", "cnt": 7}])
+    r = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
+
+    inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+    tr = TimeRange(
+        start=UtcTimestamp(datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)),
+        end=UtcTimestamp(datetime(2026, 2, 2, 0, 0, tzinfo=timezone.utc)),
+    )
+    out = r.daily_counts(instrument_id=inst, time_range=tr)
+
+    assert len(out) == 1
+    assert out[0].count == 7
+    assert gw.last_query is not None
+    assert "uniqExact(toStartOfMinute(ts_open)) AS cnt" in gw.last_query

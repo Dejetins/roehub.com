@@ -185,6 +185,65 @@ Gap fill выполняется автоматически, без ручных 
 - Любой insert пересекает ≤ 7 UTC-дней (runtime config guard).
 - Source=rest всегда проставляется в `CandleMeta.source`.
 
+### Dedup safety (gap fill)
+Для gap-fill применяется дополнительная защитная проверка перед записью:
+- для каждого chunk `[start,end)` use-case читает `distinct_ts_opens` из canonical index;
+- сравнение делается по минутным ключам (`epoch_minutes`), а не по “сырым” datetime;
+- если минута уже есть в canonical, запись этой минуты пропускается.
+
+Это защищает от ложных gap-диапазонов при timezone/ms-шумах и не даёт наращивать дубликаты
+в canonical при повторном восстановлении истории.
+
+
+## Verification SQL (post-run)
+Проверка глобальной динамики missing/duplicates:
+
+```sql
+-- global duplicates/missing
+SELECT
+  first_m,
+  last_m,
+  dateDiff('minute', first_m, last_m) + 1 AS candles_expected,
+  candles_actual,
+  (dateDiff('minute', first_m, last_m) + 1) - candles_actual AS candles_missing,
+  rows_total - candles_actual AS duplicate_rows
+FROM
+(
+  SELECT
+    min(m) AS first_m,
+    max(m) AS last_m,
+    count() AS rows_total,
+    uniqExact(m) AS candles_actual
+  FROM
+  (
+    SELECT toStartOfMinute(ts_open) AS m
+    FROM market_data.canonical_candles_1m
+  )
+);
+```
+
+Диагностика дней с остаточными gap-минутами:
+
+```sql
+SELECT
+  day,
+  expected,
+  actual,
+  expected - actual AS missing
+FROM
+(
+  SELECT
+    toDate(ts_open) AS day,
+    uniqExact(toStartOfMinute(ts_open)) AS actual,
+    1440 AS expected
+  FROM market_data.canonical_candles_1m
+  GROUP BY day
+)
+WHERE missing > 0
+ORDER BY missing DESC
+LIMIT 50;
+```
+
 
 ## Адаптер: REST CandleIngestSource (routing по market_id)
 
