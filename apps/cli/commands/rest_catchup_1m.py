@@ -1,0 +1,164 @@
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Sequence
+from uuid import uuid4
+
+from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
+    ClickHouseSettingsLoader,
+    _clickhouse_client,
+)
+from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
+from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import (
+    RestCandleIngestSource,
+)
+from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
+    load_market_data_runtime_config,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import (  # noqa: E501
+    ClickHouseCanonicalCandleIndexReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
+    ClickHouseConnectGateway,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (
+    ClickHouseRawKlineWriter,
+)
+from trading.contexts.market_data.application.use_cases.rest_catchup_1m import RestCatchUp1mUseCase
+from trading.platform.time.system_clock import SystemClock
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
+
+log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class RestCatchUpCliReport:
+    instruments_total: int
+    instruments_ok: int
+    instruments_failed: int
+
+
+class RestCatchUp1mCli:
+    def run(self, argv: Sequence[str]) -> int:
+        p = _build_parser()
+        ns = p.parse_args(list(argv))
+
+        cfg = load_market_data_runtime_config(Path(ns.config))
+        clock = SystemClock()
+        http = RequestsHttpClient()
+
+        # ClickHouse
+        settings = ClickHouseSettingsLoader(os.environ).load()
+        client = _clickhouse_client(settings)
+        gw = ClickHouseConnectGateway(client)
+
+        index = ClickHouseCanonicalCandleIndexReader(gateway=gw, database=settings.database)
+        writer = ClickHouseRawKlineWriter(gateway=gw, database=settings.database)
+
+        ingest_id = uuid4()
+
+        source = RestCandleIngestSource(cfg=cfg, clock=clock, http=http, ingest_id=ingest_id)
+
+        uc = RestCatchUp1mUseCase(
+            index=index,
+            source=source,
+            writer=writer,
+            clock=clock,
+            max_days_per_insert=cfg.backfill.max_days_per_insert,
+            batch_size=int(ns.batch_size),
+            ingest_id=ingest_id,
+        )
+
+        if ns.all_from_ref_instruments:
+            instruments = _load_enabled_instruments(gw, settings.database)
+            ok = 0
+            fail = 0
+            for inst in instruments:
+                try:
+                    rep = uc.run(inst)
+                    ok += 1
+                    _print_report(rep, fmt=ns.report_format)
+                except Exception:  # noqa: BLE001
+                    log.exception("rest-catchup failed for %s", inst)
+                    fail += 1
+
+            summary = RestCatchUpCliReport(
+                instruments_total=len(instruments),
+                instruments_ok=ok,
+                instruments_failed=fail,
+            )
+            if ns.report_format == "json":
+                print(json.dumps(asdict(summary), ensure_ascii=False))
+            else:
+                print(
+                    "rest-catchup summary:\n"
+                    f"- instruments_total: {summary.instruments_total}\n"
+                    f"- ok: {summary.instruments_ok}\n"
+                    f"- failed: {summary.instruments_failed}\n"
+                )
+            return 0 if fail == 0 else 2
+
+        if ns.market_id is None or ns.symbol is None:
+            raise SystemExit("Either --all-from-ref-instruments or (--market-id and --symbol) must be provided")  # noqa: E501
+
+        inst = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
+        rep = uc.run(inst)
+        _print_report(rep, fmt=ns.report_format)
+        return 0
+
+
+def _load_enabled_instruments(gw, database: str) -> list[InstrumentId]:
+    q = f"""
+    SELECT market_id, symbol
+    FROM {database}.ref_instruments
+    WHERE is_tradable = 1
+    """
+    rows = gw.select(q, {})
+    out: list[InstrumentId] = []
+    for r in rows:
+        out.append(InstrumentId(MarketId(int(r["market_id"])), Symbol(str(r["symbol"]))))
+    return out
+
+
+def _print_report(rep, *, fmt: str) -> None:
+    if fmt == "json":
+        print(json.dumps(asdict(rep), ensure_ascii=False))
+        return
+
+    print(
+        "rest-catchup report:\n"
+        f"- instrument_id: {rep.instrument_id}\n"
+        f"- start: {rep.start}\n"
+        f"- end: {rep.end}\n"
+        f"- tail_rows_written: {rep.tail_rows_written}\n"
+        f"- gap_rows_written: {rep.gap_rows_written}\n"
+        f"- gaps_filled: {rep.gaps_filled}\n"
+        f"- lag_seconds: {rep.lag_seconds:.3f}\n"
+        f"- elapsed_s: {rep.elapsed_s:.3f}\n"
+        f"- rows_per_second: {rep.rows_per_second:.2f}\n"
+        f"- ingest_id: {rep.ingest_id}\n"
+    )
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="rest-catchup")
+    p.add_argument(
+        "--config",
+        default="configs/dev/market_data.yaml",
+        help="Path to market_data.yaml (default: configs/dev/market_data.yaml)",
+    )
+    p.add_argument("--market-id", type=int, default=None, help="MarketId (when running single instrument)")  # noqa: E501
+    p.add_argument("--symbol", type=str, default=None, help="Symbol (when running single instrument)")  # noqa: E501
+    p.add_argument(
+        "--all-from-ref-instruments",
+        action="store_true",
+        help="Run rest-catchup for all enabled instruments in ClickHouse ref_instruments",
+    )
+    p.add_argument("--batch-size", type=int, default=10000, help="Raw insert batch size (default: 10000)")  # noqa: E501
+    p.add_argument("--report-format", choices=("text", "json"), default="text", help="Output format")  # noqa: E501
+    return p
