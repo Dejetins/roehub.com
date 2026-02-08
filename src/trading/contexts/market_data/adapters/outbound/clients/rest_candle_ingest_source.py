@@ -29,10 +29,11 @@ class RestCandleIngestSource(CandleIngestSource):
     REST CandleIngestSource для 4 рынков (binance/bybit × spot/futures).
 
     Важно:
-    - отдаёт только CLOSED 1m свечи (по полузамкнутому диапазону [start, end))
+    - отдаёт только CLOSED 1m свечи по семантике TimeRange: [start, end)
     - CandleMeta.source = "rest"
-    - ingested_at = clock.now()
+    - ingested_at = clock.now() (UTC, ms)
     - ingest_id = фиксированный UUID на весь запуск/сессию
+    - instrument_key = "{exchange}:{market_type}:{symbol}" (из runtime config)
     """
 
     cfg: MarketDataRuntimeConfig
@@ -40,18 +41,37 @@ class RestCandleIngestSource(CandleIngestSource):
     http: HttpClient
     ingest_id: UUID
 
-    def stream_1m(self, instrument_id: InstrumentId, time_range: TimeRange) -> Iterator[CandleWithMeta]:  # noqa: E501
+    def stream_1m(
+        self,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> Iterator[CandleWithMeta]:
         market = self.cfg.market_by_id(instrument_id.market_id)
         exch = market.exchange
         mtype = market.market_type
 
+        symbol = str(instrument_id.symbol)
+        instrument_key = f"{market.exchange}:{market.market_type}:{symbol}"
+
         if exch == "binance":
-            yield from self._stream_binance_klines_1m(market_base=market.rest.base_url, instrument_id=instrument_id, time_range=time_range)  # noqa: E501
+            yield from self._stream_binance_klines_1m(
+                market_base=market.rest.base_url,
+                market_type=mtype,
+                instrument_id=instrument_id,
+                instrument_key=instrument_key,
+                time_range=time_range,
+            )
             return
 
         if exch == "bybit":
             category = "spot" if mtype == "spot" else "linear"
-            yield from self._stream_bybit_kline_1m(market_base=market.rest.base_url, category=category, instrument_id=instrument_id, time_range=time_range)  # noqa: E501
+            yield from self._stream_bybit_kline_1m(
+                market_base=market.rest.base_url,
+                category=category,
+                instrument_id=instrument_id,
+                instrument_key=instrument_key,
+                time_range=time_range,
+            )
             return
 
         raise ValueError(f"Unsupported exchange={exch!r}")
@@ -62,24 +82,28 @@ class RestCandleIngestSource(CandleIngestSource):
         self,
         *,
         market_base: str,
+        market_type: str,
         instrument_id: InstrumentId,
+        instrument_key: str,
         time_range: TimeRange,
     ) -> Iterator[CandleWithMeta]:
-        # spot: /api/v3/klines
-        # futures (USD-M): /fapi/v1/klines
-        # У нас base_url в конфиге уже различается (api.binance.com vs fapi.binance.com),
-        # поэтому путь определяем по market_type косвенно: если base содержит "fapi" -> futures.
-        path = "/fapi/v1/klines" if "fapi" in market_base else "/api/v3/klines"
+        # spot:   GET /api/v3/klines
+        # futures GET /fapi/v1/klines (USD-M)
+        path = "/fapi/v1/klines" if market_type == "futures" else "/api/v3/klines"
 
         start = _ensure_tz_utc(time_range.start.value)
         end = _ensure_tz_utc(time_range.end.value)
 
+        market = self.cfg.market_by_id(instrument_id.market_id)
+        timeout_s = market.rest.timeout_s
+        retries = market.rest.retries
+        backoff = market.rest.backoff
+
         cursor = start
-        max_limit = 1000  # spot: 1000, futures: 1500, но держим 1000 как общий безопасный лимит
+        max_limit = 1000  # общий безопасный лимит
 
         while cursor < end:
-            # Binance endTime — трактуем как inclusive, поэтому ставим end_ms-1,
-            # чтобы соблюдать семантику [start, end).
+            # Binance endTime трактуем как inclusive => end_ms-1 сохраняет [start,end)
             window_end = min(end, cursor + timedelta(minutes=max_limit))
             start_ms = int(cursor.timestamp() * 1000)
             end_ms = int(window_end.timestamp() * 1000) - 1
@@ -94,41 +118,55 @@ class RestCandleIngestSource(CandleIngestSource):
                     "endTime": end_ms,
                     "limit": max_limit,
                 },
-                timeout_s=self.cfg.market_by_id(instrument_id.market_id).rest.timeout_s,
-                retries=self.cfg.market_by_id(instrument_id.market_id).rest.retries,
-                backoff_base_s=self.cfg.market_by_id(instrument_id.market_id).rest.backoff.base_s,
-                backoff_max_s=self.cfg.market_by_id(instrument_id.market_id).rest.backoff.max_s,
-                backoff_jitter_s=self.cfg.market_by_id(instrument_id.market_id).rest.backoff.jitter_s,
+                timeout_s=timeout_s,
+                retries=retries,
+                backoff_base_s=backoff.base_s,
+                backoff_max_s=backoff.max_s,
+                backoff_jitter_s=backoff.jitter_s,
             )
 
             body = resp.body
             if not isinstance(body, list):
-                raise RuntimeError(f"Unexpected Binance klines payload type: {type(body).__name__}")
+                raise RuntimeError(
+                    f"Unexpected Binance klines payload type: {type(body).__name__}"
+                )
 
             if not body:
                 cursor = window_end
                 continue
 
-            # Ответ уже по возрастанию open time
             last_open_dt = None
             for item in body:
-                row = self._map_binance_kline_item(instrument_id=instrument_id, item=item)
-                # фильтруем по [start,end)
+                row = self._map_binance_kline_item(
+                    instrument_id=instrument_id,
+                    instrument_key=instrument_key,
+                    item=item,
+                )
+
+                # фильтр по [start,end) и внутри текущего окна
                 if row.candle.ts_open.value < start or row.candle.ts_open.value >= end:
                     continue
-                # и также не выходим за window_end
                 if row.candle.ts_open.value >= window_end:
                     continue
 
                 last_open_dt = row.candle.ts_open.value
                 yield row
 
-            if last_open_dt is None:
-                cursor = window_end
-            else:
-                cursor = last_open_dt + timedelta(minutes=1)
+            cursor = window_end if last_open_dt is None else last_open_dt + timedelta(minutes=1)
 
-    def _map_binance_kline_item(self, *, instrument_id: InstrumentId, item: Any) -> CandleWithMeta:
+    def _map_binance_kline_item(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        instrument_key: str,
+        item: Any,
+    ) -> CandleWithMeta:
+        # Binance kline item:
+        # [
+        #   open_time, open, high, low, close, volume, close_time,
+        #   quote_asset_volume, number_of_trades,
+        #   taker_buy_base_asset_volume, taker_buy_quote_asset_volume, ...
+        # ]
         if not isinstance(item, list) or len(item) < 11:
             raise RuntimeError(f"Invalid Binance kline item: {item!r}")
 
@@ -137,38 +175,26 @@ class RestCandleIngestSource(CandleIngestSource):
         ts_open = UtcTimestamp(open_dt)
         ts_close = UtcTimestamp(open_dt + timedelta(minutes=1))
 
-        # Binance: [open, high, low, close] — строки
-        open_p = float(item[1])
-        high_p = float(item[2])
-        low_p = float(item[3])
-        close_p = float(item[4])
-
-        volume_base = float(item[5])
-        quote_asset_volume = float(item[7])  # quote volume
-        trades_count = int(item[8])
-        taker_buy_base = float(item[9])
-        taker_buy_quote = float(item[10])
-
         candle = Candle(
             instrument_id=instrument_id,
             ts_open=ts_open,
             ts_close=ts_close,
-            open=open_p,
-            high=high_p,
-            low=low_p,
-            close=close_p,
-            volume_base=volume_base,
-            volume_quote=quote_asset_volume,
+            open=float(item[1]),
+            high=float(item[2]),
+            low=float(item[3]),
+            close=float(item[4]),
+            volume_base=float(item[5]),
+            volume_quote=float(item[7]),
         )
 
         meta = CandleMeta(
             source="rest",
             ingested_at=self.clock.now(),
             ingest_id=self.ingest_id,
-            instrument_key=_instrument_key(instrument_id),
-            trades_count=trades_count,
-            taker_buy_volume_base=taker_buy_base,
-            taker_buy_volume_quote=taker_buy_quote,
+            instrument_key=instrument_key,
+            trades_count=int(item[8]),
+            taker_buy_volume_base=float(item[9]),
+            taker_buy_volume_quote=float(item[10]),
         )
 
         return CandleWithMeta(candle=candle, meta=meta)
@@ -181,6 +207,7 @@ class RestCandleIngestSource(CandleIngestSource):
         market_base: str,
         category: str,
         instrument_id: InstrumentId,
+        instrument_key: str,
         time_range: TimeRange,
     ) -> Iterator[CandleWithMeta]:
         # GET /v5/market/kline
@@ -188,6 +215,11 @@ class RestCandleIngestSource(CandleIngestSource):
 
         start = _ensure_tz_utc(time_range.start.value)
         end = _ensure_tz_utc(time_range.end.value)
+
+        market = self.cfg.market_by_id(instrument_id.market_id)
+        timeout_s = market.rest.timeout_s
+        retries = market.rest.retries
+        backoff = market.rest.backoff
 
         cursor = start
         max_limit = 1000
@@ -208,16 +240,20 @@ class RestCandleIngestSource(CandleIngestSource):
                     "end": end_ms,
                     "limit": max_limit,
                 },
-                timeout_s=self.cfg.market_by_id(instrument_id.market_id).rest.timeout_s,
-                retries=self.cfg.market_by_id(instrument_id.market_id).rest.retries,
-                backoff_base_s=self.cfg.market_by_id(instrument_id.market_id).rest.backoff.base_s,
-                backoff_max_s=self.cfg.market_by_id(instrument_id.market_id).rest.backoff.max_s,
-                backoff_jitter_s=self.cfg.market_by_id(instrument_id.market_id).rest.backoff.jitter_s,
+                timeout_s=timeout_s,
+                retries=retries,
+                backoff_base_s=backoff.base_s,
+                backoff_max_s=backoff.max_s,
+                backoff_jitter_s=backoff.jitter_s,
             )
 
             body = resp.body
             if not isinstance(body, dict):
                 raise RuntimeError(f"Unexpected Bybit response type: {type(body).__name__}")
+
+            ret_code = body.get("retCode")
+            if ret_code not in (0, "0", None):
+                raise RuntimeError(f"Bybit retCode={ret_code!r}, body={body!r}")
 
             result = body.get("result")
             if not isinstance(result, dict):
@@ -231,12 +267,17 @@ class RestCandleIngestSource(CandleIngestSource):
                 cursor = window_end
                 continue
 
-            # Bybit отдаёт list обычно в порядке убывания startTime — перевернём
+            # Bybit часто отдаёт list по убыванию startTime -> переворачиваем
             lst_sorted = list(reversed(lst))
 
             last_open_dt = None
             for item in lst_sorted:
-                row = self._map_bybit_kline_item(instrument_id=instrument_id, item=item)
+                row = self._map_bybit_kline_item(
+                    instrument_id=instrument_id,
+                    instrument_key=instrument_key,
+                    item=item,
+                )
+
                 if row.candle.ts_open.value < start or row.candle.ts_open.value >= end:
                     continue
                 if row.candle.ts_open.value >= window_end:
@@ -245,13 +286,17 @@ class RestCandleIngestSource(CandleIngestSource):
                 last_open_dt = row.candle.ts_open.value
                 yield row
 
-            if last_open_dt is None:
-                cursor = window_end
-            else:
-                cursor = last_open_dt + timedelta(minutes=1)
+            cursor = window_end if last_open_dt is None else last_open_dt + timedelta(minutes=1)
 
-    def _map_bybit_kline_item(self, *, instrument_id: InstrumentId, item: Any) -> CandleWithMeta:
-        # item: ["startTime","open","high","low","close","volume","turnover"]
+    def _map_bybit_kline_item(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        instrument_key: str,
+        item: Any,
+    ) -> CandleWithMeta:
+        # Bybit kline item (V5):
+        # ["startTime","open","high","low","close","volume","turnover"]
         if not isinstance(item, list) or len(item) < 7:
             raise RuntimeError(f"Invalid Bybit kline item: {item!r}")
 
@@ -276,23 +321,13 @@ class RestCandleIngestSource(CandleIngestSource):
             source="rest",
             ingested_at=self.clock.now(),
             ingest_id=self.ingest_id,
-            instrument_key=_instrument_key(instrument_id),
+            instrument_key=instrument_key,
             trades_count=None,
             taker_buy_volume_base=None,
             taker_buy_volume_quote=None,
         )
 
         return CandleWithMeta(candle=candle, meta=meta)
-
-
-def _instrument_key(instrument_id: InstrumentId) -> str:
-    # "{exchange}:{market_type}:{symbol}" — берём exchange/market_type из market_id косвенно уже нельзя,  # noqa: E501
-    # поэтому делаем через instrument_id только symbol, а exchange/type доступны через cfg в источнике.  # noqa: E501
-    # Здесь оставляем общий формат, а exchange/type добавляются выше через cfg при желании.
-    # В EPIC 0/1 вы уже приняли формат "exchange:market_type:symbol".
-    # Для rest источника делаем то же через cfg: exchange/type мы знаем, но ключ строим в stream_1m.
-    # Поэтому эта функция используется только как fallback.
-    return f"unknown:unknown:{instrument_id.symbol}"
 
 
 def _dt_from_ms(ms: int):

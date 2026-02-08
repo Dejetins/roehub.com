@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, Protocol, Sequence
+from typing import Iterable, Iterator, Sequence  # noqa: F401
 from uuid import UUID
 
 from trading.contexts.market_data.application.dto import CandleWithMeta
@@ -10,68 +10,50 @@ from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.contexts.market_data.application.ports.sources.candle_ingest_source import (
     CandleIngestSource,
 )
+from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
+    CanonicalCandleIndexReader,
+    DailyTsOpenCount,  # noqa: F401
+)
 from trading.contexts.market_data.application.ports.stores.raw_kline_writer import RawKlineWriter
 from trading.contexts.market_data.application.use_cases.time_slicing import (
     slice_time_range_by_utc_days,
 )
 from trading.shared_kernel.primitives import InstrumentId, TimeRange, UtcTimestamp
-from trading.shared_kernel.primitives.candle_meta import CandleMeta
 
 
 @dataclass(frozen=True, slots=True)
 class RestCatchUp1mReport:
-    instrument: str
-    tail_start: str
-    tail_end: str
+    # tail
+    tail_start: UtcTimestamp | None
+    tail_end: UtcTimestamp | None
     tail_rows_read: int
     tail_rows_written: int
+    tail_batches: int
+
+    # gaps
+    gap_scan_start: UtcTimestamp | None
+    gap_scan_end: UtcTimestamp | None
+    gap_days_scanned: int
+    gap_days_with_gaps: int
+    gap_ranges_filled: int
     gap_rows_read: int
     gap_rows_written: int
-    batches_written: int
-
-
-class CanonicalCandleIndexReader(Protocol):
-    """
-    Минимальный контракт индекса по canonical, который нужен rest-catchup.
-
-    Реальная реализация: ClickHouseCanonicalCandleIndexReader.
-    """
-
-    def bounds(self, instrument_id: InstrumentId) -> tuple[UtcTimestamp, UtcTimestamp] | None:
-        ...
-
-    def max_ts_open_lt(
-        self,
-        *,
-        instrument_id: InstrumentId,
-        before: UtcTimestamp,
-    ) -> UtcTimestamp | None:
-        ...
-
-    def daily_counts(
-        self,
-        *,
-        instrument_id: InstrumentId,
-        time_range: TimeRange,
-    ) -> Sequence[object]:
-        ...
-
-    def distinct_ts_opens(
-        self,
-        *,
-        instrument_id: InstrumentId,
-        time_range: TimeRange,
-    ) -> Sequence[UtcTimestamp]:
-        ...
-
+    gap_batches: int
 
 
 class RestCatchUp1mUseCase:
     """
-    REST догонка 1m:
-    1) tail: [last_closed_ts_open + 1m, floor(now, 1m))
-    2) gap-fill: только внутри уже существующей истории [min_ts_open, last_closed_ts_open]
-       (то есть не "от полуночи дня", а от первого реально существующего ts_open).
+    REST catch-up 1m:
+
+    1) tail догоняем до "закрытой" минуты:
+       start = last_closed_ts_open + 1m (из canonical index)
+       end = floor(now to minute)
+
+    2) gap-fill: ищем пропуски по всей истории, НО в одном запуске НЕ лезем в tail-range,
+       чтобы не писать повторно то, что только что догнали.
+       gap-scan range = [bounds.first, tail_start)
+
+    Запись — через RawKlineWriter (в raw_*), canonical строится MV.
     """
 
     def __init__(
@@ -107,84 +89,104 @@ class RestCatchUp1mUseCase:
         self._ingest_id = ingest_id
 
     def run(self, instrument_id: InstrumentId) -> RestCatchUp1mReport:
-        now = self._clock.now().value
-        end_floor = _floor_to_minute(now)
+        end_dt = _floor_to_minute_utc(self._clock.now().value)
+        end = UtcTimestamp(end_dt)
 
-        bounds = self._index.bounds(instrument_id)
-        if bounds is None:
+        last = self._index.max_ts_open_lt(instrument_id=instrument_id, before=end)
+        if last is None:
             raise ValueError(
                 f"No canonical candles for {instrument_id}. "
-                "Run initial history backfill first."
+                "Run initial backfill first (or seed history), then rest-catchup can maintain tail/gaps."  # noqa: E501
             )
-        first_ts_open, last_ts_open = bounds
 
-        last_closed = self._index.max_ts_open_lt(
-            instrument_id=instrument_id,
-            before=UtcTimestamp(end_floor),
-        )
-        if last_closed is None:
-            # На практике это значит: bounds есть, но в окне "до end_floor" ничего нет.
-            # Это странно, но лучше явно.
-            raise ValueError(f"Cannot determine last closed ts_open for {instrument_id}")
+        tail_start_dt = _ensure_tz_utc(last.value) + timedelta(minutes=1)
+        tail_start = UtcTimestamp(tail_start_dt)
 
-        tail_start_dt = last_closed.value + timedelta(minutes=1)
-        tail_end_dt = end_floor
-
-        tail_range = TimeRange(
-            start=UtcTimestamp(tail_start_dt),
-            end=UtcTimestamp(tail_end_dt),
-        )
-
-        tail_read, tail_written, tail_batches = 0, 0, 0
-        if tail_range.start.value < tail_range.end.value:
-            tail_read, tail_written, tail_batches = self._ingest_range(
+        tail_rows_read = tail_rows_written = tail_batches = 0
+        if tail_start.value < end.value:
+            tr = TimeRange(start=tail_start, end=end)
+            tail_rows_read, tail_rows_written, tail_batches = self._ingest_time_range(
                 instrument_id=instrument_id,
-                time_range=tail_range,
+                time_range=tr,
             )
 
-        # GAP-SCAN: только внутри существующей истории: [first_ts_open, last_closed + 1m)
-        gap_scan_end = min(last_closed.value + timedelta(minutes=1), tail_range.start.value)
-        gap_scan = None
-        if first_ts_open.value < gap_scan_end:
-            gap_scan = TimeRange(start=first_ts_open, end=UtcTimestamp(gap_scan_end))
+        # gap-scan: [bounds.first, tail_start)  (НЕ включаем tail, чтобы не писать дубль)
+        gap_scan_start = gap_scan_end = None
+        gap_days_scanned = gap_days_with_gaps = gap_ranges_filled = 0
+        gap_rows_read = gap_rows_written = gap_batches = 0
 
-        gap_read, gap_written, gap_batches = 0, 0, 0
-        if gap_scan is not None:
-            gr, gw, gb = self._fill_gaps_in_range(
-                instrument_id=instrument_id,
-                time_range=gap_scan,
-            )
-            gap_read += gr
-            gap_written += gw
-            gap_batches += gb
+        bounds = self._index.bounds(instrument_id)
+        if bounds is not None:
+            b_first, _b_last = bounds
+            scan_start_dt = _ensure_tz_utc(b_first.value)
+            scan_end_dt = _ensure_tz_utc(tail_start.value)
+
+            if scan_start_dt < scan_end_dt:
+                gap_scan_start = UtcTimestamp(scan_start_dt)
+                gap_scan_end = UtcTimestamp(scan_end_dt)
+
+                (
+                    gap_days_scanned,
+                    gap_days_with_gaps,
+                    gap_ranges_filled,
+                    gap_rows_read,
+                    gap_rows_written,
+                    gap_batches,
+                ) = self._fill_gaps_in_range(
+                    instrument_id=instrument_id,
+                    time_range=TimeRange(start=gap_scan_start, end=gap_scan_end),
+                )
 
         return RestCatchUp1mReport(
-            instrument=str(instrument_id),
-            tail_start=str(tail_range.start),
-            tail_end=str(tail_range.end),
-            tail_rows_read=tail_read,
-            tail_rows_written=tail_written,
-            gap_rows_read=gap_read,
-            gap_rows_written=gap_written,
-            batches_written=tail_batches + gap_batches,
+            tail_start=tail_start,
+            tail_end=end,
+            tail_rows_read=tail_rows_read,
+            tail_rows_written=tail_rows_written,
+            tail_batches=tail_batches,
+            gap_scan_start=gap_scan_start,
+            gap_scan_end=gap_scan_end,
+            gap_days_scanned=gap_days_scanned,
+            gap_days_with_gaps=gap_days_with_gaps,
+            gap_ranges_filled=gap_ranges_filled,
+            gap_rows_read=gap_rows_read,
+            gap_rows_written=gap_rows_written,
+            gap_batches=gap_batches,
         )
 
-    def _ingest_range(self, *, instrument_id: InstrumentId, time_range: TimeRange) -> tuple[int, int, int]:  # noqa: E501
-        # режем range на ≤N суток, а внутри пишем батчами по batch_size
-        rows_read = 0
-        rows_written = 0
-        batches = 0
+    def _ingest_time_range(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> tuple[int, int, int]:
+        rows_read = rows_written = batches = 0
 
-        for chunk in slice_time_range_by_utc_days(time_range, max_days=self._max_days):
+        for chunk in slice_time_range_by_utc_days(time_range=time_range, max_days=self._max_days):
             batch: list[CandleWithMeta] = []
+
             for row in self._source.stream_1m(instrument_id, chunk):
+                fixed = CandleWithMeta(
+                    candle=row.candle,
+                    meta=row.meta.__class__(  # CandleMeta (dataclass)
+                        source=row.meta.source,
+                        ingested_at=row.meta.ingested_at,
+                        ingest_id=self._ingest_id,
+                        instrument_key=row.meta.instrument_key,
+                        trades_count=row.meta.trades_count,
+                        taker_buy_volume_base=row.meta.taker_buy_volume_base,
+                        taker_buy_volume_quote=row.meta.taker_buy_volume_quote,
+                    ),
+                )
+
+                batch.append(fixed)
                 rows_read += 1
-                batch.append(_with_forced_ingest_id(row, ingest_id=self._ingest_id))
+
                 if len(batch) >= self._batch_size:
                     self._writer.write_1m(batch)
                     rows_written += len(batch)
                     batches += 1
                     batch = []
+
             if batch:
                 self._writer.write_1m(batch)
                 rows_written += len(batch)
@@ -192,96 +194,60 @@ class RestCatchUp1mUseCase:
 
         return rows_read, rows_written, batches
 
-    def _fill_gaps_in_range(self, *, instrument_id: InstrumentId, time_range: TimeRange) -> tuple[int, int, int]:  # noqa: E501
-        """
-        1) берём daily_counts по диапазону
-        2) для дней, где count != expected, берём distinct_ts_opens и строим missing ranges
-        3) догружаем REST-ом только missing ranges
-        """
-        total_read = 0
-        total_written = 0
-        total_batches = 0
+    def _fill_gaps_in_range(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> tuple[int, int, int, int, int, int]:
+        # day -> count (IMPORTANT: day is datetime.date from ClickHouse)
+        day_counts = self._index.daily_counts(instrument_id=instrument_id, time_range=time_range)
+        counts_map = {r.day: int(r.count) for r in day_counts}
 
-        for day_start_dt, day_end_dt in _iterate_utc_days(time_range.start.value, time_range.end.value):  # noqa: E501
-            day_start = max(day_start_dt, time_range.start.value)
-            day_end = min(day_end_dt, time_range.end.value)
-            if day_start >= day_end:
-                continue
+        scan_start = _ensure_tz_utc(time_range.start.value)
+        scan_end = _ensure_tz_utc(time_range.end.value)
+
+        day_cursor = scan_start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        days_scanned = days_with_gaps = ranges_filled = 0
+        rows_read = rows_written = batches = 0
+
+        while day_cursor < scan_end:
+            next_day = day_cursor + timedelta(days=1)
+
+            day_start = max(day_cursor, scan_start)
+            day_end = min(next_day, scan_end)
 
             expected = int((day_end - day_start).total_seconds() // 60)
-            actual = _find_daily_count(
-                self._index.daily_counts(
-                    instrument_id=instrument_id,
-                    time_range=TimeRange(start=UtcTimestamp(day_start), end=UtcTimestamp(day_end)),
-                ),
-                day_start_dt,
-            )
+            if expected <= 0:
+                day_cursor = next_day
+                continue
+
+            days_scanned += 1
+            actual = counts_map.get(day_cursor.date(), 0)
 
             if actual == expected:
+                day_cursor = next_day
                 continue
+
+            days_with_gaps += 1
 
             existing = self._index.distinct_ts_opens(
                 instrument_id=instrument_id,
                 time_range=TimeRange(start=UtcTimestamp(day_start), end=UtcTimestamp(day_end)),
             )
-            missing = _missing_ranges_for_day(existing=existing, start=day_start, end=day_end)
-            for gap in missing:
-                r, w, b = self._ingest_range(instrument_id=instrument_id, time_range=gap)
-                total_read += r
-                total_written += w
-                total_batches += b
+            missing_ranges = _missing_ranges_for_day(existing=existing, start=day_start, end=day_end)  # noqa: E501
 
-        return total_read, total_written, total_batches
+            for mr in missing_ranges:
+                rr, rw, bb = self._ingest_time_range(instrument_id=instrument_id, time_range=mr)
+                rows_read += rr
+                rows_written += rw
+                batches += bb
+                ranges_filled += 1
 
+            day_cursor = next_day
 
-def _with_forced_ingest_id(row: CandleWithMeta, *, ingest_id: UUID) -> CandleWithMeta:
-    m = row.meta
-    forced = CandleMeta(
-        source=m.source,
-        ingested_at=m.ingested_at,
-        ingest_id=ingest_id,
-        instrument_key=m.instrument_key,
-        trades_count=m.trades_count,
-        taker_buy_volume_base=m.taker_buy_volume_base,
-        taker_buy_volume_quote=m.taker_buy_volume_quote,
-    )
-    return CandleWithMeta(candle=row.candle, meta=forced)
-
-
-def _floor_to_minute(dt: datetime) -> datetime:
-    dt_utc = dt.astimezone(timezone.utc)
-    return dt_utc.replace(second=0, microsecond=0)
-
-
-def _iterate_utc_days(start: datetime, end: datetime) -> Iterable[tuple[datetime, datetime]]:
-    cur = start.astimezone(timezone.utc)
-    end_utc = end.astimezone(timezone.utc)
-
-    day0 = cur.replace(hour=0, minute=0, second=0, microsecond=0)
-    cur_day = day0
-    while cur_day < end_utc:
-        nxt = cur_day + timedelta(days=1)
-        yield cur_day, nxt
-        cur_day = nxt
-
-
-def _find_daily_count(rows: Sequence[object], day_start_utc: datetime) -> int:
-    # допускаем, что адаптер вернёт dataclass/obj с .day/.count или Mapping с ключами
-    for r in rows:
-        if isinstance(r, dict):
-            d = r.get("day")
-            c = r.get("count")
-        else:
-            d = getattr(r, "day", None)
-            c = getattr(r, "count", None)
-
-        if d is None or c is None:
-            continue
-
-        d_utc = d.astimezone(timezone.utc) if getattr(d, "tzinfo", None) else d.replace(tzinfo=timezone.utc)  # noqa: E501
-        if d_utc == day_start_utc.replace(tzinfo=timezone.utc):
-            return int(c)
-    return 0
+        return days_scanned, days_with_gaps, ranges_filled, rows_read, rows_written, batches
 
 
 def _missing_ranges_for_day(
@@ -290,30 +256,40 @@ def _missing_ranges_for_day(
     start: datetime,
     end: datetime,
 ) -> list[TimeRange]:
-    # existing: ts_open внутри [start, end)
-    existing_set = {e.value.replace(second=0, microsecond=0, tzinfo=timezone.utc) for e in existing}
+    # existing: отсортированные ts_open (уже distinct) внутри [start,end)
+    existing_set = {e.value for e in existing}
 
     out: list[TimeRange] = []
-    cur = start.replace(second=0, microsecond=0, tzinfo=timezone.utc)
-    end_dt = end.replace(second=0, microsecond=0, tzinfo=timezone.utc)
-
+    cursor = start
     missing_start: datetime | None = None
-    while cur < end_dt:
-        if cur not in existing_set:
+
+    while cursor < end:
+        if cursor not in existing_set:
             if missing_start is None:
-                missing_start = cur
+                missing_start = cursor
         else:
             if missing_start is not None:
                 out.append(
                     TimeRange(
                         start=UtcTimestamp(missing_start),
-                        end=UtcTimestamp(cur),
+                        end=UtcTimestamp(cursor),
                     )
                 )
                 missing_start = None
-        cur = cur + timedelta(minutes=1)
+        cursor += timedelta(minutes=1)
 
-    if missing_start is not None and missing_start < end_dt:
-        out.append(TimeRange(start=UtcTimestamp(missing_start), end=UtcTimestamp(end_dt)))
+    if missing_start is not None:
+        out.append(TimeRange(start=UtcTimestamp(missing_start), end=UtcTimestamp(end)))
 
     return out
+
+
+def _floor_to_minute_utc(dt: datetime) -> datetime:
+    dt_utc = _ensure_tz_utc(dt)
+    return dt_utc.replace(second=0, microsecond=0)
+
+
+def _ensure_tz_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None or dt.utcoffset() is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
