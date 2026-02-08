@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Mapping, Protocol, Sequence
 
 from apps.cli.wiring.clients.parquet import ParquetSourceFactory
 from apps.cli.wiring.db.clickhouse import ClickHouseWriterFactory
+from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
+    load_market_data_runtime_config,
+)
 from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.platform.time.system_clock import SystemClock
 
@@ -30,11 +34,36 @@ class MarketDataBackfill1mWiring:
     """
 
     environ: Mapping[str, str]
+    market_data_config_path: str
 
     def use_case(self, *, parquet_paths: Sequence[str], batch_size: int | None) -> Backfill1mUseCase:  # noqa: E501
-        clock: Clock = SystemClock()
+        """
+        Build a fully wired backfill use-case instance for CLI command execution.
 
-        source = ParquetSourceFactory(clock=clock).source(paths=parquet_paths, batch_size=batch_size)  # noqa: E501
+        Parameters:
+        - parquet_paths: list of parquet inputs used by source scanner.
+        - batch_size: optional writer batch size requested by CLI.
+
+        Returns:
+        - Ready-to-run `Backfill1mUseCase`.
+
+        Assumptions/Invariants:
+        - `market_data_config_path` points to a readable runtime config file.
+        - ClickHouse settings are supplied through environment.
+
+        Errors/Exceptions:
+        - Propagates config parsing, source creation, and writer wiring errors.
+
+        Side effects:
+        - Loads runtime config from filesystem.
+        """
+        clock: Clock = SystemClock()
+        cfg = load_market_data_runtime_config(Path(self.market_data_config_path))
+
+        source = ParquetSourceFactory(clock=clock, cfg=cfg).source(
+            paths=parquet_paths,
+            batch_size=batch_size,
+        )
         writer = ClickHouseWriterFactory(environ=self.environ).writer()
 
         # use-case у тебя именно здесь:

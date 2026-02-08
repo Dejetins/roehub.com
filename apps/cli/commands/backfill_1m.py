@@ -100,6 +100,7 @@ class JsonReportPresenter(ReportPresenter):
 
 @dataclass(frozen=True, slots=True)
 class Backfill1mCliArgs:
+    config: str
     market_id: int
     symbol: str
     start: UtcTimestamp
@@ -127,6 +128,26 @@ class Backfill1mCli:
         self._batch_parser = batch_parser if batch_parser is not None else OptionalIntBatchSizeParser()  # noqa: E501
 
     def run(self, argv: Sequence[str]) -> int:
+        """
+        Parse CLI arguments, wire dependencies, and execute backfill use-case.
+
+        Parameters:
+        - argv: raw CLI argument sequence without program name.
+
+        Returns:
+        - Process exit code: `0` on success, non-zero on validation/runtime errors.
+
+        Assumptions/Invariants:
+        - runtime market-data config file is available on disk.
+        - ClickHouse connection settings come from environment.
+
+        Errors/Exceptions:
+        - Validation errors are converted into exit code `2`.
+        - Runtime execution errors are logged and converted into exit code `1`.
+
+        Side effects:
+        - Reads config from filesystem and writes data to ClickHouse through use-case wiring.
+        """
         ns = self._build_arg_parser().parse_args(list(argv))
         try:
             args = self._to_args(ns)
@@ -136,7 +157,10 @@ class Backfill1mCli:
 
         presenter = self._presenter(args.report_format)
 
-        wiring = MarketDataBackfill1mWiring(environ=self._effective_environ())
+        wiring = MarketDataBackfill1mWiring(
+            environ=self._effective_environ(),
+            market_data_config_path=args.config,
+        )
 
         try:
             use_case = wiring.use_case(parquet_paths=args.parquet_paths, batch_size=args.batch_size)
@@ -168,8 +192,31 @@ class Backfill1mCli:
         return os.environ
 
     def _build_arg_parser(self) -> argparse.ArgumentParser:
+        """
+        Build command-line parser for backfill-1m entrypoint.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - Configured `argparse.ArgumentParser` instance.
+
+        Assumptions/Invariants:
+        - Default config path points to repository dev config.
+
+        Errors/Exceptions:
+        - None.
+
+        Side effects:
+        - None.
+        """
         p = argparse.ArgumentParser(prog="backfill-1m", add_help=True)
 
+        p.add_argument(
+            "--config",
+            default="configs/dev/market_data.yaml",
+            help="Path to market_data.yaml (default: configs/dev/market_data.yaml)",
+        )
         p.add_argument("--market-id", required=True, type=int, help="MarketId (1..4)")
         p.add_argument("--symbol", required=True, type=str, help="Symbol, e.g. BTCUSDT")
         p.add_argument(
@@ -202,6 +249,25 @@ class Backfill1mCli:
         return p
 
     def _to_args(self, ns: argparse.Namespace) -> Backfill1mCliArgs:
+        """
+        Convert parsed argparse namespace into validated command DTO.
+
+        Parameters:
+        - ns: parsed arguments namespace.
+
+        Returns:
+        - `Backfill1mCliArgs` with normalized and validated values.
+
+        Assumptions/Invariants:
+        - `--start` and `--end` must be timezone-aware UTC timestamps.
+        - `market_id` is constrained to supported configured values `1..4`.
+
+        Errors/Exceptions:
+        - Raises `ValueError` on invalid argument combinations or value ranges.
+
+        Side effects:
+        - None.
+        """
         market_id = int(ns.market_id)
         if market_id < 1 or market_id > 4:
             raise ValueError("market_id must be in 1..4")
@@ -222,6 +288,7 @@ class Backfill1mCli:
         batch_size = self._batch_parser.parse(ns.batch_size)
 
         return Backfill1mCliArgs(
+            config=str(ns.config),
             market_id=market_id,
             symbol=symbol,
             start=start,

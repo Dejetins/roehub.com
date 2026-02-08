@@ -29,7 +29,10 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gatew
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (
     ClickHouseRawKlineWriter,
 )
-from trading.contexts.market_data.application.use_cases.rest_catchup_1m import RestCatchUp1mUseCase
+from trading.contexts.market_data.application.use_cases.rest_catchup_1m import (
+    RestCatchUp1mReport,
+    RestCatchUp1mUseCase,
+)
 from trading.platform.time.system_clock import SystemClock
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
 
@@ -82,7 +85,7 @@ class RestCatchUp1mCli:
                 try:
                     rep = uc.run(inst)
                     ok += 1
-                    _print_report(rep, fmt=ns.report_format)
+                    _print_report(rep, fmt=ns.report_format, instrument_id=inst)
                 except Exception:  # noqa: BLE001
                     log.exception("rest-catchup failed for %s", inst)
                     fail += 1
@@ -108,7 +111,7 @@ class RestCatchUp1mCli:
 
         inst = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
         rep = uc.run(inst)
-        _print_report(rep, fmt=ns.report_format)
+        _print_report(rep, fmt=ns.report_format, instrument_id=inst)
         return 0
 
 
@@ -125,23 +128,51 @@ def _load_enabled_instruments(gw, database: str) -> list[InstrumentId]:
     return out
 
 
-def _print_report(rep, *, fmt: str) -> None:
+def _print_report(rep: RestCatchUp1mReport, *, fmt: str, instrument_id: InstrumentId) -> None:
+    """
+    Print one rest-catchup report in text or JSON format.
+
+    Parameters:
+    - rep: rest catch-up report DTO returned by use-case.
+    - fmt: output format, either `text` or `json`.
+    - instrument_id: instrument for which the report was produced.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - report structure matches `RestCatchUp1mReport`.
+    - `to_dict()` contains only JSON primitives.
+
+    Errors/Exceptions:
+    - Propagates `TypeError` if a non-serializable value appears unexpectedly.
+
+    Side effects:
+    - Writes report to stdout.
+    """
+    payload = rep.to_dict()
+    payload["instrument_id"] = str(instrument_id)
+
     if fmt == "json":
-        print(json.dumps(asdict(rep), ensure_ascii=False))
+        print(json.dumps(payload, ensure_ascii=False))
         return
 
     print(
         "rest-catchup report:\n"
-        f"- instrument_id: {rep.instrument_id}\n"
-        f"- start: {rep.start}\n"
-        f"- end: {rep.end}\n"
-        f"- tail_rows_written: {rep.tail_rows_written}\n"
-        f"- gap_rows_written: {rep.gap_rows_written}\n"
-        f"- gaps_filled: {rep.gaps_filled}\n"
-        f"- lag_seconds: {rep.lag_seconds:.3f}\n"
-        f"- elapsed_s: {rep.elapsed_s:.3f}\n"
-        f"- rows_per_second: {rep.rows_per_second:.2f}\n"
-        f"- ingest_id: {rep.ingest_id}\n"
+        f"- instrument_id: {payload['instrument_id']}\n"
+        f"- tail_start: {payload['tail_start']}\n"
+        f"- tail_end: {payload['tail_end']}\n"
+        f"- tail_rows_read: {payload['tail_rows_read']}\n"
+        f"- tail_rows_written: {payload['tail_rows_written']}\n"
+        f"- tail_batches: {payload['tail_batches']}\n"
+        f"- gap_scan_start: {payload['gap_scan_start']}\n"
+        f"- gap_scan_end: {payload['gap_scan_end']}\n"
+        f"- gap_days_scanned: {payload['gap_days_scanned']}\n"
+        f"- gap_days_with_gaps: {payload['gap_days_with_gaps']}\n"
+        f"- gap_ranges_filled: {payload['gap_ranges_filled']}\n"
+        f"- gap_rows_read: {payload['gap_rows_read']}\n"
+        f"- gap_rows_written: {payload['gap_rows_written']}\n"
+        f"- gap_batches: {payload['gap_batches']}\n"
     )
 
 

@@ -34,6 +34,24 @@ class FakeHttp:
 
 
 def test_binance_maps_to_candle_with_meta(tmp_path):
+    """
+    Verify Binance REST mapping produces canonical instrument_key format.
+
+    Parameters:
+    - tmp_path: pytest temp path fixture for runtime config file.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - runtime config maps market_id=1 to binance/spot.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
     # используем configs/dev/market_data.yaml из репо (здесь — через temp имитируем минимально)
     yaml_text = """
 version: 1
@@ -87,4 +105,5 @@ market_data:
     assert len(rows) == 1
     assert rows[0].meta.source == "rest"
     assert rows[0].meta.ingest_id == ingest_id
+    assert rows[0].meta.instrument_key == "binance:spot:BTCUSDT"
     assert rows[0].candle.volume_quote == 15.0

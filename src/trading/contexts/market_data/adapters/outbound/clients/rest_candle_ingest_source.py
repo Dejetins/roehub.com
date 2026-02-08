@@ -6,6 +6,9 @@ from typing import Any, Iterator
 from uuid import UUID
 
 from trading.contexts.market_data.adapters.outbound.clients.common_http import HttpClient
+from trading.contexts.market_data.adapters.outbound.config.instrument_key import (
+    build_instrument_key,
+)
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     MarketDataRuntimeConfig,
 )
@@ -46,12 +49,33 @@ class RestCandleIngestSource(CandleIngestSource):
         instrument_id: InstrumentId,
         time_range: TimeRange,
     ) -> Iterator[CandleWithMeta]:
+        """
+        Stream closed 1m candles from REST and attach canonical ingestion metadata.
+
+        Parameters:
+        - instrument_id: domain instrument id `(market_id, symbol)`.
+        - time_range: UTC half-open interval `[start, end)`.
+
+        Returns:
+        - Iterator of `CandleWithMeta` rows with `meta.source="rest"` and canonical
+          `instrument_key`.
+
+        Assumptions/Invariants:
+        - market_id must be present in runtime config and map to supported exchange/market_type.
+        - source methods return only candles that belong to the requested half-open range.
+
+        Errors/Exceptions:
+        - Raises `KeyError` if market_id is absent in runtime config.
+        - Raises `ValueError` for unsupported exchange.
+
+        Side effects:
+        - Performs HTTP requests through injected `HttpClient`.
+        """
         market = self.cfg.market_by_id(instrument_id.market_id)
         exch = market.exchange
         mtype = market.market_type
 
-        symbol = str(instrument_id.symbol)
-        instrument_key = f"{market.exchange}:{market.market_type}:{symbol}"
+        instrument_key = build_instrument_key(cfg=self.cfg, instrument_id=instrument_id)
 
         if exch == "binance":
             yield from self._stream_binance_klines_1m(

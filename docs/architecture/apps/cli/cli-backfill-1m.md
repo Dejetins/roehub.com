@@ -75,6 +75,9 @@ CLI не содержит fallback или перекрытия параметр�
   Путь к `.parquet` файлу или директории. Аргумент может повторяться.
 
 **Arguments (optional)**
+- `--config <path>`
+  Default: `configs/dev/market_data.yaml`.
+  Runtime config market mapping для генерации канонического `meta.instrument_key`.
 - `--batch-size <int>`
   Default: `10000`.
   Если задано число — use-case пишет батчами по `N` строк.
@@ -115,8 +118,9 @@ CLI wiring собирает следующий граф зависимостей
 1) `clock = SystemClock()`
 
 2) Parquet source:
+- `cfg = load_market_data_runtime_config(--config)`
 - `scanner = PyArrowParquetScanner(paths=[--parquet...])`
-- `source = ParquetCandleIngestSource(scanner=scanner, clock=clock, batch_size=scanner_batch_size)`
+- `source = ParquetCandleIngestSource(scanner=scanner, cfg=cfg, clock=clock, batch_size=scanner_batch_size)`
 
 Примечание:
 - batching чтения parquet (scanner batch_size) — internal detail источника.

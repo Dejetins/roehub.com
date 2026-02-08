@@ -34,12 +34,10 @@ Parquet-источник должен предоставлять:
 Parquet-источник не обязан его содержать.
 
 Parquet-адаптер обязан сгенерировать `instrument_key` самостоятельно (канонично и стабильно).
-В walking skeleton v1 фиксируем минимальный формат:
+Каноничный формат (совпадает с REST catch-up):
 
-- `instrument_key = f"{market_id.value}:{symbol}"`
-
-(Позже можно заменить на более человекочитаемый формат `{exchange}:{market_type}:{symbol}`
-после подключения `ref_market` и правил mapping.)
+- `instrument_key = f"{exchange}:{market_type}:{symbol}"`
+- пример: `binance:spot:BTCUSDT`
 
 ### 3) Источник правды по свечам — `canonical_candles_1m`, но запись идёт в `raw_*`
 Запись выполняется только в `raw_*` таблицы через port `RawKlineWriter`.

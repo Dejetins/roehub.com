@@ -17,6 +17,8 @@
 - читает 1m свечи из `CandleIngestSource` для `(InstrumentId, TimeRange)`;
 - пишет их в `RawKlineWriter` батчами;
 - собирает простой отчёт выполнения (для CLI/логов/наблюдаемости).
+- сохраняет `meta.instrument_key` в едином каноничном формате
+  `"{exchange}:{market_type}:{symbol}"` (едино с REST catch-up).
 
 ### Что use-case НЕ делает (осознанно)
 - не читает `canonical_candles_1m` для проверки записи (read-back) — это отдельный сценарий/проверка качества;

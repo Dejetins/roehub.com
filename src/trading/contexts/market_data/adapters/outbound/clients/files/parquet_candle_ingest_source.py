@@ -4,6 +4,12 @@ from dataclasses import dataclass
 from datetime import timedelta, timezone
 from typing import Any, Iterator, Mapping, Protocol, Sequence
 
+from trading.contexts.market_data.adapters.outbound.config.instrument_key import (
+    build_instrument_key,
+)
+from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
+    MarketDataRuntimeConfig,
+)
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.contexts.market_data.application.ports.sources.candle_ingest_source import (
@@ -77,7 +83,8 @@ class ParquetCandleIngestSource(CandleIngestSource):
 
     Ключевые решения:
     - parquet ОБЯЗАН содержать market_id и symbol
-    - instrument_key генерируется здесь (trace/debug), parquet его не обязан иметь
+    - instrument_key генерируется здесь через runtime config:
+      "{exchange}:{market_type}:{symbol}" (parquet его не обязан иметь)
     - meta.source = "file"
     - meta.ingested_at = clock.now() (один на весь stream_1m вызов)
     """
@@ -85,24 +92,72 @@ class ParquetCandleIngestSource(CandleIngestSource):
     def __init__(
         self,
         scanner: ParquetScanner,
+        cfg: MarketDataRuntimeConfig,
         clock: Clock,
         column_map: ParquetColumnMap | None = None,
         batch_size: int = 50_000,
     ) -> None:
+        """
+        Initialize parquet ingestion source and its dependencies.
+
+        Parameters:
+        - scanner: parquet scanner implementation yielding filtered rows.
+        - cfg: runtime config for market_id -> exchange/market_type resolution.
+        - clock: clock used to stamp `meta.ingested_at`.
+        - column_map: optional parquet column aliases.
+        - batch_size: scanner read batch size.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - scanner/cfg/clock are provided and valid.
+        - batch_size is positive.
+
+        Errors/Exceptions:
+        - Raises `ValueError` if a required dependency is missing or batch_size is invalid.
+
+        Side effects:
+        - None.
+        """
         if scanner is None:  # type: ignore[truthy-bool]
             raise ValueError("ParquetCandleIngestSource requires scanner")
+        if cfg is None:  # type: ignore[truthy-bool]
+            raise ValueError("ParquetCandleIngestSource requires cfg")
         if clock is None:  # type: ignore[truthy-bool]
             raise ValueError("ParquetCandleIngestSource requires clock")
         if batch_size <= 0:
             raise ValueError("ParquetCandleIngestSource requires batch_size > 0")
 
         self._scanner = scanner
+        self._cfg = cfg
         self._clock = clock
         self._cols = column_map or ParquetColumnMap()
         self._batch_size = batch_size
 
     def stream_1m(self, instrument_id: InstrumentId, time_range: TimeRange) -> Iterator[CandleWithMeta]:  # noqa: E501
+        """
+        Stream parquet candles for a single instrument and UTC half-open range.
+
+        Parameters:
+        - instrument_id: instrument identity used for scanner filtering.
+        - time_range: requested half-open interval `[start, end)`.
+
+        Returns:
+        - Iterator of mapped `CandleWithMeta` rows.
+
+        Assumptions/Invariants:
+        - scanner filter semantics preserve `[start, end)` boundaries.
+        - instrument_key is canonical and stable for the requested instrument.
+
+        Errors/Exceptions:
+        - Propagates mapping/validation errors from `_map_row(...)`.
+
+        Side effects:
+        - Reads parquet rows through the injected scanner.
+        """
         ingested_at = self._clock.now()
+        instrument_key = build_instrument_key(cfg=self._cfg, instrument_id=instrument_id)
 
         market_id = int(instrument_id.market_id.value)
         symbol = str(instrument_id.symbol)
@@ -116,7 +171,7 @@ class ParquetCandleIngestSource(CandleIngestSource):
             columns=required_cols,
             batch_size=self._batch_size,
         ):
-            yield self._map_row(raw, ingested_at)
+            yield self._map_row(raw=raw, ingested_at=ingested_at, instrument_key=instrument_key)
 
     def _required_columns(self) -> Sequence[str]:
         # В V1 требуем market_id+symbol обязательно, остальное как в доке.
@@ -137,7 +192,35 @@ class ParquetCandleIngestSource(CandleIngestSource):
             c.taker_buy_volume_quote,
         ]
 
-    def _map_row(self, raw: Mapping[str, Any], ingested_at: UtcTimestamp) -> CandleWithMeta:
+    def _map_row(
+        self,
+        *,
+        raw: Mapping[str, Any],
+        ingested_at: UtcTimestamp,
+        instrument_key: str,
+    ) -> CandleWithMeta:
+        """
+        Map one parquet row to `CandleWithMeta`.
+
+        Parameters:
+        - raw: parquet row values by column name.
+        - ingested_at: ingestion timestamp used in metadata.
+        - instrument_key: canonical key `exchange:market_type:symbol`.
+
+        Returns:
+        - Domain row with normalized candle fields and ingestion metadata.
+
+        Assumptions/Invariants:
+        - `raw` includes required identifier columns (`market_id`, `symbol`).
+        - numeric fields are convertible to expected primitive types.
+
+        Errors/Exceptions:
+        - Raises `ValueError` if identifier columns are missing.
+        - Propagates primitive validation and type conversion errors.
+
+        Side effects:
+        - None.
+        """
         c = self._cols
 
         if c.market_id not in raw or c.symbol not in raw:
@@ -165,8 +248,6 @@ class ParquetCandleIngestSource(CandleIngestSource):
             volume_base=float(raw[c.volume_base]),
             volume_quote=(float(raw[c.volume_quote]) if raw.get(c.volume_quote) is not None else None),  # noqa: E501
         )
-
-        instrument_key = f"{instrument.market_id.value}:{instrument.symbol}"
 
         meta = CandleMeta(
             source="file",

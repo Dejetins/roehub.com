@@ -100,6 +100,9 @@ REST catch-up и gap fill не изобретают новую “батч-ло�
 - `ingest_id`: UUID “на страницу/кусок” REST (для трассировки)
 - `instrument_key = f"{exchange}:{market_type}:{symbol}"` (exchange/market_type из runtime config)
 
+Тот же формат `instrument_key` обязателен и для file/parquet backfill, чтобы все ingestion paths
+писали единый каноничный ключ.
+
 
 ## Ports (добавления для v2)
 

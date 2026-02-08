@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
 
 from trading.contexts.market_data.adapters.outbound.clients.files.parquet_candle_ingest_source import (  # noqa: E501
     ParquetCandleIngestSource,
     ParquetScanner,
+)
+from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
+    MarketDataRuntimeConfig,
+    load_market_data_runtime_config,
 )
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, TimeRange, UtcTimestamp
 
@@ -50,7 +55,77 @@ def _ts(dt: datetime) -> UtcTimestamp:
     return UtcTimestamp(dt)
 
 
-def test_parquet_source_requires_market_id_and_symbol_and_generates_instrument_key() -> None:
+def _runtime_config(tmp_path: Path) -> MarketDataRuntimeConfig:
+    """
+    Create minimal runtime config with market_id=1 mapped to binance spot.
+
+    Parameters:
+    - tmp_path: pytest temporary directory fixture.
+
+    Returns:
+    - Parsed `MarketDataRuntimeConfig`.
+
+    Assumptions/Invariants:
+    - YAML contains all required runtime-config fields.
+
+    Errors/Exceptions:
+    - Propagates config parser validation errors.
+
+    Side effects:
+    - Writes temporary YAML file in pytest temp directory.
+    """
+    yaml_text = """
+version: 1
+market_data:
+  markets:
+    - market_id: 1
+      exchange: binance
+      market_type: spot
+      market_code: binance:spot
+      rest:
+        base_url: "https://api.binance.com"
+        timeout_s: 10.0
+        retries: 0
+        backoff: { base_s: 0.01, max_s: 0.01, jitter_s: 0.0 }
+        limiter: { mode: autodetect, safety_factor: 0.8, max_concurrency: 1 }
+      ws:
+        url: "wss://example"
+        ping_interval_s: 20.0
+        pong_timeout_s: 10.0
+        reconnect: { min_delay_s: 0.5, max_delay_s: 30.0, factor: 1.7, jitter_s: 0.2 }
+        max_symbols_per_connection: 200
+  ingestion:
+    raw_write: { flush_interval_ms: 250, max_buffer_rows: 2000 }
+  backfill:
+    max_days_per_insert: 7
+    chunk_align: "utc_day"
+"""
+    p = tmp_path / "market_data.yaml"
+    p.write_text(yaml_text, encoding="utf-8")
+    return load_market_data_runtime_config(p)
+
+
+def test_parquet_source_requires_market_id_and_symbol_and_generates_instrument_key(
+    tmp_path: Path,
+) -> None:
+    """
+    Ensure parquet ingestion emits canonical instrument_key resolved from runtime config.
+
+    Parameters:
+    - tmp_path: pytest temp path fixture.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - parquet rows include required market_id/symbol columns.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
     rows = [
         {
             "market_id": 1,
@@ -73,7 +148,11 @@ def test_parquet_source_requires_market_id_and_symbol_and_generates_instrument_k
     tr = TimeRange(_ts(datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)), _ts(datetime(2026, 2, 1, 0, 2, tzinfo=timezone.utc))) # noqa: E501
 
     clock = FixedClock(_ts(datetime(2026, 2, 5, 12, 0, tzinfo=timezone.utc)))
-    src = ParquetCandleIngestSource(scanner=InMemoryScanner(rows), clock=clock)
+    src = ParquetCandleIngestSource(
+        scanner=InMemoryScanner(rows),
+        cfg=_runtime_config(tmp_path),
+        clock=clock,
+    )
 
     out = list(src.stream_1m(instrument, tr))
     assert len(out) == 1
@@ -86,10 +165,28 @@ def test_parquet_source_requires_market_id_and_symbol_and_generates_instrument_k
     assert row.meta.source == "file"
     assert row.meta.ingested_at.value == datetime(2026, 2, 5, 12, 0, tzinfo=timezone.utc)
     # instrument_key generated
-    assert row.meta.instrument_key == "1:BTCUSDT"
+    assert row.meta.instrument_key == "binance:spot:BTCUSDT"
 
 
-def test_parquet_source_filters_by_time_range_semantics_half_interval() -> None:
+def test_parquet_source_filters_by_time_range_semantics_half_interval(tmp_path: Path) -> None:
+    """
+    Verify parquet source respects half-open time interval semantics `[start, end)`.
+
+    Parameters:
+    - tmp_path: pytest temp path fixture.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - scanner applies same half-open boundaries as source contract.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
     rows = [
         {
             "market_id": 1,
@@ -129,7 +226,11 @@ def test_parquet_source_filters_by_time_range_semantics_half_interval() -> None:
     tr = TimeRange(_ts(datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)), _ts(datetime(2026, 2, 1, 0, 1, tzinfo=timezone.utc))) # noqa: E501
 
     clock = FixedClock(_ts(datetime(2026, 2, 5, 12, 0, tzinfo=timezone.utc)))
-    src = ParquetCandleIngestSource(scanner=InMemoryScanner(rows), clock=clock)
+    src = ParquetCandleIngestSource(
+        scanner=InMemoryScanner(rows),
+        cfg=_runtime_config(tmp_path),
+        clock=clock,
+    )
 
     out = list(src.stream_1m(instrument, tr))
     assert len(out) == 1

@@ -40,6 +40,42 @@ class RestCatchUp1mReport:
     gap_rows_written: int
     gap_batches: int
 
+    def to_dict(self) -> dict[str, object]:
+        """
+        Serialize report into JSON-friendly primitives for CLI/notebooks/logging.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - Dictionary with only JSON-serializable primitives.
+
+        Assumptions/Invariants:
+        - Timestamp fields are `UtcTimestamp | None`.
+        - Numeric counters are plain integers.
+
+        Errors/Exceptions:
+        - None.
+
+        Side effects:
+        - None.
+        """
+        return {
+            "tail_start": _ts_to_iso(self.tail_start),
+            "tail_end": _ts_to_iso(self.tail_end),
+            "tail_rows_read": self.tail_rows_read,
+            "tail_rows_written": self.tail_rows_written,
+            "tail_batches": self.tail_batches,
+            "gap_scan_start": _ts_to_iso(self.gap_scan_start),
+            "gap_scan_end": _ts_to_iso(self.gap_scan_end),
+            "gap_days_scanned": self.gap_days_scanned,
+            "gap_days_with_gaps": self.gap_days_with_gaps,
+            "gap_ranges_filled": self.gap_ranges_filled,
+            "gap_rows_read": self.gap_rows_read,
+            "gap_rows_written": self.gap_rows_written,
+            "gap_batches": self.gap_batches,
+        }
+
 
 class RestCatchUp1mUseCase:
     """
@@ -293,3 +329,27 @@ def _ensure_tz_utc(dt: datetime) -> datetime:
     if dt.tzinfo is None or dt.utcoffset() is None:
         return dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc)
+
+
+def _ts_to_iso(value: UtcTimestamp | None) -> str | None:
+    """
+    Convert optional UTC timestamp wrapper into ISO-8601 string.
+
+    Parameters:
+    - value: timestamp value or `None`.
+
+    Returns:
+    - ISO-8601 UTC string with `Z` suffix when value is present, otherwise `None`.
+
+    Assumptions/Invariants:
+    - `UtcTimestamp.__str__` already returns canonical UTC ISO representation.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    if value is None:
+        return None
+    return str(value)
