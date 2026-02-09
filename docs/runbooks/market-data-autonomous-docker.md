@@ -50,6 +50,8 @@ docker compose -f infra/docker/docker-compose.market_data.yml --profile standalo
 ## 3. Prod запуск в фоне (на хосте)
 
 ```bash
+MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src \
+MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data \
 docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
 docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env ps
 docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-scheduler

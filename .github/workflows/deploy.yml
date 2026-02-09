@@ -50,13 +50,33 @@ jobs:
           # ensure target dirs exist
           install -d /opt/roehub
           install -d /opt/roehub/monitoring
+          install -d /opt/roehub/market-data-src
 
           # 1) main compose -> /opt/roehub/docker-compose.yml
           install -m 0644 infra/docker/docker-compose.yml /opt/roehub/docker-compose.yml
           # 2) market-data compose -> /opt/roehub/docker-compose.market_data.yml
           install -m 0644 infra/docker/docker-compose.market_data.yml /opt/roehub/docker-compose.market_data.yml
 
-          # 3) monitoring -> /opt/roehub/monitoring/
+          # 3) market-data build context -> /opt/roehub/market-data-src/
+          if command -v rsync >/dev/null 2>&1; then
+            rsync -a --delete src/ /opt/roehub/market-data-src/src/
+            rsync -a --delete apps/ /opt/roehub/market-data-src/apps/
+            rsync -a --delete configs/ /opt/roehub/market-data-src/configs/
+            rsync -a --delete infra/docker/ /opt/roehub/market-data-src/infra/docker/
+          else
+            rm -rf /opt/roehub/market-data-src/src /opt/roehub/market-data-src/apps /opt/roehub/market-data-src/configs /opt/roehub/market-data-src/infra/docker
+            install -d /opt/roehub/market-data-src/src
+            install -d /opt/roehub/market-data-src/apps
+            install -d /opt/roehub/market-data-src/configs
+            install -d /opt/roehub/market-data-src/infra/docker
+            tar -C src -cf - . | tar -C /opt/roehub/market-data-src/src -xf -
+            tar -C apps -cf - . | tar -C /opt/roehub/market-data-src/apps -xf -
+            tar -C configs -cf - . | tar -C /opt/roehub/market-data-src/configs -xf -
+            tar -C infra/docker -cf - . | tar -C /opt/roehub/market-data-src/infra/docker -xf -
+          fi
+          install -m 0644 pyproject.toml /opt/roehub/market-data-src/pyproject.toml
+
+          # 4) monitoring -> /opt/roehub/monitoring/
           if command -v rsync >/dev/null 2>&1; then
             rsync -a --delete infra/monitoring/monitoring/ /opt/roehub/monitoring/
           else
@@ -67,6 +87,8 @@ jobs:
           # checks
           test -s /opt/roehub/docker-compose.yml
           test -s /opt/roehub/docker-compose.market_data.yml
+          test -s /opt/roehub/market-data-src/pyproject.toml
+          test -s /opt/roehub/market-data-src/infra/docker/Dockerfile.market_data
           test -s /opt/roehub/monitoring/prometheus/prometheus.yml
           test -s /opt/roehub/monitoring/blackbox/blackbox.yml
           ls -la /opt/roehub | head -n 50
@@ -94,6 +116,8 @@ jobs:
       - name: Deploy market-data stack via Docker Compose
         env:
           COMPOSE_PROJECT_NAME: roehub-market-data
+          MARKET_DATA_BUILD_CONTEXT: /opt/roehub/market-data-src
+          MARKET_DATA_DOCKERFILE: infra/docker/Dockerfile.market_data
         run: |
           set -euxo pipefail
           docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans

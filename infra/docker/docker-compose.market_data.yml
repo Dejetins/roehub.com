@@ -28,8 +28,8 @@ services:
 
   market-data-ws-worker:
     build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.market_data
+      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
+      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     restart: unless-stopped
     environment:
       CH_HOST: ${CH_HOST:-clickhouse}
@@ -54,8 +54,8 @@ services:
 
   market-data-scheduler:
     build:
-      context: ../..
-      dockerfile: infra/docker/Dockerfile.market_data
+      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
+      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     restart: unless-stopped
     environment:
       CH_HOST: ${CH_HOST:-clickhouse}
