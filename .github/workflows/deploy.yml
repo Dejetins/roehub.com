@@ -51,6 +51,7 @@ jobs:
           install -d /opt/roehub
           install -d /opt/roehub/monitoring
           install -d /opt/roehub/market-data-src
+          install -d /opt/roehub/market-data-src/infra
 
           # 1) main compose -> /opt/roehub/docker-compose.yml
           install -m 0644 infra/docker/docker-compose.yml /opt/roehub/docker-compose.yml
