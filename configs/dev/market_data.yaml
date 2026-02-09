@@ -79,10 +79,20 @@ market_data:
         max_symbols_per_connection: 200
 
   ingestion:
-    raw_write:
-      # SLO: <=1s до raw (лучше 0.5s) -> держим 250ms как дефолт
-      flush_interval_ms: 250
-      max_buffer_rows: 2000
+    # SLO: <=1s до raw (лучше 0.5s) -> держим 250ms как дефолт
+    flush_interval_ms: 250
+    max_buffer_rows: 2000
+    rest_concurrency_instruments: 4
+    tail_lookback_minutes: 180
+
+  scheduler:
+    jobs:
+      sync_whitelist:
+        interval_seconds: 900
+      enrich:
+        interval_seconds: 21600
+      rest_insurance_catchup:
+        interval_seconds: 3600
 
   backfill:
     max_days_per_insert: 7

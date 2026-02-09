@@ -88,16 +88,24 @@ WS:
 - `ws.reconnect.jitter_s: float`
 - `ws.max_symbols_per_connection: int`
 
-### market_data.ingestion.raw_write
-Flush policy для записи в raw (WS worker):
+### market_data.ingestion
+Flush/maintenance policy для WS worker и scheduler:
 - `flush_interval_ms: int` — максимальная задержка удержания данных в буфере перед вставкой в ClickHouse.
   Даже если буфер не достиг `max_buffer_rows`, по таймеру выполняется flush.
   Меньше `flush_interval_ms` → ниже latency до raw, но больше insert-операций.
 - `max_buffer_rows: int` — предохранитель на всплески: flush при достижении размера буфера.
+- `rest_concurrency_instruments: int` — ограничение параллельных REST fill/insurance задач по инструментам.
+- `tail_lookback_minutes: int` — lookback для scheduler insurance catchup (S3).
 
 SLO guidance:
 - чтобы уложиться в “≤1s до raw” (лучше 0.5s), рекомендуется `flush_interval_ms` порядка 250–500 ms
   (при разумном `max_buffer_rows`, например 1k–5k).
+
+### market_data.scheduler.jobs
+Периодические maintenance интервалы:
+- `sync_whitelist.interval_seconds`
+- `enrich.interval_seconds`
+- `rest_insurance_catchup.interval_seconds`
 
 ### market_data.backfill
 Политика REST backfill:

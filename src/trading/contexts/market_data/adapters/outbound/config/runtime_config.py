@@ -110,8 +110,103 @@ class RawWriteConfig:
     max_buffer_rows: int
 
     def __post_init__(self) -> None:
+        """
+        Validate raw-write buffering policy.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - `flush_interval_ms` must stay at or below 500ms to satisfy WS-to-raw SLO target.
+        - `max_buffer_rows` must be a positive integer.
+
+        Errors/Exceptions:
+        - Raises `ValueError` when constraints are violated.
+
+        Side effects:
+        - None.
+        """
         _require_positive_int("ingestion.raw_write.flush_interval_ms", self.flush_interval_ms)
         _require_positive_int("ingestion.raw_write.max_buffer_rows", self.max_buffer_rows)
+        if self.flush_interval_ms > 500:
+            raise ValueError(
+                "ingestion.raw_write.flush_interval_ms must be <= 500, "
+                f"got {self.flush_interval_ms}"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class IngestionConfig:
+    raw_write: RawWriteConfig
+    rest_concurrency_instruments: int
+    tail_lookback_minutes: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate ingestion runtime controls used by worker and scheduler.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - REST instrument-level concurrency must be positive.
+        - Tail lookback in minutes must be positive.
+
+        Errors/Exceptions:
+        - Raises `ValueError` when constraints are violated.
+
+        Side effects:
+        - None.
+        """
+        _require_positive_int(
+            "ingestion.rest_concurrency_instruments",
+            self.rest_concurrency_instruments,
+        )
+        _require_positive_int("ingestion.tail_lookback_minutes", self.tail_lookback_minutes)
+
+
+@dataclass(frozen=True, slots=True)
+class SchedulerJobConfig:
+    interval_seconds: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one scheduler job interval.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - Interval is always positive.
+
+        Errors/Exceptions:
+        - Raises `ValueError` when interval is not positive.
+
+        Side effects:
+        - None.
+        """
+        _require_positive_int("scheduler.jobs.*.interval_seconds", self.interval_seconds)
+
+
+@dataclass(frozen=True, slots=True)
+class SchedulerJobsConfig:
+    sync_whitelist: SchedulerJobConfig
+    enrich: SchedulerJobConfig
+    rest_insurance_catchup: SchedulerJobConfig
+
+
+@dataclass(frozen=True, slots=True)
+class SchedulerConfig:
+    jobs: SchedulerJobsConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,7 +226,8 @@ class BackfillConfig:
 class MarketDataRuntimeConfig:
     version: int
     markets: tuple[MarketConfig, ...]
-    raw_write: RawWriteConfig
+    ingestion: IngestionConfig
+    scheduler: SchedulerConfig
     backfill: BackfillConfig
 
     def market_by_id(self, market_id: MarketId) -> MarketConfig:
@@ -143,8 +239,50 @@ class MarketDataRuntimeConfig:
     def market_ids(self) -> tuple[int, ...]:
         return tuple(m.market_id.value for m in self.markets)
 
+    @property
+    def raw_write(self) -> RawWriteConfig:
+        """
+        Provide backward-compatible access to raw write settings.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - `RawWriteConfig` from ingestion section.
+
+        Assumptions/Invariants:
+        - `self.ingestion` is validated during config load.
+
+        Errors/Exceptions:
+        - None.
+
+        Side effects:
+        - None.
+        """
+        return self.ingestion.raw_write
+
 
 def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig:
+    """
+    Load and validate market-data runtime YAML.
+
+    Parameters:
+    - path: filesystem path to `market_data.yaml`.
+
+    Returns:
+    - Parsed and validated `MarketDataRuntimeConfig`.
+
+    Assumptions/Invariants:
+    - YAML top-level is a mapping with keys `version` and `market_data`.
+    - Market ids are unique within `market_data.markets`.
+
+    Errors/Exceptions:
+    - Raises `FileNotFoundError` if config path does not exist.
+    - Raises `ValueError` on schema/validation failures.
+
+    Side effects:
+    - Reads one file from disk.
+    """
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"market_data config not found: {p}")
@@ -165,10 +303,60 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
         raise ValueError(f"duplicate market_id in config: {ids}")
 
     ingestion = _get_mapping(md, "ingestion", required=True)
-    raw_write_map = _get_mapping(ingestion, "raw_write", required=True)
-    raw_write = RawWriteConfig(
-        flush_interval_ms=_get_int(raw_write_map, "flush_interval_ms", required=True),
-        max_buffer_rows=_get_int(raw_write_map, "max_buffer_rows", required=True),
+    raw_write_map = _get_mapping(ingestion, "raw_write", required=False)
+    if raw_write_map:
+        raw_write = RawWriteConfig(
+            flush_interval_ms=_get_int(raw_write_map, "flush_interval_ms", required=True),
+            max_buffer_rows=_get_int(raw_write_map, "max_buffer_rows", required=True),
+        )
+    else:
+        raw_write = RawWriteConfig(
+            flush_interval_ms=_get_int(ingestion, "flush_interval_ms", required=True),
+            max_buffer_rows=_get_int(ingestion, "max_buffer_rows", required=True),
+        )
+    ingestion_cfg = IngestionConfig(
+        raw_write=raw_write,
+        rest_concurrency_instruments=_get_int_with_default(
+            ingestion,
+            "rest_concurrency_instruments",
+            default=4,
+        ),
+        tail_lookback_minutes=_get_int_with_default(
+            ingestion,
+            "tail_lookback_minutes",
+            default=180,
+        ),
+    )
+
+    scheduler_map = _get_mapping(md, "scheduler", required=False)
+    scheduler_jobs = _get_mapping(scheduler_map, "jobs", required=False)
+    scheduler_cfg = SchedulerConfig(
+        jobs=SchedulerJobsConfig(
+            sync_whitelist=SchedulerJobConfig(
+                interval_seconds=_get_int_nested_with_default(
+                    scheduler_jobs,
+                    section="sync_whitelist",
+                    key="interval_seconds",
+                    default=3600,
+                )
+            ),
+            enrich=SchedulerJobConfig(
+                interval_seconds=_get_int_nested_with_default(
+                    scheduler_jobs,
+                    section="enrich",
+                    key="interval_seconds",
+                    default=21600,
+                )
+            ),
+            rest_insurance_catchup=SchedulerJobConfig(
+                interval_seconds=_get_int_nested_with_default(
+                    scheduler_jobs,
+                    section="rest_insurance_catchup",
+                    key="interval_seconds",
+                    default=3600,
+                )
+            ),
+        )
     )
 
     backfill_map = _get_mapping(md, "backfill", required=True)
@@ -180,7 +368,8 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
     return MarketDataRuntimeConfig(
         version=version,
         markets=markets,
-        raw_write=raw_write,
+        ingestion=ingestion_cfg,
+        scheduler=scheduler_cfg,
         backfill=backfill,
     )
 
@@ -298,6 +487,64 @@ def _get_float(d: Mapping[str, Any], key: str, *, required: bool) -> float:
     if isinstance(v, (int, float)):
         return float(v)
     raise ValueError(f"expected float at key '{key}', got {type(v).__name__}")
+
+
+def _get_int_with_default(d: Mapping[str, Any], key: str, *, default: int) -> int:
+    """
+    Read optional integer key from mapping with explicit default.
+
+    Parameters:
+    - d: source mapping.
+    - key: integer field name.
+    - default: value returned when key is absent.
+
+    Returns:
+    - Parsed integer from mapping or `default`.
+
+    Assumptions/Invariants:
+    - Boolean values are rejected even though `bool` is an `int` subclass.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when present value is not a valid int.
+
+    Side effects:
+    - None.
+    """
+    if key not in d:
+        return default
+    return _get_int(d, key, required=True)
+
+
+def _get_int_nested_with_default(
+    d: Mapping[str, Any],
+    *,
+    section: str,
+    key: str,
+    default: int,
+) -> int:
+    """
+    Read optional integer from nested mapping section with default.
+
+    Parameters:
+    - d: parent mapping containing optional subsection.
+    - section: subsection name.
+    - key: integer key inside subsection.
+    - default: returned when subsection or key is absent.
+
+    Returns:
+    - Parsed integer value or default.
+
+    Assumptions/Invariants:
+    - Subsection, when present, must be a mapping.
+
+    Errors/Exceptions:
+    - Raises `ValueError` for invalid subsection shape or invalid integer value.
+
+    Side effects:
+    - None.
+    """
+    section_map = _get_mapping(d, section, required=False)
+    return _get_int_with_default(section_map, key, default=default)
 
 
 def _require_non_empty(name: str, s: str) -> None:
