@@ -119,6 +119,15 @@ jobs:
           MARKET_DATA_DOCKERFILE: infra/docker/Dockerfile.market_data
         run: |
           set -euxo pipefail
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env pull postgres clickhouse grafana prometheus blackbox
+          for attempt in 1 2 3 4 5; do
+            if docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env pull postgres clickhouse grafana prometheus blackbox; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "docker compose pull failed after ${attempt} attempts"
+              exit 1
+            fi
+            sleep "$((attempt * 15))"
+          done
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps
