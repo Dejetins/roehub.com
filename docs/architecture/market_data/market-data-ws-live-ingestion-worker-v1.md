@@ -273,3 +273,5 @@ SIGTERM/SIGINT:
 - Одна реплика worker (как указано).
 - Дубликаты в raw допустимы; canonical dedup — ReplacingMergeTree(ingested_at).
 - REST не может “сгенерировать” свечи, которых у биржи нет — это нормально.
+- Для worker/scheduler runtime используется thread-local ClickHouse gateway (один CH client на поток), чтобы при `rest_concurrency_instruments > 1` не ловить session-конфликт `Attempt to execute concurrent queries within the same session`.
+- Временный workaround для старых инстансов без фикса: `market_data.ingestion.rest_concurrency_instruments: 1`.

@@ -32,9 +32,9 @@ from trading.contexts.market_data.adapters.outbound.config.runtime_config import
 )
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleIndexReader,
-    ClickHouseConnectGateway,
     ClickHouseEnabledInstrumentReader,
     ClickHouseRawKlineWriter,
+    ThreadLocalClickHouseConnectGateway,
 )
 from trading.contexts.market_data.application.dto import CandleWithMeta, RestFillTask
 from trading.contexts.market_data.application.services import (
@@ -575,8 +575,9 @@ def build_market_data_ws_app(
     """
     config = load_market_data_runtime_config(Path(config_path))
     clickhouse_settings = ClickHouseSettingsLoader(environ).load()
-    clickhouse_client = _clickhouse_client(clickhouse_settings)
-    gateway = ClickHouseConnectGateway(clickhouse_client)
+    gateway = ThreadLocalClickHouseConnectGateway(
+        client_factory=lambda: _clickhouse_client(clickhouse_settings)
+    )
 
     raw_writer = ClickHouseRawKlineWriter(gateway=gateway, database=clickhouse_settings.database)
     index_reader = ClickHouseCanonicalCandleIndexReader(
