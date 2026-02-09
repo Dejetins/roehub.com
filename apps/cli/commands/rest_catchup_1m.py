@@ -172,6 +172,7 @@ def _print_report(rep: RestCatchUp1mReport, *, fmt: str, instrument_id: Instrume
         f"- gap_ranges_filled: {payload['gap_ranges_filled']}\n"
         f"- gap_rows_read: {payload['gap_rows_read']}\n"
         f"- gap_rows_written: {payload['gap_rows_written']}\n"
+        f"- gap_rows_skipped_existing: {payload['gap_rows_skipped_existing']}\n"
         f"- gap_batches: {payload['gap_batches']}\n"
     )
 

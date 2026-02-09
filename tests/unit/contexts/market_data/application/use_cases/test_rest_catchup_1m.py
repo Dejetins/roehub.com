@@ -367,6 +367,7 @@ def test_rest_catchup_report_to_dict_is_json_serializable() -> None:
         gap_ranges_filled=1,
         gap_rows_read=3,
         gap_rows_written=3,
+        gap_rows_skipped_existing=0,
         gap_batches=1,
     )
 
@@ -377,6 +378,7 @@ def test_rest_catchup_report_to_dict_is_json_serializable() -> None:
     assert decoded["tail_start"] == "2026-02-05T12:04:00.000Z"
     assert decoded["tail_end"] == "2026-02-05T12:05:00.000Z"
     assert decoded["gap_rows_written"] == 3
+    assert decoded["gap_rows_skipped_existing"] == 0
 
 
 def test_rest_catchup_run_returns_json_friendly_report() -> None:
@@ -417,6 +419,7 @@ def test_rest_catchup_run_returns_json_friendly_report() -> None:
     assert payload["tail_end"] == "2026-02-05T12:05:00.000Z"
     assert payload["tail_rows_written"] == 1
     assert payload["gap_rows_written"] == 0
+    assert payload["gap_rows_skipped_existing"] == 0
     assert len(writer.calls) == 1
     assert writer.calls[0][0].meta.ingest_id == UUID("00000000-0000-0000-0000-000000000042")
     json.dumps(payload, ensure_ascii=False)
@@ -501,6 +504,7 @@ def test_gap_fill_does_not_write_existing_minutes() -> None:
     assert report.gap_ranges_filled == 1
     assert report.gap_rows_read == 2
     assert report.gap_rows_written == 0
+    assert report.gap_rows_skipped_existing == 2
     assert writer.calls == []
 
 
@@ -557,6 +561,7 @@ def test_gap_fill_writes_only_missing_minutes() -> None:
     assert report.gap_ranges_filled == 1
     assert report.gap_rows_read == 2
     assert report.gap_rows_written == 1
+    assert report.gap_rows_skipped_existing == 1
     assert len(writer.calls) == 1
     assert len(writer.calls[0]) == 1
     assert writer.calls[0][0].candle.ts_open.value == m02

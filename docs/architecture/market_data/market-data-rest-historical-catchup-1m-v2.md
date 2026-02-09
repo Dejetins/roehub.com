@@ -244,6 +244,15 @@ ORDER BY missing DESC
 LIMIT 50;
 ```
 
+Проверка дубликатов по конкретному инструменту:
+
+```sql
+SELECT
+  count() - uniqExact(toStartOfMinute(ts_open)) AS dup
+FROM market_data.canonical_candles_1m
+WHERE instrument_key = 'binance:spot:BTCUSDT';
+```
+
 
 ## Адаптер: REST CandleIngestSource (routing по market_id)
 
@@ -310,6 +319,7 @@ REST catch-up является частью автоматического па�
 - `days_with_gaps_total`
 - `gap_intervals_total`
 - `gap_rows_written_total`
+- `gap_rows_skipped_existing_total` (защитный дедуп: минуты, уже присутствующие в canonical)
 
 ### Error metrics
 - `rest_errors_total` (by exchange/market_type/status_code)

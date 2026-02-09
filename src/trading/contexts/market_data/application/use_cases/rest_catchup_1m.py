@@ -38,6 +38,7 @@ class RestCatchUp1mReport:
     gap_ranges_filled: int
     gap_rows_read: int
     gap_rows_written: int
+    gap_rows_skipped_existing: int
     gap_batches: int
 
     def to_dict(self) -> dict[str, object]:
@@ -73,6 +74,7 @@ class RestCatchUp1mReport:
             "gap_ranges_filled": self.gap_ranges_filled,
             "gap_rows_read": self.gap_rows_read,
             "gap_rows_written": self.gap_rows_written,
+            "gap_rows_skipped_existing": self.gap_rows_skipped_existing,
             "gap_batches": self.gap_batches,
         }
 
@@ -160,7 +162,7 @@ class RestCatchUp1mUseCase:
         tail_rows_read = tail_rows_written = tail_batches = 0
         if tail_start.value < end.value:
             tr = TimeRange(start=tail_start, end=end)
-            tail_rows_read, tail_rows_written, tail_batches = self._ingest_time_range(
+            tail_rows_read, tail_rows_written, tail_batches, _ = self._ingest_time_range(
                 instrument_id=instrument_id,
                 time_range=tr,
             )
@@ -168,7 +170,7 @@ class RestCatchUp1mUseCase:
         # gap-scan: [bounds.first, tail_start)  (НЕ включаем tail, чтобы не писать дубль)
         gap_scan_start = gap_scan_end = None
         gap_days_scanned = gap_days_with_gaps = gap_ranges_filled = 0
-        gap_rows_read = gap_rows_written = gap_batches = 0
+        gap_rows_read = gap_rows_written = gap_rows_skipped_existing = gap_batches = 0
 
         bounds = self._index.bounds(instrument_id)
         if bounds is not None:
@@ -186,6 +188,7 @@ class RestCatchUp1mUseCase:
                     gap_ranges_filled,
                     gap_rows_read,
                     gap_rows_written,
+                    gap_rows_skipped_existing,
                     gap_batches,
                 ) = self._fill_gaps_in_range(
                     instrument_id=instrument_id,
@@ -205,6 +208,7 @@ class RestCatchUp1mUseCase:
             gap_ranges_filled=gap_ranges_filled,
             gap_rows_read=gap_rows_read,
             gap_rows_written=gap_rows_written,
+            gap_rows_skipped_existing=gap_rows_skipped_existing,
             gap_batches=gap_batches,
         )
 
@@ -214,7 +218,7 @@ class RestCatchUp1mUseCase:
         instrument_id: InstrumentId,
         time_range: TimeRange,
         dedup_existing: bool = False,
-    ) -> tuple[int, int, int]:
+    ) -> tuple[int, int, int, int]:
         """
         Ingest one time range into raw storage with optional pre-write dedup filtering.
 
@@ -224,7 +228,7 @@ class RestCatchUp1mUseCase:
         - dedup_existing: when true, skip rows whose minute already exists in canonical index.
 
         Returns:
-        - Tuple `(rows_read, rows_written, batches_written)`.
+        - Tuple `(rows_read, rows_written, batches_written, rows_skipped_existing)`.
 
         Assumptions/Invariants:
         - Source emits 1m closed candles for requested range.
@@ -236,7 +240,7 @@ class RestCatchUp1mUseCase:
         Side effects:
         - Reads source and canonical index, writes to raw storage.
         """
-        rows_read = rows_written = batches = 0
+        rows_read = rows_written = rows_skipped_existing = batches = 0
 
         for chunk in slice_time_range_by_utc_days(time_range=time_range, max_days=self._max_days):
             existing_minute_keys: set[int] = set()
@@ -266,6 +270,7 @@ class RestCatchUp1mUseCase:
                 minute_key = _minute_key(fixed.candle.ts_open.value)
 
                 if dedup_existing and minute_key in existing_minute_keys:
+                    rows_skipped_existing += 1
                     continue
 
                 if dedup_existing:
@@ -284,7 +289,7 @@ class RestCatchUp1mUseCase:
                 rows_written += len(batch)
                 batches += 1
 
-        return rows_read, rows_written, batches
+        return rows_read, rows_written, batches, rows_skipped_existing
 
     def _existing_minute_keys(
         self,
@@ -322,7 +327,7 @@ class RestCatchUp1mUseCase:
         *,
         instrument_id: InstrumentId,
         time_range: TimeRange,
-    ) -> tuple[int, int, int, int, int, int]:
+    ) -> tuple[int, int, int, int, int, int, int]:
         """
         Detect missing minute windows and ingest only those windows for one historical range.
 
@@ -332,7 +337,8 @@ class RestCatchUp1mUseCase:
 
         Returns:
         - Tuple with counters:
-          `(days_scanned, days_with_gaps, ranges_filled, rows_read, rows_written, batches)`.
+          `(days_scanned, days_with_gaps, ranges_filled, rows_read, rows_written,
+          rows_skipped_existing, batches)`.
 
         Assumptions/Invariants:
         - Day-level counts and distinct timestamps come from canonical index.
@@ -354,7 +360,7 @@ class RestCatchUp1mUseCase:
         day_cursor = scan_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
         days_scanned = days_with_gaps = ranges_filled = 0
-        rows_read = rows_written = batches = 0
+        rows_read = rows_written = rows_skipped_existing = batches = 0
 
         while day_cursor < scan_end:
             next_day = day_cursor + timedelta(days=1)
@@ -383,19 +389,28 @@ class RestCatchUp1mUseCase:
             missing_ranges = _missing_ranges_for_day(existing=existing, start=day_start, end=day_end)  # noqa: E501
 
             for mr in missing_ranges:
-                rr, rw, bb = self._ingest_time_range(
+                rr, rw, bb, rs = self._ingest_time_range(
                     instrument_id=instrument_id,
                     time_range=mr,
                     dedup_existing=True,
                 )
                 rows_read += rr
                 rows_written += rw
+                rows_skipped_existing += rs
                 batches += bb
                 ranges_filled += 1
 
             day_cursor = next_day
 
-        return days_scanned, days_with_gaps, ranges_filled, rows_read, rows_written, batches
+        return (
+            days_scanned,
+            days_with_gaps,
+            ranges_filled,
+            rows_read,
+            rows_written,
+            rows_skipped_existing,
+            batches,
+        )
 
 
 def _missing_ranges_for_day(

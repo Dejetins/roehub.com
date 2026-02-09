@@ -74,6 +74,8 @@ def test_writer_routes_binance_markets_to_binance_raw_and_normalizes_non_nullabl
     assert table.endswith("market_data.raw_binance_klines_1m")
     assert payload[0]["quote_asset_volume"] == 0.0
     assert payload[0]["number_of_trades"] == 0
+    assert "open_time" in payload[0]
+    assert "ts_open" not in payload[0]
 
 
 def test_writer_routes_bybit_markets_to_bybit_raw_and_normalizes_turnover() -> None:
@@ -89,3 +91,5 @@ def test_writer_routes_bybit_markets_to_bybit_raw_and_normalizes_turnover() -> N
     assert payload[0]["turnover"] == 0.0
     assert payload[0]["interval_min"] == 1
     assert isinstance(payload[0]["start_time_ms"], int)
+    assert "start_time_utc" in payload[0]
+    assert "ts_open" not in payload[0]
