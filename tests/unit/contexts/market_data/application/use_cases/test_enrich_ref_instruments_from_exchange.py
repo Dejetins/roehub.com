@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from trading.contexts.market_data.application.dto import ExchangeInstrumentMetadata
+from trading.contexts.market_data.application.dto import (
+    ExchangeInstrumentMetadata,
+    InstrumentRefEnrichmentSnapshot,
+)
 from trading.contexts.market_data.application.use_cases import (
     EnrichRefInstrumentsFromExchangeUseCase,
 )
@@ -40,9 +43,15 @@ class _MetadataSource:
 
 
 class _Writer:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        existing_enrichment: dict[tuple[int, str], InstrumentRefEnrichmentSnapshot] | None = None,
+    ) -> None:
         """Initialize in-memory captured enrichment rows."""
         self.rows = []
+        self._existing_enrichment = (
+            dict(existing_enrichment) if existing_enrichment is not None else {}
+        )
 
     def existing_latest(self, *, market_id, symbols):  # noqa: ANN001
         """Unused in this use-case; return empty mapping."""
@@ -53,6 +62,15 @@ class _Writer:
     def upsert(self, rows):  # noqa: ANN001
         """Unused in this use-case."""
         _ = rows
+
+    def existing_latest_enrichment(self, *, market_id, symbols):  # noqa: ANN001
+        """Return configured latest enrichment snapshots for provided symbols."""
+        out = {}
+        for symbol in symbols:
+            key = (int(market_id.value), str(symbol).upper())
+            if key in self._existing_enrichment:
+                out[str(symbol).upper()] = self._existing_enrichment[key]
+        return out
 
     def upsert_enrichment(self, rows):  # noqa: ANN001
         """Capture enrichment rows for assertions."""
@@ -123,3 +141,77 @@ def test_enrich_use_case_returns_zero_report_for_empty_instrument_set() -> None:
     assert report.rows_upserted == 0
     assert report.symbols_missing_metadata == 0
     assert writer.rows == []
+
+
+def test_enrich_use_case_skips_unchanged_metadata_rows() -> None:
+    """Ensure enrich run does not append duplicate rows when metadata did not change."""
+    instrument = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+    writer = _Writer(
+        existing_enrichment={
+            (1, "BTCUSDT"): InstrumentRefEnrichmentSnapshot(
+                status="ENABLED",
+                is_tradable=1,
+                base_asset="BTC",
+                quote_asset="USDT",
+                price_step=0.01,
+                qty_step=0.0001,
+                min_notional=10.0,
+            )
+        }
+    )
+    use_case = EnrichRefInstrumentsFromExchangeUseCase(
+        instrument_reader=_InstrumentReader([instrument]),
+        metadata_source=_MetadataSource(
+            {
+                1: [
+                    ExchangeInstrumentMetadata(
+                        instrument_id=instrument,
+                        base_asset="BTC",
+                        quote_asset="USDT",
+                        price_step=0.01,
+                        qty_step=0.0001,
+                        min_notional=10.0,
+                    )
+                ]
+            }
+        ),
+        writer=writer,
+        clock=_Clock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc))),
+    )
+
+    report = use_case.run()
+
+    assert report.instruments_total == 1
+    assert report.rows_upserted == 0
+    assert writer.rows == []
+
+
+def test_enrich_use_case_deduplicates_duplicate_instrument_ids() -> None:
+    """Ensure duplicate symbols from reader are collapsed before metadata upsert planning."""
+    instrument = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+    writer = _Writer()
+    use_case = EnrichRefInstrumentsFromExchangeUseCase(
+        instrument_reader=_InstrumentReader([instrument, instrument]),
+        metadata_source=_MetadataSource(
+            {
+                1: [
+                    ExchangeInstrumentMetadata(
+                        instrument_id=instrument,
+                        base_asset="BTC",
+                        quote_asset="USDT",
+                        price_step=0.01,
+                        qty_step=0.0001,
+                        min_notional=10.0,
+                    )
+                ]
+            }
+        ),
+        writer=writer,
+        clock=_Clock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc))),
+    )
+
+    report = use_case.run()
+
+    assert report.instruments_total == 2
+    assert report.rows_upserted == 1
+    assert len(writer.rows) == 1

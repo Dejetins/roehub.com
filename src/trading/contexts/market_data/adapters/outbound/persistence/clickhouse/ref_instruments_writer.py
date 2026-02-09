@@ -6,6 +6,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gatew
     ClickHouseGateway,
 )
 from trading.contexts.market_data.application.dto.reference_data import (
+    InstrumentRefEnrichmentSnapshot,
     InstrumentRefEnrichmentUpsert,
     InstrumentRefUpsert,
 )
@@ -136,6 +137,83 @@ class ClickHouseInstrumentRefWriter(InstrumentRefWriter):
             )
         self._gw.insert_rows(f"{self._db}.ref_instruments", payload)
 
+    def existing_latest_enrichment(
+        self,
+        *,
+        market_id: MarketId,
+        symbols: Sequence[Symbol],
+    ) -> Mapping[str, InstrumentRefEnrichmentSnapshot]:
+        """
+        Read latest enrichment fields for one market-symbol set.
+
+        Parameters:
+        - market_id: market id filter.
+        - symbols: symbols to fetch.
+
+        Returns:
+        - Mapping `symbol -> InstrumentRefEnrichmentSnapshot`.
+
+        Assumptions/Invariants:
+        - Empty symbol input returns empty mapping without storage queries.
+
+        Errors/Exceptions:
+        - Propagates gateway query errors.
+
+        Side effects:
+        - Executes one ClickHouse SELECT query when symbols are provided.
+        """
+        if not symbols:
+            return {}
+
+        sym_list = [str(s) for s in symbols]
+
+        query = f"""
+            SELECT
+                symbol,
+                status,
+                is_tradable,
+                base_asset,
+                quote_asset,
+                price_step,
+                qty_step,
+                min_notional
+            FROM {self._db}.ref_instruments
+            WHERE market_id = {{market_id:UInt16}}
+              AND symbol IN {{symbols:Array(String)}}
+            ORDER BY updated_at DESC
+            LIMIT 1 BY symbol
+        """.strip()
+
+        rows = self._gw.select(
+            query,
+            parameters={
+                "market_id": market_id.value,
+                "symbols": sym_list,
+            },
+        )
+
+        out: dict[str, InstrumentRefEnrichmentSnapshot] = {}
+        for row in rows:
+            symbol = row.get("symbol")
+            status = row.get("status")
+            is_tradable = row.get("is_tradable")
+            if not (
+                isinstance(symbol, str)
+                and isinstance(status, str)
+                and isinstance(is_tradable, int)
+            ):
+                continue
+            out[symbol] = InstrumentRefEnrichmentSnapshot(
+                status=status,
+                is_tradable=is_tradable,
+                base_asset=row.get("base_asset"),
+                quote_asset=row.get("quote_asset"),
+                price_step=_as_optional_float(row.get("price_step")),
+                qty_step=_as_optional_float(row.get("qty_step")),
+                min_notional=_as_optional_float(row.get("min_notional")),
+            )
+        return out
+
     def upsert_enrichment(self, rows: Iterable[InstrumentRefEnrichmentUpsert]) -> None:
         """
         Insert enrichment rows preserving status/tradable flags.
@@ -172,3 +250,29 @@ class ClickHouseInstrumentRefWriter(InstrumentRefWriter):
                 }
             )
         self._gw.insert_rows(f"{self._db}.ref_instruments", payload)
+
+
+def _as_optional_float(value: Any) -> float | None:
+    """
+    Convert ClickHouse scalar value into optional float.
+
+    Parameters:
+    - value: raw value from gateway row mapping.
+
+    Returns:
+    - `float(value)` for numeric inputs, otherwise `None`.
+
+    Assumptions/Invariants:
+    - Non-numeric values are treated as missing optional fields.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None

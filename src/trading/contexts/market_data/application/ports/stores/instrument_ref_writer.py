@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Iterable, Mapping, Protocol, Sequence
 
 from trading.contexts.market_data.application.dto.reference_data import (
+    InstrumentRefEnrichmentSnapshot,
     InstrumentRefEnrichmentUpsert,
     InstrumentRefUpsert,
 )
@@ -34,6 +35,24 @@ class InstrumentRefWriter(Protocol):
 
         Returns:
         - None.
+        """
+        ...
+
+    def existing_latest_enrichment(
+        self,
+        *,
+        market_id: MarketId,
+        symbols: Sequence[Symbol],
+    ) -> Mapping[str, InstrumentRefEnrichmentSnapshot]:
+        """
+        Return latest enrichment state for given `(market_id, symbols)`.
+
+        Parameters:
+        - market_id: market id filter.
+        - symbols: symbol set to read.
+
+        Returns:
+        - Mapping `symbol -> latest enrichment snapshot`.
         """
         ...
 

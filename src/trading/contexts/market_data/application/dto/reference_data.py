@@ -85,6 +85,30 @@ class InstrumentRefEnrichmentUpsert:
 
 
 @dataclass(frozen=True, slots=True)
+class InstrumentRefEnrichmentSnapshot:
+    """
+    Latest persisted enrichment state for one instrument in `ref_instruments`.
+
+    Parameters:
+    - status: current status field (`ENABLED`/`DISABLED`).
+    - is_tradable: current tradable flag (`0`/`1`).
+    - base_asset: current base asset value.
+    - quote_asset: current quote asset value.
+    - price_step: current price step value.
+    - qty_step: current quantity step value.
+    - min_notional: current min notional value.
+    """
+
+    status: str
+    is_tradable: int
+    base_asset: str | None
+    quote_asset: str | None
+    price_step: float | None
+    qty_step: float | None
+    min_notional: float | None
+
+
+@dataclass(frozen=True, slots=True)
 class ExchangeInstrumentMetadata:
     instrument_id: InstrumentId
     base_asset: str | None
