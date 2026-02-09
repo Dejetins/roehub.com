@@ -64,6 +64,56 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
             return None
         return (UtcTimestamp(_ensure_tz_utc(first)), UtcTimestamp(_ensure_tz_utc(last)))
 
+    def bounds_1m(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        before: UtcTimestamp,
+    ) -> tuple[UtcTimestamp | None, UtcTimestamp | None]:
+        """
+        Return canonical min/max minute buckets for one instrument before an exclusive bound.
+
+        Parameters:
+        - instrument_id: instrument whose canonical bounds are requested.
+        - before: exclusive upper bound for `ts_open`.
+
+        Returns:
+        - Tuple `(min_ts_open, max_ts_open)` where values are `None` when dataset is empty.
+
+        Assumptions/Invariants:
+        - Bounds are computed on minute buckets via `toStartOfMinute(ts_open)`.
+
+        Errors/Exceptions:
+        - Propagates gateway/storage errors.
+
+        Side effects:
+        - Executes one ClickHouse SELECT query.
+        """
+        q = f"""
+        SELECT
+            min(toStartOfMinute(ts_open)) AS first,
+            max(toStartOfMinute(ts_open)) AS last
+        FROM {self._table()}
+        WHERE market_id = %(market_id)s
+          AND symbol = %(symbol)s
+          AND ts_open < %(before)s
+        """
+        rows = self.gateway.select(
+            q,
+            {
+                "market_id": int(instrument_id.market_id.value),
+                "symbol": str(instrument_id.symbol),
+                "before": _ensure_tz_utc(before.value),
+            },
+        )
+        if not rows:
+            return (None, None)
+        first = rows[0].get("first")
+        last = rows[0].get("last")
+        if first is None or last is None:
+            return (None, None)
+        return (UtcTimestamp(_ensure_tz_utc(first)), UtcTimestamp(_ensure_tz_utc(last)))
+
     def max_ts_open_lt(self, *, instrument_id: InstrumentId, before: UtcTimestamp) -> UtcTimestamp | None:  # noqa: E501
         """
         Return latest canonical minute strictly before `before`.

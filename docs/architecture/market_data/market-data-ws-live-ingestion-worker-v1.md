@@ -131,6 +131,17 @@ REST fill вызывает существующий use-case `RestCatchUp1mUseCa
 - **Job S2**: `enrich_ref_instruments`
 - **Job S3**: `rest_insurance_catchup`
 
+Стартовая последовательность процесса (выполняется один раз на запуск):
+- `S1` (seed `ref_market` + sync whitelist)
+- `S2` (enrich `ref_instruments` из биржевых instrument-info endpoint’ов)
+- startup scan:
+  - для каждого enabled/tradable инструмента читаем canonical bounds до `now_floor`
+  - если bounds пустые: bootstrap `[earliest_available_ts_utc, now_floor)`
+  - если `canonical_min > earliest_available_ts_utc + 1m`: historical backfill
+    `[earliest_available_ts_utc, canonical_min)`
+  - tail insurance: `[max(canonical_max + 1m, now_floor - tail_lookback), now_floor)`
+  - все задачи enqueue в фоновой REST queue (не блокируют основной loop scheduler).
+
 ---
 
 ## WS worker: точные правила поведения
@@ -200,13 +211,20 @@ REST fill вызывает существующий use-case `RestCatchUp1mUseCa
 
 ---
 
-## Bootstrap по REST для инструментов без данных
+## Bootstrap/Historical boundary
 
-Если в canonical данных нет (`bounds(...) is None`) — грузим **всю доступную историю**:
-- `start = минимально доступная дата на бирже`
+Если в canonical данных нет (`bounds_1m(..., before=now_floor) == (None, None)`) — грузим **всю доступную историю**:
+- `start = market_data.markets[*].rest.earliest_available_ts_utc`
 - `end = now_floor`
 
 Concurrency ограничиваем: максимум 4 инструмента одновременно.
+
+Если canonical уже не пустой, но начинается позже earliest boundary:
+- `canonical_min > earliest_available_ts_utc + 1m` → историческая догрузка:
+  `[earliest_available_ts_utc, canonical_min)`.
+
+Это закрывает production-case, когда worker успел записать только свежий хвост, и
+`canonical` перестал быть “пустым” до запуска scheduler.
 
 ---
 
@@ -214,7 +232,8 @@ Concurrency ограничиваем: максимум 4 инструмента 
 
 - S1) Sync whitelist → ref_instruments (on start + периодически)
 - S2) Enrich ref_instruments (on start + раз в 6–24 часа)
-- S3) REST insurance catchup (каждый час, lookback 2–6 часов) + bootstrap пустых
+- S3) REST insurance catchup (каждый час, lookback 2–6 часов) + startup/periodic scan
+  исторических “дыр” относительно `earliest_available_ts_utc`.
 
 ---
 
@@ -226,6 +245,7 @@ Concurrency ограничиваем: максимум 4 инструмента 
 - `market_data.ingestion.max_buffer_rows: 2000`
 - `market_data.ingestion.rest_concurrency_instruments: 4`
 - `market_data.ingestion.tail_lookback_minutes: 180`
+- `market_data.markets[*].rest.earliest_available_ts_utc: "YYYY-MM-DDTHH:MM:SSZ"`
 - `market_data.scheduler.jobs.*` (интервалы)
 
 ---
@@ -236,9 +256,6 @@ Concurrency ограничиваем: максимум 4 инструмента 
   - `python -m apps.worker.market_data_ws.main.main --config configs/dev/market_data.yaml --metrics-port 9201`
 - Scheduler:
   - `python -m apps.scheduler.market_data_scheduler.main.main --config configs/dev/market_data.yaml --whitelist configs/dev/whitelist.csv --metrics-port 9202`
-
-Примечание:
-- Джоба `S2 enrich_ref_instruments` в текущей версии репозитория заведена как operational stub (логирует `not implemented`), пока отдельный use-case enrich не добавлен.
 
 ---
 

@@ -1,0 +1,87 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: market-data-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: market_data
+      CLICKHOUSE_USER: ${CH_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CH_PASSWORD:-}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - market_data_ch_data:/var/lib/clickhouse
+      - market_data_ch_logs:/var/log/clickhouse-server
+
+  market-data-ws-worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.market_data
+    container_name: market-data-ws-worker
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: 8123
+      CH_DATABASE: market_data
+      CH_USER: ${CH_USER:-default}
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      CH_SECURE: "0"
+      CH_VERIFY: "1"
+    command:
+      - python
+      - -m
+      - apps.worker.market_data_ws.main.main
+      - --config
+      - /app/configs/dev/market_data.yaml
+      - --metrics-port
+      - "9201"
+    ports:
+      - "9201:9201"
+
+  market-data-scheduler:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.market_data
+    container_name: market-data-scheduler
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: 8123
+      CH_DATABASE: market_data
+      CH_USER: ${CH_USER:-default}
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      CH_SECURE: "0"
+      CH_VERIFY: "1"
+    command:
+      - python
+      - -m
+      - apps.scheduler.market_data_scheduler.main.main
+      - --config
+      - /app/configs/dev/market_data.yaml
+      - --whitelist
+      - /app/configs/dev/whitelist.csv
+      - --metrics-port
+      - "9202"
+    ports:
+      - "9202:9202"
+
+volumes:
+  market_data_ch_data: {}
+  market_data_ch_logs: {}

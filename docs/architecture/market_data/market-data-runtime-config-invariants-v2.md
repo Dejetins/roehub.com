@@ -67,6 +67,7 @@ Required fields:
 
 REST:
 - `rest.base_url: str`
+- `rest.earliest_available_ts_utc: str (ISO-8601, UTC, not in future)`
 - `rest.timeout_s: float`
 - `rest.retries: int`
 - `rest.backoff.base_s: float`
@@ -106,6 +107,12 @@ SLO guidance:
 - `sync_whitelist.interval_seconds`
 - `enrich.interval_seconds`
 - `rest_insurance_catchup.interval_seconds`
+
+Operational semantics:
+- scheduler на старте делает startup scan по enabled/tradable инструментам:
+  - bootstrap `[earliest_available_ts_utc, now_floor)` для пустого canonical
+  - historical backfill `[earliest_available_ts_utc, canonical_min)` если canonical начинается позже earliest boundary
+  - tail insurance `[max(canonical_max + 1m, now_floor - tail_lookback), now_floor)`.
 
 ### market_data.backfill
 Политика REST backfill:
@@ -155,5 +162,8 @@ Guarantee:
 ## Notes
 - Конфиг читается на старте процесса (без hot reload).
 - Валидируем YAML/CSV строго и падаем быстро, чтобы не получать “тихие” частичные запуски.
+- `rest.earliest_available_ts_utc` — обязательный ключ, используется worker/scheduler для bootstrap/historical границ.
+- Для конкурентных `asyncio.to_thread(...)` путей worker/scheduler используют thread-local CH gateway
+  (один ClickHouse client на поток), чтобы избежать session-конфликта concurrent queries.
 - Adapters могут логировать “observed rate limits” (из заголовков/metadata) для диагностики,
   но не используют захардкоженные численные лимиты из конфига.

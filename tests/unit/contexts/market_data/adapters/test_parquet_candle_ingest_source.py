@@ -84,6 +84,7 @@ market_data:
       market_code: binance:spot
       rest:
         base_url: "https://api.binance.com"
+        earliest_available_ts_utc: "2017-01-01T00:00:00Z"
         timeout_s: 10.0
         retries: 0
         backoff: { base_s: 0.01, max_s: 0.01, jitter_s: 0.0 }

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
 import yaml
 
 from trading.shared_kernel.primitives.market_id import MarketId
+from trading.shared_kernel.primitives.utc_timestamp import UtcTimestamp
 
 _ALLOWED_EXCHANGES = {"binance", "bybit"}
 _ALLOWED_MARKET_TYPES = {"spot", "futures"}
@@ -45,6 +47,7 @@ class RestConfig:
     base_url: str
     timeout_s: float
     retries: int
+    earliest_available_ts_utc: UtcTimestamp
     backoff: BackoffConfig
     limiter: RateLimiterConfig
 
@@ -375,6 +378,25 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
 
 
 def _parse_market(m: Any) -> MarketConfig:
+    """
+    Parse and validate one market mapping from runtime YAML.
+
+    Parameters:
+    - m: raw market mapping loaded from YAML.
+
+    Returns:
+    - Fully validated `MarketConfig`.
+
+    Assumptions/Invariants:
+    - Required nested sections `rest` and `ws` are present.
+    - `rest.earliest_available_ts_utc` is ISO-8601 UTC timestamp not in the future.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when shape or value constraints are violated.
+
+    Side effects:
+    - None.
+    """
     if not isinstance(m, dict):
         raise ValueError("each market entry must be a mapping")
 
@@ -391,6 +413,10 @@ def _parse_market(m: Any) -> MarketConfig:
         base_url=_get_str(rest_map, "base_url", required=True),
         timeout_s=_get_float(rest_map, "timeout_s", required=True),
         retries=_get_int(rest_map, "retries", required=True),
+        earliest_available_ts_utc=_get_utc_timestamp(
+            rest_map,
+            "earliest_available_ts_utc",
+        ),
         backoff=BackoffConfig(
             base_s=_get_float(backoff_map, "base_s", required=True),
             max_s=_get_float(backoff_map, "max_s", required=True),
@@ -487,6 +513,41 @@ def _get_float(d: Mapping[str, Any], key: str, *, required: bool) -> float:
     if isinstance(v, (int, float)):
         return float(v)
     raise ValueError(f"expected float at key '{key}', got {type(v).__name__}")
+
+
+def _get_utc_timestamp(d: Mapping[str, Any], key: str) -> UtcTimestamp:
+    """
+    Read one ISO-8601 UTC timestamp from mapping and validate it is not in future.
+
+    Parameters:
+    - d: source mapping.
+    - key: timestamp field name.
+    Returns:
+    - Parsed `UtcTimestamp`.
+
+    Assumptions/Invariants:
+    - Accepts ISO-8601 with explicit timezone or `Z` suffix.
+    - Result must not be later than current UTC wall clock.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when value is missing, malformed, timezone-naive, or in future.
+
+    Side effects:
+    - None.
+    """
+    raw = _get_str(d, key, required=True)
+
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise ValueError(f"invalid ISO-8601 timestamp at key '{key}': {raw!r}") from exc
+
+    ts = UtcTimestamp(parsed)
+    now_utc = datetime.now(tz=timezone.utc)
+    if ts.value > now_utc:
+        raise ValueError(f"key '{key}' must not be in the future: {raw!r}")
+    return ts
 
 
 def _get_int_with_default(d: Mapping[str, Any], key: str, *, default: int) -> int:

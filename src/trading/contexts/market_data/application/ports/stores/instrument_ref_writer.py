@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Iterable, Mapping, Protocol, Sequence
 
-from trading.contexts.market_data.application.dto.reference_data import InstrumentRefUpsert
+from trading.contexts.market_data.application.dto.reference_data import (
+    InstrumentRefEnrichmentUpsert,
+    InstrumentRefUpsert,
+)
 from trading.shared_kernel.primitives.market_id import MarketId
 from trading.shared_kernel.primitives.symbol import Symbol
 
@@ -23,4 +26,25 @@ class InstrumentRefWriter(Protocol):
         ...
 
     def upsert(self, rows: Iterable[InstrumentRefUpsert]) -> None:
+        """
+        Insert status/tradable updates into `ref_instruments`.
+
+        Parameters:
+        - rows: upsert rows with status and tradable flags.
+
+        Returns:
+        - None.
+        """
+        ...
+
+    def upsert_enrichment(self, rows: Iterable[InstrumentRefEnrichmentUpsert]) -> None:
+        """
+        Insert enrichment updates (base/quote/steps/min_notional) into `ref_instruments`.
+
+        Parameters:
+        - rows: enrichment rows; status and tradable flags must be preserved by caller.
+
+        Returns:
+        - None.
+        """
         ...

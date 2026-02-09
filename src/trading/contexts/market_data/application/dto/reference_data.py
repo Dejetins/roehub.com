@@ -30,6 +30,102 @@ class InstrumentRefUpsert:
 
 
 @dataclass(frozen=True, slots=True)
+class InstrumentRefEnrichmentUpsert:
+    market_id: MarketId
+    symbol: Symbol
+    status: str
+    is_tradable: int
+    base_asset: str | None
+    quote_asset: str | None
+    price_step: float | None
+    qty_step: float | None
+    min_notional: float | None
+    updated_at: UtcTimestamp
+
+    def __post_init__(self) -> None:
+        """
+        Validate enrichment upsert invariants for storage safety.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - Status/is_tradable keep the same constraints as whitelist sync rows.
+        - Numeric enrichment fields, when present, are strictly positive.
+
+        Errors/Exceptions:
+        - Raises `ValueError` on invalid field values.
+
+        Side effects:
+        - None.
+        """
+        if self.status not in ("ENABLED", "DISABLED"):
+            raise ValueError(
+                "InstrumentRefEnrichmentUpsert.status must be ENABLED|DISABLED, "
+                f"got {self.status!r}"
+            )
+        if self.is_tradable not in (0, 1):
+            raise ValueError(
+                "InstrumentRefEnrichmentUpsert.is_tradable must be 0|1, "
+                f"got {self.is_tradable!r}"
+            )
+        if self.base_asset is not None and not self.base_asset.strip():
+            raise ValueError("InstrumentRefEnrichmentUpsert.base_asset must not be blank")
+        if self.quote_asset is not None and not self.quote_asset.strip():
+            raise ValueError("InstrumentRefEnrichmentUpsert.quote_asset must not be blank")
+        if self.price_step is not None and self.price_step <= 0:
+            raise ValueError("InstrumentRefEnrichmentUpsert.price_step must be > 0")
+        if self.qty_step is not None and self.qty_step <= 0:
+            raise ValueError("InstrumentRefEnrichmentUpsert.qty_step must be > 0")
+        if self.min_notional is not None and self.min_notional <= 0:
+            raise ValueError("InstrumentRefEnrichmentUpsert.min_notional must be > 0")
+
+
+@dataclass(frozen=True, slots=True)
+class ExchangeInstrumentMetadata:
+    instrument_id: InstrumentId
+    base_asset: str | None
+    quote_asset: str | None
+    price_step: float | None
+    qty_step: float | None
+    min_notional: float | None
+
+    def __post_init__(self) -> None:
+        """
+        Validate normalized exchange metadata values.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - Blank asset strings are not allowed.
+        - Numeric values, when present, are strictly positive.
+
+        Errors/Exceptions:
+        - Raises `ValueError` on invalid values.
+
+        Side effects:
+        - None.
+        """
+        if self.base_asset is not None and not self.base_asset.strip():
+            raise ValueError("ExchangeInstrumentMetadata.base_asset must not be blank")
+        if self.quote_asset is not None and not self.quote_asset.strip():
+            raise ValueError("ExchangeInstrumentMetadata.quote_asset must not be blank")
+        if self.price_step is not None and self.price_step <= 0:
+            raise ValueError("ExchangeInstrumentMetadata.price_step must be > 0")
+        if self.qty_step is not None and self.qty_step <= 0:
+            raise ValueError("ExchangeInstrumentMetadata.qty_step must be > 0")
+        if self.min_notional is not None and self.min_notional <= 0:
+            raise ValueError("ExchangeInstrumentMetadata.min_notional must be > 0")
+
+
+@dataclass(frozen=True, slots=True)
 class RefMarketRow:
     market_id: MarketId
     exchange_name: str

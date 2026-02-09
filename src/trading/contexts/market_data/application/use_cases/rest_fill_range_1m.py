@@ -12,10 +12,15 @@ from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.contexts.market_data.application.ports.sources.candle_ingest_source import (
     CandleIngestSource,
 )
+from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
+    CanonicalCandleIndexReader,
+)
 from trading.contexts.market_data.application.ports.stores.raw_kline_writer import RawKlineWriter
+from trading.contexts.market_data.application.services.minute_utils import floor_to_minute_utc
 from trading.contexts.market_data.application.use_cases.time_slicing import (
     slice_time_range_by_utc_days,
 )
+from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +45,7 @@ class RestFillRange1mUseCase:
     clock: Clock
     max_days_per_insert: int
     batch_size: int
+    index_reader: CanonicalCandleIndexReader | None = None
 
     def __post_init__(self) -> None:
         """
@@ -92,27 +98,83 @@ class RestFillRange1mUseCase:
         - Reads external REST data and writes raw rows.
         """
         started_at = self.clock.now()
+        effective_task = self._effective_task(task)
+        if effective_task is None:
+            finished_at = self.clock.now()
+            return RestFillResult(
+                task=task,
+                rows_read=0,
+                rows_written=0,
+                batches_written=0,
+                started_at=started_at,
+                finished_at=finished_at,
+            )
+
         rows_read = 0
         rows_written = 0
         batches_written = 0
 
         for chunk in slice_time_range_by_utc_days(
-            time_range=task.time_range,
+            time_range=effective_task.time_range,
             max_days=self.max_days_per_insert,
         ):
-            chunk_read, chunk_written, chunk_batches = self._ingest_chunk(task, chunk)
+            chunk_read, chunk_written, chunk_batches = self._ingest_chunk(effective_task, chunk)
             rows_read += chunk_read
             rows_written += chunk_written
             batches_written += chunk_batches
 
         finished_at = self.clock.now()
         return RestFillResult(
-            task=task,
+            task=effective_task,
             rows_read=rows_read,
             rows_written=rows_written,
             batches_written=batches_written,
             started_at=started_at,
             finished_at=finished_at,
+        )
+
+    def _effective_task(self, task: RestFillTask) -> RestFillTask | None:
+        """
+        Build execution task, clamping historical/bootstrap ranges to current canonical minimum.
+
+        Parameters:
+        - task: original fill task.
+
+        Returns:
+        - Clamped task to execute or `None` when range becomes empty.
+
+        Assumptions/Invariants:
+        - Clamping applies only to historical bootstrap-style reasons.
+        - Missing index reader disables clamping and preserves original task.
+
+        Errors/Exceptions:
+        - Propagates index-reader errors when clamping is enabled.
+
+        Side effects:
+        - Reads canonical index bounds for selected reasons.
+        """
+        clamp_reasons = {"bootstrap", "scheduler_bootstrap", "historical_backfill"}
+        if task.reason not in clamp_reasons or self.index_reader is None:
+            return task
+
+        now_floor = UtcTimestamp(floor_to_minute_utc(self.clock.now().value))
+        canonical_min, _canonical_max = self.index_reader.bounds_1m(
+            instrument_id=task.instrument_id,
+            before=now_floor,
+        )
+        if canonical_min is None:
+            return task
+
+        clamped_end = canonical_min
+        if task.time_range.end.value <= clamped_end.value:
+            return task
+        if task.time_range.start.value >= clamped_end.value:
+            return None
+
+        return RestFillTask(
+            instrument_id=task.instrument_id,
+            time_range=TimeRange(start=task.time_range.start, end=clamped_end),
+            reason=task.reason,
         )
 
     def _ingest_chunk(self, task: RestFillTask, chunk) -> tuple[int, int, int]:
@@ -178,4 +240,3 @@ class RestFillRange1mUseCase:
         - Writes one insert batch into raw storage.
         """
         self.writer.write_1m(rows)
-

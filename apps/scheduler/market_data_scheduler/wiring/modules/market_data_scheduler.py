@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Mapping
 from uuid import uuid4
@@ -17,6 +16,9 @@ from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
 from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import (
     RestCandleIngestSource,
+)
+from trading.contexts.market_data.adapters.outbound.clients.rest_instrument_metadata_source import (
+    RestInstrumentMetadataSource,
 )
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     MarketDataRuntimeConfig,
@@ -34,14 +36,25 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ThreadLocalClickHouseConnectGateway,
 )
 from trading.contexts.market_data.application.dto import RestFillTask, WhitelistInstrumentRow
+from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
+    CanonicalCandleIndexReader,
+)
+from trading.contexts.market_data.application.ports.stores.enabled_instrument_reader import (
+    EnabledInstrumentReader,
+)
+from trading.contexts.market_data.application.services import (
+    AsyncRestFillQueue,
+    SchedulerBackfillPlanner,
+)
 from trading.contexts.market_data.application.services.minute_utils import floor_to_minute_utc
 from trading.contexts.market_data.application.use_cases import (
+    EnrichRefInstrumentsFromExchangeUseCase,
     RestFillRange1mUseCase,
     SeedRefMarketUseCase,
     SyncWhitelistToRefInstrumentsUseCase,
 )
 from trading.platform.time.system_clock import SystemClock
-from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
+from trading.shared_kernel.primitives import UtcTimestamp
 
 log = logging.getLogger(__name__)
 
@@ -111,9 +124,11 @@ class MarketDataSchedulerApp:
     - whitelist_path: path to whitelist CSV used by sync job.
     - seed_use_case: seed ref_market use-case.
     - sync_use_case: whitelist sync use-case.
+    - enrich_use_case: instrument enrichment use-case.
     - instrument_reader: enabled-instruments reader.
     - index_reader: canonical index reader.
-    - rest_fill_use_case: bounded rest range fill use-case.
+    - rest_fill_queue: async queue executing rest fill tasks in background.
+    - backfill_planner: deterministic planner of bootstrap/historical/tail ranges.
     - metrics: scheduler metrics bundle.
     - metrics_port: HTTP port for `/metrics`.
     """
@@ -125,9 +140,11 @@ class MarketDataSchedulerApp:
         whitelist_path: str,
         seed_use_case: SeedRefMarketUseCase,
         sync_use_case: SyncWhitelistToRefInstrumentsUseCase,
-        instrument_reader: ClickHouseEnabledInstrumentReader,
-        index_reader: ClickHouseCanonicalCandleIndexReader,
-        rest_fill_use_case: RestFillRange1mUseCase,
+        enrich_use_case: EnrichRefInstrumentsFromExchangeUseCase,
+        instrument_reader: EnabledInstrumentReader,
+        index_reader: CanonicalCandleIndexReader,
+        rest_fill_queue: AsyncRestFillQueue,
+        backfill_planner: SchedulerBackfillPlanner,
         metrics: MarketDataSchedulerMetrics,
         metrics_port: int,
     ) -> None:
@@ -155,12 +172,13 @@ class MarketDataSchedulerApp:
         self._whitelist_path = whitelist_path
         self._seed_use_case = seed_use_case
         self._sync_use_case = sync_use_case
+        self._enrich_use_case = enrich_use_case
         self._instrument_reader = instrument_reader
         self._index_reader = index_reader
-        self._rest_fill_use_case = rest_fill_use_case
+        self._rest_fill_queue = rest_fill_queue
+        self._backfill_planner = backfill_planner
         self._metrics = metrics
         self._metrics_port = metrics_port
-        self._bootstrap_start = UtcTimestamp(datetime(2017, 1, 1, tzinfo=timezone.utc))
         self._clock = SystemClock()
 
     async def run(self, stop_event: asyncio.Event) -> None:
@@ -181,10 +199,29 @@ class MarketDataSchedulerApp:
 
         Side effects:
         - Starts Prometheus endpoint.
+        - Runs startup sequence (S1, S2, startup scan).
         - Runs periodic scheduler jobs.
         """
         start_http_server(self._metrics_port)
         log.info("scheduler metrics server started on port %s", self._metrics_port)
+        await self._rest_fill_queue.start()
+
+        startup_jobs = [
+            SchedulerJob(
+                name="sync_whitelist",
+                interval_seconds=self._config.scheduler.jobs.sync_whitelist.interval_seconds,
+            ),
+            SchedulerJob(
+                name="enrich",
+                interval_seconds=self._config.scheduler.jobs.enrich.interval_seconds,
+            ),
+            SchedulerJob(
+                name="startup_scan",
+                interval_seconds=1,
+            ),
+        ]
+        for job in startup_jobs:
+            await self._run_once(job)
 
         jobs = [
             SchedulerJob(
@@ -201,7 +238,7 @@ class MarketDataSchedulerApp:
             ),
         ]
 
-        tasks = [
+        periodic_tasks = [
             asyncio.create_task(
                 self._run_periodic_job(job, stop_event),
                 name=f"scheduler-{job.name}",
@@ -209,11 +246,12 @@ class MarketDataSchedulerApp:
             for job in jobs
         ]
         await stop_event.wait()
-        await asyncio.gather(*tasks, return_exceptions=True)
+        await asyncio.gather(*periodic_tasks, return_exceptions=True)
+        await self._rest_fill_queue.close()
 
     async def _run_periodic_job(self, job: SchedulerJob, stop_event: asyncio.Event) -> None:
         """
-        Execute one scheduler job on start and then periodically.
+        Execute one scheduler job periodically until shutdown.
 
         Parameters:
         - job: job descriptor.
@@ -231,8 +269,6 @@ class MarketDataSchedulerApp:
         Side effects:
         - Runs job-specific side effects according to handler logic.
         """
-        await self._run_once(job)
-
         while not stop_event.is_set():
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=job.interval_seconds)
@@ -267,6 +303,8 @@ class MarketDataSchedulerApp:
                 await self._run_sync_whitelist_job()
             elif job.name == "enrich":
                 await self._run_enrich_job()
+            elif job.name == "startup_scan":
+                await self._run_startup_scan_job()
             elif job.name == "rest_insurance_catchup":
                 await self._run_rest_insurance_job()
             else:
@@ -310,7 +348,7 @@ class MarketDataSchedulerApp:
 
     async def _run_enrich_job(self) -> None:
         """
-        Run S2 placeholder: enrich reference instruments.
+        Run S2: enrich reference instruments from exchange instrument metadata endpoints.
 
         Parameters:
         - None.
@@ -319,19 +357,47 @@ class MarketDataSchedulerApp:
         - None.
 
         Assumptions/Invariants:
-        - Enrich use-case is not implemented in current codebase.
+        - Only enabled tradable symbols are enriched.
 
         Errors/Exceptions:
-        - None.
+        - Propagates enrich use-case errors.
 
         Side effects:
-        - Emits informational log line.
+        - Writes enrichment rows into `ref_instruments`.
         """
-        log.info("enrich_ref_instruments job is not implemented in current repository state")
+        report = await asyncio.to_thread(self._enrich_use_case.run)
+        log.info(
+            "enrich_ref_instruments completed: instruments_total=%s rows_upserted=%s missing_metadata=%s",  # noqa: E501
+            report.instruments_total,
+            report.rows_upserted,
+            report.symbols_missing_metadata,
+        )
+
+    async def _run_startup_scan_job(self) -> None:
+        """
+        Run startup maintenance scan once and enqueue bootstrap/historical/tail tasks.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - Startup scan should execute exactly once per process start.
+
+        Errors/Exceptions:
+        - Propagates planning or queue errors.
+
+        Side effects:
+        - Reads canonical bounds for enabled instruments.
+        - Enqueues background REST fill tasks.
+        """
+        await self._scan_and_enqueue(scan_reason="startup_scan")
 
     async def _run_rest_insurance_job(self) -> None:
         """
-        Run S3: periodic insurance rest catchup and bootstrap for empty instruments.
+        Run S3: periodic maintenance scan and enqueue insurance/background fill tasks.
 
         Parameters:
         - None.
@@ -347,40 +413,77 @@ class MarketDataSchedulerApp:
         - Propagates per-instrument errors to caller (job wrapper handles them).
 
         Side effects:
-        - Executes REST reads and raw writes for enabled instruments.
+        - Reads canonical bounds for enabled instruments.
+        - Enqueues background REST fill tasks.
+        """
+        await self._scan_and_enqueue(scan_reason="rest_insurance_catchup")
+
+    async def _scan_and_enqueue(self, *, scan_reason: str) -> None:
+        """
+        Build and enqueue maintenance tasks for all enabled instruments.
+
+        Parameters:
+        - scan_reason: textual reason used in logs.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - Instrument list source is `ref_instruments` with enabled+tradable filter.
+        - Task ranges keep half-open semantics `[start, end)`.
+
+        Errors/Exceptions:
+        - Propagates storage and queue errors.
+
+        Side effects:
+        - Executes canonical bounds reads.
+        - Enqueues REST fill tasks into background queue.
         """
         instruments = await asyncio.to_thread(self._instrument_reader.list_enabled_tradable)
         if not instruments:
+            log.info("%s: no enabled instruments for maintenance scan", scan_reason)
             return
 
         now_floor = UtcTimestamp(floor_to_minute_utc(self._clock.now().value))
-        lookback_start = UtcTimestamp(
-            now_floor.value - timedelta(minutes=self._config.ingestion.tail_lookback_minutes)
-        )
         semaphore = asyncio.Semaphore(self._config.ingestion.rest_concurrency_instruments)
+        planned_tasks: list[RestFillTask] = []
 
-        async def _fill_one(instrument) -> None:
+        async def _plan_one(instrument) -> list[RestFillTask]:  # noqa: ANN001
             async with semaphore:
-                bounds = await asyncio.to_thread(self._index_reader.bounds, instrument)
-                if bounds is None:
-                    if self._bootstrap_start.value >= now_floor.value:
-                        return
-                    task = RestFillTask(
-                        instrument_id=instrument,
-                        time_range=TimeRange(start=self._bootstrap_start, end=now_floor),
-                        reason="scheduler_bootstrap",
-                    )
-                else:
-                    if lookback_start.value >= now_floor.value:
-                        return
-                    task = RestFillTask(
-                        instrument_id=instrument,
-                        time_range=TimeRange(start=lookback_start, end=now_floor),
-                        reason="scheduler_tail",
-                    )
-                await asyncio.to_thread(self._rest_fill_use_case.run, task)
+                bounds = await asyncio.to_thread(
+                    self._index_reader.bounds_1m,
+                    instrument_id=instrument,
+                    before=now_floor,
+                )
+                earliest = self._config.market_by_id(
+                    instrument.market_id
+                ).rest.earliest_available_ts_utc
+                return self._backfill_planner.plan_for_instrument(
+                    instrument_id=instrument,
+                    earliest_market_ts=earliest,
+                    bounds_1m=bounds,
+                    now_floor=now_floor,
+                )
 
-        await asyncio.gather(*[asyncio.create_task(_fill_one(inst)) for inst in instruments])
+        grouped = await asyncio.gather(
+            *[asyncio.create_task(_plan_one(instrument)) for instrument in instruments]
+        )
+        for tasks in grouped:
+            planned_tasks.extend(tasks)
+
+        enqueued = 0
+        for task in planned_tasks:
+            accepted = await self._rest_fill_queue.enqueue(task)
+            if accepted:
+                enqueued += 1
+
+        log.info(
+            "%s: planned_tasks=%s enqueued_tasks=%s instruments=%s",
+            scan_reason,
+            len(planned_tasks),
+            enqueued,
+            len(instruments),
+        )
 
 
 def build_market_data_scheduler_app(
@@ -452,6 +555,21 @@ def build_market_data_scheduler_app(
         clock=SystemClock(),
         max_days_per_insert=config.backfill.max_days_per_insert,
         batch_size=10_000,
+        index_reader=index_reader,
+    )
+    metadata_source = RestInstrumentMetadataSource(cfg=config, http=RequestsHttpClient())
+    enrich_use_case = EnrichRefInstrumentsFromExchangeUseCase(
+        instrument_reader=instrument_reader,
+        metadata_source=metadata_source,
+        writer=instrument_writer,
+        clock=SystemClock(),
+    )
+    rest_fill_queue = AsyncRestFillQueue(
+        executor=rest_fill_use_case.run,
+        worker_count=config.ingestion.rest_concurrency_instruments,
+    )
+    backfill_planner = SchedulerBackfillPlanner(
+        tail_lookback_minutes=config.ingestion.tail_lookback_minutes,
     )
 
     return MarketDataSchedulerApp(
@@ -459,9 +577,11 @@ def build_market_data_scheduler_app(
         whitelist_path=whitelist_path,
         seed_use_case=seed_use_case,
         sync_use_case=sync_use_case,
+        enrich_use_case=enrich_use_case,
         instrument_reader=instrument_reader,
         index_reader=index_reader,
-        rest_fill_use_case=rest_fill_use_case,
+        rest_fill_queue=rest_fill_queue,
+        backfill_planner=backfill_planner,
         metrics=MarketDataSchedulerMetrics(),
         metrics_port=metrics_port,
     )

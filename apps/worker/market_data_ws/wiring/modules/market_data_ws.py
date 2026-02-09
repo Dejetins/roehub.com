@@ -604,6 +604,7 @@ def build_market_data_ws_app(
         clock=clock,
         max_days_per_insert=config.backfill.max_days_per_insert,
         batch_size=10_000,
+        index_reader=index_reader,
     )
 
     insert_buffer = AsyncRawInsertBuffer(
@@ -632,7 +633,14 @@ def build_market_data_ws_app(
         on_duplicate=metrics.ws_duplicates_total.inc,
         on_out_of_order=metrics.ws_out_of_order_total.inc,
     )
-    reconnect_planner = ReconnectTailFillPlanner(index_reader=index_reader, clock=clock)
+    reconnect_planner = ReconnectTailFillPlanner(
+        index_reader=index_reader,
+        clock=clock,
+        bootstrap_start_by_market={
+            int(market.market_id.value): market.rest.earliest_available_ts_utc
+            for market in config.markets
+        },
+    )
 
     return MarketDataWsApp(
         config=config,

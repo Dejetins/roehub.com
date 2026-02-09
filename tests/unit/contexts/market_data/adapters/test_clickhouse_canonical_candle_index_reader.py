@@ -83,6 +83,35 @@ def test_max_ts_open_lt():
     assert int(gw.last_params["market_id"]) == 1
 
 
+def test_bounds_1m_applies_exclusive_before_filter() -> None:
+    """
+    Ensure `bounds_1m` query includes exclusive `ts_open < before` constraint.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+    """
+    dt1 = datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)
+    dt2 = datetime(2026, 2, 1, 0, 5, tzinfo=timezone.utc)
+    gw = FakeGateway([{"first": dt1, "last": dt2}])
+    reader = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
+    inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+
+    out = reader.bounds_1m(
+        instrument_id=inst,
+        before=UtcTimestamp(datetime(2026, 2, 1, 0, 10, tzinfo=timezone.utc)),
+    )
+
+    assert str(out[0]) == str(UtcTimestamp(dt1))
+    assert str(out[1]) == str(UtcTimestamp(dt2))
+    assert gw.last_query is not None
+    assert "ts_open < %(before)s" in gw.last_query
+    assert gw.last_params is not None
+    assert "before" in gw.last_params
+
+
 def test_distinct_ts_opens():
     """
     Ensure distinct-ts query deduplicates on minute buckets.

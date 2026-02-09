@@ -9,6 +9,7 @@ market_data:
       market_code: binance:spot
       rest:
         base_url: "https://api.binance.com"
+        earliest_available_ts_utc: "2017-01-01T00:00:00Z"
         timeout_s: 10.0
         retries: 3
         backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
@@ -28,6 +29,7 @@ market_data:
       market_code: binance:futures
       rest:
         base_url: "https://fapi.binance.com"
+        earliest_available_ts_utc: "2019-09-01T00:00:00Z"
         timeout_s: 10.0
         retries: 3
         backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
@@ -47,6 +49,7 @@ market_data:
       market_code: bybit:spot
       rest:
         base_url: "https://api.bybit.com"
+        earliest_available_ts_utc: "2018-01-01T00:00:00Z"
         timeout_s: 10.0
         retries: 3
         backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
@@ -67,6 +70,7 @@ market_data:
       market_code: bybit:futures
       rest:
         base_url: "https://api.bybit.com"
+        earliest_available_ts_utc: "2018-01-01T00:00:00Z"
         timeout_s: 10.0
         retries: 3
         backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }

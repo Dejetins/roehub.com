@@ -1,0 +1,206 @@
+from __future__ import annotations
+
+import asyncio
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+
+from apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler import (
+    MarketDataSchedulerApp,
+    MarketDataSchedulerMetrics,
+)
+from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
+    load_market_data_runtime_config,
+)
+from trading.contexts.market_data.application.services import SchedulerBackfillPlanner
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
+
+
+@dataclass(frozen=True, slots=True)
+class _FixedClock:
+    now_value: UtcTimestamp
+
+    def now(self) -> UtcTimestamp:
+        """Return deterministic current timestamp for scheduler tests."""
+        return self.now_value
+
+
+class _SeedUseCase:
+    def __init__(self) -> None:
+        """Initialize seed invocation counter."""
+        self.calls = 0
+
+    def run(self):  # noqa: ANN001
+        """Increment invocation counter for each scheduler seed run."""
+        self.calls += 1
+
+
+class _SyncUseCase:
+    def __init__(self) -> None:
+        """Initialize sync invocation counter."""
+        self.calls = 0
+
+    def run(self, rows):  # noqa: ANN001
+        """Increment invocation counter and ignore payload details."""
+        _ = rows
+        self.calls += 1
+
+
+class _EnrichUseCase:
+    def __init__(self) -> None:
+        """Initialize enrich invocation counter."""
+        self.calls = 0
+
+    def run(self):  # noqa: ANN001
+        """Increment invocation counter and return minimal report-like object."""
+        self.calls += 1
+        return type(
+            "_Report",
+            (),
+            {"instruments_total": 1, "rows_upserted": 1, "symbols_missing_metadata": 0},
+        )()
+
+
+class _InstrumentReader:
+    def list_enabled_tradable(self):  # noqa: ANN001
+        """Return one enabled instrument for startup scan planning."""
+        return [InstrumentId(MarketId(1), Symbol("BTCUSDT"))]
+
+
+class _IndexReader:
+    def bounds_1m(self, *, instrument_id, before):  # noqa: ANN001
+        """Return canonical bounds causing both historical and tail tasks."""
+        _ = instrument_id
+        _ = before
+        return (
+            UtcTimestamp(datetime(2026, 2, 9, 13, 55, tzinfo=timezone.utc)),
+            UtcTimestamp(datetime(2026, 2, 9, 13, 58, tzinfo=timezone.utc)),
+        )
+
+
+class _RestQueue:
+    def __init__(self) -> None:
+        """Initialize queue lifecycle and enqueue tracking containers."""
+        self.started = 0
+        self.closed = 0
+        self.enqueued = []
+
+    async def start(self) -> None:
+        """Record queue start call."""
+        self.started += 1
+
+    async def close(self) -> None:
+        """Record queue close call."""
+        self.closed += 1
+
+    async def enqueue(self, task) -> bool:  # noqa: ANN001
+        """Capture enqueued task and report acceptance."""
+        self.enqueued.append(task)
+        return True
+
+
+def _config(tmp_path: Path):
+    """
+    Build runtime config fixture for scheduler startup scan test.
+
+    Parameters:
+    - tmp_path: pytest temporary directory fixture.
+
+    Returns:
+    - Parsed market-data runtime config.
+    """
+    yaml_text = """
+version: 1
+market_data:
+  markets:
+    - market_id: 1
+      exchange: binance
+      market_type: spot
+      market_code: binance:spot
+      rest:
+        base_url: https://api.binance.com
+        earliest_available_ts_utc: "2017-01-01T00:00:00Z"
+        timeout_s: 10.0
+        retries: 0
+        backoff: { base_s: 0.1, max_s: 0.1, jitter_s: 0.0 }
+        limiter: { mode: autodetect, safety_factor: 0.8, max_concurrency: 1 }
+      ws:
+        url: wss://stream.binance.com:9443/stream
+        ping_interval_s: 20.0
+        pong_timeout_s: 10.0
+        reconnect: { min_delay_s: 0.5, max_delay_s: 30.0, factor: 1.7, jitter_s: 0.2 }
+        max_symbols_per_connection: 50
+  ingestion:
+    flush_interval_ms: 250
+    max_buffer_rows: 1000
+    rest_concurrency_instruments: 2
+    tail_lookback_minutes: 180
+  scheduler:
+    jobs:
+      sync_whitelist: { interval_seconds: 3600 }
+      enrich: { interval_seconds: 3600 }
+      rest_insurance_catchup: { interval_seconds: 3600 }
+  backfill:
+    max_days_per_insert: 7
+    chunk_align: utc_day
+"""
+    cfg_path = tmp_path / "market_data.yaml"
+    cfg_path.write_text(yaml_text.strip(), encoding="utf-8")
+    return load_market_data_runtime_config(cfg_path)
+
+
+def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(tmp_path: Path, monkeypatch) -> None:
+    """
+    Ensure startup scan runs once per process start and enqueues planned tasks.
+
+    Parameters:
+    - tmp_path: pytest temporary path fixture.
+    - monkeypatch: pytest monkeypatch fixture.
+
+    Returns:
+    - None.
+    """
+
+    async def _scenario() -> None:
+        monkeypatch.setattr(
+            "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.start_http_server",
+            lambda _port: None,
+        )
+
+        seed = _SeedUseCase()
+        sync = _SyncUseCase()
+        enrich = _EnrichUseCase()
+        queue = _RestQueue()
+        app = MarketDataSchedulerApp(
+            config=_config(tmp_path),
+            whitelist_path=str(tmp_path / "missing.csv"),
+            seed_use_case=seed,
+            sync_use_case=sync,
+            enrich_use_case=enrich,
+            instrument_reader=_InstrumentReader(),
+            index_reader=_IndexReader(),
+            rest_fill_queue=queue,
+            backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
+            metrics=MarketDataSchedulerMetrics(),
+            metrics_port=9202,
+        )
+        app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
+
+        whitelist = tmp_path / "missing.csv"
+        whitelist.write_text("market_id,symbol,is_enabled\n1,BTCUSDT,1\n", encoding="utf-8")
+
+        stop_event = asyncio.Event()
+        stop_event.set()
+
+        await app.run(stop_event)
+
+        assert seed.calls == 1
+        assert sync.calls == 1
+        assert enrich.calls == 1
+        assert queue.started == 1
+        assert queue.closed == 1
+        assert len(queue.enqueued) == 2
+        reasons = {task.reason for task in queue.enqueued}
+        assert reasons == {"historical_backfill", "scheduler_tail"}
+
+    asyncio.run(_scenario())

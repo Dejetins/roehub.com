@@ -39,6 +39,9 @@ def test_reconnect_tail_planner_bootstrap_when_canonical_is_empty() -> None:
     planner = ReconnectTailFillPlanner(
         index_reader=_FakeIndex(last_value=None),
         clock=_FixedClock(UtcTimestamp(datetime(2026, 2, 5, 12, 34, 45, tzinfo=timezone.utc))),
+        bootstrap_start_by_market={
+            1: UtcTimestamp(datetime(2017, 1, 1, tzinfo=timezone.utc)),
+        },
     )
     task = planner.plan_for_instrument(InstrumentId(MarketId(1), Symbol("BTCUSDT")))
     assert task is not None
@@ -55,6 +58,9 @@ def test_reconnect_tail_planner_enqueues_tail_fill_for_old_last_minute() -> None
             last_value=UtcTimestamp(datetime(2026, 2, 5, 12, 30, tzinfo=timezone.utc))
         ),
         clock=_FixedClock(UtcTimestamp(datetime(2026, 2, 5, 12, 34, 30, tzinfo=timezone.utc))),
+        bootstrap_start_by_market={
+            1: UtcTimestamp(datetime(2017, 1, 1, tzinfo=timezone.utc)),
+        },
     )
     task = planner.plan_for_instrument(InstrumentId(MarketId(1), Symbol("BTCUSDT")))
     assert task is not None
