@@ -30,25 +30,108 @@ class ClickHouseRawKlineWriter(RawKlineWriter):
         self._db = database.strip()
 
     def write_1m(self, rows: Iterable[CandleWithMeta]) -> None:
+        """
+        Write 1m candles into proper raw tables grouped by market route.
+
+        Parameters:
+        - rows: iterable of normalized candle-with-meta rows.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - Rows can belong to multiple markets within one call.
+        - Routing is determined per row by `market_id`.
+
+        Errors/Exceptions:
+        - Raises `ValueError` for unsupported market ids.
+        - Propagates gateway insert errors.
+
+        Side effects:
+        - Executes one or more ClickHouse inserts into `raw_*_klines_1m`.
+        """
         materialized = list(rows)
         if not materialized:
             return
 
-        first_market_id = materialized[0].candle.instrument_id.market_id.value
-        table = self._raw_table_for_market_id(int(first_market_id))
-
-        payload = [self._row_to_raw_payload(r) for r in materialized]
-        fq_table = f"{self._db}.{table}"
-        self._gw.insert_rows(fq_table, payload)
+        payload_by_table = self._payload_by_table(materialized)
+        for table, payload in payload_by_table.items():
+            fq_table = f"{self._db}.{table}"
+            self._gw.insert_rows(fq_table, payload)
 
     def _raw_table_for_market_id(self, market_id: int) -> str:
+        """
+        Map market id to target raw table name.
+
+        Parameters:
+        - market_id: integer market id.
+
+        Returns:
+        - Raw table name without database prefix.
+
+        Assumptions/Invariants:
+        - Market ids `1,2` are Binance; `3,4` are Bybit.
+
+        Errors/Exceptions:
+        - Raises `ValueError` for unsupported market ids.
+
+        Side effects:
+        - None.
+        """
         if market_id in (1, 2):
             return "raw_binance_klines_1m"
         if market_id in (3, 4):
             return "raw_bybit_klines_1m"
         raise ValueError(f"Unsupported market_id={market_id} for raw writer routing")
 
+    def _payload_by_table(
+        self,
+        rows: list[CandleWithMeta],
+    ) -> dict[str, list[Mapping[str, Any]]]:
+        """
+        Build per-table payload groups for one mixed market batch.
+
+        Parameters:
+        - rows: materialized rows from caller.
+
+        Returns:
+        - Mapping `table_name -> payload rows`.
+
+        Assumptions/Invariants:
+        - Every row has a supported `market_id`.
+
+        Errors/Exceptions:
+        - Raises `ValueError` for unsupported market ids.
+
+        Side effects:
+        - None.
+        """
+        grouped: dict[str, list[Mapping[str, Any]]] = {}
+        for row in rows:
+            market_id = int(row.candle.instrument_id.market_id.value)
+            table = self._raw_table_for_market_id(market_id)
+            grouped.setdefault(table, []).append(self._row_to_raw_payload(row))
+        return grouped
+
     def _row_to_raw_payload(self, row: CandleWithMeta) -> Mapping[str, Any]:
+        """
+        Convert domain row into raw-table-specific payload mapping.
+
+        Parameters:
+        - row: domain row to serialize.
+
+        Returns:
+        - Payload dictionary matching target raw table schema.
+
+        Assumptions/Invariants:
+        - Market id determines payload schema family (Binance or Bybit).
+
+        Errors/Exceptions:
+        - Raises `ValueError` for unsupported market ids.
+
+        Side effects:
+        - None.
+        """
         m_id = int(row.candle.instrument_id.market_id.value)
         if m_id in (1, 2):
             return self._to_binance_raw(row)
@@ -57,6 +140,24 @@ class ClickHouseRawKlineWriter(RawKlineWriter):
         raise ValueError(f"Unsupported market_id={m_id} for raw payload mapping")
 
     def _to_binance_raw(self, row: CandleWithMeta) -> Mapping[str, Any]:
+        """
+        Map one candle row to Binance raw table schema.
+
+        Parameters:
+        - row: candle row for Binance market.
+
+        Returns:
+        - Payload dictionary for `raw_binance_klines_1m`.
+
+        Assumptions/Invariants:
+        - Non-nullable numeric fields are normalized to 0/0.0 when source value is absent.
+
+        Errors/Exceptions:
+        - None.
+
+        Side effects:
+        - None.
+        """
         c = row.candle
         m = row.meta
 
@@ -91,6 +192,25 @@ class ClickHouseRawKlineWriter(RawKlineWriter):
         }
 
     def _to_bybit_raw(self, row: CandleWithMeta) -> Mapping[str, Any]:
+        """
+        Map one candle row to Bybit raw table schema.
+
+        Parameters:
+        - row: candle row for Bybit market.
+
+        Returns:
+        - Payload dictionary for `raw_bybit_klines_1m`.
+
+        Assumptions/Invariants:
+        - `interval_min` is always integer `1`.
+        - Non-nullable turnover is normalized to `0.0` when absent.
+
+        Errors/Exceptions:
+        - None.
+
+        Side effects:
+        - None.
+        """
         c = row.candle
         m = row.meta
 

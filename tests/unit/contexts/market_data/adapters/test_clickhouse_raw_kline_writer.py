@@ -93,3 +93,32 @@ def test_writer_routes_bybit_markets_to_bybit_raw_and_normalizes_turnover() -> N
     assert isinstance(payload[0]["start_time_ms"], int)
     assert "start_time_utc" in payload[0]
     assert "ts_open" not in payload[0]
+
+
+def test_writer_splits_mixed_market_batch_into_separate_raw_tables() -> None:
+    """
+    Ensure mixed WS flush batch is split by target raw table to avoid schema mismatch.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+    """
+    gw = RecordingGateway()
+    writer = ClickHouseRawKlineWriter(gateway=gw)
+
+    mixed_rows = [
+        _row(3, "BTCUSDT", volume_quote=None),
+        _row(1, "ETHUSDT", volume_quote=None, trades_count=None),
+    ]
+    writer.write_1m(mixed_rows)
+
+    assert len(gw.inserts) == 2
+    tables = {table for table, _ in gw.inserts}
+    assert "market_data.raw_binance_klines_1m" in tables
+    assert "market_data.raw_bybit_klines_1m" in tables
+
+    by_table = {table: payload for table, payload in gw.inserts}
+    assert by_table["market_data.raw_bybit_klines_1m"][0]["interval_min"] == 1
+    assert by_table["market_data.raw_binance_klines_1m"][0]["number_of_trades"] == 0
