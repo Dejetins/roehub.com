@@ -4,6 +4,10 @@
 - `market-data-ws-worker` (`http://<host>:9201/metrics`)
 - `market-data-scheduler` (`http://<host>:9202/metrics`)
 
+В production Prometheus опрашивает их по DNS внутри compose-сети:
+- `http://market-data-ws-worker:9201/metrics`
+- `http://market-data-scheduler:9202/metrics`
+
 Документ отвечает на вопросы:
 - что считает каждая метрика;
 - когда метрика должна расти;

@@ -1,12 +1,13 @@
+# Dev/standalone compose for market-data only.
+# Production path uses infra/docker/docker-compose.yml.
 services:
   market-data-clickhouse:
     image: clickhouse/clickhouse-server:24.8
-    profiles: ["standalone"]
     restart: unless-stopped
     environment:
       CLICKHOUSE_DB: ${CH_DATABASE:-market_data}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CLICKHOUSE_USER: ${CH_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CH_PASSWORD:-}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     ports:
       - "127.0.0.1:${MARKET_DATA_CH_HTTP_PORT:-18123}:8123"
@@ -23,20 +24,20 @@ services:
     volumes:
       - market_data_ch_data:/var/lib/clickhouse
       - market_data_ch_logs:/var/log/clickhouse-server
-    networks:
-      - roehub-shared
 
   market-data-ws-worker:
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     restart: unless-stopped
+    depends_on:
+      - market-data-clickhouse
     environment:
-      CH_HOST: ${CH_HOST:-clickhouse}
+      CH_HOST: ${CH_HOST:-market-data-clickhouse}
       CH_PORT: ${CH_PORT:-8123}
       CH_DATABASE: ${CH_DATABASE:-market_data}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CH_USER: ${CH_USER:-default}
+      CH_PASSWORD: ${CH_PASSWORD:-}
       CH_SECURE: ${CH_SECURE:-0}
       CH_VERIFY: ${CH_VERIFY:-1}
     command:
@@ -49,20 +50,20 @@ services:
       - "9201"
     ports:
       - "127.0.0.1:${MARKET_DATA_WORKER_METRICS_PORT:-9201}:9201"
-    networks:
-      - roehub-shared
 
   market-data-scheduler:
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     restart: unless-stopped
+    depends_on:
+      - market-data-clickhouse
     environment:
-      CH_HOST: ${CH_HOST:-clickhouse}
+      CH_HOST: ${CH_HOST:-market-data-clickhouse}
       CH_PORT: ${CH_PORT:-8123}
       CH_DATABASE: ${CH_DATABASE:-market_data}
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CH_USER: ${CH_USER:-default}
+      CH_PASSWORD: ${CH_PASSWORD:-}
       CH_SECURE: ${CH_SECURE:-0}
       CH_VERIFY: ${CH_VERIFY:-1}
     command:
@@ -77,14 +78,7 @@ services:
       - "9202"
     ports:
       - "127.0.0.1:${MARKET_DATA_SCHEDULER_METRICS_PORT:-9202}:9202"
-    networks:
-      - roehub-shared
 
 volumes:
   market_data_ch_data: {}
   market_data_ch_logs: {}
-
-networks:
-  roehub-shared:
-    name: ${ROEHUB_SHARED_NETWORK:-roehub_default}
-    external: true

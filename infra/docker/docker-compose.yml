@@ -45,6 +45,60 @@ services:
       - ch_data:/var/lib/clickhouse
       - ch_logs:/var/log/clickhouse-server
 
+  market-data-ws-worker:
+    build:
+      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
+      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    restart: unless-stopped
+    depends_on:
+      - clickhouse
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: 8123
+      CH_DATABASE: ${CH_DATABASE:-market_data}
+      CH_USER: ${CLICKHOUSE_USER:-default}
+      CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CH_SECURE: "0"
+      CH_VERIFY: "1"
+    command:
+      - python
+      - -m
+      - apps.worker.market_data_ws.main.main
+      - --config
+      - /app/configs/prod/market_data.yaml
+      - --metrics-port
+      - "9201"
+    ports:
+      - "127.0.0.1:9201:9201"
+
+  market-data-scheduler:
+    build:
+      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
+      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    restart: unless-stopped
+    depends_on:
+      - clickhouse
+    environment:
+      CH_HOST: clickhouse
+      CH_PORT: 8123
+      CH_DATABASE: ${CH_DATABASE:-market_data}
+      CH_USER: ${CLICKHOUSE_USER:-default}
+      CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CH_SECURE: "0"
+      CH_VERIFY: "1"
+    command:
+      - python
+      - -m
+      - apps.scheduler.market_data_scheduler.main.main
+      - --config
+      - /app/configs/prod/market_data.yaml
+      - --whitelist
+      - /app/configs/prod/whitelist.csv
+      - --metrics-port
+      - "9202"
+    ports:
+      - "127.0.0.1:9202:9202"
+
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -62,9 +116,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:9090:9090"
-    # Linux: даёт DNS имя host.docker.internal -> gateway (хост)
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prom_data:/prometheus
@@ -79,9 +130,6 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:9115:9115"
-    # если blackbox тоже будет проверять хостовые URL — оставь
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
     command:

@@ -1,80 +1,70 @@
-# Market Data Autonomous Docker Runbook
+# Market Data Docker Runbook
 
-Runbook для автономного запуска `market-data-ws-worker` и `market-data-scheduler` в Docker.
+Runbook для `market-data-ws-worker` и `market-data-scheduler`.
 
-## 1. Режимы запуска
+## 1. Рекомендуемая прод-модель
 
-### Режим по умолчанию (prod-friendly)
+Прод использует **единый стек** `infra/docker/docker-compose.yml`:
 
-`infra/docker/docker-compose.market_data.yml` по умолчанию **не поднимает отдельный ClickHouse** и подключается к уже существующему CH (`CH_HOST=clickhouse`) через внешнюю сеть Docker:
+- `market-data-ws-worker`
+- `market-data-scheduler`
+- `clickhouse` (общий сервис)
+- `prometheus` скрапит market-data по DNS внутри compose-сети:
+  - `market-data-ws-worker:9201`
+  - `market-data-scheduler:9202`
 
-- external network: `${ROEHUB_SHARED_NETWORK:-roehub_default}`
-- без конфликта с `infra/docker/docker-compose.yml`
+`host.docker.internal` для market-data метрик в Linux больше не нужен.
 
-### Standalone режим (опционально)
-
-Поднимает отдельный `market-data-clickhouse` только при профиле `standalone` на альтернативных портах:
-
-- HTTP: `127.0.0.1:${MARKET_DATA_CH_HTTP_PORT:-18123}`
-- Native: `127.0.0.1:${MARKET_DATA_CH_NATIVE_PORT:-19000}`
-
-## 2. Локальный запуск (из репозитория)
+## 2. Деплой/перезапуск в фоне (prod host)
 
 ```bash
-cd /path/to/roehub.com
-docker network inspect roehub_default >/dev/null 2>&1 || docker network create roehub_default
-docker compose -f infra/docker/docker-compose.market_data.yml config >/dev/null
-docker compose -f infra/docker/docker-compose.market_data.yml up -d --build
-docker compose -f infra/docker/docker-compose.market_data.yml ps
+export COMPOSE_PROJECT_NAME=roehub
+export MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src
+export MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data
+
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps
 ```
 
 Логи:
 
 ```bash
-docker compose -f infra/docker/docker-compose.market_data.yml logs -f --tail=200 market-data-scheduler
-docker compose -f infra/docker/docker-compose.market_data.yml logs -f --tail=200 market-data-ws-worker
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-ws-worker
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-scheduler
 ```
 
-Остановка:
+Остановка только market-data сервисов:
 
 ```bash
-docker compose -f infra/docker/docker-compose.market_data.yml down
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env stop market-data-ws-worker market-data-scheduler
 ```
 
-Standalone запуск:
+## 3. Проверка метрик и scrape
 
-```bash
-docker compose -f infra/docker/docker-compose.market_data.yml --profile standalone up -d --build
-```
-
-## 3. Prod запуск в фоне (на хосте)
-
-```bash
-MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src \
-MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data \
-docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
-docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env ps
-docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-scheduler
-docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-ws-worker
-docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env down
-```
-
-## 4. Проверка метрик
+С хоста:
 
 ```bash
 curl -fsS http://localhost:9201/metrics | head
 curl -fsS http://localhost:9202/metrics | head
 ```
 
-Ключевые scheduler-метрики для startup backfill:
+Из контейнера Prometheus (проверка DNS scrape внутри сети):
 
 ```bash
-curl -fsS http://localhost:9202/metrics | rg "scheduler_tasks_(planned|enqueued)_total|scheduler_startup_scan_instruments_total"
+docker exec -it prometheus wget -T 2 -qO- http://market-data-ws-worker:9201/metrics | head
+docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | head
 ```
 
-## 5. Проверка данных (SQL, операторские проверки)
+Проверка startup historical backfill:
 
-Последняя canonical свеча на инструмент:
+```bash
+curl -fsS http://localhost:9202/metrics | rg 'scheduler_tasks_(planned|enqueued)_total.*historical_backfill'
+curl -fsS http://localhost:9202/metrics | rg 'scheduler_job_(runs|errors)_total.*startup_scan|rest_insurance_catchup'
+```
+
+## 4. SQL-проверки (выполняет оператор)
+
+Последний canonical close:
 
 ```sql
 SELECT instrument_key, max(ts_open) AS last_ts
@@ -84,7 +74,7 @@ ORDER BY last_ts DESC
 LIMIT 50;
 ```
 
-Lag по инструментам:
+Lag:
 
 ```sql
 SELECT
@@ -109,23 +99,27 @@ ORDER BY dup_minutes DESC
 LIMIT 50;
 ```
 
+## 5. Standalone compose (dev/local only)
+
+`infra/docker/docker-compose.market_data.yml` оставлен для локального автономного запуска.
+Он поднимает отдельный `market-data-clickhouse` на портах:
+
+- `127.0.0.1:18123 -> 8123`
+- `127.0.0.1:19000 -> 9000`
+
+Запуск:
+
+```bash
+docker compose -f infra/docker/docker-compose.market_data.yml up -d --build
+docker compose -f infra/docker/docker-compose.market_data.yml ps
+```
+
+В проде этот файл не является основным путем деплоя.
+
 ## 6. First 10 Minutes Checklist
 
-1. В логах scheduler есть `startup_scan: instruments_scanned=...` и причины задач `historical_backfill` при необходимости.
-2. `scheduler_tasks_planned_total{reason="historical_backfill"}` и `scheduler_tasks_enqueued_total{reason="historical_backfill"}` растут на старте, если canonical начинается позже earliest boundary.
-3. В логах worker нет серии ошибок вставки или session-конфликтов.
-4. `/metrics` для портов `9201` и `9202` отвечают.
-5. В canonical уменьшается lag, а исторические диапазоны постепенно заполняются.
-
-## 7. Траблшутинг
-
-`Attempt to execute concurrent queries within the same session`:
-- убедиться, что используется версия с `ThreadLocalClickHouseConnectGateway`.
-
-`DataError ... Unable to create Python array`:
-- проверить, что в payload не попадают `None` в non-nullable numeric колонки raw.
-
-Виден только хвост, истории нет:
-- проверить `market_data.markets[*].rest.earliest_available_ts_utc` в конфиге;
-- проверить метрики `scheduler_tasks_planned_total{reason="historical_backfill"}` и `scheduler_tasks_enqueued_total{reason="historical_backfill"}`;
-- проверить логи startup scan (`planned_task[...]`).
+1. `docker compose ... ps` показывает `market-data-ws-worker` и `market-data-scheduler` в `running`.
+2. `docker exec prometheus wget ... market-data-ws-worker:9201/metrics` и `...market-data-scheduler:9202/metrics` возвращают ответ.
+3. В логах scheduler есть `startup_scan: instruments_scanned=...` и задачи `historical_backfill` при необходимости.
+4. `scheduler_tasks_planned_total{reason="historical_backfill"}` и `scheduler_tasks_enqueued_total{reason="historical_backfill"}` растут, если истории не хватает.
+5. В логах worker нет серийных `insert_errors_total`/`rest_fill_errors_total`.

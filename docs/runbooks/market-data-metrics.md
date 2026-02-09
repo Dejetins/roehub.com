@@ -7,6 +7,16 @@
 Подробный русскоязычный справочник по каждой метрике:
 - `docs/runbooks/market-data-metrics-reference-ru.md`
 
+## Scrape модель в Docker
+
+В production scrape идет **внутри docker-сети** по DNS-именам сервисов:
+
+- `market-data-ws-worker:9201`
+- `market-data-scheduler:9202`
+
+Prometheus job-ы настроены в `infra/monitoring/monitoring/prometheus/prometheus.yml`.
+Для Linux не используется `host.docker.internal` и не используется scrape через host loopback.
+
 ## Worker Metrics (`market-data-ws-worker`)
 
 WebSocket runtime:
@@ -75,6 +85,13 @@ SLO latency buckets:
 
 ```bash
 curl -fsS http://localhost:9201/metrics | rg "ws_closed_to_insert_(start|done)_seconds"
+```
+
+Проверка scrape из контейнера Prometheus:
+
+```bash
+docker exec -it prometheus wget -T 2 -qO- http://market-data-ws-worker:9201/metrics | head
+docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | head
 ```
 
 ## Интерпретация
