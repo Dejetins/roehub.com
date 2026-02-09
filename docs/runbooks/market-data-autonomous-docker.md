@@ -41,14 +41,7 @@ docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.e
 
 ## 3. Проверка метрик и scrape
 
-С хоста:
-
-```bash
-curl -fsS http://localhost:9201/metrics | head
-curl -fsS http://localhost:9202/metrics | head
-```
-
-Из контейнера Prometheus (проверка DNS scrape внутри сети):
+Проверка scrape из контейнера Prometheus (DNS внутри сети):
 
 ```bash
 docker exec -it prometheus wget -T 2 -qO- http://market-data-ws-worker:9201/metrics | head
@@ -58,8 +51,8 @@ docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metr
 Проверка startup historical backfill:
 
 ```bash
-curl -fsS http://localhost:9202/metrics | rg 'scheduler_tasks_(planned|enqueued)_total.*historical_backfill'
-curl -fsS http://localhost:9202/metrics | rg 'scheduler_job_(runs|errors)_total.*startup_scan|rest_insurance_catchup'
+docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | rg 'scheduler_tasks_(planned|enqueued)_total.*historical_backfill'
+docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | rg 'scheduler_job_(runs|errors)_total.*startup_scan|rest_insurance_catchup'
 ```
 
 ## 4. SQL-проверки (выполняет оператор)
@@ -115,6 +108,13 @@ docker compose -f infra/docker/docker-compose.market_data.yml ps
 ```
 
 В проде этот файл не является основным путем деплоя.
+
+В standalone режиме метрики доступны с хоста:
+
+```bash
+curl -fsS http://localhost:9201/metrics | head
+curl -fsS http://localhost:9202/metrics | head
+```
 
 ## 6. First 10 Minutes Checklist
 

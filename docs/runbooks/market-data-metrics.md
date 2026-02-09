@@ -63,13 +63,13 @@ REST fill queue:
 
 ## Quick Checks
 
-Worker endpoint:
+Standalone/локальный endpoint (если опубликованы порты на хост):
 
 ```bash
 curl -fsS http://localhost:9201/metrics | rg "ws_|insert_|rest_fill_"
 ```
 
-Scheduler endpoint:
+Standalone/локальный scheduler endpoint:
 
 ```bash
 curl -fsS http://localhost:9202/metrics | rg "scheduler_(job_|tasks_|startup_scan_)"
@@ -87,7 +87,7 @@ SLO latency buckets:
 curl -fsS http://localhost:9201/metrics | rg "ws_closed_to_insert_(start|done)_seconds"
 ```
 
-Проверка scrape из контейнера Prometheus:
+Проверка scrape из контейнера Prometheus (production recommended):
 
 ```bash
 docker exec -it prometheus wget -T 2 -qO- http://market-data-ws-worker:9201/metrics | head

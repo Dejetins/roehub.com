@@ -68,8 +68,8 @@ services:
       - /app/configs/prod/market_data.yaml
       - --metrics-port
       - "9201"
-    ports:
-      - "127.0.0.1:9201:9201"
+    expose:
+      - "9201"
 
   market-data-scheduler:
     build:
@@ -96,8 +96,8 @@ services:
       - /app/configs/prod/whitelist.csv
       - --metrics-port
       - "9202"
-    ports:
-      - "127.0.0.1:9202:9202"
+    expose:
+      - "9202"
 
   grafana:
     image: grafana/grafana:latest

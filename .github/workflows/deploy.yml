@@ -104,6 +104,14 @@ jobs:
           set -euxo pipefail
           docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env config >/dev/null
 
+      - name: Cleanup legacy market-data stack
+        run: |
+          set -euxo pipefail
+          old_market_data_ids="$(docker ps -aq --filter label=com.docker.compose.project=roehub-market-data || true)"
+          if [ -n "${old_market_data_ids}" ]; then
+            docker rm -f ${old_market_data_ids}
+          fi
+
       - name: Deploy main stack via Docker Compose
         env:
           COMPOSE_PROJECT_NAME: roehub
