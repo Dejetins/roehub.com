@@ -271,7 +271,13 @@ Job name: **`market-data-ws-worker`**.
   - `ws_closed_to_insert_start_seconds`
   - `ws_closed_to_insert_done_seconds`
 - REST fill tasks/active/errors/duration
-- Scheduler job runs/duration/errors + progress
+- Scheduler job runs/duration/errors + progress:
+  - `scheduler_job_runs_total{job=...}`
+  - `scheduler_job_errors_total{job=...}`
+  - `scheduler_job_duration_seconds{job=...}`
+  - `scheduler_tasks_planned_total{reason=...}`
+  - `scheduler_tasks_enqueued_total{reason=...}`
+  - `scheduler_startup_scan_instruments_total`
 
 ---
 

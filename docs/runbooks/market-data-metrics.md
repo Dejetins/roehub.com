@@ -38,6 +38,9 @@ REST fill queue:
 - `scheduler_job_runs_total{job="..."}`
 - `scheduler_job_errors_total{job="..."}`
 - `scheduler_job_duration_seconds{job="..."}`
+- `scheduler_tasks_planned_total{reason="..."}`
+- `scheduler_tasks_enqueued_total{reason="..."}`
+- `scheduler_startup_scan_instruments_total`
 
 Ожидаемые job labels:
 - `sync_whitelist`
@@ -56,7 +59,7 @@ curl -fsS http://localhost:9201/metrics | rg "ws_|insert_|rest_fill_"
 Scheduler endpoint:
 
 ```bash
-curl -fsS http://localhost:9202/metrics | rg "scheduler_job_"
+curl -fsS http://localhost:9202/metrics | rg "scheduler_(job_|tasks_|startup_scan_)"
 ```
 
 Ошибки job’ов:
@@ -77,3 +80,6 @@ curl -fsS http://localhost:9201/metrics | rg "ws_closed_to_insert_(start|done)_s
 - Рост `insert_errors_total` или `rest_fill_errors_total` требует проверки CH и REST лимитов.
 - Для SLO ориентируйтесь на p95 из `ws_closed_to_insert_done_seconds`.
 - Рост `scheduler_job_errors_total{job="startup_scan"}` блокирует ранний historical backfill.
+- При старте, если canonical начинается позже earliest boundary, должны расти:
+  - `scheduler_tasks_planned_total{reason="historical_backfill"}`
+  - `scheduler_tasks_enqueued_total{reason="historical_backfill"}`.

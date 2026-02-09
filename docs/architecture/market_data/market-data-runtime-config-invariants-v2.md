@@ -113,6 +113,10 @@ Operational semantics:
   - bootstrap `[earliest_available_ts_utc, now_floor)` для пустого canonical
   - historical backfill `[earliest_available_ts_utc, canonical_min)` если canonical начинается позже earliest boundary
   - tail insurance `[max(canonical_max + 1m, now_floor - tail_lookback), now_floor)`.
+- observability startup scan:
+  - `scheduler_startup_scan_instruments_total`
+  - `scheduler_tasks_planned_total{reason=...}`
+  - `scheduler_tasks_enqueued_total{reason=...}`
 
 ### market_data.backfill
 Политика REST backfill:

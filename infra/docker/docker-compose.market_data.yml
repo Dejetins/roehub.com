@@ -1,16 +1,16 @@
 services:
-  clickhouse:
+  market-data-clickhouse:
     image: clickhouse/clickhouse-server:24.8
-    container_name: market-data-clickhouse
+    profiles: ["standalone"]
     restart: unless-stopped
     environment:
-      CLICKHOUSE_DB: market_data
-      CLICKHOUSE_USER: ${CH_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CH_PASSWORD:-}
+      CLICKHOUSE_DB: ${CH_DATABASE:-market_data}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "127.0.0.1:${MARKET_DATA_CH_HTTP_PORT:-18123}:8123"
+      - "127.0.0.1:${MARKET_DATA_CH_NATIVE_PORT:-19000}:9000"
     ulimits:
       nofile:
         soft: 262144
@@ -23,65 +23,68 @@ services:
     volumes:
       - market_data_ch_data:/var/lib/clickhouse
       - market_data_ch_logs:/var/log/clickhouse-server
+    networks:
+      - roehub-shared
 
   market-data-ws-worker:
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.market_data
-    container_name: market-data-ws-worker
     restart: unless-stopped
-    depends_on:
-      clickhouse:
-        condition: service_healthy
     environment:
-      CH_HOST: clickhouse
-      CH_PORT: 8123
-      CH_DATABASE: market_data
-      CH_USER: ${CH_USER:-default}
-      CH_PASSWORD: ${CH_PASSWORD:-}
-      CH_SECURE: "0"
-      CH_VERIFY: "1"
+      CH_HOST: ${CH_HOST:-clickhouse}
+      CH_PORT: ${CH_PORT:-8123}
+      CH_DATABASE: ${CH_DATABASE:-market_data}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CH_SECURE: ${CH_SECURE:-0}
+      CH_VERIFY: ${CH_VERIFY:-1}
     command:
       - python
       - -m
       - apps.worker.market_data_ws.main.main
       - --config
-      - /app/configs/dev/market_data.yaml
+      - ${MARKET_DATA_CONFIG_PATH:-/app/configs/prod/market_data.yaml}
       - --metrics-port
       - "9201"
     ports:
-      - "9201:9201"
+      - "127.0.0.1:${MARKET_DATA_WORKER_METRICS_PORT:-9201}:9201"
+    networks:
+      - roehub-shared
 
   market-data-scheduler:
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile.market_data
-    container_name: market-data-scheduler
     restart: unless-stopped
-    depends_on:
-      clickhouse:
-        condition: service_healthy
     environment:
-      CH_HOST: clickhouse
-      CH_PORT: 8123
-      CH_DATABASE: market_data
-      CH_USER: ${CH_USER:-default}
-      CH_PASSWORD: ${CH_PASSWORD:-}
-      CH_SECURE: "0"
-      CH_VERIFY: "1"
+      CH_HOST: ${CH_HOST:-clickhouse}
+      CH_PORT: ${CH_PORT:-8123}
+      CH_DATABASE: ${CH_DATABASE:-market_data}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CH_SECURE: ${CH_SECURE:-0}
+      CH_VERIFY: ${CH_VERIFY:-1}
     command:
       - python
       - -m
       - apps.scheduler.market_data_scheduler.main.main
       - --config
-      - /app/configs/dev/market_data.yaml
+      - ${MARKET_DATA_CONFIG_PATH:-/app/configs/prod/market_data.yaml}
       - --whitelist
-      - /app/configs/dev/whitelist.csv
+      - ${MARKET_DATA_WHITELIST_PATH:-/app/configs/prod/whitelist.csv}
       - --metrics-port
       - "9202"
     ports:
-      - "9202:9202"
+      - "127.0.0.1:${MARKET_DATA_SCHEDULER_METRICS_PORT:-9202}:9202"
+    networks:
+      - roehub-shared
 
 volumes:
   market_data_ch_data: {}
   market_data_ch_logs: {}
+
+networks:
+  roehub-shared:
+    name: ${ROEHUB_SHARED_NETWORK:-roehub_default}
+    external: true

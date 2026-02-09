@@ -1,32 +1,38 @@
 # Market Data Autonomous Docker Runbook
 
-Этот runbook описывает автономный запуск EPIC 3 (ClickHouse + WS worker + scheduler)
-через `docker-compose.market_data.yml`.
+Runbook для автономного запуска `market-data-ws-worker` и `market-data-scheduler` в Docker.
 
-## 1. Подготовка
+## 1. Режимы запуска
+
+### Режим по умолчанию (prod-friendly)
+
+`infra/docker/docker-compose.market_data.yml` по умолчанию **не поднимает отдельный ClickHouse** и подключается к уже существующему CH (`CH_HOST=clickhouse`) через внешнюю сеть Docker:
+
+- external network: `${ROEHUB_SHARED_NETWORK:-roehub_default}`
+- без конфликта с `infra/docker/docker-compose.yml`
+
+### Standalone режим (опционально)
+
+Поднимает отдельный `market-data-clickhouse` только при профиле `standalone` на альтернативных портах:
+
+- HTTP: `127.0.0.1:${MARKET_DATA_CH_HTTP_PORT:-18123}`
+- Native: `127.0.0.1:${MARKET_DATA_CH_NATIVE_PORT:-19000}`
+
+## 2. Локальный запуск (из репозитория)
 
 ```bash
 cd /path/to/roehub.com
-```
-
-Проверить, что порты свободны:
-- `8123` (ClickHouse HTTP)
-- `9000` (ClickHouse native)
-- `9201` (worker /metrics)
-- `9202` (scheduler /metrics)
-
-## 2. Запуск compose
-
-```bash
+docker network inspect roehub_default >/dev/null 2>&1 || docker network create roehub_default
+docker compose -f infra/docker/docker-compose.market_data.yml config >/dev/null
 docker compose -f infra/docker/docker-compose.market_data.yml up -d --build
+docker compose -f infra/docker/docker-compose.market_data.yml ps
 ```
 
 Логи:
 
 ```bash
-docker compose -f infra/docker/docker-compose.market_data.yml logs -f clickhouse
-docker compose -f infra/docker/docker-compose.market_data.yml logs -f market-data-ws-worker
-docker compose -f infra/docker/docker-compose.market_data.yml logs -f market-data-scheduler
+docker compose -f infra/docker/docker-compose.market_data.yml logs -f --tail=200 market-data-scheduler
+docker compose -f infra/docker/docker-compose.market_data.yml logs -f --tail=200 market-data-ws-worker
 ```
 
 Остановка:
@@ -35,38 +41,36 @@ docker compose -f infra/docker/docker-compose.market_data.yml logs -f market-dat
 docker compose -f infra/docker/docker-compose.market_data.yml down
 ```
 
-Полная очистка volume ClickHouse:
+Standalone запуск:
 
 ```bash
-docker compose -f infra/docker/docker-compose.market_data.yml down -v
+docker compose -f infra/docker/docker-compose.market_data.yml --profile standalone up -d --build
 ```
 
-## 3. Инициализация схемы ClickHouse
+## 3. Prod запуск в фоне (на хосте)
 
-Если таблицы ещё не созданы, выполните DDL из `docs/architecture/market_data/market_data_ddl.sql`
-в вашем CH-клиенте/IDE перед запуском worker/scheduler в production.
-
-Пример проверки существования таблиц:
-
-```sql
-SHOW TABLES FROM market_data;
+```bash
+docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
+docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env ps
+docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-scheduler
+docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-ws-worker
+docker compose -f /opt/roehub/docker-compose.market_data.yml --env-file /etc/roehub/roehub.env down
 ```
 
-## 4. Проверка health и метрик
-
-Worker:
+## 4. Проверка метрик
 
 ```bash
 curl -fsS http://localhost:9201/metrics | head
-```
-
-Scheduler:
-
-```bash
 curl -fsS http://localhost:9202/metrics | head
 ```
 
-## 5. Проверка данных (SQL)
+Ключевые scheduler-метрики для startup backfill:
+
+```bash
+curl -fsS http://localhost:9202/metrics | rg "scheduler_tasks_(planned|enqueued)_total|scheduler_startup_scan_instruments_total"
+```
+
+## 5. Проверка данных (SQL, операторские проверки)
 
 Последняя canonical свеча на инструмент:
 
@@ -90,7 +94,7 @@ ORDER BY lag_s DESC
 LIMIT 50;
 ```
 
-Дубликаты минут в canonical (контроль качества):
+Контроль дубликатов минут в canonical:
 
 ```sql
 SELECT
@@ -105,20 +109,21 @@ LIMIT 50;
 
 ## 6. First 10 Minutes Checklist
 
-1. В логах worker нет непрерывных ошибок `insert`/`session`.
-2. В логах scheduler есть успешные `sync_whitelist`, `enrich`, `startup_scan`.
-3. `/metrics` endpoints отвечают на `9201` и `9202`.
-4. В `raw_*_klines_1m` и `canonical_candles_1m` растут строки.
-5. `lag_s` по ключевым инструментам стабилизируется и не накапливается.
+1. В логах scheduler есть `startup_scan: instruments_scanned=...` и причины задач `historical_backfill` при необходимости.
+2. `scheduler_tasks_planned_total{reason="historical_backfill"}` и `scheduler_tasks_enqueued_total{reason="historical_backfill"}` растут на старте, если canonical начинается позже earliest boundary.
+3. В логах worker нет серии ошибок вставки или session-конфликтов.
+4. `/metrics` для портов `9201` и `9202` отвечают.
+5. В canonical уменьшается lag, а исторические диапазоны постепенно заполняются.
 
 ## 7. Траблшутинг
 
 `Attempt to execute concurrent queries within the same session`:
-- убедитесь, что используется текущая версия с `ThreadLocalClickHouseConnectGateway`.
+- убедиться, что используется версия с `ThreadLocalClickHouseConnectGateway`.
 
-`DataError ... Unable to create Python array` при вставке:
-- проверьте, что в payload нет `None` для non-nullable numeric колонок raw-таблиц.
+`DataError ... Unable to create Python array`:
+- проверить, что в payload не попадают `None` в non-nullable numeric колонки raw.
 
-История не догружается, виден только свежий хвост:
-- проверьте, что в config задан `market_data.markets[*].rest.earliest_available_ts_utc`;
-- убедитесь, что startup scan scheduler отработал и enqueue’ит `historical_backfill`.
+Виден только хвост, истории нет:
+- проверить `market_data.markets[*].rest.earliest_available_ts_utc` в конфиге;
+- проверить метрики `scheduler_tasks_planned_total{reason="historical_backfill"}` и `scheduler_tasks_enqueued_total{reason="historical_backfill"}`;
+- проверить логи startup scan (`planned_task[...]`).

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+from prometheus_client import CollectorRegistry
 
 from apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler import (
     MarketDataSchedulerApp,
@@ -78,6 +81,17 @@ class _IndexReader:
         )
 
 
+class _TailOnlyIndexReader:
+    def bounds_1m(self, *, instrument_id, before):  # noqa: ANN001
+        """Return canonical tail-only bounds to reproduce production bug scenario."""
+        _ = instrument_id
+        _ = before
+        return (
+            UtcTimestamp(datetime(2026, 2, 9, 13, 50, tzinfo=timezone.utc)),
+            UtcTimestamp(datetime(2026, 2, 9, 13, 59, tzinfo=timezone.utc)),
+        )
+
+
 class _RestQueue:
     def __init__(self) -> None:
         """Initialize queue lifecycle and enqueue tracking containers."""
@@ -149,7 +163,11 @@ market_data:
     return load_market_data_runtime_config(cfg_path)
 
 
-def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(tmp_path: Path, monkeypatch) -> None:
+def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(
+    tmp_path: Path,
+    monkeypatch,
+    caplog,
+) -> None:
     """
     Ensure startup scan runs once per process start and enqueues planned tasks.
 
@@ -162,6 +180,7 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(tmp_path: Path, mon
     """
 
     async def _scenario() -> None:
+        caplog.set_level(logging.INFO)
         monkeypatch.setattr(
             "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.start_http_server",
             lambda _port: None,
@@ -171,6 +190,7 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(tmp_path: Path, mon
         sync = _SyncUseCase()
         enrich = _EnrichUseCase()
         queue = _RestQueue()
+        registry = CollectorRegistry()
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
             whitelist_path=str(tmp_path / "missing.csv"),
@@ -181,7 +201,7 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(tmp_path: Path, mon
             index_reader=_IndexReader(),
             rest_fill_queue=queue,
             backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
-            metrics=MarketDataSchedulerMetrics(),
+            metrics=MarketDataSchedulerMetrics(registry=registry),
             metrics_port=9202,
         )
         app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
@@ -202,5 +222,70 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(tmp_path: Path, mon
         assert len(queue.enqueued) == 2
         reasons = {task.reason for task in queue.enqueued}
         assert reasons == {"historical_backfill", "scheduler_tail"}
+        assert app._metrics.scheduler_startup_scan_instruments_total._value.get() == 1
+        assert app._metrics.scheduler_tasks_planned_total.labels(
+            reason="historical_backfill"
+        )._value.get() == 1
+        assert app._metrics.scheduler_tasks_enqueued_total.labels(
+            reason="historical_backfill"
+        )._value.get() == 1
+        assert app._metrics.scheduler_tasks_planned_total.labels(reason="scheduler_tail")._value.get() == 1  # noqa: E501
+        assert app._metrics.scheduler_tasks_enqueued_total.labels(reason="scheduler_tail")._value.get() == 1  # noqa: E501
+        assert "startup_scan: instruments_scanned=1" in caplog.text
+        assert "startup_scan planned_task[1]" in caplog.text
+
+    asyncio.run(_scenario())
+
+
+def test_scheduler_startup_scan_tail_only_canonical_still_enqueues_historical(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """
+    Ensure startup scan enqueues historical task in tail-only canonical state.
+
+    Parameters:
+    - tmp_path: pytest temporary path fixture.
+    - monkeypatch: pytest monkeypatch fixture.
+
+    Returns:
+    - None.
+    """
+
+    async def _scenario() -> None:
+        monkeypatch.setattr(
+            "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.start_http_server",
+            lambda _port: None,
+        )
+
+        queue = _RestQueue()
+        app = MarketDataSchedulerApp(
+            config=_config(tmp_path),
+            whitelist_path=str(tmp_path / "missing.csv"),
+            seed_use_case=_SeedUseCase(),
+            sync_use_case=_SyncUseCase(),
+            enrich_use_case=_EnrichUseCase(),
+            instrument_reader=_InstrumentReader(),
+            index_reader=_TailOnlyIndexReader(),
+            rest_fill_queue=queue,
+            backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
+            metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
+            metrics_port=9202,
+        )
+        app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
+
+        whitelist = tmp_path / "missing.csv"
+        whitelist.write_text("market_id,symbol,is_enabled\n1,BTCUSDT,1\n", encoding="utf-8")
+
+        stop_event = asyncio.Event()
+        stop_event.set()
+
+        await app.run(stop_event)
+
+        reasons = {task.reason for task in queue.enqueued}
+        assert "historical_backfill" in reasons
+        historical = next(task for task in queue.enqueued if task.reason == "historical_backfill")
+        assert str(historical.time_range.start) == "2017-01-01T00:00:00.000Z"
+        assert str(historical.time_range.end) == "2026-02-09T13:50:00.000Z"
 
     asyncio.run(_scenario())

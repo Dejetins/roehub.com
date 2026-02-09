@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Mapping
 from uuid import uuid4
 
-from prometheus_client import Counter, Histogram, start_http_server
+from prometheus_client import CollectorRegistry, Counter, Histogram, start_http_server
 
 from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     ClickHouseSettingsLoader,
@@ -78,12 +78,12 @@ class MarketDataSchedulerMetrics:
     Prometheus metrics bundle for maintenance scheduler jobs.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, registry: CollectorRegistry | None = None) -> None:
         """
         Create scheduler metric objects.
 
         Parameters:
-        - None.
+        - registry: optional explicit Prometheus registry (tests can pass isolated one).
 
         Returns:
         - None.
@@ -101,17 +101,37 @@ class MarketDataSchedulerMetrics:
             "scheduler_job_runs_total",
             "Scheduler job run count",
             labelnames=("job",),
+            registry=registry,
         )
         self.scheduler_job_errors_total = Counter(
             "scheduler_job_errors_total",
             "Scheduler job error count",
             labelnames=("job",),
+            registry=registry,
         )
         self.scheduler_job_duration_seconds = Histogram(
             "scheduler_job_duration_seconds",
             "Scheduler job duration in seconds",
             labelnames=("job",),
             buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 15.0, 60.0, 180.0),
+            registry=registry,
+        )
+        self.scheduler_tasks_planned_total = Counter(
+            "scheduler_tasks_planned_total",
+            "Planned maintenance tasks grouped by reason",
+            labelnames=("reason",),
+            registry=registry,
+        )
+        self.scheduler_tasks_enqueued_total = Counter(
+            "scheduler_tasks_enqueued_total",
+            "Enqueued maintenance tasks grouped by reason",
+            labelnames=("reason",),
+            registry=registry,
+        )
+        self.scheduler_startup_scan_instruments_total = Counter(
+            "scheduler_startup_scan_instruments_total",
+            "How many instruments were scanned in startup scan runs",
+            registry=registry,
         )
 
 
@@ -444,6 +464,9 @@ class MarketDataSchedulerApp:
             log.info("%s: no enabled instruments for maintenance scan", scan_reason)
             return
 
+        if scan_reason == "startup_scan":
+            self._metrics.scheduler_startup_scan_instruments_total.inc(len(instruments))
+
         now_floor = UtcTimestamp(floor_to_minute_utc(self._clock.now().value))
         semaphore = asyncio.Semaphore(self._config.ingestion.rest_concurrency_instruments)
         planned_tasks: list[RestFillTask] = []
@@ -471,18 +494,80 @@ class MarketDataSchedulerApp:
         for tasks in grouped:
             planned_tasks.extend(tasks)
 
+        planned_by_reason: dict[str, int] = {}
+        for task in planned_tasks:
+            planned_by_reason[task.reason] = planned_by_reason.get(task.reason, 0) + 1
+            self._metrics.scheduler_tasks_planned_total.labels(reason=task.reason).inc()
+
+        _log_first_planned_tasks(
+            scan_reason=scan_reason,
+            tasks=planned_tasks,
+            config=self._config,
+            limit=10,
+        )
+
         enqueued = 0
+        enqueued_by_reason: dict[str, int] = {}
         for task in planned_tasks:
             accepted = await self._rest_fill_queue.enqueue(task)
             if accepted:
                 enqueued += 1
+                enqueued_by_reason[task.reason] = enqueued_by_reason.get(task.reason, 0) + 1
+                self._metrics.scheduler_tasks_enqueued_total.labels(reason=task.reason).inc()
 
         log.info(
-            "%s: planned_tasks=%s enqueued_tasks=%s instruments=%s",
+            "%s: instruments_scanned=%s planned_tasks=%s planned_by_reason=%s enqueued_tasks=%s enqueued_by_reason=%s",  # noqa: E501
             scan_reason,
-            len(planned_tasks),
-            enqueued,
             len(instruments),
+            len(planned_tasks),
+            planned_by_reason,
+            enqueued,
+            enqueued_by_reason,
+        )
+
+
+def _log_first_planned_tasks(
+    *,
+    scan_reason: str,
+    tasks: list[RestFillTask],
+    config: MarketDataRuntimeConfig,
+    limit: int,
+) -> None:
+    """
+    Emit debug-friendly preview logs for the first planned maintenance tasks.
+
+    Parameters:
+    - scan_reason: current scan type (`startup_scan` or periodic scan).
+    - tasks: planned task list.
+    - config: runtime config used to derive instrument key prefixes.
+    - limit: maximum number of tasks to log.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - `limit` can be zero or positive; negative values are treated as zero.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - Writes INFO logs through scheduler logger.
+    """
+    if not tasks:
+        return
+    size = max(limit, 0)
+    for index, task in enumerate(tasks[:size], start=1):
+        market = config.market_by_id(task.instrument_id.market_id)
+        instrument_key = f"{market.market_code}:{task.instrument_id.symbol}"
+        log.info(
+            "%s planned_task[%s]: instrument_key=%s reason=%s range=[%s, %s)",
+            scan_reason,
+            index,
+            instrument_key,
+            task.reason,
+            task.time_range.start,
+            task.time_range.end,
         )
 
 
