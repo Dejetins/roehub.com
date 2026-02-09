@@ -4,6 +4,9 @@
 - `market-data-ws-worker` (`:9201/metrics`)
 - `market-data-scheduler` (`:9202/metrics`)
 
+Подробный русскоязычный справочник по каждой метрике:
+- `docs/runbooks/market-data-metrics-reference-ru.md`
+
 ## Worker Metrics (`market-data-ws-worker`)
 
 WebSocket runtime:
