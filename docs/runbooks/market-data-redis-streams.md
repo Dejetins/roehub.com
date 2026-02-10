@@ -1,130 +1,132 @@
 # Runbook — Market Data Redis Streams
 
-## Scope
-Operational commands for live feed streams published by `market-data-ws-worker`.
+## Назначение
+Операционные команды для live feed stream’ов, которые публикует `market-data-ws-worker`.
 
-Stream pattern:
+Шаблон stream:
 - `md.candles.1m.<instrument_key>`
 
-Example stream:
+Пример stream:
 - `md.candles.1m.binance:spot:BTCUSDT`
 
-## Preconditions
-Redis runs in docker compose as service `redis`.
+## Предусловия
+Redis должен быть запущен в docker-compose как сервис `redis`.
 
-Check container:
+Проверка контейнера:
 
 ```bash
 docker ps --filter name=redis
 ```
 
-All commands below use `redis-cli` inside container (host install is not required).
+Все команды ниже используют `redis-cli` внутри контейнера (установка `redis-cli` на хост не требуется).
 
-## Basic Inspection
-Check server ping:
+## Базовая проверка stream’ов
+Проверка доступности Redis:
 
 ```bash
 docker exec -it redis redis-cli PING
 ```
 
-List stream length:
+Проверка длины stream:
 
 ```bash
 docker exec -it redis redis-cli XLEN md.candles.1m.binance:spot:BTCUSDT
 ```
 
-Show stream info:
+Информация о stream:
 
 ```bash
 docker exec -it redis redis-cli XINFO STREAM md.candles.1m.binance:spot:BTCUSDT
 ```
 
-Read range (first entries):
+Чтение диапазона (первые записи):
 
 ```bash
 docker exec -it redis redis-cli XRANGE md.candles.1m.binance:spot:BTCUSDT - + COUNT 5
 ```
 
-Read latest entries:
+Чтение последних записей:
 
 ```bash
 docker exec -it redis redis-cli XREVRANGE md.candles.1m.binance:spot:BTCUSDT + - COUNT 5
 ```
 
-Ad-hoc read without groups:
+Разовое чтение без consumer groups:
 
 ```bash
 docker exec -it redis redis-cli XREAD COUNT 10 STREAMS md.candles.1m.binance:spot:BTCUSDT 0-0
 ```
 
 ## Consumer Groups
-Create group (only once):
+Создание группы (выполняется один раз):
 
 ```bash
 docker exec -it redis redis-cli XGROUP CREATE md.candles.1m.binance:spot:BTCUSDT strategy.demo '$' MKSTREAM
 ```
 
-Inspect groups:
+Проверка групп:
 
 ```bash
 docker exec -it redis redis-cli XINFO GROUPS md.candles.1m.binance:spot:BTCUSDT
 ```
 
-Read with group:
+Чтение через группу:
 
 ```bash
 docker exec -it redis redis-cli XREADGROUP GROUP strategy.demo consumer-1 COUNT 10 BLOCK 5000 STREAMS md.candles.1m.binance:spot:BTCUSDT '>'
 ```
 
-Pending entries summary:
+Сводка pending-сообщений:
 
 ```bash
 docker exec -it redis redis-cli XPENDING md.candles.1m.binance:spot:BTCUSDT strategy.demo
 ```
 
-Acknowledge processed message:
+Подтверждение обработанного сообщения:
 
 ```bash
 docker exec -it redis redis-cli XACK md.candles.1m.binance:spot:BTCUSDT strategy.demo 1739181240000-0
 ```
 
-Destroy group (maintenance):
+Удаление группы (операционное обслуживание):
 
 ```bash
 docker exec -it redis redis-cli XGROUP DESTROY md.candles.1m.binance:spot:BTCUSDT strategy.demo
 ```
 
-## Retention and Trimming
-Publisher uses approximate maxlen (`MAXLEN ~ <N>`).
-Manual trim (approximate):
+## Retention и trim
+Publisher использует приблизительное ограничение длины stream (`MAXLEN ~ <N>`).
+
+Ручной trim по длине (approximate):
 
 ```bash
 docker exec -it redis redis-cli XTRIM md.candles.1m.binance:spot:BTCUSDT MAXLEN '~' 10080
 ```
 
-Manual trim by min ID:
+Ручной trim по минимальному ID:
 
 ```bash
 docker exec -it redis redis-cli XTRIM md.candles.1m.binance:spot:BTCUSDT MINID 1738576440000-0
 ```
 
-## Troubleshooting
-Redis publish is best-effort. If Redis is unavailable, worker should continue writing raw candles to ClickHouse.
+## Диагностика
+Публикация в Redis работает в режиме best-effort.
+Если Redis недоступен, worker должен продолжать запись raw свечей в ClickHouse.
 
-Check worker metrics for Redis path:
+Проверка Redis-метрик worker:
 
 ```bash
 curl -fsS http://localhost:9201/metrics | rg 'redis_publish_(total|errors_total|duplicates_total|duration_seconds)'
 ```
 
-Check worker logs for publish errors:
+Проверка логов worker по ошибкам publish:
 
 ```bash
 docker logs --tail 200 market-data-ws-worker | rg 'redis publish failed|live candle publish'
 ```
 
-## Windows PowerShell Notes
-If running on Windows with Docker Desktop, commands are the same:
+## Примечание для Windows PowerShell
+Если используется Docker Desktop на Windows, команды те же:
 
 ```powershell
 docker exec -it redis redis-cli XLEN md.candles.1m.binance:spot:BTCUSDT
