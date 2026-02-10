@@ -45,6 +45,14 @@ services:
       - ch_data:/var/lib/clickhouse
       - ch_logs:/var/log/clickhouse-server
 
+  redis:
+    image: redis:7.2-bookworm
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+
   market-data-ws-worker:
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
@@ -52,6 +60,7 @@ services:
     restart: unless-stopped
     depends_on:
       - clickhouse
+      - redis
     environment:
       CH_HOST: clickhouse
       CH_PORT: 8123
@@ -60,6 +69,7 @@ services:
       CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CH_SECURE: "0"
       CH_VERIFY: "1"
+      ROEHUB_REDIS_PASSWORD: ${ROEHUB_REDIS_PASSWORD:-}
     command:
       - python
       - -m
@@ -139,6 +149,7 @@ volumes:
   pg_data: {}
   ch_data: {}
   ch_logs: {}
+  redis_data: {}
   prom_data: {}
   grafana_data:
     external: true

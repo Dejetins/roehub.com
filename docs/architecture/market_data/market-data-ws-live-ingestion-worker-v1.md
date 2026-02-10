@@ -112,6 +112,10 @@
    - по таймеру `flush_interval_ms` (≤ 500ms; дефолт 250ms)
    - или по размеру `max_buffer_rows` (пример: 2000)
 6) Flush вызывает `RawKlineWriter.write_1m(rows)` — это момент **insert begin/end**.
+7) После submit в insert buffer worker делает best-effort publish в Redis Streams:
+   - stream: `md.candles.1m.<instrument_key>`
+   - id: `<ts_open_epoch_ms>-0`
+   - ошибки Redis логируются/метрятся и не останавливают ingestion.
 
 **Pipeline B: Gap detection → REST fill (фон)**
 - Срабатывает по двум причинам:
@@ -281,6 +285,11 @@ Job name: **`market-data-ws-worker`**.
   - `ws_closed_to_insert_start_seconds`
   - `ws_closed_to_insert_done_seconds`
 - REST fill tasks/active/errors/duration
+- Redis live feed:
+  - `redis_publish_total`
+  - `redis_publish_errors_total`
+  - `redis_publish_duplicates_total`
+  - `redis_publish_duration_seconds`
 - Scheduler job runs/duration/errors + progress:
   - `scheduler_job_runs_total{job=...}`
   - `scheduler_job_errors_total{job=...}`

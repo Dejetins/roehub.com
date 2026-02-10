@@ -89,6 +89,19 @@ market_data:
     rest_concurrency_instruments: 4
     tail_lookback_minutes: 180
 
+  live_feed:
+    redis_streams:
+      enabled: true
+      host: "redis"
+      port: 6379
+      db: 0
+      password_env: "ROEHUB_REDIS_PASSWORD"
+      socket_timeout_s: 2.0
+      connect_timeout_s: 2.0
+      stream_mode: "per_instrument"
+      stream_prefix: "md.candles.1m"
+      retention_days: 7
+
   scheduler:
     jobs:
       sync_whitelist:

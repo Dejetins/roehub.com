@@ -226,12 +226,98 @@ class BackfillConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class RedisStreamsConfig:
+    enabled: bool
+    host: str
+    port: int
+    db: int
+    password_env: str | None
+    socket_timeout_s: float
+    connect_timeout_s: float
+    stream_mode: str
+    stream_prefix: str
+    retention_days: int
+    maxlen_approx: int | None
+
+    def __post_init__(self) -> None:
+        """
+        Validate runtime Redis Streams configuration for WS live feed.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - `stream_mode` is fixed to `per_instrument`.
+        - `maxlen_approx` defaults to `retention_days * 1440` when omitted.
+
+        Errors/Exceptions:
+        - Raises `ValueError` on invalid host/port/timeouts/mode/retention values.
+
+        Side effects:
+        - May normalize `maxlen_approx` in frozen dataclass via `object.__setattr__`.
+        """
+        _require_non_empty("live_feed.redis_streams.host", self.host)
+        _require_positive_int("live_feed.redis_streams.port", self.port)
+        _require_non_negative_int("live_feed.redis_streams.db", self.db)
+        _require_positive(
+            "live_feed.redis_streams.socket_timeout_s",
+            self.socket_timeout_s,
+        )
+        _require_positive(
+            "live_feed.redis_streams.connect_timeout_s",
+            self.connect_timeout_s,
+        )
+        if self.stream_mode != "per_instrument":
+            raise ValueError(
+                "live_feed.redis_streams.stream_mode must be 'per_instrument', "
+                f"got {self.stream_mode!r}"
+            )
+        _require_non_empty("live_feed.redis_streams.stream_prefix", self.stream_prefix)
+        _require_positive_int("live_feed.redis_streams.retention_days", self.retention_days)
+        if self.maxlen_approx is None:
+            object.__setattr__(self, "maxlen_approx", self.retention_days * 1440)
+            return
+        _require_positive_int("live_feed.redis_streams.maxlen_approx", self.maxlen_approx)
+
+
+@dataclass(frozen=True, slots=True)
+class LiveFeedConfig:
+    redis_streams: RedisStreamsConfig
+
+    def __post_init__(self) -> None:
+        """
+        Validate live feed config container.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - `redis_streams` is always present to avoid optional checks in wiring.
+
+        Errors/Exceptions:
+        - Raises `ValueError` when redis_streams config is not provided.
+
+        Side effects:
+        - None.
+        """
+        if self.redis_streams is None:  # type: ignore[truthy-bool]
+            raise ValueError("live_feed.redis_streams must be provided")
+
+
+@dataclass(frozen=True, slots=True)
 class MarketDataRuntimeConfig:
     version: int
     markets: tuple[MarketConfig, ...]
     ingestion: IngestionConfig
     scheduler: SchedulerConfig
     backfill: BackfillConfig
+    live_feed: LiveFeedConfig
 
     def market_by_id(self, market_id: MarketId) -> MarketConfig:
         for m in self.markets:
@@ -367,6 +453,43 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
         max_days_per_insert=_get_int(backfill_map, "max_days_per_insert", required=True),
         chunk_align=_get_str(backfill_map, "chunk_align", required=True),
     )
+    live_feed_map = _get_mapping(md, "live_feed", required=False)
+    redis_streams_map = _get_mapping(live_feed_map, "redis_streams", required=False)
+    live_feed = LiveFeedConfig(
+        redis_streams=RedisStreamsConfig(
+            enabled=_get_bool_with_default(redis_streams_map, "enabled", default=False),
+            host=_get_str_with_default(redis_streams_map, "host", default="redis"),
+            port=_get_int_with_default(redis_streams_map, "port", default=6379),
+            db=_get_int_with_default(redis_streams_map, "db", default=0),
+            password_env=_get_optional_str_with_default(
+                redis_streams_map,
+                "password_env",
+                default="ROEHUB_REDIS_PASSWORD",
+            ),
+            socket_timeout_s=_get_float_with_default(
+                redis_streams_map,
+                "socket_timeout_s",
+                default=2.0,
+            ),
+            connect_timeout_s=_get_float_with_default(
+                redis_streams_map,
+                "connect_timeout_s",
+                default=2.0,
+            ),
+            stream_mode=_get_str_with_default(
+                redis_streams_map,
+                "stream_mode",
+                default="per_instrument",
+            ),
+            stream_prefix=_get_str_with_default(
+                redis_streams_map,
+                "stream_prefix",
+                default="md.candles.1m",
+            ),
+            retention_days=_get_int_with_default(redis_streams_map, "retention_days", default=7),
+            maxlen_approx=_get_optional_int(redis_streams_map, "maxlen_approx"),
+        )
+    )
 
     return MarketDataRuntimeConfig(
         version=version,
@@ -374,6 +497,7 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
         ingestion=ingestion_cfg,
         scheduler=scheduler_cfg,
         backfill=backfill,
+        live_feed=live_feed,
     )
 
 
@@ -574,6 +698,151 @@ def _get_int_with_default(d: Mapping[str, Any], key: str, *, default: int) -> in
     if key not in d:
         return default
     return _get_int(d, key, required=True)
+
+
+def _get_str_with_default(d: Mapping[str, Any], key: str, *, default: str) -> str:
+    """
+    Read optional string key from mapping with explicit default.
+
+    Parameters:
+    - d: source mapping.
+    - key: string field name.
+    - default: value returned when key is absent.
+
+    Returns:
+    - Non-empty string value.
+
+    Assumptions/Invariants:
+    - Empty strings are not allowed.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when present value is not a valid non-empty string.
+
+    Side effects:
+    - None.
+    """
+    if key not in d:
+        return default
+    return _get_str(d, key, required=True)
+
+
+def _get_float_with_default(d: Mapping[str, Any], key: str, *, default: float) -> float:
+    """
+    Read optional float key from mapping with explicit default.
+
+    Parameters:
+    - d: source mapping.
+    - key: float field name.
+    - default: value returned when key is absent.
+
+    Returns:
+    - Parsed float from mapping or `default`.
+
+    Assumptions/Invariants:
+    - Integer values are accepted and converted to float.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when present value is not numeric.
+
+    Side effects:
+    - None.
+    """
+    if key not in d:
+        return default
+    return _get_float(d, key, required=True)
+
+
+def _get_bool_with_default(d: Mapping[str, Any], key: str, *, default: bool) -> bool:
+    """
+    Read optional boolean key from mapping with explicit default.
+
+    Parameters:
+    - d: source mapping.
+    - key: boolean field name.
+    - default: value returned when key is absent.
+
+    Returns:
+    - Parsed bool from mapping or `default`.
+
+    Assumptions/Invariants:
+    - Only explicit YAML booleans are accepted.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when present value is not bool.
+
+    Side effects:
+    - None.
+    """
+    if key not in d:
+        return default
+    value = d[key]
+    if not isinstance(value, bool):
+        raise ValueError(f"expected bool at key '{key}', got {type(value).__name__}")
+    return value
+
+
+def _get_optional_int(d: Mapping[str, Any], key: str) -> int | None:
+    """
+    Read optional integer key where `null`/missing maps to None.
+
+    Parameters:
+    - d: source mapping.
+    - key: integer field name.
+
+    Returns:
+    - Parsed positive integer, or `None` if key is missing or null.
+
+    Assumptions/Invariants:
+    - Boolean values are rejected.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when present value is not a valid int.
+
+    Side effects:
+    - None.
+    """
+    if key not in d or d[key] is None:
+        return None
+    return _get_int(d, key, required=True)
+
+
+def _get_optional_str_with_default(
+    d: Mapping[str, Any],
+    key: str,
+    *,
+    default: str | None,
+) -> str | None:
+    """
+    Read optional string key with nullable support and explicit default.
+
+    Parameters:
+    - d: source mapping.
+    - key: string field name.
+    - default: returned when key is absent.
+
+    Returns:
+    - Non-empty stripped string, `None`, or default.
+
+    Assumptions/Invariants:
+    - Empty string is treated as invalid to avoid ambiguous env variable names.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when present value is not string or is empty.
+
+    Side effects:
+    - None.
+    """
+    if key not in d:
+        return default
+    value = d[key]
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"expected string at key '{key}', got {type(value).__name__}")
+    stripped = value.strip()
+    if not stripped:
+        raise ValueError(f"key '{key}' must be non-empty when provided")
+    return stripped
 
 
 def _get_int_nested_with_default(

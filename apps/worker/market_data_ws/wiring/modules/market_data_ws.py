@@ -30,6 +30,11 @@ from trading.contexts.market_data.adapters.outbound.config.runtime_config import
     MarketDataRuntimeConfig,
     load_market_data_runtime_config,
 )
+from trading.contexts.market_data.adapters.outbound.messaging.redis import (
+    NoopLiveCandlePublisher,
+    RedisLiveCandlePublisherHooks,
+    RedisStreamsLiveCandlePublisher,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleIndexReader,
     ClickHouseEnabledInstrumentReader,
@@ -37,6 +42,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ThreadLocalClickHouseConnectGateway,
 )
 from trading.contexts.market_data.application.dto import CandleWithMeta, RestFillTask
+from trading.contexts.market_data.application.ports.feeds import LiveCandlePublisher
 from trading.contexts.market_data.application.services import (
     AsyncRawInsertBuffer,
     AsyncRestFillQueue,
@@ -131,6 +137,23 @@ class MarketDataWsMetrics:
         self.ws_duplicates_total = Counter(
             "ws_duplicates_total",
             "Duplicate websocket candle events",
+        )
+        self.redis_publish_total = Counter(
+            "redis_publish_total",
+            "Successful Redis stream publish operations",
+        )
+        self.redis_publish_errors_total = Counter(
+            "redis_publish_errors_total",
+            "Redis stream publish failures",
+        )
+        self.redis_publish_duplicates_total = Counter(
+            "redis_publish_duplicates_total",
+            "Redis publish duplicate or out-of-order stream id events",
+        )
+        self.redis_publish_duration_seconds = Histogram(
+            "redis_publish_duration_seconds",
+            "Redis publish call duration in seconds",
+            buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
         )
 
         self.rest_fill_tasks_total = Counter("rest_fill_tasks_total", "Scheduled rest fill tasks")
@@ -284,6 +307,7 @@ class MarketDataWsApp:
     - index_reader: canonical index reader for reconnect tail planning.
     - insert_buffer: async raw insert buffer.
     - rest_fill_queue: background rest fill queue.
+    - live_candle_publisher: best-effort live feed publisher for WS closed candles.
     - gap_tracker: in-memory minute gap tracker.
     - reconnect_planner: reconnect/restart tail planner.
     - ingest_id: process-level ingest session id.
@@ -299,6 +323,7 @@ class MarketDataWsApp:
         index_reader: ClickHouseCanonicalCandleIndexReader,
         insert_buffer: AsyncRawInsertBuffer,
         rest_fill_queue: AsyncRestFillQueue,
+        live_candle_publisher: LiveCandlePublisher,
         gap_tracker: WsMinuteGapTracker,
         reconnect_planner: ReconnectTailFillPlanner,
         ingest_id: UUID,
@@ -325,11 +350,14 @@ class MarketDataWsApp:
         """
         if metrics_port <= 0:
             raise ValueError("metrics_port must be > 0")
+        if live_candle_publisher is None:  # type: ignore[truthy-bool]
+            raise ValueError("live_candle_publisher must be provided")
         self._config = config
         self._instrument_reader = instrument_reader
         self._index_reader = index_reader
         self._insert_buffer = insert_buffer
         self._rest_fill_queue = rest_fill_queue
+        self._live_candle_publisher = live_candle_publisher
         self._gap_tracker = gap_tracker
         self._reconnect_planner = reconnect_planner
         self._ingest_id = ingest_id
@@ -512,12 +540,21 @@ class MarketDataWsApp:
 
         Side effects:
         - Enqueues row into insert buffer.
+        - Attempts best-effort publish into live Redis feed.
         - Schedules gap-based rest fill task when minute sequence has gaps.
         """
         try:
             self._insert_buffer.submit(row)
         except RuntimeError:
             return
+
+        try:
+            self._live_candle_publisher.publish_1m_closed(row)
+        except Exception:  # noqa: BLE001
+            log.exception(
+                "live candle publish raised unexpectedly and will be ignored for instrument_key=%s",
+                row.meta.instrument_key,
+            )
 
         task = self._gap_tracker.observe(row)
         if task is not None:
@@ -591,6 +628,22 @@ def build_market_data_ws_app(
     metrics = MarketDataWsMetrics()
     clock = SystemClock()
     ingest_id = uuid4()
+    redis_cfg = config.live_feed.redis_streams
+    if redis_cfg.enabled:
+        live_candle_publisher: LiveCandlePublisher = RedisStreamsLiveCandlePublisher(
+            config=redis_cfg,
+            runtime_config=config,
+            process_ingest_id=ingest_id,
+            environ=environ,
+            hooks=RedisLiveCandlePublisherHooks(
+                on_publish_success=metrics.redis_publish_total.inc,
+                on_publish_error=metrics.redis_publish_errors_total.inc,
+                on_publish_duplicate=metrics.redis_publish_duplicates_total.inc,
+                on_publish_duration=metrics.redis_publish_duration_seconds.observe,
+            ),
+        )
+    else:
+        live_candle_publisher = NoopLiveCandlePublisher()
 
     rest_source = RestCandleIngestSource(
         cfg=config,
@@ -648,6 +701,7 @@ def build_market_data_ws_app(
         index_reader=index_reader,
         insert_buffer=insert_buffer,
         rest_fill_queue=rest_queue,
+        live_candle_publisher=live_candle_publisher,
         gap_tracker=gap_tracker,
         reconnect_planner=reconnect_planner,
         ingest_id=ingest_id,

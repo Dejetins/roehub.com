@@ -45,6 +45,10 @@
 | `rest_fill_active` | Gauge | - | Текущее число выполняющихся REST fill задач | Колеблется от 0 до `rest_concurrency_instruments` |
 | `rest_fill_errors_total` | Counter | - | Ошибки выполнения REST fill задач | Норма: близко к 0 |
 | `rest_fill_duration_seconds` | Histogram | - | Длительность REST fill задачи | Зависит от размера диапазона и лимитов API |
+| `redis_publish_total` | Counter | - | Успешные публикации WS candle в Redis Streams | Должен стабильно расти при живом WS потоке |
+| `redis_publish_errors_total` | Counter | - | Ошибки публикации в Redis Streams | Рост указывает на недоступность/ошибки Redis |
+| `redis_publish_duplicates_total` | Counter | - | Дубликаты/нарушение монотонности Stream ID (XADD) | Допустим редкий рост, обработка best-effort |
+| `redis_publish_duration_seconds` | Histogram | - | Длительность вызова publish (XADD) | Используется для контроля латентности live feed |
 
 ## Scheduler: `market-data-scheduler`
 
@@ -89,6 +93,7 @@
 curl -fsS http://localhost:9201/metrics | rg "ws_|insert_|rest_fill_"
 curl -fsS http://localhost:9202/metrics | rg "scheduler_(job_|tasks_|startup_scan_)"
 curl -fsS http://localhost:9202/metrics | rg "scheduler_rest_catchup_"
+curl -fsS http://localhost:9201/metrics | rg "redis_publish_"
 ```
 
 Исторические задачи scheduler:
@@ -128,6 +133,12 @@ histogram_quantile(
 
 ```promql
 increase(rest_fill_errors_total[15m])
+```
+
+Рост ошибок Redis публикации:
+
+```promql
+increase(redis_publish_errors_total[15m])
 ```
 
 Ошибки startup scan:

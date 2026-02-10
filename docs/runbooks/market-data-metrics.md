@@ -46,6 +46,12 @@ REST fill queue:
 - `rest_fill_errors_total`
 - `rest_fill_duration_seconds`
 
+Redis live feed publish:
+- `redis_publish_total`
+- `redis_publish_errors_total`
+- `redis_publish_duplicates_total`
+- `redis_publish_duration_seconds`
+
 ## Scheduler Metrics (`market-data-scheduler`)
 
 - `scheduler_job_runs_total{job="..."}`
@@ -87,6 +93,12 @@ SLO latency buckets:
 curl -fsS http://localhost:9201/metrics | rg "ws_closed_to_insert_(start|done)_seconds"
 ```
 
+Redis live feed metrics:
+
+```bash
+curl -fsS http://localhost:9201/metrics | rg "redis_publish_(total|errors_total|duplicates_total|duration_seconds)"
+```
+
 Проверка scrape из контейнера Prometheus (production recommended):
 
 ```bash
@@ -94,10 +106,25 @@ docker exec -it prometheus wget -T 2 -qO- http://market-data-ws-worker:9201/metr
 docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | head
 ```
 
+PromQL quick checks (Redis live feed):
+
+```promql
+increase(redis_publish_errors_total[15m])
+```
+
+```promql
+histogram_quantile(
+  0.95,
+  sum(rate(redis_publish_duration_seconds_bucket[5m])) by (le)
+)
+```
+
 ## Интерпретация
 
 - Рост `ws_reconnects_total` при стабильном `ws_messages_total` может указывать на сетевые проблемы.
 - Рост `insert_errors_total` или `rest_fill_errors_total` требует проверки CH и REST лимитов.
+- Рост `redis_publish_errors_total` при стабильном `insert_rows_total` означает проблему канала live feed, но не остановку ingestion.
+- Рост `redis_publish_duplicates_total` обычно указывает на повтор/опоздание WS candle по тому же `ts_open`.
 - Для SLO ориентируйтесь на p95 из `ws_closed_to_insert_done_seconds`.
 - Рост `scheduler_job_errors_total{job="startup_scan"}` блокирует ранний historical backfill.
 - При старте, если canonical начинается позже earliest boundary, должны расти:

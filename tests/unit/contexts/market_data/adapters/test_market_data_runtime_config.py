@@ -117,6 +117,88 @@ market_data:
     assert cfg.scheduler.jobs.rest_insurance_catchup.interval_seconds == 3600
 
 
+def test_live_feed_defaults_to_disabled_when_section_is_missing(tmp_path: Path) -> None:
+    """
+    Ensure Redis streams live feed is disabled by default for backward compatibility.
+
+    Parameters:
+    - tmp_path: pytest temporary directory fixture.
+
+    Returns:
+    - None.
+    """
+    p = tmp_path / "market_data.yaml"
+    p.write_text(
+        """
+version: 1
+market_data:
+  markets: []
+  ingestion: { flush_interval_ms: 250, max_buffer_rows: 1000 }
+  backfill: { max_days_per_insert: 7, chunk_align: utc_day }
+""".strip(),
+        encoding="utf-8",
+    )
+
+    cfg = load_market_data_runtime_config(p)
+    redis_streams = cfg.live_feed.redis_streams
+    assert redis_streams.enabled is False
+    assert redis_streams.host == "redis"
+    assert redis_streams.port == 6379
+    assert redis_streams.db == 0
+    assert redis_streams.stream_mode == "per_instrument"
+    assert redis_streams.stream_prefix == "md.candles.1m"
+    assert redis_streams.maxlen_approx == 7 * 1440
+
+
+def test_live_feed_redis_streams_section_is_parsed_with_computed_maxlen(tmp_path: Path) -> None:
+    """
+    Ensure parser reads live feed redis section and computes maxlen when omitted.
+
+    Parameters:
+    - tmp_path: pytest temporary directory fixture.
+
+    Returns:
+    - None.
+    """
+    p = tmp_path / "market_data.yaml"
+    p.write_text(
+        """
+version: 1
+market_data:
+  markets: []
+  ingestion: { flush_interval_ms: 250, max_buffer_rows: 1000 }
+  live_feed:
+    redis_streams:
+      enabled: true
+      host: redis
+      port: 6380
+      db: 2
+      password_env: "CUSTOM_REDIS_PASSWORD_ENV"
+      socket_timeout_s: 1.5
+      connect_timeout_s: 1.25
+      stream_mode: per_instrument
+      stream_prefix: md.candles.1m
+      retention_days: 3
+  backfill: { max_days_per_insert: 7, chunk_align: utc_day }
+""".strip(),
+        encoding="utf-8",
+    )
+
+    cfg = load_market_data_runtime_config(p)
+    redis_streams = cfg.live_feed.redis_streams
+    assert redis_streams.enabled is True
+    assert redis_streams.host == "redis"
+    assert redis_streams.port == 6380
+    assert redis_streams.db == 2
+    assert redis_streams.password_env == "CUSTOM_REDIS_PASSWORD_ENV"
+    assert redis_streams.socket_timeout_s == 1.5
+    assert redis_streams.connect_timeout_s == 1.25
+    assert redis_streams.stream_mode == "per_instrument"
+    assert redis_streams.stream_prefix == "md.candles.1m"
+    assert redis_streams.retention_days == 3
+    assert redis_streams.maxlen_approx == 3 * 1440
+
+
 def test_market_earliest_available_timestamp_must_not_be_in_future(tmp_path: Path) -> None:
     """
     Ensure parser rejects market earliest boundary timestamps that are in the future.
