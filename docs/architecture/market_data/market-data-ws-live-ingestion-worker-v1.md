@@ -142,6 +142,13 @@ REST fill вызывает существующий use-case `RestCatchUp1mUseCa
   - tail insurance: `[max(canonical_max + 1m, now_floor - tail_lookback), now_floor)`
   - все задачи enqueue в фоновой REST queue (не блокируют основной loop scheduler).
 
+Периодический `S3` выполняется в две фазы:
+- phase-1 (planner queue): enqueue только `scheduler_bootstrap` и `historical_backfill`
+  для инструментов, у которых canonical пустой или начинается позже `earliest_available_ts_utc`.
+- phase-2 (full catchup): для всех enabled/tradable инструментов запускается
+  `RestCatchUp1mUseCase` (tail + full gap scan по историческому диапазону canonical),
+  чтобы закрывать внутренние multi-day дыры, включая дни, где в canonical пока 0 строк.
+
 ---
 
 ## WS worker: точные правила поведения
@@ -234,6 +241,9 @@ Concurrency ограничиваем: максимум 4 инструмента 
 - S2) Enrich ref_instruments (on start + раз в 6–24 часа)
 - S3) REST insurance catchup (каждый час, lookback 2–6 часов) + startup/periodic scan
   исторических “дыр” относительно `earliest_available_ts_utc`.
+  В runtime это реализовано как:
+  - planner enqueue (`scheduler_bootstrap`/`historical_backfill`) и
+  - per-instrument `RestCatchUp1mUseCase` для tail+gap заполнения.
 
 ---
 
@@ -278,6 +288,13 @@ Job name: **`market-data-ws-worker`**.
   - `scheduler_tasks_planned_total{reason=...}`
   - `scheduler_tasks_enqueued_total{reason=...}`
   - `scheduler_startup_scan_instruments_total`
+  - `scheduler_rest_catchup_instruments_total{status=ok|failed|skipped_no_seed}`
+  - `scheduler_rest_catchup_tail_minutes_total`
+  - `scheduler_rest_catchup_tail_rows_written_total`
+  - `scheduler_rest_catchup_gap_days_scanned_total`
+  - `scheduler_rest_catchup_gap_days_with_gaps_total`
+  - `scheduler_rest_catchup_gap_ranges_filled_total`
+  - `scheduler_rest_catchup_gap_rows_written_total`
 
 ---
 

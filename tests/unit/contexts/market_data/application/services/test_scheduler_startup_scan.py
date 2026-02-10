@@ -16,6 +16,7 @@ from trading.contexts.market_data.adapters.outbound.config.runtime_config import
     load_market_data_runtime_config,
 )
 from trading.contexts.market_data.application.services import SchedulerBackfillPlanner
+from trading.contexts.market_data.application.use_cases import RestCatchUp1mReport
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
 
 
@@ -70,6 +71,15 @@ class _InstrumentReader:
         return [InstrumentId(MarketId(1), Symbol("BTCUSDT"))]
 
 
+class _MultiInstrumentReader:
+    def list_enabled_tradable(self):  # noqa: ANN001
+        """Return multiple enabled instruments for periodic insurance tests."""
+        return [
+            InstrumentId(MarketId(1), Symbol("BTCUSDT")),
+            InstrumentId(MarketId(1), Symbol("ETHUSDT")),
+        ]
+
+
 class _IndexReader:
     def bounds_1m(self, *, instrument_id, before):  # noqa: ANN001
         """Return canonical bounds causing both historical and tail tasks."""
@@ -92,6 +102,14 @@ class _TailOnlyIndexReader:
         )
 
 
+class _NoSeedIndexReader:
+    def bounds_1m(self, *, instrument_id, before):  # noqa: ANN001
+        """Return empty canonical bounds to force bootstrap planning path."""
+        _ = instrument_id
+        _ = before
+        return (None, None)
+
+
 class _RestQueue:
     def __init__(self) -> None:
         """Initialize queue lifecycle and enqueue tracking containers."""
@@ -111,6 +129,43 @@ class _RestQueue:
         """Capture enqueued task and report acceptance."""
         self.enqueued.append(task)
         return True
+
+
+class _RestCatchUpUseCase:
+    def __init__(self) -> None:
+        """Initialize deterministic rest-catchup fake state."""
+        self.calls: list[InstrumentId] = []
+
+    def run(self, instrument_id: InstrumentId) -> RestCatchUp1mReport:
+        """Record invocation and return fixed report payload."""
+        self.calls.append(instrument_id)
+        return RestCatchUp1mReport(
+            tail_start=UtcTimestamp(datetime(2026, 2, 9, 13, 55, tzinfo=timezone.utc)),
+            tail_end=UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)),
+            tail_rows_read=5,
+            tail_rows_written=5,
+            tail_batches=1,
+            gap_scan_start=UtcTimestamp(datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)),
+            gap_scan_end=UtcTimestamp(datetime(2026, 2, 9, 13, 55, tzinfo=timezone.utc)),
+            gap_days_scanned=8,
+            gap_days_with_gaps=2,
+            gap_ranges_filled=3,
+            gap_rows_read=10,
+            gap_rows_written=7,
+            gap_rows_skipped_existing=3,
+            gap_batches=1,
+        )
+
+
+class _NoSeedRestCatchUpUseCase:
+    def __init__(self) -> None:
+        """Initialize invocation tracking for missing-seed scenario."""
+        self.calls: list[InstrumentId] = []
+
+    def run(self, instrument_id: InstrumentId) -> RestCatchUp1mReport:
+        """Always emulate missing canonical seed error."""
+        self.calls.append(instrument_id)
+        raise ValueError("Run initial backfill first")
 
 
 def _config(tmp_path: Path):
@@ -201,6 +256,7 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(
             index_reader=_IndexReader(),
             rest_fill_queue=queue,
             backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
+            rest_catchup_use_case=_RestCatchUpUseCase(),
             metrics=MarketDataSchedulerMetrics(registry=registry),
             metrics_port=9202,
         )
@@ -269,6 +325,7 @@ def test_scheduler_startup_scan_tail_only_canonical_still_enqueues_historical(
             index_reader=_TailOnlyIndexReader(),
             rest_fill_queue=queue,
             backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
+            rest_catchup_use_case=_RestCatchUpUseCase(),
             metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
             metrics_port=9202,
         )
@@ -287,5 +344,106 @@ def test_scheduler_startup_scan_tail_only_canonical_still_enqueues_historical(
         historical = next(task for task in queue.enqueued if task.reason == "historical_backfill")
         assert str(historical.time_range.start) == "2017-01-01T00:00:00.000Z"
         assert str(historical.time_range.end) == "2026-02-09T13:50:00.000Z"
+
+    asyncio.run(_scenario())
+
+
+def test_rest_insurance_catchup_runs_for_all_enabled_instruments(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """
+    Ensure periodic insurance catchup executes rest-catchup for every enabled instrument.
+
+    Parameters:
+    - tmp_path: pytest temporary path fixture.
+    - monkeypatch: pytest monkeypatch fixture.
+
+    Returns:
+    - None.
+    """
+
+    async def _scenario() -> None:
+        monkeypatch.setattr(
+            "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.start_http_server",
+            lambda _port: None,
+        )
+
+        queue = _RestQueue()
+        rest_catchup = _RestCatchUpUseCase()
+        app = MarketDataSchedulerApp(
+            config=_config(tmp_path),
+            whitelist_path=str(tmp_path / "missing.csv"),
+            seed_use_case=_SeedUseCase(),
+            sync_use_case=_SyncUseCase(),
+            enrich_use_case=_EnrichUseCase(),
+            instrument_reader=_MultiInstrumentReader(),
+            index_reader=_IndexReader(),
+            rest_fill_queue=queue,
+            backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
+            rest_catchup_use_case=rest_catchup,
+            metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
+            metrics_port=9202,
+        )
+        app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
+
+        await app._run_rest_insurance_job()
+
+        assert len(rest_catchup.calls) == 2
+        assert {str(inst.symbol) for inst in rest_catchup.calls} == {"BTCUSDT", "ETHUSDT"}
+        assert not any(task.reason == "scheduler_tail" for task in queue.enqueued)
+        assert app._metrics.scheduler_rest_catchup_instruments_total.labels(status="ok")._value.get() == 2  # noqa: E501
+        assert app._metrics.scheduler_rest_catchup_tail_rows_written_total._value.get() == 10
+        assert app._metrics.scheduler_rest_catchup_gap_days_scanned_total._value.get() == 16
+
+    asyncio.run(_scenario())
+
+
+def test_rest_insurance_catchup_tracks_skipped_no_seed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """
+    Ensure periodic insurance marks no-seed instruments as skipped without failing the job.
+
+    Parameters:
+    - tmp_path: pytest temporary path fixture.
+    - monkeypatch: pytest monkeypatch fixture.
+
+    Returns:
+    - None.
+    """
+
+    async def _scenario() -> None:
+        monkeypatch.setattr(
+            "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.start_http_server",
+            lambda _port: None,
+        )
+
+        queue = _RestQueue()
+        rest_catchup = _NoSeedRestCatchUpUseCase()
+        app = MarketDataSchedulerApp(
+            config=_config(tmp_path),
+            whitelist_path=str(tmp_path / "missing.csv"),
+            seed_use_case=_SeedUseCase(),
+            sync_use_case=_SyncUseCase(),
+            enrich_use_case=_EnrichUseCase(),
+            instrument_reader=_InstrumentReader(),
+            index_reader=_NoSeedIndexReader(),
+            rest_fill_queue=queue,
+            backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
+            rest_catchup_use_case=rest_catchup,
+            metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
+            metrics_port=9202,
+        )
+        app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
+
+        await app._run_rest_insurance_job()
+
+        assert len(rest_catchup.calls) == 1
+        assert app._metrics.scheduler_rest_catchup_instruments_total.labels(
+            status="skipped_no_seed"
+        )._value.get() == 1
+        assert any(task.reason == "scheduler_bootstrap" for task in queue.enqueued)
 
     asyncio.run(_scenario())

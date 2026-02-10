@@ -170,6 +170,8 @@ Gap fill выполняется автоматически, без ручных 
 2) Оцениваем покрытие по дням:
    - строим `TimeRange(min_ts_open, max_ts_open + 1m)`
    - `daily_counts = index_reader.count_distinct_ts_open_by_utc_day(...)`
+   - важно: если дня нет в `daily_counts`, он трактуется как `actual_cnt = 0`
+     (иначе “полностью пустые” дни не будут восстанавливаться)
 
 3) Для каждого UTC-дня считаем `expected`:
    - обычно 1440 минут
@@ -179,6 +181,14 @@ Gap fill выполняется автоматически, без ручных 
    - получаем список `ts_open` за день: `list_ts_open_in_range(day_range)`
    - в памяти строим missing intervals (склеиваем подряд идущие пропуски)
    - каждый missing interval прогоняем тем же REST ingestion механизмом (time slicing + batching)
+
+### Scheduler integration (Epic 3 maintenance)
+- startup scan планирует `scheduler_bootstrap` и `historical_backfill` диапазоны.
+- periodic `rest_insurance_catchup` дополнительно запускает `RestCatchUp1mUseCase`
+  по всем enabled/tradable инструментам.
+- это покрывает оба класса проблем:
+  - “история до canonical_min” (через planner tasks),
+  - “внутренние дыры внутри canonical диапазона” (через full gap scan).
 
 ### Invariants
 - Пишем только закрытые 1m (end всегда “вниз до минуты”).

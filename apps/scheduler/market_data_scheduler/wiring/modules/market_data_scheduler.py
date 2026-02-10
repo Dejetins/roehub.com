@@ -49,12 +49,13 @@ from trading.contexts.market_data.application.services import (
 from trading.contexts.market_data.application.services.minute_utils import floor_to_minute_utc
 from trading.contexts.market_data.application.use_cases import (
     EnrichRefInstrumentsFromExchangeUseCase,
+    RestCatchUp1mUseCase,
     RestFillRange1mUseCase,
     SeedRefMarketUseCase,
     SyncWhitelistToRefInstrumentsUseCase,
 )
 from trading.platform.time.system_clock import SystemClock
-from trading.shared_kernel.primitives import UtcTimestamp
+from trading.shared_kernel.primitives import InstrumentId, UtcTimestamp
 
 log = logging.getLogger(__name__)
 
@@ -133,6 +134,42 @@ class MarketDataSchedulerMetrics:
             "How many instruments were scanned in startup scan runs",
             registry=registry,
         )
+        self.scheduler_rest_catchup_instruments_total = Counter(
+            "scheduler_rest_catchup_instruments_total",
+            "How many instruments were processed by periodic rest insurance catchup",
+            labelnames=("status",),
+            registry=registry,
+        )
+        self.scheduler_rest_catchup_tail_minutes_total = Counter(
+            "scheduler_rest_catchup_tail_minutes_total",
+            "Total tail minutes requested by periodic rest catchup",
+            registry=registry,
+        )
+        self.scheduler_rest_catchup_tail_rows_written_total = Counter(
+            "scheduler_rest_catchup_tail_rows_written_total",
+            "Total tail rows written by periodic rest catchup",
+            registry=registry,
+        )
+        self.scheduler_rest_catchup_gap_days_scanned_total = Counter(
+            "scheduler_rest_catchup_gap_days_scanned_total",
+            "Total historical UTC days scanned for gaps by periodic rest catchup",
+            registry=registry,
+        )
+        self.scheduler_rest_catchup_gap_days_with_gaps_total = Counter(
+            "scheduler_rest_catchup_gap_days_with_gaps_total",
+            "Total historical UTC days where gaps were detected",
+            registry=registry,
+        )
+        self.scheduler_rest_catchup_gap_ranges_filled_total = Counter(
+            "scheduler_rest_catchup_gap_ranges_filled_total",
+            "Total missing ranges filled by periodic rest catchup",
+            registry=registry,
+        )
+        self.scheduler_rest_catchup_gap_rows_written_total = Counter(
+            "scheduler_rest_catchup_gap_rows_written_total",
+            "Total historical gap rows written by periodic rest catchup",
+            registry=registry,
+        )
 
 
 class MarketDataSchedulerApp:
@@ -149,6 +186,7 @@ class MarketDataSchedulerApp:
     - index_reader: canonical index reader.
     - rest_fill_queue: async queue executing rest fill tasks in background.
     - backfill_planner: deterministic planner of bootstrap/historical/tail ranges.
+    - rest_catchup_use_case: periodic full-history gap/tail catchup executor.
     - metrics: scheduler metrics bundle.
     - metrics_port: HTTP port for `/metrics`.
     """
@@ -165,6 +203,7 @@ class MarketDataSchedulerApp:
         index_reader: CanonicalCandleIndexReader,
         rest_fill_queue: AsyncRestFillQueue,
         backfill_planner: SchedulerBackfillPlanner,
+        rest_catchup_use_case: RestCatchUp1mUseCase,
         metrics: MarketDataSchedulerMetrics,
         metrics_port: int,
     ) -> None:
@@ -197,6 +236,7 @@ class MarketDataSchedulerApp:
         self._index_reader = index_reader
         self._rest_fill_queue = rest_fill_queue
         self._backfill_planner = backfill_planner
+        self._rest_catchup_use_case = rest_catchup_use_case
         self._metrics = metrics
         self._metrics_port = metrics_port
         self._clock = SystemClock()
@@ -436,14 +476,133 @@ class MarketDataSchedulerApp:
         - Reads canonical bounds for enabled instruments.
         - Enqueues background REST fill tasks.
         """
-        await self._scan_and_enqueue(scan_reason="rest_insurance_catchup")
+        await self._scan_and_enqueue(
+            scan_reason="rest_insurance_catchup",
+            allowed_reasons={"scheduler_bootstrap", "historical_backfill"},
+        )
+        await self._run_periodic_gap_catchup()
 
-    async def _scan_and_enqueue(self, *, scan_reason: str) -> None:
+    async def _run_periodic_gap_catchup(self) -> None:
+        """
+        Run full-history REST catchup for all enabled instruments with bounded concurrency.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - None.
+
+        Assumptions/Invariants:
+        - Use-case performs tail catchup and historical gap scan against canonical index.
+        - Instruments without canonical seed are skipped (bootstrap is handled by planner queue).
+
+        Errors/Exceptions:
+        - None. Per-instrument failures are logged and reflected in metrics.
+
+        Side effects:
+        - Executes REST catchup use-case and writes rows into raw storage.
+        """
+        instruments = await asyncio.to_thread(self._instrument_reader.list_enabled_tradable)
+        if not instruments:
+            log.info("rest_insurance_catchup: no enabled instruments for periodic gap catchup")
+            return
+
+        semaphore = asyncio.Semaphore(self._config.ingestion.rest_concurrency_instruments)
+        now_floor = UtcTimestamp(floor_to_minute_utc(self._clock.now().value))
+
+        async def _run_one(instrument: InstrumentId) -> None:
+            """
+            Execute one periodic REST catchup run under shared concurrency semaphore.
+
+            Parameters:
+            - instrument: enabled tradable instrument id.
+
+            Returns:
+            - None.
+
+            Assumptions/Invariants:
+            - Per-instrument failures do not abort other scheduled instruments.
+
+            Errors/Exceptions:
+            - None. Errors are converted into metrics/log records.
+
+            Side effects:
+            - Triggers REST catchup execution and updates scheduler metrics.
+            """
+            async with semaphore:
+                try:
+                    report = await asyncio.to_thread(self._rest_catchup_use_case.run, instrument)
+                except ValueError as exc:
+                    if "Run initial backfill first" in str(exc):
+                        self._metrics.scheduler_rest_catchup_instruments_total.labels(
+                            status="skipped_no_seed"
+                        ).inc()
+                        log.info(
+                            "rest_insurance_catchup skipped instrument without canonical seed: %s",
+                            instrument,
+                        )
+                        return
+                    self._metrics.scheduler_rest_catchup_instruments_total.labels(
+                        status="failed"
+                    ).inc()
+                    log.exception("rest_insurance_catchup failed for %s", instrument)
+                    return
+                except Exception:  # noqa: BLE001
+                    self._metrics.scheduler_rest_catchup_instruments_total.labels(
+                        status="failed"
+                    ).inc()
+                    log.exception("rest_insurance_catchup failed for %s", instrument)
+                    return
+
+                self._metrics.scheduler_rest_catchup_instruments_total.labels(status="ok").inc()
+                tail_minutes = _minutes_between(report.tail_start, report.tail_end)
+                lag_to_now_minutes = _minutes_between(report.tail_end, now_floor)
+                self._metrics.scheduler_rest_catchup_tail_minutes_total.inc(tail_minutes)
+                self._metrics.scheduler_rest_catchup_tail_rows_written_total.inc(
+                    report.tail_rows_written
+                )
+                self._metrics.scheduler_rest_catchup_gap_days_scanned_total.inc(
+                    report.gap_days_scanned
+                )
+                self._metrics.scheduler_rest_catchup_gap_days_with_gaps_total.inc(
+                    report.gap_days_with_gaps
+                )
+                self._metrics.scheduler_rest_catchup_gap_ranges_filled_total.inc(
+                    report.gap_ranges_filled
+                )
+                self._metrics.scheduler_rest_catchup_gap_rows_written_total.inc(
+                    report.gap_rows_written
+                )
+                log.info(
+                    "rest_insurance_catchup instrument=%s tail_minutes=%s tail_rows_written=%s "
+                    "gap_days_scanned=%s gap_days_with_gaps=%s gap_ranges_filled=%s "
+                    "gap_rows_written=%s lag_to_now_minutes=%s",
+                    instrument,
+                    tail_minutes,
+                    report.tail_rows_written,
+                    report.gap_days_scanned,
+                    report.gap_days_with_gaps,
+                    report.gap_ranges_filled,
+                    report.gap_rows_written,
+                    lag_to_now_minutes,
+                )
+
+        await asyncio.gather(
+            *[asyncio.create_task(_run_one(instrument)) for instrument in instruments]
+        )
+
+    async def _scan_and_enqueue(
+        self,
+        *,
+        scan_reason: str,
+        allowed_reasons: set[str] | None = None,
+    ) -> None:
         """
         Build and enqueue maintenance tasks for all enabled instruments.
 
         Parameters:
         - scan_reason: textual reason used in logs.
+        - allowed_reasons: optional whitelist of task reasons to enqueue.
 
         Returns:
         - None.
@@ -471,7 +630,25 @@ class MarketDataSchedulerApp:
         semaphore = asyncio.Semaphore(self._config.ingestion.rest_concurrency_instruments)
         planned_tasks: list[RestFillTask] = []
 
-        async def _plan_one(instrument) -> list[RestFillTask]:  # noqa: ANN001
+        async def _plan_one(instrument: InstrumentId) -> list[RestFillTask]:
+            """
+            Plan maintenance tasks for one instrument under bounded planner concurrency.
+
+            Parameters:
+            - instrument: enabled tradable instrument id.
+
+            Returns:
+            - Planned task list for that instrument.
+
+            Assumptions/Invariants:
+            - Canonical bounds are read with `before=now_floor` to exclude in-flight minute.
+
+            Errors/Exceptions:
+            - Propagates index reader and planner errors.
+
+            Side effects:
+            - Reads canonical bounds from storage.
+            """
             async with semaphore:
                 bounds = await asyncio.to_thread(
                     self._index_reader.bounds_1m,
@@ -492,7 +669,10 @@ class MarketDataSchedulerApp:
             *[asyncio.create_task(_plan_one(instrument)) for instrument in instruments]
         )
         for tasks in grouped:
-            planned_tasks.extend(tasks)
+            if allowed_reasons is None:
+                planned_tasks.extend(tasks)
+                continue
+            planned_tasks.extend([task for task in tasks if task.reason in allowed_reasons])
 
         planned_by_reason: dict[str, int] = {}
         for task in planned_tasks:
@@ -571,6 +751,34 @@ def _log_first_planned_tasks(
         )
 
 
+def _minutes_between(start: UtcTimestamp | None, end: UtcTimestamp | None) -> int:
+    """
+    Compute non-negative difference in whole minutes between optional UTC timestamps.
+
+    Parameters:
+    - start: range start timestamp or `None`.
+    - end: range end timestamp or `None`.
+
+    Returns:
+    - Non-negative minute difference rounded down to whole minutes.
+
+    Assumptions/Invariants:
+    - Both timestamps are UTC-aware when present.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    if start is None or end is None:
+        return 0
+    delta_seconds = (end.value - start.value).total_seconds()
+    if delta_seconds <= 0:
+        return 0
+    return int(delta_seconds // 60)
+
+
 def build_market_data_scheduler_app(
     *,
     config_path: str,
@@ -642,6 +850,15 @@ def build_market_data_scheduler_app(
         batch_size=10_000,
         index_reader=index_reader,
     )
+    rest_catchup_use_case = RestCatchUp1mUseCase(
+        index=index_reader,
+        source=rest_source,
+        writer=ClickHouseRawKlineWriter(gateway=gateway, database=clickhouse_settings.database),
+        clock=SystemClock(),
+        max_days_per_insert=config.backfill.max_days_per_insert,
+        batch_size=10_000,
+        ingest_id=uuid4(),
+    )
     metadata_source = RestInstrumentMetadataSource(cfg=config, http=RequestsHttpClient())
     enrich_use_case = EnrichRefInstrumentsFromExchangeUseCase(
         instrument_reader=instrument_reader,
@@ -667,6 +884,7 @@ def build_market_data_scheduler_app(
         index_reader=index_reader,
         rest_fill_queue=rest_fill_queue,
         backfill_planner=backfill_planner,
+        rest_catchup_use_case=rest_catchup_use_case,
         metrics=MarketDataSchedulerMetrics(),
         metrics_port=metrics_port,
     )

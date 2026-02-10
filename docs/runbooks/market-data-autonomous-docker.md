@@ -123,3 +123,9 @@ curl -fsS http://localhost:9202/metrics | head
 3. В логах scheduler есть `startup_scan: instruments_scanned=...` и задачи `historical_backfill` при необходимости.
 4. `scheduler_tasks_planned_total{reason="historical_backfill"}` и `scheduler_tasks_enqueued_total{reason="historical_backfill"}` растут, если истории не хватает.
 5. В логах worker нет серийных `insert_errors_total`/`rest_fill_errors_total`.
+
+
+## 7. restart ws+sheduler
+```md
+`docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env restart market-data-scheduler market-data-ws-worker`
+```

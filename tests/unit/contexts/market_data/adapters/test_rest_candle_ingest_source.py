@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from trading.contexts.market_data.adapters.outbound.clients.common_http.http_client import (
@@ -31,6 +31,18 @@ class FakeHttp:
     def get_json(self, *, url, params, timeout_s, retries, backoff_base_s, backoff_max_s, backoff_jitter_s):  # noqa: E501
         self.calls.append((url, dict(params)))
         return HttpResponse(status_code=200, headers={}, body=self.body)
+
+
+class PagingFakeHttp:
+    def __init__(self, pages):
+        self.pages = dict(pages)
+        self.calls = []
+
+    def get_json(self, *, url, params, timeout_s, retries, backoff_base_s, backoff_max_s, backoff_jitter_s):  # noqa: E501
+        self.calls.append((url, dict(params)))
+        start_time = int(params["startTime"])
+        body = self.pages.get(start_time, [])
+        return HttpResponse(status_code=200, headers={}, body=body)
 
 
 def test_binance_maps_to_candle_with_meta(tmp_path):
@@ -108,3 +120,79 @@ market_data:
     assert rows[0].meta.ingest_id == ingest_id
     assert rows[0].meta.instrument_key == "binance:spot:BTCUSDT"
     assert rows[0].candle.volume_quote == 15.0
+
+
+def test_binance_stream_respects_half_open_range_and_paging(tmp_path):
+    """
+    Verify binance paging keeps half-open `[start, end)` semantics across windows.
+
+    Parameters:
+    - tmp_path: pytest temp path fixture for runtime config file.
+
+    Returns:
+    - None.
+    """
+    yaml_text = """
+version: 1
+market_data:
+  markets:
+    - market_id: 1
+      exchange: binance
+      market_type: spot
+      market_code: binance:spot
+      rest:
+        base_url: "https://api.binance.com"
+        earliest_available_ts_utc: "2017-01-01T00:00:00Z"
+        timeout_s: 10.0
+        retries: 0
+        backoff: { base_s: 0.01, max_s: 0.01, jitter_s: 0.0 }
+        limiter: { mode: autodetect, safety_factor: 0.8, max_concurrency: 1 }
+      ws:
+        url: "wss://x"
+        ping_interval_s: 20.0
+        pong_timeout_s: 10.0
+        reconnect: { min_delay_s: 0.5, max_delay_s: 30.0, factor: 1.7, jitter_s: 0.2 }
+        max_symbols_per_connection: 200
+  ingestion:
+    raw_write: { flush_interval_ms: 250, max_buffer_rows: 2000 }
+  backfill:
+    max_days_per_insert: 7
+    chunk_align: "utc_day"
+"""
+    p = tmp_path / "market_data.yaml"
+    p.write_text(yaml_text, encoding="utf-8")
+    cfg = load_market_data_runtime_config(p)
+
+    start = datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)
+    minute_999 = start + timedelta(minutes=999)
+    minute_1000 = start + timedelta(minutes=1000)
+    minute_1001 = start + timedelta(minutes=1001)
+    end = start + timedelta(minutes=1002)
+
+    def _kline(dt):
+        open_ms = int(dt.timestamp() * 1000)
+        return [open_ms, "1", "2", "0.5", "1.5", "10", open_ms + 59999, "15", 7, "3", "4", "0"]  # noqa: E501
+
+    first_start_ms = int(start.timestamp() * 1000)
+    second_start_ms = int(minute_1000.timestamp() * 1000)
+    fake_http = PagingFakeHttp(
+        {
+            first_start_ms: [_kline(start), _kline(minute_999), _kline(minute_1000)],
+            second_start_ms: [_kline(minute_1000), _kline(minute_1001), _kline(end)],
+        }
+    )
+    fake_clock = FakeClock(datetime(2026, 2, 2, 0, 0, tzinfo=timezone.utc))
+    src = RestCandleIngestSource(
+        cfg=cfg,
+        clock=fake_clock,
+        http=fake_http,
+        ingest_id=UUID("00000000-0000-0000-0000-000000000002"),
+    )
+
+    inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+    tr = TimeRange(start=UtcTimestamp(start), end=UtcTimestamp(end))
+    rows = list(src.stream_1m(inst, tr))
+
+    ts_list = [row.candle.ts_open.value for row in rows]
+    assert ts_list == [start, minute_999, minute_1000, minute_1001]
+    assert len(fake_http.calls) == 2

@@ -56,6 +56,13 @@
 | `scheduler_tasks_planned_total` | Counter | `reason` | Сколько fill-задач запланировано planner'ом | На старте обычно заметный рост |
 | `scheduler_tasks_enqueued_total` | Counter | `reason` | Сколько из запланированных реально enqueued в queue | Обычно <= planned (из-за дедупликации) |
 | `scheduler_startup_scan_instruments_total` | Counter | - | Сколько инструментов обработано startup scan | Растет на каждый startup scan |
+| `scheduler_rest_catchup_instruments_total` | Counter | `status` | Сколько инструментов обработал periodic rest catchup | Рост по `status="ok"` в штатном режиме |
+| `scheduler_rest_catchup_tail_minutes_total` | Counter | - | Сколько tail-минут суммарно запрошено periodic catchup | Растет на каждом S3-запуске |
+| `scheduler_rest_catchup_tail_rows_written_total` | Counter | - | Сколько tail-строк реально записано periodic catchup | Обычно растет при отставании хвоста |
+| `scheduler_rest_catchup_gap_days_scanned_total` | Counter | - | Сколько UTC-дней просканировано на gaps | Растет стабильно при каждом full scan |
+| `scheduler_rest_catchup_gap_days_with_gaps_total` | Counter | - | Сколько дней найдено с gaps | Должен уменьшать темп роста после стабилизации |
+| `scheduler_rest_catchup_gap_ranges_filled_total` | Counter | - | Сколько gap-диапазонов отправлено в fill | Рост в фазе восстановления истории |
+| `scheduler_rest_catchup_gap_rows_written_total` | Counter | - | Сколько gap-строк записано | Ключевой индикатор, что дыры реально закрываются |
 
 ### `job` labels
 
@@ -70,17 +77,25 @@
 - `historical_backfill` — canonical начинается позже earliest, диапазон `[earliest, canonical_min)`.
 - `scheduler_tail` — страховочный хвост `[max(canonical_max+1m, now_floor-lookback), now_floor)`.
 
+### `status` labels (`scheduler_rest_catchup_instruments_total`)
+
+- `ok` — инструмент успешно обработан `RestCatchUp1mUseCase`.
+- `failed` — processing упал с исключением (смотреть логи).
+- `skipped_no_seed` — canonical пустой; инструмент оставлен planner-ветке bootstrap.
+
 ## Быстрые проверки с `curl`
 
 ```bash
 curl -fsS http://localhost:9201/metrics | rg "ws_|insert_|rest_fill_"
 curl -fsS http://localhost:9202/metrics | rg "scheduler_(job_|tasks_|startup_scan_)"
+curl -fsS http://localhost:9202/metrics | rg "scheduler_rest_catchup_"
 ```
 
 Исторические задачи scheduler:
 
 ```bash
 curl -fsS http://localhost:9202/metrics | rg "scheduler_tasks_(planned|enqueued)_total.*historical_backfill"
+curl -fsS http://localhost:9202/metrics | rg "scheduler_rest_catchup_gap_(days|ranges|rows)"
 ```
 
 Ошибка job:

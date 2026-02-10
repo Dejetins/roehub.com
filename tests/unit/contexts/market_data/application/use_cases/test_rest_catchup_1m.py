@@ -450,6 +450,66 @@ def test_rest_catchup_run_raises_without_canonical_seed() -> None:
         uc.run(instrument_id)
 
 
+def test_gap_fill_includes_absent_days_from_daily_counts() -> None:
+    """
+    Ensure days absent in day-counts map are treated as zero-candle gaps and filled.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+    """
+    instrument_id = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+
+    d1 = date(2026, 1, 1)
+    d3 = date(2026, 1, 3)
+    jan2_open = datetime(2026, 1, 2, 0, 0, tzinfo=timezone.utc)
+    jan2_end = datetime(2026, 1, 3, 0, 0, tzinfo=timezone.utc)
+
+    def distinct_for_range(time_range: TimeRange) -> Sequence[UtcTimestamp]:
+        key = (_minute_key(time_range.start.value), _minute_key(time_range.end.value))
+        jan2_key = (_minute_key(jan2_open), _minute_key(jan2_end))
+        if key == jan2_key:
+            return []
+        return []
+
+    index = FakeIndex(
+        last=_ts(datetime(2026, 1, 3, 0, 0, tzinfo=timezone.utc)),
+        bounds_value=(
+            _ts(datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)),
+            _ts(datetime(2026, 1, 3, 0, 0, tzinfo=timezone.utc)),
+        ),
+        daily=[
+            DailyTsOpenCount(day=d1, count=1440),
+            DailyTsOpenCount(day=d3, count=1),
+            # 2026-01-02 intentionally missing in daily_counts -> should be interpreted as 0.
+        ],
+        distinct_fn=distinct_for_range,
+    )
+    source = FakeSource([_mk_row(instrument_id, jan2_open)])
+    writer = RecordingWriter()
+
+    uc = RestCatchUp1mUseCase(
+        index=index,
+        source=source,
+        writer=writer,
+        clock=FixedClock(_ts(datetime(2026, 1, 3, 0, 1, 30, tzinfo=timezone.utc))),
+        max_days_per_insert=1,
+        batch_size=100,
+        ingest_id=UUID("00000000-0000-0000-0000-000000000055"),
+    )
+
+    report = uc.run(instrument_id)
+
+    assert report.gap_days_scanned >= 2
+    assert report.gap_days_with_gaps >= 1
+    assert report.gap_ranges_filled >= 1
+    assert report.gap_rows_written == 1
+    assert len(writer.calls) == 1
+    assert writer.calls[0][0].candle.ts_open.value == jan2_open
+
+
 def test_gap_fill_does_not_write_existing_minutes() -> None:
     """
     Regression: gap fill must skip rows that already exist in canonical minute index.
