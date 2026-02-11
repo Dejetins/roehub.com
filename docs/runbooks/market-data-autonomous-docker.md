@@ -159,3 +159,21 @@ docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.e
 ```bash
 docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env restart market-data-scheduler market-data-ws-worker
 ```
+
+```bash
+cd /opt/actions-runner/roehub_com/actions-runner/_work/roehub.com/roehub.com
+source /home/roe/venvs/roehub/bin/activate
+```
+
+# 1) Сначала посмотреть план без выполнения
+```bash
+DRY_RUN=1 bash scripts/ops/optimize_canonical_partitions.sh
+```
+```bash
+# 2) Выполнить оптимизацию всех partition с дублями
+bash scripts/ops/optimize_canonical_partitions.sh
+```
+```bash
+# 3) Ограничить количество partition за проход
+MAX_PARTITIONS=5 bash scripts/ops/optimize_canonical_partitions.sh
+```
