@@ -190,7 +190,7 @@ defaults:
         mode: range
         start: 1.0
         stop_incl: 3.0
-        step: 0.03
+        step: 0.025
 """
 
     with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
@@ -232,3 +232,236 @@ defaults:
         _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
 
     assert "defaults.ma.sma.inputs.source.values[0]" in str(exc_info.value)
+
+
+def test_yaml_validation_accepts_expanded_source_defaults(tmp_path: Path) -> None:
+    """
+    Verify expanded source defaults list is accepted for source-axis indicators.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture.
+    Returns:
+        None.
+    Assumptions:
+        MA indicators expose source axis with the expanded allowed source set.
+    Raises:
+        AssertionError: If validation unexpectedly fails.
+    Side Effects:
+        None.
+    """
+    yaml_text = """
+schema_version: 1
+defaults:
+  ma.sma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
+"""
+    _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
+
+
+def test_yaml_validation_rejects_source_for_indicator_without_source_axis(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify `inputs.source` is rejected for indicators without source axis.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture.
+    Returns:
+        None.
+    Assumptions:
+        OBV uses fixed close/volume inputs and has no configurable input axis.
+    Raises:
+        AssertionError: If expected validation error is not raised.
+    Side Effects:
+        None.
+    """
+    yaml_text = """
+schema_version: 1
+defaults:
+  volume.obv:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+"""
+    with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
+        _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
+
+    assert "defaults.volume.obv.inputs.source" in str(exc_info.value)
+
+
+def test_yaml_validation_rejects_float_range_start_alignment(tmp_path: Path) -> None:
+    """
+    Verify float range start must align with hard step grid.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture.
+    Returns:
+        None.
+    Assumptions:
+        `volatility.bbands.mult` uses hard_min=0.1 and hard_step=0.01.
+    Raises:
+        AssertionError: If expected alignment error is not raised.
+    Side Effects:
+        None.
+    """
+    yaml_text = """
+schema_version: 1
+defaults:
+  volatility.bbands:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
+      mult:
+        mode: range
+        start: 0.105
+        stop_incl: 0.205
+        step: 0.01
+"""
+    with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
+        _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
+
+    assert "defaults.volatility.bbands.params.mult.start" in str(exc_info.value)
+
+
+def test_yaml_validation_rejects_float_range_stop_alignment(tmp_path: Path) -> None:
+    """
+    Verify float range stop_incl must align with hard step grid.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture.
+    Returns:
+        None.
+    Assumptions:
+        `volatility.bbands.mult` uses hard_min=0.1 and hard_step=0.01.
+    Raises:
+        AssertionError: If expected alignment error is not raised.
+    Side Effects:
+        None.
+    """
+    yaml_text = """
+schema_version: 1
+defaults:
+  volatility.bbands:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
+      mult:
+        mode: range
+        start: 0.10
+        stop_incl: 0.205
+        step: 0.01
+"""
+    with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
+        _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
+
+    assert "defaults.volatility.bbands.params.mult.stop_incl" in str(exc_info.value)
+
+
+def test_yaml_validation_rejects_float_explicit_value_alignment(tmp_path: Path) -> None:
+    """
+    Verify explicit float values must align to hard step grid.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture.
+    Returns:
+        None.
+    Assumptions:
+        `trend.keltner.mult` uses hard_min=0.1 and hard_step=0.01.
+    Raises:
+        AssertionError: If expected alignment error is not raised.
+    Side Effects:
+        None.
+    """
+    yaml_text = """
+schema_version: 1
+defaults:
+  trend.keltner:
+    params:
+      window:
+        mode: explicit
+        values: [20]
+      mult:
+        mode: explicit
+        values: [1.005]
+"""
+    with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
+        _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
+
+    assert "defaults.trend.keltner.params.mult.values[0]" in str(exc_info.value)
+
+
+def test_yaml_validation_accepts_new_indicator_ids_from_expanded_baseline(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify YAML can reference newly added baseline indicators.
+
+    Args:
+        tmp_path: Pytest temporary directory fixture.
+    Returns:
+        None.
+    Assumptions:
+        Expanded hard definitions include the referenced indicators.
+    Raises:
+        AssertionError: If validation unexpectedly fails.
+    Side Effects:
+        None.
+    """
+    yaml_text = """
+schema_version: 1
+defaults:
+  momentum.macd:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      fast_window:
+        mode: explicit
+        values: [12]
+      signal_window:
+        mode: explicit
+        values: [9]
+      slow_window:
+        mode: explicit
+        values: [26]
+  structure.heikin_ashi: {}
+  trend.psar:
+    params:
+      accel_max:
+        mode: explicit
+        values: [0.2]
+      accel_start:
+        mode: explicit
+        values: [0.02]
+      accel_step:
+        mode: explicit
+        values: [0.02]
+  volume.vwap_deviation:
+    params:
+      mult:
+        mode: explicit
+        values: [2.0]
+      window:
+        mode: explicit
+        values: [20]
+"""
+    _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)

@@ -203,7 +203,7 @@ def _validate_inputs(
     Returns:
         None.
     Assumptions:
-        Only `source` input axis is parameterizable in v1 domain model.
+        Only `source` input axis is parameterizable in the current domain model.
     Raises:
         IndicatorDefaultsValidationError: If input defaults are unknown or invalid.
     Side Effects:
@@ -217,12 +217,17 @@ def _validate_inputs(
     for input_name in sorted(indicator_defaults.inputs.keys()):
         yaml_path = f"defaults.{indicator_id}.inputs.{input_name}"
         if input_name not in allowed_input_values:
+            expected_axes = (
+                f"one of {sorted(allowed_input_values.keys())}"
+                if allowed_input_values
+                else "no configurable input axes for this indicator"
+            )
             raise IndicatorDefaultsValidationError(
                 config_path=config_path,
                 yaml_path=yaml_path,
                 indicator_id=indicator_id,
                 field_name=input_name,
-                expected=f"one of {sorted(allowed_input_values.keys())}",
+                expected=expected_axes,
                 actual=input_name,
             )
 
@@ -509,7 +514,7 @@ def _validate_int_spec(
             yaml_path=f"{yaml_path}.step",
             indicator_id=indicator_id,
             field_name=param_name,
-            expected=f"step multiple of hard step {hard_step}",
+            expected=_expected_grid(hard_min=hard_min, hard_step=hard_step),
             actual=step,
         )
 
@@ -532,6 +537,15 @@ def _validate_int_spec(
         hard_min=hard_min,
         hard_max=hard_max,
         hard_step=hard_step,
+    )
+    _ensure_range_materializes(
+        config_path=config_path,
+        indicator_id=indicator_id,
+        yaml_path=yaml_path,
+        field_name=param_name,
+        start=float(start),
+        stop_incl=float(stop_incl),
+        step=float(step),
     )
 
 
@@ -661,7 +675,7 @@ def _validate_float_spec(
             yaml_path=f"{yaml_path}.step",
             indicator_id=indicator_id,
             field_name=param_name,
-            expected=f"step multiple of hard step {hard_step}",
+            expected=_expected_grid(hard_min=hard_min, hard_step=hard_step),
             actual=step,
         )
 
@@ -684,6 +698,15 @@ def _validate_float_spec(
         hard_min=hard_min,
         hard_max=hard_max,
         hard_step=hard_step,
+    )
+    _ensure_range_materializes(
+        config_path=config_path,
+        indicator_id=indicator_id,
+        yaml_path=yaml_path,
+        field_name=param_name,
+        start=start,
+        stop_incl=stop_incl,
+        step=step,
     )
 
 
@@ -725,7 +748,7 @@ def _validate_int_value(
             yaml_path=yaml_path,
             indicator_id=indicator_id,
             field_name=field_name,
-            expected=f"{hard_min} <= value <= {hard_max}",
+            expected=_expected_bounds(hard_min=hard_min, hard_max=hard_max),
             actual=value,
         )
 
@@ -735,7 +758,7 @@ def _validate_int_value(
             yaml_path=yaml_path,
             indicator_id=indicator_id,
             field_name=field_name,
-            expected=f"value on hard grid min={hard_min}, step={hard_step}",
+            expected=_expected_grid(hard_min=hard_min, hard_step=hard_step),
             actual=value,
         )
 
@@ -778,7 +801,7 @@ def _validate_float_value(
             yaml_path=yaml_path,
             indicator_id=indicator_id,
             field_name=field_name,
-            expected=f"{hard_min} <= value <= {hard_max}",
+            expected=_expected_bounds(hard_min=hard_min, hard_max=hard_max),
             actual=value,
         )
 
@@ -788,7 +811,7 @@ def _validate_float_value(
             yaml_path=yaml_path,
             indicator_id=indicator_id,
             field_name=field_name,
-            expected=f"value on hard grid min={hard_min}, step={hard_step}",
+            expected=_expected_grid(hard_min=hard_min, hard_step=hard_step),
             actual=value,
         )
 
@@ -1005,6 +1028,110 @@ def _require_float_bound(
             actual=value,
         )
     return float(value)
+
+
+def _expected_bounds(*, hard_min: int | float, hard_max: int | float) -> str:
+    """
+    Build canonical bounds expectation message.
+
+    Args:
+        hard_min: Inclusive hard lower bound.
+        hard_max: Inclusive hard upper bound.
+    Returns:
+        str: Human-readable bounds message.
+    Assumptions:
+        Bounds are already validated by hard definition invariants.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return f"value within hard bounds [{hard_min}, {hard_max}]"
+
+
+def _expected_grid(*, hard_min: int | float, hard_step: int | float) -> str:
+    """
+    Build canonical hard-grid expectation message.
+
+    Args:
+        hard_min: Inclusive hard lower bound acting as grid origin.
+        hard_step: Hard grid step.
+    Returns:
+        str: Human-readable grid alignment message.
+    Assumptions:
+        Grid origin and step are already validated for this parameter.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return (
+        "value aligned to hard grid "
+        f"(hard_min={hard_min}, hard_step={hard_step})"
+    )
+
+
+def _ensure_range_materializes(
+    *,
+    config_path: str,
+    indicator_id: str,
+    yaml_path: str,
+    field_name: str,
+    start: float,
+    stop_incl: float,
+    step: float,
+) -> None:
+    """
+    Ensure inclusive range settings materialize at least one value.
+
+    Args:
+        config_path: Config path for error context.
+        indicator_id: Indicator identifier.
+        yaml_path: YAML path for the range node.
+        field_name: Parameter name.
+        start: Range start value.
+        stop_incl: Inclusive range stop value.
+        step: Positive range step value.
+    Returns:
+        None.
+    Assumptions:
+        Start/stop/step already passed type and sign validation.
+    Raises:
+        IndicatorDefaultsValidationError: If range cannot materialize values.
+    Side Effects:
+        None.
+    """
+    epsilon = abs(step) * _FLOAT_EPS
+    if start > stop_incl + epsilon:
+        raise IndicatorDefaultsValidationError(
+            config_path=config_path,
+            yaml_path=f"{yaml_path}.start",
+            indicator_id=indicator_id,
+            field_name=field_name,
+            expected="start <= stop_incl",
+            actual=(start, stop_incl),
+        )
+
+    if step <= 0:
+        raise IndicatorDefaultsValidationError(
+            config_path=config_path,
+            yaml_path=f"{yaml_path}.step",
+            indicator_id=indicator_id,
+            field_name=field_name,
+            expected="step > 0",
+            actual=step,
+        )
+
+    points = int(((stop_incl - start) / step) + 1 + epsilon)
+    if points < 1:
+        raise IndicatorDefaultsValidationError(
+            config_path=config_path,
+            yaml_path=yaml_path,
+            indicator_id=indicator_id,
+            field_name=field_name,
+            expected="range must materialize at least one point",
+            actual={"start": start, "stop_incl": stop_incl, "step": step},
+        )
 
 
 def _is_float_multiple(value: float) -> bool:

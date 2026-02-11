@@ -1,180 +1,598 @@
 schema_version: 1
 defaults:
-  ma.sma:
+  ma.dema:
     inputs:
       source:
         mode: explicit
-        values: ["close", "hlc3", "ohlc4"]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
     params:
       window:
         mode: range
         start: 5
-        stop_incl: 200
-        step: 5
+        stop_incl: 400
+        step: 1
 
   ma.ema:
     inputs:
       source:
         mode: explicit
-        values: ["close", "hlc3"]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
     params:
       window:
         mode: range
         start: 5
-        stop_incl: 200
-        step: 5
-
-  ma.wma:
-    inputs:
-      source:
-        mode: explicit
-        values: ["close", "hlc3"]
-    params:
-      window:
-        mode: range
-        start: 5
-        stop_incl: 150
-        step: 5
+        stop_incl: 400
+        step: 1
 
   ma.hma:
     inputs:
       source:
         mode: explicit
-        values: ["close", "hlc3"]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
     params:
       window:
         mode: range
-        start: 9
-        stop_incl: 150
-        step: 7
+        start: 5
+        stop_incl: 400
+        step: 1
+
+  ma.lwma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 400
+        step: 1
 
   ma.rma:
     inputs:
       source:
         mode: explicit
-        values: ["close"]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
     params:
       window:
         mode: range
         start: 5
-        stop_incl: 200
-        step: 5
+        stop_incl: 400
+        step: 1
+
+  ma.sma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 400
+        step: 1
+
+  ma.tema:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 400
+        step: 1
 
   ma.vwma:
     params:
       window:
         mode: range
         start: 5
-        stop_incl: 120
-        step: 5
+        stop_incl: 400
+        step: 1
 
-  trend.adx:
+  ma.wma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
     params:
       window:
         mode: range
-        start: 7
-        stop_incl: 35
-        step: 2
-      smoothing:
+        start: 5
+        stop_incl: 400
+        step: 1
+
+  ma.zlema:
+    inputs:
+      source:
         mode: explicit
-        values: [7, 14, 21]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 400
+        step: 1
+
+  trend.adx:
+    params:
+      smoothing:
+        mode: range
+        start: 5
+        stop_incl: 100
+        step: 1
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  trend.aroon:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  trend.chandelier_exit:
+    params:
+      mult:
+        mode: range
+        start: 0.5
+        stop_incl: 6.0
+        step: 0.01
+      window:
+        mode: range
+        start: 5
+        stop_incl: 300
+        step: 1
 
   trend.donchian:
     params:
       window:
         mode: range
+        start: 5
+        stop_incl: 300
+        step: 1
+
+  trend.ichimoku:
+    params:
+      base_window:
+        mode: range
         start: 10
         stop_incl: 80
-        step: 5
+        step: 1
+      conversion_window:
+        mode: range
+        start: 5
+        stop_incl: 30
+        step: 1
+      displacement:
+        mode: range
+        start: 5
+        stop_incl: 80
+        step: 1
+      span_b_window:
+        mode: range
+        start: 20
+        stop_incl: 160
+        step: 1
+
+  trend.keltner:
+    params:
+      mult:
+        mode: range
+        start: 0.5
+        stop_incl: 6.0
+        step: 0.01
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  trend.linreg_slope:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 300
+        step: 1
+
+  trend.psar:
+    params:
+      accel_max:
+        mode: range
+        start: 0.10
+        stop_incl: 1.00
+        step: 0.01
+      accel_start:
+        mode: range
+        start: 0.005
+        stop_incl: 0.050
+        step: 0.001
+      accel_step:
+        mode: range
+        start: 0.005
+        stop_incl: 0.050
+        step: 0.001
+
+  trend.supertrend:
+    params:
+      mult:
+        mode: range
+        start: 0.5
+        stop_incl: 6.0
+        step: 0.01
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  trend.vortex:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
 
   volatility.atr:
     params:
       window:
         mode: range
         start: 5
-        stop_incl: 50
+        stop_incl: 200
+        step: 1
+
+  volatility.bbands:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      mult:
+        mode: range
+        start: 0.5
+        stop_incl: 5.0
+        step: 0.01
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  volatility.bbands_bandwidth:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      mult:
+        mode: range
+        start: 0.5
+        stop_incl: 5.0
+        step: 0.01
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  volatility.bbands_percent_b:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      mult:
+        mode: range
+        start: 0.5
+        stop_incl: 5.0
+        step: 0.01
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  volatility.hv:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      annualization:
+        mode: explicit
+        values: [252, 365]
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
         step: 1
 
   volatility.stddev:
     inputs:
       source:
         mode: explicit
-        values: ["close", "hlc3"]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
     params:
       window:
         mode: range
-        start: 10
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  volatility.tr: {}
+
+  volatility.variance:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  momentum.cci:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  momentum.fisher:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  momentum.macd:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      fast_window:
+        mode: range
+        start: 4
+        stop_incl: 40
+        step: 1
+      signal_window:
+        mode: range
+        start: 3
+        stop_incl: 30
+        step: 1
+      slow_window:
+        mode: range
+        start: 8
         stop_incl: 80
-        step: 5
+        step: 1
 
-  volatility.bbands:
+  momentum.ppo:
     inputs:
       source:
         mode: explicit
-        values: ["close", "hlc3"]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
     params:
-      window:
+      fast_window:
         mode: range
-        start: 10
-        stop_incl: 60
-        step: 5
-      mult:
+        start: 4
+        stop_incl: 40
+        step: 1
+      signal_window:
         mode: range
-        start: 1.0
-        stop_incl: 3.0
-        step: 0.25
-
-  momentum.rsi:
-    inputs:
-      source:
-        mode: explicit
-        values: ["close"]
-    params:
-      window:
+        start: 3
+        stop_incl: 30
+        step: 1
+      slow_window:
         mode: range
-        start: 7
-        stop_incl: 35
+        start: 8
+        stop_incl: 80
         step: 1
 
   momentum.roc:
     inputs:
       source:
         mode: explicit
-        values: ["close", "hlc3"]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
     params:
       window:
         mode: range
-        start: 5
-        stop_incl: 40
+        start: 3
+        stop_incl: 200
+        step: 1
+
+  momentum.rsi:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 3
+        stop_incl: 200
         step: 1
 
   momentum.stoch:
     params:
+      d_window:
+        mode: range
+        start: 2
+        stop_incl: 20
+        step: 1
       k_window:
         mode: range
         start: 5
-        stop_incl: 21
-        step: 2
-      d_window:
-        mode: explicit
-        values: [3, 5, 7]
+        stop_incl: 200
+        step: 1
       smoothing:
+        mode: range
+        start: 2
+        stop_incl: 20
+        step: 1
+
+  momentum.stoch_rsi:
+    inputs:
+      source:
         mode: explicit
-        values: [3, 5]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      d_window:
+        mode: range
+        start: 2
+        stop_incl: 20
+        step: 1
+      k_window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+      rsi_window:
+        mode: range
+        start: 3
+        stop_incl: 200
+        step: 1
+      smoothing:
+        mode: range
+        start: 2
+        stop_incl: 20
+        step: 1
+
+  momentum.trix:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      signal_window:
+        mode: range
+        start: 3
+        stop_incl: 30
+        step: 1
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  momentum.williams_r:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  volume.ad_line: {}
+
+  volume.cmf:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  volume.mfi:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  volume.obv: {}
+
+  volume.volume_sma:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 300
+        step: 1
 
   volume.vwap:
     params:
       window:
         mode: range
-        start: 10
-        stop_incl: 100
-        step: 10
+        start: 5
+        stop_incl: 300
+        step: 1
+
+  volume.vwap_deviation:
+    params:
+      mult:
+        mode: range
+        start: 0.5
+        stop_incl: 6.0
+        step: 0.01
+      window:
+        mode: range
+        start: 5
+        stop_incl: 300
+        step: 1
+
+  structure.candle_stats: {}
+
+  structure.candle_stats_atr_norm:
+    params:
+      atr_window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
+  structure.heikin_ashi: {}
+
+  structure.percent_rank:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 300
+        step: 1
 
   structure.pivots:
     params:
       left:
-        mode: explicit
-        values: [3, 5, 8]
+        mode: range
+        start: 2
+        stop_incl: 30
+        step: 1
       right:
+        mode: range
+        start: 2
+        stop_incl: 30
+        step: 1
+
+  structure.zscore:
+    inputs:
+      source:
         mode: explicit
-        values: [3, 5, 8]
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 300
+        step: 1

@@ -1,6 +1,6 @@
 schema_version: 1
 defaults:
-  ma.sma:
+  ma.dema:
     inputs:
       source:
         mode: explicit
@@ -8,7 +8,7 @@ defaults:
     params:
       window:
         mode: explicit
-        values: [5, 10]
+        values: [10]
 
   ma.ema:
     inputs:
@@ -18,30 +18,9 @@ defaults:
     params:
       window:
         mode: explicit
-        values: [5]
+        values: [10]
 
-  ma.vwma:
-    params:
-      window:
-        mode: explicit
-        values: [5]
-
-  trend.adx:
-    params:
-      window:
-        mode: explicit
-        values: [7]
-      smoothing:
-        mode: explicit
-        values: [7]
-
-  volatility.atr:
-    params:
-      window:
-        mode: explicit
-        values: [7]
-
-  volatility.bbands:
+  ma.hma:
     inputs:
       source:
         mode: explicit
@@ -50,9 +29,297 @@ defaults:
       window:
         mode: explicit
         values: [10]
+
+  ma.lwma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  ma.rma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  ma.sma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  ma.tema:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  ma.vwma:
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  ma.wma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  ma.zlema:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  trend.adx:
+    params:
+      smoothing:
+        mode: explicit
+        values: [14]
+      window:
+        mode: explicit
+        values: [14]
+
+  trend.aroon:
+    params:
+      window:
+        mode: explicit
+        values: [14]
+
+  trend.chandelier_exit:
+    params:
+      mult:
+        mode: explicit
+        values: [3.0]
+      window:
+        mode: explicit
+        values: [22]
+
+  trend.donchian:
+    params:
+      window:
+        mode: explicit
+        values: [20]
+
+  trend.ichimoku:
+    params:
+      base_window:
+        mode: explicit
+        values: [26]
+      conversion_window:
+        mode: explicit
+        values: [9]
+      displacement:
+        mode: explicit
+        values: [26]
+      span_b_window:
+        mode: explicit
+        values: [52]
+
+  trend.keltner:
+    params:
       mult:
         mode: explicit
         values: [2.0]
+      window:
+        mode: explicit
+        values: [20]
+
+  trend.linreg_slope:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
+
+  trend.psar:
+    params:
+      accel_max:
+        mode: explicit
+        values: [0.2]
+      accel_start:
+        mode: explicit
+        values: [0.02]
+      accel_step:
+        mode: explicit
+        values: [0.02]
+
+  trend.supertrend:
+    params:
+      mult:
+        mode: explicit
+        values: [3.0]
+      window:
+        mode: explicit
+        values: [10]
+
+  trend.vortex:
+    params:
+      window:
+        mode: explicit
+        values: [14]
+
+  volatility.atr:
+    params:
+      window:
+        mode: explicit
+        values: [14]
+
+  volatility.bbands:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      mult:
+        mode: explicit
+        values: [2.0]
+      window:
+        mode: explicit
+        values: [20]
+
+  volatility.bbands_bandwidth:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      mult:
+        mode: explicit
+        values: [2.0]
+      window:
+        mode: explicit
+        values: [20]
+
+  volatility.bbands_percent_b:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      mult:
+        mode: explicit
+        values: [2.0]
+      window:
+        mode: explicit
+        values: [20]
+
+  volatility.hv:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      annualization:
+        mode: explicit
+        values: [365]
+      window:
+        mode: explicit
+        values: [20]
+
+  volatility.stddev:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
+
+  volatility.tr: {}
+
+  volatility.variance:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
+
+  momentum.cci:
+    params:
+      window:
+        mode: explicit
+        values: [20]
+
+  momentum.fisher:
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  momentum.macd:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      fast_window:
+        mode: explicit
+        values: [12]
+      signal_window:
+        mode: explicit
+        values: [9]
+      slow_window:
+        mode: explicit
+        values: [26]
+
+  momentum.ppo:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      fast_window:
+        mode: explicit
+        values: [12]
+      signal_window:
+        mode: explicit
+        values: [9]
+      slow_window:
+        mode: explicit
+        values: [26]
+
+  momentum.roc:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [12]
 
   momentum.rsi:
     inputs:
@@ -62,31 +329,130 @@ defaults:
     params:
       window:
         mode: explicit
-        values: [7]
+        values: [14]
 
   momentum.stoch:
     params:
-      k_window:
-        mode: explicit
-        values: [5]
       d_window:
         mode: explicit
         values: [3]
+      k_window:
+        mode: explicit
+        values: [14]
       smoothing:
         mode: explicit
         values: [3]
+
+  momentum.stoch_rsi:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      d_window:
+        mode: explicit
+        values: [3]
+      k_window:
+        mode: explicit
+        values: [14]
+      rsi_window:
+        mode: explicit
+        values: [14]
+      smoothing:
+        mode: explicit
+        values: [3]
+
+  momentum.trix:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      signal_window:
+        mode: explicit
+        values: [9]
+      window:
+        mode: explicit
+        values: [15]
+
+  momentum.williams_r:
+    params:
+      window:
+        mode: explicit
+        values: [14]
+
+  volume.ad_line: {}
+
+  volume.cmf:
+    params:
+      window:
+        mode: explicit
+        values: [20]
+
+  volume.mfi:
+    params:
+      window:
+        mode: explicit
+        values: [14]
+
+  volume.obv: {}
+
+  volume.volume_sma:
+    params:
+      window:
+        mode: explicit
+        values: [20]
 
   volume.vwap:
     params:
       window:
         mode: explicit
-        values: [10]
+        values: [20]
+
+  volume.vwap_deviation:
+    params:
+      mult:
+        mode: explicit
+        values: [2.0]
+      window:
+        mode: explicit
+        values: [20]
+
+  structure.candle_stats: {}
+
+  structure.candle_stats_atr_norm:
+    params:
+      atr_window:
+        mode: explicit
+        values: [14]
+
+  structure.heikin_ashi: {}
+
+  structure.percent_rank:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
 
   structure.pivots:
     params:
       left:
         mode: explicit
-        values: [3]
+        values: [5]
       right:
         mode: explicit
-        values: [3]
+        values: [5]
+
+  structure.zscore:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20]

@@ -32,6 +32,17 @@
 
 * `apps/api/routes/indicators.py` + wiring в `apps/api/wiring/...`
 
+### Baseline library (expanded follow-up)
+
+В baseline-библиотеку registry включены следующие семейства индикаторов:
+
+* MA/smoothing: SMA, EMA, WMA/LWMA, RMA/SMMA, VWMA, DEMA, TEMA, ZLEMA, HMA
+* Trend/breakout: ADX, Aroon, Donchian, Vortex, LinReg slope, Keltner, SuperTrend, Chandelier Exit, PSAR, Ichimoku
+* Volatility: TR, ATR, StdDev, Variance, HV, Bollinger Bands + Bandwidth + %B
+* Momentum: RSI, ROC, CCI, Williams %R, TRIX, Fisher, Stochastic, Stoch RSI, MACD, PPO
+* Volume: OBV, Volume SMA, A/D line, CMF, MFI, Rolling VWAP, VWAP Deviation
+* Structure/normalization: Z-score, Percentile rank, candle stats, ATR-normalized candle stats, pivots, Heikin-Ashi
+
 ### Out of scope (EPIC-02)
 
 * compute engine (numba/numpy), staged backtest, оптимизация, хранение результатов — это следующие EPIC’и;
@@ -127,6 +138,16 @@ YAML задаёт UI-friendly defaults для построения grid-search:
 * `explicit` (values)
 
 YAML **не задаёт hard bounds** и **не может их расширять**.
+
+Политика defaults для `dev/prod` (follow-up):
+
+* defaults в `prod` менее консервативны, чем ранний baseline (более широкие рабочие диапазоны);
+* defaults в `dev` допускают более широкое исследовательское покрытие, чем `prod`;
+* для всех indicator defs с axis `source` используется expanded list:
+  `["close", "hlc3", "ohlc4", "low", "high", "open"]`;
+* шаг в YAML должен быть минимально допустимым для данного hard-def:
+  * int params: `step = 1`
+  * float params: `step = hard_step` из `ParamDef`.
 
 ### Предлагаемый формат YAML v1
 
