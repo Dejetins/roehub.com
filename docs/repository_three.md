@@ -107,6 +107,7 @@
 |   |-- decisions/
 |   |-- repository_three.md
 |   `-- runbooks/
+|       |-- help_commands.md
 |       |-- market-data-autonomous-docker.md
 |       |-- market-data-metrics-reference-ru.md
 |       |-- market-data-metrics.md
@@ -460,4 +461,4 @@
 |   `-- lint/
 `-- uv.lock
 
-275 directories, 186 files
+275 directories, 187 files
