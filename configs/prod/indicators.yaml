@@ -1,0 +1,158 @@
+schema_version: 1
+defaults:
+  ma.sma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3"]
+    params:
+      window:
+        mode: range
+        start: 10
+        stop_incl: 120
+        step: 10
+
+  ma.ema:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: range
+        start: 10
+        stop_incl: 120
+        step: 10
+
+  ma.wma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: range
+        start: 10
+        stop_incl: 100
+        step: 10
+
+  ma.hma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: range
+        start: 12
+        stop_incl: 100
+        step: 8
+
+  ma.rma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: range
+        start: 10
+        stop_incl: 120
+        step: 10
+
+  ma.vwma:
+    params:
+      window:
+        mode: explicit
+        values: [20, 50, 100]
+
+  trend.adx:
+    params:
+      window:
+        mode: explicit
+        values: [14, 21, 28]
+      smoothing:
+        mode: explicit
+        values: [14]
+
+  trend.donchian:
+    params:
+      window:
+        mode: explicit
+        values: [20, 55]
+
+  volatility.atr:
+    params:
+      window:
+        mode: explicit
+        values: [14, 21]
+
+  volatility.stddev:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20, 50]
+
+  volatility.bbands:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20, 50]
+      mult:
+        mode: explicit
+        values: [2.0]
+
+  momentum.rsi:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [14]
+
+  momentum.roc:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [12, 24]
+
+  momentum.stoch:
+    params:
+      k_window:
+        mode: explicit
+        values: [14]
+      d_window:
+        mode: explicit
+        values: [3]
+      smoothing:
+        mode: explicit
+        values: [3]
+
+  volume.vwap:
+    params:
+      window:
+        mode: explicit
+        values: [20, 50]
+
+  structure.pivots:
+    params:
+      left:
+        mode: explicit
+        values: [5, 8]
+      right:
+        mode: explicit
+        values: [5, 8]

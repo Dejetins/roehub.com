@@ -1,0 +1,92 @@
+schema_version: 1
+defaults:
+  ma.sma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [5, 10]
+
+  ma.ema:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [5]
+
+  ma.vwma:
+    params:
+      window:
+        mode: explicit
+        values: [5]
+
+  trend.adx:
+    params:
+      window:
+        mode: explicit
+        values: [7]
+      smoothing:
+        mode: explicit
+        values: [7]
+
+  volatility.atr:
+    params:
+      window:
+        mode: explicit
+        values: [7]
+
+  volatility.bbands:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [10]
+      mult:
+        mode: explicit
+        values: [2.0]
+
+  momentum.rsi:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [7]
+
+  momentum.stoch:
+    params:
+      k_window:
+        mode: explicit
+        values: [5]
+      d_window:
+        mode: explicit
+        values: [3]
+      smoothing:
+        mode: explicit
+        values: [3]
+
+  volume.vwap:
+    params:
+      window:
+        mode: explicit
+        values: [10]
+
+  structure.pivots:
+    params:
+      left:
+        mode: explicit
+        values: [3]
+      right:
+        mode: explicit
+        values: [3]

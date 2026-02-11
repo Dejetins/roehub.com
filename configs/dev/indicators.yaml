@@ -1,0 +1,180 @@
+schema_version: 1
+defaults:
+  ma.sma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 5
+
+  ma.ema:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 5
+
+  ma.wma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 150
+        step: 5
+
+  ma.hma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3"]
+    params:
+      window:
+        mode: range
+        start: 9
+        stop_incl: 150
+        step: 7
+
+  ma.rma:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 5
+
+  ma.vwma:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 120
+        step: 5
+
+  trend.adx:
+    params:
+      window:
+        mode: range
+        start: 7
+        stop_incl: 35
+        step: 2
+      smoothing:
+        mode: explicit
+        values: [7, 14, 21]
+
+  trend.donchian:
+    params:
+      window:
+        mode: range
+        start: 10
+        stop_incl: 80
+        step: 5
+
+  volatility.atr:
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 50
+        step: 1
+
+  volatility.stddev:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3"]
+    params:
+      window:
+        mode: range
+        start: 10
+        stop_incl: 80
+        step: 5
+
+  volatility.bbands:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3"]
+    params:
+      window:
+        mode: range
+        start: 10
+        stop_incl: 60
+        step: 5
+      mult:
+        mode: range
+        start: 1.0
+        stop_incl: 3.0
+        step: 0.25
+
+  momentum.rsi:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: range
+        start: 7
+        stop_incl: 35
+        step: 1
+
+  momentum.roc:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 40
+        step: 1
+
+  momentum.stoch:
+    params:
+      k_window:
+        mode: range
+        start: 5
+        stop_incl: 21
+        step: 2
+      d_window:
+        mode: explicit
+        values: [3, 5, 7]
+      smoothing:
+        mode: explicit
+        values: [3, 5]
+
+  volume.vwap:
+    params:
+      window:
+        mode: range
+        start: 10
+        stop_incl: 100
+        step: 10
+
+  structure.pivots:
+    params:
+      left:
+        mode: explicit
+        values: [3, 5, 8]
+      right:
+        mode: explicit
+        values: [3, 5, 8]

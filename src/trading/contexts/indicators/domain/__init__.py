@@ -1,3 +1,4 @@
+from .definitions import all_defs
 from .entities import (
     AxisDef,
     IndicatorDef,
@@ -12,6 +13,7 @@ from .errors import GridValidationError, MissingInputSeriesError, UnknownIndicat
 from .specifications import ExplicitValuesSpec, GridParamSpec, GridSpec, RangeValuesSpec
 
 __all__ = [
+    "all_defs",
     "AxisDef",
     "ExplicitValuesSpec",
     "GridParamSpec",

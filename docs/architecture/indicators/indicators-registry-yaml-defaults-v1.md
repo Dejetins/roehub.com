@@ -249,6 +249,8 @@ UI получает “полный registry”:
 * YAML берём по окружению (аналогично `market_data.yaml`):
 
   * путь конфигов фиксирован: `configs/{env}/indicators.yaml`
+  * `env` берётся из `ROEHUB_ENV` (`dev` по умолчанию; допустимые: `dev|prod|test`)
+  * приоритетный override: `ROEHUB_INDICATORS_CONFIG=/abs/or/relative/path/to/indicators.yaml`
 
 ---
 

@@ -1,0 +1,43 @@
+"""
+FastAPI application factory for Roehub API.
+"""
+
+from __future__ import annotations
+
+import os
+from typing import Mapping
+
+from fastapi import FastAPI
+
+from apps.api.routes import build_indicators_router
+from apps.api.wiring.modules import build_indicators_registry
+
+
+def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
+    """
+    Build FastAPI app with indicators registry wired at startup.
+
+    Args:
+        environ: Optional environment mapping override.
+    Returns:
+        FastAPI: Application instance with registered routers.
+    Assumptions:
+        Registry wiring performs fail-fast validation before first request.
+    Raises:
+        FileNotFoundError: If indicators config path is missing.
+        ValueError: If config parsing/validation fails.
+    Side Effects:
+        Reads indicators YAML at application creation time.
+    """
+    effective_environ = os.environ if environ is None else environ
+    registry = build_indicators_registry(environ=effective_environ)
+
+    app = FastAPI(
+        title="Roehub API",
+        version="1.0.0",
+    )
+    app.include_router(build_indicators_router(registry=registry))
+    return app
+
+
+app = create_app()
