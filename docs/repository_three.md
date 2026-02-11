@@ -12,14 +12,25 @@
 |-- apps/
 |   |-- __init__.py
 |   |-- api/
+|   |   |-- __init__.py
 |   |   |-- dto/
+|   |   |   |-- __init__.py
+|   |   |   `-- indicators.py
 |   |   |-- main/
+|   |   |   |-- __init__.py
+|   |   |   |-- app.py
+|   |   |   `-- main.py
 |   |   |-- routes/
+|   |   |   |-- __init__.py
+|   |   |   `-- indicators.py
 |   |   `-- wiring/
+|   |       |-- __init__.py
 |   |       |-- clients/
 |   |       |-- container/
 |   |       |-- db/
 |   |       `-- modules/
+|   |           |-- __init__.py
+|   |           `-- indicators.py
 |   |-- cli/
 |   |   |-- __init__.py
 |   |   |-- commands/
@@ -80,12 +91,15 @@
 |           `-- modules/
 |-- configs/
 |   |-- dev/
+|   |   |-- indicators.yaml
 |   |   |-- market_data.yaml
 |   |   `-- whitelist.csv
 |   |-- prod/
+|   |   |-- indicators.yaml
 |   |   |-- market_data.yaml
 |   |   `-- whitelist.csv
 |   `-- test/
+|       `-- indicators.yaml
 |-- deploy/
 |-- docs/
 |   |-- api/
@@ -94,7 +108,8 @@
 |   |   |   `-- cli/
 |   |   |       `-- cli-backfill-1m.md
 |   |   |-- indicators/
-|   |   |   `-- indicators-application-ports-walking-skeleton-v1.md
+|   |   |   |-- indicators-application-ports-walking-skeleton-v1.md
+|   |   |   `-- indicators-registry-yaml-defaults-v1.md
 |   |   |-- market_data/
 |   |   |   |-- market-data-application-ports.md
 |   |   |   |-- market-data-live-feed-redis-streams-v1.md
@@ -136,6 +151,7 @@
 |   |-- data/
 |   |-- local/
 |   `-- ops/
+|       `-- optimize_canonical_partitions.sh*
 |-- src/
 |   `-- trading/
 |       |-- __init__.py
@@ -171,11 +187,20 @@
 |       |   |-- indicators/
 |       |   |   |-- __init__.py
 |       |   |   |-- adapters/
+|       |   |   |   |-- __init__.py
 |       |   |   |   |-- inbound/
 |       |   |   |   `-- outbound/
+|       |   |   |       |-- __init__.py
 |       |   |   |       |-- caching/
 |       |   |   |       |-- compute_numba/
-|       |   |   |       `-- compute_numpy/
+|       |   |   |       |-- compute_numpy/
+|       |   |   |       |-- config/
+|       |   |   |       |   |-- __init__.py
+|       |   |   |       |   |-- yaml_defaults_loader.py
+|       |   |   |       |   `-- yaml_defaults_validator.py
+|       |   |   |       `-- registry/
+|       |   |   |           |-- __init__.py
+|       |   |   |           `-- yaml_indicator_registry.py
 |       |   |   |-- application/
 |       |   |   |   |-- __init__.py
 |       |   |   |   |-- dto/
@@ -184,7 +209,9 @@
 |       |   |   |   |   |-- compute_request.py
 |       |   |   |   |   |-- estimate_result.py
 |       |   |   |   |   |-- grid.py
-|       |   |   |   |   `-- indicator_tensor.py
+|       |   |   |   |   |-- indicator_tensor.py
+|       |   |   |   |   |-- registry_view.py
+|       |   |   |   |   `-- variant_key.py
 |       |   |   |   |-- errors/
 |       |   |   |   |-- ports/
 |       |   |   |   |   |-- __init__.py
@@ -201,6 +228,14 @@
 |       |   |   |   `-- use_cases/
 |       |   |   `-- domain/
 |       |   |       |-- __init__.py
+|       |   |       |-- definitions/
+|       |   |       |   |-- __init__.py
+|       |   |       |   |-- ma.py
+|       |   |       |   |-- momentum.py
+|       |   |       |   |-- structure.py
+|       |   |       |   |-- trend.py
+|       |   |       |   |-- volatility.py
+|       |   |       |   `-- volume.py
 |       |   |       |-- entities/
 |       |   |       |   |-- __init__.py
 |       |   |       |   |-- axis_def.py
@@ -451,11 +486,19 @@
 |   `-- unit/
 |       |-- contexts/
 |       |   |-- indicators/
+|       |   |   |-- adapters/
+|       |   |   |   `-- outbound/
+|       |   |   |       |-- config/
+|       |   |   |       |   `-- test_yaml_defaults_validator.py
+|       |   |   |       `-- registry/
+|       |   |   |           `-- test_yaml_indicator_registry.py
 |       |   |   |-- application/
 |       |   |   |   `-- dto/
-|       |   |   |       `-- test_candle_arrays_invariants.py
+|       |   |   |       |-- test_candle_arrays_invariants.py
+|       |   |   |       `-- test_variant_key.py
 |       |   |   `-- domain/
 |       |   |       |-- test_axis_def_oneof_values.py
+|       |   |       |-- test_definitions_baseline.py
 |       |   |       |-- test_grid_param_spec_shapes.py
 |       |   |       |-- test_indicator_def_consistency.py
 |       |   |       `-- test_param_def_invariants.py
@@ -504,4 +547,4 @@
 |   `-- lint/
 `-- uv.lock
 
-281 directories, 224 files
+288 directories, 260 files
