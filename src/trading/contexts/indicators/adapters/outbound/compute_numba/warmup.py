@@ -1,0 +1,223 @@
+"""
+Numba runtime configuration and warmup runner for indicators compute.
+
+Docs: docs/architecture/indicators/indicators-compute-engine-core.md
+Related: trading.contexts.indicators.adapters.outbound.compute_numba.kernels._common,
+  trading.platform.config.indicators_compute_numba
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import time
+from pathlib import Path
+from tempfile import NamedTemporaryFile
+
+import numba
+import numpy as np
+
+from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import (
+    ewma_grid_f64,
+    rolling_mean_grid_f64,
+    rolling_sum_grid_f64,
+    write_series_grid_time_major,
+    write_series_grid_variant_major,
+)
+from trading.platform.config import IndicatorsComputeNumbaConfig
+
+log = logging.getLogger(__name__)
+
+
+def apply_numba_runtime_config(*, config: IndicatorsComputeNumbaConfig) -> int:
+    """
+    Apply numba threads/cache settings and validate cache directory writability.
+
+    Args:
+        config: Validated indicators Numba runtime config.
+    Returns:
+        int: Effective numba thread count after applying configuration.
+    Assumptions:
+        Numba runtime is available in current interpreter.
+    Raises:
+        ValueError: If cache directory is not writable.
+    Side Effects:
+        Mutates process env (`NUMBA_NUM_THREADS`, `NUMBA_CACHE_DIR`) and numba runtime state.
+    """
+    if _can_set_numba_num_threads_env():
+        os.environ["NUMBA_NUM_THREADS"] = str(config.numba_num_threads)
+    os.environ["NUMBA_CACHE_DIR"] = str(config.numba_cache_dir)
+
+    cache_dir = ensure_numba_cache_dir_writable(path=config.numba_cache_dir)
+    numba.config.CACHE_DIR = str(cache_dir)
+    numba.set_num_threads(config.numba_num_threads)
+    return int(numba.get_num_threads())
+
+
+def _can_set_numba_num_threads_env() -> bool:
+    """
+    Return whether `NUMBA_NUM_THREADS` env var can be safely mutated now.
+
+    Args:
+        None.
+    Returns:
+        bool: True when Numba threadpool has not been initialized yet.
+    Assumptions:
+        After threadpool launch Numba forbids changing NUMBA_NUM_THREADS env.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    try:
+        from numba.np.ufunc import parallel
+    except Exception:  # pragma: no cover - defensive import guard
+        return True
+    return not bool(parallel._is_initialized)
+
+
+def ensure_numba_cache_dir_writable(*, path: Path) -> Path:
+    """
+    Ensure provided cache directory exists and supports write operations.
+
+    Args:
+        path: Candidate Numba cache directory.
+    Returns:
+        Path: Normalized cache directory path.
+    Assumptions:
+        Caller passes path resolved from runtime config.
+    Raises:
+        ValueError: If path cannot be created or written.
+    Side Effects:
+        Creates directory tree when missing and touches a short-lived probe file.
+    """
+    normalized = Path(path)
+    try:
+        normalized.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise ValueError(
+            f"NUMBA_CACHE_DIR is not writable: {normalized}"
+        ) from error
+
+    try:
+        with NamedTemporaryFile(
+            mode="w",
+            prefix=".numba_write_probe_",
+            dir=normalized,
+            delete=True,
+            encoding="utf-8",
+        ) as probe:
+            probe.write("ok")
+            probe.flush()
+    except OSError as error:
+        raise ValueError(
+            f"NUMBA_CACHE_DIR is not writable: {normalized}"
+        ) from error
+    return normalized
+
+
+class ComputeNumbaWarmupRunner:
+    """
+    Idempotent warmup runner for indicators compute common Numba kernels.
+
+    Docs: docs/architecture/indicators/indicators-compute-engine-core.md
+    Related: trading.contexts.indicators.adapters.outbound.compute_numba.kernels._common,
+      trading.contexts.indicators.adapters.outbound.compute_numba.engine
+    """
+
+    def __init__(self, *, config: IndicatorsComputeNumbaConfig) -> None:
+        """
+        Store config and initialize warmup state.
+
+        Args:
+            config: Indicators compute numba config.
+        Returns:
+            None.
+        Assumptions:
+            Warmup can be safely executed multiple times; runner keeps idempotent flag.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        self._config = config
+        self._is_warm = False
+
+    def warmup(self) -> None:
+        """
+        Apply runtime config and eagerly compile core Numba kernels.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Warmup inputs are deterministic and side-effect free for business logic.
+        Raises:
+            ValueError: If runtime config cannot be applied.
+        Side Effects:
+            JIT-compiles Numba kernels and emits one structured log message.
+        """
+        if self._is_warm:
+            return
+
+        warmup_started = time.perf_counter()
+        effective_threads = apply_numba_runtime_config(config=self._config)
+        self._run_kernel_warmup()
+        elapsed_seconds = time.perf_counter() - warmup_started
+        log.info(
+            "compute_numba warmup complete",
+            extra={
+                "warmup_done": True,
+                "warmup_seconds": round(elapsed_seconds, 6),
+                "numba_num_threads_effective": effective_threads,
+                "numba_cache_dir": str(self._config.numba_cache_dir),
+                "kernels": [
+                    "rolling_sum_grid_f64",
+                    "rolling_mean_grid_f64",
+                    "ewma_grid_f64",
+                    "write_series_grid_time_major",
+                    "write_series_grid_variant_major",
+                ],
+            },
+        )
+        self._is_warm = True
+
+    def _run_kernel_warmup(self) -> None:
+        """
+        Execute short deterministic workloads to trigger kernel compilation.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Warmup shapes are small enough to keep startup overhead minimal.
+        Raises:
+            None.
+        Side Effects:
+            Compiles Numba kernels and allocates temporary arrays.
+        """
+        t_size = 2_048
+        windows = np.array([5, 10, 20, 50, 100], dtype=np.int64)
+        source_f64 = np.linspace(1.0, 2.0, t_size, dtype=np.float64)
+
+        _ = rolling_sum_grid_f64(source_f64, windows)
+        _ = rolling_mean_grid_f64(source_f64, windows)
+        _ = ewma_grid_f64(source_f64, windows, False)
+
+        variants = windows.shape[0]
+        variant_series = np.ascontiguousarray(
+            np.repeat(source_f64.reshape(1, t_size), repeats=variants, axis=0).astype(np.float32)
+        )
+        out_time_major = np.empty((t_size, variants), dtype=np.float32)
+        out_variant_major = np.empty((variants, t_size), dtype=np.float32)
+        write_series_grid_time_major(out_time_major, variant_series)
+        write_series_grid_variant_major(out_variant_major, variant_series)
+
+
+__all__ = [
+    "ComputeNumbaWarmupRunner",
+    "apply_numba_runtime_config",
+    "ensure_numba_cache_dir_writable",
+]

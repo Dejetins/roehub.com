@@ -1,4 +1,9 @@
 schema_version: 1
+compute:
+  numba:
+    numba_num_threads: 1
+    numba_cache_dir: ".cache/numba/test"
+    max_compute_bytes_total: 5368709120
 defaults:
   ma.dema:
     inputs:

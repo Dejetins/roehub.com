@@ -9,10 +9,17 @@ from .entities import (
     ParamDef,
     ParamKind,
 )
-from .errors import GridValidationError, MissingInputSeriesError, UnknownIndicatorError
+from .errors import (
+    ComputeBudgetExceeded,
+    GridValidationError,
+    MissingInputSeriesError,
+    MissingRequiredSeries,
+    UnknownIndicatorError,
+)
 from .specifications import ExplicitValuesSpec, GridParamSpec, GridSpec, RangeValuesSpec
 
 __all__ = [
+    "ComputeBudgetExceeded",
     "all_defs",
     "AxisDef",
     "ExplicitValuesSpec",
@@ -24,6 +31,7 @@ __all__ = [
     "InputSeries",
     "Layout",
     "MissingInputSeriesError",
+    "MissingRequiredSeries",
     "OutputSpec",
     "ParamDef",
     "ParamKind",

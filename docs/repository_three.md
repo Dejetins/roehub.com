@@ -108,7 +108,10 @@
 |   |   |   `-- cli/
 |   |   |       `-- cli-backfill-1m.md
 |   |   |-- indicators/
+|   |   |   |-- README.md
 |   |   |   |-- indicators-application-ports-walking-skeleton-v1.md
+|   |   |   |-- indicators-compute-engine-core.md
+|   |   |   |-- indicators-overview.md
 |   |   |   `-- indicators-registry-yaml-defaults-v1.md
 |   |   |-- market_data/
 |   |   |   |-- market-data-application-ports.md
@@ -193,6 +196,12 @@
 |       |   |   |       |-- __init__.py
 |       |   |   |       |-- caching/
 |       |   |   |       |-- compute_numba/
+|       |   |   |       |   |-- __init__.py
+|       |   |   |       |   |-- engine.py
+|       |   |   |       |   |-- kernels/
+|       |   |   |       |   |   |-- __init__.py
+|       |   |   |       |   |   `-- _common.py
+|       |   |   |       |   `-- warmup.py
 |       |   |   |       |-- compute_numpy/
 |       |   |   |       |-- config/
 |       |   |   |       |   |-- __init__.py
@@ -248,8 +257,10 @@
 |       |   |       |   `-- param_kind.py
 |       |   |       |-- errors/
 |       |   |       |   |-- __init__.py
+|       |   |       |   |-- compute_budget_exceeded.py
 |       |   |       |   |-- grid_validation_error.py
 |       |   |       |   |-- missing_input_series_error.py
+|       |   |       |   |-- missing_required_series.py
 |       |   |       |   `-- unknown_indicator_error.py
 |       |   |       |-- specifications/
 |       |   |       |   |-- __init__.py
@@ -459,6 +470,8 @@
 |       |-- platform/
 |       |   |-- __init__.py
 |       |   |-- config/
+|       |   |   |-- __init__.py
+|       |   |   `-- indicators_compute_numba.py
 |       |   |-- observability/
 |       |   |-- serialization/
 |       |   `-- time/
@@ -482,12 +495,19 @@
 |   |   |-- 01_sync_instruments.ipynb
 |   |   `-- 02_rest_catchup_1m.ipynb
 |   |-- perf_smoke/
+|   |   `-- contexts/
+|   |       `-- indicators/
+|   |           `-- test_compute_numba_perf_smoke.py
 |   |-- test_smoke.py
 |   `-- unit/
 |       |-- contexts/
 |       |   |-- indicators/
 |       |   |   |-- adapters/
 |       |   |   |   `-- outbound/
+|       |   |   |       |-- compute_numba/
+|       |   |   |       |   |-- test_common_kernels.py
+|       |   |   |       |   |-- test_engine.py
+|       |   |   |       |   `-- test_runtime_wiring.py
 |       |   |   |       |-- config/
 |       |   |   |       |   `-- test_yaml_defaults_validator.py
 |       |   |   |       `-- registry/
@@ -534,6 +554,9 @@
 |       |               |-- test_rest_catchup_1m.py
 |       |               |-- test_rest_fill_range_1m.py
 |       |               `-- test_time_slicing.py
+|       |-- platform/
+|       |   `-- config/
+|       |       `-- test_indicators_compute_numba_config.py
 |       `-- shared_kernel/
 |           `-- primitives/
 |               |-- test_candle.py
@@ -547,4 +570,4 @@
 |   `-- lint/
 `-- uv.lock
 
-288 directories, 260 files
+294 directories, 277 files

@@ -22,6 +22,7 @@ from .application import (
 )
 from .domain import (
     AxisDef,
+    ComputeBudgetExceeded,
     ExplicitValuesSpec,
     GridParamSpec,
     GridValidationError,
@@ -30,6 +31,7 @@ from .domain import (
     InputSeries,
     Layout,
     MissingInputSeriesError,
+    MissingRequiredSeries,
     OutputSpec,
     ParamDef,
     ParamKind,
@@ -42,6 +44,7 @@ __all__ = [
     "AxisDef",
     "CandleArrays",
     "CandleFeed",
+    "ComputeBudgetExceeded",
     "ComputeRequest",
     "DefaultSpec",
     "EstimateResult",
@@ -65,6 +68,7 @@ __all__ = [
     "MergedInputView",
     "MergedParamView",
     "MissingInputSeriesError",
+    "MissingRequiredSeries",
     "OutputSpec",
     "ParamDef",
     "ParamKind",

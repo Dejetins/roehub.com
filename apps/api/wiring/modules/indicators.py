@@ -9,8 +9,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
+from trading.contexts.indicators.adapters.outbound import NumbaIndicatorCompute
 from trading.contexts.indicators.adapters.outbound.registry import YamlIndicatorRegistry
 from trading.contexts.indicators.domain.definitions import all_defs
+from trading.platform.config import load_indicators_compute_numba_config
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _CONFIG_PATH_KEY = "ROEHUB_INDICATORS_CONFIG"
@@ -40,6 +42,30 @@ def build_indicators_registry(*, environ: Mapping[str, str]) -> YamlIndicatorReg
         defs=all_defs(),
         config_path=config_path,
     )
+
+
+def build_indicators_compute(*, environ: Mapping[str, str]) -> NumbaIndicatorCompute:
+    """
+    Build indicators CPU/Numba compute adapter and run startup warmup.
+
+    Docs: docs/architecture/indicators/indicators-compute-engine-core.md
+
+    Args:
+        environ: Process environment mapping.
+    Returns:
+        NumbaIndicatorCompute: Warmed-up compute adapter instance.
+    Assumptions:
+        Numba runtime settings are loaded from env + indicators YAML config.
+    Raises:
+        FileNotFoundError: If indicators config path cannot be resolved/read.
+        ValueError: If runtime config is invalid or cache dir is not writable.
+    Side Effects:
+        Applies Numba runtime config and performs JIT warmup at startup.
+    """
+    compute_config = load_indicators_compute_numba_config(environ=environ)
+    compute = NumbaIndicatorCompute(defs=all_defs(), config=compute_config)
+    compute.warmup()
+    return compute
 
 
 def _resolve_indicators_config_path(*, environ: Mapping[str, str]) -> Path:

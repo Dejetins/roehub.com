@@ -10,7 +10,7 @@ from typing import Mapping
 from fastapi import FastAPI
 
 from apps.api.routes import build_indicators_router
-from apps.api.wiring.modules import build_indicators_registry
+from apps.api.wiring.modules import build_indicators_compute, build_indicators_registry
 
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
@@ -27,15 +27,17 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         FileNotFoundError: If indicators config path is missing.
         ValueError: If config parsing/validation fails.
     Side Effects:
-        Reads indicators YAML at application creation time.
+        Reads indicators YAML and performs Numba warmup at application creation time.
     """
     effective_environ = os.environ if environ is None else environ
     registry = build_indicators_registry(environ=effective_environ)
+    compute = build_indicators_compute(environ=effective_environ)
 
     app = FastAPI(
         title="Roehub API",
         version="1.0.0",
     )
+    app.state.indicators_compute = compute
     app.include_router(build_indicators_router(registry=registry))
     return app
 
