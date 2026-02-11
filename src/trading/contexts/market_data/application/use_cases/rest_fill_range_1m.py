@@ -202,9 +202,14 @@ class RestFillRange1mUseCase:
         rows_written = 0
         batches_written = 0
         batch: list[CandleWithMeta] = []
+        existing_minute_keys = self._existing_minute_keys(task=task, chunk=chunk)
 
         for row in self.source.stream_1m(task.instrument_id, chunk):
             rows_read += 1
+            minute_key = _minute_key(row.candle.ts_open.value)
+            if minute_key in existing_minute_keys:
+                continue
+            existing_minute_keys.add(minute_key)
             batch.append(row)
 
             if len(batch) >= self.batch_size:
@@ -219,6 +224,34 @@ class RestFillRange1mUseCase:
             batches_written += 1
 
         return rows_read, rows_written, batches_written
+
+    def _existing_minute_keys(self, *, task: RestFillTask, chunk) -> set[int]:
+        """
+        Load existing canonical minute keys for one instrument/chunk pair.
+
+        Parameters:
+        - task: parent task containing instrument id.
+        - chunk: UTC half-open range for one ingest chunk.
+
+        Returns:
+        - Set of integer minute keys (`epoch_seconds // 60`) already present in canonical.
+
+        Assumptions/Invariants:
+        - Empty set is returned when canonical index reader is not configured.
+
+        Errors/Exceptions:
+        - Propagates index-reader errors when reader is configured.
+
+        Side effects:
+        - Executes canonical index query when reader is configured.
+        """
+        if self.index_reader is None:
+            return set()
+        existing = self.index_reader.distinct_ts_opens(
+            instrument_id=task.instrument_id,
+            time_range=chunk,
+        )
+        return {_minute_key(item.value) for item in existing}
 
     def _write_batch(self, rows: Iterable[CandleWithMeta]) -> None:
         """
@@ -240,3 +273,25 @@ class RestFillRange1mUseCase:
         - Writes one insert batch into raw storage.
         """
         self.writer.write_1m(rows)
+
+
+def _minute_key(dt) -> int:
+    """
+    Convert timestamp to deterministic integer minute key.
+
+    Parameters:
+    - dt: UTC datetime-like value.
+
+    Returns:
+    - Integer key `floor(epoch_seconds / 60)`.
+
+    Assumptions/Invariants:
+    - Input timestamp is timezone-aware UTC in runtime pipelines.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    return int(dt.timestamp() // 60)

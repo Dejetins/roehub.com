@@ -125,7 +125,37 @@ curl -fsS http://localhost:9202/metrics | head
 5. В логах worker нет серийных `insert_errors_total`/`rest_fill_errors_total`.
 
 
-## 7. restart ws+sheduler
-```md
-`docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env restart market-data-scheduler market-data-ws-worker`
+## 7. Troubleshooting: Bybit WS Stalled
+
+Симптом:
+- Bybit инструменты догоняются через REST после рестарта, но live-обновления не приходят.
+
+Проверка live WS по рынкам (последние 10 минут):
+
+```sql
+SELECT
+  market_id,
+  count() AS ws_rows_10m,
+  max(ts_open) AS last_ws_ts
+FROM market_data.canonical_candles_1m
+WHERE source = 'ws'
+  AND ts_open >= now() - INTERVAL 10 MINUTE
+  AND market_id IN (1,2,3)
+GROUP BY market_id
+ORDER BY market_id;
+```
+
+Если `market_id=3` отсутствует, проверьте логи на subscribe ACK ошибки:
+
+```bash
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env logs --tail=2000 market-data-ws-worker | rg "bybit ws stream failed|ret_msg|subscribe|args size"
+```
+
+Типичный корень проблемы:
+- Bybit V5 вернул `{"success":false,"ret_msg":"args size >10","op":"subscribe"}`.
+
+## 8. Restart WS + Scheduler
+
+```bash
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env restart market-data-scheduler market-data-ws-worker
 ```

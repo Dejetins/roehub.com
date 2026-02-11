@@ -89,6 +89,11 @@ WS:
 - `ws.reconnect.jitter_s: float`
 - `ws.max_symbols_per_connection: int`
 
+WS operational notes:
+- Bybit V5 public WS ограничивает размер `subscribe.args` (в проде observed limit: `<= 10`).
+- Адаптер обязан отправлять подписки батчами и валидировать subscribe ACK (`op=subscribe`, `success=true`).
+- При `success=false` runtime должен падать в reconnect-loop с явной ошибкой в логах.
+
 ### market_data.ingestion
 Flush/maintenance policy для WS worker и scheduler:
 - `flush_interval_ms: int` — максимальная задержка удержания данных в буфере перед вставкой в ClickHouse.

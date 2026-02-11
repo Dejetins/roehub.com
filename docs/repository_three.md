@@ -93,6 +93,8 @@
 |   |   |-- apps/
 |   |   |   `-- cli/
 |   |   |       `-- cli-backfill-1m.md
+|   |   |-- indicators/
+|   |   |   `-- indicators-application-ports-walking-skeleton-v1.md
 |   |   |-- market_data/
 |   |   |   |-- market-data-application-ports.md
 |   |   |   |-- market-data-live-feed-redis-streams-v1.md
@@ -175,17 +177,49 @@
 |       |   |   |       |-- compute_numba/
 |       |   |   |       `-- compute_numpy/
 |       |   |   |-- application/
+|       |   |   |   |-- __init__.py
 |       |   |   |   |-- dto/
+|       |   |   |   |   |-- __init__.py
+|       |   |   |   |   |-- candle_arrays.py
+|       |   |   |   |   |-- compute_request.py
+|       |   |   |   |   |-- estimate_result.py
+|       |   |   |   |   |-- grid.py
+|       |   |   |   |   `-- indicator_tensor.py
 |       |   |   |   |-- errors/
 |       |   |   |   |-- ports/
+|       |   |   |   |   |-- __init__.py
 |       |   |   |   |   |-- cache/
 |       |   |   |   |   |-- compute/
+|       |   |   |   |   |   |-- __init__.py
+|       |   |   |   |   |   `-- indicator_compute.py
+|       |   |   |   |   |-- feeds/
+|       |   |   |   |   |   |-- __init__.py
+|       |   |   |   |   |   `-- candle_feed.py
 |       |   |   |   |   `-- registry/
+|       |   |   |   |       |-- __init__.py
+|       |   |   |   |       `-- indicator_registry.py
 |       |   |   |   `-- use_cases/
 |       |   |   `-- domain/
+|       |   |       |-- __init__.py
 |       |   |       |-- entities/
+|       |   |       |   |-- __init__.py
+|       |   |       |   |-- axis_def.py
+|       |   |       |   |-- indicator_def.py
+|       |   |       |   |-- indicator_id.py
+|       |   |       |   |-- input_series.py
+|       |   |       |   |-- layout.py
+|       |   |       |   |-- output_spec.py
+|       |   |       |   |-- param_def.py
+|       |   |       |   `-- param_kind.py
 |       |   |       |-- errors/
+|       |   |       |   |-- __init__.py
+|       |   |       |   |-- grid_validation_error.py
+|       |   |       |   |-- missing_input_series_error.py
+|       |   |       |   `-- unknown_indicator_error.py
 |       |   |       |-- specifications/
+|       |   |       |   |-- __init__.py
+|       |   |       |   |-- grid_param_spec.py
+|       |   |       |   `-- grid_spec.py
 |       |   |       `-- value_objects/
 |       |   |-- market_data/
 |       |   |   |-- __init__.py
@@ -416,6 +450,15 @@
 |   |-- test_smoke.py
 |   `-- unit/
 |       |-- contexts/
+|       |   |-- indicators/
+|       |   |   |-- application/
+|       |   |   |   `-- dto/
+|       |   |   |       `-- test_candle_arrays_invariants.py
+|       |   |   `-- domain/
+|       |   |       |-- test_axis_def_oneof_values.py
+|       |   |       |-- test_grid_param_spec_shapes.py
+|       |   |       |-- test_indicator_def_consistency.py
+|       |   |       `-- test_param_def_invariants.py
 |       |   `-- market_data/
 |       |       |-- adapters/
 |       |       |   |-- test_clickhouse_canonical_candle_index_reader.py
@@ -461,4 +504,4 @@
 |   `-- lint/
 `-- uv.lock
 
-275 directories, 187 files
+281 directories, 224 files

@@ -147,6 +147,7 @@ class BinanceWsClosedCandleStream:
         stream_url = build_binance_combined_stream_url(self._ws_url, self._symbols)
 
         while not stop_event.is_set():
+            connected = False
             try:
                 async with websockets.connect(
                     stream_url,
@@ -154,6 +155,7 @@ class BinanceWsClosedCandleStream:
                     ping_timeout=self._pong_timeout_s,
                 ) as socket:
                     _emit_connected(self._hooks.on_connected, 1)
+                    connected = True
                     if not first_connect:
                         _emit_simple(self._hooks.on_reconnect)
                     first_connect = False
@@ -183,7 +185,8 @@ class BinanceWsClosedCandleStream:
                 _emit_simple(self._hooks.on_error)
                 log.exception("binance ws stream failed for market_id=%s", self._market_id.value)
             finally:
-                _emit_connected(self._hooks.on_connected, 0)
+                if connected:
+                    _emit_connected(self._hooks.on_connected, 0)
 
             if stop_event.is_set():
                 break

@@ -167,7 +167,9 @@ REST fill вызывает существующий use-case `RestCatchUp1mUseCa
 3) Для каждого `market_id` создаём N WS соединений, где:
 - `max_symbols_per_connection` берём из runtime config `market_data.markets[*].ws.max_symbols_per_connection`.
 - Binance spot/futures: комбинированные стримы `/stream?streams=...`
-- Bybit: подписки пачками (ограничение на args уже в адаптере).
+- Bybit: подписки пачками. Для V5 public stream лимит `subscribe.args <= 10`,
+  поэтому адаптер отправляет несколько subscribe frame и валидирует ACK (`success=true`)
+  для каждой пачки.
 
 4) На reconnect: resubscribe на тот же набор символов.
 

@@ -26,6 +26,9 @@ from trading.shared_kernel.primitives import (
 
 log = logging.getLogger(__name__)
 
+_BYBIT_MAX_SUBSCRIBE_ARGS = 10
+_BYBIT_SUBSCRIBE_ACK_TIMEOUT_S = 5.0
+
 
 @dataclass(frozen=True, slots=True)
 class BybitWsHooks:
@@ -145,6 +148,7 @@ class BybitWsClosedCandleStream:
         first_connect = True
 
         while not stop_event.is_set():
+            connected = False
             try:
                 async with websockets.connect(
                     self._ws_url,
@@ -152,6 +156,7 @@ class BybitWsClosedCandleStream:
                     ping_timeout=self._pong_timeout_s,
                 ) as socket:
                     _emit_connected(self._hooks.on_connected, 1)
+                    connected = True
                     if not first_connect:
                         _emit_simple(self._hooks.on_reconnect)
                     first_connect = False
@@ -183,7 +188,8 @@ class BybitWsClosedCandleStream:
                 _emit_simple(self._hooks.on_error)
                 log.exception("bybit ws stream failed for market_id=%s", self._market_id.value)
             finally:
-                _emit_connected(self._hooks.on_connected, 0)
+                if connected:
+                    _emit_connected(self._hooks.on_connected, 0)
 
             if stop_event.is_set():
                 break
@@ -301,7 +307,7 @@ def parse_bybit_closed_1m_message(
 
 async def _subscribe_topics(socket, symbols: tuple[str, ...]) -> None:
     """
-    Send Bybit V5 subscription payload for `kline.1.<symbol>` topics.
+    Send Bybit V5 subscription payloads for `kline.1.<symbol>` topics.
 
     Parameters:
     - socket: active websocket connection object.
@@ -314,14 +320,148 @@ async def _subscribe_topics(socket, symbols: tuple[str, ...]) -> None:
     - Socket is connected and writable.
 
     Errors/Exceptions:
-    - Propagates websocket send errors.
+    - Raises `RuntimeError` when subscribe ack reports failure.
+    - Propagates websocket send/recv errors.
 
     Side effects:
-    - Sends one subscribe frame through websocket.
+    - Sends one or more subscribe frames through websocket.
     """
-    args = [f"kline.1.{symbol}" for symbol in symbols]
-    payload = {"op": "subscribe", "args": args}
-    await socket.send(json.dumps(payload))
+    for chunk in _chunk_symbols(
+        symbols=symbols,
+        chunk_size=_BYBIT_MAX_SUBSCRIBE_ARGS,
+    ):
+        args = [f"kline.1.{symbol}" for symbol in chunk]
+        payload = {"op": "subscribe", "args": args}
+        await socket.send(json.dumps(payload))
+        await _await_subscribe_ack(socket, ack_timeout_s=_BYBIT_SUBSCRIBE_ACK_TIMEOUT_S)
+
+
+def _chunk_symbols(*, symbols: tuple[str, ...], chunk_size: int) -> list[tuple[str, ...]]:
+    """
+    Split symbol tuple into fixed-size chunks preserving input order.
+
+    Parameters:
+    - symbols: source symbol tuple.
+    - chunk_size: maximum symbols per chunk.
+
+    Returns:
+    - List of non-empty symbol chunks.
+
+    Assumptions/Invariants:
+    - `chunk_size` is strictly positive.
+
+    Errors/Exceptions:
+    - Raises `ValueError` when `chunk_size <= 0`.
+
+    Side effects:
+    - None.
+    """
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be > 0")
+    out: list[tuple[str, ...]] = []
+    for offset in range(0, len(symbols), chunk_size):
+        out.append(tuple(symbols[offset : offset + chunk_size]))
+    return out
+
+
+async def _await_subscribe_ack(socket, *, ack_timeout_s: float) -> None:
+    """
+    Wait for one Bybit subscribe acknowledgment frame and validate status.
+
+    Parameters:
+    - socket: active websocket connection object.
+    - ack_timeout_s: per-recv timeout while waiting subscribe ack.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - Subscribe acknowledgments use `{"op":"subscribe","success":...}` format.
+
+    Errors/Exceptions:
+    - Raises `RuntimeError` on malformed/failed subscribe acknowledgments.
+    - Propagates websocket receive errors and timeout errors.
+
+    Side effects:
+    - Consumes websocket frames until subscribe ack is found.
+    """
+    while True:
+        payload = await asyncio.wait_for(socket.recv(), timeout=ack_timeout_s)
+        ack = _parse_subscribe_ack(str(payload))
+        if ack is None:
+            continue
+        success, reason = ack
+        if not success:
+            error_reason = reason if reason is not None else "unknown subscribe error"
+            raise RuntimeError(f"bybit subscribe failed: {error_reason}")
+        return
+
+
+def _parse_subscribe_ack(payload: str) -> tuple[bool, str | None] | None:
+    """
+    Parse one websocket payload and extract Bybit subscribe ack status.
+
+    Parameters:
+    - payload: websocket payload text.
+
+    Returns:
+    - `None` for non-subscribe frames.
+    - Tuple `(success, reason)` for subscribe acknowledgments.
+
+    Assumptions/Invariants:
+    - For subscribe frames `success` may be bool or string (`"true"`/`"false"`).
+
+    Errors/Exceptions:
+    - None. Invalid payloads are treated as non-subscribe frames.
+
+    Side effects:
+    - None.
+    """
+    try:
+        envelope = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(envelope, dict):
+        return None
+    if str(envelope.get("op", "")) != "subscribe":
+        return None
+
+    success = _to_bool_or_none(envelope.get("success"))
+    reason_raw = envelope.get("ret_msg")
+    reason = str(reason_raw) if reason_raw is not None else None
+    if success is None:
+        return (False, "subscribe ack missing success flag")
+    return (success, reason)
+
+
+def _to_bool_or_none(value: object) -> bool | None:
+    """
+    Convert bool-like scalar to bool, returning `None` when conversion is not possible.
+
+    Parameters:
+    - value: scalar value to convert.
+
+    Returns:
+    - Boolean value for bool or `"true"/"false"` strings, otherwise `None`.
+
+    Assumptions/Invariants:
+    - String conversion is case-insensitive and trims surrounding spaces.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized == "true":
+            return True
+        if normalized == "false":
+            return False
+    return None
 
 
 def _to_int(value) -> int | None:

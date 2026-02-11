@@ -195,14 +195,15 @@ Gap fill выполняется автоматически, без ручных 
 - Любой insert пересекает ≤ 7 UTC-дней (runtime config guard).
 - Source=rest всегда проставляется в `CandleMeta.source`.
 
-### Dedup safety (gap fill)
-Для gap-fill применяется дополнительная защитная проверка перед записью:
+### Dedup safety (all REST fill paths)
+Для всех REST fill путей (`scheduler_bootstrap`, `historical_backfill`, `scheduler_tail`,
+`reconnect_tail`, `bootstrap`, `gap_fill`) применяется защитная проверка перед записью:
 - для каждого chunk `[start,end)` use-case читает `distinct_ts_opens` из canonical index;
 - сравнение делается по минутным ключам (`epoch_minutes`), а не по “сырым” datetime;
 - если минута уже есть в canonical, запись этой минуты пропускается.
 
 Это защищает от ложных gap-диапазонов при timezone/ms-шумах и не даёт наращивать дубликаты
-в canonical при повторном восстановлении истории.
+в canonical при повторных/перекрывающихся запусках REST ingestion.
 
 
 ## Verification SQL (post-run)

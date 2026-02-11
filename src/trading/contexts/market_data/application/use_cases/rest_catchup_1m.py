@@ -165,6 +165,7 @@ class RestCatchUp1mUseCase:
             tail_rows_read, tail_rows_written, tail_batches, _ = self._ingest_time_range(
                 instrument_id=instrument_id,
                 time_range=tr,
+                dedup_existing=True,
             )
 
         # gap-scan: [bounds.first, tail_start)  (НЕ включаем tail, чтобы не писать дубль)
