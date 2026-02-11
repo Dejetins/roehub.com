@@ -42,38 +42,14 @@ def apply_numba_runtime_config(*, config: IndicatorsComputeNumbaConfig) -> int:
     Raises:
         ValueError: If cache directory is not writable.
     Side Effects:
-        Mutates process env (`NUMBA_NUM_THREADS`, `NUMBA_CACHE_DIR`) and numba runtime state.
+        Mutates process env (`NUMBA_CACHE_DIR`) and numba runtime state.
     """
-    if _can_set_numba_num_threads_env():
-        os.environ["NUMBA_NUM_THREADS"] = str(config.numba_num_threads)
     os.environ["NUMBA_CACHE_DIR"] = str(config.numba_cache_dir)
 
     cache_dir = ensure_numba_cache_dir_writable(path=config.numba_cache_dir)
     numba.config.CACHE_DIR = str(cache_dir)
     numba.set_num_threads(config.numba_num_threads)
     return int(numba.get_num_threads())
-
-
-def _can_set_numba_num_threads_env() -> bool:
-    """
-    Return whether `NUMBA_NUM_THREADS` env var can be safely mutated now.
-
-    Args:
-        None.
-    Returns:
-        bool: True when Numba threadpool has not been initialized yet.
-    Assumptions:
-        After threadpool launch Numba forbids changing NUMBA_NUM_THREADS env.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
-    try:
-        from numba.np.ufunc import parallel
-    except Exception:  # pragma: no cover - defensive import guard
-        return True
-    return not bool(parallel._is_initialized)
 
 
 def ensure_numba_cache_dir_writable(*, path: Path) -> Path:
