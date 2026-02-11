@@ -1,134 +1,134 @@
-# Indicators — Application Ports + Domain Walking Skeleton v1
+# Indicators — Порты application + доменный walking skeleton v1
 
-This document is the source of truth for **IND-EPIC-01**.
-It defines the minimal domain model, application DTOs, and application ports
-for the `indicators` bounded context.
+Этот документ является source of truth для **IND-EPIC-01**.
+Он определяет минимальную доменную модель, application DTO и application ports
+для bounded context `indicators`.
 
-Scope:
-- include domain contracts, DTOs, and ports only;
-- no compute implementation (Numba/Numpy kernels), no API wiring, no adapters;
-- candles are read through an application port, not directly from infrastructure.
+Область охвата:
+- включаются только domain-контракты, DTO и порты;
+- без реализации compute (Numba/Numpy kernels), без API wiring, без адаптеров;
+- свечи читаются через application port, а не напрямую из инфраструктуры.
 
-## Key Decisions
+## Ключевые решения
 
-### 1) Immutable indicator definitions and versioning
-Indicator formulas are immutable. Any formula change must produce a new identity
-(for example `sma_v2`) or an explicit versioned identifier.
+### 1) Неизменяемые определения индикаторов и версионирование
+Формулы индикаторов неизменяемы. Любое изменение формулы должно приводить к новой
+идентичности (например, `sma_v2`) или к явно версионированному идентификатору.
 
-### 2) Hard bounds + step for parameters
-Each parameter has a declared kind (`int`, `float`, `enum`) and validation rules:
-- numeric params: `hard_min`, `hard_max`, `step` (step must be positive);
-- enum params: non-empty enum values, no numeric bounds.
+### 2) Жёсткие границы + step для параметров
+Каждый параметр имеет объявленный тип (`int`, `float`, `enum`) и правила валидации:
+- числовые параметры: `hard_min`, `hard_max`, `step` (`step` должен быть положительным);
+- enum-параметры: непустой набор enum-значений, без числовых границ.
 
-### 3) Tensor output + explicit layout
-Compute output is an `IndicatorTensor` with `float32` values and explicit layout:
+### 3) Тензорный output + явный layout
+Результат compute — это `IndicatorTensor` с `float32` значениями и явным layout:
 - `TIME_MAJOR`
 - `VARIANT_MAJOR`
 
-### 4) Guard against combinatorial explosion
-`variants = product(axis lengths)` is limited by guard.
-Default guard in this epic: `600_000` variants.
-If exceeded, the flow must fail with grid validation error.
+### 4) Guard от комбинаторного взрыва
+`variants = product(axis lengths)` ограничивается guard.
+Дефолтный guard в этом epic: `600_000` вариантов.
+При превышении поток должен завершаться ошибкой валидации grid.
 
-### 5) NaN propagation policy
-`CandleFeed` returns dense 1m arrays. Missing candles are represented by `NaN`
-in OHLCV arrays. Compute must preserve/propagate NaN and does not impute values.
+### 5) Политика распространения NaN
+`CandleFeed` возвращает плотные 1m-массивы. Отсутствующие свечи представлены через `NaN`
+в OHLCV-массивах. Compute должен сохранять/распространять NaN и не должен делать импутацию.
 
-### 6) Float32 output contract
-`IndicatorTensor.values` must be `float32`.
-Any internal temporary precision is an implementation detail outside this epic.
+### 6) Контракт на float32 output
+`IndicatorTensor.values` должен быть `float32`.
+Любая внутренняя временная повышенная точность — detail реализации вне этого epic.
 
-### 7) Warmup in compute contract
-`IndicatorCompute` must expose `warmup()` for engine bootstrap.
-This is a contract-level requirement even before implementation exists.
+### 7) Warmup в compute-контракте
+`IndicatorCompute` должен предоставлять `warmup()` для bootstrap движка.
+Это требование уровня контракта даже до появления реализации.
 
-## Domain Model Overview
+## Обзор доменной модели
 
 ### Entities / Value Objects
-- `IndicatorId`: stable indicator identifier.
-- `Layout`: tensor memory/layout orientation (`TIME_MAJOR`, `VARIANT_MAJOR`).
-- `ParamKind`: parameter kind (`INT`, `FLOAT`, `ENUM`).
-- `InputSeries`: supported logical input series labels.
-- `OutputSpec`: output declaration (logical output names/components).
-- `ParamDef`: parameter definition with invariants.
-- `AxisDef`: materialized axis values (exactly one of int/float/enum values).
-- `IndicatorDef`: full indicator contract (`inputs`, `params`, `axes`, `output`).
+- `IndicatorId`: стабильный идентификатор индикатора.
+- `Layout`: ориентация layout тензора в памяти (`TIME_MAJOR`, `VARIANT_MAJOR`).
+- `ParamKind`: тип параметра (`INT`, `FLOAT`, `ENUM`).
+- `InputSeries`: поддерживаемые логические метки входных рядов.
+- `OutputSpec`: декларация выхода (логические имена/компоненты выхода).
+- `ParamDef`: определение параметра с инвариантами.
+- `AxisDef`: материализованные значения оси (ровно один из int/float/enum наборов значений).
+- `IndicatorDef`: полный контракт индикатора (`inputs`, `params`, `axes`, `output`).
 
 ### Specifications
-- `GridParamSpec` (contract): polymorphic parameter grid specification.
-- `ExplicitValuesSpec`: explicit axis values.
-- `RangeValuesSpec`: inclusive `start..stop` materialization with positive step.
-- `GridSpec`: indicator-level grid request (`params`, optional `source`, layout hint).
+- `GridParamSpec` (контракт): полиморфная спецификация grid-параметра.
+- `ExplicitValuesSpec`: явные значения оси.
+- `RangeValuesSpec`: инклюзивная материализация `start..stop` с положительным step.
+- `GridSpec`: grid-запрос уровня индикатора (`params`, optional `source`, hint по layout).
 
-### Domain Errors
+### Доменные ошибки
 - `UnknownIndicatorError`
 - `GridValidationError`
 - `MissingInputSeriesError`
 
-## DTO Overview (Application)
+## Обзор DTO (Application)
 
 ### CandleArrays
-Dense 1m candle arrays used by compute:
+Плотные 1m-массивы свечей для compute:
 - `ts_open: int64[1d]`
 - `open/high/low/close/volume: float32[1d]`
-- shared kernel metadata: `MarketId`, `Symbol`, `TimeRange`, `Timeframe`
+- метаданные shared kernel: `MarketId`, `Symbol`, `TimeRange`, `Timeframe`
 
-Invariants:
-- all arrays are 1D and equal length;
-- OHLCV dtype is `float32`;
-- timestamp dtype is `int64`;
-- timestamps are stably ordered.
+Инварианты:
+- все массивы 1D и одной длины;
+- dtype OHLCV — `float32`;
+- dtype timestamp — `int64`;
+- timestamps стабильно отсортированы.
 
 ### ComputeRequest
-Compute input envelope:
+Входной envelope для compute:
 - `candles: CandleArrays`
 - `grid: GridSpec`
 - `max_variants_guard: int`
-- `dtype: "float32"` (v1 fixed value)
+- `dtype: "float32"` (фиксированное значение в v1)
 
 ### EstimateResult
-Estimate output:
+Выход estimate:
 - `indicator_id`
-- materialized `axes`
+- материализованные `axes`
 - `variants`
 - `max_variants_guard`
 
 ### IndicatorTensor
-Compute output:
+Выход compute:
 - `indicator_id`
 - `layout`
 - `axes`
 - `values: np.ndarray[float32]`
 - `meta` (`t`, `variants`, `nan_policy`, optional `compute_ms`)
 
-## Application Ports
+## Порты application
 
 ### IndicatorRegistry
-Contract:
+Контракт:
 - `list_defs() -> tuple[IndicatorDef, ...]`
 - `get_def(indicator_id: IndicatorId) -> IndicatorDef`
 
-Error semantics:
-- `get_def` may raise `UnknownIndicatorError`.
+Семантика ошибок:
+- `get_def` может выбрасывать `UnknownIndicatorError`.
 
 ### CandleFeed
-Contract:
+Контракт:
 - `load_1m_dense(market_id: MarketId, symbol: Symbol, time_range: TimeRange) -> CandleArrays`
 
-Error semantics:
-- may raise `MissingInputSeriesError` when requested series cannot be produced.
+Семантика ошибок:
+- может выбрасывать `MissingInputSeriesError`, если запрошенный ряд нельзя получить.
 
 ### IndicatorCompute
-Contract:
+Контракт:
 - `estimate(grid: GridSpec, *, max_variants_guard: int) -> EstimateResult`
 - `compute(req: ComputeRequest) -> IndicatorTensor`
 - `warmup() -> None`
 
-Error semantics:
-- `estimate`/`compute` may raise `GridValidationError`;
-- `compute` may raise `UnknownIndicatorError` and `MissingInputSeriesError`.
+Семантика ошибок:
+- `estimate`/`compute` могут выбрасывать `GridValidationError`;
+- `compute` может выбрасывать `UnknownIndicatorError` и `MissingInputSeriesError`.
 
-## Target Repository Placement
+## Целевое размещение в репозитории
 
 ### Domain
 - `src/trading/contexts/indicators/domain/entities/`
@@ -147,87 +147,87 @@ Error semantics:
 
 ---
 
-## Ports
+## Порты
 
-Контракты port-ов определяются в application-слое.
+Контракты портов определяются в application-слое.
 Имена и семантика не зависят от конкретной реализации (Numba/Numpy, ClickHouse и т.д.).
 
 ### IndicatorRegistry
 
-**Purpose**
+**Назначение**
 `IndicatorRegistry` — источник описаний индикаторов (library).
 Используется UI/use-cases для получения списка доступных индикаторов и их hard bounds.
 
-**Contract**
+**Контракт**
 - `list_defs() -> tuple[IndicatorDef, ...]`
 - `get_def(indicator_id: IndicatorId) -> IndicatorDef`
 
-**Semantics**
-- список детерминирован и стабилен при фиксированной версии кода
-- `get_def` бросает доменную ошибку `UnknownIndicatorError` если индикатор не существует
+**Семантика**
+- список детерминирован и стабилен при фиксированной версии кода;
+- `get_def` выбрасывает доменную ошибку `UnknownIndicatorError`, если индикатор не существует.
 
 ---
 
 ### CandleFeed
 
-**Purpose**
+**Назначение**
 `CandleFeed` — порт чтения канонических свечей из market_data в формате dense arrays.
 Порт не зависит от ClickHouse/таблиц/биржи: это детали адаптера.
 
-**Contract**
+**Контракт**
 - `load_1m_dense(market_id: MarketId, symbol: Symbol, time_range: TimeRange) -> CandleArrays`
 
-**Semantics**
-- возвращает свечи для полуинтервала `[time_range.start, time_range.end)`
-- возвращает **плотную** временную сетку для `timeframe=1m`
-- пропуски заполняются NaN в OHLCV
-- SHOULD: массивы отсортированы по времени по возрастанию
+**Семантика**
+- возвращает свечи для полуинтервала `[time_range.start, time_range.end)`;
+- возвращает **плотную** временную сетку для `timeframe=1m`;
+- пропуски заполняются NaN в OHLCV;
+- SHOULD: массивы отсортированы по времени по возрастанию.
 
-**Invariants**
-- `len(open)==len(close)==...==len(ts_open)`
-- `timeframe` соответствует requested (1m в v1)
+**Инварианты**
+- `len(open)==len(close)==...==len(ts_open)`;
+- `timeframe` соответствует requested (1m в v1).
 
 ---
 
 ### IndicatorCompute
 
-**Purpose**
+**Назначение**
 `IndicatorCompute` — порт вычисления индикаторов по свечам и grid.
 Реализация может быть на Numba (основная) или Numpy (референсная).
 
-**Contract**
+**Контракт**
 - `estimate(grid: GridSpec, *, max_variants_guard: int) -> EstimateResult`
 - `compute(req: ComputeRequest) -> IndicatorTensor`
 - `warmup() -> None`
 
-**Semantics**
+**Семантика**
 - `estimate`:
-  - строит фактические оси (AxisDef) из grid,
-  - считает variants,
-  - применяет guard `variants <= max_variants_guard` (иначе ошибка валидации)
+  - строит фактические оси (`AxisDef`) из grid;
+  - считает variants;
+  - применяет guard `variants <= max_variants_guard` (иначе ошибка валидации).
 - `compute`:
-  - должен повторять семантику `estimate` (оси и variants совпадают),
-  - возвращает `IndicatorTensor(values=float32, nan_policy=propagate)`
+  - должен повторять семантику `estimate` (оси и variants совпадают);
+  - возвращает `IndicatorTensor(values=float32, nan_policy=propagate)`.
 - `warmup`:
-  - прогревает ключевые kernels/код paths (implementation detail),
+  - прогревает ключевые kernels/код paths (implementation detail);
   - MUST вызываться при старте процесса (composition root решает когда).
 
-**Errors**
-- `GridValidationError` (выход за bounds, пустые оси, неверный step, variants > guard)
-- `UnknownIndicatorError`
-- `MissingInputSeriesError` (если индикатор требует high/low/volume, а candles не содержат — в v1 candles всегда содержит OHLCV, но оставляем ошибку как контракт)
+**Ошибки**
+- `GridValidationError` (выход за bounds, пустые оси, неверный step, variants > guard);
+- `UnknownIndicatorError`;
+- `MissingInputSeriesError` (если индикатор требует high/low/volume, а candles не содержат — в v1 candles всегда содержит OHLCV, но оставляем ошибку как контракт).
 
 ---
 
-## Notes for future EPICs (не входит в v1)
+## Заметки для будущих EPIC (не входит в v1)
 - CachePort (`indicators.application.ports.cache`) появится, когда будет >=2 реализации кеша или >=2 потребителя.
-- YAML defaults (configs/*/indicators.yaml) валидируются против `IndicatorDef` в EPIC-02.
+- YAML defaults (`configs/*/indicators.yaml`) валидируются против `IndicatorDef` в EPIC-02.
 - Выбор default layout фиксируется в EPIC-10 (benchmark).
 - API endpoints (`/indicators`, `/indicators/estimate`, `/indicators/compute`) реализуются позже (EPIC-02/03).
 
 ---
 
-## Target repo placement (guidance)
+## Целевое размещение в репозитории (guidance)
 
 Следующие пути соответствуют текущему дереву репозитория:
 
@@ -239,10 +239,10 @@ Error semantics:
 - Application DTO:
   - `src/trading/contexts/indicators/application/dto/` (CandleArrays, ComputeRequest, EstimateResult, IndicatorTensor)
 
-- Application Ports:
+- Порты application:
   - `src/trading/contexts/indicators/application/ports/registry/` (IndicatorRegistry)
   - `src/trading/contexts/indicators/application/ports/compute/` (IndicatorCompute)
-  - `src/trading/contexts/indicators/application/ports/feeds/` (CandleFeed)  *(если feeds-подпапки нет — создаётся в EPIC-01)*
+  - `src/trading/contexts/indicators/application/ports/feeds/` (CandleFeed) *(если feeds-подпапки нет — создаётся в EPIC-01)*
 
 Примечание: в текущем дереве у `indicators/application/ports/` уже есть `cache/compute/registry/`.
 Порт `CandleFeed` в v1 добавляется как новый раздел (`feeds/`), по аналогии с другими контекстами.
