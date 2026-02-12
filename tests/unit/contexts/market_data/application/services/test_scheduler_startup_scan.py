@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
-from prometheus_client import CollectorRegistry
+from prometheus_client import REGISTRY, CollectorRegistry
 
 from apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler import (
     MarketDataSchedulerApp,
@@ -447,3 +447,52 @@ def test_rest_insurance_catchup_tracks_skipped_no_seed(
         assert any(task.reason == "scheduler_bootstrap" for task in queue.enqueued)
 
     asyncio.run(_scenario())
+
+
+def test_scheduler_metrics_register_in_default_registry_when_not_provided() -> None:
+    """
+    Ensure scheduler metrics are exposed on global Prometheus registry by default.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - Default scheduler runtime uses global Prometheus registry via `start_http_server`.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - Registers and then unregisters scheduler collectors in global registry.
+    """
+    metrics = MarketDataSchedulerMetrics()
+    collectors = [
+        metrics.scheduler_job_runs_total,
+        metrics.scheduler_job_errors_total,
+        metrics.scheduler_job_duration_seconds,
+        metrics.scheduler_tasks_planned_total,
+        metrics.scheduler_tasks_enqueued_total,
+        metrics.scheduler_startup_scan_instruments_total,
+        metrics.scheduler_rest_catchup_instruments_total,
+        metrics.scheduler_rest_catchup_tail_minutes_total,
+        metrics.scheduler_rest_catchup_tail_rows_written_total,
+        metrics.scheduler_rest_catchup_gap_days_scanned_total,
+        metrics.scheduler_rest_catchup_gap_days_with_gaps_total,
+        metrics.scheduler_rest_catchup_gap_ranges_filled_total,
+        metrics.scheduler_rest_catchup_gap_rows_written_total,
+    ]
+    try:
+        metrics.scheduler_job_runs_total.labels(job="startup_scan").inc()
+        assert (
+            REGISTRY.get_sample_value(
+                "scheduler_job_runs_total",
+                labels={"job": "startup_scan"},
+            )
+            == 1.0
+        )
+    finally:
+        for collector in collectors:
+            REGISTRY.unregister(collector)

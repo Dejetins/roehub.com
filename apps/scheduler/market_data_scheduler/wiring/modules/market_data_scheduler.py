@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Mapping
 from uuid import uuid4
 
-from prometheus_client import CollectorRegistry, Counter, Histogram, start_http_server
+from prometheus_client import REGISTRY, CollectorRegistry, Counter, Histogram, start_http_server
 
 from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     ClickHouseSettingsLoader,
@@ -98,77 +98,79 @@ class MarketDataSchedulerMetrics:
         Side effects:
         - Registers metrics in default Prometheus registry.
         """
+        effective_registry = registry if registry is not None else REGISTRY
+
         self.scheduler_job_runs_total = Counter(
             "scheduler_job_runs_total",
             "Scheduler job run count",
             labelnames=("job",),
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_job_errors_total = Counter(
             "scheduler_job_errors_total",
             "Scheduler job error count",
             labelnames=("job",),
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_job_duration_seconds = Histogram(
             "scheduler_job_duration_seconds",
             "Scheduler job duration in seconds",
             labelnames=("job",),
             buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 15.0, 60.0, 180.0),
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_tasks_planned_total = Counter(
             "scheduler_tasks_planned_total",
             "Planned maintenance tasks grouped by reason",
             labelnames=("reason",),
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_tasks_enqueued_total = Counter(
             "scheduler_tasks_enqueued_total",
             "Enqueued maintenance tasks grouped by reason",
             labelnames=("reason",),
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_startup_scan_instruments_total = Counter(
             "scheduler_startup_scan_instruments_total",
             "How many instruments were scanned in startup scan runs",
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_rest_catchup_instruments_total = Counter(
             "scheduler_rest_catchup_instruments_total",
             "How many instruments were processed by periodic rest insurance catchup",
             labelnames=("status",),
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_rest_catchup_tail_minutes_total = Counter(
             "scheduler_rest_catchup_tail_minutes_total",
             "Total tail minutes requested by periodic rest catchup",
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_rest_catchup_tail_rows_written_total = Counter(
             "scheduler_rest_catchup_tail_rows_written_total",
             "Total tail rows written by periodic rest catchup",
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_rest_catchup_gap_days_scanned_total = Counter(
             "scheduler_rest_catchup_gap_days_scanned_total",
             "Total historical UTC days scanned for gaps by periodic rest catchup",
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_rest_catchup_gap_days_with_gaps_total = Counter(
             "scheduler_rest_catchup_gap_days_with_gaps_total",
             "Total historical UTC days where gaps were detected",
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_rest_catchup_gap_ranges_filled_total = Counter(
             "scheduler_rest_catchup_gap_ranges_filled_total",
             "Total missing ranges filled by periodic rest catchup",
-            registry=registry,
+            registry=effective_registry,
         )
         self.scheduler_rest_catchup_gap_rows_written_total = Counter(
             "scheduler_rest_catchup_gap_rows_written_total",
             "Total historical gap rows written by periodic rest catchup",
-            registry=registry,
+            registry=effective_registry,
         )
 
 

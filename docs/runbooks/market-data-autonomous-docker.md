@@ -52,7 +52,7 @@ docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metr
 
 ```bash
 docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | rg 'scheduler_tasks_(planned|enqueued)_total.*historical_backfill'
-docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | rg 'scheduler_job_(runs|errors)_total.*startup_scan|rest_insurance_catchup'
+docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | rg 'scheduler_job_(runs|errors)_total.*(startup_scan|rest_insurance_catchup)'
 ```
 
 ## 4. SQL-проверки (выполняет оператор)
