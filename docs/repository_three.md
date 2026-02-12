@@ -116,6 +116,7 @@
 |   |   |   |-- indicators-candlefeed-acl-dense-timeline-v1.md
 |   |   |   |-- indicators-compute-engine-core.md
 |   |   |   |-- indicators-grid-builder-estimate-guards-v1.md
+|   |   |   |-- indicators-ma-compute-numba-v1.md
 |   |   |   |-- indicators-overview.md
 |   |   |   |-- indicators-registry-yaml-defaults-v1.md
 |   |   |   `-- indicators_formula.yaml
@@ -206,9 +207,12 @@
 |       |   |   |       |   |-- engine.py
 |       |   |   |       |   |-- kernels/
 |       |   |   |       |   |   |-- __init__.py
-|       |   |   |       |   |   `-- _common.py
+|       |   |   |       |   |   |-- _common.py
+|       |   |   |       |   |   `-- ma.py
 |       |   |   |       |   `-- warmup.py
 |       |   |   |       |-- compute_numpy/
+|       |   |   |       |   |-- __init__.py
+|       |   |   |       |   `-- ma.py
 |       |   |   |       |-- config/
 |       |   |   |       |   |-- __init__.py
 |       |   |   |       |   |-- yaml_defaults_loader.py
@@ -514,7 +518,8 @@
 |   |-- perf_smoke/
 |   |   `-- contexts/
 |   |       `-- indicators/
-|   |           `-- test_compute_numba_perf_smoke.py
+|   |           |-- test_compute_numba_perf_smoke.py
+|   |           `-- test_indicators_ma.py
 |   |-- test_smoke.py
 |   `-- unit/
 |       |-- contexts/
@@ -524,7 +529,10 @@
 |       |   |   |       |-- compute_numba/
 |       |   |   |       |   |-- test_common_kernels.py
 |       |   |   |       |   |-- test_engine.py
+|       |   |   |       |   |-- test_ma_kernels.py
 |       |   |   |       |   `-- test_runtime_wiring.py
+|       |   |   |       |-- compute_numpy/
+|       |   |   |       |   `-- test_ma_oracle.py
 |       |   |   |       |-- config/
 |       |   |   |       |   `-- test_yaml_defaults_validator.py
 |       |   |   |       |-- feeds/
@@ -532,6 +540,7 @@
 |       |   |   |       `-- registry/
 |       |   |   |           `-- test_yaml_indicator_registry.py
 |       |   |   |-- api/
+|       |   |   |   |-- test_indicators_compute.py
 |       |   |   |   `-- test_indicators_estimate.py
 |       |   |   |-- application/
 |       |   |   |   |-- dto/
@@ -593,4 +602,4 @@
 |   `-- lint/
 `-- uv.lock
 
-303 directories, 291 files
+304 directories, 299 files

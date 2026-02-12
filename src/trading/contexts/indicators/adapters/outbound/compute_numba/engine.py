@@ -21,9 +21,13 @@ from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import 
     WORKSPACE_FIXED_BYTES_DEFAULT,
     check_total_budget_or_raise,
     compute_ma_grid_f32,
+    compute_momentum_grid_f32,
+    compute_volatility_grid_f32,
     estimate_tensor_bytes,
     estimate_total_bytes,
     is_supported_ma_indicator,
+    is_supported_momentum_indicator,
+    is_supported_volatility_indicator,
     write_series_grid_time_major,
     write_series_grid_variant_major,
 )
@@ -230,6 +234,20 @@ class NumbaIndicatorCompute(IndicatorCompute):
                 definition=definition,
                 axes=axes,
                 available_series=series_map,
+            )
+        elif is_supported_volatility_indicator(indicator_id=definition.indicator_id.value):
+            variant_series_matrix = _compute_volatility_variant_matrix(
+                definition=definition,
+                axes=axes,
+                available_series=series_map,
+                t_size=t_size,
+            )
+        elif is_supported_momentum_indicator(indicator_id=definition.indicator_id.value):
+            variant_series_matrix = _compute_momentum_variant_matrix(
+                definition=definition,
+                axes=axes,
+                available_series=series_map,
+                t_size=t_size,
             )
         else:
             variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
@@ -631,6 +649,450 @@ def _compute_ma_variant_source_matrix(
     return out
 
 
+def _compute_volatility_variant_matrix(
+    *,
+    definition: IndicatorDef,
+    axes: tuple[AxisDef, ...],
+    available_series: Mapping[str, np.ndarray],
+    t_size: int,
+) -> np.ndarray:
+    """
+    Compute variant-major matrix `(V, T)` for volatility-family indicators.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/volatility.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/volatility.py,
+      src/trading/contexts/indicators/domain/definitions/volatility.py
+
+    Args:
+        definition: Hard indicator definition for the request.
+        axes: Materialized domain axes preserving request order.
+        available_series: Mapping of available source arrays.
+        t_size: Time dimension length.
+    Returns:
+        np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
+    Assumptions:
+        Volatility kernels return one primary output line per indicator id in v1.
+    Raises:
+        GridValidationError: If required axes are missing or malformed.
+        MissingRequiredSeries: If required OHLC/source series are unavailable.
+    Side Effects:
+        Allocates source/parameter vectors and one output matrix.
+    """
+    indicator_id = definition.indicator_id.value
+
+    try:
+        if indicator_id == "volatility.tr":
+            return compute_volatility_grid_f32(
+                indicator_id=indicator_id,
+                high=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.HIGH.value,
+                ),
+                low=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.LOW.value,
+                ),
+                close=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.CLOSE.value,
+                ),
+            )
+
+        if indicator_id == "volatility.atr":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_volatility_grid_f32(
+                indicator_id=indicator_id,
+                high=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.HIGH.value,
+                ),
+                low=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.LOW.value,
+                ),
+                close=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.CLOSE.value,
+                ),
+                windows=windows_i64,
+            )
+
+        variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
+        _validate_required_series_available(
+            variant_source_labels=variant_source_labels,
+            available_series=available_series,
+        )
+        source_variants = _build_variant_source_matrix(
+            variant_source_labels=variant_source_labels,
+            available_series=available_series,
+            t_size=t_size,
+        )
+
+        if indicator_id in {"volatility.stddev", "volatility.variance"}:
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_volatility_grid_f32(
+                indicator_id=indicator_id,
+                source_variants=source_variants,
+                windows=windows_i64,
+            )
+
+        if indicator_id == "volatility.hv":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            annualizations_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="annualization"),
+                    dtype=np.int64,
+                )
+            )
+            return compute_volatility_grid_f32(
+                indicator_id=indicator_id,
+                source_variants=source_variants,
+                windows=windows_i64,
+                annualizations=annualizations_i64,
+            )
+
+        if indicator_id in {
+            "volatility.bbands",
+            "volatility.bbands_bandwidth",
+            "volatility.bbands_percent_b",
+        }:
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            mults_f64 = np.ascontiguousarray(
+                np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
+            )
+            return compute_volatility_grid_f32(
+                indicator_id=indicator_id,
+                source_variants=source_variants,
+                windows=windows_i64,
+                mults=mults_f64,
+            )
+    except ValueError as error:
+        raise GridValidationError(str(error)) from error
+
+    raise GridValidationError(f"unsupported volatility indicator_id: {indicator_id}")
+
+
+def _compute_momentum_variant_matrix(
+    *,
+    definition: IndicatorDef,
+    axes: tuple[AxisDef, ...],
+    available_series: Mapping[str, np.ndarray],
+    t_size: int,
+) -> np.ndarray:
+    """
+    Compute variant-major matrix `(V, T)` for momentum-family indicators.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/momentum.py,
+      src/trading/contexts/indicators/domain/definitions/momentum.py
+
+    Args:
+        definition: Hard indicator definition for the request.
+        axes: Materialized domain axes preserving request order.
+        available_series: Mapping of available source arrays.
+        t_size: Time dimension length.
+    Returns:
+        np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
+    Assumptions:
+        Momentum kernels return one primary output line per indicator id in v1.
+    Raises:
+        GridValidationError: If required axes are missing or malformed.
+        MissingRequiredSeries: If required OHLC/source series are unavailable.
+    Side Effects:
+        Allocates source/parameter vectors and one output matrix.
+    """
+    indicator_id = definition.indicator_id.value
+
+    try:
+        if indicator_id in {"momentum.rsi", "momentum.roc"}:
+            variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
+            _validate_required_series_available(
+                variant_source_labels=variant_source_labels,
+                available_series=available_series,
+            )
+            source_variants = _build_variant_source_matrix(
+                variant_source_labels=variant_source_labels,
+                available_series=available_series,
+                t_size=t_size,
+            )
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_momentum_grid_f32(
+                indicator_id=indicator_id,
+                source_variants=source_variants,
+                windows=windows_i64,
+            )
+
+        if indicator_id in {"momentum.cci", "momentum.williams_r"}:
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_momentum_grid_f32(
+                indicator_id=indicator_id,
+                high=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.HIGH.value,
+                ),
+                low=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.LOW.value,
+                ),
+                close=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.CLOSE.value,
+                ),
+                windows=windows_i64,
+            )
+
+        if indicator_id == "momentum.fisher":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_momentum_grid_f32(
+                indicator_id=indicator_id,
+                high=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.HIGH.value,
+                ),
+                low=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.LOW.value,
+                ),
+                windows=windows_i64,
+            )
+
+        if indicator_id == "momentum.stoch":
+            k_windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="k_window"), dtype=np.int64)
+            )
+            smoothings_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="smoothing"), dtype=np.int64)
+            )
+            d_windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="d_window"), dtype=np.int64)
+            )
+            return compute_momentum_grid_f32(
+                indicator_id=indicator_id,
+                high=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.HIGH.value,
+                ),
+                low=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.LOW.value,
+                ),
+                close=_require_series(
+                    available_series=available_series,
+                    name=InputSeries.CLOSE.value,
+                ),
+                k_windows=k_windows_i64,
+                smoothings=smoothings_i64,
+                d_windows=d_windows_i64,
+            )
+
+        variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
+        _validate_required_series_available(
+            variant_source_labels=variant_source_labels,
+            available_series=available_series,
+        )
+        source_variants = _build_variant_source_matrix(
+            variant_source_labels=variant_source_labels,
+            available_series=available_series,
+            t_size=t_size,
+        )
+
+        if indicator_id == "momentum.stoch_rsi":
+            rsi_windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="rsi_window"), dtype=np.int64)
+            )
+            k_windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="k_window"), dtype=np.int64)
+            )
+            smoothings_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="smoothing"), dtype=np.int64)
+            )
+            d_windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="d_window"), dtype=np.int64)
+            )
+            return compute_momentum_grid_f32(
+                indicator_id=indicator_id,
+                source_variants=source_variants,
+                rsi_windows=rsi_windows_i64,
+                k_windows=k_windows_i64,
+                smoothings=smoothings_i64,
+                d_windows=d_windows_i64,
+            )
+
+        if indicator_id == "momentum.trix":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            signal_windows_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="signal_window"),
+                    dtype=np.int64,
+                )
+            )
+            return compute_momentum_grid_f32(
+                indicator_id=indicator_id,
+                source_variants=source_variants,
+                windows=windows_i64,
+                signal_windows=signal_windows_i64,
+            )
+
+        if indicator_id in {"momentum.ppo", "momentum.macd"}:
+            fast_windows_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="fast_window"),
+                    dtype=np.int64,
+                )
+            )
+            slow_windows_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="slow_window"),
+                    dtype=np.int64,
+                )
+            )
+            signal_windows_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="signal_window"),
+                    dtype=np.int64,
+                )
+            )
+            return compute_momentum_grid_f32(
+                indicator_id=indicator_id,
+                source_variants=source_variants,
+                fast_windows=fast_windows_i64,
+                slow_windows=slow_windows_i64,
+                signal_windows=signal_windows_i64,
+            )
+    except ValueError as error:
+        raise GridValidationError(str(error)) from error
+
+    raise GridValidationError(f"unsupported momentum indicator_id: {indicator_id}")
+
+
+def _variant_int_values(*, axes: tuple[AxisDef, ...], axis_name: str) -> tuple[int, ...]:
+    """
+    Resolve one integer axis value per variant in deterministic variant order.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/application/services/grid_builder.py,
+      src/trading/contexts/indicators/domain/entities/axis_def.py
+
+    Args:
+        axes: Materialized axes in definition order.
+        axis_name: Target integer axis name.
+    Returns:
+        tuple[int, ...]: One axis value per variant.
+    Assumptions:
+        Variant order follows cartesian product of axes in definition order.
+    Raises:
+        GridValidationError: If axis is missing or not integer-valued.
+    Side Effects:
+        None.
+    """
+    axis_index = _axis_index(axes=axes, axis_name=axis_name)
+    axis = axes[axis_index]
+    if axis.values_int is None:
+        raise GridValidationError(f"axis '{axis_name}' must have values_int")
+    axis_lengths = tuple(axis_item.length() for axis_item in axes)
+    items: list[int] = []
+    for coordinate in np.ndindex(axis_lengths):
+        items.append(axis.values_int[coordinate[axis_index]])
+    return tuple(items)
+
+
+def _variant_float_values(*, axes: tuple[AxisDef, ...], axis_name: str) -> tuple[float, ...]:
+    """
+    Resolve one float axis value per variant in deterministic variant order.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/application/services/grid_builder.py,
+      src/trading/contexts/indicators/domain/entities/axis_def.py
+
+    Args:
+        axes: Materialized axes in definition order.
+        axis_name: Target float axis name.
+    Returns:
+        tuple[float, ...]: One axis value per variant.
+    Assumptions:
+        Variant order follows cartesian product of axes in definition order.
+    Raises:
+        GridValidationError: If axis is missing or not float-valued.
+    Side Effects:
+        None.
+    """
+    axis_index = _axis_index(axes=axes, axis_name=axis_name)
+    axis = axes[axis_index]
+    if axis.values_float is None:
+        raise GridValidationError(f"axis '{axis_name}' must have values_float")
+    axis_lengths = tuple(axis_item.length() for axis_item in axes)
+    items: list[float] = []
+    for coordinate in np.ndindex(axis_lengths):
+        items.append(axis.values_float[coordinate[axis_index]])
+    return tuple(items)
+
+
+def _axis_index(*, axes: tuple[AxisDef, ...], axis_name: str) -> int:
+    """
+    Resolve axis index by name in deterministic definition order.
+
+    Args:
+        axes: Materialized axes in definition order.
+        axis_name: Target axis name.
+    Returns:
+        int: Axis index.
+    Assumptions:
+        Axis names in tuple are unique by `AxisDef` invariants.
+    Raises:
+        GridValidationError: If axis is absent.
+    Side Effects:
+        None.
+    """
+    axis_names = [axis.name for axis in axes]
+    if axis_name not in axis_names:
+        raise GridValidationError(f"axis '{axis_name}' is required")
+    return axis_names.index(axis_name)
+
+
+def _require_series(*, available_series: Mapping[str, np.ndarray], name: str) -> np.ndarray:
+    """
+    Resolve one required series from available map or raise deterministic domain error.
+
+    Args:
+        available_series: Mapping of available source arrays.
+        name: Required source name.
+    Returns:
+        np.ndarray: Resolved source series.
+    Assumptions:
+        Series map keys are normalized source names.
+    Raises:
+        MissingRequiredSeries: If required series is not available.
+    Side Effects:
+        None.
+    """
+    series = available_series.get(name)
+    if series is None:
+        raise MissingRequiredSeries(f"MissingRequiredSeries: missing={name!r}")
+    return series
+
+
 def _window_values_from_axes(*, axes: tuple[AxisDef, ...]) -> tuple[int, ...]:
     """
     Extract window axis integer values from materialized axes.
@@ -856,12 +1318,12 @@ def _variants_from_axes(*, axes: tuple[AxisDef, ...]) -> int:
     Assumptions:
         Axis invariants guarantee each axis has positive length.
     Raises:
-        GridValidationError: If axis tuple is empty.
+        None.
     Side Effects:
         None.
     """
     if len(axes) == 0:
-        raise GridValidationError("axes must not be empty")
+        return 1
     variants = 1
     for axis in axes:
         variants = variants * axis.length()

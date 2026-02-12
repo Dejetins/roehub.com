@@ -20,8 +20,12 @@ import numpy as np
 
 from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import (
     compute_ma_grid_f32,
+    compute_momentum_grid_f32,
+    compute_volatility_grid_f32,
     ewma_grid_f64,
     is_supported_ma_indicator,
+    is_supported_momentum_indicator,
+    is_supported_volatility_indicator,
     rolling_mean_grid_f64,
     rolling_sum_grid_f64,
     write_series_grid_time_major,
@@ -159,6 +163,8 @@ class ComputeNumbaWarmupRunner:
                     "write_series_grid_time_major",
                     "write_series_grid_variant_major",
                     "compute_ma_grid_f32",
+                    "compute_volatility_grid_f32",
+                    "compute_momentum_grid_f32",
                 ],
             },
         )
@@ -198,6 +204,12 @@ class ComputeNumbaWarmupRunner:
 
         source_f32 = source_f64.astype(np.float32, copy=False)
         volume_f32 = np.linspace(10.0, 20.0, t_size, dtype=np.float32)
+        source_variants = np.ascontiguousarray(
+            np.repeat(source_f32.reshape(1, t_size), repeats=variants, axis=0)
+        )
+        mults_f64 = np.linspace(1.5, 2.5, variants, dtype=np.float64)
+        annualizations_i64 = np.array([252, 365, 252, 365, 252], dtype=np.int64)
+
         for indicator_id in (
             "ma.sma",
             "ma.ema",
@@ -216,6 +228,44 @@ class ComputeNumbaWarmupRunner:
                     windows=windows,
                     volume=volume_f32,
                 )
+
+        if is_supported_volatility_indicator(indicator_id="volatility.atr"):
+            _ = compute_volatility_grid_f32(
+                indicator_id="volatility.atr",
+                high=source_f32 + np.float32(1.0),
+                low=source_f32 - np.float32(1.0),
+                close=source_f32,
+                windows=windows,
+            )
+        if is_supported_volatility_indicator(indicator_id="volatility.bbands"):
+            _ = compute_volatility_grid_f32(
+                indicator_id="volatility.bbands",
+                source_variants=source_variants,
+                windows=windows,
+                mults=mults_f64,
+            )
+        if is_supported_volatility_indicator(indicator_id="volatility.hv"):
+            _ = compute_volatility_grid_f32(
+                indicator_id="volatility.hv",
+                source_variants=source_variants,
+                windows=windows,
+                annualizations=annualizations_i64,
+            )
+
+        if is_supported_momentum_indicator(indicator_id="momentum.rsi"):
+            _ = compute_momentum_grid_f32(
+                indicator_id="momentum.rsi",
+                source_variants=source_variants,
+                windows=windows,
+            )
+        if is_supported_momentum_indicator(indicator_id="momentum.macd"):
+            _ = compute_momentum_grid_f32(
+                indicator_id="momentum.macd",
+                source_variants=source_variants,
+                fast_windows=np.array([8, 10, 12, 14, 16], dtype=np.int64),
+                slow_windows=np.array([20, 22, 24, 26, 28], dtype=np.int64),
+                signal_windows=np.array([5, 7, 9, 11, 13], dtype=np.int64),
+            )
 
 
 __all__ = [
