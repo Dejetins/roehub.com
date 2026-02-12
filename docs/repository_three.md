@@ -1,4 +1,7 @@
 ./
+|-- .cache/
+|   `-- numba/
+|       `-- dev/
 |-- .dockerignore
 |-- .github/
 |   `-- workflows/
@@ -110,9 +113,12 @@
 |   |   |-- indicators/
 |   |   |   |-- README.md
 |   |   |   |-- indicators-application-ports-walking-skeleton-v1.md
+|   |   |   |-- indicators-candlefeed-acl-dense-timeline-v1.md
 |   |   |   |-- indicators-compute-engine-core.md
+|   |   |   |-- indicators-grid-builder-estimate-guards-v1.md
 |   |   |   |-- indicators-overview.md
-|   |   |   `-- indicators-registry-yaml-defaults-v1.md
+|   |   |   |-- indicators-registry-yaml-defaults-v1.md
+|   |   |   `-- indicators_formula.yaml
 |   |   |-- market_data/
 |   |   |   |-- market-data-application-ports.md
 |   |   |   |-- market-data-live-feed-redis-streams-v1.md
@@ -207,6 +213,11 @@
 |       |   |   |       |   |-- __init__.py
 |       |   |   |       |   |-- yaml_defaults_loader.py
 |       |   |   |       |   `-- yaml_defaults_validator.py
+|       |   |   |       |-- feeds/
+|       |   |   |       |   |-- __init__.py
+|       |   |   |       |   `-- market_data_acl/
+|       |   |   |       |       |-- __init__.py
+|       |   |   |       |       `-- market_data_candle_feed.py
 |       |   |   |       `-- registry/
 |       |   |   |           |-- __init__.py
 |       |   |   |           `-- yaml_indicator_registry.py
@@ -222,6 +233,9 @@
 |       |   |   |   |   |-- registry_view.py
 |       |   |   |   |   `-- variant_key.py
 |       |   |   |   |-- errors/
+|       |   |   |   |   |-- __init__.py
+|       |   |   |   |   |-- memory_guard_exceeded.py
+|       |   |   |   |   `-- variants_guard_exceeded.py
 |       |   |   |   |-- ports/
 |       |   |   |   |   |-- __init__.py
 |       |   |   |   |   |-- cache/
@@ -234,6 +248,9 @@
 |       |   |   |   |   `-- registry/
 |       |   |   |   |       |-- __init__.py
 |       |   |   |   |       `-- indicator_registry.py
+|       |   |   |   |-- services/
+|       |   |   |   |   |-- __init__.py
+|       |   |   |   |   `-- grid_builder.py
 |       |   |   |   `-- use_cases/
 |       |   |   `-- domain/
 |       |   |       |-- __init__.py
@@ -510,12 +527,18 @@
 |       |   |   |       |   `-- test_runtime_wiring.py
 |       |   |   |       |-- config/
 |       |   |   |       |   `-- test_yaml_defaults_validator.py
+|       |   |   |       |-- feeds/
+|       |   |   |       |   `-- test_market_data_acl_candle_feed.py
 |       |   |   |       `-- registry/
 |       |   |   |           `-- test_yaml_indicator_registry.py
+|       |   |   |-- api/
+|       |   |   |   `-- test_indicators_estimate.py
 |       |   |   |-- application/
-|       |   |   |   `-- dto/
-|       |   |   |       |-- test_candle_arrays_invariants.py
-|       |   |   |       `-- test_variant_key.py
+|       |   |   |   |-- dto/
+|       |   |   |   |   |-- test_candle_arrays_invariants.py
+|       |   |   |   |   `-- test_variant_key.py
+|       |   |   |   `-- services/
+|       |   |   |       `-- test_grid_builder.py
 |       |   |   `-- domain/
 |       |   |       |-- test_axis_def_oneof_values.py
 |       |   |       |-- test_definitions_baseline.py
@@ -570,4 +593,4 @@
 |   `-- lint/
 `-- uv.lock
 
-294 directories, 277 files
+303 directories, 291 files
