@@ -100,7 +100,7 @@ market_data:
   scheduler:
     jobs:
       sync_whitelist:
-        interval_seconds: 3600
+        interval_seconds: 60
       enrich:
         interval_seconds: 43200
       rest_insurance_catchup:
