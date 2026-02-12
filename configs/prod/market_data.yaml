@@ -104,7 +104,7 @@ market_data:
       enrich:
         interval_seconds: 43200
       rest_insurance_catchup:
-        interval_seconds: 3600
+        interval_seconds: 360
 
   backfill:
     max_days_per_insert: 7
