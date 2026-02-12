@@ -1,6 +1,6 @@
 from .candle_arrays import CandleArrays
 from .compute_request import ComputeRequest
-from .estimate_result import EstimateResult
+from .estimate_result import BatchEstimateResult, EstimateResult
 from .grid import ExplicitValuesSpec, GridParamSpec, GridSpec, RangeValuesSpec
 from .indicator_tensor import IndicatorTensor, TensorMeta
 from .registry_view import (
@@ -17,6 +17,7 @@ from .registry_view import (
 from .variant_key import IndicatorVariantSelection, build_variant_key_v1
 
 __all__ = [
+    "BatchEstimateResult",
     "CandleArrays",
     "ComputeRequest",
     "DefaultSpec",

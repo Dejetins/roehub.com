@@ -1,4 +1,5 @@
 from .dto import (
+    BatchEstimateResult,
     CandleArrays,
     ComputeRequest,
     DefaultSpec,
@@ -20,16 +21,33 @@ from .dto import (
     TensorMeta,
     build_variant_key_v1,
 )
+from .errors import EstimateMemoryGuardExceeded, EstimateVariantsGuardExceeded
 from .ports import CandleFeed, IndicatorCompute, IndicatorRegistry
+from .services import (
+    MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+    MAX_VARIANTS_PER_COMPUTE_DEFAULT,
+    BatchEstimateSnapshot,
+    BatchEstimator,
+    GridBuilder,
+    MaterializedAxis,
+    MaterializedIndicatorGrid,
+    enforce_batch_guards,
+)
 
 __all__ = [
+    "BatchEstimateResult",
+    "BatchEstimateSnapshot",
+    "BatchEstimator",
     "CandleArrays",
     "CandleFeed",
     "ComputeRequest",
     "DefaultSpec",
+    "EstimateMemoryGuardExceeded",
     "EstimateResult",
+    "EstimateVariantsGuardExceeded",
     "ExplicitDefaultSpec",
     "ExplicitValuesSpec",
+    "GridBuilder",
     "GridParamSpec",
     "GridSpec",
     "IndicatorDefaults",
@@ -41,9 +59,14 @@ __all__ = [
     "MergedIndicatorView",
     "MergedInputView",
     "MergedParamView",
+    "MAX_COMPUTE_BYTES_TOTAL_DEFAULT",
+    "MAX_VARIANTS_PER_COMPUTE_DEFAULT",
+    "MaterializedAxis",
+    "MaterializedIndicatorGrid",
     "RangeDefaultSpec",
     "RangeValuesSpec",
     "RegistryScalar",
     "TensorMeta",
     "build_variant_key_v1",
+    "enforce_batch_guards",
 ]

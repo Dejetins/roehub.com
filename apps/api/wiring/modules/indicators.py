@@ -12,7 +12,10 @@ from typing import Mapping
 from trading.contexts.indicators.adapters.outbound import NumbaIndicatorCompute
 from trading.contexts.indicators.adapters.outbound.registry import YamlIndicatorRegistry
 from trading.contexts.indicators.domain.definitions import all_defs
-from trading.platform.config import load_indicators_compute_numba_config
+from trading.platform.config import (
+    IndicatorsComputeNumbaConfig,
+    load_indicators_compute_numba_config,
+)
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _CONFIG_PATH_KEY = "ROEHUB_INDICATORS_CONFIG"
@@ -44,7 +47,11 @@ def build_indicators_registry(*, environ: Mapping[str, str]) -> YamlIndicatorReg
     )
 
 
-def build_indicators_compute(*, environ: Mapping[str, str]) -> NumbaIndicatorCompute:
+def build_indicators_compute(
+    *,
+    environ: Mapping[str, str],
+    config: IndicatorsComputeNumbaConfig | None = None,
+) -> NumbaIndicatorCompute:
     """
     Build indicators CPU/Numba compute adapter and run startup warmup.
 
@@ -52,6 +59,7 @@ def build_indicators_compute(*, environ: Mapping[str, str]) -> NumbaIndicatorCom
 
     Args:
         environ: Process environment mapping.
+        config: Optional preloaded runtime config to avoid duplicate disk/env reads.
     Returns:
         NumbaIndicatorCompute: Warmed-up compute adapter instance.
     Assumptions:
@@ -62,7 +70,7 @@ def build_indicators_compute(*, environ: Mapping[str, str]) -> NumbaIndicatorCom
     Side Effects:
         Applies Numba runtime config and performs JIT warmup at startup.
     """
-    compute_config = load_indicators_compute_numba_config(environ=environ)
+    compute_config = config or load_indicators_compute_numba_config(environ=environ)
     compute = NumbaIndicatorCompute(defs=all_defs(), config=compute_config)
     compute.warmup()
     return compute

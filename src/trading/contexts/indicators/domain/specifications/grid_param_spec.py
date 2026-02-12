@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import ROUND_FLOOR, Decimal
 from typing import Protocol
 
 GridValue = int | float | str
@@ -129,28 +130,46 @@ class RangeValuesSpec:
 
     def materialize(self) -> tuple[GridValue, ...]:
         """
-        Materialize an inclusive range with deterministic step increments.
+        Materialize an inclusive range via deterministic index-based arithmetic.
 
         Args:
             None.
         Returns:
             tuple[GridValue, ...]: Inclusive axis values from start to stop.
         Assumptions:
-            A small epsilon is acceptable for float stop comparisons.
+            Uses `n=floor((stop-start)/step)+1` and `value_i=start+i*step`.
         Raises:
-            ValueError: If generated sequence is empty or exceeds safety iteration bounds.
+            ValueError: If generated sequence is empty, invalid, or exceeds safety bounds.
         Side Effects:
             None.
         """
-        values: list[int | float] = []
-        current = self.start
-        epsilon = abs(self.step) * 1e-9
-        while current <= self.stop_inclusive + epsilon:
-            values.append(current)
-            if len(values) > 1_000_000:
-                raise ValueError("RangeValuesSpec generated too many values")
-            current = current + self.step
+        if (
+            isinstance(self.start, bool)
+            or isinstance(self.stop_inclusive, bool)
+            or isinstance(self.step, bool)
+        ):
+            raise ValueError("RangeValuesSpec values must not be booleans")
 
-        if len(values) == 0:
+        if isinstance(self.start, int) and isinstance(self.stop_inclusive, int) and isinstance(
+            self.step, int
+        ):
+            span = self.stop_inclusive - self.start
+            count = (span // self.step) + 1
+            if count <= 0:
+                raise ValueError("RangeValuesSpec materialized an empty sequence")
+            if count > 1_000_000:
+                raise ValueError("RangeValuesSpec generated too many values")
+            return tuple(self.start + self.step * index for index in range(count))
+
+        start_dec = Decimal(str(self.start))
+        stop_dec = Decimal(str(self.stop_inclusive))
+        step_dec = Decimal(str(self.step))
+        count_dec = ((stop_dec - start_dec) / step_dec).to_integral_value(
+            rounding=ROUND_FLOOR
+        )
+        count = int(count_dec) + 1
+        if count <= 0:
             raise ValueError("RangeValuesSpec materialized an empty sequence")
-        return tuple(values)
+        if count > 1_000_000:
+            raise ValueError("RangeValuesSpec generated too many values")
+        return tuple(float(start_dec + (step_dec * index)) for index in range(count))

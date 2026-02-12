@@ -22,10 +22,12 @@ _ALLOWED_ENVS = ("dev", "prod", "test")
 _THREADS_ENV_KEYS = ("ROEHUB_NUMBA_NUM_THREADS", "NUMBA_NUM_THREADS")
 _CACHE_DIR_ENV_KEYS = ("ROEHUB_NUMBA_CACHE_DIR", "NUMBA_CACHE_DIR")
 _MAX_TOTAL_ENV_KEYS = ("ROEHUB_MAX_COMPUTE_BYTES_TOTAL", "MAX_COMPUTE_BYTES_TOTAL")
+_MAX_VARIANTS_ENV_KEYS = ("ROEHUB_MAX_VARIANTS_PER_COMPUTE", "MAX_VARIANTS_PER_COMPUTE")
 
 _DEFAULT_NUMBA_NUM_THREADS = max(1, min(os.cpu_count() or 1, 16))
 _DEFAULT_NUMBA_CACHE_DIR = Path(".cache/numba")
 _DEFAULT_MAX_COMPUTE_BYTES_TOTAL = 5 * 1024**3
+_DEFAULT_MAX_VARIANTS_PER_COMPUTE = 600_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +43,7 @@ class IndicatorsComputeNumbaConfig:
     numba_num_threads: int = _DEFAULT_NUMBA_NUM_THREADS
     numba_cache_dir: Path = _DEFAULT_NUMBA_CACHE_DIR
     max_compute_bytes_total: int = _DEFAULT_MAX_COMPUTE_BYTES_TOTAL
+    max_variants_per_compute: int = _DEFAULT_MAX_VARIANTS_PER_COMPUTE
 
     def __post_init__(self) -> None:
         """
@@ -66,6 +69,11 @@ class IndicatorsComputeNumbaConfig:
             raise ValueError(
                 "max_compute_bytes_total must be > 0, "
                 f"got {self.max_compute_bytes_total}"
+            )
+        if self.max_variants_per_compute <= 0:
+            raise ValueError(
+                "max_variants_per_compute must be > 0, "
+                f"got {self.max_variants_per_compute}"
             )
         if not str(self.numba_cache_dir).strip():
             raise ValueError("numba_cache_dir must be a non-empty path")
@@ -115,11 +123,19 @@ def load_indicators_compute_numba_config(
         payload_key="max_compute_bytes_total",
         default=_DEFAULT_MAX_COMPUTE_BYTES_TOTAL,
     )
+    max_variants_per_compute = _resolve_int_setting(
+        environ=environ,
+        env_keys=_MAX_VARIANTS_ENV_KEYS,
+        payload=file_payload,
+        payload_key="max_variants_per_compute",
+        default=_DEFAULT_MAX_VARIANTS_PER_COMPUTE,
+    )
 
     return IndicatorsComputeNumbaConfig(
         numba_num_threads=numba_num_threads,
         numba_cache_dir=numba_cache_dir,
         max_compute_bytes_total=max_compute_bytes_total,
+        max_variants_per_compute=max_variants_per_compute,
     )
 
 

@@ -52,6 +52,7 @@ compute:
     numba_num_threads: 3
     numba_cache_dir: ".cache/test-numba"
     max_compute_bytes_total: 10485760
+    max_variants_per_compute: 123456
 defaults: {}
 """.strip(),
     )
@@ -65,6 +66,7 @@ defaults: {}
     assert config.numba_num_threads == 3
     assert str(config.numba_cache_dir) == ".cache/test-numba"
     assert config.max_compute_bytes_total == 10_485_760
+    assert config.max_variants_per_compute == 123_456
 
 
 def test_load_indicators_compute_numba_config_env_overrides_have_priority(tmp_path: Path) -> None:
@@ -91,6 +93,7 @@ compute:
     numba_num_threads: 2
     numba_cache_dir: ".cache/yaml-numba"
     max_compute_bytes_total: 5242880
+    max_variants_per_compute: 99999
 defaults: {}
 """.strip(),
     )
@@ -99,6 +102,7 @@ defaults: {}
         "NUMBA_NUM_THREADS": "5",
         "NUMBA_CACHE_DIR": str(tmp_path / "env-numba-cache"),
         "ROEHUB_MAX_COMPUTE_BYTES_TOTAL": "7777777",
+        "ROEHUB_MAX_VARIANTS_PER_COMPUTE": "888888",
     }
 
     config = load_indicators_compute_numba_config(environ=environ)
@@ -106,6 +110,7 @@ defaults: {}
     assert config.numba_num_threads == 5
     assert config.numba_cache_dir == tmp_path / "env-numba-cache"
     assert config.max_compute_bytes_total == 7_777_777
+    assert config.max_variants_per_compute == 888_888
 
 
 def test_load_indicators_compute_numba_config_rejects_invalid_env_name(tmp_path: Path) -> None:
