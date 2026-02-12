@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from apps.api.routes import build_indicators_router
+from trading.contexts.indicators.application.dto.registry_view import MergedIndicatorView
 from trading.contexts.indicators.application.ports.registry import IndicatorRegistry
 from trading.contexts.indicators.domain.definitions import all_defs
 from trading.contexts.indicators.domain.entities import IndicatorDef, IndicatorId
@@ -78,14 +79,14 @@ class _RegistryStub(IndicatorRegistry):
             raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
         return definition
 
-    def list_merged(self) -> tuple[object, ...]:
+    def list_merged(self) -> tuple[MergedIndicatorView, ...]:
         """
         Return empty merged view for protocol completeness in these tests.
 
         Args:
             None.
         Returns:
-            tuple[object, ...]: Empty placeholder tuple.
+            tuple[MergedIndicatorView, ...]: Empty placeholder tuple.
         Assumptions:
             Estimate endpoint tests do not require merged registry payload.
         Raises:
@@ -95,14 +96,14 @@ class _RegistryStub(IndicatorRegistry):
         """
         return ()
 
-    def get_merged(self, indicator_id: IndicatorId) -> object:
+    def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
         """
         Always raise because merged item resolution is not used in these tests.
 
         Args:
             indicator_id: Target indicator identifier.
         Returns:
-            object: Never returns.
+            MergedIndicatorView: Never returns.
         Assumptions:
             Merged-view contract is irrelevant for estimate endpoint tests.
         Raises:

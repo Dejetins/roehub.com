@@ -1,7 +1,8 @@
 """
 Composition helpers for indicators API module.
 
-Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md,
+  docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md
 """
 
 from __future__ import annotations
@@ -9,9 +10,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
-from trading.contexts.indicators.adapters.outbound import NumbaIndicatorCompute
+from trading.contexts.indicators.adapters.outbound import (
+    MarketDataCandleFeed,
+    NumbaIndicatorCompute,
+)
 from trading.contexts.indicators.adapters.outbound.registry import YamlIndicatorRegistry
+from trading.contexts.indicators.application.ports.feeds import CandleFeed
 from trading.contexts.indicators.domain.definitions import all_defs
+from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
 from trading.platform.config import (
     IndicatorsComputeNumbaConfig,
     load_indicators_compute_numba_config,
@@ -74,6 +80,32 @@ def build_indicators_compute(
     compute = NumbaIndicatorCompute(defs=all_defs(), config=compute_config)
     compute.warmup()
     return compute
+
+
+def build_indicators_candle_feed(
+    *,
+    canonical_candle_reader: CanonicalCandleReader,
+) -> CandleFeed:
+    """
+    Bind indicators `CandleFeed` port to `market_data_acl` adapter implementation.
+
+    Docs: docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md
+    Related: src/trading/contexts/indicators/application/ports/feeds/candle_feed.py,
+      src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/market_data_candle_feed.py,
+      src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py
+
+    Args:
+        canonical_candle_reader: market_data canonical 1m reader port implementation.
+    Returns:
+        CandleFeed: Ready adapter for dense timeline loading.
+    Assumptions:
+        `canonical_candle_reader` enforces source-specific dedup rules for canonical candles.
+    Raises:
+        ValueError: If reader dependency is missing.
+    Side Effects:
+        None.
+    """
+    return MarketDataCandleFeed(canonical_candle_reader=canonical_candle_reader)
 
 
 def _resolve_indicators_config_path(*, environ: Mapping[str, str]) -> Path:

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta, timezone
-from typing import Any, Iterator, Mapping, Protocol, Sequence
+from importlib import import_module
+from typing import Any, Iterator, Mapping, Protocol, Sequence, cast
 
 from trading.contexts.market_data.adapters.outbound.config.instrument_key import (
     build_instrument_key,
@@ -290,7 +291,7 @@ class PyArrowParquetScanner:
         batch_size: int,
     ) -> Iterator[Mapping[str, Any]]:
         try:
-            import pyarrow.dataset as ds
+            ds = cast(Any, import_module("pyarrow.dataset"))
         except Exception as e:  # noqa: BLE001
             raise RuntimeError("pyarrow is required for PyArrowParquetScanner") from e
 

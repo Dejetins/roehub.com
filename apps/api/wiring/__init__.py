@@ -1,3 +1,11 @@
-from .modules import build_indicators_compute, build_indicators_registry
+from .modules import (
+    build_indicators_candle_feed,
+    build_indicators_compute,
+    build_indicators_registry,
+)
 
-__all__ = ["build_indicators_compute", "build_indicators_registry"]
+__all__ = [
+    "build_indicators_candle_feed",
+    "build_indicators_compute",
+    "build_indicators_registry",
+]

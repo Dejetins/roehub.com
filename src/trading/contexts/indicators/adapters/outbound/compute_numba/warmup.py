@@ -13,6 +13,7 @@ import os
 import time
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+from typing import Any, cast
 
 import numba
 import numpy as np
@@ -47,7 +48,8 @@ def apply_numba_runtime_config(*, config: IndicatorsComputeNumbaConfig) -> int:
     os.environ["NUMBA_CACHE_DIR"] = str(config.numba_cache_dir)
 
     cache_dir = ensure_numba_cache_dir_writable(path=config.numba_cache_dir)
-    numba.config.CACHE_DIR = str(cache_dir)
+    numba_config = cast(Any, numba.config)
+    setattr(numba_config, "CACHE_DIR", str(cache_dir))
     numba.set_num_threads(config.numba_num_threads)
     return int(numba.get_num_threads())
 

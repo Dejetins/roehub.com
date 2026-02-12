@@ -80,9 +80,13 @@ class ParamDef:
         if self.default is None:
             return
 
-        if self.hard_min is not None and self.default < self.hard_min:
+        default_value = self.default
+        if isinstance(default_value, bool) or isinstance(default_value, str):
+            raise ValueError("Numeric ParamDef default must be int or float")
+
+        if self.hard_min is not None and default_value < self.hard_min:
             raise ValueError("ParamDef default must be >= hard_min")
-        if self.hard_max is not None and self.default > self.hard_max:
+        if self.hard_max is not None and default_value > self.hard_max:
             raise ValueError("ParamDef default must be <= hard_max")
 
     def _validate_enum_param(self) -> None:

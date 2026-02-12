@@ -5,6 +5,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import cast
 
 from prometheus_client import REGISTRY, CollectorRegistry
 
@@ -15,9 +16,27 @@ from apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler i
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     load_market_data_runtime_config,
 )
-from trading.contexts.market_data.application.services import SchedulerBackfillPlanner
-from trading.contexts.market_data.application.use_cases import RestCatchUp1mReport
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
+from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
+    DailyTsOpenCount,
+)
+from trading.contexts.market_data.application.services import (
+    AsyncRestFillQueue,
+    SchedulerBackfillPlanner,
+)
+from trading.contexts.market_data.application.use_cases import (
+    EnrichRefInstrumentsFromExchangeUseCase,
+    RestCatchUp1mReport,
+    RestCatchUp1mUseCase,
+    SeedRefMarketUseCase,
+    SyncWhitelistToRefInstrumentsUseCase,
+)
+from trading.shared_kernel.primitives import (
+    InstrumentId,
+    MarketId,
+    Symbol,
+    TimeRange,
+    UtcTimestamp,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,7 +99,84 @@ class _MultiInstrumentReader:
         ]
 
 
-class _IndexReader:
+class _BaseIndexReader:
+    """Base canonical-index fake with protocol-compatible helper methods."""
+
+    def bounds(self, instrument_id: InstrumentId) -> tuple[UtcTimestamp, UtcTimestamp] | None:
+        """
+        Return full canonical bounds when known.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+
+        Returns:
+        - `None` because startup-scan tests only require `bounds_1m`.
+        """
+        _ = instrument_id
+        return None
+
+    def max_ts_open_lt(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        before: UtcTimestamp,
+    ) -> UtcTimestamp | None:
+        """
+        Return latest canonical minute before upper bound.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - before: exclusive upper bound.
+
+        Returns:
+        - `None` because startup-scan tests do not use this method.
+        """
+        _ = instrument_id
+        _ = before
+        return None
+
+    def daily_counts(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> tuple[DailyTsOpenCount, ...]:
+        """
+        Return day-count rows for gap scanning.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - time_range: requested time range.
+
+        Returns:
+        - Empty tuple for startup-scan focused tests.
+        """
+        _ = instrument_id
+        _ = time_range
+        return ()
+
+    def distinct_ts_opens(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> tuple[UtcTimestamp, ...]:
+        """
+        Return distinct canonical minute opens.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - time_range: requested time range.
+
+        Returns:
+        - Empty tuple for startup-scan focused tests.
+        """
+        _ = instrument_id
+        _ = time_range
+        return ()
+
+
+class _IndexReader(_BaseIndexReader):
     def bounds_1m(self, *, instrument_id, before):  # noqa: ANN001
         """Return canonical bounds causing both historical and tail tasks."""
         _ = instrument_id
@@ -91,7 +187,7 @@ class _IndexReader:
         )
 
 
-class _TailOnlyIndexReader:
+class _TailOnlyIndexReader(_BaseIndexReader):
     def bounds_1m(self, *, instrument_id, before):  # noqa: ANN001
         """Return canonical tail-only bounds to reproduce production bug scenario."""
         _ = instrument_id
@@ -102,7 +198,7 @@ class _TailOnlyIndexReader:
         )
 
 
-class _NoSeedIndexReader:
+class _NoSeedIndexReader(_BaseIndexReader):
     def bounds_1m(self, *, instrument_id, before):  # noqa: ANN001
         """Return empty canonical bounds to force bootstrap planning path."""
         _ = instrument_id
@@ -249,14 +345,14 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
             whitelist_path=str(tmp_path / "missing.csv"),
-            seed_use_case=seed,
-            sync_use_case=sync,
-            enrich_use_case=enrich,
+            seed_use_case=cast(SeedRefMarketUseCase, seed),
+            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, sync),
+            enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, enrich),
             instrument_reader=_InstrumentReader(),
             index_reader=_IndexReader(),
-            rest_fill_queue=queue,
+            rest_fill_queue=cast(AsyncRestFillQueue, queue),
             backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
-            rest_catchup_use_case=_RestCatchUpUseCase(),
+            rest_catchup_use_case=cast(RestCatchUp1mUseCase, _RestCatchUpUseCase()),
             metrics=MarketDataSchedulerMetrics(registry=registry),
             metrics_port=9202,
         )
@@ -318,14 +414,14 @@ def test_scheduler_startup_scan_tail_only_canonical_still_enqueues_historical(
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
             whitelist_path=str(tmp_path / "missing.csv"),
-            seed_use_case=_SeedUseCase(),
-            sync_use_case=_SyncUseCase(),
-            enrich_use_case=_EnrichUseCase(),
+            seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
+            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
             instrument_reader=_InstrumentReader(),
             index_reader=_TailOnlyIndexReader(),
-            rest_fill_queue=queue,
+            rest_fill_queue=cast(AsyncRestFillQueue, queue),
             backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
-            rest_catchup_use_case=_RestCatchUpUseCase(),
+            rest_catchup_use_case=cast(RestCatchUp1mUseCase, _RestCatchUpUseCase()),
             metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
             metrics_port=9202,
         )
@@ -374,14 +470,14 @@ def test_rest_insurance_catchup_runs_for_all_enabled_instruments(
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
             whitelist_path=str(tmp_path / "missing.csv"),
-            seed_use_case=_SeedUseCase(),
-            sync_use_case=_SyncUseCase(),
-            enrich_use_case=_EnrichUseCase(),
+            seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
+            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
             instrument_reader=_MultiInstrumentReader(),
             index_reader=_IndexReader(),
-            rest_fill_queue=queue,
+            rest_fill_queue=cast(AsyncRestFillQueue, queue),
             backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
-            rest_catchup_use_case=rest_catchup,
+            rest_catchup_use_case=cast(RestCatchUp1mUseCase, rest_catchup),
             metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
             metrics_port=9202,
         )
@@ -425,14 +521,14 @@ def test_rest_insurance_catchup_tracks_skipped_no_seed(
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
             whitelist_path=str(tmp_path / "missing.csv"),
-            seed_use_case=_SeedUseCase(),
-            sync_use_case=_SyncUseCase(),
-            enrich_use_case=_EnrichUseCase(),
+            seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
+            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
             instrument_reader=_InstrumentReader(),
             index_reader=_NoSeedIndexReader(),
-            rest_fill_queue=queue,
+            rest_fill_queue=cast(AsyncRestFillQueue, queue),
             backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
-            rest_catchup_use_case=rest_catchup,
+            rest_catchup_use_case=cast(RestCatchUp1mUseCase, rest_catchup),
             metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
             metrics_port=9202,
         )

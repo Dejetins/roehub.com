@@ -5,6 +5,7 @@ Adapters package for indicators bounded context.
 from .outbound import (
     ComputeNumbaWarmupRunner,
     IndicatorDefaultsValidationError,
+    MarketDataCandleFeed,
     NumbaIndicatorCompute,
     YamlIndicatorRegistry,
     apply_numba_runtime_config,
@@ -16,6 +17,7 @@ from .outbound import (
 __all__ = [
     "ComputeNumbaWarmupRunner",
     "IndicatorDefaultsValidationError",
+    "MarketDataCandleFeed",
     "NumbaIndicatorCompute",
     "YamlIndicatorRegistry",
     "apply_numba_runtime_config",

@@ -1,11 +1,21 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Sequence
 
+from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
+    DailyTsOpenCount,
+)
 from trading.contexts.market_data.application.services.reconnect_tail_fill import (
     ReconnectTailFillPlanner,
 )
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
+from trading.shared_kernel.primitives import (
+    InstrumentId,
+    MarketId,
+    Symbol,
+    TimeRange,
+    UtcTimestamp,
+)
 
 
 class _FixedClock:
@@ -32,6 +42,79 @@ class _FakeIndex:
         _ = instrument_id
         _ = before
         return self._last_value
+
+    def bounds(self, instrument_id: InstrumentId) -> tuple[UtcTimestamp, UtcTimestamp] | None:
+        """
+        Return canonical bounds placeholder required by protocol.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+
+        Returns:
+        - None because planner tests only rely on `max_ts_open_lt`.
+        """
+        _ = instrument_id
+        return None
+
+    def bounds_1m(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        before: UtcTimestamp,
+    ) -> tuple[UtcTimestamp | None, UtcTimestamp | None]:
+        """
+        Return minute bounds placeholder required by protocol.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - before: exclusive upper bound.
+
+        Returns:
+        - Tuple `(None, None)` because this fake does not model bounds.
+        """
+        _ = instrument_id
+        _ = before
+        return (None, None)
+
+    def daily_counts(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> Sequence[DailyTsOpenCount]:
+        """
+        Return empty day counts placeholder required by protocol.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - time_range: requested range.
+
+        Returns:
+        - Empty sequence for planner-only tests.
+        """
+        _ = instrument_id
+        _ = time_range
+        return ()
+
+    def distinct_ts_opens(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> Sequence[UtcTimestamp]:
+        """
+        Return empty distinct timestamp list placeholder required by protocol.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - time_range: requested range.
+
+        Returns:
+        - Empty sequence for planner-only tests.
+        """
+        _ = instrument_id
+        _ = time_range
+        return ()
 
 
 def test_reconnect_tail_planner_bootstrap_when_canonical_is_empty() -> None:

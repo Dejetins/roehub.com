@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import numpy.typing as npt
 
 from trading.shared_kernel.primitives import MarketId, Symbol, Timeframe, TimeRange
 
@@ -64,7 +65,7 @@ class CandleArrays:
         self,
         name: str,
         values: np.ndarray,
-        expected_dtype: np.dtype,
+        expected_dtype: npt.DTypeLike,
         expected_length: int | None,
     ) -> int:
         """
@@ -86,11 +87,14 @@ class CandleArrays:
         Side Effects:
             None.
         """
+        normalized_expected_dtype = np.dtype(expected_dtype)
         try:
             if values.ndim != 1:
                 raise ValueError(f"{name} must be a 1D array")
-            if values.dtype != expected_dtype:
-                raise ValueError(f"{name} must have dtype {expected_dtype}, got {values.dtype}")
+            if values.dtype != normalized_expected_dtype:
+                raise ValueError(
+                    f"{name} must have dtype {normalized_expected_dtype}, got {values.dtype}"
+                )
         except AttributeError as error:
             raise ValueError(f"{name} must be a numpy ndarray") from error
 

@@ -15,7 +15,23 @@ class GridParamSpec(Protocol):
     Related: .grid_spec, ..entities.param_def
     """
 
-    name: str
+    @property
+    def name(self) -> str:
+        """
+        Return canonical axis name for this grid parameter specification.
+
+        Args:
+            None.
+        Returns:
+            str: Non-empty parameter axis identifier.
+        Assumptions:
+            Name normalization/validation is implementation-specific.
+        Raises:
+            ValueError: If implementation cannot provide a valid name.
+        Side Effects:
+            None.
+        """
+        ...
 
     def materialize(self) -> tuple[GridValue, ...]:
         """

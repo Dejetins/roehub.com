@@ -90,9 +90,18 @@ def test_thread_local_gateway_creates_distinct_clients_for_distinct_threads() ->
         return (client_id, threading.get_ident())
 
     async def _run_concurrent() -> list[tuple[int, int]]:
+        """
+        Run two worker calls concurrently and return results as list payload.
+
+        Parameters:
+        - None.
+
+        Returns:
+        - List of `(client_id, thread_id)` tuples.
+        """
         task1 = asyncio.create_task(asyncio.to_thread(_worker))
         task2 = asyncio.create_task(asyncio.to_thread(_worker))
-        return await asyncio.gather(task1, task2)
+        return list(await asyncio.gather(task1, task2))
 
     pairs = asyncio.run(_run_concurrent())
     ids = [client_id for client_id, _thread_id in pairs]

@@ -129,14 +129,14 @@ def rolling_sum_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
         running_sum = 0.0
         nan_count = 0
         for time_index in range(t_size):
-            incoming = source[time_index]
+            incoming = float(source[time_index])
             if is_nan(incoming):
                 nan_count += 1
             else:
                 running_sum += incoming
 
             if time_index >= window:
-                outgoing = source[time_index - window]
+                outgoing = float(source[time_index - window])
                 if is_nan(outgoing):
                     nan_count -= 1
                 else:
@@ -173,7 +173,7 @@ def rolling_mean_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray
     for window_index in nb.prange(w_size):
         window = windows[window_index]
         for time_index in range(t_size):
-            value = rolling_sum[time_index, window_index]
+            value = float(rolling_sum[time_index, window_index])
             if is_nan(value):
                 out[time_index, window_index] = np.nan
             else:
@@ -207,7 +207,7 @@ def ewma_grid_f64(source: np.ndarray, windows: np.ndarray, use_rma_alpha: bool) 
         alpha = 1.0 / window if use_rma_alpha else 2.0 / (window + 1.0)
         previous = np.nan
         for time_index in range(t_size):
-            value = source[time_index]
+            value = float(source[time_index])
             if is_nan(value):
                 previous = np.nan
                 out[time_index, window_index] = np.nan

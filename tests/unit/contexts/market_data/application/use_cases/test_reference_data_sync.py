@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Iterable, Mapping, Sequence
 
 import pytest
 
 from trading.contexts.market_data.application.dto.reference_data import (
+    InstrumentRefEnrichmentSnapshot,
+    InstrumentRefEnrichmentUpsert,
     RefMarketRow,
     WhitelistInstrumentRow,
 )
@@ -60,6 +63,38 @@ class _FakeInstrumentWriter:
 
     def upsert(self, rows) -> None:
         self.upserts.extend(list(rows))
+
+    def existing_latest_enrichment(
+        self,
+        *,
+        market_id: MarketId,
+        symbols: Sequence[Symbol],
+    ) -> Mapping[str, InstrumentRefEnrichmentSnapshot]:
+        """
+        Return empty enrichment snapshot mapping for tests focused on whitelist sync only.
+
+        Parameters:
+        - market_id: market id filter.
+        - symbols: symbol list.
+
+        Returns:
+        - Empty mapping because enrichment snapshot is irrelevant for these tests.
+        """
+        _ = market_id
+        _ = symbols
+        return {}
+
+    def upsert_enrichment(self, rows: Iterable[InstrumentRefEnrichmentUpsert]) -> None:
+        """
+        Accept enrichment writes as no-op for protocol compatibility in these tests.
+
+        Parameters:
+        - rows: enrichment payload rows.
+
+        Returns:
+        - None.
+        """
+        _ = rows
 
 
 def test_seed_ref_market_inserts_only_missing() -> None:

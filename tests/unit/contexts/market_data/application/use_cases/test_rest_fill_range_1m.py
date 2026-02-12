@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from typing import Sequence
 from uuid import UUID
 
 from trading.contexts.market_data.application.dto import CandleWithMeta, RestFillTask
+from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
+    DailyTsOpenCount,
+)
 from trading.contexts.market_data.application.use_cases import RestFillRange1mUseCase
 from trading.shared_kernel.primitives import (
     Candle,
@@ -82,6 +86,63 @@ class _FakeIndex:
         _ = instrument_id
         _ = before
         return self._bounds
+
+    def bounds(self, instrument_id: InstrumentId) -> tuple[UtcTimestamp, UtcTimestamp] | None:
+        """
+        Return canonical bounds for protocol compatibility.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+
+        Returns:
+        - Tuple when both bounds are present; otherwise `None`.
+        """
+        _ = instrument_id
+        min_ts, max_ts = self._bounds
+        if min_ts is None or max_ts is None:
+            return None
+        return (min_ts, max_ts)
+
+    def max_ts_open_lt(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        before: UtcTimestamp,
+    ) -> UtcTimestamp | None:
+        """
+        Return latest canonical timestamp below the exclusive upper bound.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - before: exclusive upper bound.
+
+        Returns:
+        - Maximum timestamp below `before` or `None`.
+        """
+        _ = instrument_id
+        _ = before
+        _min_ts, max_ts = self._bounds
+        return max_ts
+
+    def daily_counts(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> Sequence[DailyTsOpenCount]:
+        """
+        Return empty day-counts placeholder for protocol compatibility.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - time_range: requested range.
+
+        Returns:
+        - Empty sequence.
+        """
+        _ = instrument_id
+        _ = time_range
+        return ()
 
     def distinct_ts_opens(self, *, instrument_id, time_range):  # noqa: ANN001
         """

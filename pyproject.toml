@@ -64,6 +64,7 @@ dev = [
   "mypy==1.13.0",
   "types-python-dateutil==2.9.0.20241003",
   "types-PyYAML==6.0.12.20240917",
+  "pyright[nodejs]>=1.1.408",
 ]
 data = [
   "pandas==2.2.3",

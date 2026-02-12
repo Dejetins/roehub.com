@@ -36,6 +36,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ThreadLocalClickHouseConnectGateway,
 )
 from trading.contexts.market_data.application.dto import RestFillTask, WhitelistInstrumentRow
+from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
     CanonicalCandleIndexReader,
 )
@@ -241,7 +242,7 @@ class MarketDataSchedulerApp:
         self._rest_catchup_use_case = rest_catchup_use_case
         self._metrics = metrics
         self._metrics_port = metrics_port
-        self._clock = SystemClock()
+        self._clock: Clock = SystemClock()
 
     async def run(self, stop_event: asyncio.Event) -> None:
         """

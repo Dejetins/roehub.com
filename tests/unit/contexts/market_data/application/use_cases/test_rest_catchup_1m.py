@@ -125,6 +125,30 @@ class FakeIndex:
         _ = before
         return self._last
 
+    def bounds_1m(
+        self,
+        *,
+        instrument_id: InstrumentId,
+        before: UtcTimestamp,
+    ) -> tuple[UtcTimestamp | None, UtcTimestamp | None]:
+        """
+        Return canonical bounds with exclusive upper bound semantics.
+
+        Parameters:
+        - instrument_id: requested instrument id.
+        - before: exclusive upper bound for returned max timestamp.
+
+        Returns:
+        - Tuple `(min_ts_open, max_ts_open)` filtered by `before`.
+        """
+        _ = instrument_id
+        if self._bounds is None:
+            return (None, None)
+        min_ts, max_ts = self._bounds
+        if max_ts.value >= before.value:
+            return (min_ts, None)
+        return (min_ts, max_ts)
+
     def daily_counts(
         self,
         *,

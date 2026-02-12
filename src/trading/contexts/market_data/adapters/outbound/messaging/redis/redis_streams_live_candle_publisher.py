@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Callable, Mapping
+from typing import Any, Callable, Mapping, cast
 from uuid import UUID
 
 from redis import Redis
@@ -119,9 +119,10 @@ class RedisStreamsLiveCandlePublisher(LiveCandlePublisher):
         fields = self._payload(candle)
 
         try:
+            redis_fields = cast(dict[Any, Any], fields)
             self._redis.xadd(
                 name=stream_name,
-                fields=fields,
+                fields=redis_fields,
                 id=stream_id,
                 maxlen=self._maxlen,
                 approximate=True,

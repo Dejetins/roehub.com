@@ -13,11 +13,13 @@ from .config import (
     load_indicator_defaults_yaml,
     validate_indicator_defaults,
 )
+from .feeds import MarketDataCandleFeed
 from .registry import YamlIndicatorRegistry
 
 __all__ = [
     "ComputeNumbaWarmupRunner",
     "IndicatorDefaultsValidationError",
+    "MarketDataCandleFeed",
     "NumbaIndicatorCompute",
     "YamlIndicatorRegistry",
     "apply_numba_runtime_config",

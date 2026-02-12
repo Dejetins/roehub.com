@@ -7,6 +7,7 @@ import pytest
 from trading.contexts.indicators.application.dto import (
     ExplicitValuesSpec,
     GridSpec,
+    MergedIndicatorView,
     RangeValuesSpec,
 )
 from trading.contexts.indicators.application.ports.registry import IndicatorRegistry
@@ -83,14 +84,14 @@ class _RegistryStub(IndicatorRegistry):
             raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
         return found
 
-    def list_merged(self) -> tuple[object, ...]:
+    def list_merged(self) -> tuple[MergedIndicatorView, ...]:
         """
         Return empty merged payload for protocol completeness in tests.
 
         Args:
             None.
         Returns:
-            tuple[object, ...]: Empty placeholder.
+            tuple[MergedIndicatorView, ...]: Empty placeholder.
         Assumptions:
             Grid-builder tests do not use merged views.
         Raises:
@@ -100,14 +101,14 @@ class _RegistryStub(IndicatorRegistry):
         """
         return ()
 
-    def get_merged(self, indicator_id: IndicatorId) -> object:
+    def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
         """
         Raise lookup error because merged views are not used in these tests.
 
         Args:
             indicator_id: Target indicator id.
         Returns:
-            object: Never returns.
+            MergedIndicatorView: Never returns.
         Assumptions:
             Merged-view contract is irrelevant for grid-builder unit tests.
         Raises:
