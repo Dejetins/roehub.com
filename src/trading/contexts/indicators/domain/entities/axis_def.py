@@ -85,7 +85,7 @@ class AxisDef:
         self, values: tuple[int, ...] | tuple[float, ...], field: str
     ) -> None:
         """
-        Validate non-empty, unique, and sorted numeric axis values.
+        Validate non-empty and unique numeric axis values.
 
         Args:
             values: Axis numeric values.
@@ -93,9 +93,9 @@ class AxisDef:
         Returns:
             None.
         Assumptions:
-            Values are hashable and comparable.
+            Values are hashable and preserve caller-provided deterministic ordering.
         Raises:
-            ValueError: If values are empty, duplicated, or not sorted ascending.
+            ValueError: If values are empty or duplicated.
         Side Effects:
             None.
         """
@@ -103,8 +103,6 @@ class AxisDef:
             raise ValueError(f"AxisDef {field} must be non-empty")
         if len(set(values)) != len(values):
             raise ValueError(f"AxisDef {field} must contain unique values")
-        if tuple(sorted(values)) != values:
-            raise ValueError(f"AxisDef {field} must be sorted in ascending order")
 
     def _validate_enum_tuple(self) -> None:
         """

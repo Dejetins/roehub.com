@@ -10,3 +10,4 @@
 - `docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md` — Indicators — Grid Builder + Batch Estimate + Guards (v1).
 - `docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md` — CandleFeed ACL (`market_data_acl`) with dense `[start, end)` 1m timeline, `NaN` holes, `last-wins` duplicates, and `ignore` out-of-range policy.
 - `docs/architecture/indicators/indicators-compute-engine-core.md` — CPU/Numba compute engine core, warmup, memory guard, runtime config.
+- `docs/architecture/indicators/indicators-ma-compute-numba-v1.md` — MA kernels (Numba) + Numpy oracle + `POST /indicators/compute` v1.

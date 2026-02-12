@@ -132,16 +132,18 @@ def _compute_request(*, candles: CandleArrays, layout: Layout) -> ComputeRequest
     return ComputeRequest(candles=candles, grid=grid, max_variants_guard=100_000)
 
 
-def test_compute_supports_time_major_layout_and_sorted_axes(tmp_path: Path) -> None:
+def test_compute_supports_time_major_layout_and_preserves_explicit_axis_order(
+    tmp_path: Path,
+) -> None:
     """
-    Verify TIME_MAJOR compute output shape, dtype, and deterministic axis ordering.
+    Verify TIME_MAJOR compute output shape, dtype, and explicit axis ordering.
 
     Args:
         tmp_path: pytest temporary path fixture.
     Returns:
         None.
     Assumptions:
-        Engine sorts axis values deterministically before tensor materialization.
+        Engine keeps explicit axis values ordering from request materialization.
     Raises:
         AssertionError: If shape/dtype/axes contract is violated.
     Side Effects:
@@ -159,9 +161,9 @@ def test_compute_supports_time_major_layout_and_sorted_axes(tmp_path: Path) -> N
     assert tensor.meta.t == 128
     assert tensor.meta.variants == 4
     assert tensor.axes[0].name == "source"
-    assert tensor.axes[0].values_enum == ("close", "open")
+    assert tensor.axes[0].values_enum == ("open", "close")
     assert tensor.axes[1].name == "window"
-    assert tensor.axes[1].values_int == (10, 20)
+    assert tensor.axes[1].values_int == (20, 10)
 
 
 def test_compute_supports_variant_major_layout(tmp_path: Path) -> None:

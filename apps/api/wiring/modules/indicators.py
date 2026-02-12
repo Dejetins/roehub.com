@@ -2,7 +2,8 @@
 Composition helpers for indicators API module.
 
 Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md,
-  docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md
+  docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md,
+  docs/architecture/indicators/indicators-ma-compute-numba-v1.md
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from trading.contexts.indicators.adapters.outbound import (
     NumbaIndicatorCompute,
 )
 from trading.contexts.indicators.adapters.outbound.registry import YamlIndicatorRegistry
+from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.ports.feeds import CandleFeed
 from trading.contexts.indicators.domain.definitions import all_defs
 from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
@@ -106,6 +108,39 @@ def build_indicators_candle_feed(
         None.
     """
     return MarketDataCandleFeed(canonical_candle_reader=canonical_candle_reader)
+
+
+def bind_indicators_runtime_dependencies(
+    *,
+    app_state: object,
+    compute: IndicatorCompute,
+    candle_feed: CandleFeed | None = None,
+) -> None:
+    """
+    Bind indicators compute/feed runtime dependencies into FastAPI app state.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.main.app,
+      apps.api.routes.indicators,
+      src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
+
+    Args:
+        app_state: Mutable app state object (typically `FastAPI.state`).
+        compute: Configured indicators compute adapter.
+        candle_feed: Optional CandleFeed adapter for `/indicators/compute`.
+    Returns:
+        None.
+    Assumptions:
+        `app_state` supports dynamic attribute assignment.
+    Raises:
+        ValueError: If compute dependency is missing.
+    Side Effects:
+        Mutates app state by setting `indicators_compute` and `indicators_candle_feed`.
+    """
+    if compute is None:  # type: ignore[truthy-bool]
+        raise ValueError("bind_indicators_runtime_dependencies requires compute")
+    setattr(app_state, "indicators_compute", compute)
+    setattr(app_state, "indicators_candle_feed", candle_feed)
 
 
 def _resolve_indicators_config_path(*, environ: Mapping[str, str]) -> Path:

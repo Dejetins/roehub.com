@@ -10,13 +10,22 @@ from typing import Mapping
 from fastapi import FastAPI
 
 from apps.api.routes import build_indicators_router
-from apps.api.wiring.modules import build_indicators_compute, build_indicators_registry
+from apps.api.wiring.modules import (
+    bind_indicators_runtime_dependencies,
+    build_indicators_compute,
+    build_indicators_registry,
+)
 from trading.platform.config import load_indicators_compute_numba_config
 
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     """
     Build FastAPI app with indicators registry wired at startup.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      apps.api.wiring.modules.indicators,
+      trading.contexts.indicators.application.ports.compute.indicator_compute
 
     Args:
         environ: Optional environment mapping override.
@@ -42,10 +51,15 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         title="Roehub API",
         version="1.0.0",
     )
-    app.state.indicators_compute = compute
+    bind_indicators_runtime_dependencies(
+        app_state=app.state,
+        compute=compute,
+        candle_feed=None,
+    )
     app.include_router(
         build_indicators_router(
             registry=registry,
+            compute=compute,
             max_variants_per_compute=compute_config.max_variants_per_compute,
             max_compute_bytes_total=compute_config.max_compute_bytes_total,
         )

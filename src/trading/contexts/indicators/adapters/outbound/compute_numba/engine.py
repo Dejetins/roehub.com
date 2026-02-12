@@ -4,6 +4,7 @@ CPU/Numba implementation of indicators compute application port.
 Docs: docs/architecture/indicators/indicators-compute-engine-core.md
 Related: trading.contexts.indicators.application.ports.compute.indicator_compute,
   trading.contexts.indicators.adapters.outbound.compute_numba.kernels._common,
+  trading.contexts.indicators.adapters.outbound.compute_numba.kernels.ma,
   trading.contexts.indicators.adapters.outbound.compute_numba.warmup
 """
 
@@ -19,8 +20,10 @@ from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import 
     WORKSPACE_FACTOR_DEFAULT,
     WORKSPACE_FIXED_BYTES_DEFAULT,
     check_total_budget_or_raise,
+    compute_ma_grid_f32,
     estimate_tensor_bytes,
     estimate_total_bytes,
+    is_supported_ma_indicator,
     write_series_grid_time_major,
     write_series_grid_variant_major,
 )
@@ -34,33 +37,34 @@ from trading.contexts.indicators.application.dto import (
     IndicatorTensor,
     TensorMeta,
 )
+from trading.contexts.indicators.application.dto.registry_view import MergedIndicatorView
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
+from trading.contexts.indicators.application.ports.registry import IndicatorRegistry
+from trading.contexts.indicators.application.services import GridBuilder, MaterializedAxis
 from trading.contexts.indicators.domain.entities import (
     AxisDef,
     IndicatorDef,
     IndicatorId,
     InputSeries,
     Layout,
-    ParamDef,
-    ParamKind,
 )
 from trading.contexts.indicators.domain.errors import (
     GridValidationError,
     MissingRequiredSeries,
     UnknownIndicatorError,
 )
-from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
+from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.platform.config import IndicatorsComputeNumbaConfig
 
 
 class NumbaIndicatorCompute(IndicatorCompute):
     """
-    Indicator compute engine skeleton based on CPU+Numba common kernels.
+    Indicator compute engine backed by CPU+Numba kernels.
 
     Docs: docs/architecture/indicators/indicators-compute-engine-core.md
     Related: trading.contexts.indicators.application.dto.indicator_tensor,
-      trading.contexts.indicators.domain.entities.layout,
-      trading.contexts.indicators.adapters.outbound.compute_numba.kernels._common
+      trading.contexts.indicators.application.services.grid_builder,
+      trading.contexts.indicators.adapters.outbound.compute_numba.kernels.ma
     """
 
     def __init__(
@@ -74,6 +78,11 @@ class NumbaIndicatorCompute(IndicatorCompute):
     ) -> None:
         """
         Build deterministic definition index and runtime dependencies.
+
+        Docs: docs/architecture/indicators/indicators-compute-engine-core.md
+        Related:
+          src/trading/contexts/indicators/domain/definitions/__init__.py,
+          src/trading/contexts/indicators/application/services/grid_builder.py
 
         Args:
             defs: Hard indicator definitions.
@@ -98,13 +107,19 @@ class NumbaIndicatorCompute(IndicatorCompute):
             )
 
         defs_by_id: dict[str, IndicatorDef] = {}
+        ordered_defs: list[IndicatorDef] = []
         for definition in sorted(defs, key=lambda item: item.indicator_id.value):
             key = definition.indicator_id.value
             if key in defs_by_id:
                 raise ValueError(f"duplicate indicator_id in defs: {key}")
             defs_by_id[key] = definition
+            ordered_defs.append(definition)
 
         self._defs_by_id: Mapping[str, IndicatorDef] = MappingProxyType(defs_by_id)
+        self._defs: tuple[IndicatorDef, ...] = tuple(ordered_defs)
+        self._grid_builder = GridBuilder(
+            registry=_DefinitionsRegistry(defs=self._defs, defs_by_id=self._defs_by_id)
+        )
         self._config = config
         self._workspace_factor = workspace_factor
         self._workspace_fixed_bytes = workspace_fixed_bytes
@@ -113,6 +128,11 @@ class NumbaIndicatorCompute(IndicatorCompute):
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
         Estimate axis cardinality and variant count without kernel execution.
+
+        Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+        Related:
+          src/trading/contexts/indicators/application/services/grid_builder.py,
+          src/trading/contexts/indicators/application/dto/estimate_result.py
 
         Args:
             grid: Grid specification for one indicator.
@@ -127,9 +147,10 @@ class NumbaIndicatorCompute(IndicatorCompute):
         Side Effects:
             None.
         """
-        definition = self._get_definition(indicator_id=grid.indicator_id)
-        axes = self._resolve_axes(definition=definition, grid=grid)
-        variants = _variants_from_axes(axes=axes)
+        materialized = self._grid_builder.materialize_indicator(grid=grid)
+        axes = _axis_defs_from_materialized_axes(axes=materialized.axes)
+        variants = materialized.variants
+
         if max_variants_guard <= 0:
             raise GridValidationError("max_variants_guard must be > 0")
         if variants > max_variants_guard:
@@ -137,6 +158,7 @@ class NumbaIndicatorCompute(IndicatorCompute):
                 "variants exceed guard: "
                 f"variants={variants}, max_variants_guard={max_variants_guard}"
             )
+
         return EstimateResult(
             indicator_id=grid.indicator_id,
             axes=axes,
@@ -146,27 +168,34 @@ class NumbaIndicatorCompute(IndicatorCompute):
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:
         """
-        Compute indicator tensor skeleton with deterministic layout and guards.
+        Compute indicator tensor for one request.
+
+        Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+        Related:
+          src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+          src/trading/contexts/indicators/application/dto/indicator_tensor.py,
+          src/trading/contexts/indicators/application/services/grid_builder.py
 
         Args:
             req: Compute request with candles and grid specification.
         Returns:
             IndicatorTensor: Float32 tensor in selected layout.
         Assumptions:
-            Indicator-specific math kernels are introduced in later epics; v1 skeleton
-            writes selected source series per variant.
+            Guards are checked before large output allocations.
         Raises:
             UnknownIndicatorError: If indicator id is not defined.
             GridValidationError: If grid/layout/guard invariants are violated.
             MissingRequiredSeries: If required source series cannot be resolved.
             ComputeBudgetExceeded: If estimated total bytes exceed budget.
         Side Effects:
-            Allocates output tensor and intermediate source matrix.
+            Allocates output tensor and intermediate source matrices.
         """
         started = time.perf_counter()
         definition = self._get_definition(indicator_id=req.grid.indicator_id)
-        axes = self._resolve_axes(definition=definition, grid=req.grid)
-        variants = _variants_from_axes(axes=axes)
+
+        materialized = self._grid_builder.materialize_indicator(grid=req.grid)
+        axes = _axis_defs_from_materialized_axes(axes=materialized.axes)
+        variants = materialized.variants
         if variants > req.max_variants_guard:
             raise GridValidationError(
                 "variants exceed guard: "
@@ -196,16 +225,23 @@ class NumbaIndicatorCompute(IndicatorCompute):
         )
 
         series_map = _build_series_map(candles=req.candles)
-        variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
-        _validate_required_series_available(
-            variant_source_labels=variant_source_labels,
-            available_series=series_map,
-        )
-        variant_series_matrix = _build_variant_source_matrix(
-            variant_source_labels=variant_source_labels,
-            available_series=series_map,
-            t_size=t_size,
-        )
+        if is_supported_ma_indicator(indicator_id=definition.indicator_id.value):
+            variant_series_matrix = _compute_ma_variant_source_matrix(
+                definition=definition,
+                axes=axes,
+                available_series=series_map,
+            )
+        else:
+            variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
+            _validate_required_series_available(
+                variant_source_labels=variant_source_labels,
+                available_series=series_map,
+            )
+            variant_series_matrix = _build_variant_source_matrix(
+                variant_source_labels=variant_source_labels,
+                available_series=series_map,
+                t_size=t_size,
+            )
 
         if layout is Layout.TIME_MAJOR:
             values = np.empty((t_size, variants), dtype=np.float32, order="C")
@@ -233,6 +269,11 @@ class NumbaIndicatorCompute(IndicatorCompute):
         """
         Warm up Numba runtime and core kernels.
 
+        Docs: docs/architecture/indicators/indicators-compute-engine-core.md
+        Related:
+          src/trading/contexts/indicators/adapters/outbound/compute_numba/warmup.py,
+          src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py
+
         Args:
             None.
         Returns:
@@ -250,6 +291,11 @@ class NumbaIndicatorCompute(IndicatorCompute):
         """
         Resolve one indicator definition by id.
 
+        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+        Related:
+          src/trading/contexts/indicators/domain/definitions/__init__.py,
+          src/trading/contexts/indicators/domain/errors/unknown_indicator_error.py
+
         Args:
             indicator_id: Indicator identifier.
         Returns:
@@ -266,221 +312,210 @@ class NumbaIndicatorCompute(IndicatorCompute):
             raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
         return definition
 
-    def _resolve_axes(self, *, definition: IndicatorDef, grid: GridSpec) -> tuple[AxisDef, ...]:
+
+class _DefinitionsRegistry(IndicatorRegistry):
+    """
+    Minimal immutable registry adapter used by `GridBuilder` inside compute engine.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/application/services/grid_builder.py,
+      src/trading/contexts/indicators/application/ports/registry/indicator_registry.py
+    """
+
+    def __init__(
+        self,
+        *,
+        defs: tuple[IndicatorDef, ...],
+        defs_by_id: Mapping[str, IndicatorDef],
+    ) -> None:
         """
-        Materialize axis metadata from grid and hard definition contracts.
+        Store immutable definitions snapshot.
+
+        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+        Related:
+          src/trading/contexts/indicators/domain/definitions/__init__.py,
+          src/trading/contexts/indicators/application/services/grid_builder.py
 
         Args:
-            definition: Hard indicator definition.
-            grid: Grid specification from request.
+            defs: Stable ordered indicator definitions.
+            defs_by_id: Immutable indicator lookup mapping.
         Returns:
-            tuple[AxisDef, ...]: Deterministic axis descriptors in definition order.
+            None.
         Assumptions:
-            `definition.axes` describes all variant dimensions.
+            Input collections are deterministic and immutable for runtime.
         Raises:
-            GridValidationError: If required axis spec is missing or invalid.
+            None.
         Side Effects:
             None.
         """
-        param_by_name = {param.name: param for param in definition.params}
-        materialized_axes: list[AxisDef] = []
+        self._defs = defs
+        self._defs_by_id = defs_by_id
 
-        for axis_name in definition.axes:
-            if axis_name == "source":
-                if grid.source is None:
-                    raise GridValidationError("source axis is required by indicator definition")
-                materialized_axes.append(_build_source_axis(spec=grid.source))
-                continue
+    def list_defs(self) -> tuple[IndicatorDef, ...]:
+        """
+        Return hard definitions tuple.
 
-            spec = grid.params.get(axis_name)
-            if spec is None:
-                raise GridValidationError(f"missing grid param axis: {axis_name}")
-            param_def = param_by_name.get(axis_name)
-            if param_def is None:
-                raise GridValidationError(f"unknown axis in definition: {axis_name}")
-            materialized_axes.append(
-                _build_param_axis(
-                    axis_name=axis_name,
-                    spec=spec,
-                    param_def=param_def,
-                )
-            )
+        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+        Related:
+          src/trading/contexts/indicators/application/ports/registry/indicator_registry.py,
+          src/trading/contexts/indicators/domain/definitions/__init__.py
 
-        if not materialized_axes:
-            raise GridValidationError("indicator definition must expose at least one axis")
-        return tuple(materialized_axes)
+        Args:
+            None.
+        Returns:
+            tuple[IndicatorDef, ...]: Stable ordered definitions.
+        Assumptions:
+            Definitions are immutable.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self._defs
+
+    def get_def(self, indicator_id: IndicatorId) -> IndicatorDef:
+        """
+        Resolve one hard definition by id.
+
+        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+        Related:
+          src/trading/contexts/indicators/application/ports/registry/indicator_registry.py,
+          src/trading/contexts/indicators/domain/errors/unknown_indicator_error.py
+
+        Args:
+            indicator_id: Target indicator identifier.
+        Returns:
+            IndicatorDef: Matching hard definition.
+        Assumptions:
+            Identifier normalization is handled by `IndicatorId` value-object.
+        Raises:
+            UnknownIndicatorError: If id is absent.
+        Side Effects:
+            None.
+        """
+        definition = self._defs_by_id.get(indicator_id.value)
+        if definition is None:
+            raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
+        return definition
+
+    def list_merged(self) -> tuple[MergedIndicatorView, ...]:
+        """
+        Return empty merged-view tuple (not used by compute engine internals).
+
+        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+        Related:
+          src/trading/contexts/indicators/application/ports/registry/indicator_registry.py,
+          src/trading/contexts/indicators/application/services/grid_builder.py
+
+        Args:
+            None.
+        Returns:
+            tuple[MergedIndicatorView, ...]: Empty tuple.
+        Assumptions:
+            Compute engine needs only `get_def`/`list_defs` for grid materialization.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return ()
+
+    def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
+        """
+        Reject merged-view lookups for internal compute registry.
+
+        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+        Related:
+          src/trading/contexts/indicators/application/ports/registry/indicator_registry.py,
+          src/trading/contexts/indicators/domain/errors/unknown_indicator_error.py
+
+        Args:
+            indicator_id: Target indicator identifier.
+        Returns:
+            MergedIndicatorView: Never returns.
+        Assumptions:
+            Method exists only for protocol completeness.
+        Raises:
+            UnknownIndicatorError: Always for this minimal registry.
+        Side Effects:
+            None.
+        """
+        raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
 
 
-def _build_source_axis(*, spec: GridParamSpec) -> AxisDef:
+def _axis_defs_from_materialized_axes(*, axes: tuple[MaterializedAxis, ...]) -> tuple[AxisDef, ...]:
     """
-    Materialize deterministic source axis from grid specification.
+    Convert `GridBuilder` materialized axes into domain `AxisDef` tuple.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/application/services/grid_builder.py,
+      src/trading/contexts/indicators/domain/entities/axis_def.py
 
     Args:
-        spec: Grid axis specification for `source`.
+        axes: Materialized axes preserving request order semantics.
     Returns:
-        AxisDef: Source axis definition with sorted enum values.
+        tuple[AxisDef, ...]: Domain axis objects in deterministic order.
     Assumptions:
-        Source axis values are string identifiers of `InputSeries`.
+        Materialized axes are non-empty and validated by `GridBuilder`.
     Raises:
-        GridValidationError: If source values are empty or invalid.
+        GridValidationError: If values family cannot be represented as `AxisDef`.
     Side Effects:
         None.
     """
-    values = spec.materialize()
-    normalized: list[str] = []
-    for value in values:
-        if not isinstance(value, str):
-            raise GridValidationError("source axis values must be strings")
-        candidate = value.strip().lower()
-        if not candidate:
-            raise GridValidationError("source axis values must be non-empty")
-        normalized.append(candidate)
-
-    unique_sorted = tuple(sorted(set(normalized)))
-    if not unique_sorted:
-        raise GridValidationError("source axis values must be non-empty")
-    for source_name in unique_sorted:
-        try:
-            InputSeries(source_name)
-        except ValueError as error:
-            raise GridValidationError(f"unsupported source axis value: {source_name!r}") from error
-    return AxisDef(name="source", values_enum=unique_sorted)
+    return tuple(_axis_def_from_materialized_axis(axis=axis) for axis in axes)
 
 
-def _build_param_axis(*, axis_name: str, spec: GridParamSpec, param_def: ParamDef) -> AxisDef:
+def _axis_def_from_materialized_axis(*, axis: MaterializedAxis) -> AxisDef:
     """
-    Materialize deterministic parameter axis according to declared parameter kind.
+    Convert one materialized axis into `AxisDef` while preserving value order.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/application/services/grid_builder.py,
+      src/trading/contexts/indicators/domain/entities/axis_def.py
 
     Args:
-        axis_name: Axis name for diagnostics.
-        spec: Grid axis specification.
-        param_def: Hard parameter definition.
+        axis: Materialized axis from grid builder.
     Returns:
-        AxisDef: Materialized axis descriptor with sorted values.
+        AxisDef: Domain axis object with one active value family.
     Assumptions:
-        Spec materialization follows `GridParamSpec` contract.
+        `axis.values` are homogeneous by grid validation contracts.
     Raises:
-        GridValidationError: If axis values are incompatible with parameter kind.
+        GridValidationError: If values contain unsupported or mixed scalar families.
     Side Effects:
         None.
     """
-    values = spec.materialize()
+    values = axis.values
     if len(values) == 0:
-        raise GridValidationError(f"axis '{axis_name}' materialized to empty values")
+        raise GridValidationError(f"axis '{axis.name}' materialized to empty values")
 
-    if param_def.kind is ParamKind.ENUM:
-        normalized = _normalize_enum_values(values=values, axis_name=axis_name)
-        return AxisDef(name=axis_name, values_enum=normalized)
+    if all(isinstance(value, str) for value in values):
+        return AxisDef(name=axis.name, values_enum=tuple(str(value) for value in values))
 
-    if param_def.kind is ParamKind.INT:
-        normalized_int = _normalize_int_values(values=values, axis_name=axis_name)
-        return AxisDef(name=axis_name, values_int=normalized_int)
+    if all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+        return AxisDef(name=axis.name, values_int=tuple(int(value) for value in values))
 
-    normalized_float = _normalize_float_values(values=values, axis_name=axis_name)
-    return AxisDef(name=axis_name, values_float=normalized_float)
+    if all(
+        isinstance(value, (int, float)) and not isinstance(value, bool)
+        for value in values
+    ):
+        return AxisDef(name=axis.name, values_float=tuple(float(value) for value in values))
 
-
-def _normalize_enum_values(*, values: tuple[object, ...], axis_name: str) -> tuple[str, ...]:
-    """
-    Normalize enum axis values into deterministic sorted tuple.
-
-    Args:
-        values: Raw axis values.
-        axis_name: Axis name for diagnostics.
-    Returns:
-        tuple[str, ...]: Sorted unique enum values.
-    Assumptions:
-        Enum values are represented as strings.
-    Raises:
-        GridValidationError: If values are not non-empty strings.
-    Side Effects:
-        None.
-    """
-    normalized: set[str] = set()
-    for value in values:
-        if not isinstance(value, str):
-            raise GridValidationError(f"axis '{axis_name}' expects string values")
-        candidate = value.strip()
-        if not candidate:
-            raise GridValidationError(f"axis '{axis_name}' contains blank enum value")
-        normalized.add(candidate)
-    return tuple(sorted(normalized))
-
-
-def _normalize_int_values(*, values: tuple[object, ...], axis_name: str) -> tuple[int, ...]:
-    """
-    Normalize integer axis values into deterministic sorted tuple.
-
-    Args:
-        values: Raw axis values.
-        axis_name: Axis name for diagnostics.
-    Returns:
-        tuple[int, ...]: Sorted unique integer values.
-    Assumptions:
-        Integer axes do not accept booleans.
-    Raises:
-        GridValidationError: If values are not integers.
-    Side Effects:
-        None.
-    """
-    normalized: set[int] = set()
-    for value in values:
-        if isinstance(value, bool) or not isinstance(value, int):
-            raise GridValidationError(f"axis '{axis_name}' expects integer values")
-        normalized.add(int(value))
-    return tuple(sorted(normalized))
-
-
-def _normalize_float_values(*, values: tuple[object, ...], axis_name: str) -> tuple[float, ...]:
-    """
-    Normalize float axis values into deterministic sorted tuple.
-
-    Args:
-        values: Raw axis values.
-        axis_name: Axis name for diagnostics.
-    Returns:
-        tuple[float, ...]: Sorted unique float values.
-    Assumptions:
-        Numeric float axes accept ints/floats but reject booleans.
-    Raises:
-        GridValidationError: If values are non-numeric.
-    Side Effects:
-        None.
-    """
-    normalized: set[float] = set()
-    for value in values:
-        if isinstance(value, bool) or not isinstance(value, (int, float)):
-            raise GridValidationError(f"axis '{axis_name}' expects numeric values")
-        normalized.add(float(value))
-    return tuple(sorted(normalized))
-
-
-def _variants_from_axes(*, axes: tuple[AxisDef, ...]) -> int:
-    """
-    Calculate deterministic variant count as product of axis lengths.
-
-    Args:
-        axes: Materialized axis tuple.
-    Returns:
-        int: Total variant count.
-    Assumptions:
-        Axis invariants guarantee each axis has positive length.
-    Raises:
-        GridValidationError: If axis tuple is empty.
-    Side Effects:
-        None.
-    """
-    if len(axes) == 0:
-        raise GridValidationError("axes must not be empty")
-    variants = 1
-    for axis in axes:
-        variants = variants * axis.length()
-    return variants
+    raise GridValidationError(
+        f"axis '{axis.name}' contains unsupported values family: {values!r}"
+    )
 
 
 def _build_series_map(*, candles: CandleArrays) -> Mapping[str, np.ndarray]:
     """
     Build deterministic source-series map including derived OHLC aggregates.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/application/dto/candle_arrays.py,
+      src/trading/contexts/indicators/domain/entities/input_series.py
 
     Args:
         candles: Dense candle arrays payload.
@@ -519,6 +554,148 @@ def _build_series_map(*, candles: CandleArrays) -> Mapping[str, np.ndarray]:
     }
 
 
+def _compute_ma_variant_source_matrix(
+    *,
+    definition: IndicatorDef,
+    axes: tuple[AxisDef, ...],
+    available_series: Mapping[str, np.ndarray],
+) -> np.ndarray:
+    """
+    Compute variant-major MA matrix `(V, T)` via Numba MA kernels.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      src/trading/contexts/indicators/domain/entities/axis_def.py,
+      src/trading/contexts/indicators/application/dto/indicator_tensor.py
+
+    Args:
+        definition: Hard indicator definition for the request.
+        axes: Materialized domain axes preserving request order.
+        available_series: Mapping of available source arrays.
+    Returns:
+        np.ndarray: Float32 C-contiguous matrix `(V, T)`.
+    Assumptions:
+        MA indicators always expose integer `window` axis in hard definitions.
+    Raises:
+        GridValidationError: If required `window` axis is missing or malformed.
+        MissingRequiredSeries: If required source/volume series is missing.
+        ValueError: If MA kernel inputs are invalid.
+    Side Effects:
+        Allocates per-source MA grid matrices and one variant-major output matrix.
+    """
+    window_values = _window_values_from_axes(axes=axes)
+    windows_i64 = np.ascontiguousarray(np.asarray(window_values, dtype=np.int64))
+
+    variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
+    variant_window_values = _variant_window_values(axes=axes)
+    _validate_required_series_available(
+        variant_source_labels=variant_source_labels,
+        available_series=available_series,
+    )
+
+    volume_series = available_series.get(InputSeries.VOLUME.value)
+    if volume_series is None:
+        raise MissingRequiredSeries(
+            "MissingRequiredSeries: missing=('volume',); "
+            f"required={tuple(sorted(set(variant_source_labels)))}"
+        )
+
+    unique_sources_in_order = tuple(dict.fromkeys(variant_source_labels))
+    per_source_grid: dict[str, np.ndarray] = {}
+    for source_name in unique_sources_in_order:
+        source_series = available_series.get(source_name)
+        if source_series is None:
+            raise MissingRequiredSeries(f"MissingRequiredSeries: missing={source_name!r}")
+        try:
+            per_source_grid[source_name] = compute_ma_grid_f32(
+                indicator_id=definition.indicator_id.value,
+                source=source_series,
+                windows=windows_i64,
+                volume=volume_series,
+            )
+        except ValueError as error:
+            raise GridValidationError(str(error)) from error
+
+    window_to_index = {window: idx for idx, window in enumerate(window_values)}
+    variants = len(variant_source_labels)
+    t_size = int(next(iter(available_series.values())).shape[0])
+    out = np.empty((variants, t_size), dtype=np.float32, order="C")
+
+    for variant_index in range(variants):
+        source_name = variant_source_labels[variant_index]
+        window_value = variant_window_values[variant_index]
+        window_index = window_to_index[window_value]
+        out[variant_index, :] = per_source_grid[source_name][:, window_index]
+
+    return out
+
+
+def _window_values_from_axes(*, axes: tuple[AxisDef, ...]) -> tuple[int, ...]:
+    """
+    Extract window axis integer values from materialized axes.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/domain/entities/axis_def.py,
+      src/trading/contexts/indicators/domain/definitions/ma.py
+
+    Args:
+        axes: Materialized axes in definition order.
+    Returns:
+        tuple[int, ...]: Window values preserving request materialization order.
+    Assumptions:
+        MA indicators define `window` axis in hard contracts.
+    Raises:
+        GridValidationError: If `window` axis is missing or not integer-valued.
+    Side Effects:
+        None.
+    """
+    for axis in axes:
+        if axis.name != "window":
+            continue
+        if axis.values_int is None:
+            raise GridValidationError("window axis must be integer-valued")
+        return axis.values_int
+    raise GridValidationError("window axis is required for MA compute")
+
+
+def _variant_window_values(*, axes: tuple[AxisDef, ...]) -> tuple[int, ...]:
+    """
+    Resolve one window value for each variant in deterministic variant order.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/domain/entities/axis_def.py,
+      src/trading/contexts/indicators/application/services/grid_builder.py
+
+    Args:
+        axes: Materialized axes in definition order.
+    Returns:
+        tuple[int, ...]: Window value per variant index.
+    Assumptions:
+        Variant order follows cartesian product of axis values in axis order.
+    Raises:
+        GridValidationError: If window axis metadata is missing.
+    Side Effects:
+        None.
+    """
+    axis_names = [axis.name for axis in axes]
+    if "window" not in axis_names:
+        raise GridValidationError("window axis is required for MA compute")
+
+    window_axis_index = axis_names.index("window")
+    window_axis = axes[window_axis_index]
+    if window_axis.values_int is None:
+        raise GridValidationError("window axis must have values_int")
+
+    axis_lengths = tuple(axis.length() for axis in axes)
+    labels: list[int] = []
+    for coordinate in np.ndindex(axis_lengths):
+        labels.append(window_axis.values_int[coordinate[window_axis_index]])
+    return tuple(labels)
+
+
 def _variant_source_labels(
     *,
     definition: IndicatorDef,
@@ -526,6 +703,11 @@ def _variant_source_labels(
 ) -> tuple[str, ...]:
     """
     Resolve one source label for each variant in deterministic variant order.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/domain/entities/axis_def.py,
+      src/trading/contexts/indicators/domain/entities/indicator_def.py
 
     Args:
         definition: Hard indicator definition.
@@ -562,6 +744,11 @@ def _fallback_source(*, definition: IndicatorDef) -> str:
     """
     Pick deterministic fallback source when indicator has no source axis.
 
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/domain/entities/indicator_def.py,
+      src/trading/contexts/indicators/domain/entities/input_series.py
+
     Args:
         definition: Hard indicator definition.
     Returns:
@@ -588,6 +775,11 @@ def _validate_required_series_available(
 ) -> None:
     """
     Validate that all source labels used by variants exist in available series map.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/domain/errors/missing_required_series.py,
+      src/trading/contexts/indicators/application/dto/candle_arrays.py
 
     Args:
         variant_source_labels: Source labels selected for each variant.
@@ -620,6 +812,11 @@ def _build_variant_source_matrix(
     """
     Build contiguous variant-major matrix `(V, T)` from source label assignments.
 
+    Docs: docs/architecture/indicators/indicators-compute-engine-core.md
+    Related:
+      src/trading/contexts/indicators/application/dto/indicator_tensor.py,
+      src/trading/contexts/indicators/domain/errors/missing_required_series.py
+
     Args:
         variant_source_labels: Source label for each variant.
         available_series: Source arrays mapping.
@@ -641,6 +838,34 @@ def _build_variant_source_matrix(
             raise MissingRequiredSeries(f"MissingRequiredSeries: missing={source_name!r}")
         matrix[variant_index, :] = source
     return matrix
+
+
+def _variants_from_axes(*, axes: tuple[AxisDef, ...]) -> int:
+    """
+    Calculate deterministic variant count as product of axis lengths.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/domain/entities/axis_def.py,
+      src/trading/contexts/indicators/application/services/grid_builder.py
+
+    Args:
+        axes: Materialized axis tuple.
+    Returns:
+        int: Total variant count.
+    Assumptions:
+        Axis invariants guarantee each axis has positive length.
+    Raises:
+        GridValidationError: If axis tuple is empty.
+    Side Effects:
+        None.
+    """
+    if len(axes) == 0:
+        raise GridValidationError("axes must not be empty")
+    variants = 1
+    for axis in axes:
+        variants = variants * axis.length()
+    return variants
 
 
 __all__ = ["NumbaIndicatorCompute"]

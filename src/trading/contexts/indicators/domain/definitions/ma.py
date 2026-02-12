@@ -20,6 +20,7 @@ from trading.contexts.indicators.domain.entities import (
 
 _SOURCE_INPUTS = (
     InputSeries.CLOSE,
+    InputSeries.HL2,
     InputSeries.HLC3,
     InputSeries.OHLC4,
     InputSeries.LOW,

@@ -14,19 +14,28 @@ from pydantic import BaseModel, Field
 
 from trading.contexts.indicators.application.dto import (
     BatchEstimateResult,
+    CandleArrays,
+    ComputeRequest,
     DefaultSpec,
     ExplicitDefaultSpec,
     ExplicitValuesSpec,
     GridParamSpec,
     GridSpec,
+    IndicatorTensor,
     MergedIndicatorView,
     MergedInputView,
     MergedParamView,
     RangeDefaultSpec,
     RangeValuesSpec,
 )
-from trading.contexts.indicators.domain.entities import IndicatorId
-from trading.shared_kernel.primitives import Timeframe, TimeRange, UtcTimestamp
+from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId, Layout
+from trading.shared_kernel.primitives import (
+    MarketId,
+    Symbol,
+    Timeframe,
+    TimeRange,
+    UtcTimestamp,
+)
 
 
 class ExplicitDefaultSpecResponse(BaseModel):
@@ -175,6 +184,71 @@ class IndicatorsEstimateResponse(BaseModel):
     estimated_memory_bytes: int
 
 
+class IndicatorsComputeRequest(BaseModel):
+    """
+    API request contract for `POST /indicators/compute` (one indicator per request).
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.contexts.indicators.application.dto.compute_request
+    """
+
+    market_id: int
+    symbol: str
+    timeframe: str
+    time_range: EstimateTimeRangeRequest
+    indicator: EstimateIndicatorRequest
+    layout: Literal["time_major", "variant_major"] | None = None
+    max_variants_guard: int | None = Field(default=None, gt=0)
+
+
+class ComputeAxisResponse(BaseModel):
+    """
+    API response axis descriptor for computed tensor metadata.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: trading.contexts.indicators.domain.entities.axis_def,
+      trading.contexts.indicators.application.dto.indicator_tensor
+    """
+
+    name: str
+    values: list[int | float | str]
+
+
+class ComputeMetaResponse(BaseModel):
+    """
+    API response metadata for computed tensor.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: trading.contexts.indicators.application.dto.indicator_tensor,
+      apps.api.routes.indicators
+    """
+
+    t: int
+    variants: int
+    nan_policy: str
+    compute_ms: int | None = None
+
+
+class IndicatorsComputeResponse(BaseModel):
+    """
+    Compact API response contract for `POST /indicators/compute`.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.contexts.indicators.application.dto.indicator_tensor
+    """
+
+    schema_version: int
+    indicator_id: str
+    layout: str
+    axes: list[ComputeAxisResponse]
+    shape: list[int]
+    dtype: str
+    c_contiguous: bool
+    meta: ComputeMetaResponse
+
+
 def build_indicators_response(
     *,
     views: tuple[MergedIndicatorView, ...],
@@ -282,6 +356,157 @@ def build_timeframe(*, request: IndicatorsEstimateRequest) -> Timeframe:
     return Timeframe(request.timeframe)
 
 
+def build_compute_time_range(*, request: IndicatorsComputeRequest) -> TimeRange:
+    """
+    Convert compute request time-range into shared-kernel `TimeRange`.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.shared_kernel.primitives.time_range
+
+    Args:
+        request: Parsed API request for `POST /indicators/compute`.
+    Returns:
+        TimeRange: Half-open UTC range `[start, end)`.
+    Assumptions:
+        Input datetimes are timezone-aware or will be rejected by `UtcTimestamp`.
+    Raises:
+        ValueError: If datetimes are invalid or do not satisfy `start < end`.
+    Side Effects:
+        None.
+    """
+    start = UtcTimestamp(request.time_range.start)
+    end = UtcTimestamp(request.time_range.end)
+    return TimeRange(start=start, end=end)
+
+
+def build_compute_timeframe(*, request: IndicatorsComputeRequest) -> Timeframe:
+    """
+    Convert compute request timeframe string into shared-kernel `Timeframe`.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.shared_kernel.primitives.timeframe
+
+    Args:
+        request: Parsed API request for `POST /indicators/compute`.
+    Returns:
+        Timeframe: Validated timeframe primitive.
+    Assumptions:
+        Timeframe code follows shared-kernel allowed set.
+    Raises:
+        ValueError: If timeframe code is unsupported.
+    Side Effects:
+        None.
+    """
+    return Timeframe(request.timeframe)
+
+
+def build_compute_market_id(*, request: IndicatorsComputeRequest) -> MarketId:
+    """
+    Convert compute request market id into shared-kernel `MarketId`.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.shared_kernel.primitives.market_id
+
+    Args:
+        request: Parsed API request for `POST /indicators/compute`.
+    Returns:
+        MarketId: Validated market identifier value object.
+    Assumptions:
+        `market_id` is integer-like and positive.
+    Raises:
+        ValueError: If market id violates shared-kernel invariants.
+    Side Effects:
+        None.
+    """
+    return MarketId(request.market_id)
+
+
+def build_compute_symbol(*, request: IndicatorsComputeRequest) -> Symbol:
+    """
+    Convert compute request symbol string into shared-kernel `Symbol`.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.shared_kernel.primitives.symbol
+
+    Args:
+        request: Parsed API request for `POST /indicators/compute`.
+    Returns:
+        Symbol: Normalized symbol value object.
+    Assumptions:
+        Symbol normalization follows shared-kernel rules.
+    Raises:
+        ValueError: If symbol is blank after normalization.
+    Side Effects:
+        None.
+    """
+    return Symbol(request.symbol)
+
+
+def build_compute_grid_spec(*, request: IndicatorsComputeRequest) -> GridSpec:
+    """
+    Convert compute request indicator block into one domain `GridSpec`.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.contexts.indicators.domain.specifications.grid_spec
+
+    Args:
+        request: Parsed API request for `POST /indicators/compute`.
+    Returns:
+        GridSpec: Domain grid specification for one indicator.
+    Assumptions:
+        Request contains exactly one indicator block in `request.indicator`.
+    Raises:
+        ValueError: If indicator id is invalid or layout code is unsupported.
+    Side Effects:
+        None.
+    """
+    layout_preference: Layout | None = None
+    if request.layout is not None:
+        layout_preference = Layout(request.layout)
+    return _build_grid_spec_from_indicator_request(
+        item=request.indicator,
+        layout_preference=layout_preference,
+    )
+
+
+def build_compute_request(
+    *,
+    candles: CandleArrays,
+    request: IndicatorsComputeRequest,
+    max_variants_guard: int,
+) -> ComputeRequest:
+    """
+    Build application `ComputeRequest` from API compute payload and candles.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.contexts.indicators.application.dto.compute_request
+
+    Args:
+        candles: Dense candle arrays loaded via `CandleFeed`.
+        request: Parsed API request for `POST /indicators/compute`.
+        max_variants_guard: Effective variants guard to enforce during compute.
+    Returns:
+        ComputeRequest: Application-layer compute request DTO.
+    Assumptions:
+        Candle arrays are already validated by candle feed adapter.
+    Raises:
+        ValueError: If DTO invariants are violated.
+    Side Effects:
+        None.
+    """
+    return ComputeRequest(
+        candles=candles,
+        grid=build_compute_grid_spec(request=request),
+        max_variants_guard=max_variants_guard,
+    )
+
+
 def build_indicators_estimate_response(
     *,
     result: BatchEstimateResult,
@@ -304,6 +529,45 @@ def build_indicators_estimate_response(
         schema_version=result.schema_version,
         total_variants=result.total_variants,
         estimated_memory_bytes=result.estimated_memory_bytes,
+    )
+
+
+def build_indicators_compute_response(
+    *,
+    tensor: IndicatorTensor,
+) -> IndicatorsComputeResponse:
+    """
+    Convert application tensor output into compact compute API response.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.contexts.indicators.application.dto.indicator_tensor
+
+    Args:
+        tensor: Computed indicator tensor from application compute adapter.
+    Returns:
+        IndicatorsComputeResponse: Metadata-focused response without raw tensor payload.
+    Assumptions:
+        Tensor invariants are validated by `IndicatorTensor` dataclass.
+    Raises:
+        ValueError: If tensor axes contain unsupported value families.
+    Side Effects:
+        None.
+    """
+    return IndicatorsComputeResponse(
+        schema_version=1,
+        indicator_id=tensor.indicator_id.value,
+        layout=tensor.layout.value,
+        axes=[_to_compute_axis_response(axis=axis) for axis in tensor.axes],
+        shape=[int(dim) for dim in tensor.values.shape],
+        dtype=str(tensor.values.dtype),
+        c_contiguous=bool(tensor.values.flags["C_CONTIGUOUS"]),
+        meta=ComputeMetaResponse(
+            t=tensor.meta.t,
+            variants=tensor.meta.variants,
+            nan_policy=tensor.meta.nan_policy,
+            compute_ms=tensor.meta.compute_ms,
+        ),
     )
 
 
@@ -382,6 +646,37 @@ def _to_param_axis_response(*, item: MergedParamView) -> ParamAxisResponse:
     )
 
 
+def _to_compute_axis_response(*, axis: AxisDef) -> ComputeAxisResponse:
+    """
+    Convert domain `AxisDef` into compact API axis response shape.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: trading.contexts.indicators.domain.entities.axis_def,
+      trading.contexts.indicators.application.dto.indicator_tensor
+
+    Args:
+        axis: Domain axis definition from computed tensor metadata.
+    Returns:
+        ComputeAxisResponse: Response axis with one values list.
+    Assumptions:
+        `AxisDef` enforces one-of value family semantics.
+    Raises:
+        ValueError: If axis has no active values family.
+    Side Effects:
+        None.
+    """
+    if axis.values_int is not None:
+        return ComputeAxisResponse(name=axis.name, values=[int(item) for item in axis.values_int])
+    if axis.values_float is not None:
+        return ComputeAxisResponse(
+            name=axis.name,
+            values=[float(item) for item in axis.values_float],
+        )
+    if axis.values_enum is not None:
+        return ComputeAxisResponse(name=axis.name, values=[str(item) for item in axis.values_enum])
+    raise ValueError(f"axis '{axis.name}' has no active values family")
+
+
 def _to_default_spec_response(
     *,
     default: DefaultSpec | None,
@@ -417,12 +712,21 @@ def _to_default_spec_response(
     raise ValueError(f"unsupported default spec type: {type(default).__name__}")
 
 
-def _build_grid_spec_from_indicator_request(*, item: EstimateIndicatorRequest) -> GridSpec:
+def _build_grid_spec_from_indicator_request(
+    *,
+    item: EstimateIndicatorRequest,
+    layout_preference: Layout | None = None,
+) -> GridSpec:
     """
     Convert one indicator block from API request into domain `GridSpec`.
 
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related: apps.api.routes.indicators,
+      trading.contexts.indicators.domain.specifications.grid_spec
+
     Args:
         item: One indicator request block.
+        layout_preference: Optional explicit tensor layout preference.
     Returns:
         GridSpec: Domain grid specification.
     Assumptions:
@@ -444,6 +748,7 @@ def _build_grid_spec_from_indicator_request(*, item: EstimateIndicatorRequest) -
         indicator_id=IndicatorId(item.indicator_id),
         params=params,
         source=source_spec,
+        layout_preference=layout_preference,
     )
 
 

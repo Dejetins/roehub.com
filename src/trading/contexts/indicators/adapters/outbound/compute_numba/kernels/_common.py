@@ -103,7 +103,7 @@ def first_valid_index(values: np.ndarray) -> int:
     return -1
 
 
-@nb.njit(parallel=True, fastmath=True, cache=True)
+@nb.njit(parallel=True, cache=True)
 def rolling_sum_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     """
     Compute rolling sums for multiple integer windows using float64 accumulators.
@@ -149,7 +149,7 @@ def rolling_sum_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     return out
 
 
-@nb.njit(parallel=True, fastmath=True, cache=True)
+@nb.njit(parallel=True, cache=True)
 def rolling_mean_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     """
     Compute rolling means for multiple integer windows.
@@ -181,7 +181,7 @@ def rolling_mean_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray
     return out
 
 
-@nb.njit(parallel=True, fastmath=True, cache=True)
+@nb.njit(parallel=True, cache=True)
 def ewma_grid_f64(source: np.ndarray, windows: np.ndarray, use_rma_alpha: bool) -> np.ndarray:
     """
     Compute EWMA/RMA matrix for multiple windows in one pass per window.

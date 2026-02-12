@@ -15,6 +15,7 @@ from ._common import (
     write_series_grid_variant_major,
     zero_to_nan,
 )
+from .ma import compute_ma_grid_f32, is_supported_ma_indicator
 
 __all__ = [
     "FLOAT32_DTYPE_BYTES",
@@ -32,4 +33,6 @@ __all__ = [
     "write_series_grid_time_major",
     "write_series_grid_variant_major",
     "zero_to_nan",
+    "compute_ma_grid_f32",
+    "is_supported_ma_indicator",
 ]

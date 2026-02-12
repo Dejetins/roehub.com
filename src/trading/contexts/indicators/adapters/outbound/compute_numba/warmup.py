@@ -19,7 +19,9 @@ import numba
 import numpy as np
 
 from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import (
+    compute_ma_grid_f32,
     ewma_grid_f64,
+    is_supported_ma_indicator,
     rolling_mean_grid_f64,
     rolling_sum_grid_f64,
     write_series_grid_time_major,
@@ -156,6 +158,7 @@ class ComputeNumbaWarmupRunner:
                     "ewma_grid_f64",
                     "write_series_grid_time_major",
                     "write_series_grid_variant_major",
+                    "compute_ma_grid_f32",
                 ],
             },
         )
@@ -192,6 +195,27 @@ class ComputeNumbaWarmupRunner:
         out_variant_major = np.empty((variants, t_size), dtype=np.float32)
         write_series_grid_time_major(out_time_major, variant_series)
         write_series_grid_variant_major(out_variant_major, variant_series)
+
+        source_f32 = source_f64.astype(np.float32, copy=False)
+        volume_f32 = np.linspace(10.0, 20.0, t_size, dtype=np.float32)
+        for indicator_id in (
+            "ma.sma",
+            "ma.ema",
+            "ma.wma",
+            "ma.rma",
+            "ma.vwma",
+            "ma.dema",
+            "ma.tema",
+            "ma.zlema",
+            "ma.hma",
+        ):
+            if is_supported_ma_indicator(indicator_id=indicator_id):
+                _ = compute_ma_grid_f32(
+                    indicator_id=indicator_id,
+                    source=source_f32,
+                    windows=windows,
+                    volume=volume_f32,
+                )
 
 
 __all__ = [
