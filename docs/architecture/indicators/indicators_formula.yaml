@@ -1,0 +1,1211 @@
+schema_version: 1
+formula_dsl: "steps@1"
+
+formulas:
+  ma.sma:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { sma: "series<float>" }
+    steps:
+      - id: sma
+        op: rolling_mean
+        args: { x: source, window: window }
+
+  ma.ema:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { ema: "series<float>" }
+    steps:
+      - id: ema
+        op: ema
+        args: { x: source, window: window, init: "sma" }
+
+  ma.rma:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { rma: "series<float>" }
+    steps:
+      - id: rma
+        op: rma
+        args: { x: source, window: window, init: "sma" }
+
+  ma.wma:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { wma: "series<float>" }
+    steps:
+      - id: wma
+        op: wma_linear
+        args: { x: source, window: window }
+
+  ma.lwma:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { lwma: "series<float>" }
+    steps:
+      - id: lwma
+        op: wma_linear
+        args: { x: source, window: window }
+
+  ma.vwma:
+    dsl: "steps@1"
+    inputs: { source: "series<float>", volume: "series<float>" }
+    params: { window: "int" }
+    outputs: { vwma: "series<float>" }
+    steps:
+      - id: pv
+        op: mul
+        args: { a: source, b: volume }
+      - id: num
+        op: rolling_sum
+        args: { x: pv, window: window }
+      - id: den
+        op: rolling_sum
+        args: { x: volume, window: window }
+      - id: vwma
+        op: div
+        args: { a: num, b: den }
+
+  ma.dema:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { dema: "series<float>" }
+    steps:
+      - id: ema1
+        op: ema
+        args: { x: source, window: window, init: "sma" }
+      - id: ema2
+        op: ema
+        args: { x: ema1, window: window, init: "sma" }
+      - id: two_ema1
+        op: mul
+        args: { a: ema1, b: 2.0 }
+      - id: dema
+        op: sub
+        args: { a: two_ema1, b: ema2 }
+
+  ma.tema:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { tema: "series<float>" }
+    steps:
+      - id: ema1
+        op: ema
+        args: { x: source, window: window, init: "sma" }
+      - id: ema2
+        op: ema
+        args: { x: ema1, window: window, init: "sma" }
+      - id: ema3
+        op: ema
+        args: { x: ema2, window: window, init: "sma" }
+      - id: t1
+        op: mul
+        args: { a: ema1, b: 3.0 }
+      - id: t2
+        op: mul
+        args: { a: ema2, b: 3.0 }
+      - id: t1_minus_t2
+        op: sub
+        args: { a: t1, b: t2 }
+      - id: tema
+        op: add
+        args: { a: t1_minus_t2, b: ema3 }
+
+  ma.hma:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { hma: "series<float>" }
+    steps:
+      - id: half
+        op: floor_div
+        args: { a: window, b: 2 }
+      - id: sqrtw
+        op: floor_sqrt
+        args: { x: window }
+      - id: wma_half
+        op: wma_linear
+        args: { x: source, window: half }
+      - id: wma_full
+        op: wma_linear
+        args: { x: source, window: window }
+      - id: two_wma_half
+        op: mul
+        args: { a: wma_half, b: 2.0 }
+      - id: diff
+        op: sub
+        args: { a: two_wma_half, b: wma_full }
+      - id: hma
+        op: wma_linear
+        args: { x: diff, window: sqrtw }
+
+  ma.zlema:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { zlema: "series<float>" }
+    steps:
+      - id: lag
+        op: floor_div
+        args: { a: { op: sub, args: { a: window, b: 1 } }, b: 2 }
+      - id: lagged
+        op: shift
+        args: { x: source, periods: lag }
+      - id: delta
+        op: sub
+        args: { a: source, b: lagged }
+      - id: adj
+        op: add
+        args: { a: source, b: delta }
+      - id: zlema
+        op: ema
+        args: { x: adj, window: window, init: "sma" }
+
+  volatility.tr:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { tr: "series<float>" }
+    steps:
+      - id: prev_close
+        op: shift
+        args: { x: close, periods: 1 }
+      - id: hl
+        op: sub
+        args: { a: high, b: low }
+      - id: hc
+        op: abs
+        args: { x: { op: sub, args: { a: high, b: prev_close } } }
+      - id: lc
+        op: abs
+        args: { x: { op: sub, args: { a: low, b: prev_close } } }
+      - id: m1
+        op: max
+        args: { a: hl, b: hc }
+      - id: tr
+        op: max
+        args: { a: m1, b: lc }
+
+  volatility.atr:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int" }
+    outputs: { atr: "series<float>" }
+    steps:
+      - id: tr
+        op: call
+        args:
+          fn: "volatility.tr"
+          kwargs: { high: high, low: low, close: close }
+      - id: atr
+        op: rma
+        args: { x: tr.tr, window: window, init: "sma" }
+
+  volatility.stddev:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { stddev: "series<float>" }
+    steps:
+      - id: stddev
+        op: rolling_std
+        args: { x: source, window: window, ddof: 0 }
+
+  volatility.variance:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { variance: "series<float>" }
+    steps:
+      - id: variance
+        op: rolling_var
+        args: { x: source, window: window, ddof: 0 }
+
+  volatility.bbands:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int", mult: "float" }
+    outputs: { bb_mid: "series<float>", bb_upper: "series<float>", bb_lower: "series<float>" }
+    steps:
+      - id: mid
+        op: rolling_mean
+        args: { x: source, window: window }
+      - id: sd
+        op: rolling_std
+        args: { x: source, window: window, ddof: 0 }
+      - id: ksd
+        op: mul
+        args: { a: sd, b: mult }
+      - id: bb_upper
+        op: add
+        args: { a: mid, b: ksd }
+      - id: bb_lower
+        op: sub
+        args: { a: mid, b: ksd }
+      - id: bb_mid
+        op: alias
+        args: { x: mid }
+
+  volatility.bbands_bandwidth:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int", mult: "float" }
+    outputs: { bb_bw: "series<float>" }
+    steps:
+      - id: bb
+        op: call
+        args:
+          fn: "volatility.bbands"
+          kwargs: { source: source, window: window, mult: mult }
+      - id: width
+        op: sub
+        args: { a: bb.bb_upper, b: bb.bb_lower }
+      - id: bb_bw
+        op: div
+        args: { a: width, b: bb.bb_mid }
+
+  volatility.bbands_percent_b:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int", mult: "float" }
+    outputs: { bb_percent_b: "series<float>" }
+    steps:
+      - id: bb
+        op: call
+        args:
+          fn: "volatility.bbands"
+          kwargs: { source: source, window: window, mult: mult }
+      - id: num
+        op: sub
+        args: { a: source, b: bb.bb_lower }
+      - id: den
+        op: sub
+        args: { a: bb.bb_upper, b: bb.bb_lower }
+      - id: bb_percent_b
+        op: div
+        args: { a: num, b: den }
+
+  volatility.hv:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int", annualization: "int" }
+    outputs: { hv: "series<float>" }
+    steps:
+      - id: prev
+        op: shift
+        args: { x: source, periods: 1 }
+      - id: ratio
+        op: div
+        args: { a: source, b: prev }
+      - id: r
+        op: ln
+        args: { x: ratio }
+      - id: sd
+        op: rolling_std
+        args: { x: r, window: window, ddof: 0 }
+      - id: ann
+        op: sqrt
+        args: { x: annualization }
+      - id: hv_raw
+        op: mul
+        args: { a: sd, b: ann }
+      - id: hv
+        op: mul
+        args: { a: hv_raw, b: 100.0 }
+
+  momentum.roc:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { roc: "series<float>" }
+    steps:
+      - id: prev
+        op: shift
+        args: { x: source, periods: window }
+      - id: ratio
+        op: div
+        args: { a: source, b: prev }
+      - id: roc
+        op: mul
+        args: { a: { op: sub, args: { a: ratio, b: 1.0 } }, b: 100.0 }
+
+  momentum.rsi:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { rsi: "series<float>" }
+    steps:
+      - id: d
+        op: diff
+        args: { x: source, periods: 1 }
+      - id: up
+        op: max
+        args: { a: d, b: 0.0 }
+      - id: dn
+        op: max
+        args: { a: { op: neg, args: { x: d } }, b: 0.0 }
+      - id: avg_up
+        op: rma
+        args: { x: up, window: window, init: "sma" }
+      - id: avg_dn
+        op: rma
+        args: { x: dn, window: window, init: "sma" }
+      - id: rs
+        op: div
+        args: { a: avg_up, b: avg_dn }
+      - id: rsi_base
+        op: sub
+        args:
+          a: 100.0
+          b: { op: div, args: { a: 100.0, b: { op: add, args: { a: 1.0, b: rs } } } }
+      - id: rsi
+        op: where
+        args:
+          cond: { op: eq, args: { a: avg_dn, b: 0.0 } }
+          a: 100.0
+          b: rsi_base
+
+  momentum.macd:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { fast_window: "int", slow_window: "int", signal_window: "int" }
+    outputs: { macd: "series<float>", signal: "series<float>", hist: "series<float>" }
+    steps:
+      - id: fast
+        op: ema
+        args: { x: source, window: fast_window, init: "sma" }
+      - id: slow
+        op: ema
+        args: { x: source, window: slow_window, init: "sma" }
+      - id: macd
+        op: sub
+        args: { a: fast, b: slow }
+      - id: signal
+        op: ema
+        args: { x: macd, window: signal_window, init: "sma" }
+      - id: hist
+        op: sub
+        args: { a: macd, b: signal }
+
+  momentum.ppo:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { fast_window: "int", slow_window: "int", signal_window: "int" }
+    outputs: { ppo: "series<float>", signal: "series<float>", hist: "series<float>" }
+    steps:
+      - id: fast
+        op: ema
+        args: { x: source, window: fast_window, init: "sma" }
+      - id: slow
+        op: ema
+        args: { x: source, window: slow_window, init: "sma" }
+      - id: diff
+        op: sub
+        args: { a: fast, b: slow }
+      - id: ppo
+        op: mul
+        args: { a: { op: div, args: { a: diff, b: slow } }, b: 100.0 }
+      - id: signal
+        op: ema
+        args: { x: ppo, window: signal_window, init: "sma" }
+      - id: hist
+        op: sub
+        args: { a: ppo, b: signal }
+
+  momentum.stoch:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { k_window: "int", smoothing: "int", d_window: "int" }
+    outputs: { stoch_k: "series<float>", stoch_d: "series<float>" }
+    steps:
+      - id: ll
+        op: rolling_min
+        args: { x: low, window: k_window }
+      - id: hh
+        op: rolling_max
+        args: { x: high, window: k_window }
+      - id: num
+        op: sub
+        args: { a: close, b: ll }
+      - id: den
+        op: sub
+        args: { a: hh, b: ll }
+      - id: k_raw
+        op: mul
+        args: { a: { op: div, args: { a: num, b: den } }, b: 100.0 }
+      - id: stoch_k
+        op: rolling_mean
+        args: { x: k_raw, window: smoothing }
+      - id: stoch_d
+        op: rolling_mean
+        args: { x: stoch_k, window: d_window }
+
+  momentum.stoch_rsi:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { rsi_window: "int", k_window: "int", smoothing: "int", d_window: "int" }
+    outputs: { stochrsi_k: "series<float>", stochrsi_d: "series<float>" }
+    steps:
+      - id: rsi
+        op: call
+        args:
+          fn: "momentum.rsi"
+          kwargs: { source: source, window: rsi_window }
+      - id: ll
+        op: rolling_min
+        args: { x: rsi.rsi, window: k_window }
+      - id: hh
+        op: rolling_max
+        args: { x: rsi.rsi, window: k_window }
+      - id: num
+        op: sub
+        args: { a: rsi.rsi, b: ll }
+      - id: den
+        op: sub
+        args: { a: hh, b: ll }
+      - id: k_raw
+        op: mul
+        args: { a: { op: div, args: { a: num, b: den } }, b: 100.0 }
+      - id: stochrsi_k
+        op: rolling_mean
+        args: { x: k_raw, window: smoothing }
+      - id: stochrsi_d
+        op: rolling_mean
+        args: { x: stochrsi_k, window: d_window }
+
+  momentum.trix:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int", signal_window: "int" }
+    outputs: { trix: "series<float>", trix_signal: "series<float>" }
+    steps:
+      - id: e1
+        op: ema
+        args: { x: source, window: window, init: "sma" }
+      - id: e2
+        op: ema
+        args: { x: e1, window: window, init: "sma" }
+      - id: e3
+        op: ema
+        args: { x: e2, window: window, init: "sma" }
+      - id: prev
+        op: shift
+        args: { x: e3, periods: 1 }
+      - id: trix
+        op: mul
+        args: { a: { op: sub, args: { a: { op: div, args: { a: e3, b: prev } }, b: 1.0 } }, b: 100.0 }
+      - id: trix_signal
+        op: ema
+        args: { x: trix, window: signal_window, init: "sma" }
+
+  momentum.williams_r:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int" }
+    outputs: { williams_r: "series<float>" }
+    steps:
+      - id: hh
+        op: rolling_max
+        args: { x: high, window: window }
+      - id: ll
+        op: rolling_min
+        args: { x: low, window: window }
+      - id: num
+        op: sub
+        args: { a: hh, b: close }
+      - id: den
+        op: sub
+        args: { a: hh, b: ll }
+      - id: williams_r
+        op: mul
+        args: { a: { op: div, args: { a: num, b: den } }, b: -100.0 }
+
+  momentum.cci:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int" }
+    outputs: { cci: "series<float>" }
+    steps:
+      - id: tp
+        op: div
+        args: { a: { op: add, args: { a: { op: add, args: { a: high, b: low } }, b: close } }, b: 3.0 }
+      - id: sma_tp
+        op: rolling_mean
+        args: { x: tp, window: window }
+      - id: dev
+        op: abs
+        args: { x: { op: sub, args: { a: tp, b: sma_tp } } }
+      - id: mean_dev
+        op: rolling_mean
+        args: { x: dev, window: window }
+      - id: denom
+        op: mul
+        args: { a: mean_dev, b: 0.015 }
+      - id: cci
+        op: div
+        args: { a: { op: sub, args: { a: tp, b: sma_tp } }, b: denom }
+
+  momentum.fisher:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>" }
+    params: { window: "int" }
+    outputs: { fisher: "series<float>", fisher_trigger: "series<float>" }
+    steps:
+      - id: out
+        op: fisher_transform
+        args:
+          high: high
+          low: low
+          window: window
+          price: "hl2"
+          clamp: 0.999
+          smoothing_a: 0.33
+          smoothing_b: 0.67
+      - id: fisher
+        op: alias
+        args: { x: out.fisher }
+      - id: fisher_trigger
+        op: alias
+        args: { x: out.trigger }
+
+  trend.aroon:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>" }
+    params: { window: "int" }
+    outputs: { aroon_up: "series<float>", aroon_down: "series<float>", aroon_osc: "series<float>" }
+    steps:
+      - id: since_hh
+        op: rolling_time_since_max
+        args: { x: high, window: window } # 0 = max at t
+      - id: since_ll
+        op: rolling_time_since_min
+        args: { x: low, window: window } # 0 = min at t
+      - id: aroon_up
+        op: mul
+        args:
+          a: { op: div, args: { a: { op: sub, args: { a: window, b: since_hh } }, b: window } }
+          b: 100.0
+      - id: aroon_down
+        op: mul
+        args:
+          a: { op: div, args: { a: { op: sub, args: { a: window, b: since_ll } }, b: window } }
+          b: 100.0
+      - id: aroon_osc
+        op: sub
+        args: { a: aroon_up, b: aroon_down }
+
+  trend.donchian:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>" }
+    params: { window: "int" }
+    outputs: { donchian_upper: "series<float>", donchian_lower: "series<float>", donchian_mid: "series<float>" }
+    steps:
+      - id: donchian_upper
+        op: rolling_max
+        args: { x: high, window: window }
+      - id: donchian_lower
+        op: rolling_min
+        args: { x: low, window: window }
+      - id: donchian_mid
+        op: mul
+        args: { a: { op: add, args: { a: donchian_upper, b: donchian_lower } }, b: 0.5 }
+
+  trend.chandelier_exit:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int", mult: "float" }
+    outputs: { chandelier_long: "series<float>", chandelier_short: "series<float>" }
+    steps:
+      - id: atr
+        op: call
+        args:
+          fn: "volatility.atr"
+          kwargs: { high: high, low: low, close: close, window: window }
+      - id: hh
+        op: rolling_max
+        args: { x: high, window: window }
+      - id: ll
+        op: rolling_min
+        args: { x: low, window: window }
+      - id: k_atr
+        op: mul
+        args: { a: atr.atr, b: mult }
+      - id: chandelier_long
+        op: sub
+        args: { a: hh, b: k_atr }
+      - id: chandelier_short
+        op: add
+        args: { a: ll, b: k_atr }
+
+  trend.ichimoku:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { conversion_window: "int", base_window: "int", span_b_window: "int", displacement: "int" }
+    outputs:
+      conversion: "series<float>"
+      base: "series<float>"
+      span_a: "series<float>"
+      span_b: "series<float>"
+      lagging: "series<float>"
+    steps:
+      - id: conv_h
+        op: rolling_max
+        args: { x: high, window: conversion_window }
+      - id: conv_l
+        op: rolling_min
+        args: { x: low, window: conversion_window }
+      - id: conversion
+        op: mul
+        args: { a: { op: add, args: { a: conv_h, b: conv_l } }, b: 0.5 }
+
+      - id: base_h
+        op: rolling_max
+        args: { x: high, window: base_window }
+      - id: base_l
+        op: rolling_min
+        args: { x: low, window: base_window }
+      - id: base
+        op: mul
+        args: { a: { op: add, args: { a: base_h, b: base_l } }, b: 0.5 }
+
+      - id: span_a_raw
+        op: mul
+        args: { a: { op: add, args: { a: conversion, b: base } }, b: 0.5 }
+      - id: span_a
+        op: shift
+        args: { x: span_a_raw, periods: -displacement }
+
+      - id: spanb_h
+        op: rolling_max
+        args: { x: high, window: span_b_window }
+      - id: spanb_l
+        op: rolling_min
+        args: { x: low, window: span_b_window }
+      - id: span_b_raw
+        op: mul
+        args: { a: { op: add, args: { a: spanb_h, b: spanb_l } }, b: 0.5 }
+      - id: span_b
+        op: shift
+        args: { x: span_b_raw, periods: -displacement }
+
+      - id: lagging
+        op: shift
+        args: { x: close, periods: displacement }
+
+  trend.keltner:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int", mult: "float" }
+    outputs: { middle: "series<float>", upper: "series<float>", lower: "series<float>" }
+    steps:
+      - id: tp
+        op: div
+        args: { a: { op: add, args: { a: { op: add, args: { a: high, b: low } }, b: close } }, b: 3.0 }
+      - id: middle
+        op: ema
+        args: { x: tp, window: window, init: "sma" }
+      - id: atr
+        op: call
+        args:
+          fn: "volatility.atr"
+          kwargs: { high: high, low: low, close: close, window: window }
+      - id: band
+        op: mul
+        args: { a: atr.atr, b: mult }
+      - id: upper
+        op: add
+        args: { a: middle, b: band }
+      - id: lower
+        op: sub
+        args: { a: middle, b: band }
+
+  trend.linreg_slope:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { slope: "series<float>" }
+    steps:
+      - id: slope
+        op: rolling_linreg_slope
+        args: { y: source, window: window, x_mode: "0..N-1" }
+
+  trend.vortex:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int" }
+    outputs: { vi_plus: "series<float>", vi_minus: "series<float>" }
+    steps:
+      - id: prev_low
+        op: shift
+        args: { x: low, periods: 1 }
+      - id: prev_high
+        op: shift
+        args: { x: high, periods: 1 }
+      - id: vm_plus
+        op: abs
+        args: { x: { op: sub, args: { a: high, b: prev_low } } }
+      - id: vm_minus
+        op: abs
+        args: { x: { op: sub, args: { a: low, b: prev_high } } }
+      - id: tr
+        op: call
+        args:
+          fn: "volatility.tr"
+          kwargs: { high: high, low: low, close: close }
+      - id: sum_vm_plus
+        op: rolling_sum
+        args: { x: vm_plus, window: window }
+      - id: sum_vm_minus
+        op: rolling_sum
+        args: { x: vm_minus, window: window }
+      - id: sum_tr
+        op: rolling_sum
+        args: { x: tr.tr, window: window }
+      - id: vi_plus
+        op: div
+        args: { a: sum_vm_plus, b: sum_tr }
+      - id: vi_minus
+        op: div
+        args: { a: sum_vm_minus, b: sum_tr }
+
+  trend.adx:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int", smoothing: "int" }
+    outputs: { plus_di: "series<float>", minus_di: "series<float>", adx: "series<float>" }
+    steps:
+      - id: prev_high
+        op: shift
+        args: { x: high, periods: 1 }
+      - id: prev_low
+        op: shift
+        args: { x: low, periods: 1 }
+
+      - id: up_move
+        op: sub
+        args: { a: high, b: prev_high }
+      - id: down_move
+        op: sub
+        args: { a: prev_low, b: low }
+
+      - id: plus_dm
+        op: where
+        args:
+          cond:
+            op: and
+            args:
+              a: { op: gt, args: { a: up_move, b: down_move } }
+              b: { op: gt, args: { a: up_move, b: 0.0 } }
+          a: up_move
+          b: 0.0
+
+      - id: minus_dm
+        op: where
+        args:
+          cond:
+            op: and
+            args:
+              a: { op: gt, args: { a: down_move, b: up_move } }
+              b: { op: gt, args: { a: down_move, b: 0.0 } }
+          a: down_move
+          b: 0.0
+
+      - id: tr
+        op: call
+        args:
+          fn: "volatility.tr"
+          kwargs: { high: high, low: low, close: close }
+
+      - id: atr
+        op: rma
+        args: { x: tr.tr, window: window, init: "sma" }
+      - id: plus_dm_sm
+        op: rma
+        args: { x: plus_dm, window: window, init: "sma" }
+      - id: minus_dm_sm
+        op: rma
+        args: { x: minus_dm, window: window, init: "sma" }
+
+      - id: plus_di
+        op: mul
+        args: { a: { op: div, args: { a: plus_dm_sm, b: atr } }, b: 100.0 }
+      - id: minus_di
+        op: mul
+        args: { a: { op: div, args: { a: minus_dm_sm, b: atr } }, b: 100.0 }
+
+      - id: di_sum
+        op: add
+        args: { a: plus_di, b: minus_di }
+      - id: di_diff
+        op: abs
+        args: { x: { op: sub, args: { a: plus_di, b: minus_di } } }
+      - id: dx
+        op: mul
+        args: { a: { op: div, args: { a: di_diff, b: di_sum } }, b: 100.0 }
+
+      - id: adx
+        op: rma
+        args: { x: dx, window: smoothing, init: "sma" }
+
+  trend.psar:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>" }
+    params: { accel_start: "float", accel_step: "float", accel_max: "float" }
+    outputs: { psar: "series<float>", psar_dir: "series<int>" }
+    steps:
+      - id: out
+        op: psar_wilder
+        args:
+          high: high
+          low: low
+          accel_start: accel_start
+          accel_step: accel_step
+          accel_max: accel_max
+      - id: psar
+        op: alias
+        args: { x: out.psar }
+      - id: psar_dir
+        op: alias
+        args: { x: out.direction } # 1=uptrend, -1=downtrend
+
+  trend.supertrend:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int", mult: "float" }
+    outputs: { supertrend: "series<float>", supertrend_dir: "series<int>" }
+    steps:
+      - id: out
+        op: supertrend
+        args:
+          high: high
+          low: low
+          close: close
+          window: window
+          mult: mult
+          atr_mode: "wilder"
+      - id: supertrend
+        op: alias
+        args: { x: out.supertrend }
+      - id: supertrend_dir
+        op: alias
+        args: { x: out.direction } # 1=up, -1=down
+
+  volume.ad_line:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>", volume: "series<float>" }
+    params: {}
+    outputs: { ad_line: "series<float>" }
+    steps:
+      - id: den
+        op: sub
+        args: { a: high, b: low }
+      - id: num
+        op: sub
+        args: { a: { op: sub, args: { a: close, b: low } }, b: { op: sub, args: { a: high, b: close } } }
+      - id: mfm
+        op: div
+        args: { a: num, b: den }
+      - id: mfv
+        op: mul
+        args: { a: mfm, b: volume }
+      - id: ad_line
+        op: cumsum
+        args: { x: mfv }
+
+  volume.cmf:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>", volume: "series<float>" }
+    params: { window: "int" }
+    outputs: { cmf: "series<float>" }
+    steps:
+      - id: ad
+        op: call
+        args:
+          fn: "volume.ad_line"
+          kwargs: { high: high, low: low, close: close, volume: volume }
+      - id: mfv
+        op: diff
+        args: { x: ad.ad_line, periods: 1 } # per-bar MFV (since AD is cumsum)
+      - id: sum_mfv
+        op: rolling_sum
+        args: { x: mfv, window: window }
+      - id: sum_v
+        op: rolling_sum
+        args: { x: volume, window: window }
+      - id: cmf
+        op: div
+        args: { a: sum_mfv, b: sum_v }
+
+  volume.obv:
+    dsl: "steps@1"
+    inputs: { close: "series<float>", volume: "series<float>" }
+    params: {}
+    outputs: { obv: "series<float>" }
+    steps:
+      - id: dc
+        op: diff
+        args: { x: close, periods: 1 }
+      - id: dir
+        op: sign
+        args: { x: dc } # -1,0,1
+      - id: signed_v
+        op: mul
+        args: { a: dir, b: volume }
+      - id: obv
+        op: cumsum
+        args: { x: signed_v }
+
+  volume.mfi:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>", volume: "series<float>" }
+    params: { window: "int" }
+    outputs: { mfi: "series<float>" }
+    steps:
+      - id: tp
+        op: div
+        args: { a: { op: add, args: { a: { op: add, args: { a: high, b: low } }, b: close } }, b: 3.0 }
+      - id: prev_tp
+        op: shift
+        args: { x: tp, periods: 1 }
+      - id: rmf
+        op: mul
+        args: { a: tp, b: volume }
+      - id: pos
+        op: where
+        args: { cond: { op: gt, args: { a: tp, b: prev_tp } }, a: rmf, b: 0.0 }
+      - id: neg
+        op: where
+        args: { cond: { op: lt, args: { a: tp, b: prev_tp } }, a: rmf, b: 0.0 }
+      - id: sum_pos
+        op: rolling_sum
+        args: { x: pos, window: window }
+      - id: sum_neg
+        op: rolling_sum
+        args: { x: neg, window: window }
+      - id: mr
+        op: div
+        args: { a: sum_pos, b: sum_neg }
+      - id: mfi_base
+        op: sub
+        args:
+          a: 100.0
+          b: { op: div, args: { a: 100.0, b: { op: add, args: { a: 1.0, b: mr } } } }
+      - id: mfi
+        op: where
+        args:
+          cond: { op: eq, args: { a: sum_neg, b: 0.0 } }
+          a: 100.0
+          b: mfi_base
+
+  volume.volume_sma:
+    dsl: "steps@1"
+    inputs: { volume: "series<float>" }
+    params: { window: "int" }
+    outputs: { volume_sma: "series<float>" }
+    steps:
+      - id: volume_sma
+        op: rolling_mean
+        args: { x: volume, window: window }
+
+  volume.vwap:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>", volume: "series<float>" }
+    params: { window: "int" }
+    outputs: { vwap: "series<float>" }
+    steps:
+      - id: tp
+        op: div
+        args: { a: { op: add, args: { a: { op: add, args: { a: high, b: low } }, b: close } }, b: 3.0 }
+      - id: pv
+        op: mul
+        args: { a: tp, b: volume }
+      - id: num
+        op: rolling_sum
+        args: { x: pv, window: window }
+      - id: den
+        op: rolling_sum
+        args: { x: volume, window: window }
+      - id: vwap
+        op: div
+        args: { a: num, b: den }
+
+  volume.vwap_deviation:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>", close: "series<float>", volume: "series<float>" }
+    params: { window: "int", mult: "float" }
+    outputs: { vwap: "series<float>", vwap_upper: "series<float>", vwap_lower: "series<float>", vwap_stdev: "series<float>" }
+    steps:
+      - id: v
+        op: call
+        args:
+          fn: "volume.vwap"
+          kwargs: { high: high, low: low, close: close, volume: volume, window: window }
+      - id: tp
+        op: div
+        args: { a: { op: add, args: { a: { op: add, args: { a: high, b: low } }, b: close } }, b: 3.0 }
+      - id: diff
+        op: sub
+        args: { a: tp, b: v.vwap }
+      - id: vwap_stdev
+        op: rolling_std
+        args: { x: diff, window: window, ddof: 0 }
+      - id: band
+        op: mul
+        args: { a: vwap_stdev, b: mult }
+      - id: vwap
+        op: alias
+        args: { x: v.vwap }
+      - id: vwap_upper
+        op: add
+        args: { a: v.vwap, b: band }
+      - id: vwap_lower
+        op: sub
+        args: { a: v.vwap, b: band }
+
+  structure.candle_stats:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs:
+      body: "series<float>"
+      range: "series<float>"
+      upper_wick: "series<float>"
+      lower_wick: "series<float>"
+      body_pct: "series<float>"
+      upper_wick_pct: "series<float>"
+      lower_wick_pct: "series<float>"
+    steps:
+      - id: range
+        op: sub
+        args: { a: high, b: low }
+      - id: body
+        op: abs
+        args: { x: { op: sub, args: { a: close, b: open } } }
+      - id: oc_max
+        op: max
+        args: { a: open, b: close }
+      - id: oc_min
+        op: min
+        args: { a: open, b: close }
+      - id: upper_wick
+        op: sub
+        args: { a: high, b: oc_max }
+      - id: lower_wick
+        op: sub
+        args: { a: oc_min, b: low }
+      - id: body_pct
+        op: div
+        args: { a: body, b: range }
+      - id: upper_wick_pct
+        op: div
+        args: { a: upper_wick, b: range }
+      - id: lower_wick_pct
+        op: div
+        args: { a: lower_wick, b: range }
+
+  structure.candle_stats_atr_norm:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { atr_window: "int" }
+    outputs:
+      body_atr: "series<float>"
+      range_atr: "series<float>"
+      upper_wick_atr: "series<float>"
+      lower_wick_atr: "series<float>"
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats"
+          kwargs: { open: open, high: high, low: low, close: close }
+      - id: atr
+        op: call
+        args:
+          fn: "volatility.atr"
+          kwargs: { high: high, low: low, close: close, window: atr_window }
+      - id: body_atr
+        op: div
+        args: { a: cs.body, b: atr.atr }
+      - id: range_atr
+        op: div
+        args: { a: cs.range, b: atr.atr }
+      - id: upper_wick_atr
+        op: div
+        args: { a: cs.upper_wick, b: atr.atr }
+      - id: lower_wick_atr
+        op: div
+        args: { a: cs.lower_wick, b: atr.atr }
+
+  structure.heikin_ashi:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { ha_open: "series<float>", ha_high: "series<float>", ha_low: "series<float>", ha_close: "series<float>" }
+    steps:
+      - id: out
+        op: heikin_ashi
+        args: { open: open, high: high, low: low, close: close, init: "ha_open0=(open0+close0)/2" }
+      - id: ha_open
+        op: alias
+        args: { x: out.ha_open }
+      - id: ha_high
+        op: alias
+        args: { x: out.ha_high }
+      - id: ha_low
+        op: alias
+        args: { x: out.ha_low }
+      - id: ha_close
+        op: alias
+        args: { x: out.ha_close }
+
+  structure.percent_rank:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { percent_rank: "series<float>" }
+    steps:
+      - id: percent_rank
+        op: rolling_percent_rank
+        args: { x: source, window: window, scale: 100.0, tie_mode: "le" }
+
+  structure.pivots:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>" }
+    params: { left: "int", right: "int" }
+    outputs: { pivot_high: "series<float>", pivot_low: "series<float>" }
+    steps:
+      - id: ph
+        op: pivothigh
+        args: { x: high, left: left, right: right, strict: true, shift_confirm: true }
+      - id: pl
+        op: pivotlow
+        args: { x: low, left: left, right: right, strict: true, shift_confirm: true }
+      - id: pivot_high
+        op: alias
+        args: { x: ph.value }
+      - id: pivot_low
+        op: alias
+        args: { x: pl.value }
+
+  structure.zscore:
+    dsl: "steps@1"
+    inputs: { source: "series<float>" }
+    params: { window: "int" }
+    outputs: { zscore: "series<float>" }
+    steps:
+      - id: mu
+        op: rolling_mean
+        args: { x: source, window: window }
+      - id: sd
+        op: rolling_std
+        args: { x: source, window: window, ddof: 0 }
+      - id: zscore
+        op: div
+        args: { a: { op: sub, args: { a: source, b: mu } }, b: sd }
