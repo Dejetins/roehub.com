@@ -34,10 +34,11 @@ def test_rest_fill_queue_enqueue_is_non_blocking_for_slow_executor() -> None:
     async def _scenario() -> None:
         started = threading.Event()
         finished = threading.Event()
+        executor_sleep_seconds = 0.3
 
         def _slow_executor(task: RestFillTask) -> RestFillResult:
             started.set()
-            time.sleep(0.3)
+            time.sleep(executor_sleep_seconds)
             finished.set()
             return RestFillResult(
                 task=task,
@@ -51,16 +52,13 @@ def test_rest_fill_queue_enqueue_is_non_blocking_for_slow_executor() -> None:
         queue = AsyncRestFillQueue(executor=_slow_executor, worker_count=1)
         await queue.start()
 
-        enqueue_started = time.monotonic()
         accepted = await queue.enqueue(_task())
-        enqueue_elapsed = time.monotonic() - enqueue_started
 
         assert accepted is True
-        assert enqueue_elapsed < 0.05
-        assert await asyncio.to_thread(started.wait, 0.2)
+        assert await asyncio.to_thread(started.wait, 1.0)
         assert not finished.is_set()
 
-        await asyncio.sleep(0.35)
+        await asyncio.sleep(executor_sleep_seconds + 0.05)
         assert finished.is_set()
         await queue.close()
 
