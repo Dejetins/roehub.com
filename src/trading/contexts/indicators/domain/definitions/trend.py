@@ -2,9 +2,11 @@
 Hard indicator definitions for trend and breakout group.
 
 Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+  docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md
 Related: trading.contexts.indicators.domain.entities.indicator_def,
   trading.contexts.indicators.domain.entities.param_def,
-  trading.contexts.indicators.domain.entities.output_spec
+  trading.contexts.indicators.domain.entities.output_spec,
+  docs/architecture/indicators/indicators_formula.yaml
 """
 
 from __future__ import annotations
@@ -32,6 +34,12 @@ def defs() -> tuple[IndicatorDef, ...]:
     """
     Return hard trend-family definitions sorted by indicator_id.
 
+    Docs: docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/trend.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/trend.py,
+      docs/architecture/indicators/indicators_formula.yaml
+
     Args:
         None.
     Returns:
@@ -54,7 +62,7 @@ def defs() -> tuple[IndicatorDef, ...]:
             inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
             params=(window, smoothing),
             axes=("window", "smoothing"),
-            output=OutputSpec(names=("adx", "plus_di", "minus_di")),
+            output=OutputSpec(names=("plus_di", "minus_di", "adx")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.aroon"),
@@ -70,7 +78,7 @@ def defs() -> tuple[IndicatorDef, ...]:
             inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
             params=(window, mult),
             axes=("window", "mult"),
-            output=OutputSpec(names=("long_stop", "short_stop")),
+            output=OutputSpec(names=("chandelier_long", "chandelier_short")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.donchian"),
@@ -78,7 +86,7 @@ def defs() -> tuple[IndicatorDef, ...]:
             inputs=(InputSeries.HIGH, InputSeries.LOW),
             params=(window,),
             axes=("window",),
-            output=OutputSpec(names=("upper", "middle", "lower")),
+            output=OutputSpec(names=("donchian_upper", "donchian_lower", "donchian_mid")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.ichimoku"),
@@ -91,9 +99,7 @@ def defs() -> tuple[IndicatorDef, ...]:
                 _window_named(name="displacement", default=26),
             ),
             axes=("conversion_window", "base_window", "span_b_window", "displacement"),
-            output=OutputSpec(
-                names=("tenkan", "kijun", "senkou_a", "senkou_b", "chikou")
-            ),
+            output=OutputSpec(names=("conversion", "base", "span_a", "span_b", "lagging")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.keltner"),
@@ -101,7 +107,7 @@ def defs() -> tuple[IndicatorDef, ...]:
             inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
             params=(window, mult),
             axes=("window", "mult"),
-            output=OutputSpec(names=("basis", "upper", "lower")),
+            output=OutputSpec(names=("middle", "upper", "lower")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.linreg_slope"),
@@ -139,7 +145,7 @@ def defs() -> tuple[IndicatorDef, ...]:
                 ),
             ),
             axes=("accel_max", "accel_start", "accel_step"),
-            output=OutputSpec(names=("sar",)),
+            output=OutputSpec(names=("psar", "psar_dir")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.supertrend"),
@@ -147,7 +153,7 @@ def defs() -> tuple[IndicatorDef, ...]:
             inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
             params=(window, mult),
             axes=("window", "mult"),
-            output=OutputSpec(names=("line", "direction")),
+            output=OutputSpec(names=("supertrend", "supertrend_dir")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.vortex"),
@@ -155,7 +161,7 @@ def defs() -> tuple[IndicatorDef, ...]:
             inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
             params=(window,),
             axes=("window",),
-            output=OutputSpec(names=("plus_vi", "minus_vi")),
+            output=OutputSpec(names=("vi_plus", "vi_minus")),
         ),
     )
     return _sorted_defs(items)

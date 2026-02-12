@@ -12,3 +12,4 @@
 - `docs/architecture/indicators/indicators-compute-engine-core.md` — CPU/Numba compute engine core, warmup, memory guard, runtime config.
 - `docs/architecture/indicators/indicators-ma-compute-numba-v1.md` — MA kernels (Numba) + Numpy oracle + `POST /indicators/compute` v1.
 - `docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md` — Volatility + Momentum kernels (Numba) + Numpy oracle + `POST /indicators/compute` v1.
+- `docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md` — Trend + Volume kernels (Numba) + Numpy oracle + `POST /indicators/compute` v1.

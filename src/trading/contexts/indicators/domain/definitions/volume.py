@@ -2,9 +2,11 @@
 Hard indicator definitions for volume group.
 
 Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+  docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md
 Related: trading.contexts.indicators.domain.entities.indicator_def,
   trading.contexts.indicators.domain.entities.param_def,
-  trading.contexts.indicators.domain.entities.output_spec
+  trading.contexts.indicators.domain.entities.output_spec,
+  docs/architecture/indicators/indicators_formula.yaml
 """
 
 from __future__ import annotations
@@ -22,6 +24,12 @@ from trading.contexts.indicators.domain.entities import (
 def defs() -> tuple[IndicatorDef, ...]:
     """
     Return hard volume-family definitions sorted by indicator_id.
+
+    Docs: docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/volume.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/volume.py,
+      docs/architecture/indicators/indicators_formula.yaml
 
     Args:
         None.
@@ -100,7 +108,7 @@ def defs() -> tuple[IndicatorDef, ...]:
                 window,
             ),
             axes=("mult", "window"),
-            output=OutputSpec(names=("vwap", "deviation", "upper", "lower")),
+            output=OutputSpec(names=("vwap", "vwap_upper", "vwap_lower", "vwap_stdev")),
         ),
     )
     return _sorted_defs(items)

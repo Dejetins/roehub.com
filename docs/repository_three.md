@@ -119,6 +119,7 @@
 |   |   |   |-- indicators-ma-compute-numba-v1.md
 |   |   |   |-- indicators-overview.md
 |   |   |   |-- indicators-registry-yaml-defaults-v1.md
+|   |   |   |-- indicators-trend-volume-compute-numba-v1.md
 |   |   |   |-- indicators-volatility-momentum-compute-numba-v1.md
 |   |   |   `-- indicators_formula.yaml
 |   |   |-- market_data/
@@ -211,13 +212,17 @@
 |       |   |   |       |   |   |-- _common.py
 |       |   |   |       |   |   |-- ma.py
 |       |   |   |       |   |   |-- momentum.py
-|       |   |   |       |   |   `-- volatility.py
+|       |   |   |       |   |   |-- trend.py
+|       |   |   |       |   |   |-- volatility.py
+|       |   |   |       |   |   `-- volume.py
 |       |   |   |       |   `-- warmup.py
 |       |   |   |       |-- compute_numpy/
 |       |   |   |       |   |-- __init__.py
 |       |   |   |       |   |-- ma.py
 |       |   |   |       |   |-- momentum.py
-|       |   |   |       |   `-- volatility.py
+|       |   |   |       |   |-- trend.py
+|       |   |   |       |   |-- volatility.py
+|       |   |   |       |   `-- volume.py
 |       |   |   |       |-- config/
 |       |   |   |       |   |-- __init__.py
 |       |   |   |       |   |-- yaml_defaults_loader.py
@@ -525,6 +530,7 @@
 |   |       `-- indicators/
 |   |           |-- test_compute_numba_perf_smoke.py
 |   |           |-- test_indicators_ma.py
+|   |           |-- test_indicators_trend_volume.py
 |   |           `-- test_indicators_vol_mom.py
 |   |-- test_smoke.py
 |   `-- unit/
@@ -538,11 +544,15 @@
 |       |   |   |       |   |-- test_ma_kernels.py
 |       |   |   |       |   |-- test_momentum_kernels.py
 |       |   |   |       |   |-- test_runtime_wiring.py
-|       |   |   |       |   `-- test_volatility_kernels.py
+|       |   |   |       |   |-- test_trend_kernels.py
+|       |   |   |       |   |-- test_volatility_kernels.py
+|       |   |   |       |   `-- test_volume_kernels.py
 |       |   |   |       |-- compute_numpy/
 |       |   |   |       |   |-- test_ma_oracle.py
 |       |   |   |       |   |-- test_momentum_oracle.py
-|       |   |   |       |   `-- test_volatility_oracle.py
+|       |   |   |       |   |-- test_trend_oracle.py
+|       |   |   |       |   |-- test_volatility_oracle.py
+|       |   |   |       |   `-- test_volume_oracle.py
 |       |   |   |       |-- config/
 |       |   |   |       |   `-- test_yaml_defaults_validator.py
 |       |   |   |       |-- feeds/
@@ -612,4 +622,4 @@
 |   `-- lint/
 `-- uv.lock
 
-304 directories, 309 files
+304 directories, 319 files

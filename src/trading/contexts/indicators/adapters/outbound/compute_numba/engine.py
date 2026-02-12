@@ -22,12 +22,16 @@ from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import 
     check_total_budget_or_raise,
     compute_ma_grid_f32,
     compute_momentum_grid_f32,
+    compute_trend_grid_f32,
     compute_volatility_grid_f32,
+    compute_volume_grid_f32,
     estimate_tensor_bytes,
     estimate_total_bytes,
     is_supported_ma_indicator,
     is_supported_momentum_indicator,
+    is_supported_trend_indicator,
     is_supported_volatility_indicator,
+    is_supported_volume_indicator,
     write_series_grid_time_major,
     write_series_grid_variant_major,
 )
@@ -248,6 +252,19 @@ class NumbaIndicatorCompute(IndicatorCompute):
                 axes=axes,
                 available_series=series_map,
                 t_size=t_size,
+            )
+        elif is_supported_trend_indicator(indicator_id=definition.indicator_id.value):
+            variant_series_matrix = _compute_trend_variant_matrix(
+                definition=definition,
+                axes=axes,
+                available_series=series_map,
+                t_size=t_size,
+            )
+        elif is_supported_volume_indicator(indicator_id=definition.indicator_id.value):
+            variant_series_matrix = _compute_volume_variant_matrix(
+                definition=definition,
+                axes=axes,
+                available_series=series_map,
             )
         else:
             variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
@@ -983,6 +1000,336 @@ def _compute_momentum_variant_matrix(
         raise GridValidationError(str(error)) from error
 
     raise GridValidationError(f"unsupported momentum indicator_id: {indicator_id}")
+
+
+def _compute_trend_variant_matrix(
+    *,
+    definition: IndicatorDef,
+    axes: tuple[AxisDef, ...],
+    available_series: Mapping[str, np.ndarray],
+    t_size: int,
+) -> np.ndarray:
+    """
+    Compute variant-major matrix `(V, T)` for trend-family indicators.
+
+    Docs: docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md
+    Related:
+      docs/architecture/indicators/indicators_formula.yaml,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/trend.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/trend.py,
+      src/trading/contexts/indicators/domain/definitions/trend.py
+
+    Args:
+        definition: Hard indicator definition for the request.
+        axes: Materialized domain axes preserving request order.
+        available_series: Mapping of available source arrays.
+        t_size: Time dimension length.
+    Returns:
+        np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
+    Assumptions:
+        Trend kernels return one primary output line per indicator id in v1.
+    Raises:
+        GridValidationError: If required axes are missing or malformed.
+        MissingRequiredSeries: If required OHLC/source series are unavailable.
+    Side Effects:
+        Allocates source/parameter vectors and one output matrix.
+    """
+    indicator_id = definition.indicator_id.value
+
+    try:
+        if indicator_id == "trend.linreg_slope":
+            variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
+            _validate_required_series_available(
+                variant_source_labels=variant_source_labels,
+                available_series=available_series,
+            )
+            source_variants = _build_variant_source_matrix(
+                variant_source_labels=variant_source_labels,
+                available_series=available_series,
+                t_size=t_size,
+            )
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                source_variants=source_variants,
+                windows=windows_i64,
+            )
+
+        high = _require_series(available_series=available_series, name=InputSeries.HIGH.value)
+        low = _require_series(available_series=available_series, name=InputSeries.LOW.value)
+
+        if indicator_id == "trend.psar":
+            accel_starts_f64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_float_values(axes=axes, axis_name="accel_start"),
+                    dtype=np.float64,
+                )
+            )
+            accel_steps_f64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_float_values(axes=axes, axis_name="accel_step"),
+                    dtype=np.float64,
+                )
+            )
+            accel_maxes_f64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_float_values(axes=axes, axis_name="accel_max"),
+                    dtype=np.float64,
+                )
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                accel_starts=accel_starts_f64,
+                accel_steps=accel_steps_f64,
+                accel_maxes=accel_maxes_f64,
+            )
+
+        close = _require_series(
+            available_series=available_series,
+            name=InputSeries.CLOSE.value,
+        )
+
+        if indicator_id == "trend.adx":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            smoothings_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="smoothing"), dtype=np.int64)
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                windows=windows_i64,
+                smoothings=smoothings_i64,
+            )
+
+        if indicator_id == "trend.aroon":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                windows=windows_i64,
+            )
+
+        if indicator_id == "trend.chandelier_exit":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            mults_f64 = np.ascontiguousarray(
+                np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                windows=windows_i64,
+                mults=mults_f64,
+            )
+
+        if indicator_id == "trend.donchian":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                windows=windows_i64,
+            )
+
+        if indicator_id == "trend.ichimoku":
+            conversion_windows_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="conversion_window"),
+                    dtype=np.int64,
+                )
+            )
+            base_windows_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="base_window"),
+                    dtype=np.int64,
+                )
+            )
+            span_b_windows_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="span_b_window"),
+                    dtype=np.int64,
+                )
+            )
+            displacements_i64 = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="displacement"),
+                    dtype=np.int64,
+                )
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                conversion_windows=conversion_windows_i64,
+                base_windows=base_windows_i64,
+                span_b_windows=span_b_windows_i64,
+                displacements=displacements_i64,
+            )
+
+        if indicator_id in {"trend.keltner", "trend.supertrend"}:
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            mults_f64 = np.ascontiguousarray(
+                np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                windows=windows_i64,
+                mults=mults_f64,
+            )
+
+        if indicator_id == "trend.vortex":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_trend_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                windows=windows_i64,
+            )
+    except ValueError as error:
+        raise GridValidationError(str(error)) from error
+
+    raise GridValidationError(f"unsupported trend indicator_id: {indicator_id}")
+
+
+def _compute_volume_variant_matrix(
+    *,
+    definition: IndicatorDef,
+    axes: tuple[AxisDef, ...],
+    available_series: Mapping[str, np.ndarray],
+) -> np.ndarray:
+    """
+    Compute variant-major matrix `(V, T)` for volume-family indicators.
+
+    Docs: docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md
+    Related:
+      docs/architecture/indicators/indicators_formula.yaml,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/volume.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/volume.py,
+      src/trading/contexts/indicators/domain/definitions/volume.py
+
+    Args:
+        definition: Hard indicator definition for the request.
+        axes: Materialized domain axes preserving request order.
+        available_series: Mapping of available source arrays.
+    Returns:
+        np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
+    Assumptions:
+        Volume kernels return one primary output line per indicator id in v1.
+    Raises:
+        GridValidationError: If required axes are missing or malformed.
+        MissingRequiredSeries: If required OHLCV series are unavailable.
+    Side Effects:
+        Allocates source/parameter vectors and one output matrix.
+    """
+    indicator_id = definition.indicator_id.value
+
+    try:
+        volume = _require_series(
+            available_series=available_series,
+            name=InputSeries.VOLUME.value,
+        )
+
+        if indicator_id == "volume.obv":
+            close = _require_series(
+                available_series=available_series,
+                name=InputSeries.CLOSE.value,
+            )
+            return compute_volume_grid_f32(
+                indicator_id=indicator_id,
+                close=close,
+                volume=volume,
+            )
+
+        if indicator_id == "volume.volume_sma":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+            return compute_volume_grid_f32(
+                indicator_id=indicator_id,
+                volume=volume,
+                windows=windows_i64,
+            )
+
+        high = _require_series(
+            available_series=available_series,
+            name=InputSeries.HIGH.value,
+        )
+        low = _require_series(
+            available_series=available_series,
+            name=InputSeries.LOW.value,
+        )
+        close = _require_series(
+            available_series=available_series,
+            name=InputSeries.CLOSE.value,
+        )
+
+        if indicator_id == "volume.ad_line":
+            return compute_volume_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                volume=volume,
+            )
+
+        windows_i64 = np.ascontiguousarray(
+            np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+        )
+
+        if indicator_id in {"volume.cmf", "volume.mfi", "volume.vwap"}:
+            return compute_volume_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                volume=volume,
+                windows=windows_i64,
+            )
+
+        if indicator_id == "volume.vwap_deviation":
+            mults_f64 = np.ascontiguousarray(
+                np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
+            )
+            return compute_volume_grid_f32(
+                indicator_id=indicator_id,
+                high=high,
+                low=low,
+                close=close,
+                volume=volume,
+                windows=windows_i64,
+                mults=mults_f64,
+            )
+    except ValueError as error:
+        raise GridValidationError(str(error)) from error
+
+    raise GridValidationError(f"unsupported volume indicator_id: {indicator_id}")
 
 
 def _variant_int_values(*, axes: tuple[AxisDef, ...], axis_name: str) -> tuple[int, ...]:

@@ -21,11 +21,15 @@ import numpy as np
 from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import (
     compute_ma_grid_f32,
     compute_momentum_grid_f32,
+    compute_trend_grid_f32,
     compute_volatility_grid_f32,
+    compute_volume_grid_f32,
     ewma_grid_f64,
     is_supported_ma_indicator,
     is_supported_momentum_indicator,
+    is_supported_trend_indicator,
     is_supported_volatility_indicator,
+    is_supported_volume_indicator,
     rolling_mean_grid_f64,
     rolling_sum_grid_f64,
     write_series_grid_time_major,
@@ -163,8 +167,10 @@ class ComputeNumbaWarmupRunner:
                     "write_series_grid_time_major",
                     "write_series_grid_variant_major",
                     "compute_ma_grid_f32",
+                    "compute_trend_grid_f32",
                     "compute_volatility_grid_f32",
                     "compute_momentum_grid_f32",
+                    "compute_volume_grid_f32",
                 ],
             },
         )
@@ -265,6 +271,64 @@ class ComputeNumbaWarmupRunner:
                 fast_windows=np.array([8, 10, 12, 14, 16], dtype=np.int64),
                 slow_windows=np.array([20, 22, 24, 26, 28], dtype=np.int64),
                 signal_windows=np.array([5, 7, 9, 11, 13], dtype=np.int64),
+            )
+
+        high_f32 = source_f32 + np.float32(1.2)
+        low_f32 = source_f32 - np.float32(1.2)
+        close_f32 = source_f32 + np.float32(0.3)
+
+        if is_supported_trend_indicator(indicator_id="trend.adx"):
+            _ = compute_trend_grid_f32(
+                indicator_id="trend.adx",
+                high=high_f32,
+                low=low_f32,
+                close=close_f32,
+                windows=windows,
+                smoothings=np.array([5, 7, 9, 11, 13], dtype=np.int64),
+            )
+        if is_supported_trend_indicator(indicator_id="trend.supertrend"):
+            _ = compute_trend_grid_f32(
+                indicator_id="trend.supertrend",
+                high=high_f32,
+                low=low_f32,
+                close=close_f32,
+                windows=windows,
+                mults=mults_f64,
+            )
+        if is_supported_trend_indicator(indicator_id="trend.linreg_slope"):
+            _ = compute_trend_grid_f32(
+                indicator_id="trend.linreg_slope",
+                source_variants=source_variants,
+                windows=windows,
+            )
+        if is_supported_trend_indicator(indicator_id="trend.psar"):
+            _ = compute_trend_grid_f32(
+                indicator_id="trend.psar",
+                high=high_f32,
+                low=low_f32,
+                accel_starts=np.array([0.01, 0.015, 0.02, 0.025, 0.03], dtype=np.float64),
+                accel_steps=np.array([0.01, 0.015, 0.02, 0.025, 0.03], dtype=np.float64),
+                accel_maxes=np.array([0.2, 0.25, 0.3, 0.35, 0.4], dtype=np.float64),
+            )
+
+        if is_supported_volume_indicator(indicator_id="volume.vwap"):
+            _ = compute_volume_grid_f32(
+                indicator_id="volume.vwap",
+                high=high_f32,
+                low=low_f32,
+                close=close_f32,
+                volume=volume_f32,
+                windows=windows,
+            )
+        if is_supported_volume_indicator(indicator_id="volume.vwap_deviation"):
+            _ = compute_volume_grid_f32(
+                indicator_id="volume.vwap_deviation",
+                high=high_f32,
+                low=low_f32,
+                close=close_f32,
+                volume=volume_f32,
+                windows=windows,
+                mults=mults_f64,
             )
 
 
