@@ -189,6 +189,7 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
           AND ts_open < %(end)s
         GROUP BY day
         ORDER BY day
+        SETTINGS max_threads = 1
         """
         rows = self.gateway.select(
             q,
