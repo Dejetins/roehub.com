@@ -1110,6 +1110,111 @@ formulas:
         op: div
         args: { a: lower_wick, b: range }
 
+  structure.candle_body:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { body: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats"
+          kwargs: { open: open, high: high, low: low, close: close }
+      - id: body
+        op: alias
+        args: { x: cs.body }
+
+  structure.candle_range:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { range: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats"
+          kwargs: { open: open, high: high, low: low, close: close }
+      - id: range
+        op: alias
+        args: { x: cs.range }
+
+  structure.candle_upper_wick:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { upper_wick: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats"
+          kwargs: { open: open, high: high, low: low, close: close }
+      - id: upper_wick
+        op: alias
+        args: { x: cs.upper_wick }
+
+  structure.candle_lower_wick:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { lower_wick: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats"
+          kwargs: { open: open, high: high, low: low, close: close }
+      - id: lower_wick
+        op: alias
+        args: { x: cs.lower_wick }
+
+  structure.candle_body_pct:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { body_pct: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats"
+          kwargs: { open: open, high: high, low: low, close: close }
+      - id: body_pct
+        op: alias
+        args: { x: cs.body_pct }
+
+  structure.candle_upper_wick_pct:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { upper_wick_pct: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats"
+          kwargs: { open: open, high: high, low: low, close: close }
+      - id: upper_wick_pct
+        op: alias
+        args: { x: cs.upper_wick_pct }
+
+  structure.candle_lower_wick_pct:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: {}
+    outputs: { lower_wick_pct: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats"
+          kwargs: { open: open, high: high, low: low, close: close }
+      - id: lower_wick_pct
+        op: alias
+        args: { x: cs.lower_wick_pct }
+
   structure.candle_stats_atr_norm:
     dsl: "steps@1"
     inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
@@ -1143,6 +1248,84 @@ formulas:
         op: div
         args: { a: cs.lower_wick, b: atr.atr }
 
+  structure.candle_body_atr:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { atr_window: "int" }
+    outputs: { body_atr: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats_atr_norm"
+          kwargs: { open: open, high: high, low: low, close: close, atr_window: atr_window }
+      - id: body_atr
+        op: alias
+        args: { x: cs.body_atr }
+
+  structure.candle_range_atr:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { atr_window: "int" }
+    outputs: { range_atr: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats_atr_norm"
+          kwargs: { open: open, high: high, low: low, close: close, atr_window: atr_window }
+      - id: range_atr
+        op: alias
+        args: { x: cs.range_atr }
+
+  structure.candle_upper_wick_atr:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { atr_window: "int" }
+    outputs: { upper_wick_atr: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats_atr_norm"
+          kwargs: { open: open, high: high, low: low, close: close, atr_window: atr_window }
+      - id: upper_wick_atr
+        op: alias
+        args: { x: cs.upper_wick_atr }
+
+  structure.candle_lower_wick_atr:
+    dsl: "steps@1"
+    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { atr_window: "int" }
+    outputs: { lower_wick_atr: "series<float>" }
+    steps:
+      - id: cs
+        op: call
+        args:
+          fn: "structure.candle_stats_atr_norm"
+          kwargs: { open: open, high: high, low: low, close: close, atr_window: atr_window }
+      - id: lower_wick_atr
+        op: alias
+        args: { x: cs.lower_wick_atr }
+
+  structure.distance_to_ma_norm:
+    dsl: "steps@1"
+    inputs: { source: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
+    params: { window: "int" }
+    outputs: { distance_to_ma_norm: "series<float>" }
+    steps:
+      - id: ma
+        op: ema
+        args: { x: source, window: window, init: "sma" }
+      - id: atr
+        op: call
+        args:
+          fn: "volatility.atr"
+          kwargs: { high: high, low: low, close: close, window: window }
+      - id: distance_to_ma_norm
+        op: div
+        args: { a: { op: sub, args: { a: source, b: ma } }, b: atr.atr }
+
   structure.percent_rank:
     dsl: "steps@1"
     inputs: { source: "series<float>" }
@@ -1159,6 +1342,7 @@ formulas:
     params: { left: "int", right: "int" }
     outputs: { pivot_high: "series<float>", pivot_low: "series<float>" }
     steps:
+      # shift_confirm=true
       - id: ph
         op: pivothigh
         args: { x: high, left: left, right: right, strict: true, shift_confirm: true }
@@ -1171,6 +1355,36 @@ formulas:
       - id: pivot_low
         op: alias
         args: { x: pl.value }
+
+  structure.pivot_high:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>" }
+    params: { left: "int", right: "int" }
+    outputs: { pivot_high: "series<float>" }
+    steps:
+      - id: p
+        op: call
+        args:
+          fn: "structure.pivots"
+          kwargs: { high: high, low: low, left: left, right: right }
+      - id: pivot_high
+        op: alias
+        args: { x: p.pivot_high }
+
+  structure.pivot_low:
+    dsl: "steps@1"
+    inputs: { high: "series<float>", low: "series<float>" }
+    params: { left: "int", right: "int" }
+    outputs: { pivot_low: "series<float>" }
+    steps:
+      - id: p
+        op: call
+        args:
+          fn: "structure.pivots"
+          kwargs: { high: high, low: low, left: left, right: right }
+      - id: pivot_low
+        op: alias
+        args: { x: p.pivot_low }
 
   structure.zscore:
     dsl: "steps@1"

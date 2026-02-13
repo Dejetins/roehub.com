@@ -443,7 +443,15 @@ defaults:
       slow_window:
         mode: explicit
         values: [26]
-  structure.heikin_ashi: {}
+  structure.distance_to_ma_norm:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
   trend.psar:
     params:
       accel_max:

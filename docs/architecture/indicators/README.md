@@ -13,3 +13,4 @@
 - `docs/architecture/indicators/indicators-ma-compute-numba-v1.md` — MA kernels (Numba) + Numpy oracle + `POST /indicators/compute` v1.
 - `docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md` — Volatility + Momentum kernels (Numba) + Numpy oracle + `POST /indicators/compute` v1.
 - `docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md` — Trend + Volume kernels (Numba) + Numpy oracle + `POST /indicators/compute` v1.
+- `docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md` — Structure/Normalization kernels (Numba) + Numpy oracle + wrappers + `POST /indicators/compute` v1.

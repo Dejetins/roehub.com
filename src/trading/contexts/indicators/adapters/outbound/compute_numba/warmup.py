@@ -21,12 +21,14 @@ import numpy as np
 from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import (
     compute_ma_grid_f32,
     compute_momentum_grid_f32,
+    compute_structure_grid_f32,
     compute_trend_grid_f32,
     compute_volatility_grid_f32,
     compute_volume_grid_f32,
     ewma_grid_f64,
     is_supported_ma_indicator,
     is_supported_momentum_indicator,
+    is_supported_structure_indicator,
     is_supported_trend_indicator,
     is_supported_volatility_indicator,
     is_supported_volume_indicator,
@@ -171,6 +173,7 @@ class ComputeNumbaWarmupRunner:
                     "compute_volatility_grid_f32",
                     "compute_momentum_grid_f32",
                     "compute_volume_grid_f32",
+                    "compute_structure_grid_f32",
                 ],
             },
         )
@@ -329,6 +332,57 @@ class ComputeNumbaWarmupRunner:
                 volume=volume_f32,
                 windows=windows,
                 mults=mults_f64,
+            )
+
+        open_f32 = source_f32 - np.float32(0.15)
+        lefts_i64 = np.array([2, 3, 4, 5, 6], dtype=np.int64)
+        rights_i64 = np.array([2, 3, 4, 5, 6], dtype=np.int64)
+
+        if is_supported_structure_indicator(indicator_id="structure.zscore"):
+            _ = compute_structure_grid_f32(
+                indicator_id="structure.zscore",
+                source_variants=source_variants,
+                windows=windows,
+            )
+        if is_supported_structure_indicator(indicator_id="structure.percent_rank"):
+            _ = compute_structure_grid_f32(
+                indicator_id="structure.percent_rank",
+                source_variants=source_variants,
+                windows=windows,
+            )
+        if is_supported_structure_indicator(indicator_id="structure.candle_stats"):
+            _ = compute_structure_grid_f32(
+                indicator_id="structure.candle_stats",
+                open=open_f32,
+                high=high_f32,
+                low=low_f32,
+                close=close_f32,
+            )
+        if is_supported_structure_indicator(indicator_id="structure.candle_stats_atr_norm"):
+            _ = compute_structure_grid_f32(
+                indicator_id="structure.candle_stats_atr_norm",
+                open=open_f32,
+                high=high_f32,
+                low=low_f32,
+                close=close_f32,
+                atr_windows=windows,
+            )
+        if is_supported_structure_indicator(indicator_id="structure.pivots"):
+            _ = compute_structure_grid_f32(
+                indicator_id="structure.pivots",
+                high=high_f32,
+                low=low_f32,
+                lefts=lefts_i64,
+                rights=rights_i64,
+            )
+        if is_supported_structure_indicator(indicator_id="structure.distance_to_ma_norm"):
+            _ = compute_structure_grid_f32(
+                indicator_id="structure.distance_to_ma_norm",
+                source_variants=source_variants,
+                high=high_f32,
+                low=low_f32,
+                close=close_f32,
+                windows=windows,
             )
 
 

@@ -22,6 +22,7 @@ from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import 
     check_total_budget_or_raise,
     compute_ma_grid_f32,
     compute_momentum_grid_f32,
+    compute_structure_grid_f32,
     compute_trend_grid_f32,
     compute_volatility_grid_f32,
     compute_volume_grid_f32,
@@ -29,6 +30,7 @@ from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import 
     estimate_total_bytes,
     is_supported_ma_indicator,
     is_supported_momentum_indicator,
+    is_supported_structure_indicator,
     is_supported_trend_indicator,
     is_supported_volatility_indicator,
     is_supported_volume_indicator,
@@ -265,6 +267,13 @@ class NumbaIndicatorCompute(IndicatorCompute):
                 definition=definition,
                 axes=axes,
                 available_series=series_map,
+            )
+        elif is_supported_structure_indicator(indicator_id=definition.indicator_id.value):
+            variant_series_matrix = _compute_structure_variant_matrix(
+                definition=definition,
+                axes=axes,
+                available_series=series_map,
+                t_size=t_size,
             )
         else:
             variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
@@ -1330,6 +1339,105 @@ def _compute_volume_variant_matrix(
         raise GridValidationError(str(error)) from error
 
     raise GridValidationError(f"unsupported volume indicator_id: {indicator_id}")
+
+
+def _compute_structure_variant_matrix(
+    *,
+    definition: IndicatorDef,
+    axes: tuple[AxisDef, ...],
+    available_series: Mapping[str, np.ndarray],
+    t_size: int,
+) -> np.ndarray:
+    """
+    Compute variant-major matrix `(V, T)` for structure-family indicators.
+
+    Docs: docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md
+    Related:
+      docs/architecture/indicators/indicators_formula.yaml,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/structure.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/structure.py,
+      src/trading/contexts/indicators/domain/definitions/structure.py
+
+    Args:
+        definition: Hard indicator definition for the request.
+        axes: Materialized domain axes preserving request order.
+        available_series: Mapping of available source arrays.
+        t_size: Time dimension length.
+    Returns:
+        np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
+    Assumptions:
+        Structure wrappers expose one v1 output and keep deterministic variant indexing.
+    Raises:
+        GridValidationError: If required axes are missing or malformed.
+        MissingRequiredSeries: If required OHLC/source series are unavailable.
+    Side Effects:
+        Allocates source/parameter vectors and one output matrix.
+    """
+    indicator_id = definition.indicator_id.value
+
+    try:
+        axis_names = [axis.name for axis in axes]
+        kernel_kwargs: dict[str, np.ndarray] = {}
+
+        if "source" in axis_names:
+            variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
+            _validate_required_series_available(
+                variant_source_labels=variant_source_labels,
+                available_series=available_series,
+            )
+            kernel_kwargs["source_variants"] = _build_variant_source_matrix(
+                variant_source_labels=variant_source_labels,
+                available_series=available_series,
+                t_size=t_size,
+            )
+
+        if "window" in axis_names:
+            kernel_kwargs["windows"] = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
+        if "atr_window" in axis_names:
+            kernel_kwargs["atr_windows"] = np.ascontiguousarray(
+                np.asarray(
+                    _variant_int_values(axes=axes, axis_name="atr_window"),
+                    dtype=np.int64,
+                )
+            )
+        if "left" in axis_names:
+            kernel_kwargs["lefts"] = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="left"), dtype=np.int64)
+            )
+        if "right" in axis_names:
+            kernel_kwargs["rights"] = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="right"), dtype=np.int64)
+            )
+
+        if InputSeries.OPEN in definition.inputs:
+            kernel_kwargs["open"] = _require_series(
+                available_series=available_series,
+                name=InputSeries.OPEN.value,
+            )
+        if InputSeries.HIGH in definition.inputs:
+            kernel_kwargs["high"] = _require_series(
+                available_series=available_series,
+                name=InputSeries.HIGH.value,
+            )
+        if InputSeries.LOW in definition.inputs:
+            kernel_kwargs["low"] = _require_series(
+                available_series=available_series,
+                name=InputSeries.LOW.value,
+            )
+        if InputSeries.CLOSE in definition.inputs:
+            kernel_kwargs["close"] = _require_series(
+                available_series=available_series,
+                name=InputSeries.CLOSE.value,
+            )
+
+        return compute_structure_grid_f32(
+            indicator_id=indicator_id,
+            **kernel_kwargs,
+        )
+    except ValueError as error:
+        raise GridValidationError(str(error)) from error
 
 
 def _variant_int_values(*, axes: tuple[AxisDef, ...], axis_name: str) -> tuple[int, ...]:

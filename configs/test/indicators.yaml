@@ -431,7 +431,15 @@ defaults:
         mode: explicit
         values: [14]
 
-  structure.heikin_ashi: {}
+  structure.distance_to_ma_norm:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close"]
+    params:
+      window:
+        mode: explicit
+        values: [20]
 
   structure.percent_rank:
     inputs:

@@ -1,10 +1,11 @@
 """
-Hard indicator definitions for structure and normalization group.
+Hard indicator definitions for structure/normalization group.
 
-Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
-Related: trading.contexts.indicators.domain.entities.indicator_def,
-  trading.contexts.indicators.domain.entities.param_def,
-  trading.contexts.indicators.domain.entities.output_spec
+Docs: docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md
+Related: docs/architecture/indicators/indicators_formula.yaml,
+  trading.contexts.indicators.domain.entities.indicator_def,
+  trading.contexts.indicators.adapters.outbound.compute_numba.kernels.structure,
+  configs/prod/indicators.yaml
 """
 
 from __future__ import annotations
@@ -27,17 +28,31 @@ _SOURCE_INPUTS = (
     InputSeries.OPEN,
 )
 
+_OHLC_INPUTS = (
+    InputSeries.OPEN,
+    InputSeries.HIGH,
+    InputSeries.LOW,
+    InputSeries.CLOSE,
+)
+
 
 def defs() -> tuple[IndicatorDef, ...]:
     """
     Return hard structure-family definitions sorted by indicator_id.
+
+    Docs: docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md
+    Related:
+      docs/architecture/indicators/indicators_formula.yaml,
+      configs/dev/indicators.yaml,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/structure.py
 
     Args:
         None.
     Returns:
         tuple[IndicatorDef, ...]: Immutable ordered structure indicator definitions.
     Assumptions:
-        Candle-stat outputs are registry-level contracts for future compute epics.
+        Multi-output indicators keep v1 primary-output compute semantics and wrapper ids expose
+        additional outputs without changing API shapes.
     Raises:
         ValueError: If any definition violates domain invariants.
     Side Effects:
@@ -47,30 +62,133 @@ def defs() -> tuple[IndicatorDef, ...]:
 
     items = (
         IndicatorDef(
-            indicator_id=IndicatorId("structure.candle_stats"),
-            title="Candle Body and Wicks",
-            inputs=(InputSeries.OPEN, InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
+            indicator_id=IndicatorId("structure.candle_body"),
+            title="Candle Body",
+            inputs=_OHLC_INPUTS,
             params=(),
             axes=(),
-            output=OutputSpec(names=("body", "upper_wick", "lower_wick", "range")),
+            output=OutputSpec(names=("body",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_body_atr"),
+            title="Candle Body ATR-Normalized",
+            inputs=_OHLC_INPUTS,
+            params=(_window_named(name="atr_window", default=14),),
+            axes=("atr_window",),
+            output=OutputSpec(names=("body_atr",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_body_pct"),
+            title="Candle Body Percent of Range",
+            inputs=_OHLC_INPUTS,
+            params=(),
+            axes=(),
+            output=OutputSpec(names=("body_pct",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_lower_wick"),
+            title="Candle Lower Wick",
+            inputs=_OHLC_INPUTS,
+            params=(),
+            axes=(),
+            output=OutputSpec(names=("lower_wick",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_lower_wick_atr"),
+            title="Candle Lower Wick ATR-Normalized",
+            inputs=_OHLC_INPUTS,
+            params=(_window_named(name="atr_window", default=14),),
+            axes=("atr_window",),
+            output=OutputSpec(names=("lower_wick_atr",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_lower_wick_pct"),
+            title="Candle Lower Wick Percent of Range",
+            inputs=_OHLC_INPUTS,
+            params=(),
+            axes=(),
+            output=OutputSpec(names=("lower_wick_pct",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_range"),
+            title="Candle Range",
+            inputs=_OHLC_INPUTS,
+            params=(),
+            axes=(),
+            output=OutputSpec(names=("range",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_range_atr"),
+            title="Candle Range ATR-Normalized",
+            inputs=_OHLC_INPUTS,
+            params=(_window_named(name="atr_window", default=14),),
+            axes=("atr_window",),
+            output=OutputSpec(names=("range_atr",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_stats"),
+            title="Candle Body and Wicks",
+            inputs=_OHLC_INPUTS,
+            params=(),
+            axes=(),
+            output=OutputSpec(
+                names=(
+                    "body",
+                    "range",
+                    "upper_wick",
+                    "lower_wick",
+                    "body_pct",
+                    "upper_wick_pct",
+                    "lower_wick_pct",
+                )
+            ),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("structure.candle_stats_atr_norm"),
             title="ATR-Normalized Candle Stats",
-            inputs=(InputSeries.OPEN, InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
+            inputs=_OHLC_INPUTS,
             params=(_window_named(name="atr_window", default=14),),
             axes=("atr_window",),
             output=OutputSpec(
-                names=("body_norm", "upper_wick_norm", "lower_wick_norm", "range_norm")
+                names=(
+                    "body_atr",
+                    "range_atr",
+                    "upper_wick_atr",
+                    "lower_wick_atr",
+                )
             ),
         ),
         IndicatorDef(
-            indicator_id=IndicatorId("structure.heikin_ashi"),
-            title="Heikin-Ashi Candle Transform",
-            inputs=(InputSeries.OPEN, InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
+            indicator_id=IndicatorId("structure.candle_upper_wick"),
+            title="Candle Upper Wick",
+            inputs=_OHLC_INPUTS,
             params=(),
             axes=(),
-            output=OutputSpec(names=("ha_open", "ha_high", "ha_low", "ha_close")),
+            output=OutputSpec(names=("upper_wick",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_upper_wick_atr"),
+            title="Candle Upper Wick ATR-Normalized",
+            inputs=_OHLC_INPUTS,
+            params=(_window_named(name="atr_window", default=14),),
+            axes=("atr_window",),
+            output=OutputSpec(names=("upper_wick_atr",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.candle_upper_wick_pct"),
+            title="Candle Upper Wick Percent of Range",
+            inputs=_OHLC_INPUTS,
+            params=(),
+            axes=(),
+            output=OutputSpec(names=("upper_wick_pct",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.distance_to_ma_norm"),
+            title="Distance to EMA in ATR Units",
+            inputs=_SOURCE_INPUTS,
+            params=(window,),
+            axes=("source", "window"),
+            output=OutputSpec(names=("distance_to_ma_norm",)),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("structure.percent_rank"),
@@ -79,6 +197,28 @@ def defs() -> tuple[IndicatorDef, ...]:
             params=(window,),
             axes=("source", "window"),
             output=OutputSpec(names=("percent_rank",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.pivot_high"),
+            title="Pivot High",
+            inputs=(InputSeries.HIGH, InputSeries.LOW),
+            params=(
+                _window_named(name="left", default=5),
+                _window_named(name="right", default=5),
+            ),
+            axes=("left", "right"),
+            output=OutputSpec(names=("pivot_high",)),
+        ),
+        IndicatorDef(
+            indicator_id=IndicatorId("structure.pivot_low"),
+            title="Pivot Low",
+            inputs=(InputSeries.HIGH, InputSeries.LOW),
+            params=(
+                _window_named(name="left", default=5),
+                _window_named(name="right", default=5),
+            ),
+            axes=("left", "right"),
+            output=OutputSpec(names=("pivot_low",)),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("structure.pivots"),

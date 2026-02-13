@@ -563,6 +563,18 @@ defaults:
         stop_incl: 120
         step: 1
 
+  structure.distance_to_ma_norm:
+    inputs:
+      source:
+        mode: explicit
+        values: ["close", "hlc3", "ohlc4", "low", "high", "open"]
+    params:
+      window:
+        mode: range
+        start: 5
+        stop_incl: 200
+        step: 1
+
   structure.percent_rank:
     inputs:
       source:

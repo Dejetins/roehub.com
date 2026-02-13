@@ -70,7 +70,6 @@
 
 ### Out of scope (EPIC-08)
 
-- `structure.heikin_ashi` — **не реализуем** и не документируем в рамках EPIC-08 (будет удалено из docs/plan пользователем).
 - Изменение публичного API/DTO `/indicators/compute` под multi-output или int-output.
 - Runtime DSL parsing `indicators_formula.yaml` (формулы — спецификация, реализация — вручную в kernels).
 
