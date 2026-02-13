@@ -81,7 +81,7 @@ market_data:
   ingestion:
     flush_interval_ms: 250
     max_buffer_rows: 3000
-    rest_concurrency_instruments: 1
+    rest_concurrency_instruments: 4
     tail_lookback_minutes: 180
     rest_inter_instrument_delay_s: 2.0
 
@@ -105,7 +105,7 @@ market_data:
       enrich:
         interval_seconds: 43200
       rest_insurance_catchup:
-        interval_seconds: 360
+        interval_seconds: 3600
 
   backfill:
     max_days_per_insert: 7
