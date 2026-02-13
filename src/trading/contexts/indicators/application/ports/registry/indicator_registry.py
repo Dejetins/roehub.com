@@ -10,13 +10,23 @@ class IndicatorRegistry(Protocol):
     """
     Port for listing and resolving indicator definitions.
 
-    Docs: docs/architecture/indicators/indicators-application-ports-walking-skeleton-v1.md
-    Related: ....domain.entities.indicator_def, ....domain.errors.unknown_indicator_error
+    Docs:
+      - docs/architecture/indicators/indicators-overview.md
+      - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+      - docs/architecture/indicators/README.md
+    Related:
+      - src/trading/contexts/indicators/domain/entities/indicator_def.py
+      - src/trading/contexts/indicators/domain/errors/unknown_indicator_error.py
+      - src/trading/contexts/indicators/adapters/outbound/registry/yaml_indicator_registry.py
     """
 
     def list_defs(self) -> tuple[IndicatorDef, ...]:
         """
         Return all indicator definitions available in this registry.
+
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
 
         Args:
             None.
@@ -35,6 +45,10 @@ class IndicatorRegistry(Protocol):
         """
         Resolve one indicator definition by identifier.
 
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+
         Args:
             indicator_id: Indicator identifier to resolve.
         Returns:
@@ -52,6 +66,10 @@ class IndicatorRegistry(Protocol):
         """
         Return merged registry view (hard definitions + defaults).
 
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+
         Args:
             None.
         Returns:
@@ -68,6 +86,10 @@ class IndicatorRegistry(Protocol):
     def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
         """
         Resolve one merged registry view by identifier.
+
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
 
         Args:
             indicator_id: Indicator identifier to resolve.

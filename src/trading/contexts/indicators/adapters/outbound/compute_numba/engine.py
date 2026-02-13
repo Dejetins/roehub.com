@@ -1,11 +1,14 @@
 """
 CPU/Numba implementation of indicators compute application port.
 
-Docs: docs/architecture/indicators/indicators-compute-engine-core.md
-Related: trading.contexts.indicators.application.ports.compute.indicator_compute,
-  trading.contexts.indicators.adapters.outbound.compute_numba.kernels._common,
-  trading.contexts.indicators.adapters.outbound.compute_numba.kernels.ma,
-  trading.contexts.indicators.adapters.outbound.compute_numba.warmup
+Docs:
+  - docs/architecture/indicators/indicators-overview.md
+  - docs/architecture/indicators/indicators-compute-engine-core.md
+  - docs/architecture/indicators/README.md
+Related:
+  - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
+  - src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py
+  - src/trading/contexts/indicators/adapters/outbound/compute_numba/warmup.py
 """
 
 from __future__ import annotations
@@ -71,10 +74,14 @@ class NumbaIndicatorCompute(IndicatorCompute):
     """
     Indicator compute engine backed by CPU+Numba kernels.
 
-    Docs: docs/architecture/indicators/indicators-compute-engine-core.md
-    Related: trading.contexts.indicators.application.dto.indicator_tensor,
-      trading.contexts.indicators.application.services.grid_builder,
-      trading.contexts.indicators.adapters.outbound.compute_numba.kernels.ma
+    Docs:
+      - docs/architecture/indicators/indicators-overview.md
+      - docs/architecture/indicators/indicators-compute-engine-core.md
+      - docs/architecture/indicators/README.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/indicator_tensor.py
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py
     """
 
     def __init__(
@@ -139,7 +146,9 @@ class NumbaIndicatorCompute(IndicatorCompute):
         """
         Estimate axis cardinality and variant count without kernel execution.
 
-        Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+        Docs:
+          - docs/architecture/indicators/indicators-overview.md
+          - docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md
         Related:
           src/trading/contexts/indicators/application/services/grid_builder.py,
           src/trading/contexts/indicators/application/dto/estimate_result.py
@@ -180,7 +189,15 @@ class NumbaIndicatorCompute(IndicatorCompute):
         """
         Compute indicator tensor for one request.
 
-        Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+        Docs:
+          - docs/architecture/indicators/indicators-overview.md
+          - docs/architecture/indicators/indicators-ma.md
+          - docs/architecture/indicators/indicators-volatility.md
+          - docs/architecture/indicators/indicators-momentum.md
+          - docs/architecture/indicators/indicators-trend.md
+          - docs/architecture/indicators/indicators-volume.md
+          - docs/architecture/indicators/indicators-structure.md
+          - docs/runbooks/indicators-why-nan.md
         Related:
           src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
           src/trading/contexts/indicators/application/dto/indicator_tensor.py,
@@ -313,7 +330,11 @@ class NumbaIndicatorCompute(IndicatorCompute):
         """
         Warm up Numba runtime and core kernels.
 
-        Docs: docs/architecture/indicators/indicators-compute-engine-core.md
+        Docs:
+          - docs/architecture/indicators/indicators-overview.md
+          - docs/architecture/indicators/indicators-compute-engine-core.md
+          - docs/runbooks/indicators-numba-warmup-jit.md
+          - docs/runbooks/indicators-numba-cache-and-threads.md
         Related:
           src/trading/contexts/indicators/adapters/outbound/compute_numba/warmup.py,
           src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py

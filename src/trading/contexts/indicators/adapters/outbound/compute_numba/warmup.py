@@ -1,9 +1,15 @@
 """
 Numba runtime configuration and warmup runner for indicators compute.
 
-Docs: docs/architecture/indicators/indicators-compute-engine-core.md
-Related: trading.contexts.indicators.adapters.outbound.compute_numba.kernels._common,
-  trading.platform.config.indicators_compute_numba
+Docs:
+  - docs/architecture/indicators/indicators-overview.md
+  - docs/architecture/indicators/indicators-compute-engine-core.md
+  - docs/runbooks/indicators-numba-warmup-jit.md
+  - docs/runbooks/indicators-numba-cache-and-threads.md
+Related:
+  - src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py
+  - src/trading/platform/config/indicators_compute_numba.py
+  - configs/prod/indicators.yaml
 """
 
 from __future__ import annotations
@@ -46,6 +52,10 @@ def apply_numba_runtime_config(*, config: IndicatorsComputeNumbaConfig) -> int:
     """
     Apply numba threads/cache settings and validate cache directory writability.
 
+    Docs:
+        - docs/architecture/indicators/indicators-overview.md
+        - docs/runbooks/indicators-numba-cache-and-threads.md
+
     Args:
         config: Validated indicators Numba runtime config.
     Returns:
@@ -69,6 +79,10 @@ def apply_numba_runtime_config(*, config: IndicatorsComputeNumbaConfig) -> int:
 def ensure_numba_cache_dir_writable(*, path: Path) -> Path:
     """
     Ensure provided cache directory exists and supports write operations.
+
+    Docs:
+        - docs/architecture/indicators/indicators-overview.md
+        - docs/runbooks/indicators-numba-cache-and-threads.md
 
     Args:
         path: Candidate Numba cache directory.
@@ -110,9 +124,13 @@ class ComputeNumbaWarmupRunner:
     """
     Idempotent warmup runner for indicators compute common Numba kernels.
 
-    Docs: docs/architecture/indicators/indicators-compute-engine-core.md
-    Related: trading.contexts.indicators.adapters.outbound.compute_numba.kernels._common,
-      trading.contexts.indicators.adapters.outbound.compute_numba.engine
+    Docs:
+      - docs/architecture/indicators/indicators-overview.md
+      - docs/architecture/indicators/indicators-compute-engine-core.md
+      - docs/runbooks/indicators-numba-warmup-jit.md
+    Related:
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
     """
 
     def __init__(self, *, config: IndicatorsComputeNumbaConfig) -> None:
@@ -136,6 +154,10 @@ class ComputeNumbaWarmupRunner:
     def warmup(self) -> None:
         """
         Apply runtime config and eagerly compile core Numba kernels.
+
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/runbooks/indicators-numba-warmup-jit.md
 
         Args:
             None.
@@ -182,6 +204,10 @@ class ComputeNumbaWarmupRunner:
     def _run_kernel_warmup(self) -> None:
         """
         Execute short deterministic workloads to trigger kernel compilation.
+
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/runbooks/indicators-numba-warmup-jit.md
 
         Args:
             None.

@@ -10,8 +10,15 @@ class CandleFeed(Protocol):
     """
     Port for loading dense 1m candle arrays for indicator compute.
 
-    Docs: docs/architecture/indicators/indicators-application-ports-walking-skeleton-v1.md
-    Related: ....application.dto.candle_arrays, ....domain.errors.missing_input_series_error
+    Docs:
+      - docs/architecture/indicators/indicators-overview.md
+      - docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md
+      - docs/runbooks/indicators-why-nan.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/candle_arrays.py
+      - src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/
+        market_data_candle_feed.py
+      - src/trading/contexts/indicators/domain/errors/missing_required_series.py
     """
 
     def load_1m_dense(
@@ -22,6 +29,11 @@ class CandleFeed(Protocol):
     ) -> CandleArrays:
         """
         Load dense 1m candles for one instrument and time range.
+
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md
+            - docs/runbooks/indicators-why-nan.md
 
         Args:
             market_id: Stable market identifier.

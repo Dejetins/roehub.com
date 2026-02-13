@@ -117,11 +117,17 @@
 |   |   |   |-- indicators-compute-engine-core.md
 |   |   |   |-- indicators-grid-builder-estimate-guards-v1.md
 |   |   |   |-- indicators-ma-compute-numba-v1.md
+|   |   |   |-- indicators-ma.md
+|   |   |   |-- indicators-momentum.md
 |   |   |   |-- indicators-overview.md
 |   |   |   |-- indicators-registry-yaml-defaults-v1.md
 |   |   |   |-- indicators-structure-normalization-compute-numba-v1.md
+|   |   |   |-- indicators-structure.md
 |   |   |   |-- indicators-trend-volume-compute-numba-v1.md
+|   |   |   |-- indicators-trend.md
 |   |   |   |-- indicators-volatility-momentum-compute-numba-v1.md
+|   |   |   |-- indicators-volatility.md
+|   |   |   |-- indicators-volume.md
 |   |   |   `-- indicators_formula.yaml
 |   |   |-- market_data/
 |   |   |   |-- market-data-application-ports.md
@@ -138,6 +144,9 @@
 |   |-- repository_three.md
 |   `-- runbooks/
 |       |-- help_commands.md
+|       |-- indicators-numba-cache-and-threads.md
+|       |-- indicators-numba-warmup-jit.md
+|       |-- indicators-why-nan.md
 |       |-- market-data-autonomous-docker.md
 |       |-- market-data-metrics-reference-ru.md
 |       |-- market-data-metrics.md
@@ -628,4 +637,4 @@
 |   `-- lint/
 `-- uv.lock
 
-304 directories, 325 files
+304 directories, 334 files

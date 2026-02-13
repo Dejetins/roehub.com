@@ -14,13 +14,23 @@ class IndicatorCompute(Protocol):
     """
     Port for indicator estimate/compute execution.
 
-    Docs: docs/architecture/indicators/indicators-application-ports-walking-skeleton-v1.md
-    Related: ....application.dto.compute_request, ....domain.specifications.grid_spec
+    Docs:
+      - docs/architecture/indicators/indicators-overview.md
+      - docs/architecture/indicators/indicators-application-ports-walking-skeleton-v1.md
+      - docs/architecture/indicators/README.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/compute_request.py
+      - src/trading/contexts/indicators/domain/specifications/grid_spec.py
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
     """
 
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
         Estimate axis cardinality and variant count without running compute.
+
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md
 
         Args:
             grid: Grid specification for one indicator.
@@ -41,6 +51,11 @@ class IndicatorCompute(Protocol):
         """
         Compute the indicator tensor for the provided request.
 
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/architecture/indicators/README.md
+            - docs/runbooks/indicators-why-nan.md
+
         Args:
             req: Compute request with candles, grid, and guard.
         Returns:
@@ -59,6 +74,11 @@ class IndicatorCompute(Protocol):
     def warmup(self) -> None:
         """
         Trigger optional compute-engine warmup on process startup.
+
+        Docs:
+            - docs/architecture/indicators/indicators-overview.md
+            - docs/runbooks/indicators-numba-warmup-jit.md
+            - docs/runbooks/indicators-numba-cache-and-threads.md
 
         Args:
             None.
