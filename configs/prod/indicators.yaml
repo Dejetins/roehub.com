@@ -563,8 +563,6 @@ defaults:
         stop_incl: 120
         step: 1
 
-  structure.heikin_ashi: {}
-
   structure.percent_rank:
     inputs:
       source:

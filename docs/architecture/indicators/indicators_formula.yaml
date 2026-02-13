@@ -1143,28 +1143,6 @@ formulas:
         op: div
         args: { a: cs.lower_wick, b: atr.atr }
 
-  structure.heikin_ashi:
-    dsl: "steps@1"
-    inputs: { open: "series<float>", high: "series<float>", low: "series<float>", close: "series<float>" }
-    params: {}
-    outputs: { ha_open: "series<float>", ha_high: "series<float>", ha_low: "series<float>", ha_close: "series<float>" }
-    steps:
-      - id: out
-        op: heikin_ashi
-        args: { open: open, high: high, low: low, close: close, init: "ha_open0=(open0+close0)/2" }
-      - id: ha_open
-        op: alias
-        args: { x: out.ha_open }
-      - id: ha_high
-        op: alias
-        args: { x: out.ha_high }
-      - id: ha_low
-        op: alias
-        args: { x: out.ha_low }
-      - id: ha_close
-        op: alias
-        args: { x: out.ha_close }
-
   structure.percent_rank:
     dsl: "steps@1"
     inputs: { source: "series<float>" }
