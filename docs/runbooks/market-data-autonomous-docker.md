@@ -165,15 +165,54 @@ cd /opt/actions-runner/roehub_com/actions-runner/_work/roehub.com/roehub.com
 source /home/roe/venvs/roehub/bin/activate
 ```
 
-# 1) Сначала посмотреть план без выполнения
+Вот несколько типовых примеров запуска **этого** скрипта (через env-переменные).
+
+### 1) Посмотреть план (ничего не оптимизирует)
+
 ```bash
-DRY_RUN=1 bash scripts/ops/optimize_canonical_partitions.sh
-```
-```bash
-# 2) Выполнить оптимизацию всех partition с дублями
+INSTRUMENT_KEY='binance:spot:BTCUSDT' DRY_RUN=1 \
 bash scripts/ops/optimize_canonical_partitions.sh
 ```
+
+### 2) Запустить реально (по умолчанию: скан по 1 потоку, лимиты памяти как в скрипте)
+
 ```bash
-# 3) Ограничить количество partition за проход
-MAX_PARTITIONS=5 bash scripts/ops/optimize_canonical_partitions.sh
+INSTRUMENT_KEY='binance:spot:BTCUSDT' \
+bash scripts/ops/optimize_canonical_partitions.sh
 ```
+
+### 3) Ограничить ресурсы сканирования (память/ядра)
+
+Например, сканировать **в 1 поток** и с лимитом **600MB** памяти:
+
+```bash
+INSTRUMENT_KEY='binance:spot:BTCUSDT' \
+SCAN_MAX_THREADS=1 SCAN_MAX_MEMORY_BYTES=$((600*1024*1024)) \
+bash scripts/ops/optimize_canonical_partitions.sh
+```
+
+### 4) Ограничить диапазон партиций (YYYYMMDD включительно)
+
+```bash
+INSTRUMENT_KEY='binance:spot:BTCUSDT' \
+PARTITION_FROM=20260201 PARTITION_TO=20260210 \
+bash scripts/ops/optimize_canonical_partitions.sh
+```
+
+### 5) Ограничить число оптимизируемых партиций и паузу между ними
+
+```bash
+INSTRUMENT_KEY='binance:spot:BTCUSDT' \
+MAX_PARTITIONS=3 SLEEP_SECONDS=5 \
+bash scripts/ops/optimize_canonical_partitions.sh
+```
+
+### 6) Задушить и скан, и OPTIMIZE (потоки/память отдельно)
+
+```bash
+INSTRUMENT_KEY='binance:spot:BTCUSDT' \
+SCAN_MAX_THREADS=1 SCAN_MAX_MEMORY_BYTES=$((500*1024*1024)) \
+OPTIMIZE_MAX_THREADS=1 OPTIMIZE_MAX_MEMORY_BYTES=$((700*1024*1024)) \
+bash scripts/ops/optimize_canonical_partitions.sh
+```
+

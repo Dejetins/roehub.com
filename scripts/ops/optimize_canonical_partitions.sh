@@ -9,19 +9,23 @@ set -Eeuo pipefail
 # then runs:
 #   OPTIMIZE TABLE ... PARTITION <YYYYMMDD> FINAL
 #
+# IMPORTANT:
+# - OPTIMIZE PARTITION FINAL affects the whole partition (day), not only that instrument.
+# - Scanning is sequential per-partition and uses ClickHouse settings to cap memory/threads and allow spill to disk.
+#
 # Examples:
 #   INSTRUMENT_KEY='binance:spot:BTCUSDT' DRY_RUN=1 \
-#     bash scripts/ops/optimize_canonical_by_instrument.sh
+#     bash scripts/ops/optimize_canonical_partitions.sh
 #
 #   INSTRUMENT_KEY='binance:spot:BTCUSDT' \
 #     SCAN_MAX_THREADS=1 SCAN_MAX_MEMORY_BYTES=$((600*1024*1024)) \
-#     bash scripts/ops/optimize_canonical_by_instrument.sh
+#     bash scripts/ops/optimize_canonical_partitions.sh
 #
 #   INSTRUMENT_KEY='binance:spot:BTCUSDT' PARTITION_FROM=20260201 PARTITION_TO=20260210 DRY_RUN=1 \
-#     bash scripts/ops/optimize_canonical_by_instrument.sh
+#     bash scripts/ops/optimize_canonical_partitions.sh
 #
 #   INSTRUMENT_KEY='binance:spot:BTCUSDT' MAX_PARTITIONS=3 SLEEP_SECONDS=5 \
-#     bash scripts/ops/optimize_canonical_by_instrument.sh
+#     bash scripts/ops/optimize_canonical_partitions.sh
 
 COMPOSE_FILE="${COMPOSE_FILE:-/opt/roehub/docker-compose.yml}"
 ENV_FILE="${ENV_FILE:-/etc/roehub/roehub.env}"
@@ -30,16 +34,17 @@ SERVICE="${SERVICE:-clickhouse}"
 DB="${DB:-market_data}"
 TABLE="${TABLE:-canonical_candles_1m}"
 
-INSTRUMENT_KEY="${INSTRUMENT_KEY:-}"     # REQUIRED
+# REQUIRED: which instrument to scan for duplicates
+INSTRUMENT_KEY="${INSTRUMENT_KEY:-}"
 
 MIN_DUP_ROWS="${MIN_DUP_ROWS:-1}"
-MAX_PARTITIONS="${MAX_PARTITIONS:-0}"    # 0 = no limit
+MAX_PARTITIONS="${MAX_PARTITIONS:-0}"   # 0 = no limit
 SLEEP_SECONDS="${SLEEP_SECONDS:-2}"
 DRY_RUN="${DRY_RUN:-0}"
 
 # Optional inclusive bounds for partition_id (YYYYMMDD) based on toYYYYMMDD(ts_open)
-PARTITION_FROM="${PARTITION_FROM:-}"     # e.g. 20260201
-PARTITION_TO="${PARTITION_TO:-}"         # e.g. 20260210
+PARTITION_FROM="${PARTITION_FROM:-}"    # e.g. 20260201
+PARTITION_TO="${PARTITION_TO:-}"        # e.g. 20260210
 
 # Scan (duplicate detection) resource limits (ClickHouse SETTINGS)
 SCAN_MAX_THREADS="${SCAN_MAX_THREADS:-1}"
@@ -186,7 +191,7 @@ SETTINGS
   max_threads = ${SCAN_MAX_THREADS},
   max_memory_usage = ${SCAN_MAX_MEMORY_BYTES},
   max_bytes_before_external_group_by = ${SCAN_EXTERNAL_GB_BYTES},
-  max_temporary_data_on_disk = ${SCAN_MAX_TMP_DISK_BYTES}
+  max_temporary_data_on_disk_size_for_query = ${SCAN_MAX_TMP_DISK_BYTES}
   ${scan_time_setting}
 FORMAT TSVRaw
 "
@@ -251,6 +256,7 @@ if (( optimized == 0 )); then
 fi
 
 echo "[$(timestamp)] optimized ${optimized} partition(s). Post-check (memory-capped):"
+
 for p in "${touched_partitions[@]}"; do
   check_query="
 SELECT
@@ -268,7 +274,7 @@ SETTINGS
   max_threads = ${SCAN_MAX_THREADS},
   max_memory_usage = ${SCAN_MAX_MEMORY_BYTES},
   max_bytes_before_external_group_by = ${SCAN_EXTERNAL_GB_BYTES},
-  max_temporary_data_on_disk = ${SCAN_MAX_TMP_DISK_BYTES}
+  max_temporary_data_on_disk_size_for_query = ${SCAN_MAX_TMP_DISK_BYTES}
   ${scan_time_setting}
 FORMAT TSVRaw
 "
