@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 import os
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Sequence
@@ -48,6 +49,26 @@ class RestCatchUpCliReport:
 
 class RestCatchUp1mCli:
     def run(self, argv: Sequence[str]) -> int:
+        """
+        Execute rest-catchup command for one instrument or whole enabled universe.
+
+        Parameters:
+        - argv: command-line args without program name.
+
+        Returns:
+        - Process exit code (`0` on success, `2` when at least one instrument failed).
+
+        Assumptions/Invariants:
+        - Runtime config contains valid ClickHouse and ingestion settings.
+        - Inter-instrument delay is read from `ingestion.rest_inter_instrument_delay_s`.
+
+        Errors/Exceptions:
+        - Propagates argument/config/database initialization errors.
+
+        Side effects:
+        - Executes REST catchup use-case and writes reports to stdout/logs.
+        - Sleeps between instruments when configured and running in all-instruments mode.
+        """
         p = _build_parser()
         ns = p.parse_args(list(argv))
 
@@ -81,7 +102,7 @@ class RestCatchUp1mCli:
             instruments = _load_enabled_instruments(gw, settings.database)
             ok = 0
             fail = 0
-            for inst in instruments:
+            for idx, inst in enumerate(instruments):
                 try:
                     rep = uc.run(inst)
                     ok += 1
@@ -89,6 +110,10 @@ class RestCatchUp1mCli:
                 except Exception:  # noqa: BLE001
                     log.exception("rest-catchup failed for %s", inst)
                     fail += 1
+                _sleep_between_instruments(
+                    delay_s=cfg.ingestion.rest_inter_instrument_delay_s,
+                    has_next=idx < len(instruments) - 1,
+                )
 
             summary = RestCatchUpCliReport(
                 instruments_total=len(instruments),
@@ -113,6 +138,31 @@ class RestCatchUp1mCli:
         rep = uc.run(inst)
         _print_report(rep, fmt=ns.report_format, instrument_id=inst)
         return 0
+
+
+def _sleep_between_instruments(*, delay_s: float, has_next: bool) -> None:
+    """
+    Sleep between instrument runs in sequential CLI mode.
+
+    Parameters:
+    - delay_s: configured pause duration in seconds.
+    - has_next: whether loop has another instrument after current one.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - Delay is non-negative and validated by runtime config parser.
+
+    Errors/Exceptions:
+    - Propagates `ValueError` from `time.sleep` if called with invalid delay.
+
+    Side effects:
+    - Blocks current thread for `delay_s` seconds when conditions are met.
+    """
+    if delay_s <= 0 or not has_next:
+        return
+    time.sleep(delay_s)
 
 
 def _load_enabled_instruments(gw, database: str) -> list[InstrumentId]:

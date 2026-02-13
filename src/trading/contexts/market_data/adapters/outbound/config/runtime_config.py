@@ -146,6 +146,7 @@ class IngestionConfig:
     raw_write: RawWriteConfig
     rest_concurrency_instruments: int
     tail_lookback_minutes: int
+    rest_inter_instrument_delay_s: float
 
     def __post_init__(self) -> None:
         """
@@ -160,6 +161,7 @@ class IngestionConfig:
         Assumptions/Invariants:
         - REST instrument-level concurrency must be positive.
         - Tail lookback in minutes must be positive.
+        - Inter-instrument delay must be non-negative.
 
         Errors/Exceptions:
         - Raises `ValueError` when constraints are violated.
@@ -172,6 +174,10 @@ class IngestionConfig:
             self.rest_concurrency_instruments,
         )
         _require_positive_int("ingestion.tail_lookback_minutes", self.tail_lookback_minutes)
+        _require_non_negative(
+            "ingestion.rest_inter_instrument_delay_s",
+            self.rest_inter_instrument_delay_s,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -414,6 +420,11 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
             ingestion,
             "tail_lookback_minutes",
             default=180,
+        ),
+        rest_inter_instrument_delay_s=_get_float_with_default(
+            ingestion,
+            "rest_inter_instrument_delay_s",
+            default=0.0,
         ),
     )
 

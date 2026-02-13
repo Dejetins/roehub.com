@@ -264,12 +264,13 @@ class _NoSeedRestCatchUpUseCase:
         raise ValueError("Run initial backfill first")
 
 
-def _config(tmp_path: Path):
+def _config(tmp_path: Path, *, rest_inter_instrument_delay_s: float = 0.0):
     """
     Build runtime config fixture for scheduler startup scan test.
 
     Parameters:
     - tmp_path: pytest temporary directory fixture.
+    - rest_inter_instrument_delay_s: pause in seconds between processed instruments.
 
     Returns:
     - Parsed market-data runtime config.
@@ -300,6 +301,7 @@ market_data:
     max_buffer_rows: 1000
     rest_concurrency_instruments: 2
     tail_lookback_minutes: 180
+    rest_inter_instrument_delay_s: __REST_INTER_INSTRUMENT_DELAY_S__
   scheduler:
     jobs:
       sync_whitelist: { interval_seconds: 3600 }
@@ -310,7 +312,13 @@ market_data:
     chunk_align: utc_day
 """
     cfg_path = tmp_path / "market_data.yaml"
-    cfg_path.write_text(yaml_text.strip(), encoding="utf-8")
+    cfg_path.write_text(
+        yaml_text.replace(
+            "__REST_INTER_INSTRUMENT_DELAY_S__",
+            str(rest_inter_instrument_delay_s),
+        ).strip(),
+        encoding="utf-8",
+    )
     return load_market_data_runtime_config(cfg_path)
 
 
@@ -491,6 +499,70 @@ def test_rest_insurance_catchup_runs_for_all_enabled_instruments(
         assert app._metrics.scheduler_rest_catchup_instruments_total.labels(status="ok")._value.get() == 2  # noqa: E501
         assert app._metrics.scheduler_rest_catchup_tail_rows_written_total._value.get() == 10
         assert app._metrics.scheduler_rest_catchup_gap_days_scanned_total._value.get() == 16
+
+    asyncio.run(_scenario())
+
+
+def test_rest_insurance_catchup_applies_configured_inter_instrument_delay(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """
+    Ensure scheduler applies configured pause between processed instruments.
+
+    Parameters:
+    - tmp_path: pytest temporary path fixture.
+    - monkeypatch: pytest monkeypatch fixture.
+
+    Returns:
+    - None.
+    """
+
+    async def _scenario() -> None:
+        monkeypatch.setattr(
+            "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.start_http_server",
+            lambda _port: None,
+        )
+        sleep_calls: list[float] = []
+
+        async def _fake_sleep(delay: float) -> None:
+            """
+            Record requested scheduler delay without blocking test runtime.
+
+            Parameters:
+            - delay: requested sleep duration in seconds.
+
+            Returns:
+            - None.
+            """
+            sleep_calls.append(delay)
+
+        monkeypatch.setattr(
+            "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.asyncio.sleep",
+            _fake_sleep,
+        )
+
+        queue = _RestQueue()
+        rest_catchup = _RestCatchUpUseCase()
+        app = MarketDataSchedulerApp(
+            config=_config(tmp_path, rest_inter_instrument_delay_s=2.0),
+            whitelist_path=str(tmp_path / "missing.csv"),
+            seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
+            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
+            instrument_reader=_MultiInstrumentReader(),
+            index_reader=_IndexReader(),
+            rest_fill_queue=cast(AsyncRestFillQueue, queue),
+            backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
+            rest_catchup_use_case=cast(RestCatchUp1mUseCase, rest_catchup),
+            metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
+            metrics_port=9202,
+        )
+        app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
+
+        await app._run_rest_insurance_job()
+
+        assert sleep_calls == [2.0]
 
     asyncio.run(_scenario())
 

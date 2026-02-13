@@ -511,7 +511,38 @@ class MarketDataSchedulerApp:
             return
 
         semaphore = asyncio.Semaphore(self._config.ingestion.rest_concurrency_instruments)
+        inter_instrument_delay_s = self._config.ingestion.rest_inter_instrument_delay_s
+        remaining_instruments = len(instruments)
+        remaining_instruments_lock = asyncio.Lock()
         now_floor = UtcTimestamp(floor_to_minute_utc(self._clock.now().value))
+
+        async def _sleep_between_instruments_if_needed() -> None:
+            """
+            Apply configured pause only when there are pending instruments in this run.
+
+            Parameters:
+            - None.
+
+            Returns:
+            - None.
+
+            Assumptions/Invariants:
+            - `remaining_instruments` is decremented exactly once per instrument task.
+            - Delay value is already validated as non-negative by runtime config parser.
+
+            Errors/Exceptions:
+            - Propagates asyncio cancellation errors from `asyncio.sleep`.
+
+            Side effects:
+            - Suspends current coroutine for configured delay between instrument runs.
+            """
+            nonlocal remaining_instruments
+            async with remaining_instruments_lock:
+                remaining_instruments -= 1
+                has_next = remaining_instruments > 0
+            if inter_instrument_delay_s <= 0 or not has_next:
+                return
+            await asyncio.sleep(inter_instrument_delay_s)
 
         async def _run_one(instrument: InstrumentId) -> None:
             """
@@ -531,6 +562,7 @@ class MarketDataSchedulerApp:
 
             Side effects:
             - Triggers REST catchup execution and updates scheduler metrics.
+            - Applies configured delay before releasing execution slot when next instrument exists.
             """
             async with semaphore:
                 try:
@@ -556,39 +588,41 @@ class MarketDataSchedulerApp:
                     ).inc()
                     log.exception("rest_insurance_catchup failed for %s", instrument)
                     return
-
-                self._metrics.scheduler_rest_catchup_instruments_total.labels(status="ok").inc()
-                tail_minutes = _minutes_between(report.tail_start, report.tail_end)
-                lag_to_now_minutes = _minutes_between(report.tail_end, now_floor)
-                self._metrics.scheduler_rest_catchup_tail_minutes_total.inc(tail_minutes)
-                self._metrics.scheduler_rest_catchup_tail_rows_written_total.inc(
-                    report.tail_rows_written
-                )
-                self._metrics.scheduler_rest_catchup_gap_days_scanned_total.inc(
-                    report.gap_days_scanned
-                )
-                self._metrics.scheduler_rest_catchup_gap_days_with_gaps_total.inc(
-                    report.gap_days_with_gaps
-                )
-                self._metrics.scheduler_rest_catchup_gap_ranges_filled_total.inc(
-                    report.gap_ranges_filled
-                )
-                self._metrics.scheduler_rest_catchup_gap_rows_written_total.inc(
-                    report.gap_rows_written
-                )
-                log.info(
-                    "rest_insurance_catchup instrument=%s tail_minutes=%s tail_rows_written=%s "
-                    "gap_days_scanned=%s gap_days_with_gaps=%s gap_ranges_filled=%s "
-                    "gap_rows_written=%s lag_to_now_minutes=%s",
-                    instrument,
-                    tail_minutes,
-                    report.tail_rows_written,
-                    report.gap_days_scanned,
-                    report.gap_days_with_gaps,
-                    report.gap_ranges_filled,
-                    report.gap_rows_written,
-                    lag_to_now_minutes,
-                )
+                else:
+                    self._metrics.scheduler_rest_catchup_instruments_total.labels(status="ok").inc()
+                    tail_minutes = _minutes_between(report.tail_start, report.tail_end)
+                    lag_to_now_minutes = _minutes_between(report.tail_end, now_floor)
+                    self._metrics.scheduler_rest_catchup_tail_minutes_total.inc(tail_minutes)
+                    self._metrics.scheduler_rest_catchup_tail_rows_written_total.inc(
+                        report.tail_rows_written
+                    )
+                    self._metrics.scheduler_rest_catchup_gap_days_scanned_total.inc(
+                        report.gap_days_scanned
+                    )
+                    self._metrics.scheduler_rest_catchup_gap_days_with_gaps_total.inc(
+                        report.gap_days_with_gaps
+                    )
+                    self._metrics.scheduler_rest_catchup_gap_ranges_filled_total.inc(
+                        report.gap_ranges_filled
+                    )
+                    self._metrics.scheduler_rest_catchup_gap_rows_written_total.inc(
+                        report.gap_rows_written
+                    )
+                    log.info(
+                        "rest_insurance_catchup instrument=%s tail_minutes=%s tail_rows_written=%s "
+                        "gap_days_scanned=%s gap_days_with_gaps=%s gap_ranges_filled=%s "
+                        "gap_rows_written=%s lag_to_now_minutes=%s",
+                        instrument,
+                        tail_minutes,
+                        report.tail_rows_written,
+                        report.gap_days_scanned,
+                        report.gap_days_with_gaps,
+                        report.gap_ranges_filled,
+                        report.gap_rows_written,
+                        lag_to_now_minutes,
+                    )
+                finally:
+                    await _sleep_between_instruments_if_needed()
 
         await asyncio.gather(
             *[asyncio.create_task(_run_one(instrument)) for instrument in instruments]

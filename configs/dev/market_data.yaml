@@ -88,6 +88,7 @@ market_data:
     max_buffer_rows: 2000
     rest_concurrency_instruments: 4
     tail_lookback_minutes: 180
+    rest_inter_instrument_delay_s: 2.0
 
   live_feed:
     redis_streams:

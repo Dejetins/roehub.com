@@ -39,6 +39,7 @@ market_data:
     max_buffer_rows: 2000
     rest_concurrency_instruments: 7
     tail_lookback_minutes: 240
+    rest_inter_instrument_delay_s: 2.0
   scheduler:
     jobs:
       sync_whitelist: { interval_seconds: 900 }
@@ -57,6 +58,7 @@ market_data:
     assert cfg.raw_write.flush_interval_ms == 250
     assert cfg.ingestion.rest_concurrency_instruments == 7
     assert cfg.ingestion.tail_lookback_minutes == 240
+    assert cfg.ingestion.rest_inter_instrument_delay_s == 2.0
     assert cfg.scheduler.jobs.sync_whitelist.interval_seconds == 900
     assert cfg.backfill.max_days_per_insert == 7
     assert str(cfg.markets[0].rest.earliest_available_ts_utc) == "2017-01-01T00:00:00.000Z"
@@ -115,6 +117,36 @@ market_data:
     assert cfg.scheduler.jobs.sync_whitelist.interval_seconds == 3600
     assert cfg.scheduler.jobs.enrich.interval_seconds == 21600
     assert cfg.scheduler.jobs.rest_insurance_catchup.interval_seconds == 3600
+    assert cfg.ingestion.rest_inter_instrument_delay_s == 0.0
+
+
+def test_inter_instrument_delay_must_be_non_negative(tmp_path: Path) -> None:
+    """
+    Ensure ingestion inter-instrument delay rejects negative values.
+
+    Parameters:
+    - tmp_path: pytest temporary directory fixture.
+
+    Returns:
+    - None.
+    """
+    p = tmp_path / "market_data.yaml"
+    p.write_text(
+        """
+version: 1
+market_data:
+  markets: []
+  ingestion:
+    flush_interval_ms: 250
+    max_buffer_rows: 1000
+    rest_inter_instrument_delay_s: -0.1
+  backfill: { max_days_per_insert: 7, chunk_align: utc_day }
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError):
+        load_market_data_runtime_config(p)
 
 
 def test_live_feed_defaults_to_disabled_when_section_is_missing(tmp_path: Path) -> None:
