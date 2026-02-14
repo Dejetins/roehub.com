@@ -1,0 +1,3 @@
+from .telegram_login_widget_payload_validator import TelegramLoginWidgetPayloadValidator
+
+__all__ = ["TelegramLoginWidgetPayloadValidator"]

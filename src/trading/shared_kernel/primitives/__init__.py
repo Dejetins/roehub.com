@@ -11,9 +11,11 @@ from .candle import Candle
 from .candle_meta import CandleMeta
 from .instrument_id import InstrumentId
 from .market_id import MarketId
+from .paid_level import PaidLevel
 from .symbol import Symbol
 from .time_range import TimeRange
 from .timeframe import Timeframe
+from .user_id import UserId
 from .utc_timestamp import UtcTimestamp
 
 __all__ = [
@@ -21,8 +23,10 @@ __all__ = [
     "CandleMeta",
     "InstrumentId",
     "MarketId",
+    "PaidLevel",
     "Symbol",
     "TimeRange",
     "Timeframe",
     "UtcTimestamp",
+    "UserId",
 ]

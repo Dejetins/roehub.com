@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from apps.api.routes import build_indicators_router
 from apps.api.wiring.modules import (
     bind_indicators_runtime_dependencies,
+    build_identity_router,
     build_indicators_compute,
     build_indicators_registry,
 )
@@ -20,10 +21,13 @@ from trading.platform.config import load_indicators_compute_numba_config
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     """
-    Build FastAPI app with indicators registry wired at startup.
+    Build FastAPI app with indicators and identity modules wired at startup.
 
-    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md,
+      docs/architecture/identity/identity-telegram-login-user-model-v1.md
     Related: apps.api.routes.indicators,
+      apps.api.routes.identity,
+      apps.api.wiring.modules.identity,
       apps.api.wiring.modules.indicators,
       trading.contexts.indicators.application.ports.compute.indicator_compute
 
@@ -32,12 +36,12 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     Returns:
         FastAPI: Application instance with registered routers.
     Assumptions:
-        Registry wiring performs fail-fast validation before first request.
+        Modules wiring performs fail-fast validation before first request.
     Raises:
         FileNotFoundError: If indicators config path is missing.
-        ValueError: If config parsing/validation fails.
+        ValueError: If config parsing/validation fails for indicators or identity.
     Side Effects:
-        Reads indicators YAML and performs Numba warmup at application creation time.
+        Reads indicators YAML, performs Numba warmup, and validates identity runtime settings.
     """
     effective_environ = os.environ if environ is None else environ
     registry = build_indicators_registry(environ=effective_environ)
@@ -51,6 +55,7 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         title="Roehub API",
         version="1.0.0",
     )
+    app.include_router(build_identity_router(environ=effective_environ))
     bind_indicators_runtime_dependencies(
         app_state=app.state,
         compute=compute,
