@@ -105,8 +105,11 @@
 |       `-- indicators.yaml
 |-- deploy/
 |-- docs/
+|   |-- _templates/
+|   |   `-- architecture-doc-template.md
 |   |-- api/
 |   |-- architecture/
+|   |   |-- README.md
 |   |   |-- apps/
 |   |   |   `-- cli/
 |   |   |       `-- cli-backfill-1m.md
@@ -139,7 +142,13 @@
 |   |   |   |-- market-data-use-case-backfill-1m.md
 |   |   |   |-- market-data-ws-live-ingestion-worker-v1.md
 |   |   |   `-- market_data_ddl.sql
-|   |   `-- shared-kernel-primitives.md
+|   |   |-- roadmap/
+|   |   |   |-- base_milestone_plan.md
+|   |   |   |-- milestone-2-epics-v1.md
+|   |   |   `-- milestone-3-epics-v1.md
+|   |   |-- shared-kernel-primitives.md
+|   |   `-- strategy/
+|   |       `-- strategy-milestone-3-epics-v1.md
 |   |-- decisions/
 |   |-- repository_three.md
 |   `-- runbooks/
@@ -547,6 +556,10 @@
 |   |           `-- test_indicators_vol_mom.py
 |   |-- test_smoke.py
 |   `-- unit/
+|       |-- apps/
+|       |   `-- cli/
+|       |       `-- commands/
+|       |           `-- test_rest_catchup_1m_cli.py
 |       |-- contexts/
 |       |   |-- indicators/
 |       |   |   |-- adapters/
@@ -624,17 +637,21 @@
 |       |-- platform/
 |       |   `-- config/
 |       |       `-- test_indicators_compute_numba_config.py
-|       `-- shared_kernel/
-|           `-- primitives/
-|               |-- test_candle.py
-|               |-- test_candle_meta.py
-|               |-- test_instrument_id.py
-|               |-- test_market_id.py
-|               `-- test_timeframe.py
+|       |-- shared_kernel/
+|       |   `-- primitives/
+|       |       |-- test_candle.py
+|       |       |-- test_candle_meta.py
+|       |       |-- test_instrument_id.py
+|       |       |-- test_market_id.py
+|       |       `-- test_timeframe.py
+|       `-- tools/
+|           `-- test_generate_docs_index.py
 |-- tools/
 |   |-- ci/
+|   |-- docs/
+|   |   `-- generate_docs_index.py
 |   |-- format/
 |   `-- lint/
 `-- uv.lock
 
-304 directories, 334 files
+312 directories, 343 files
