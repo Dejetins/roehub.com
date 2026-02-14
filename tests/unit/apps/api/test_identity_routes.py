@@ -272,8 +272,9 @@ def test_current_user_dependency_rejects_invalid_cookie() -> None:
         None.
     """
     client, _ = _build_cookie_test_client()
+    client.cookies.set("roehub_identity_jwt", "invalid-token")
 
-    response = client.get("/auth/current-user", cookies={"roehub_identity_jwt": "invalid-token"})
+    response = client.get("/auth/current-user")
 
     assert response.status_code == 401
     assert response.json()["detail"]["error"] == "invalid_token_format"
@@ -296,8 +297,9 @@ def test_current_user_dependency_accepts_valid_cookie() -> None:
         None.
     """
     client, valid_token = _build_cookie_test_client()
+    client.cookies.set("roehub_identity_jwt", valid_token)
 
-    response = client.get("/auth/current-user", cookies={"roehub_identity_jwt": valid_token})
+    response = client.get("/auth/current-user")
 
     assert response.status_code == 200
     payload = response.json()

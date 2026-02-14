@@ -25,6 +25,7 @@
 |   |   |   `-- main.py
 |   |   |-- routes/
 |   |   |   |-- __init__.py
+|   |   |   |-- identity.py
 |   |   |   `-- indicators.py
 |   |   `-- wiring/
 |   |       |-- __init__.py
@@ -33,6 +34,7 @@
 |   |       |-- db/
 |   |       `-- modules/
 |   |           |-- __init__.py
+|   |           |-- identity.py
 |   |           `-- indicators.py
 |   |-- cli/
 |   |   |-- __init__.py
@@ -113,6 +115,8 @@
 |   |   |-- apps/
 |   |   |   `-- cli/
 |   |   |       `-- cli-backfill-1m.md
+|   |   |-- identity/
+|   |   |   `-- identity-telegram-login-user-model-v1.md
 |   |   |-- indicators/
 |   |   |   |-- README.md
 |   |   |   |-- indicators-application-ports-walking-skeleton-v1.md
@@ -176,6 +180,7 @@
 |-- migrations/
 |   |-- clickhouse/
 |   `-- postgres/
+|       `-- 0001_identity_v1.sql
 |-- pyproject.toml
 |-- repo_tree.md
 |-- scripts/
@@ -215,6 +220,66 @@
 |       |   |       |-- events/
 |       |   |       |-- specifications/
 |       |   |       `-- value_objects/
+|       |   |-- identity/
+|       |   |   |-- __init__.py
+|       |   |   |-- adapters/
+|       |   |   |   |-- __init__.py
+|       |   |   |   |-- inbound/
+|       |   |   |   |   |-- __init__.py
+|       |   |   |   |   `-- api/
+|       |   |   |   |       |-- __init__.py
+|       |   |   |   |       |-- deps/
+|       |   |   |   |       |   |-- __init__.py
+|       |   |   |   |       |   `-- current_user.py
+|       |   |   |   |       `-- routes/
+|       |   |   |   |           |-- __init__.py
+|       |   |   |   |           `-- auth_telegram.py
+|       |   |   |   `-- outbound/
+|       |   |   |       |-- __init__.py
+|       |   |   |       |-- persistence/
+|       |   |   |       |   |-- __init__.py
+|       |   |   |       |   |-- in_memory/
+|       |   |   |       |   |   |-- __init__.py
+|       |   |   |       |   |   `-- user_repository.py
+|       |   |   |       |   `-- postgres/
+|       |   |   |       |       |-- __init__.py
+|       |   |   |       |       |-- gateway.py
+|       |   |   |       |       `-- user_repository.py
+|       |   |   |       |-- security/
+|       |   |   |       |   |-- __init__.py
+|       |   |   |       |   |-- current_user/
+|       |   |   |       |   |   |-- __init__.py
+|       |   |   |       |   |   `-- jwt_cookie_current_user.py
+|       |   |   |       |   |-- jwt/
+|       |   |   |       |   |   |-- __init__.py
+|       |   |   |       |   |   `-- hs256_jwt_codec.py
+|       |   |   |       |   `-- telegram/
+|       |   |   |       |       |-- __init__.py
+|       |   |   |       |       `-- telegram_login_widget_payload_validator.py
+|       |   |   |       `-- time/
+|       |   |   |           |-- __init__.py
+|       |   |   |           `-- system_identity_clock.py
+|       |   |   |-- application/
+|       |   |   |   |-- __init__.py
+|       |   |   |   |-- ports/
+|       |   |   |   |   |-- __init__.py
+|       |   |   |   |   |-- clock.py
+|       |   |   |   |   |-- current_user.py
+|       |   |   |   |   |-- jwt_codec.py
+|       |   |   |   |   |-- telegram_auth_payload_validator.py
+|       |   |   |   |   `-- user_repository.py
+|       |   |   |   `-- use_cases/
+|       |   |   |       |-- __init__.py
+|       |   |   |       `-- telegram_login.py
+|       |   |   `-- domain/
+|       |   |       |-- __init__.py
+|       |   |       |-- entities/
+|       |   |       |   |-- __init__.py
+|       |   |       |   `-- user.py
+|       |   |       `-- value_objects/
+|       |   |           |-- __init__.py
+|       |   |           |-- telegram_chat_id.py
+|       |   |           `-- telegram_user_id.py
 |       |   |-- indicators/
 |       |   |   |-- __init__.py
 |       |   |   |-- adapters/
@@ -537,9 +602,11 @@
 |               |-- candle_meta.py
 |               |-- instrument_id.py
 |               |-- market_id.py
+|               |-- paid_level.py
 |               |-- symbol.py
 |               |-- time_range.py
 |               |-- timeframe.py
+|               |-- user_id.py
 |               `-- utc_timestamp.py
 |-- tests/
 |   |-- integration/
@@ -557,10 +624,21 @@
 |   |-- test_smoke.py
 |   `-- unit/
 |       |-- apps/
+|       |   |-- api/
+|       |   |   |-- test_identity_routes.py
+|       |   |   `-- wiring/
+|       |   |       `-- modules/
 |       |   `-- cli/
 |       |       `-- commands/
 |       |           `-- test_rest_catchup_1m_cli.py
 |       |-- contexts/
+|       |   |-- identity/
+|       |   |   |-- adapters/
+|       |   |   |   `-- outbound/
+|       |   |   |       `-- security/
+|       |   |   |           `-- test_telegram_login_widget_payload_validator.py
+|       |   |   `-- application/
+|       |   |       `-- test_telegram_login_use_case.py
 |       |   |-- indicators/
 |       |   |   |-- adapters/
 |       |   |   |   `-- outbound/
@@ -643,7 +721,9 @@
 |       |       |-- test_candle_meta.py
 |       |       |-- test_instrument_id.py
 |       |       |-- test_market_id.py
-|       |       `-- test_timeframe.py
+|       |       |-- test_paid_level.py
+|       |       |-- test_timeframe.py
+|       |       `-- test_user_id.py
 |       `-- tools/
 |           `-- test_generate_docs_index.py
 |-- tools/
@@ -654,4 +734,4 @@
 |   `-- lint/
 `-- uv.lock
 
-312 directories, 343 files
+342 directories, 393 files
