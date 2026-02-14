@@ -71,5 +71,6 @@
 
 ### Прочее
 
+- [Шаблон архитектурного документа](docs/_templates/architecture-doc-template.md) — `docs/_templates/architecture-doc-template.md` — Используйте этот шаблон для новых документов в `docs/architecture/**`; сразу после `# H1` оставляйте краткое описание в одной строке.
 - [repository three](docs/repository_three.md) — `docs/repository_three.md`
 <!-- END GENERATED DOCS INDEX -->
