@@ -16,6 +16,9 @@ from apps.api.wiring.modules import (
     build_indicators_compute,
     build_indicators_registry,
 )
+from trading.contexts.identity.adapters.inbound.api.deps import (
+    register_two_factor_required_exception_handler,
+)
 from trading.platform.config import load_indicators_compute_numba_config
 
 
@@ -24,7 +27,8 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     Build FastAPI app with indicators and identity modules wired at startup.
 
     Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md,
-      docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      docs/architecture/identity/identity-telegram-login-user-model-v1.md,
+      docs/architecture/identity/identity-2fa-totp-policy-v1.md
     Related: apps.api.routes.indicators,
       apps.api.routes.identity,
       apps.api.wiring.modules.identity,
@@ -55,6 +59,7 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         title="Roehub API",
         version="1.0.0",
     )
+    register_two_factor_required_exception_handler(app=app)
     app.include_router(build_identity_router(environ=effective_environ))
     bind_indicators_runtime_dependencies(
         app_state=app.state,

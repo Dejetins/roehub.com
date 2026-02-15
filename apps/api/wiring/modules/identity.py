@@ -1,7 +1,9 @@
 """
 Composition helpers for identity API module.
 
-Docs: docs/architecture/identity/identity-telegram-login-user-model-v1.md
+Docs:
+  - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+  - docs/architecture/identity/identity-2fa-totp-policy-v1.md
 """
 
 from __future__ import annotations
@@ -14,27 +16,37 @@ from fastapi import APIRouter
 from apps.api.routes import build_identity_router as build_identity_api_router
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.adapters.outbound import (
+    AesGcmEnvelopeTwoFactorSecretCipher,
     Hs256JwtCodec,
+    InMemoryIdentityTwoFactorRepository,
     InMemoryIdentityUserRepository,
     JwtCookieCurrentUser,
+    PostgresIdentityTwoFactorRepository,
     PostgresIdentityUserRepository,
     PsycopgIdentityPostgresGateway,
+    PyOtpTwoFactorTotpProvider,
     SystemIdentityClock,
     TelegramLoginWidgetPayloadValidator,
 )
-from trading.contexts.identity.application import UserRepository
-from trading.contexts.identity.application.use_cases import TelegramLoginUseCase
+from trading.contexts.identity.application import TwoFactorRepository, UserRepository
+from trading.contexts.identity.application.use_cases import (
+    SetupTwoFactorTotpUseCase,
+    TelegramLoginUseCase,
+    VerifyTwoFactorTotpUseCase,
+)
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _IDENTITY_FAIL_FAST_KEY = "IDENTITY_FAIL_FAST"
 _JWT_TTL_DAYS_KEY = "JWT_TTL_DAYS"
 _TELEGRAM_BOT_TOKEN_KEY = "TELEGRAM_BOT_TOKEN"
 _IDENTITY_JWT_SECRET_KEY = "IDENTITY_JWT_SECRET"
+_IDENTITY_2FA_KEK_B64_KEY = "IDENTITY_2FA_KEK_B64"
 _IDENTITY_PG_DSN_KEY = "IDENTITY_PG_DSN"
 _IDENTITY_COOKIE_NAME_KEY = "IDENTITY_COOKIE_NAME"
 _IDENTITY_COOKIE_PATH_KEY = "IDENTITY_COOKIE_PATH"
 _IDENTITY_COOKIE_SAMESITE_KEY = "IDENTITY_COOKIE_SAMESITE"
 _IDENTITY_COOKIE_SECURE_KEY = "IDENTITY_COOKIE_SECURE"
+_DEFAULT_DEV_IDENTITY_2FA_KEK_B64 = "cm9laHViLWRldi1pZGVudGl0eS0yZmEta2V5LTAwMDE="
 _ALLOWED_ENVS = ("dev", "prod", "test")
 _ALLOWED_SAMESITE = ("lax", "none", "strict")
 
@@ -46,6 +58,7 @@ class IdentityRuntimeSettings:
 
     Docs:
       - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/identity-2fa-totp-policy-v1.md
     Related:
       - apps/api/wiring/modules/identity.py
       - apps/api/main/app.py
@@ -57,6 +70,7 @@ class IdentityRuntimeSettings:
     jwt_ttl_days: int
     telegram_bot_token: str
     identity_jwt_secret: str
+    identity_2fa_kek_b64: str
     postgres_dsn: str
     jwt_cookie_name: str
     jwt_cookie_secure: bool
@@ -89,6 +103,8 @@ class IdentityRuntimeSettings:
             raise ValueError("IdentityRuntimeSettings.telegram_bot_token must be non-empty")
         if not self.identity_jwt_secret:
             raise ValueError("IdentityRuntimeSettings.identity_jwt_secret must be non-empty")
+        if not self.identity_2fa_kek_b64:
+            raise ValueError("IdentityRuntimeSettings.identity_2fa_kek_b64 must be non-empty")
         if not self.jwt_cookie_name:
             raise ValueError("IdentityRuntimeSettings.jwt_cookie_name must be non-empty")
         if self.jwt_cookie_samesite not in _ALLOWED_SAMESITE:
@@ -104,7 +120,9 @@ def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
     """
     Build fully wired identity router from environment settings.
 
-    Docs: docs/architecture/identity/identity-telegram-login-user-model-v1.md
+    Docs:
+      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/identity-2fa-totp-policy-v1.md
     Related: apps.api.routes.identity,
       trading.contexts.identity.adapters.outbound,
       apps.api.main.app
@@ -123,6 +141,7 @@ def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
     settings = _resolve_identity_runtime_settings(environ=environ)
     clock = SystemIdentityClock()
     user_repository = _build_user_repository(settings=settings)
+    two_factor_repository = _build_two_factor_repository(settings=settings)
     telegram_validator = TelegramLoginWidgetPayloadValidator(
         bot_token=settings.telegram_bot_token,
     )
@@ -138,6 +157,23 @@ def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
         clock=clock,
         jwt_ttl_days=settings.jwt_ttl_days,
     )
+    two_factor_secret_cipher = AesGcmEnvelopeTwoFactorSecretCipher(
+        kek_b64=settings.identity_2fa_kek_b64,
+    )
+    two_factor_totp_provider = PyOtpTwoFactorTotpProvider()
+    two_factor_setup = SetupTwoFactorTotpUseCase(
+        repository=two_factor_repository,
+        secret_cipher=two_factor_secret_cipher,
+        totp_provider=two_factor_totp_provider,
+        clock=clock,
+        issuer="Roehub",
+    )
+    two_factor_verify = VerifyTwoFactorTotpUseCase(
+        repository=two_factor_repository,
+        secret_cipher=two_factor_secret_cipher,
+        totp_provider=two_factor_totp_provider,
+        clock=clock,
+    )
 
     current_user_port = JwtCookieCurrentUser(
         jwt_codec=jwt_codec,
@@ -150,6 +186,8 @@ def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
 
     return build_identity_api_router(
         telegram_login=telegram_login,
+        two_factor_setup=two_factor_setup,
+        two_factor_verify=two_factor_verify,
         current_user_dependency=current_user_dependency,
         cookie_name=settings.jwt_cookie_name,
         cookie_secure=settings.jwt_cookie_secure,
@@ -181,6 +219,28 @@ def _build_user_repository(*, settings: IdentityRuntimeSettings) -> UserReposito
 
 
 
+def _build_two_factor_repository(*, settings: IdentityRuntimeSettings) -> TwoFactorRepository:
+    """
+    Build 2FA repository adapter based on runtime DSN availability.
+
+    Args:
+        settings: Resolved runtime settings.
+    Returns:
+        TwoFactorRepository: Postgres or in-memory adapter.
+    Assumptions:
+        Postgres DSN is optional in dev/test, in-memory fallback is acceptable for local runs.
+    Raises:
+        ValueError: If Postgres DSN is malformed for gateway construction.
+    Side Effects:
+        None.
+    """
+    if settings.postgres_dsn:
+        gateway = PsycopgIdentityPostgresGateway(dsn=settings.postgres_dsn)
+        return PostgresIdentityTwoFactorRepository(gateway=gateway)
+    return InMemoryIdentityTwoFactorRepository()
+
+
+
 def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> IdentityRuntimeSettings:
     """
     Resolve identity runtime settings with fail-fast policy and defaults.
@@ -206,6 +266,7 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
     )
     telegram_bot_token = environ.get(_TELEGRAM_BOT_TOKEN_KEY, "").strip()
     identity_jwt_secret = environ.get(_IDENTITY_JWT_SECRET_KEY, "").strip()
+    identity_2fa_kek_b64 = environ.get(_IDENTITY_2FA_KEK_B64_KEY, "").strip()
 
     if fail_fast:
         if not telegram_bot_token:
@@ -216,9 +277,14 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
             raise ValueError(
                 f"{_IDENTITY_JWT_SECRET_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
             )
+        if not identity_2fa_kek_b64:
+            raise ValueError(
+                f"{_IDENTITY_2FA_KEK_B64_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
+            )
 
     effective_telegram_token = telegram_bot_token or "dev-telegram-bot-token"
     effective_jwt_secret = identity_jwt_secret or "dev-identity-jwt-secret"
+    effective_2fa_kek_b64 = identity_2fa_kek_b64 or _DEFAULT_DEV_IDENTITY_2FA_KEK_B64
 
     postgres_dsn = environ.get(_IDENTITY_PG_DSN_KEY, "").strip()
     cookie_name = environ.get(_IDENTITY_COOKIE_NAME_KEY, "roehub_identity_jwt").strip()
@@ -232,6 +298,7 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
         jwt_ttl_days=jwt_ttl_days,
         telegram_bot_token=effective_telegram_token,
         identity_jwt_secret=effective_jwt_secret,
+        identity_2fa_kek_b64=effective_2fa_kek_b64,
         postgres_dsn=postgres_dsn,
         jwt_cookie_name=cookie_name,
         jwt_cookie_secure=cookie_secure,

@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from apps.api.routes import build_identity_router
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
+    InMemoryIdentityTwoFactorRepository,
     InMemoryIdentityUserRepository,
 )
 from trading.contexts.identity.adapters.outbound.security.current_user import (
@@ -20,12 +21,20 @@ from trading.contexts.identity.adapters.outbound.security.jwt import Hs256JwtCod
 from trading.contexts.identity.adapters.outbound.security.telegram import (
     TelegramLoginWidgetPayloadValidator,
 )
+from trading.contexts.identity.adapters.outbound.security.two_factor import (
+    AesGcmEnvelopeTwoFactorSecretCipher,
+    PyOtpTwoFactorTotpProvider,
+)
 from trading.contexts.identity.application.ports.clock import IdentityClock
 from trading.contexts.identity.application.ports.jwt_codec import IdentityJwtClaims
 from trading.contexts.identity.application.ports.telegram_auth_payload_validator import (
     TelegramAuthPayloadValidator,
 )
-from trading.contexts.identity.application.use_cases import TelegramLoginUseCase
+from trading.contexts.identity.application.use_cases import (
+    SetupTwoFactorTotpUseCase,
+    TelegramLoginUseCase,
+    VerifyTwoFactorTotpUseCase,
+)
 from trading.contexts.identity.domain.value_objects import TelegramUserId
 from trading.shared_kernel.primitives import PaidLevel
 
@@ -164,11 +173,14 @@ def _build_cookie_test_client() -> tuple[TestClient, str]:
         clock=clock,
         jwt_ttl_days=7,
     )
+    two_factor_setup, two_factor_verify = _build_two_factor_use_cases(clock=clock)
 
     app = FastAPI()
     app.include_router(
         build_identity_router(
             telegram_login=login_use_case,
+            two_factor_setup=two_factor_setup,
+            two_factor_verify=two_factor_verify,
             current_user_dependency=current_user_dependency,
             cookie_name="roehub_identity_jwt",
             cookie_secure=False,
@@ -178,6 +190,45 @@ def _build_cookie_test_client() -> tuple[TestClient, str]:
     )
     return TestClient(app), valid_token
 
+
+
+def _build_two_factor_use_cases(
+    *,
+    clock: IdentityClock,
+) -> tuple[SetupTwoFactorTotpUseCase, VerifyTwoFactorTotpUseCase]:
+    """
+    Build identity 2FA setup/verify use-cases for API router tests.
+
+    Args:
+        clock: Deterministic UTC clock shared with route dependencies.
+    Returns:
+        tuple[SetupTwoFactorTotpUseCase, VerifyTwoFactorTotpUseCase]: Wired 2FA use-cases.
+    Assumptions:
+        In-memory repository is sufficient for route-level behavior tests.
+    Raises:
+        ValueError: If any dependency construction is invalid.
+    Side Effects:
+        None.
+    """
+    repository = InMemoryIdentityTwoFactorRepository()
+    secret_cipher = AesGcmEnvelopeTwoFactorSecretCipher(
+        kek_b64="cm9laHViLWRldi1pZGVudGl0eS0yZmEta2V5LTAwMDE=",
+    )
+    totp_provider = PyOtpTwoFactorTotpProvider()
+    setup_use_case = SetupTwoFactorTotpUseCase(
+        repository=repository,
+        secret_cipher=secret_cipher,
+        totp_provider=totp_provider,
+        clock=clock,
+        issuer="Roehub",
+    )
+    verify_use_case = VerifyTwoFactorTotpUseCase(
+        repository=repository,
+        secret_cipher=secret_cipher,
+        totp_provider=totp_provider,
+        clock=clock,
+    )
+    return setup_use_case, verify_use_case
 
 
 def _build_signed_telegram_payload(
@@ -341,11 +392,14 @@ def test_post_auth_telegram_login_sets_http_only_cookie() -> None:
         clock=clock,
         jwt_ttl_days=7,
     )
+    two_factor_setup, two_factor_verify = _build_two_factor_use_cases(clock=clock)
 
     app = FastAPI()
     app.include_router(
         build_identity_router(
             telegram_login=login_use_case,
+            two_factor_setup=two_factor_setup,
+            two_factor_verify=two_factor_verify,
             current_user_dependency=current_user_dependency,
             cookie_name="roehub_identity_jwt",
             cookie_secure=False,
