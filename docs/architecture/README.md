@@ -55,6 +55,7 @@
 - [milestone 2 epics v1](docs/architecture/roadmap/milestone-2-epics-v1.md) — `docs/architecture/roadmap/milestone-2-epics-v1.md`
 - [Milestone 3 — EPIC map (v1)](docs/architecture/roadmap/milestone-3-epics-v1.md) — `docs/architecture/roadmap/milestone-3-epics-v1.md` — Карта EPIC’ов для Milestone 3: Telegram-only регистрация + 2FA-гейтинг ключей + Strategy v1 (immutable) + live runner + realtime streams + telegram notifications.
 - [Shared Kernel — Primitives (Trading)](docs/architecture/shared-kernel-primitives.md) — `docs/architecture/shared-kernel-primitives.md` — Этот документ фиксирует минимальные доменные примитивы Shared Kernel и правила, которые должны быть одинаковыми во всех bounded contexts.
+- [Strategy v1 — Immutable Spec + Storage + Runs/Events + Migrations Automation](docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md) — `docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md` — Документ фиксирует доменную модель Strategy v1 (immutable spec), хранение в Postgres (strategies/runs/events) и правила автоприменения миграций через Alembic.
 - [Strategy — User Goal & Scope (Milestone 3 / EPIC 0)](docs/architecture/strategy/strategy-milestone-3-epics-v1.md) — `docs/architecture/strategy/strategy-milestone-3-epics-v1.md` — Документ фиксирует целевой пользовательский сценарий и границы `Strategy v1` (Milestone 3) перед реализацией EPIC’ов 1–13.
 
 ### Ранбуки

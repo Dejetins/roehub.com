@@ -118,6 +118,7 @@
 |   |   |-- identity/
 |   |   |   |-- identity-2fa-totp-policy-v1.md
 |   |   |   |-- identity-exchange-keys-storage-2fa-gate-policy-v1.md
+|   |   |   |-- identity-exchange-keys-storage-2fa-gate-policy-v2.md
 |   |   |   `-- identity-telegram-login-user-model-v1.md
 |   |   |-- indicators/
 |   |   |   |-- README.md
@@ -184,7 +185,8 @@
 |   `-- postgres/
 |       |-- 0001_identity_v1.sql
 |       |-- 0002_identity_2fa_totp_v1.sql
-|       `-- 0003_identity_exchange_keys_v1.sql
+|       |-- 0003_identity_exchange_keys_v1.sql
+|       `-- 0004_identity_exchange_keys_v2.sql
 |-- pyproject.toml
 |-- repo_tree.md
 |-- scripts/
@@ -778,4 +780,4 @@
 |   `-- lint/
 `-- uv.lock
 
-345 directories, 434 files
+345 directories, 436 files
