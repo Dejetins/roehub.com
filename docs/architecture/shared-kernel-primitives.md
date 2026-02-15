@@ -4,6 +4,7 @@
 
 Цель:
 - единые идентичности (`MarketId`, `Symbol`, `InstrumentId`);
+- единая идентичность пользователя (`UserId`) для межконтекстной связности;
 - единые правила времени (`UtcTimestamp`, `TimeRange`);
 - единая каноническая свеча (`Candle`) и отдельно её метаданные (`CandleMeta`);
 - единый параметр таймфрейма (`Timeframe`) и правила rollup из 1m.
@@ -105,6 +106,31 @@
 
 **Serialization**  
 - канонично: `{ "market_id": <int>, "symbol": "<str>" }`.
+
+
+---
+
+### UserId
+
+**Purpose**  
+`UserId` — сквозной идентификатор пользователя для всех bounded contexts, где нужен
+стабильный субъект (strategy/backtest/optimize/risk/identity).
+
+**Representation**  
+- value object вокруг `UUID` (см. `src/trading/shared_kernel/primitives/user_id.py`).
+
+**Invariants**  
+- значение обязано быть валидным `UUID`;
+- строковый формат должен быть канонически парсируем через UUID-представление.
+
+**Source of truth (DDL)**  
+- `identity_users.user_id UUID` в `migrations/postgres/0001_identity_v1.sql`.
+
+**Serialization**  
+- как UUID-строка (например `00000000-0000-0000-0000-000000000001`).
+
+> Примечание: `UserId` — не Telegram-specific идентификатор.  
+> `telegram_user_id` остаётся отдельным identity-атрибутом/ключом входа.
 
 
 ---
