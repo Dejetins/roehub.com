@@ -54,6 +54,29 @@ class IdentityPostgresGateway(Protocol):
         """
         ...
 
+    def fetch_all(
+        self,
+        *,
+        query: str,
+        parameters: Mapping[str, Any],
+    ) -> tuple[Mapping[str, Any], ...]:
+        """
+        Execute SQL query and return all rows as mappings.
+
+        Args:
+            query: SQL text.
+            parameters: Bind parameters mapping.
+        Returns:
+            tuple[Mapping[str, Any], ...]: Zero or more result rows.
+        Assumptions:
+            Row ordering is controlled by SQL `ORDER BY` clauses.
+        Raises:
+            Exception: Storage/driver exceptions from implementation.
+        Side Effects:
+            Executes one SQL statement.
+        """
+        ...
+
 
 class PsycopgIdentityPostgresGateway(IdentityPostgresGateway):
     """
@@ -136,3 +159,33 @@ class PsycopgIdentityPostgresGateway(IdentityPostgresGateway):
         ) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
+
+    def fetch_all(
+        self,
+        *,
+        query: str,
+        parameters: Mapping[str, Any],
+    ) -> tuple[Mapping[str, Any], ...]:
+        """
+        Execute query and return all rows mapped by column names.
+
+        Args:
+            query: SQL text.
+            parameters: Bind parameters mapping.
+        Returns:
+            tuple[Mapping[str, Any], ...]: Query rows (possibly empty).
+        Assumptions:
+            psycopg connection context handles transaction commit/rollback.
+        Raises:
+            psycopg.Error: When database operation fails.
+        Side Effects:
+            Opens one database connection and executes one query.
+        """
+        with psycopg.connect(
+            self._dsn,
+            row_factory=cast(Any, dict_row),
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(cast(Any, query), parameters)
+                rows = cursor.fetchall()
+        return tuple(dict(row) for row in rows)

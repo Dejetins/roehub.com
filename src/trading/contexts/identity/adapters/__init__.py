@@ -3,7 +3,9 @@ Adapters package for identity bounded context.
 """
 
 from .inbound import (
+    CreateExchangeKeyRequest,
     CurrentUserResponse,
+    ExchangeKeyResponse,
     RequireCurrentUserDependency,
     RequireTwoFactorEnabledDependency,
     TelegramLoginRequest,
@@ -13,16 +15,20 @@ from .inbound import (
     TwoFactorVerifyRequest,
     TwoFactorVerifyResponse,
     build_auth_telegram_router,
+    build_exchange_keys_router,
     build_two_factor_totp_router,
     register_two_factor_required_exception_handler,
 )
 from .outbound import (
+    AesGcmEnvelopeExchangeKeysSecretCipher,
     AesGcmEnvelopeTwoFactorSecretCipher,
     Hs256JwtCodec,
     IdentityPostgresGateway,
+    InMemoryIdentityExchangeKeysRepository,
     InMemoryIdentityTwoFactorRepository,
     InMemoryIdentityUserRepository,
     JwtCookieCurrentUser,
+    PostgresIdentityExchangeKeysRepository,
     PostgresIdentityTwoFactorRepository,
     PostgresIdentityUserRepository,
     PsycopgIdentityPostgresGateway,
@@ -33,13 +39,18 @@ from .outbound import (
 )
 
 __all__ = [
+    "AesGcmEnvelopeExchangeKeysSecretCipher",
     "AesGcmEnvelopeTwoFactorSecretCipher",
+    "CreateExchangeKeyRequest",
     "CurrentUserResponse",
+    "ExchangeKeyResponse",
     "Hs256JwtCodec",
     "IdentityPostgresGateway",
+    "InMemoryIdentityExchangeKeysRepository",
     "InMemoryIdentityTwoFactorRepository",
     "InMemoryIdentityUserRepository",
     "JwtCookieCurrentUser",
+    "PostgresIdentityExchangeKeysRepository",
     "PostgresIdentityTwoFactorRepository",
     "PostgresIdentityUserRepository",
     "PyOtpTwoFactorTotpProvider",
@@ -56,6 +67,7 @@ __all__ = [
     "TwoFactorVerifyRequest",
     "TwoFactorVerifyResponse",
     "build_auth_telegram_router",
+    "build_exchange_keys_router",
     "build_two_factor_totp_router",
     "register_two_factor_required_exception_handler",
 ]

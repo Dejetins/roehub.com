@@ -1,5 +1,7 @@
 from .api import (
+    CreateExchangeKeyRequest,
     CurrentUserResponse,
+    ExchangeKeyResponse,
     RequireCurrentUserDependency,
     RequireTwoFactorEnabledDependency,
     TelegramLoginRequest,
@@ -9,13 +11,16 @@ from .api import (
     TwoFactorVerifyRequest,
     TwoFactorVerifyResponse,
     build_auth_telegram_router,
+    build_exchange_keys_router,
     build_two_factor_totp_router,
     register_two_factor_required_exception_handler,
     two_factor_required_http_error_handler,
 )
 
 __all__ = [
+    "CreateExchangeKeyRequest",
     "CurrentUserResponse",
+    "ExchangeKeyResponse",
     "RequireCurrentUserDependency",
     "RequireTwoFactorEnabledDependency",
     "TelegramLoginRequest",
@@ -25,6 +30,7 @@ __all__ = [
     "TwoFactorVerifyRequest",
     "TwoFactorVerifyResponse",
     "build_auth_telegram_router",
+    "build_exchange_keys_router",
     "build_two_factor_totp_router",
     "register_two_factor_required_exception_handler",
     "two_factor_required_http_error_handler",

@@ -117,6 +117,7 @@
 |   |   |       `-- cli-backfill-1m.md
 |   |   |-- identity/
 |   |   |   |-- identity-2fa-totp-policy-v1.md
+|   |   |   |-- identity-exchange-keys-storage-2fa-gate-policy-v1.md
 |   |   |   `-- identity-telegram-login-user-model-v1.md
 |   |   |-- indicators/
 |   |   |   |-- README.md
@@ -182,7 +183,8 @@
 |   |   `-- market_data_ddl.sql
 |   `-- postgres/
 |       |-- 0001_identity_v1.sql
-|       `-- 0002_identity_2fa_totp_v1.sql
+|       |-- 0002_identity_2fa_totp_v1.sql
+|       `-- 0003_identity_exchange_keys_v1.sql
 |-- pyproject.toml
 |-- repo_tree.md
 |-- scripts/
@@ -237,6 +239,7 @@
 |       |   |   |   |       `-- routes/
 |       |   |   |   |           |-- __init__.py
 |       |   |   |   |           |-- auth_telegram.py
+|       |   |   |   |           |-- exchange_keys.py
 |       |   |   |   |           `-- two_factor_totp.py
 |       |   |   |   `-- outbound/
 |       |   |   |       |-- __init__.py
@@ -244,10 +247,12 @@
 |       |   |   |       |   |-- __init__.py
 |       |   |   |       |   |-- in_memory/
 |       |   |   |       |   |   |-- __init__.py
+|       |   |   |       |   |   |-- exchange_keys_repository.py
 |       |   |   |       |   |   |-- two_factor_repository.py
 |       |   |   |       |   |   `-- user_repository.py
 |       |   |   |       |   `-- postgres/
 |       |   |   |       |       |-- __init__.py
+|       |   |   |       |       |-- exchange_keys_repository.py
 |       |   |   |       |       |-- gateway.py
 |       |   |   |       |       |-- two_factor_repository.py
 |       |   |   |       |       `-- user_repository.py
@@ -259,6 +264,9 @@
 |       |   |   |       |   |-- current_user/
 |       |   |   |       |   |   |-- __init__.py
 |       |   |   |       |   |   `-- jwt_cookie_current_user.py
+|       |   |   |       |   |-- exchange_keys/
+|       |   |   |       |   |   |-- __init__.py
+|       |   |   |       |   |   `-- aes_gcm_envelope_secret_cipher.py
 |       |   |   |       |   |-- jwt/
 |       |   |   |       |   |   |-- __init__.py
 |       |   |   |       |   |   `-- hs256_jwt_codec.py
@@ -278,6 +286,8 @@
 |       |   |   |   |   |-- __init__.py
 |       |   |   |   |   |-- clock.py
 |       |   |   |   |   |-- current_user.py
+|       |   |   |   |   |-- exchange_keys_repository.py
+|       |   |   |   |   |-- exchange_keys_secret_cipher.py
 |       |   |   |   |   |-- jwt_codec.py
 |       |   |   |   |   |-- telegram_auth_payload_validator.py
 |       |   |   |   |   |-- two_factor_policy_gate.py
@@ -287,6 +297,11 @@
 |       |   |   |   |   `-- user_repository.py
 |       |   |   |   `-- use_cases/
 |       |   |   |       |-- __init__.py
+|       |   |   |       |-- create_exchange_key.py
+|       |   |   |       |-- delete_exchange_key.py
+|       |   |   |       |-- exchange_keys_errors.py
+|       |   |   |       |-- exchange_keys_models.py
+|       |   |   |       |-- list_exchange_keys.py
 |       |   |   |       |-- setup_two_factor_totp.py
 |       |   |   |       |-- telegram_login.py
 |       |   |   |       |-- two_factor_errors.py
@@ -295,6 +310,7 @@
 |       |   |       |-- __init__.py
 |       |   |       |-- entities/
 |       |   |       |   |-- __init__.py
+|       |   |       |   |-- exchange_key.py
 |       |   |       |   |-- two_factor_auth.py
 |       |   |       |   `-- user.py
 |       |   |       `-- value_objects/
@@ -646,6 +662,7 @@
 |   `-- unit/
 |       |-- apps/
 |       |   |-- api/
+|       |   |   |-- test_identity_exchange_keys_routes.py
 |       |   |   |-- test_identity_routes.py
 |       |   |   |-- test_identity_two_factor_gate_dependency.py
 |       |   |   |-- test_identity_two_factor_routes.py
@@ -660,8 +677,10 @@
 |       |   |   |-- adapters/
 |       |   |   |   `-- outbound/
 |       |   |   |       `-- security/
+|       |   |   |           |-- test_exchange_keys_aes_gcm_envelope_secret_cipher.py
 |       |   |   |           `-- test_telegram_login_widget_payload_validator.py
 |       |   |   `-- application/
+|       |   |       |-- test_exchange_keys_use_cases.py
 |       |   |       |-- test_telegram_login_use_case.py
 |       |   |       `-- test_two_factor_totp_use_cases.py
 |       |   |-- indicators/
@@ -759,4 +778,4 @@
 |   `-- lint/
 `-- uv.lock
 
-344 directories, 416 files
+345 directories, 434 files
