@@ -15,7 +15,7 @@ class InMemoryIdentityExchangeKeysRepository(ExchangeKeysRepository):
     InMemoryIdentityExchangeKeysRepository — deterministic in-memory exchange keys storage.
 
     Docs:
-      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
     Related:
       - src/trading/contexts/identity/application/ports/exchange_keys_repository.py
       - src/trading/contexts/identity/adapters/outbound/persistence/postgres/
@@ -49,7 +49,9 @@ class InMemoryIdentityExchangeKeysRepository(ExchangeKeysRepository):
         market_type: str,
         label: str | None,
         permissions: str,
-        api_key: str,
+        api_key_enc: bytes,
+        api_key_hash: bytes,
+        api_key_last4: str,
         api_secret_enc: bytes,
         passphrase_enc: bytes | None,
         created_at: datetime,
@@ -65,7 +67,9 @@ class InMemoryIdentityExchangeKeysRepository(ExchangeKeysRepository):
             market_type: Market type literal.
             label: Optional user label.
             permissions: Permission literal.
-            api_key: API key value.
+            api_key_enc: Encrypted API key bytes.
+            api_key_hash: Deterministic API key hash bytes.
+            api_key_last4: Deterministic API key suffix for masked responses.
             api_secret_enc: Encrypted API secret bytes.
             passphrase_enc: Optional encrypted passphrase bytes.
             created_at: UTC creation timestamp.
@@ -73,7 +77,7 @@ class InMemoryIdentityExchangeKeysRepository(ExchangeKeysRepository):
         Returns:
             ExchangeKey | None: Created row or `None` when active duplicate exists.
         Assumptions:
-            Active duplicate uniqueness is `(user_id, exchange_name, market_type, api_key)`.
+            Active duplicate uniqueness is `(user_id, exchange_name, market_type, api_key_hash)`.
         Raises:
             ValueError: If domain invariants reject constructed row.
         Side Effects:
@@ -88,7 +92,7 @@ class InMemoryIdentityExchangeKeysRepository(ExchangeKeysRepository):
                 continue
             if existing.market_type != market_type:
                 continue
-            if existing.api_key != api_key:
+            if existing.api_key_hash != api_key_hash:
                 continue
             return None
 
@@ -99,7 +103,9 @@ class InMemoryIdentityExchangeKeysRepository(ExchangeKeysRepository):
             market_type=market_type,
             label=label,
             permissions=permissions,
-            api_key=api_key,
+            api_key_enc=bytes(api_key_enc),
+            api_key_hash=bytes(api_key_hash),
+            api_key_last4=api_key_last4,
             api_secret_enc=bytes(api_secret_enc),
             passphrase_enc=bytes(passphrase_enc) if passphrase_enc is not None else None,
             created_at=created_at,
@@ -173,7 +179,9 @@ class InMemoryIdentityExchangeKeysRepository(ExchangeKeysRepository):
             market_type=existing.market_type,
             label=existing.label,
             permissions=existing.permissions,
-            api_key=existing.api_key,
+            api_key_enc=existing.api_key_enc,
+            api_key_hash=existing.api_key_hash,
+            api_key_last4=existing.api_key_last4,
             api_secret_enc=existing.api_secret_enc,
             passphrase_enc=existing.passphrase_enc,
             created_at=existing.created_at,

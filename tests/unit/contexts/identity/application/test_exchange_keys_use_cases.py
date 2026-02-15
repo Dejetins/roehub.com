@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timezone
+from uuid import UUID
 
 import pytest
 
@@ -16,6 +18,7 @@ from trading.contexts.identity.application.use_cases import (
     DeleteExchangeKeyUseCase,
     ExchangeKeyAlreadyExistsError,
     ExchangeKeyNotFoundError,
+    ExchangeKeyValidationError,
     ListExchangeKeysUseCase,
 )
 from trading.shared_kernel.primitives import UserId
@@ -125,10 +128,44 @@ def test_create_exchange_key_encrypts_secret_and_returns_masked_projection() -> 
     stored = repository.list_active_for_user(user_id=user_id)
     assert len(stored) == 1
     stored_row = stored[0]
+    assert stored_row.api_key_enc != b"ABCD12345678"
+    assert stored_row.api_key_hash == hashlib.sha256(b"ABCD12345678").digest()
+    assert stored_row.api_key_last4 == "5678"
+    assert (
+        cipher.decrypt_secret(
+            secret_enc=stored_row.api_key_enc,
+            aad=_build_exchange_keys_aad(
+                user_id=user_id,
+                key_id=stored_row.key_id,
+                field_name="api_key",
+            ),
+        )
+        == "ABCD12345678"
+    )
     assert stored_row.api_secret_enc != b"secret-value-1"
-    assert cipher.decrypt_secret(secret_enc=stored_row.api_secret_enc) == "secret-value-1"
+    assert (
+        cipher.decrypt_secret(
+            secret_enc=stored_row.api_secret_enc,
+            aad=_build_exchange_keys_aad(
+                user_id=user_id,
+                key_id=stored_row.key_id,
+                field_name="api_secret",
+            ),
+        )
+        == "secret-value-1"
+    )
     assert stored_row.passphrase_enc is not None
-    assert cipher.decrypt_secret(secret_enc=stored_row.passphrase_enc) == "passphrase-value-1"
+    assert (
+        cipher.decrypt_secret(
+            secret_enc=stored_row.passphrase_enc,
+            aad=_build_exchange_keys_aad(
+                user_id=user_id,
+                key_id=stored_row.key_id,
+                field_name="passphrase",
+            ),
+        )
+        == "passphrase-value-1"
+    )
 
 
 def test_create_exchange_key_rejects_active_duplicate() -> None:
@@ -140,7 +177,7 @@ def test_create_exchange_key_rejects_active_duplicate() -> None:
     Returns:
         None.
     Assumptions:
-        Duplicate uniqueness is `(user_id, exchange_name, market_type, api_key)`.
+        Duplicate uniqueness is `(user_id, exchange_name, market_type, api_key_hash)`.
     Raises:
         AssertionError: If duplicate is unexpectedly accepted.
     Side Effects:
@@ -167,17 +204,60 @@ def test_create_exchange_key_rejects_active_duplicate() -> None:
         passphrase=None,
     )
 
-    with pytest.raises(ExchangeKeyAlreadyExistsError):
+    duplicate_plaintext_api_key = "DUPLICATE-KEY-0001"
+    with pytest.raises(ExchangeKeyAlreadyExistsError) as error_info:
         create_use_case.create(
             user_id=user_id,
             exchange_name="bybit",
             market_type="futures",
             label="duplicate",
             permissions="trade",
-            api_key="DUPLICATE-KEY-0001",
+            api_key=f"  {duplicate_plaintext_api_key}  ",
             api_secret="secret-value-b",
             passphrase=None,
         )
+    assert duplicate_plaintext_api_key not in str(error_info.value)
+
+
+def test_create_exchange_key_validation_error_message_never_contains_secret_input() -> None:
+    """
+    Verify validation errors are deterministic and never include raw secret inputs.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Validation errors must stay public-safe for API payloads/logs.
+    Raises:
+        AssertionError: If exception message leaks supplied secret-like values.
+    Side Effects:
+        None.
+    """
+    now = datetime(2026, 2, 15, 10, 8, 0, tzinfo=timezone.utc)
+    clock = _MutableClock(now_value=now)
+    create_use_case = CreateExchangeKeyUseCase(
+        repository=InMemoryIdentityExchangeKeysRepository(),
+        secret_cipher=_build_cipher(),
+        clock=clock,
+    )
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000001022")
+    sensitive_value = "SENSITIVE-SECRET-SHOULD-NOT-LEAK"
+
+    with pytest.raises(ExchangeKeyValidationError) as error_info:
+        create_use_case.create(
+            user_id=user_id,
+            exchange_name="binance",
+            market_type="spot",
+            label=None,
+            permissions="read",
+            api_key="   ",
+            api_secret=sensitive_value,
+            passphrase=sensitive_value,
+        )
+
+    assert str(error_info.value) == "Exchange API key must be non-empty."
+    assert sensitive_value not in str(error_info.value)
 
 
 def test_list_exchange_keys_returns_deterministic_order_and_skips_deleted_rows() -> None:
@@ -288,6 +368,49 @@ def test_delete_exchange_key_soft_deletes_and_missing_key_raises_not_found() -> 
         delete_use_case.delete(user_id=user_id, key_id=created.key_id)
 
 
+def test_delete_exchange_key_for_foreign_owner_raises_not_found() -> None:
+    """
+    Verify delete use-case returns deterministic not-found for foreign ownership attempts.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Delete semantics collapse foreign and missing rows into a single 404-equivalent error.
+    Raises:
+        AssertionError: If foreign-delete attempt is not rejected as not-found.
+    Side Effects:
+        None.
+    """
+    now = datetime(2026, 2, 15, 11, 40, 0, tzinfo=timezone.utc)
+    clock = _MutableClock(now_value=now)
+    repository = InMemoryIdentityExchangeKeysRepository()
+    create_use_case = CreateExchangeKeyUseCase(
+        repository=repository,
+        secret_cipher=_build_cipher(),
+        clock=clock,
+    )
+    delete_use_case = DeleteExchangeKeyUseCase(repository=repository, clock=clock)
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000001005")
+    foreign_user_id = UserId.from_string("00000000-0000-0000-0000-000000001006")
+
+    created = create_use_case.create(
+        user_id=owner_user_id,
+        exchange_name="binance",
+        market_type="spot",
+        label="owner",
+        permissions="read",
+        api_key="FOREIGN-DELETE-KEY-0001",
+        api_secret="foreign-secret-1",
+        passphrase=None,
+    )
+
+    with pytest.raises(ExchangeKeyNotFoundError):
+        delete_use_case.delete(user_id=foreign_user_id, key_id=created.key_id)
+    assert repository._rows[str(created.key_id)].is_deleted is False
+
+
 def _build_cipher() -> AesGcmEnvelopeExchangeKeysSecretCipher:
     """
     Build deterministic exchange keys envelope cipher for tests.
@@ -306,6 +429,28 @@ def _build_cipher() -> AesGcmEnvelopeExchangeKeysSecretCipher:
     return AesGcmEnvelopeExchangeKeysSecretCipher(
         kek_b64="cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE=",
     )
+
+
+def _build_exchange_keys_aad(*, user_id: UserId, key_id: UUID, field_name: str) -> str:
+    """
+    Build deterministic v2 AAD value used by exchange keys cipher in tests.
+
+    Args:
+        user_id: Owner identity user id.
+        key_id: Exchange key identifier value.
+        field_name: Secret field name (`api_key`, `api_secret`, `passphrase`).
+    Returns:
+        str: AAD value matching create use-case contract.
+    Assumptions:
+        Caller provides field names from the supported set.
+    Raises:
+        ValueError: If field name is unsupported.
+    Side Effects:
+        None.
+    """
+    if field_name not in {"api_key", "api_secret", "passphrase"}:
+        raise ValueError("Unsupported field_name for exchange keys AAD test helper")
+    return f"roehub.identity.exchange_keys.v2|{user_id}|{key_id}|{field_name}"
 
 
 

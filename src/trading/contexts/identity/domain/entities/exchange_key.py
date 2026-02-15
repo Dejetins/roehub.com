@@ -17,10 +17,10 @@ class ExchangeKey:
     ExchangeKey — immutable identity exchange key storage snapshot.
 
     Docs:
-      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
     Related:
       - src/trading/contexts/identity/application/ports/exchange_keys_repository.py
-      - migrations/postgres/0003_identity_exchange_keys_v1.sql
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
       - src/trading/contexts/identity/application/use_cases/create_exchange_key.py
     """
 
@@ -30,7 +30,9 @@ class ExchangeKey:
     market_type: str
     label: str | None
     permissions: str
-    api_key: str
+    api_key_enc: bytes
+    api_key_hash: bytes
+    api_key_last4: str
     api_secret_enc: bytes
     passphrase_enc: bytes | None
     created_at: datetime
@@ -59,8 +61,15 @@ class ExchangeKey:
             raise ValueError("ExchangeKey.market_type must be one of {'spot', 'futures'}")
         if self.permissions not in _ALLOWED_PERMISSIONS:
             raise ValueError("ExchangeKey.permissions must be one of {'read', 'trade'}")
-        if not self.api_key.strip():
-            raise ValueError("ExchangeKey.api_key must be non-empty")
+        if not self.api_key_enc:
+            raise ValueError("ExchangeKey.api_key_enc must be non-empty")
+        if len(self.api_key_hash) != 32:
+            raise ValueError("ExchangeKey.api_key_hash must be exactly 32 bytes (SHA-256)")
+        normalized_api_key_last4 = self.api_key_last4.strip()
+        if not normalized_api_key_last4:
+            raise ValueError("ExchangeKey.api_key_last4 must be non-empty")
+        if len(normalized_api_key_last4) > 4:
+            raise ValueError("ExchangeKey.api_key_last4 length must be <= 4")
         if not self.api_secret_enc:
             raise ValueError("ExchangeKey.api_secret_enc must be non-empty")
         if self.passphrase_enc is not None and not self.passphrase_enc:

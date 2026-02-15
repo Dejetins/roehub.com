@@ -10,15 +10,16 @@ from trading.shared_kernel.primitives import UserId
 
 class ExchangeKeysRepository(Protocol):
     """
-    ExchangeKeysRepository — storage port for identity exchange API keys v1.
+    ExchangeKeysRepository — storage port for identity exchange API keys v2.
 
     Docs:
-      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
     Related:
       - src/trading/contexts/identity/domain/entities/exchange_key.py
       - src/trading/contexts/identity/application/use_cases/create_exchange_key.py
       - src/trading/contexts/identity/adapters/outbound/persistence/postgres/
         exchange_keys_repository.py
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
     """
 
     def create(
@@ -30,7 +31,9 @@ class ExchangeKeysRepository(Protocol):
         market_type: str,
         label: str | None,
         permissions: str,
-        api_key: str,
+        api_key_enc: bytes,
+        api_key_hash: bytes,
+        api_key_last4: str,
         api_secret_enc: bytes,
         passphrase_enc: bytes | None,
         created_at: datetime,
@@ -46,7 +49,9 @@ class ExchangeKeysRepository(Protocol):
             market_type: Market literal (`spot` or `futures`).
             label: Optional user-defined label.
             permissions: Permission literal (`read` or `trade`).
-            api_key: API key value persisted in storage.
+            api_key_enc: Encrypted API key blob.
+            api_key_hash: Deterministic API key hash for unique index semantics.
+            api_key_last4: Deterministic API key suffix for masked API responses.
             api_secret_enc: Encrypted API secret blob.
             passphrase_enc: Optional encrypted passphrase blob.
             created_at: UTC creation timestamp.

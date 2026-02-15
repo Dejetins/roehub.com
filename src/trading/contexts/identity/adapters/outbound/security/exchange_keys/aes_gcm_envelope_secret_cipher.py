@@ -15,7 +15,7 @@ from trading.contexts.identity.application.ports.exchange_keys_secret_cipher imp
 _BLOB_VERSION_V1 = 1
 _NONCE_LENGTH = 12
 _HEADER_STRUCT = struct.Struct(">BBBH")
-_ENVELOPE_AAD = b"roehub.identity.exchange_keys.v1"
+_AAD_NAMESPACE_PREFIX = "roehub.identity.exchange_keys.v2|"
 _SUPPORTED_KEK_LENGTHS = {16, 24, 32}
 
 
@@ -24,11 +24,12 @@ class AesGcmEnvelopeExchangeKeysSecretCipher(ExchangeKeysSecretCipher):
     AesGcmEnvelopeExchangeKeysSecretCipher — AES-GCM envelope cipher for exchange secrets.
 
     Docs:
-      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
     Related:
       - src/trading/contexts/identity/application/ports/exchange_keys_secret_cipher.py
+      - src/trading/contexts/identity/application/use_cases/create_exchange_key.py
       - apps/api/wiring/modules/identity.py
-      - migrations/postgres/0003_identity_exchange_keys_v1.sql
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
     """
 
     def __init__(self, *, kek_b64: str) -> None:
@@ -59,32 +60,34 @@ class AesGcmEnvelopeExchangeKeysSecretCipher(ExchangeKeysSecretCipher):
             )
         self._kek = kek_bytes
 
-    def encrypt_secret(self, *, secret: str) -> bytes:
+    def encrypt_secret(self, *, secret: str, aad: str) -> bytes:
         """
         Encrypt plaintext secret using DEK+KEK envelope AES-GCM format.
 
         Args:
             secret: Plaintext secret value.
+            aad: Deterministic non-secret AAD binding payload.
         Returns:
             bytes: Versioned encrypted opaque blob.
         Assumptions:
             Secret is non-empty and never logged.
         Raises:
-            ValueError: If secret is empty.
+            ValueError: If secret or aad is invalid.
         Side Effects:
             Uses OS CSPRNG for DEK and nonces.
         """
         normalized_secret = secret.strip()
         if not normalized_secret:
             raise ValueError("AesGcmEnvelopeExchangeKeysSecretCipher secret must be non-empty")
+        aad_bytes = _normalize_aad(aad=aad)
 
         plaintext = normalized_secret.encode("utf-8")
         dek = os.urandom(32)
 
         dek_nonce = os.urandom(_NONCE_LENGTH)
         secret_nonce = os.urandom(_NONCE_LENGTH)
-        encrypted_dek = AESGCM(self._kek).encrypt(dek_nonce, dek, _ENVELOPE_AAD)
-        encrypted_secret = AESGCM(dek).encrypt(secret_nonce, plaintext, _ENVELOPE_AAD)
+        encrypted_dek = AESGCM(self._kek).encrypt(dek_nonce, dek, aad_bytes)
+        encrypted_secret = AESGCM(dek).encrypt(secret_nonce, plaintext, aad_bytes)
 
         header = _HEADER_STRUCT.pack(
             _BLOB_VERSION_V1,
@@ -94,24 +97,26 @@ class AesGcmEnvelopeExchangeKeysSecretCipher(ExchangeKeysSecretCipher):
         )
         return b"".join((header, dek_nonce, encrypted_dek, secret_nonce, encrypted_secret))
 
-    def decrypt_secret(self, *, secret_enc: bytes) -> str:
+    def decrypt_secret(self, *, secret_enc: bytes, aad: str) -> str:
         """
         Decrypt versioned envelope blob and return plaintext secret.
 
         Args:
             secret_enc: Encrypted secret blob from storage.
+            aad: Deterministic non-secret AAD binding payload.
         Returns:
             str: Plaintext secret value.
         Assumptions:
             Decryption is used only transiently and never exposed to API.
         Raises:
-            ValueError: If blob format is invalid or authentication fails.
+            ValueError: If blob format is invalid, aad is invalid, or authentication fails.
         Side Effects:
             None.
         """
         blob = bytes(secret_enc)
         if not blob:
             raise ValueError("AesGcmEnvelopeExchangeKeysSecretCipher secret_enc must be non-empty")
+        aad_bytes = _normalize_aad(aad=aad)
 
         version, dek_nonce_len, secret_nonce_len, encrypted_dek_len, payload = _parse_header(
             blob=blob
@@ -138,8 +143,8 @@ class AesGcmEnvelopeExchangeKeysSecretCipher(ExchangeKeysSecretCipher):
             raise ValueError("Encrypted exchange key blob contains invalid encrypted payload")
 
         try:
-            dek = AESGCM(self._kek).decrypt(dek_nonce, encrypted_dek, _ENVELOPE_AAD)
-            plaintext = AESGCM(dek).decrypt(secret_nonce, encrypted_secret, _ENVELOPE_AAD)
+            dek = AESGCM(self._kek).decrypt(dek_nonce, encrypted_dek, aad_bytes)
+            plaintext = AESGCM(dek).decrypt(secret_nonce, encrypted_secret, aad_bytes)
         except InvalidTag as error:
             raise ValueError("Encrypted exchange key blob authentication failed") from error
 
@@ -177,3 +182,29 @@ def _parse_header(*, blob: bytes) -> tuple[int, int, int, int, bytes]:
     if len(payload) < minimum_payload:
         raise ValueError("Encrypted exchange key blob payload is truncated")
     return version, dek_nonce_len, secret_nonce_len, encrypted_dek_len, payload
+
+
+def _normalize_aad(*, aad: str) -> bytes:
+    """
+    Validate AAD format and return UTF-8 bytes for AES-GCM authenticated data.
+
+    Args:
+        aad: Deterministic AAD binding payload.
+    Returns:
+        bytes: UTF-8 encoded AAD value.
+    Assumptions:
+        Exchange keys v2 AAD starts with `roehub.identity.exchange_keys.v2|`.
+    Raises:
+        ValueError: If aad is empty or has unsupported namespace.
+    Side Effects:
+        None.
+    """
+    normalized = aad.strip()
+    if not normalized:
+        raise ValueError("AesGcmEnvelopeExchangeKeysSecretCipher aad must be non-empty")
+    if not normalized.startswith(_AAD_NAMESPACE_PREFIX):
+        raise ValueError(
+            "AesGcmEnvelopeExchangeKeysSecretCipher aad must use "
+            f"{_AAD_NAMESPACE_PREFIX!r} prefix"
+        )
+    return normalized.encode("utf-8")

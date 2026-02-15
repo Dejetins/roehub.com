@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI
@@ -192,16 +193,30 @@ def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
         "updated_at",
     ]
     assert created_payload["api_key"] == "****1234"
-    assert "api_secret" not in created_payload
-    assert "passphrase" not in created_payload
+    for forbidden_field in (
+        "api_secret",
+        "passphrase",
+        "api_key_enc",
+        "api_secret_enc",
+        "passphrase_enc",
+        "api_key_hash",
+    ):
+        assert forbidden_field not in created_payload
 
     list_response = client.get("/exchange-keys")
     assert list_response.status_code == 200
     list_payload = list_response.json()
     assert len(list_payload) == 1
     assert list_payload[0]["key_id"] == created_payload["key_id"]
-    assert "api_secret" not in list_payload[0]
-    assert "passphrase" not in list_payload[0]
+    for forbidden_field in (
+        "api_secret",
+        "passphrase",
+        "api_key_enc",
+        "api_secret_enc",
+        "passphrase_enc",
+        "api_key_hash",
+    ):
+        assert forbidden_field not in list_payload[0]
 
     clock.set_now(now_value=clock.now() + timedelta(minutes=1))
     delete_response = client.delete(f"/exchange-keys/{created_payload['key_id']}")
@@ -212,8 +227,108 @@ def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
     assert empty_list_response.json() == []
 
     stored_row = exchange_repository._rows[created_payload["key_id"]]
+    assert not hasattr(stored_row, "api_key")
+    assert stored_row.api_key_enc != b"ROUTE-KEY-1234"
+    assert stored_row.api_key_hash == hashlib.sha256(b"ROUTE-KEY-1234").digest()
+    assert stored_row.api_key_last4 == "1234"
     assert stored_row.is_deleted is True
     assert stored_row.deleted_at is not None
+
+
+def test_exchange_keys_create_route_returns_deterministic_409_for_active_duplicate() -> None:
+    """
+    Verify create route returns deterministic 409 payload for active duplicate keys.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Duplicate semantics rely on normalized API key hash and active-row uniqueness.
+    Raises:
+        AssertionError: If duplicate request does not produce deterministic 409 payload.
+    Side Effects:
+        None.
+    """
+    client, clock, user_id, two_factor_repository, _exchange_repository = _build_test_client()
+    _enable_two_factor(
+        two_factor_repository=two_factor_repository,
+        user_id=user_id,
+        now=clock.now(),
+    )
+
+    first_response = client.post(
+        "/exchange-keys",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "label": "main",
+            "permissions": "trade",
+            "api_key": "DUPLICATE-ROUTE-0001",
+            "api_secret": "duplicate-secret-1",
+            "passphrase": None,
+        },
+    )
+    assert first_response.status_code == 201
+
+    duplicate_response = client.post(
+        "/exchange-keys",
+        json={
+            "exchange_name": "binance",
+            "market_type": "spot",
+            "label": "duplicate",
+            "permissions": "trade",
+            "api_key": "  DUPLICATE-ROUTE-0001  ",
+            "api_secret": "duplicate-secret-2",
+            "passphrase": None,
+        },
+    )
+
+    assert duplicate_response.status_code == 409
+    duplicate_payload = duplicate_response.json()
+    assert list(duplicate_payload.keys()) == ["detail"]
+    assert list(duplicate_payload["detail"].keys()) == ["error", "message"]
+    assert duplicate_payload == {
+        "detail": {
+            "error": "exchange_key_already_exists",
+            "message": "Exchange API key already exists.",
+        }
+    }
+
+
+def test_exchange_keys_delete_route_returns_404_for_missing_key_id() -> None:
+    """
+    Verify delete route returns deterministic 404 payload for missing key identifiers.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Missing/foreign/already-deleted keys share the same not-found contract.
+    Raises:
+        AssertionError: If missing-key delete does not return deterministic 404 payload.
+    Side Effects:
+        None.
+    """
+    client, clock, user_id, two_factor_repository, _exchange_repository = _build_test_client()
+    _enable_two_factor(
+        two_factor_repository=two_factor_repository,
+        user_id=user_id,
+        now=clock.now(),
+    )
+
+    response = client.delete("/exchange-keys/00000000-0000-0000-0000-00000000beef")
+    assert response.status_code == 404
+    payload = response.json()
+    assert list(payload.keys()) == ["detail"]
+    assert list(payload["detail"].keys()) == ["error", "message"]
+    assert payload == {
+        "detail": {
+            "error": "exchange_key_not_found",
+            "message": "Exchange API key was not found.",
+        }
+    }
 
 
 def test_exchange_keys_list_route_is_deterministically_sorted() -> None:

@@ -13,11 +13,12 @@ class ExchangeKeyView:
     ExchangeKeyView — non-secret API-safe exchange key projection.
 
     Docs:
-      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
     Related:
       - src/trading/contexts/identity/application/use_cases/create_exchange_key.py
       - src/trading/contexts/identity/application/use_cases/list_exchange_keys.py
       - src/trading/contexts/identity/adapters/inbound/api/routes/exchange_keys.py
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
     """
 
     key_id: UUID
@@ -60,7 +61,7 @@ def to_exchange_key_view(*, entity: ExchangeKey) -> ExchangeKeyView:
     Returns:
         ExchangeKeyView: API-safe projection with masked API key.
     Assumptions:
-        `entity.api_key` contains plaintext value persisted in storage.
+        `entity.api_key_last4` contains a deterministic API key suffix.
     Raises:
         ValueError: If entity fields violate projection invariants.
     Side Effects:
@@ -72,33 +73,33 @@ def to_exchange_key_view(*, entity: ExchangeKey) -> ExchangeKeyView:
         market_type=entity.market_type,
         label=entity.label,
         permissions=entity.permissions,
-        api_key=_mask_api_key(api_key=entity.api_key),
+        api_key=_mask_api_key_last4(api_key_last4=entity.api_key_last4),
         created_at=entity.created_at,
         updated_at=entity.updated_at,
     )
 
 
-
-def _mask_api_key(*, api_key: str) -> str:
+def _mask_api_key_last4(*, api_key_last4: str) -> str:
     """
-    Mask API key value for safe response representation.
+    Build masked API key value from stored suffix for safe response representation.
 
     Args:
-        api_key: Plaintext API key from storage.
+        api_key_last4: Stored API key suffix used for deterministic masking.
     Returns:
         str: Masked API key showing only last four characters.
     Assumptions:
-        Masking strategy is deterministic and stable for UI rendering.
+        Suffix is normalized at create-time and no decryption is required for listing.
     Raises:
-        ValueError: If API key is empty.
+        ValueError: If suffix is empty or exceeds four characters.
     Side Effects:
         None.
     """
-    normalized = api_key.strip()
+    normalized = api_key_last4.strip()
     if not normalized:
-        raise ValueError("_mask_api_key requires non-empty api_key")
-    visible_suffix = normalized[-4:] if len(normalized) >= 4 else normalized
-    return f"****{visible_suffix}"
+        raise ValueError("_mask_api_key_last4 requires non-empty api_key_last4")
+    if len(normalized) > 4:
+        raise ValueError("_mask_api_key_last4 requires api_key_last4 length <= 4")
+    return f"****{normalized}"
 
 
 

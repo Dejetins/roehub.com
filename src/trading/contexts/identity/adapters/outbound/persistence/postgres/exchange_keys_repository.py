@@ -19,10 +19,10 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
     PostgresIdentityExchangeKeysRepository — Postgres adapter for exchange keys storage.
 
     Docs:
-      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
     Related:
       - src/trading/contexts/identity/application/ports/exchange_keys_repository.py
-      - migrations/postgres/0003_identity_exchange_keys_v1.sql
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
       - src/trading/contexts/identity/adapters/outbound/persistence/postgres/gateway.py
     """
 
@@ -41,7 +41,7 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
         Returns:
             None.
         Assumptions:
-            Table schema follows migration `0003_identity_exchange_keys_v1.sql`.
+            Table schema follows migration `0004_identity_exchange_keys_v2.sql`.
         Raises:
             ValueError: If dependencies are invalid.
         Side Effects:
@@ -64,7 +64,9 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
         market_type: str,
         label: str | None,
         permissions: str,
-        api_key: str,
+        api_key_enc: bytes,
+        api_key_hash: bytes,
+        api_key_last4: str,
         api_secret_enc: bytes,
         passphrase_enc: bytes | None,
         created_at: datetime,
@@ -80,7 +82,9 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
             market_type: Market type literal.
             label: Optional label.
             permissions: Permission literal.
-            api_key: API key value.
+            api_key_enc: Encrypted API key bytes.
+            api_key_hash: Deterministic API key hash bytes.
+            api_key_last4: Deterministic API key suffix for masked responses.
             api_secret_enc: Encrypted API secret bytes.
             passphrase_enc: Optional encrypted passphrase bytes.
             created_at: UTC creation timestamp.
@@ -103,7 +107,9 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
             market_type,
             label,
             permissions,
-            api_key,
+            api_key_enc,
+            api_key_hash,
+            api_key_last4,
             api_secret_enc,
             passphrase_enc,
             created_at,
@@ -119,7 +125,9 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
             %(market_type)s,
             %(label)s,
             %(permissions)s,
-            %(api_key)s,
+            %(api_key_enc)s,
+            %(api_key_hash)s,
+            %(api_key_last4)s,
             %(api_secret_enc)s,
             %(passphrase_enc)s,
             %(created_at)s,
@@ -135,7 +143,9 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
             market_type,
             label,
             permissions,
-            api_key,
+            api_key_enc,
+            api_key_hash,
+            api_key_last4,
             api_secret_enc,
             passphrase_enc,
             created_at,
@@ -152,7 +162,9 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
                 "market_type": market_type,
                 "label": label,
                 "permissions": permissions,
-                "api_key": api_key,
+                "api_key_enc": bytes(api_key_enc),
+                "api_key_hash": bytes(api_key_hash),
+                "api_key_last4": api_key_last4,
                 "api_secret_enc": bytes(api_secret_enc),
                 "passphrase_enc": bytes(passphrase_enc) if passphrase_enc is not None else None,
                 "created_at": created_at,
@@ -186,7 +198,9 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
             market_type,
             label,
             permissions,
-            api_key,
+            api_key_enc,
+            api_key_hash,
+            api_key_last4,
             api_secret_enc,
             passphrase_enc,
             created_at,
@@ -269,8 +283,24 @@ def _map_exchange_key_row(*, row: Mapping[str, Any]) -> ExchangeKey:
         None.
     """
     try:
+        api_key_enc_raw = row["api_key_enc"]
+        api_key_hash_raw = row["api_key_hash"]
+        api_key_last4_raw = row["api_key_last4"]
         api_secret_raw = row["api_secret_enc"]
         passphrase_raw = row["passphrase_enc"]
+
+        if isinstance(api_key_enc_raw, memoryview):
+            api_key_enc = api_key_enc_raw.tobytes()
+        else:
+            api_key_enc = bytes(api_key_enc_raw)
+
+        if isinstance(api_key_hash_raw, memoryview):
+            api_key_hash = api_key_hash_raw.tobytes()
+        else:
+            api_key_hash = bytes(api_key_hash_raw)
+        if api_key_last4_raw is None:
+            raise ValueError("api_key_last4 must be present in exchange key row")
+        api_key_last4 = str(api_key_last4_raw)
 
         if isinstance(api_secret_raw, memoryview):
             api_secret_enc = api_secret_raw.tobytes()
@@ -291,7 +321,9 @@ def _map_exchange_key_row(*, row: Mapping[str, Any]) -> ExchangeKey:
             market_type=str(row["market_type"]),
             label=str(row["label"]) if row["label"] is not None else None,
             permissions=str(row["permissions"]),
-            api_key=str(row["api_key"]),
+            api_key_enc=api_key_enc,
+            api_key_hash=api_key_hash,
+            api_key_last4=api_key_last4,
             api_secret_enc=api_secret_enc,
             passphrase_enc=passphrase_enc,
             created_at=row["created_at"],
