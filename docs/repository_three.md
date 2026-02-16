@@ -12,6 +12,12 @@
 |-- Dockerfile.api
 |-- LICENSE
 |-- README.md
+|-- alembic/
+|   |-- env.py
+|   |-- script.py.mako
+|   `-- versions/
+|       `-- 20260215_0001_strategy_storage_v1.py
+|-- alembic.ini
 |-- apps/
 |   |-- __init__.py
 |   |-- api/
@@ -59,6 +65,9 @@
 |   |       `-- modules/
 |   |           |-- __init__.py
 |   |           `-- market_data.py
+|   |-- migrations/
+|   |   |-- __init__.py
+|   |   `-- main.py
 |   |-- scheduler/
 |   |   |-- main/
 |   |   |-- market_data_scheduler/
@@ -154,6 +163,7 @@
 |   |   |   `-- milestone-3-epics-v1.md
 |   |   |-- shared-kernel-primitives.md
 |   |   `-- strategy/
+|   |       |-- strategy-domain-spec-immutable-storage-runs-events-v1.md
 |   |       `-- strategy-milestone-3-epics-v1.md
 |   |-- decisions/
 |   |-- repository_three.md
@@ -575,27 +585,53 @@
 |       |   `-- strategy/
 |       |       |-- __init__.py
 |       |       |-- adapters/
+|       |       |   |-- __init__.py
 |       |       |   |-- inbound/
 |       |       |   `-- outbound/
+|       |       |       |-- __init__.py
 |       |       |       |-- feeds/
 |       |       |       |   `-- market_data_acl/
 |       |       |       |-- persistence/
+|       |       |       |   |-- __init__.py
 |       |       |       |   `-- postgres/
+|       |       |       |       |-- __init__.py
+|       |       |       |       |-- gateway.py
+|       |       |       |       |-- strategy_event_repository.py
+|       |       |       |       |-- strategy_repository.py
+|       |       |       |       `-- strategy_run_repository.py
 |       |       |       `-- sinks/
 |       |       |           |-- memory/
 |       |       |           `-- messaging/
 |       |       |-- application/
+|       |       |   |-- __init__.py
 |       |       |   |-- dto/
 |       |       |   |-- errors/
 |       |       |   |-- ports/
+|       |       |   |   |-- __init__.py
 |       |       |   |   |-- feeds/
 |       |       |   |   |-- repositories/
+|       |       |   |   |   |-- __init__.py
+|       |       |   |   |   |-- strategy_event_repository.py
+|       |       |   |   |   |-- strategy_repository.py
+|       |       |   |   |   `-- strategy_run_repository.py
 |       |       |   |   `-- sinks/
 |       |       |   `-- use_cases/
 |       |       `-- domain/
+|       |           |-- __init__.py
 |       |           |-- entities/
+|       |           |   |-- __init__.py
+|       |           |   |-- strategy.py
+|       |           |   |-- strategy_event.py
+|       |           |   |-- strategy_run.py
+|       |           |   `-- strategy_spec_v1.py
 |       |           |-- errors/
+|       |           |   |-- __init__.py
+|       |           |   `-- strategy_errors.py
 |       |           |-- events/
+|       |           |-- services/
+|       |           |   |-- __init__.py
+|       |           |   |-- run_invariants.py
+|       |           |   `-- strategy_name.py
 |       |           |-- specifications/
 |       |           `-- value_objects/
 |       |-- fastpath/
@@ -726,38 +762,43 @@
 |       |   |       |-- test_grid_param_spec_shapes.py
 |       |   |       |-- test_indicator_def_consistency.py
 |       |   |       `-- test_param_def_invariants.py
-|       |   `-- market_data/
+|       |   |-- market_data/
+|       |   |   |-- adapters/
+|       |   |   |   |-- test_clickhouse_canonical_candle_index_reader.py
+|       |   |   |   |-- test_clickhouse_canonical_candle_reader.py
+|       |   |   |   |-- test_clickhouse_enabled_instrument_reader.py
+|       |   |   |   |-- test_clickhouse_raw_kline_writer.py
+|       |   |   |   |-- test_clickhouse_ref_instruments_writer.py
+|       |   |   |   |-- test_clickhouse_thread_local_gateway.py
+|       |   |   |   |-- test_market_data_runtime_config.py
+|       |   |   |   |-- test_parquet_candle_ingest_source.py
+|       |   |   |   |-- test_redis_streams_live_candle_publisher.py
+|       |   |   |   |-- test_rest_candle_ingest_source.py
+|       |   |   |   |-- test_rest_instrument_metadata_source.py
+|       |   |   |   |-- test_whitelist_csv_loader.py
+|       |   |   |   |-- test_ws_binance_client.py
+|       |   |   |   `-- test_ws_bybit_client.py
+|       |   |   `-- application/
+|       |   |       |-- services/
+|       |   |       |   |-- test_gap_tracker.py
+|       |   |       |   |-- test_insert_buffer.py
+|       |   |       |   |-- test_reconnect_tail_fill.py
+|       |   |       |   |-- test_rest_fill_queue.py
+|       |   |       |   |-- test_scheduler_backfill_planner.py
+|       |   |       |   |-- test_scheduler_startup_scan.py
+|       |   |       |   `-- test_ws_worker_publishes_redis.py
+|       |   |       `-- use_cases/
+|       |   |           |-- test_backfill_1m_candles.py
+|       |   |           |-- test_enrich_ref_instruments_from_exchange.py
+|       |   |           |-- test_reference_data_sync.py
+|       |   |           |-- test_rest_catchup_1m.py
+|       |   |           |-- test_rest_fill_range_1m.py
+|       |   |           `-- test_time_slicing.py
+|       |   `-- strategy/
 |       |       |-- adapters/
-|       |       |   |-- test_clickhouse_canonical_candle_index_reader.py
-|       |       |   |-- test_clickhouse_canonical_candle_reader.py
-|       |       |   |-- test_clickhouse_enabled_instrument_reader.py
-|       |       |   |-- test_clickhouse_raw_kline_writer.py
-|       |       |   |-- test_clickhouse_ref_instruments_writer.py
-|       |       |   |-- test_clickhouse_thread_local_gateway.py
-|       |       |   |-- test_market_data_runtime_config.py
-|       |       |   |-- test_parquet_candle_ingest_source.py
-|       |       |   |-- test_redis_streams_live_candle_publisher.py
-|       |       |   |-- test_rest_candle_ingest_source.py
-|       |       |   |-- test_rest_instrument_metadata_source.py
-|       |       |   |-- test_whitelist_csv_loader.py
-|       |       |   |-- test_ws_binance_client.py
-|       |       |   `-- test_ws_bybit_client.py
-|       |       `-- application/
-|       |           |-- services/
-|       |           |   |-- test_gap_tracker.py
-|       |           |   |-- test_insert_buffer.py
-|       |           |   |-- test_reconnect_tail_fill.py
-|       |           |   |-- test_rest_fill_queue.py
-|       |           |   |-- test_scheduler_backfill_planner.py
-|       |           |   |-- test_scheduler_startup_scan.py
-|       |           |   `-- test_ws_worker_publishes_redis.py
-|       |           `-- use_cases/
-|       |               |-- test_backfill_1m_candles.py
-|       |               |-- test_enrich_ref_instruments_from_exchange.py
-|       |               |-- test_reference_data_sync.py
-|       |               |-- test_rest_catchup_1m.py
-|       |               |-- test_rest_fill_range_1m.py
-|       |               `-- test_time_slicing.py
+|       |       |   `-- test_postgres_strategy_repositories.py
+|       |       `-- domain/
+|       |           `-- test_strategy_domain.py
 |       |-- platform/
 |       |   `-- config/
 |       |       `-- test_indicators_compute_numba_config.py
@@ -780,4 +821,4 @@
 |   `-- lint/
 `-- uv.lock
 
-345 directories, 436 files
+352 directories, 470 files

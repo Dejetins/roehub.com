@@ -16,6 +16,22 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_DSN: postgresql://roehub:roehub@127.0.0.1:5432/roehub
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: roehub
+          POSTGRES_USER: roehub
+          POSTGRES_PASSWORD: roehub
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U roehub -d roehub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
 
     defaults:
       run:
@@ -49,9 +65,17 @@ jobs:
           uv sync --locked --all-groups
           uv run python -V
 
+      - name: Migrations (fail-fast)
+        run: |
+          uv run python -m apps.migrations.main --dsn "$POSTGRES_DSN"
+
       - name: Lint
         run: |
           uv run ruff check .
+
+      - name: Type check
+        run: |
+          uv run pyright
 
       - name: Docs index drift check
         run: |
