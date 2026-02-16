@@ -7,6 +7,7 @@ __pycache__/
 .build/
 .data_load/*
 .codex/*
+.codex/
 # Secrets / env files
 /data_load
 .env
