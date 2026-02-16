@@ -54,6 +54,23 @@ class StrategyRepository(Protocol):
         """
         ...
 
+    def find_any_by_strategy_id(self, *, strategy_id: UUID) -> Strategy | None:
+        """
+        Load strategy by identifier without owner filtering for explicit use-case ownership checks.
+
+        Args:
+            strategy_id: Strategy identifier.
+        Returns:
+            Strategy | None: Persisted strategy snapshot or `None`.
+        Assumptions:
+            Ownership/visibility checks are performed explicitly in application use-cases.
+        Raises:
+            ValueError: If repository implementation cannot map row.
+        Side Effects:
+            Reads one row from storage.
+        """
+        ...
+
     def list_for_user(
         self,
         *,

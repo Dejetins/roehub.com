@@ -139,6 +139,23 @@ class IdentityRuntimeSettings:
             raise ValueError("IdentityRuntimeSettings.jwt_cookie_path must be non-empty")
 
 
+@dataclass(frozen=True, slots=True)
+class IdentityApiModule:
+    """
+    IdentityApiModule — bundled identity router and shared current-user dependency.
+
+    Docs:
+      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+    Related:
+      - apps/api/wiring/modules/identity.py
+      - apps/api/wiring/modules/strategy.py
+      - apps/api/main/app.py
+    """
+
+    router: APIRouter
+    current_user_dependency: RequireCurrentUserDependency
+
+
 def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
     """
     Build fully wired identity router from environment settings.
@@ -158,6 +175,32 @@ def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
         APIRouter: Identity API router with all dependencies wired.
     Assumptions:
         Fail-fast policy and secrets are resolved by `_resolve_identity_runtime_settings`.
+    Raises:
+        ValueError: If fail-fast settings require missing secrets or invalid values.
+    Side Effects:
+        None.
+    """
+    return build_identity_api_module(environ=environ).router
+
+
+def build_identity_api_module(*, environ: Mapping[str, str]) -> IdentityApiModule:
+    """
+    Build bundled identity API module with router and reusable current-user dependency.
+
+    Docs:
+      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md
+    Related:
+      - apps/api/wiring/modules/identity.py
+      - apps/api/wiring/modules/strategy.py
+      - apps/api/main/app.py
+
+    Args:
+        environ: Runtime environment mapping.
+    Returns:
+        IdentityApiModule: Identity router and shared current-user dependency.
+    Assumptions:
+        Shared dependency is used by both identity and strategy routes in one FastAPI app.
     Raises:
         ValueError: If fail-fast settings require missing secrets or invalid values.
     Side Effects:
@@ -231,19 +274,22 @@ def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
         policy_gate=two_factor_policy_gate,
     )
 
-    return build_identity_api_router(
-        telegram_login=telegram_login,
-        two_factor_setup=two_factor_setup,
-        two_factor_verify=two_factor_verify,
+    return IdentityApiModule(
+        router=build_identity_api_router(
+            telegram_login=telegram_login,
+            two_factor_setup=two_factor_setup,
+            two_factor_verify=two_factor_verify,
+            current_user_dependency=current_user_dependency,
+            cookie_name=settings.jwt_cookie_name,
+            cookie_secure=settings.jwt_cookie_secure,
+            cookie_samesite=settings.jwt_cookie_samesite,
+            cookie_path=settings.jwt_cookie_path,
+            create_exchange_key_use_case=create_exchange_key_use_case,
+            list_exchange_keys_use_case=list_exchange_keys_use_case,
+            delete_exchange_key_use_case=delete_exchange_key_use_case,
+            two_factor_enabled_dependency=two_factor_enabled_dependency,
+        ),
         current_user_dependency=current_user_dependency,
-        cookie_name=settings.jwt_cookie_name,
-        cookie_secure=settings.jwt_cookie_secure,
-        cookie_samesite=settings.jwt_cookie_samesite,
-        cookie_path=settings.jwt_cookie_path,
-        create_exchange_key_use_case=create_exchange_key_use_case,
-        list_exchange_keys_use_case=list_exchange_keys_use_case,
-        delete_exchange_key_use_case=delete_exchange_key_use_case,
-        two_factor_enabled_dependency=two_factor_enabled_dependency,
     )
 
 

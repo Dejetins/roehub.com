@@ -16,12 +16,16 @@
 |   |-- env.py
 |   |-- script.py.mako
 |   `-- versions/
-|       `-- 20260215_0001_strategy_storage_v1.py
+|       |-- 20260215_0001_strategy_storage_v1.py
+|       `-- 20260216_0002_strategy_run_metadata_v1.py
 |-- alembic.ini
 |-- apps/
 |   |-- __init__.py
 |   |-- api/
 |   |   |-- __init__.py
+|   |   |-- common/
+|   |   |   |-- __init__.py
+|   |   |   `-- errors.py
 |   |   |-- dto/
 |   |   |   |-- __init__.py
 |   |   |   `-- indicators.py
@@ -32,7 +36,8 @@
 |   |   |-- routes/
 |   |   |   |-- __init__.py
 |   |   |   |-- identity.py
-|   |   |   `-- indicators.py
+|   |   |   |-- indicators.py
+|   |   |   `-- strategies.py
 |   |   `-- wiring/
 |   |       |-- __init__.py
 |   |       |-- clients/
@@ -41,7 +46,8 @@
 |   |       `-- modules/
 |   |           |-- __init__.py
 |   |           |-- identity.py
-|   |           `-- indicators.py
+|   |           |-- indicators.py
+|   |           `-- strategy.py
 |   |-- cli/
 |   |   |-- __init__.py
 |   |   |-- commands/
@@ -121,6 +127,8 @@
 |   |-- api/
 |   |-- architecture/
 |   |   |-- README.md
+|   |   |-- api/
+|   |   |   `-- api-errors-and-422-payload-v1.md
 |   |   |-- apps/
 |   |   |   `-- cli/
 |   |   |       `-- cli-backfill-1m.md
@@ -163,6 +171,7 @@
 |   |   |   `-- milestone-3-epics-v1.md
 |   |   |-- shared-kernel-primitives.md
 |   |   `-- strategy/
+|   |       |-- strategy-api-immutable-crud-clone-run-control-v1.md
 |   |       |-- strategy-domain-spec-immutable-storage-runs-events-v1.md
 |   |       `-- strategy-milestone-3-epics-v1.md
 |   |-- decisions/
@@ -593,21 +602,31 @@
 |       |       |       |   `-- market_data_acl/
 |       |       |       |-- persistence/
 |       |       |       |   |-- __init__.py
+|       |       |       |   |-- in_memory/
+|       |       |       |   |   |-- __init__.py
+|       |       |       |   |   |-- strategy_event_repository.py
+|       |       |       |   |   |-- strategy_repository.py
+|       |       |       |   |   `-- strategy_run_repository.py
 |       |       |       |   `-- postgres/
 |       |       |       |       |-- __init__.py
 |       |       |       |       |-- gateway.py
 |       |       |       |       |-- strategy_event_repository.py
 |       |       |       |       |-- strategy_repository.py
 |       |       |       |       `-- strategy_run_repository.py
-|       |       |       `-- sinks/
-|       |       |           |-- memory/
-|       |       |           `-- messaging/
+|       |       |       |-- sinks/
+|       |       |       |   |-- memory/
+|       |       |       |   `-- messaging/
+|       |       |       `-- time/
+|       |       |           |-- __init__.py
+|       |       |           `-- system_strategy_clock.py
 |       |       |-- application/
 |       |       |   |-- __init__.py
 |       |       |   |-- dto/
 |       |       |   |-- errors/
 |       |       |   |-- ports/
 |       |       |   |   |-- __init__.py
+|       |       |   |   |-- clock.py
+|       |       |   |   |-- current_user.py
 |       |       |   |   |-- feeds/
 |       |       |   |   |-- repositories/
 |       |       |   |   |   |-- __init__.py
@@ -615,7 +634,20 @@
 |       |       |   |   |   |-- strategy_repository.py
 |       |       |   |   |   `-- strategy_run_repository.py
 |       |       |   |   `-- sinks/
+|       |       |   |-- services/
+|       |       |   |   |-- __init__.py
+|       |       |   |   `-- warmup_estimator.py
 |       |       |   `-- use_cases/
+|       |       |       |-- __init__.py
+|       |       |       |-- _shared.py
+|       |       |       |-- clone_strategy.py
+|       |       |       |-- create_strategy.py
+|       |       |       |-- delete_strategy.py
+|       |       |       |-- errors.py
+|       |       |       |-- get_my_strategy.py
+|       |       |       |-- list_my_strategies.py
+|       |       |       |-- run_strategy.py
+|       |       |       `-- stop_strategy.py
 |       |       `-- domain/
 |       |           |-- __init__.py
 |       |           |-- entities/
@@ -664,6 +696,9 @@
 |       |   |-- config/
 |       |   |   |-- __init__.py
 |       |   |   `-- indicators_compute_numba.py
+|       |   |-- errors/
+|       |   |   |-- __init__.py
+|       |   |   `-- roehub_error.py
 |       |   |-- observability/
 |       |   |-- serialization/
 |       |   `-- time/
@@ -700,11 +735,13 @@
 |   `-- unit/
 |       |-- apps/
 |       |   |-- api/
+|       |   |   |-- test_api_error_handlers.py
 |       |   |   |-- test_identity_exchange_keys_routes.py
 |       |   |   |-- test_identity_routes.py
 |       |   |   |-- test_identity_two_factor_gate_dependency.py
 |       |   |   |-- test_identity_two_factor_routes.py
 |       |   |   |-- test_identity_wiring_module.py
+|       |   |   |-- test_strategies_routes.py
 |       |   |   `-- wiring/
 |       |   |       `-- modules/
 |       |   `-- cli/
@@ -797,6 +834,8 @@
 |       |   `-- strategy/
 |       |       |-- adapters/
 |       |       |   `-- test_postgres_strategy_repositories.py
+|       |       |-- application/
+|       |       |   `-- test_strategy_use_cases.py
 |       |       `-- domain/
 |       |           `-- test_strategy_domain.py
 |       |-- platform/
@@ -821,4 +860,4 @@
 |   `-- lint/
 `-- uv.lock
 
-352 directories, 470 files
+359 directories, 502 files

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, cast
+import json
+from typing import Any, Mapping, Sequence, cast
 from uuid import UUID
 
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
@@ -95,7 +96,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             stopped_at,
             checkpoint_ts_open,
             last_error,
-            updated_at
+            updated_at,
+            metadata_json
         )
         VALUES
         (
@@ -107,7 +109,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             %(stopped_at)s,
             %(checkpoint_ts_open)s,
             %(last_error)s,
-            %(updated_at)s
+            %(updated_at)s,
+            %(metadata_json)s::jsonb
         )
         RETURNING
             run_id,
@@ -118,7 +121,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             stopped_at,
             checkpoint_ts_open,
             last_error,
-            updated_at
+            updated_at,
+            metadata_json
         """
         try:
             row = self._gateway.fetch_one(
@@ -133,6 +137,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
                     "checkpoint_ts_open": run.checkpoint_ts_open,
                     "last_error": run.last_error,
                     "updated_at": run.updated_at,
+                    "metadata_json": run.metadata_json,
                 },
             )
         except Exception as error:  # noqa: BLE001
@@ -180,7 +185,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             stopped_at,
             checkpoint_ts_open,
             last_error,
-            updated_at
+            updated_at,
+            metadata_json
         """
         row = self._gateway.fetch_one(
             query=query,
@@ -224,7 +230,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             stopped_at,
             checkpoint_ts_open,
             last_error,
-            updated_at
+            updated_at,
+            metadata_json
         FROM {self._runs_table}
         WHERE user_id = %(user_id)s
           AND run_id = %(run_id)s
@@ -266,7 +273,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             stopped_at,
             checkpoint_ts_open,
             last_error,
-            updated_at
+            updated_at,
+            metadata_json
         FROM {self._runs_table}
         WHERE user_id = %(user_id)s
           AND strategy_id = %(strategy_id)s
@@ -311,7 +319,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             stopped_at,
             checkpoint_ts_open,
             last_error,
-            updated_at
+            updated_at,
+            metadata_json
         FROM {self._runs_table}
         WHERE user_id = %(user_id)s
           AND strategy_id = %(strategy_id)s
@@ -355,6 +364,7 @@ def _map_run_row(*, row: Mapping[str, Any]) -> StrategyRun:
             checkpoint_ts_open=row["checkpoint_ts_open"],
             last_error=row["last_error"],
             updated_at=row["updated_at"],
+            metadata_json=_parse_metadata_json(value=row.get("metadata_json")),
         )
     except Exception as error:  # noqa: BLE001
         raise StrategyStorageError("PostgresStrategyRunRepository cannot map run row") from error
@@ -382,6 +392,44 @@ def _is_active_run_unique_violation(*, error: Exception) -> bool:
 
     message = str(error).lower()
     return "strategy_runs_one_active" in message
+
+
+def _parse_metadata_json(*, value: Any) -> Mapping[str, Any]:
+    """
+    Parse metadata JSON field into deterministic mapping payload.
+
+    Args:
+        value: Raw `metadata_json` value from SQL row.
+    Returns:
+        Mapping[str, Any]: Parsed mapping payload.
+    Assumptions:
+        Gateway may return dict, bytes, memoryview, or JSON text.
+    Raises:
+        StrategyStorageError: If value cannot be parsed as JSON object.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        return {}
+    if isinstance(value, Mapping):
+        return dict(value)
+    if isinstance(value, memoryview):
+        value = value.tobytes().decode("utf-8")
+    if isinstance(value, (bytes, bytearray)):
+        value = bytes(value).decode("utf-8")
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError as error:
+            raise StrategyStorageError(
+                "strategy_runs.metadata_json has invalid JSON text"
+            ) from error
+        if not isinstance(parsed, Mapping):
+            raise StrategyStorageError("strategy_runs.metadata_json must be JSON object")
+        return dict(parsed)
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        raise StrategyStorageError("strategy_runs.metadata_json must be JSON object")
+    raise StrategyStorageError("strategy_runs.metadata_json has unsupported type")
 
 
 def _parse_run_state(*, value: Any) -> StrategyRunState:

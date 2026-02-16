@@ -1,3 +1,8 @@
+from .in_memory import (
+    InMemoryStrategyEventRepository,
+    InMemoryStrategyRepository,
+    InMemoryStrategyRunRepository,
+)
 from .postgres import (
     PostgresStrategyEventRepository,
     PostgresStrategyRepository,
@@ -7,6 +12,9 @@ from .postgres import (
 )
 
 __all__ = [
+    "InMemoryStrategyEventRepository",
+    "InMemoryStrategyRepository",
+    "InMemoryStrategyRunRepository",
     "PostgresStrategyEventRepository",
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",

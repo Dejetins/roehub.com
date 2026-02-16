@@ -181,6 +181,48 @@ class PostgresStrategyRepository(StrategyRepository):
             return None
         return _map_strategy_row(row=row)
 
+    def find_any_by_strategy_id(self, *, strategy_id: UUID) -> Strategy | None:
+        """
+        Find strategy by identifier without owner filter for explicit ownership checks in use-cases.
+
+        Args:
+            strategy_id: Strategy identifier.
+        Returns:
+            Strategy | None: Mapped strategy snapshot or `None`.
+        Assumptions:
+            Use-case layer performs owner checks deterministically after row loading.
+        Raises:
+            StrategyStorageError: If row mapping fails.
+        Side Effects:
+            Executes one SQL select statement.
+        """
+        query = f"""
+        SELECT
+            strategy_id,
+            user_id,
+            name,
+            instrument_id,
+            instrument_key,
+            market_type,
+            symbol,
+            timeframe,
+            indicators_json,
+            spec_json,
+            created_at,
+            is_deleted
+        FROM {self._strategies_table}
+        WHERE strategy_id = %(strategy_id)s
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={
+                "strategy_id": str(strategy_id),
+            },
+        )
+        if row is None:
+            return None
+        return _map_strategy_row(row=row)
+
     def list_for_user(
         self,
         *,

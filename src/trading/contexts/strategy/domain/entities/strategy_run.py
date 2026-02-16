@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal, Mapping, Sequence
 from uuid import UUID
 
 from trading.contexts.strategy.domain.errors import StrategyRunTransitionError
@@ -45,6 +46,7 @@ class StrategyRun:
     checkpoint_ts_open: datetime | None
     last_error: str | None
     updated_at: datetime
+    metadata_json: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """
@@ -100,6 +102,9 @@ class StrategyRun:
         elif self.last_error is not None and not self.last_error.strip():
             raise StrategyRunTransitionError("StrategyRun.last_error cannot be blank")
 
+        normalized_metadata = _normalize_metadata_json(metadata_json=self.metadata_json)
+        object.__setattr__(self, "metadata_json", normalized_metadata)
+
     @classmethod
     def start(
         cls,
@@ -108,6 +113,7 @@ class StrategyRun:
         user_id: UserId,
         strategy_id: UUID,
         started_at: datetime,
+        metadata_json: Mapping[str, Any] | None = None,
     ) -> StrategyRun:
         """
         Create new run in initial `starting` state.
@@ -117,6 +123,7 @@ class StrategyRun:
             user_id: Strategy owner identifier.
             strategy_id: Target strategy identifier.
             started_at: Run start timestamp in UTC.
+            metadata_json: Optional deterministic metadata payload for run traceability.
         Returns:
             StrategyRun: Initial run snapshot.
         Assumptions:
@@ -136,6 +143,7 @@ class StrategyRun:
             checkpoint_ts_open=None,
             last_error=None,
             updated_at=started_at,
+            metadata_json={} if metadata_json is None else dict(metadata_json),
         )
 
     def is_active(self) -> bool:
@@ -222,6 +230,7 @@ class StrategyRun:
             checkpoint_ts_open=checkpoint_ts_open,
             last_error=last_error,
             updated_at=changed_at,
+            metadata_json=self.metadata_json,
         )
 
 
@@ -266,3 +275,62 @@ def _ensure_utc_datetime(*, name: str, value: datetime) -> None:
         raise StrategyRunTransitionError(f"{name} must be timezone-aware UTC datetime")
     if offset.total_seconds() != 0:
         raise StrategyRunTransitionError(f"{name} must be UTC datetime")
+
+
+def _normalize_metadata_json(*, metadata_json: Mapping[str, Any]) -> Mapping[str, Any]:
+    """
+    Normalize run metadata mapping into deterministic JSON-compatible payload.
+
+    Args:
+        metadata_json: Raw metadata mapping.
+    Returns:
+        Mapping[str, Any]: Deterministic normalized mapping with sorted keys.
+    Assumptions:
+        Metadata payload is JSON-serializable and used for run traceability.
+    Raises:
+        StrategyRunTransitionError: If metadata cannot be serialized to JSON.
+    Side Effects:
+        None.
+    """
+    normalized = _normalize_json_value(value=dict(metadata_json))
+    if not isinstance(normalized, Mapping):
+        raise StrategyRunTransitionError("StrategyRun.metadata_json must be JSON object")
+
+    try:
+        json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    except TypeError as error:
+        raise StrategyRunTransitionError(
+            "StrategyRun.metadata_json must be JSON-serializable"
+        ) from error
+    return normalized
+
+
+def _normalize_json_value(*, value: Any) -> Any:
+    """
+    Normalize arbitrary JSON-like value into deterministic plain-Python structure.
+
+    Args:
+        value: Raw value from metadata payload.
+    Returns:
+        Any: Deterministic mapping/list/scalar value.
+    Assumptions:
+        Unknown non-JSON objects are stringified for safe trace payloads.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, Mapping):
+        normalized_mapping: dict[str, Any] = {}
+        sorted_items = sorted(value.items(), key=lambda item: str(item[0]))
+        for raw_key, raw_value in sorted_items:
+            normalized_mapping[str(raw_key)] = _normalize_json_value(value=raw_value)
+        return normalized_mapping
+
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_normalize_json_value(value=item) for item in value]
+
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+
+    return str(value)
