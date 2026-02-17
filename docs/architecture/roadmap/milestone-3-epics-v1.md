@@ -205,7 +205,7 @@ Milestone 3 делится на 2 трека, которые можно дела
 
 ### STR-EPIC-03 — Strategy live worker v1: Redis 1m ingest → rollup TF → evaluate gate (warmup) + repair(read)
 
-**Цель:** запущенные стратегии получают derived свечи (15m/1h/4h/1d) из live 1m и могут испускать events/metrics.
+**Цель:** запущенные стратегии получают свечи TF стратегии из live 1m (`1m` как passthrough; `5m/15m/1h/4h/1d` как derived rollup) и могут испускать events/metrics.
 
 **Scope:**
 - Новый процесс: `strategy-live-worker`
@@ -214,8 +214,10 @@ Milestone 3 делится на 2 трека, которые можно дела
 - Rollup:
   - строго: **только закрытые и полные бакеты**
   - bucket alignment: `Timeframe.bucket_open(ts)` (epoch-aligned UTC)
+  - для TF=`1m` rollup-шаг не выполняется (используются входные закрытые 1m свечи)
 - Warmup:
-  - `warmup_bars` в spec (в барах timeframe стратегии)
+  - `warmup_bars` вычисляется runner’ом детерминированно из `spec.indicators` (алгоритм `numeric_max_param_v1`)
+  - вычисленное значение фиксируется в `strategy_runs.metadata_json.warmup`
   - seed через ClickHouse canonical 1m (ACL read) → rollup → ring buffer
   - пока warmup не набран: evaluation запрещён, но heartbeat/lag публикуются
 - Repair(read):
@@ -306,4 +308,3 @@ Milestone 3 делится на 2 трека, которые можно дела
 ## Открытые вопросы (фиксируем, но не блокируем Milestone 3)
 - ID/OQ-01: какой Telegram flow фиксируем в v1: Login Widget vs Bot handshake?
 - ID/OQ-02: recovery для 2FA (backup codes) — в какой milestone?
-- STR/OQ-01: запрещаем ли `1m` timeframe в live v1 (скорее да), а в backtest — разрешаем.

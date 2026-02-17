@@ -283,7 +283,8 @@ UI может спросить:
 
 **Что делаем:**
 - worker читает `md.candles.1m.<instrument_key>` через consumer group
-- rollup в TF (15m/1h/4h/1d), только closed+full buckets
+- rollup в TF (`1m` как passthrough; `5m/15m/1h/4h/1d` как derived), только closed+full buckets
+- warmup_bars вычисляется в runner детерминированно из `spec.indicators` (алгоритм `numeric_max_param_v1`) и фиксируется в metadata run
 - warmup seed из ClickHouse canonical 1m
 - gap detection + repair(read) из canonical (без запуска ingestion)
 

@@ -13,7 +13,7 @@
 1. Собрать конфигурацию стратегии (**spec**) из данных:
 
 * инструмент (`instrument_id` + `instrument_key`)
-* таймфрейм **≥ 15m**
+* таймфрейм (`1m`, `5m`, `15m`, `1h`, `4h`, `1d`; `1m` в live v1 поддерживается)
 * набор индикаторов/параметров
 * `signal template` (template-based, без DSL)
 
@@ -41,7 +41,7 @@
 * Live runner worker:
 
   * читает Redis Streams 1m: `md.candles.1m.<instrument_key>`
-  * делает rollup в TF стратегии (15m/1h/4h/1d)
+  * делает rollup в TF стратегии (для TF > `1m`); для TF=`1m` использует базовые 1m (passthrough)
   * гарантирует правило “только закрытые и полные бакеты”
   * умеет repair missing 1m из ClickHouse canonical (`market_data.canonical_candles_1m`)
 * Realtime output:
@@ -93,8 +93,8 @@ ClickHouse canonical 1m (source of truth для дыр):
 
 ### Разрешённые TF (live v1)
 
-* `15m`, `1h`, `4h`, `1d`
-* `1m` в live v1 **не поддерживаем** (чтобы не плодить ложные ожидания; backtest отдельно)
+* `1m`, `5m`, `15m`, `1h`, `4h`, `1d`
+* `1m` в live v1 поддерживается как базовый TF (без rollup)
 
 ### Rollup правила (строго)
 
@@ -103,6 +103,7 @@ ClickHouse canonical 1m (source of truth для дыр):
 * derived свеча выпускается **только если бакет полный**:
 
   * все 1m свечи для `[bucket_open, bucket_close)` присутствуют
+* для TF=`1m` rollup-шаг не выполняется (используются входные закрытые 1m свечи)
 * агрегация OHLCV:
 
   * open = first
@@ -117,8 +118,10 @@ ClickHouse canonical 1m (source of truth для дыр):
 
 Правило v1:
 
-* каждая стратегия декларирует `warmup_bars` (в барах её timeframe)
-* live runner **не выполняет evaluation**, пока не накоплено `warmup_bars` derived-свечей
+* `warmup_bars` **не задаётся в spec/API вручную**; runner вычисляет его детерминированно из `spec.indicators`
+* алгоритм v1: `numeric_max_param_v1` (`max` по положительным numeric-параметрам индикаторов, fallback=`1`)
+* live runner **не выполняет evaluation**, пока не накоплено вычисленное `warmup_bars` свечей TF стратегии
+* вычисленный `warmup_bars` фиксируется в `run.metadata_json.warmup` для трассировки
 * warmup seed берём не из Redis, а из ClickHouse canonical:
 
   * при старте run: загрузить диапазон `warmup_bars * timeframe.duration` до `now_floor`
