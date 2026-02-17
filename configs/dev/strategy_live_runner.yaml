@@ -16,6 +16,17 @@ strategy_live_runner:
     read_count: 200
     block_ms: 100
 
+  realtime_output:
+    enabled: true
+    host: "redis"
+    port: 6379
+    db: 0
+    password_env: "ROEHUB_REDIS_PASSWORD"
+    socket_timeout_s: 2.0
+    connect_timeout_s: 2.0
+    metrics_stream_prefix: "strategy.metrics.v1.user"
+    events_stream_prefix: "strategy.events.v1.user"
+
   repair:
     retry_attempts: 3
     retry_backoff_seconds: 1.0

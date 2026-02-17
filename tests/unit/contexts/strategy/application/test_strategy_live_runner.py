@@ -12,6 +12,9 @@ from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
 from trading.contexts.strategy.application import (
     StrategyLiveCandleMessage,
     StrategyLiveRunner,
+    StrategyRealtimeEventV1,
+    StrategyRealtimeMetricV1,
+    StrategyRealtimeOutputRecordV1,
 )
 from trading.contexts.strategy.application.services import (
     TimeframeRollupPolicy,
@@ -283,6 +286,48 @@ class _TrackingRunRepository(InMemoryStrategyRunRepository):
         if self._reverse_active_runs:
             return tuple(reversed(rows))
         return rows
+
+
+class _RealtimeOutputProbe:
+    """
+    In-memory realtime output publisher probe recording publish batches.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize empty publish batches collection.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Probe is used to verify live-runner integration points.
+        Raises:
+            None.
+        Side Effects:
+            Creates mutable in-memory storage for publish calls.
+        """
+        self.batches: list[tuple[StrategyRealtimeOutputRecordV1, ...]] = []
+
+    def publish_records_v1(
+        self, *, records: Sequence[StrategyRealtimeOutputRecordV1]
+    ) -> None:
+        """
+        Record one realtime publish batch.
+
+        Args:
+            records: Published realtime output records.
+        Returns:
+            None.
+        Assumptions:
+            Records are already validated by application service before publishing.
+        Raises:
+            None.
+        Side Effects:
+            Appends immutable batch snapshot to probe storage.
+        """
+        self.batches.append(tuple(records))
 
 
 def test_live_runner_checkpoint_monotonicity_ignores_duplicates_and_out_of_order() -> None:
@@ -572,6 +617,65 @@ def test_live_runner_enforces_deterministic_run_processing_order_per_instrument(
     assert first_occurrence[str(run_first.run_id)] < first_occurrence[str(run_second.run_id)]
 
 
+def test_live_runner_publishes_realtime_output_records_after_persistence() -> None:
+    """
+    Ensure live-runner publishes realtime metric/event records via injected publisher probe.
+    """
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000906")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m")
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    strategy_repository.create(strategy=strategy)
+
+    started_run = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-00000000E906"),
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        started_at=datetime(2026, 2, 17, 16, 0, tzinfo=timezone.utc),
+        metadata_json={},
+    )
+    run_repository.create(run=started_run)
+    stream = _StreamStub(
+        messages_by_instrument={
+            strategy.spec.instrument_key: (
+                _message("m-rt", _candle_at(datetime(2026, 2, 17, 16, 0, tzinfo=timezone.utc))),
+            ),
+        }
+    )
+    realtime_output_probe = _RealtimeOutputProbe()
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=stream,
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+        realtime_output_probe=realtime_output_probe,
+    )
+
+    runner.run_once()
+
+    emitted = [record for batch in realtime_output_probe.batches for record in batch]
+    metric_types = [
+        record.metric_type
+        for record in emitted
+        if isinstance(record, StrategyRealtimeMetricV1)
+    ]
+    event_types = [
+        record.event_type
+        for record in emitted
+        if isinstance(record, StrategyRealtimeEventV1)
+    ]
+
+    assert "checkpoint_ts_open" in metric_types
+    assert "candles_processed_total" in metric_types
+    assert "rollup_bucket_closed" in metric_types
+    assert "run_state_changed" in event_types
+    assert all(
+        event_type in {"run_state_changed", "run_stopped", "run_failed"}
+        for event_type in event_types
+    )
+
+
 def _build_runner(
     *,
     strategy_repository: InMemoryStrategyRepository,
@@ -580,6 +684,7 @@ def _build_runner(
     canonical_reader: _CanonicalReaderStub,
     retry_attempts: int,
     sleeper: _SleeperProbe | None = None,
+    realtime_output_probe: _RealtimeOutputProbe | None = None,
 ) -> StrategyLiveRunner:
     """
     Build StrategyLiveRunner with deterministic test doubles.
@@ -591,6 +696,7 @@ def _build_runner(
         canonical_reader: Canonical reader stub.
         retry_attempts: Gap repair retries.
         sleeper: Optional sleeper probe.
+        realtime_output_probe: Optional realtime output publisher probe.
     Returns:
         StrategyLiveRunner: Configured runner instance.
     Assumptions:
@@ -609,6 +715,7 @@ def _build_runner(
         sleeper=sleeper or _SleeperProbe(),
         repair_retry_attempts=retry_attempts,
         repair_backoff_seconds=1.0,
+        realtime_output_publisher=realtime_output_probe,
     )
 
 

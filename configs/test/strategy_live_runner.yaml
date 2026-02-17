@@ -16,6 +16,17 @@ strategy_live_runner:
     read_count: 50
     block_ms: 0
 
+  realtime_output:
+    enabled: true
+    host: "localhost"
+    port: 6379
+    db: 0
+    password_env: null
+    socket_timeout_s: 1.0
+    connect_timeout_s: 1.0
+    metrics_stream_prefix: "strategy.metrics.v1.user"
+    events_stream_prefix: "strategy.events.v1.user"
+
   repair:
     retry_attempts: 0
     retry_backoff_seconds: 0.0

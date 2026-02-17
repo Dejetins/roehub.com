@@ -4,15 +4,23 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Callable, Mapping
+from uuid import UUID
 
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
 from trading.contexts.strategy.application.ports import (
+    EventTypeV1,
+    MetricTypeV1,
+    NoOpStrategyRealtimeOutputPublisher,
     StrategyClock,
     StrategyLiveCandleStream,
+    StrategyRealtimeEventV1,
+    StrategyRealtimeMetricV1,
+    StrategyRealtimeOutputPublisher,
     StrategyRepository,
     StrategyRunnerSleeper,
     StrategyRunRepository,
+    serialize_realtime_event_payload_json,
 )
 from trading.contexts.strategy.domain.entities import (
     Strategy,
@@ -117,6 +125,7 @@ class StrategyLiveRunner:
         sleeper: StrategyRunnerSleeper,
         repair_retry_attempts: int,
         repair_backoff_seconds: float,
+        realtime_output_publisher: StrategyRealtimeOutputPublisher | None = None,
         warmup_estimator: Callable[..., int] | None = None,
         rollup_policy: TimeframeRollupPolicy | None = None,
     ) -> None:
@@ -132,6 +141,7 @@ class StrategyLiveRunner:
             sleeper: Sleep abstraction for retry backoff.
             repair_retry_attempts: Maximum canonical repair retries per gap.
             repair_backoff_seconds: Base retry backoff in seconds.
+            realtime_output_publisher: Optional realtime output publisher port.
             warmup_estimator: Optional warmup estimator override.
             rollup_policy: Optional timeframe rollup closure policy override.
         Returns:
@@ -168,8 +178,15 @@ class StrategyLiveRunner:
         self._sleeper = sleeper
         self._repair_retry_attempts = repair_retry_attempts
         self._repair_backoff_seconds = repair_backoff_seconds
+        self._realtime_output_publisher = (
+            realtime_output_publisher
+            if realtime_output_publisher is not None
+            else NoOpStrategyRealtimeOutputPublisher()
+        )
         self._warmup_estimator = warmup_estimator or estimate_strategy_warmup_bars
         self._rollup_policy = rollup_policy or TimeframeRollupPolicy()
+        self._candles_processed_total_by_run: dict[str, int] = {}
+        self._dropped_non_contiguous_total_by_run: dict[str, int] = {}
 
     def run_once(self) -> StrategyLiveRunnerIterationReport:
         """
@@ -206,6 +223,7 @@ class StrategyLiveRunner:
                 run = self._mark_failed(
                     run=run,
                     error=RuntimeError("strategy not found or deleted"),
+                    spec=None,
                 )
                 _ = run
                 failed_runs += 1
@@ -248,7 +266,11 @@ class StrategyLiveRunner:
                             candle=message.candle,
                         )
                     except Exception as error:  # noqa: BLE001
-                        context.run = self._mark_failed(run=context.run, error=error)
+                        context.run = self._mark_failed(
+                            run=context.run,
+                            error=error,
+                            spec=context.strategy.spec,
+                        )
                         failed_runs += 1
 
                 self._live_candle_stream.ack(
@@ -261,6 +283,7 @@ class StrategyLiveRunner:
                 if context.run.state == "stopping":
                     context.run = self._transition_state(
                         run=context.run,
+                        spec=context.strategy.spec,
                         next_state="stopped",
                         checkpoint_ts_open=context.run.checkpoint_ts_open,
                         last_error=None,
@@ -303,10 +326,12 @@ class StrategyLiveRunner:
                 last_error=run.last_error,
                 metadata_json=metadata_json,
             )
+            self._publish_snapshot_metrics(run=run, spec=spec, ts=run.updated_at)
 
         if run.state == "starting":
             run = self._transition_state(
                 run=run,
+                spec=spec,
                 next_state="warming_up",
                 checkpoint_ts_open=run.checkpoint_ts_open,
                 last_error=None,
@@ -316,6 +341,7 @@ class StrategyLiveRunner:
         if run.state == "warming_up" and warmup_state.satisfied:
             run = self._transition_state(
                 run=run,
+                spec=spec,
                 next_state="running",
                 checkpoint_ts_open=run.checkpoint_ts_open,
                 last_error=None,
@@ -350,6 +376,7 @@ class StrategyLiveRunner:
         if run.state == "starting":
             run = self._transition_state(
                 run=run,
+                spec=spec,
                 next_state="warming_up",
                 checkpoint_ts_open=run.checkpoint_ts_open,
                 last_error=None,
@@ -361,6 +388,7 @@ class StrategyLiveRunner:
         ts_open = candle.candle.ts_open.value
         checkpoint = run.checkpoint_ts_open
         if checkpoint is not None and ts_open <= checkpoint:
+            self._increment_dropped_non_contiguous_total(run_id=run.run_id)
             return run
 
         if checkpoint is not None and ts_open > checkpoint + _ONE_MINUTE:
@@ -402,6 +430,7 @@ class StrategyLiveRunner:
         if checkpoint is not None:
             expected = checkpoint + _ONE_MINUTE
             if ts_open != expected:
+                self._increment_dropped_non_contiguous_total(run_id=run.run_id)
                 return run
 
         metadata_json, warmup_state = self._normalized_metadata(
@@ -435,9 +464,24 @@ class StrategyLiveRunner:
             last_error=run.last_error,
             metadata_json=metadata_json,
         )
+        candles_processed_total = self._increment_candles_processed_total(run_id=run.run_id)
+        self._publish_snapshot_metrics(
+            run=run,
+            spec=spec,
+            ts=run.updated_at,
+            extra_metrics=(
+                ("candles_processed_total", str(candles_processed_total)),
+                ("rollup_bucket_closed", _bool_as_flag(rollup_step.bucket_closed)),
+                ("gap_detected", "0"),
+                ("repair_missing_bars", "0"),
+                ("repair_attempt", "0"),
+                ("repair_continuous", "1"),
+            ),
+        )
         if run.state == "warming_up" and normalized_warmup.satisfied:
             run = self._transition_state(
                 run=run,
+                spec=spec,
                 next_state="running",
                 checkpoint_ts_open=run.checkpoint_ts_open,
                 last_error=None,
@@ -472,6 +516,12 @@ class StrategyLiveRunner:
         if run.checkpoint_ts_open is None:
             return run, False
 
+        first_expected_start = run.checkpoint_ts_open + _ONE_MINUTE
+        missing_bars = _missing_bars_until_target(
+            expected_start=first_expected_start,
+            target_ts_open=target_ts_open,
+        )
+
         for attempt in range(self._repair_retry_attempts + 1):
             expected_start = run.checkpoint_ts_open + _ONE_MINUTE
             if expected_start >= target_ts_open:
@@ -504,6 +554,17 @@ class StrategyLiveRunner:
             if expected_cursor >= target_ts_open:
                 for repaired in contiguous_rows:
                     run = self._accept_contiguous_candle(run=run, spec=spec, candle=repaired)
+                self._publish_snapshot_metrics(
+                    run=run,
+                    spec=spec,
+                    ts=run.updated_at,
+                    extra_metrics=(
+                        ("gap_detected", "1"),
+                        ("repair_missing_bars", str(missing_bars)),
+                        ("repair_attempt", str(attempt + 1)),
+                        ("repair_continuous", "1"),
+                    ),
+                )
                 return run, True
 
             if attempt == self._repair_retry_attempts:
@@ -557,6 +618,7 @@ class StrategyLiveRunner:
         self,
         *,
         run: StrategyRun,
+        spec: StrategySpecV1 | None,
         next_state: StrategyRunState,
         checkpoint_ts_open: datetime | None,
         last_error: str | None,
@@ -567,6 +629,7 @@ class StrategyLiveRunner:
 
         Args:
             run: Current run snapshot.
+            spec: Strategy specification snapshot for realtime output payload routing.
             next_state: Target state literal.
             checkpoint_ts_open: Target checkpoint value.
             last_error: Target error value.
@@ -599,15 +662,26 @@ class StrategyLiveRunner:
                 updated_at=transitioned.updated_at,
                 metadata_json=metadata_json,
             )
-        return self._run_repository.update(run=transitioned)
+        persisted = self._run_repository.update(run=transitioned)
+        if spec is not None:
+            self._publish_snapshot_metrics(run=persisted, spec=spec, ts=persisted.updated_at)
+            self._publish_transition_events(previous=run, current=persisted, spec=spec)
+        return persisted
 
-    def _mark_failed(self, *, run: StrategyRun, error: Exception) -> StrategyRun:
+    def _mark_failed(
+        self,
+        *,
+        run: StrategyRun,
+        error: Exception,
+        spec: StrategySpecV1 | None,
+    ) -> StrategyRun:
         """
         Transition run into `failed` state and store deterministic last_error text.
 
         Args:
             run: Current run snapshot.
             error: Caught processing error.
+            spec: Optional strategy specification snapshot for realtime output routing.
         Returns:
             StrategyRun: Persisted failed run snapshot.
         Assumptions:
@@ -623,11 +697,326 @@ class StrategyLiveRunner:
         log.exception("strategy live-runner failed run_id=%s reason=%s", run.run_id, message)
         return self._transition_state(
             run=run,
+            spec=spec,
             next_state="failed",
             checkpoint_ts_open=run.checkpoint_ts_open,
             last_error=message,
             metadata_json=run.metadata_json,
         )
+
+    def _publish_snapshot_metrics(
+        self,
+        *,
+        run: StrategyRun,
+        spec: StrategySpecV1,
+        ts: datetime,
+        extra_metrics: tuple[tuple[MetricTypeV1, str], ...] = (),
+    ) -> None:
+        """
+        Publish deterministic realtime metric snapshot after successful run persistence.
+
+        Args:
+            run: Persisted run snapshot.
+            spec: Strategy specification used for routing fields.
+            ts: Publish timestamp tied to persisted run update.
+            extra_metrics: Additional metric values for current processing step.
+        Returns:
+            None.
+        Assumptions:
+            Method is called only after successful repository update.
+        Raises:
+            None.
+        Side Effects:
+            Emits best-effort metric records via realtime output publisher port.
+        """
+        metric_values = self._snapshot_metric_values(run=run, spec=spec)
+        for metric_type, value in extra_metrics:
+            metric_values[metric_type] = value
+
+        records = tuple(
+            self._metric_record(
+                run=run,
+                spec=spec,
+                ts=ts,
+                metric_type=metric_type,
+                value=value,
+            )
+            for metric_type, value in sorted(metric_values.items(), key=lambda row: row[0])
+        )
+        self._realtime_output_publisher.publish_records_v1(records=records)
+
+    def _snapshot_metric_values(
+        self,
+        *,
+        run: StrategyRun,
+        spec: StrategySpecV1,
+    ) -> dict[MetricTypeV1, str]:
+        """
+        Build baseline metric value set for one persisted run snapshot.
+
+        Args:
+            run: Persisted run snapshot.
+            spec: Strategy specification for warmup/rollup normalization.
+        Returns:
+            dict[MetricTypeV1, str]: Baseline metric values keyed by fixed v1 metric types.
+        Assumptions:
+            Metadata payload follows Strategy live-runner normalization contract.
+        Raises:
+            ValueError: If timestamp normalization fails.
+        Side Effects:
+            None.
+        """
+        estimated_bars = max(int(self._warmup_estimator(spec=spec)), 1)
+        warmup_state = _read_warmup_state(
+            metadata_json=run.metadata_json,
+            estimated_bars=estimated_bars,
+        )
+        rollup_progress = _read_rollup_progress(
+            metadata_json=run.metadata_json,
+            timeframe_code=spec.timeframe.code,
+        )
+        return {
+            "warmup_processed_bars": str(warmup_state.processed_bars),
+            "checkpoint_ts_open": (
+                _isoformat_utc(run.checkpoint_ts_open)
+                if run.checkpoint_ts_open is not None
+                else ""
+            ),
+            "lag_seconds": str(
+                _lag_seconds(
+                    now=self._clock.now(),
+                    checkpoint_ts_open=run.checkpoint_ts_open,
+                )
+            ),
+            "candles_processed_total": str(self._candles_processed_total(run_id=run.run_id)),
+            "warmup_required_bars": str(warmup_state.bars),
+            "warmup_satisfied": _bool_as_flag(warmup_state.satisfied),
+            "run_state": run.state,
+            "rollup_bucket_count_1m": str(rollup_progress.bucket_count_1m),
+            "rollup_bucket_open_ts": (
+                _isoformat_utc(rollup_progress.bucket_open_ts)
+                if rollup_progress.bucket_open_ts is not None
+                else ""
+            ),
+            "dropped_non_contiguous_total": str(
+                self._dropped_non_contiguous_total(run_id=run.run_id)
+            ),
+        }
+
+    def _metric_record(
+        self,
+        *,
+        run: StrategyRun,
+        spec: StrategySpecV1,
+        ts: datetime,
+        metric_type: MetricTypeV1,
+        value: str,
+    ) -> StrategyRealtimeMetricV1:
+        """
+        Build one realtime metric record with fixed routing fields for run and strategy.
+
+        Args:
+            run: Persisted run snapshot.
+            spec: Strategy specification snapshot.
+            ts: Publish timestamp.
+            metric_type: Fixed metric type literal.
+            value: Metric value encoded as string.
+        Returns:
+            StrategyRealtimeMetricV1: Validated metric record.
+        Assumptions:
+            `value` is already serialized to wire-format string.
+        Raises:
+            ValueError: If record construction violates realtime metric contract.
+        Side Effects:
+            None.
+        """
+        return StrategyRealtimeMetricV1(
+            user_id=run.user_id,
+            ts=ts,
+            strategy_id=run.strategy_id,
+            run_id=run.run_id,
+            metric_type=metric_type,
+            value=value,
+            instrument_key=spec.instrument_key,
+            timeframe=spec.timeframe.code,
+        )
+
+    def _publish_transition_events(
+        self,
+        *,
+        previous: StrategyRun,
+        current: StrategyRun,
+        spec: StrategySpecV1,
+    ) -> None:
+        """
+        Publish user-facing realtime events for run state transitions.
+
+        Args:
+            previous: Run snapshot before transition persistence.
+            current: Persisted run snapshot after transition.
+            spec: Strategy specification used for routing fields.
+        Returns:
+            None.
+        Assumptions:
+            Only fixed v1 event types are emitted.
+        Raises:
+            None.
+        Side Effects:
+            Emits best-effort event records via realtime output publisher port.
+        """
+        if previous.state == current.state:
+            return
+
+        transition_payload = serialize_realtime_event_payload_json(
+            payload={
+                "from": previous.state,
+                "to": current.state,
+            }
+        )
+        events: list[StrategyRealtimeEventV1] = [
+            self._event_record(
+                run=current,
+                spec=spec,
+                ts=current.updated_at,
+                event_type="run_state_changed",
+                payload_json=transition_payload,
+            )
+        ]
+        if current.state == "stopped":
+            events.append(
+                self._event_record(
+                    run=current,
+                    spec=spec,
+                    ts=current.updated_at,
+                    event_type="run_stopped",
+                    payload_json=serialize_realtime_event_payload_json(payload={}),
+                )
+            )
+        if current.state == "failed":
+            events.append(
+                self._event_record(
+                    run=current,
+                    spec=spec,
+                    ts=current.updated_at,
+                    event_type="run_failed",
+                    payload_json=serialize_realtime_event_payload_json(
+                        payload={"error": current.last_error or ""}
+                    ),
+                )
+            )
+        self._realtime_output_publisher.publish_records_v1(records=tuple(events))
+
+    def _event_record(
+        self,
+        *,
+        run: StrategyRun,
+        spec: StrategySpecV1,
+        ts: datetime,
+        event_type: EventTypeV1,
+        payload_json: str,
+    ) -> StrategyRealtimeEventV1:
+        """
+        Build one realtime event record with fixed routing fields for run and strategy.
+
+        Args:
+            run: Persisted run snapshot.
+            spec: Strategy specification snapshot.
+            ts: Publish timestamp.
+            event_type: Fixed event type literal.
+            payload_json: Canonical JSON object string payload.
+        Returns:
+            StrategyRealtimeEventV1: Validated event record.
+        Assumptions:
+            `payload_json` is serialized with deterministic sort order and ASCII output.
+        Raises:
+            ValueError: If record construction violates realtime event contract.
+        Side Effects:
+            None.
+        """
+        return StrategyRealtimeEventV1(
+            user_id=run.user_id,
+            ts=ts,
+            strategy_id=run.strategy_id,
+            run_id=run.run_id,
+            event_type=event_type,
+            payload_json=payload_json,
+            instrument_key=spec.instrument_key,
+            timeframe=spec.timeframe.code,
+        )
+
+    def _increment_candles_processed_total(self, *, run_id: UUID) -> int:
+        """
+        Increase in-memory contiguous candle counter for one run.
+
+        Args:
+            run_id: Run identifier.
+        Returns:
+            int: Updated counter value.
+        Assumptions:
+            Counter scope is process-local for current runner instance.
+        Raises:
+            None.
+        Side Effects:
+            Mutates internal counter dictionary.
+        """
+        key = str(run_id)
+        value = self._candles_processed_total_by_run.get(key, 0) + 1
+        self._candles_processed_total_by_run[key] = value
+        return value
+
+    def _candles_processed_total(self, *, run_id: UUID) -> int:
+        """
+        Read process-local contiguous candle counter value for one run.
+
+        Args:
+            run_id: Run identifier.
+        Returns:
+            int: Current counter value.
+        Assumptions:
+            Missing run id means counter value `0`.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self._candles_processed_total_by_run.get(str(run_id), 0)
+
+    def _increment_dropped_non_contiguous_total(self, *, run_id: UUID) -> int:
+        """
+        Increase in-memory dropped non-contiguous candle counter for one run.
+
+        Args:
+            run_id: Run identifier.
+        Returns:
+            int: Updated counter value.
+        Assumptions:
+            Counter scope is process-local for current runner instance.
+        Raises:
+            None.
+        Side Effects:
+            Mutates internal counter dictionary.
+        """
+        key = str(run_id)
+        value = self._dropped_non_contiguous_total_by_run.get(key, 0) + 1
+        self._dropped_non_contiguous_total_by_run[key] = value
+        return value
+
+    def _dropped_non_contiguous_total(self, *, run_id: UUID) -> int:
+        """
+        Read process-local dropped non-contiguous candle counter value for one run.
+
+        Args:
+            run_id: Run identifier.
+        Returns:
+            int: Current counter value.
+        Assumptions:
+            Missing run id means counter value `0`.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self._dropped_non_contiguous_total_by_run.get(str(run_id), 0)
 
     def _normalized_metadata(
         self,
@@ -666,6 +1055,70 @@ class StrategyLiveRunner:
             timeframe_code=spec.timeframe.code,
         )
         return normalized, warmup_state
+
+
+def _missing_bars_until_target(*, expected_start: datetime, target_ts_open: datetime) -> int:
+    """
+    Calculate missing 1m bars count between expected checkpoint cursor and target timestamp.
+
+    Args:
+        expected_start: Expected next contiguous 1m timestamp.
+        target_ts_open: Incoming candle timestamp that exposed potential gap.
+    Returns:
+        int: Non-negative count of missing 1m bars before target timestamp.
+    Assumptions:
+        Timestamps are UTC and normalized to minute granularity.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if target_ts_open <= expected_start:
+        return 0
+    missing_seconds = (target_ts_open - expected_start).total_seconds()
+    return max(int(missing_seconds // 60), 0)
+
+
+def _lag_seconds(*, now: datetime, checkpoint_ts_open: datetime | None) -> int:
+    """
+    Compute non-negative lag in seconds between current time and run checkpoint timestamp.
+
+    Args:
+        now: Current clock timestamp.
+        checkpoint_ts_open: Run checkpoint timestamp.
+    Returns:
+        int: Lag in whole seconds, or `0` when checkpoint is absent.
+    Assumptions:
+        Inputs are timezone-aware UTC datetimes.
+    Raises:
+        ValueError: If datetime normalization fails.
+    Side Effects:
+        None.
+    """
+    if checkpoint_ts_open is None:
+        return 0
+    now_value = UtcTimestamp(now).value
+    checkpoint_value = UtcTimestamp(checkpoint_ts_open).value
+    lag = int((now_value - checkpoint_value).total_seconds())
+    return max(lag, 0)
+
+
+def _bool_as_flag(value: bool) -> str:
+    """
+    Convert boolean value into deterministic wire-format `\"0\"`/`\"1\"` string.
+
+    Args:
+        value: Boolean source value.
+    Returns:
+        str: `\"1\"` when value is true, otherwise `\"0\"`.
+    Assumptions:
+        Realtime metric schema stores boolean-like values as strings.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return "1" if value else "0"
 
 
 def _read_warmup_state(*, metadata_json: Mapping[str, Any], estimated_bars: int) -> _WarmupState:

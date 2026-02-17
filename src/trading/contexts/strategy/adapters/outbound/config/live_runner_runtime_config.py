@@ -111,6 +111,71 @@ class StrategyLiveRunnerRedisConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class StrategyLiveRunnerRealtimeOutputConfig:
+    """
+    StrategyLiveRunnerRealtimeOutputConfig — Redis Streams publish config for realtime output v1.
+
+    Docs:
+      - docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md
+    Related:
+      - src/trading/contexts/strategy/adapters/outbound/messaging/redis/
+        redis_streams_realtime_output_publisher.py
+      - apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py
+      - configs/dev/strategy_live_runner.yaml
+    """
+
+    enabled: bool
+    host: str
+    port: int
+    db: int
+    password_env: str | None
+    socket_timeout_s: float
+    connect_timeout_s: float
+    metrics_stream_prefix: str
+    events_stream_prefix: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate realtime output config invariants when feature is enabled.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Feature can be disabled without requiring Redis settings.
+        Raises:
+            ValueError: If enabled config values are invalid.
+        Side Effects:
+            None.
+        """
+        if not self.enabled:
+            return
+        if not self.host.strip():
+            raise ValueError("strategy_live_runner.realtime_output.host must be non-empty")
+        if self.port <= 0:
+            raise ValueError("strategy_live_runner.realtime_output.port must be > 0")
+        if self.db < 0:
+            raise ValueError("strategy_live_runner.realtime_output.db must be >= 0")
+        if self.socket_timeout_s <= 0:
+            raise ValueError(
+                "strategy_live_runner.realtime_output.socket_timeout_s must be > 0"
+            )
+        if self.connect_timeout_s <= 0:
+            raise ValueError(
+                "strategy_live_runner.realtime_output.connect_timeout_s must be > 0"
+            )
+        if not self.metrics_stream_prefix.strip():
+            raise ValueError(
+                "strategy_live_runner.realtime_output.metrics_stream_prefix must be non-empty"
+            )
+        if not self.events_stream_prefix.strip():
+            raise ValueError(
+                "strategy_live_runner.realtime_output.events_stream_prefix must be non-empty"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class StrategyLiveRunnerRuntimeConfig:
     """
     StrategyLiveRunnerRuntimeConfig — top-level runtime config for Strategy live-runner worker.
@@ -126,6 +191,7 @@ class StrategyLiveRunnerRuntimeConfig:
     version: int
     poll_interval_seconds: int
     redis_streams: StrategyLiveRunnerRedisConfig
+    realtime_output: StrategyLiveRunnerRealtimeOutputConfig
     repair: StrategyLiveRunnerRepairConfig
 
     def __post_init__(self) -> None:
@@ -174,6 +240,7 @@ def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRu
     version = _get_int(payload, "version", required=True)
     runner_map = _get_mapping(payload, "strategy_live_runner", required=True)
     redis_map = _get_mapping(runner_map, "redis_streams", required=False)
+    realtime_output_map = _get_mapping(runner_map, "realtime_output", required=False)
     repair_map = _get_mapping(runner_map, "repair", required=False)
 
     return StrategyLiveRunnerRuntimeConfig(
@@ -211,6 +278,37 @@ def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRu
             ),
             read_count=_get_int_with_default(redis_map, "read_count", default=200),
             block_ms=_get_int_with_default(redis_map, "block_ms", default=100),
+        ),
+        realtime_output=StrategyLiveRunnerRealtimeOutputConfig(
+            enabled=_get_bool_with_default(realtime_output_map, "enabled", default=False),
+            host=_get_str_with_default(realtime_output_map, "host", default="redis"),
+            port=_get_int_with_default(realtime_output_map, "port", default=6379),
+            db=_get_int_with_default(realtime_output_map, "db", default=0),
+            password_env=_get_optional_str_with_default(
+                realtime_output_map,
+                "password_env",
+                default="ROEHUB_REDIS_PASSWORD",
+            ),
+            socket_timeout_s=_get_float_with_default(
+                realtime_output_map,
+                "socket_timeout_s",
+                default=2.0,
+            ),
+            connect_timeout_s=_get_float_with_default(
+                realtime_output_map,
+                "connect_timeout_s",
+                default=2.0,
+            ),
+            metrics_stream_prefix=_get_str_with_default(
+                realtime_output_map,
+                "metrics_stream_prefix",
+                default="strategy.metrics.v1.user",
+            ),
+            events_stream_prefix=_get_str_with_default(
+                realtime_output_map,
+                "events_stream_prefix",
+                default="strategy.events.v1.user",
+            ),
         ),
         repair=StrategyLiveRunnerRepairConfig(
             retry_attempts=_get_int_with_default(repair_map, "retry_attempts", default=3),

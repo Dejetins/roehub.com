@@ -24,11 +24,15 @@ from trading.contexts.strategy.adapters.outbound import (
     PsycopgStrategyPostgresGateway,
     RedisStrategyLiveCandleStream,
     RedisStrategyLiveCandleStreamConfig,
+    RedisStrategyRealtimeOutputPublisher,
+    RedisStrategyRealtimeOutputPublisherConfig,
+    RedisStrategyRealtimeOutputPublisherHooks,
     SystemRunnerSleeper,
     SystemStrategyClock,
     load_strategy_live_runner_runtime_config,
 )
 from trading.contexts.strategy.application import (
+    NoOpStrategyRealtimeOutputPublisher,
     StrategyLiveRunner,
     StrategyLiveRunnerIterationReport,
 )
@@ -91,6 +95,18 @@ class StrategyLiveRunnerMetrics:
             "Strategy live-runner iteration duration in seconds",
             buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 15.0, 60.0),
         )
+        self.realtime_output_publish_total = Counter(
+            "strategy_realtime_output_publish_total",
+            "Strategy realtime output successful publish count",
+        )
+        self.realtime_output_publish_errors_total = Counter(
+            "strategy_realtime_output_publish_errors_total",
+            "Strategy realtime output publish failures count",
+        )
+        self.realtime_output_publish_duplicates_total = Counter(
+            "strategy_realtime_output_publish_duplicates_total",
+            "Strategy realtime output duplicate/out-of-order publish count",
+        )
 
     def observe_iteration(
         self,
@@ -118,6 +134,27 @@ class StrategyLiveRunnerMetrics:
         self.messages_acked_total.inc(report.acked_messages)
         self.failed_runs_total.inc(report.failed_runs)
         self.iteration_duration_seconds.observe(max(duration_seconds, 0.0))
+
+    def realtime_output_hooks(self) -> RedisStrategyRealtimeOutputPublisherHooks:
+        """
+        Build metrics callbacks bundle for realtime output publish adapter.
+
+        Args:
+            None.
+        Returns:
+            RedisStrategyRealtimeOutputPublisherHooks: Hook callbacks bound to Prometheus counters.
+        Assumptions:
+            Hook callbacks are lightweight and thread-safe in single worker process.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return RedisStrategyRealtimeOutputPublisherHooks(
+            on_publish_success=self.realtime_output_publish_total.inc,
+            on_publish_error=self.realtime_output_publish_errors_total.inc,
+            on_publish_duplicate=self.realtime_output_publish_duplicates_total.inc,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -260,6 +297,25 @@ def build_strategy_live_runner_app(
         ),
         environ=environ,
     )
+    metrics = StrategyLiveRunnerMetrics()
+
+    realtime_output_config = runtime_config.realtime_output
+    realtime_output_publisher = NoOpStrategyRealtimeOutputPublisher()
+    if realtime_output_config.enabled:
+        realtime_output_publisher = RedisStrategyRealtimeOutputPublisher(
+            config=RedisStrategyRealtimeOutputPublisherConfig(
+                host=realtime_output_config.host,
+                port=realtime_output_config.port,
+                db=realtime_output_config.db,
+                password_env=realtime_output_config.password_env,
+                socket_timeout_s=realtime_output_config.socket_timeout_s,
+                connect_timeout_s=realtime_output_config.connect_timeout_s,
+                metrics_stream_prefix=realtime_output_config.metrics_stream_prefix,
+                events_stream_prefix=realtime_output_config.events_stream_prefix,
+            ),
+            environ=environ,
+            hooks=metrics.realtime_output_hooks(),
+        )
 
     runner = StrategyLiveRunner(
         strategy_repository=strategy_repository,
@@ -270,11 +326,12 @@ def build_strategy_live_runner_app(
         sleeper=SystemRunnerSleeper(),
         repair_retry_attempts=runtime_config.repair.retry_attempts,
         repair_backoff_seconds=runtime_config.repair.retry_backoff_seconds,
+        realtime_output_publisher=realtime_output_publisher,
     )
     return StrategyLiveRunnerApp(
         poll_interval_seconds=runtime_config.poll_interval_seconds,
         runner=runner,
-        metrics=StrategyLiveRunnerMetrics(),
+        metrics=metrics,
         metrics_port=metrics_port,
     )
 

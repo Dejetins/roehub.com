@@ -104,6 +104,16 @@
 |       |       `-- modules/
 |       |           |-- __init__.py
 |       |           `-- market_data_ws.py
+|       |-- strategy_live_runner/
+|       |   |-- __init__.py
+|       |   |-- main/
+|       |   |   |-- __init__.py
+|       |   |   `-- main.py
+|       |   `-- wiring/
+|       |       |-- __init__.py
+|       |       `-- modules/
+|       |           |-- __init__.py
+|       |           `-- strategy_live_runner.py
 |       `-- wiring/
 |           |-- clients/
 |           |-- container/
@@ -113,13 +123,16 @@
 |   |-- dev/
 |   |   |-- indicators.yaml
 |   |   |-- market_data.yaml
+|   |   |-- strategy_live_runner.yaml
 |   |   `-- whitelist.csv
 |   |-- prod/
 |   |   |-- indicators.yaml
 |   |   |-- market_data.yaml
+|   |   |-- strategy_live_runner.yaml
 |   |   `-- whitelist.csv
 |   `-- test/
-|       `-- indicators.yaml
+|       |-- indicators.yaml
+|       `-- strategy_live_runner.yaml
 |-- deploy/
 |-- docs/
 |   |-- _templates/
@@ -173,7 +186,9 @@
 |   |   `-- strategy/
 |   |       |-- strategy-api-immutable-crud-clone-run-control-v1.md
 |   |       |-- strategy-domain-spec-immutable-storage-runs-events-v1.md
-|   |       `-- strategy-milestone-3-epics-v1.md
+|   |       |-- strategy-live-runner-redis-streams-v1.md
+|   |       |-- strategy-milestone-3-epics-v1.md
+|   |       `-- strategy-realtime-output-redis-streams-v1.md
 |   |-- decisions/
 |   |-- repository_three.md
 |   `-- runbooks/
@@ -598,8 +613,17 @@
 |       |       |   |-- inbound/
 |       |       |   `-- outbound/
 |       |       |       |-- __init__.py
+|       |       |       |-- config/
+|       |       |       |   |-- __init__.py
+|       |       |       |   `-- live_runner_runtime_config.py
 |       |       |       |-- feeds/
 |       |       |       |   `-- market_data_acl/
+|       |       |       |-- messaging/
+|       |       |       |   |-- __init__.py
+|       |       |       |   `-- redis/
+|       |       |       |       |-- __init__.py
+|       |       |       |       |-- redis_streams_live_candle_stream.py
+|       |       |       |       `-- redis_streams_realtime_output_publisher.py
 |       |       |       |-- persistence/
 |       |       |       |   |-- __init__.py
 |       |       |       |   |-- in_memory/
@@ -618,6 +642,7 @@
 |       |       |       |   `-- messaging/
 |       |       |       `-- time/
 |       |       |           |-- __init__.py
+|       |       |           |-- system_runner_sleeper.py
 |       |       |           `-- system_strategy_clock.py
 |       |       |-- application/
 |       |       |   |-- __init__.py
@@ -628,14 +653,19 @@
 |       |       |   |   |-- clock.py
 |       |       |   |   |-- current_user.py
 |       |       |   |   |-- feeds/
+|       |       |   |   |-- live_candle_stream.py
+|       |       |   |   |-- realtime_output_publisher.py
 |       |       |   |   |-- repositories/
 |       |       |   |   |   |-- __init__.py
 |       |       |   |   |   |-- strategy_event_repository.py
 |       |       |   |   |   |-- strategy_repository.py
 |       |       |   |   |   `-- strategy_run_repository.py
-|       |       |   |   `-- sinks/
+|       |       |   |   |-- sinks/
+|       |       |   |   `-- sleeper.py
 |       |       |   |-- services/
 |       |       |   |   |-- __init__.py
+|       |       |   |   |-- live_runner.py
+|       |       |   |   |-- timeframe_rollup.py
 |       |       |   |   `-- warmup_estimator.py
 |       |       |   `-- use_cases/
 |       |       |       |-- __init__.py
@@ -833,8 +863,12 @@
 |       |   |           `-- test_time_slicing.py
 |       |   `-- strategy/
 |       |       |-- adapters/
-|       |       |   `-- test_postgres_strategy_repositories.py
+|       |       |   |-- test_postgres_strategy_repositories.py
+|       |       |   |-- test_redis_strategy_live_candle_stream.py
+|       |       |   |-- test_redis_strategy_realtime_output_publisher.py
+|       |       |   `-- test_strategy_live_runner_runtime_config.py
 |       |       |-- application/
+|       |       |   |-- test_strategy_live_runner.py
 |       |       |   `-- test_strategy_use_cases.py
 |       |       `-- domain/
 |       |           `-- test_strategy_domain.py
@@ -860,4 +894,4 @@
 |   `-- lint/
 `-- uv.lock
 
-359 directories, 502 files
+366 directories, 529 files
