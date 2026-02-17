@@ -5,11 +5,11 @@ import os
 from pathlib import Path
 from typing import Mapping
 
+from alembic.config import Config
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Connection
 
 from alembic import command
-from alembic.config import Config
 
 _POSTGRES_DSN_ENV = "POSTGRES_DSN"
 _DEFAULT_LOCK_KEY = 56329814721

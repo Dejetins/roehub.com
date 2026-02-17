@@ -24,13 +24,15 @@ from trading.platform.errors import RoehubError
 
 class StopStrategyUseCase:
     """
-    StopStrategyUseCase — stop active strategy run with deterministic state transitions.
+    StopStrategyUseCase — request active strategy run stop via `stopping` state transition.
 
     Docs:
       - docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md
+      - docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md
     Related:
       - src/trading/contexts/strategy/domain/entities/strategy_run.py
       - src/trading/contexts/strategy/application/ports/repositories/strategy_run_repository.py
+      - src/trading/contexts/strategy/application/services/live_runner.py
       - apps/api/routes/strategies.py
     """
 
@@ -53,7 +55,7 @@ class StopStrategyUseCase:
         Returns:
             None.
         Assumptions:
-            Stop flow transitions active run deterministically: running -> stopping -> stopped.
+            Runner finalizes `stopping -> stopped` after best-effort processing.
         Raises:
             ValueError: If required dependencies are missing.
         Side Effects:
@@ -73,19 +75,19 @@ class StopStrategyUseCase:
 
     def execute(self, *, strategy_id: UUID, current_user: CurrentUser) -> StrategyRun:
         """
-        Stop current active strategy run and persist terminal stopped snapshot.
+        Request stop for current active strategy run by persisting `stopping` snapshot.
 
         Args:
             strategy_id: Target strategy identifier.
             current_user: Authenticated current user context.
         Returns:
-            StrategyRun: Persisted run snapshot in `stopped` state.
+            StrategyRun: Persisted run snapshot in `stopping` state.
         Assumptions:
             Stop is deterministic conflict when no active run exists.
         Raises:
             RoehubError: If ownership, state, or storage invariants are violated.
         Side Effects:
-            Updates active run state and appends run-stopped event.
+            Updates active run state and appends run stop-request event.
         """
         strategy = require_owned_strategy(
             repository=self._strategy_repository,
@@ -124,29 +126,20 @@ class StopStrategyUseCase:
             )
             persisted_stopping = self._run_repository.update(run=stopping)
 
-            stopped_at = ensure_utc_datetime(value=self._clock.now(), field_name="clock.now")
-            stopped = persisted_stopping.transition_to(
-                next_state="stopped",
-                changed_at=stopped_at,
-                checkpoint_ts_open=persisted_stopping.checkpoint_ts_open,
-                last_error=None,
-            )
-            persisted_stopped = self._run_repository.update(run=stopped)
-
             append_strategy_event(
                 repository=self._event_repository,
                 strategy_id=strategy.strategy_id,
                 current_user=current_user,
-                event_type="run_stopped",
-                ts=stopped_at,
+                event_type="run_stop_requested",
+                ts=stopping_at,
                 payload_json={
                     "strategy_id": str(strategy.strategy_id),
-                    "run_id": str(persisted_stopped.run_id),
-                    "state": persisted_stopped.state,
+                    "run_id": str(persisted_stopping.run_id),
+                    "state": persisted_stopping.state,
                 },
-                run_id=persisted_stopped.run_id,
+                run_id=persisted_stopping.run_id,
             )
-            return persisted_stopped
+            return persisted_stopping
         except RoehubError:
             raise
         except Exception as error:  # noqa: BLE001

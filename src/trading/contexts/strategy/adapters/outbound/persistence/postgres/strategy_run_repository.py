@@ -173,7 +173,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             stopped_at = %(stopped_at)s,
             checkpoint_ts_open = %(checkpoint_ts_open)s,
             last_error = %(last_error)s,
-            updated_at = %(updated_at)s
+            updated_at = %(updated_at)s,
+            metadata_json = %(metadata_json)s::jsonb
         WHERE user_id = %(user_id)s
           AND run_id = %(run_id)s
         RETURNING
@@ -198,6 +199,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
                 "checkpoint_ts_open": run.checkpoint_ts_open,
                 "last_error": run.last_error,
                 "updated_at": run.updated_at,
+                "metadata_json": run.metadata_json,
             },
         )
         if row is None:
@@ -332,6 +334,43 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
                 "user_id": str(user_id),
                 "strategy_id": str(strategy_id),
             },
+        )
+        return tuple(_map_run_row(row=row) for row in rows)
+
+    def list_active_runs(self) -> tuple[StrategyRun, ...]:
+        """
+        List all active strategy runs in deterministic cross-tenant order.
+
+        Args:
+            None.
+        Returns:
+            tuple[StrategyRun, ...]: Active run snapshots ordered by started time and run id.
+        Assumptions:
+            Active states are fixed by v1 storage contract.
+        Raises:
+            StrategyStorageError: If one of rows cannot be mapped.
+        Side Effects:
+            Executes one SQL select statement.
+        """
+        query = f"""
+        SELECT
+            run_id,
+            user_id,
+            strategy_id,
+            state,
+            started_at,
+            stopped_at,
+            checkpoint_ts_open,
+            last_error,
+            updated_at,
+            metadata_json
+        FROM {self._runs_table}
+        WHERE state IN ({_ACTIVE_STATES_SQL_LITERAL})
+        ORDER BY started_at ASC, run_id ASC
+        """
+        rows = self._gateway.fetch_all(
+            query=query,
+            parameters={},
         )
         return tuple(_map_run_row(row=row) for row in rows)
 

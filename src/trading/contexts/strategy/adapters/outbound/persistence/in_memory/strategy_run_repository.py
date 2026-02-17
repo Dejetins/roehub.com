@@ -171,3 +171,21 @@ class InMemoryStrategyRunRepository(StrategyRunRepository):
                 key=lambda item: (item.started_at, str(item.run_id)),
             )
         )
+
+    def list_active_runs(self) -> tuple[StrategyRun, ...]:
+        """
+        List active runs across all owners in deterministic ordering.
+
+        Args:
+            None.
+        Returns:
+            tuple[StrategyRun, ...]: Active run snapshots ordered by started time and run id.
+        Assumptions:
+            Active-state set is controlled by `StrategyRun.is_active()`.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        active = [run for run in self._runs_by_id.values() if run.is_active()]
+        return tuple(sorted(active, key=lambda item: (item.started_at, str(item.run_id))))

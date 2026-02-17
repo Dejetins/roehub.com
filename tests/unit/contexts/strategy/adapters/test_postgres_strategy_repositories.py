@@ -223,6 +223,82 @@ def test_run_repository_find_active_includes_deterministic_order_clause() -> Non
     assert "ORDER BY started_at DESC, run_id DESC" in gateway.fetch_one_queries[0]
 
 
+def test_run_repository_list_active_runs_uses_deterministic_ordering() -> None:
+    """
+    Verify active-run polling query uses stable ordering for live-runner deterministic processing.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Live runner must poll active runs ordered by started_at and run_id.
+    Raises:
+        AssertionError: If ordering clause or active-state filter is missing.
+    Side Effects:
+        None.
+    """
+    gateway = _FakeGateway(fetch_all_results=[(_build_run_row(state="running"),)])
+    repository = PostgresStrategyRunRepository(gateway=gateway)
+
+    rows = repository.list_active_runs()
+
+    assert len(rows) == 1
+    assert rows[0].state == "running"
+    assert "state IN ('starting','warming_up','running','stopping')" in gateway.fetch_all_queries[0]
+    assert "ORDER BY started_at ASC, run_id ASC" in gateway.fetch_all_queries[0]
+
+
+def test_run_repository_update_persists_metadata_json_field() -> None:
+    """
+    Verify run update SQL persists `metadata_json` together with checkpoint/state fields.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Live-runner updates warmup/rollup progress through run metadata_json.
+    Raises:
+        AssertionError: If SQL update misses metadata_json assignment.
+    Side Effects:
+        None.
+    """
+    gateway = _FakeGateway(fetch_one_results=[_build_run_row(state="running")])
+    repository = PostgresStrategyRunRepository(gateway=gateway)
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000001012")
+    started = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-00000000B912"),
+        user_id=user_id,
+        strategy_id=UUID("00000000-0000-0000-0000-00000000A112"),
+        started_at=datetime(2026, 2, 15, 13, 0, tzinfo=timezone.utc),
+        metadata_json={
+            "warmup": {
+                "algorithm": "numeric_max_param_v1",
+                "bars": 50,
+                "processed_bars": 10,
+                "satisfied": False,
+            }
+        },
+    )
+    warming = started.transition_to(
+        next_state="warming_up",
+        changed_at=datetime(2026, 2, 15, 13, 1, tzinfo=timezone.utc),
+        checkpoint_ts_open=None,
+        last_error=None,
+    )
+    running = warming.transition_to(
+        next_state="running",
+        changed_at=datetime(2026, 2, 15, 13, 2, tzinfo=timezone.utc),
+        checkpoint_ts_open=datetime(2026, 2, 15, 13, 1, tzinfo=timezone.utc),
+        last_error=None,
+    )
+
+    repository.update(run=running)
+
+    assert "metadata_json = %(metadata_json)s::jsonb" in gateway.fetch_one_queries[0]
+
+
 def test_run_repository_create_translates_unique_violation_to_domain_conflict() -> None:
     """
     Verify active-run unique DB conflict is mapped to deterministic domain conflict error.

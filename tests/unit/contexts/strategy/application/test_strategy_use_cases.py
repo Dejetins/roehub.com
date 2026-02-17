@@ -250,13 +250,8 @@ def test_run_stop_use_cases_allow_second_run_and_enforce_single_active_run() -> 
         strategy_id=created_strategy.strategy_id,
         current_user=current_user,
     )
-    assert running.state == "running"
-    assert running.metadata_json == {
-        "warmup": {
-            "algorithm": "numeric_max_param_v1",
-            "bars": 50,
-        }
-    }
+    assert running.state == "starting"
+    assert running.metadata_json == {}
 
     with pytest.raises(RoehubError) as conflict_error:
         run_use_case.execute(strategy_id=created_strategy.strategy_id, current_user=current_user)
@@ -266,13 +261,21 @@ def test_run_stop_use_cases_allow_second_run_and_enforce_single_active_run() -> 
         strategy_id=created_strategy.strategy_id,
         current_user=current_user,
     )
-    assert stopped.state == "stopped"
+    assert stopped.state == "stopping"
+
+    stopped_terminal = stopped.transition_to(
+        next_state="stopped",
+        changed_at=datetime(2026, 2, 16, 11, 5, tzinfo=timezone.utc),
+        checkpoint_ts_open=stopped.checkpoint_ts_open,
+        last_error=None,
+    )
+    run_repository.update(run=stopped_terminal)
 
     second_run = run_use_case.execute(
         strategy_id=created_strategy.strategy_id,
         current_user=current_user,
     )
-    assert second_run.state == "running"
+    assert second_run.state == "starting"
     assert second_run.run_id != running.run_id
 
 

@@ -107,3 +107,20 @@ class StrategyRunRepository(Protocol):
             Reads zero or more run rows.
         """
         ...
+
+    def list_active_runs(self) -> tuple[StrategyRun, ...]:
+        """
+        List all active runs across users/strategies in deterministic order.
+
+        Args:
+            None.
+        Returns:
+            tuple[StrategyRun, ...]: Active run snapshots ordered by `(started_at, run_id)`.
+        Assumptions:
+            Active states are fixed to `starting|warming_up|running|stopping` in Strategy v1.
+        Raises:
+            ValueError: If repository cannot map one of rows.
+        Side Effects:
+            Reads zero or more run rows.
+        """
+        ...

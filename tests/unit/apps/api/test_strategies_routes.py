@@ -290,16 +290,16 @@ def test_strategy_get_endpoint_enforces_owner_only_visibility() -> None:
 
 
 
-def test_strategy_run_stop_endpoints_allow_second_run_after_stop() -> None:
+def test_strategy_run_stop_endpoints_expose_starting_and_stopping_states() -> None:
     """
-    Verify run/stop endpoints enforce single-active-run invariant and allow second run after stop.
+    Verify run/stop endpoints expose `starting` and `stopping` states for live-runner orchestration.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Run lifecycle follows deterministic transitions documented in Strategy API v1.
+        Live runner worker finalizes `stopping -> stopped` asynchronously after API request.
     Raises:
         AssertionError: If run-control endpoint contract is violated.
     Side Effects:
@@ -319,7 +319,7 @@ def test_strategy_run_stop_endpoints_allow_second_run_after_stop() -> None:
 
     first_run = client.post(f"/strategies/{strategy_id}/run", headers=headers)
     assert first_run.status_code == 200
-    assert first_run.json()["state"] == "running"
+    assert first_run.json()["state"] == "starting"
 
     conflict_run = client.post(f"/strategies/{strategy_id}/run", headers=headers)
     assert conflict_run.status_code == 409
@@ -327,12 +327,11 @@ def test_strategy_run_stop_endpoints_allow_second_run_after_stop() -> None:
 
     stop_response = client.post(f"/strategies/{strategy_id}/stop", headers=headers)
     assert stop_response.status_code == 200
-    assert stop_response.json()["state"] == "stopped"
+    assert stop_response.json()["state"] == "stopping"
 
     second_run = client.post(f"/strategies/{strategy_id}/run", headers=headers)
-    assert second_run.status_code == 200
-    assert second_run.json()["state"] == "running"
-    assert second_run.json()["run_id"] != first_run.json()["run_id"]
+    assert second_run.status_code == 409
+    assert second_run.json()["error"]["code"] == "conflict"
 
 
 

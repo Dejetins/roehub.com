@@ -1,0 +1,21 @@
+version: 1
+
+strategy_live_runner:
+  poll_interval_seconds: 3
+
+  redis_streams:
+    enabled: true
+    host: "redis"
+    port: 6379
+    db: 0
+    password_env: "ROEHUB_REDIS_PASSWORD"
+    socket_timeout_s: 2.0
+    connect_timeout_s: 2.0
+    stream_prefix: "md.candles.1m"
+    consumer_group: "strategy.live_runner.v1"
+    read_count: 500
+    block_ms: 100
+
+  repair:
+    retry_attempts: 5
+    retry_backoff_seconds: 1.0
