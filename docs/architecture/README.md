@@ -60,6 +60,7 @@
 - [Strategy v1 — Immutable Spec + Storage + Runs/Events + Migrations Automation](docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md) — `docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md` — Документ фиксирует доменную модель Strategy v1 (immutable spec), хранение в Postgres (strategies/runs/events) и правила автоприменения миграций через Alembic.
 - [Strategy — Live Runner via Redis Streams (v1)](docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md) — `docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md` — Фиксирует контракт STR-EPIC-03: как один live-runner обслуживает множество пользователей/стратегий, читая 1m свечи из Redis Streams, делая rollup, warmup, checkpointing и repair(read).
 - [Strategy — User Goal & Scope (Milestone 3 / EPIC 0)](docs/architecture/strategy/strategy-milestone-3-epics-v1.md) — `docs/architecture/strategy/strategy-milestone-3-epics-v1.md` — Документ фиксирует целевой пользовательский сценарий и границы `Strategy v1` (Milestone 3) перед реализацией EPIC’ов 1–13.
+- [Strategy realtime output via Redis Streams v1](docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md) — `docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md` — Архитектурный контракт v1 для публикации realtime метрик и событий стратегии в Redis Streams (per-user), чтобы UI мог подписаться и видеть состояние run’ов.
 
 ### Ранбуки
 
