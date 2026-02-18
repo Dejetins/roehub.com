@@ -61,6 +61,7 @@
 - [Strategy — Live Runner via Redis Streams (v1)](docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md) — `docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md` — Фиксирует контракт STR-EPIC-03: как один live-runner обслуживает множество пользователей/стратегий, читая 1m свечи из Redis Streams, делая rollup, warmup, checkpointing и repair(read).
 - [Strategy — User Goal & Scope (Milestone 3 / EPIC 0)](docs/architecture/strategy/strategy-milestone-3-epics-v1.md) — `docs/architecture/strategy/strategy-milestone-3-epics-v1.md` — Документ фиксирует целевой пользовательский сценарий и границы `Strategy v1` (Milestone 3) перед реализацией EPIC’ов 1–13.
 - [Strategy realtime output via Redis Streams v1](docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md) — `docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md` — Архитектурный контракт v1 для публикации realtime метрик и событий стратегии в Redis Streams (per-user), чтобы UI мог подписаться и видеть состояние run’ов.
+- [Strategy runtime config v1: `configs/*/strategy.yaml` + toggles + metrics port + env overrides](docs/architecture/strategy/strategy-runtime-config-v1.md) — `docs/architecture/strategy/strategy-runtime-config-v1.md` — Документ фиксирует STR-EPIC-06: единый runtime-конфиг для Strategy (API + live worker) с fail-fast валидацией, enable-тумблерами, метриками и поддержкой env overrides.
 - [Strategy Telegram notifier v1: best-effort adapter + notification policy](docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md) — `docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md` — Документ фиксирует контракт STR-EPIC-05: как Strategy live-runner отправляет Telegram-уведомления по ключевым событиям без влияния на устойчивость pipeline.
 
 ### Ранбуки
@@ -73,6 +74,7 @@
 - [Market Data Metrics Reference (RU)](docs/runbooks/market-data-metrics-reference-ru.md) — `docs/runbooks/market-data-metrics-reference-ru.md` — Подробный справочник метрик для:
 - [Market Data Metrics](docs/runbooks/market-data-metrics.md) — `docs/runbooks/market-data-metrics.md` — Документ фиксирует основные Prometheus-метрики для:
 - [Runbook — Market Data Redis Streams](docs/runbooks/market-data-redis-streams.md) — `docs/runbooks/market-data-redis-streams.md` — Операционные команды для live feed stream’ов, которые публикует `market-data-ws-worker`.
+- [Strategy live worker runbook](docs/runbooks/strategy-live-worker.md) — `docs/runbooks/strategy-live-worker.md` — Runbook для `apps/worker/strategy_live_runner`: как поднять worker, проверить метрики, проверить Redis Streams realtime output и (опционально) Telegram notify.
 
 ### API
 
