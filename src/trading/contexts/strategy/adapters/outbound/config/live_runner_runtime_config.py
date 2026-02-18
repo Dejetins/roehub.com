@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
 import yaml
+
+from .scalar_env_overrides import resolve_bool_override, resolve_positive_int_override
+from .strategy_runtime_config import StrategyRuntimeConfig, load_strategy_runtime_config
+
+_STRATEGY_LIVE_WORKER_ENABLED_ENV_KEY = "ROEHUB_STRATEGY_LIVE_WORKER_ENABLED"
+_STRATEGY_REALTIME_OUTPUT_ENABLED_ENV_KEY = (
+    "ROEHUB_STRATEGY_REALTIME_OUTPUT_REDIS_STREAMS_ENABLED"
+)
+_STRATEGY_TELEGRAM_ENABLED_ENV_KEY = "ROEHUB_STRATEGY_TELEGRAM_ENABLED"
+_STRATEGY_METRICS_PORT_ENV_KEY = "ROEHUB_STRATEGY_METRICS_PORT"
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,15 +261,18 @@ class StrategyLiveRunnerRuntimeConfig:
     Related:
       - apps/worker/strategy_live_runner/main/main.py
       - apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py
+      - configs/dev/strategy.yaml
       - configs/dev/strategy_live_runner.yaml
     """
 
     version: int
+    live_worker_enabled: bool
     poll_interval_seconds: int
     redis_streams: StrategyLiveRunnerRedisConfig
     realtime_output: StrategyLiveRunnerRealtimeOutputConfig
     telegram: StrategyLiveRunnerTelegramConfig
     repair: StrategyLiveRunnerRepairConfig
+    metrics_port: int
 
     def __post_init__(self) -> None:
         """
@@ -277,24 +291,42 @@ class StrategyLiveRunnerRuntimeConfig:
         """
         if self.poll_interval_seconds <= 0:
             raise ValueError("strategy_live_runner.poll_interval_seconds must be > 0")
+        if self.metrics_port <= 0:
+            raise ValueError("strategy.metrics.port must be > 0")
 
 
-def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRunnerRuntimeConfig:
+def load_strategy_live_runner_runtime_config(
+    path: str | Path,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> StrategyLiveRunnerRuntimeConfig:
     """
-    Load and validate Strategy live-runner runtime YAML config.
+    Load Strategy live-runner runtime config from legacy payload, shim, or `strategy.yaml`.
+
+    Docs:
+      - docs/architecture/strategy/strategy-runtime-config-v1.md
+    Related:
+      - configs/dev/strategy_live_runner.yaml
+      - configs/dev/strategy.yaml
+      - apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py
 
     Args:
-        path: Path to `strategy_live_runner.yaml`.
+        path: Path to `strategy_live_runner.yaml` or `strategy.yaml`.
+        environ: Optional runtime environment mapping used by scalar overrides.
     Returns:
-        StrategyLiveRunnerRuntimeConfig: Parsed runtime config.
+        StrategyLiveRunnerRuntimeConfig: Parsed runtime config for live worker wiring.
     Assumptions:
-        YAML has top-level `version` and `strategy_live_runner` mapping.
+        Loader supports three formats in v1:
+        - direct `strategy.yaml`,
+        - shim `strategy_live_runner.config_ref.path`,
+        - legacy full `strategy_live_runner` payload.
     Raises:
-        FileNotFoundError: If config path does not exist.
+        FileNotFoundError: If config path (or referenced shim path) does not exist.
         ValueError: If YAML shape/values are invalid.
     Side Effects:
-        Reads one config file from disk.
+        Reads one or two config files from disk depending on shim mode.
     """
+    effective_environ = os.environ if environ is None else environ
     config_path = Path(path)
     if not config_path.exists():
         raise FileNotFoundError(f"strategy live-runner config not found: {config_path}")
@@ -303,15 +335,47 @@ def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRu
     if not isinstance(payload, Mapping):
         raise ValueError("strategy live-runner config must be mapping at top-level")
 
+    if "strategy" in payload:
+        return _build_live_runner_runtime_from_strategy_config(
+            load_strategy_runtime_config(config_path, environ=effective_environ)
+        )
+
     version = _get_int(payload, "version", required=True)
     runner_map = _get_mapping(payload, "strategy_live_runner", required=True)
+
+    config_ref_map = _get_mapping(runner_map, "config_ref", required=False)
+    config_ref_path = _get_optional_str_with_default(config_ref_map, "path", default=None)
+    if config_ref_path is not None:
+        resolved_ref_path = _resolve_config_ref_path(
+            source_config_path=config_path,
+            raw_ref_path=config_ref_path,
+        )
+        return _build_live_runner_runtime_from_strategy_config(
+            load_strategy_runtime_config(resolved_ref_path, environ=effective_environ)
+        )
+
     redis_map = _get_mapping(runner_map, "redis_streams", required=False)
     realtime_output_map = _get_mapping(runner_map, "realtime_output", required=False)
     telegram_map = _get_mapping(runner_map, "telegram", required=False)
     repair_map = _get_mapping(runner_map, "repair", required=False)
 
+    realtime_output_enabled = resolve_bool_override(
+        environ=effective_environ,
+        key=_STRATEGY_REALTIME_OUTPUT_ENABLED_ENV_KEY,
+        default=_get_bool_with_default(realtime_output_map, "enabled", default=False),
+    )
+    telegram_enabled = resolve_bool_override(
+        environ=effective_environ,
+        key=_STRATEGY_TELEGRAM_ENABLED_ENV_KEY,
+        default=_get_bool_with_default(telegram_map, "enabled", default=False),
+    )
     return StrategyLiveRunnerRuntimeConfig(
         version=version,
+        live_worker_enabled=resolve_bool_override(
+            environ=effective_environ,
+            key=_STRATEGY_LIVE_WORKER_ENABLED_ENV_KEY,
+            default=True,
+        ),
         poll_interval_seconds=_get_int_with_default(
             runner_map,
             "poll_interval_seconds",
@@ -347,7 +411,7 @@ def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRu
             block_ms=_get_int_with_default(redis_map, "block_ms", default=100),
         ),
         realtime_output=StrategyLiveRunnerRealtimeOutputConfig(
-            enabled=_get_bool_with_default(realtime_output_map, "enabled", default=False),
+            enabled=realtime_output_enabled,
             host=_get_str_with_default(realtime_output_map, "host", default="redis"),
             port=_get_int_with_default(realtime_output_map, "port", default=6379),
             db=_get_int_with_default(realtime_output_map, "db", default=0),
@@ -378,7 +442,7 @@ def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRu
             ),
         ),
         telegram=StrategyLiveRunnerTelegramConfig(
-            enabled=_get_bool_with_default(telegram_map, "enabled", default=False),
+            enabled=telegram_enabled,
             mode=_get_str_with_default(telegram_map, "mode", default="log_only"),
             bot_token_env=_get_optional_str_with_default(
                 telegram_map,
@@ -409,7 +473,105 @@ def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRu
                 default=1.0,
             ),
         ),
+        metrics_port=resolve_positive_int_override(
+            environ=effective_environ,
+            key=_STRATEGY_METRICS_PORT_ENV_KEY,
+            default=9203,
+        ),
     )
+
+
+def _build_live_runner_runtime_from_strategy_config(
+    strategy_config: StrategyRuntimeConfig,
+) -> StrategyLiveRunnerRuntimeConfig:
+    """
+    Convert source-of-truth Strategy runtime config into live-runner legacy config shape.
+
+    Args:
+        strategy_config: Parsed `strategy.yaml` runtime config.
+    Returns:
+        StrategyLiveRunnerRuntimeConfig: Live worker runtime config consumed by worker wiring.
+    Assumptions:
+        Mapping is deterministic and field-by-field without lossy transformations.
+    Raises:
+        ValueError: Propagated from destination dataclass invariant checks.
+    Side Effects:
+        None.
+    """
+    live_worker_redis = strategy_config.live_worker.redis_streams
+    realtime_output_redis = strategy_config.realtime_output.redis_streams
+    telegram = strategy_config.telegram
+    return StrategyLiveRunnerRuntimeConfig(
+        version=strategy_config.version,
+        live_worker_enabled=strategy_config.live_worker.enabled,
+        poll_interval_seconds=strategy_config.live_worker.poll_interval_seconds,
+        redis_streams=StrategyLiveRunnerRedisConfig(
+            enabled=live_worker_redis.enabled,
+            host=live_worker_redis.host,
+            port=live_worker_redis.port,
+            db=live_worker_redis.db,
+            password_env=live_worker_redis.password_env,
+            socket_timeout_s=live_worker_redis.socket_timeout_s,
+            connect_timeout_s=live_worker_redis.connect_timeout_s,
+            stream_prefix=live_worker_redis.stream_prefix,
+            consumer_group=live_worker_redis.consumer_group,
+            read_count=live_worker_redis.read_count,
+            block_ms=live_worker_redis.block_ms,
+        ),
+        realtime_output=StrategyLiveRunnerRealtimeOutputConfig(
+            enabled=realtime_output_redis.enabled,
+            host=realtime_output_redis.host,
+            port=realtime_output_redis.port,
+            db=realtime_output_redis.db,
+            password_env=realtime_output_redis.password_env,
+            socket_timeout_s=realtime_output_redis.socket_timeout_s,
+            connect_timeout_s=realtime_output_redis.connect_timeout_s,
+            metrics_stream_prefix=realtime_output_redis.metrics_stream_prefix,
+            events_stream_prefix=realtime_output_redis.events_stream_prefix,
+        ),
+        telegram=StrategyLiveRunnerTelegramConfig(
+            enabled=telegram.enabled,
+            mode=telegram.mode,
+            bot_token_env=telegram.bot_token_env,
+            api_base_url=telegram.api_base_url,
+            send_timeout_s=telegram.send_timeout_s,
+            debounce_failed_seconds=telegram.debounce_failed_seconds,
+        ),
+        repair=StrategyLiveRunnerRepairConfig(
+            retry_attempts=strategy_config.live_worker.repair.retry_attempts,
+            retry_backoff_seconds=strategy_config.live_worker.repair.retry_backoff_seconds,
+        ),
+        metrics_port=strategy_config.metrics.port,
+    )
+
+
+def _resolve_config_ref_path(*, source_config_path: Path, raw_ref_path: str) -> Path:
+    """
+    Resolve `strategy_live_runner.config_ref.path` from shim config.
+
+    Args:
+        source_config_path: Path to the shim file containing config reference.
+        raw_ref_path: Raw `config_ref.path` value from YAML.
+    Returns:
+        Path: Resolved path to referenced `strategy.yaml`.
+    Assumptions:
+        Repo-relative references usually start with `configs/` in v1 shim files.
+    Raises:
+        ValueError: If reference path is blank after normalization.
+    Side Effects:
+        None.
+    """
+    normalized_ref_path = raw_ref_path.strip()
+    if not normalized_ref_path:
+        raise ValueError("strategy_live_runner.config_ref.path must be non-empty")
+
+    candidate = Path(normalized_ref_path)
+    if candidate.is_absolute():
+        return candidate
+
+    if candidate.parts and candidate.parts[0] == "configs":
+        return candidate
+    return source_config_path.parent / candidate
 
 
 def _get_mapping(data: Mapping[str, Any], key: str, *, required: bool) -> Mapping[str, Any]:

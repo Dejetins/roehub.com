@@ -5,7 +5,7 @@ from .indicators import (
     build_indicators_compute,
     build_indicators_registry,
 )
-from .strategy import build_strategy_router
+from .strategy import build_strategy_router, is_strategy_api_enabled
 
 __all__ = [
     "build_identity_api_module",
@@ -15,4 +15,5 @@ __all__ = [
     "build_indicators_compute",
     "build_indicators_registry",
     "build_strategy_router",
+    "is_strategy_api_enabled",
 ]

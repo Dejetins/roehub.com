@@ -282,7 +282,7 @@ def build_strategy_live_runner_app(
     Build fully wired strategy live-runner worker app.
 
     Args:
-        config_path: Path to `strategy_live_runner.yaml`.
+        config_path: Path to `strategy.yaml` or `strategy_live_runner.yaml`.
         environ: Runtime environment mapping.
         metrics_port: Prometheus HTTP endpoint port.
     Returns:
@@ -294,7 +294,10 @@ def build_strategy_live_runner_app(
     Side Effects:
         Creates storage clients and runtime adapters.
     """
-    runtime_config = load_strategy_live_runner_runtime_config(Path(config_path))
+    runtime_config = load_strategy_live_runner_runtime_config(
+        Path(config_path),
+        environ=environ,
+    )
     if not runtime_config.redis_streams.enabled:
         raise ValueError(
             "strategy_live_runner.redis_streams.enabled must be true for live-runner worker"

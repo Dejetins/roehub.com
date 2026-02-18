@@ -4,6 +4,7 @@ FastAPI application factory for Roehub API.
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Mapping
 
@@ -17,11 +18,14 @@ from apps.api.wiring.modules import (
     build_indicators_compute,
     build_indicators_registry,
     build_strategy_router,
+    is_strategy_api_enabled,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import (
     register_two_factor_required_exception_handler,
 )
 from trading.platform.config import load_indicators_compute_numba_config
+
+log = logging.getLogger(__name__)
 
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
@@ -68,12 +72,15 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     register_two_factor_required_exception_handler(app=app)
     identity_module = build_identity_api_module(environ=effective_environ)
     app.include_router(identity_module.router)
-    app.include_router(
-        build_strategy_router(
-            environ=effective_environ,
-            current_user_dependency=identity_module.current_user_dependency,
+    if is_strategy_api_enabled(environ=effective_environ):
+        app.include_router(
+            build_strategy_router(
+                environ=effective_environ,
+                current_user_dependency=identity_module.current_user_dependency,
+            )
         )
-    )
+    else:
+        log.info("strategy API router disabled by strategy runtime config")
     bind_indicators_runtime_dependencies(
         app_state=app.state,
         compute=compute,

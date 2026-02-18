@@ -24,6 +24,8 @@ from trading.contexts.strategy.adapters.outbound import (
     PostgresStrategyRunRepository,
     PsycopgStrategyPostgresGateway,
     SystemStrategyClock,
+    load_strategy_runtime_config,
+    resolve_strategy_config_path,
 )
 from trading.contexts.strategy.application import (
     CloneStrategyUseCase,
@@ -186,6 +188,35 @@ class StrategyCurrentUserProviderDependency:
         principal = self._current_user_dependency(request)
         return IdentityPrincipalCurrentUserProvider(principal=principal)
 
+
+
+def is_strategy_api_enabled(*, environ: Mapping[str, str]) -> bool:
+    """
+    Resolve Strategy API enable toggle from source-of-truth runtime config.
+
+    Docs:
+      - docs/architecture/strategy/strategy-runtime-config-v1.md
+    Related:
+      - apps/api/main/app.py
+      - configs/dev/strategy.yaml
+      - src/trading/contexts/strategy/adapters/outbound/config/strategy_runtime_config.py
+
+    Args:
+        environ: Runtime environment mapping.
+    Returns:
+        bool: True when Strategy API router should be included.
+    Assumptions:
+        Config path resolution uses `ROEHUB_STRATEGY_CONFIG` or
+        `configs/<ROEHUB_ENV>/strategy.yaml`.
+    Raises:
+        FileNotFoundError: If resolved config path does not exist.
+        ValueError: If strategy config payload or scalar overrides are invalid.
+    Side Effects:
+        Reads one YAML config file from disk.
+    """
+    config_path = resolve_strategy_config_path(environ=environ)
+    runtime_config = load_strategy_runtime_config(config_path, environ=environ)
+    return runtime_config.api.enabled
 
 
 def build_strategy_router(
