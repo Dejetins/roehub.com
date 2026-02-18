@@ -308,18 +308,31 @@ UI может спросить:
 
 ---
 
-## Milestone 4 — Backtest v1 (close-fill, single strategy)
+## Milestone 4 — Backtest v1 (close-fill, single instrument; multi-variant grid)
 
-**Цель:** запустить бектест одной immutable-стратегии по одному инструменту.
+**Цель:** запускать backtest по одному инструменту для saved strategy и для ad-hoc grid из UI (любые комбинации индикаторов + диапазоны параметров из `configs/prod/indicators.yaml`).
 
 **Что делаем:**
-- close-fill модель + комиссии + простой slippage
-- отчёт: pnl, dd, trades, winrate
-- API: запуск backtest (синхронно на малом периоде)
+- close-fill модель: на закрытии бара пересчитываем индикаторы/сигналы и исполняем сделки на `close[t]` (deterministic порядок exit→entry)
+- direction modes: `long-only`, `short-only`, `long-short` (с переворотом); spot/futures одинаковая упрощённая модель (без funding/liq)
+- position sizing (4 режима): `all-in`, `fixed_quote`, `strategy_compound`, `strategy_compound_profit_lock` (с параметром safe_profit_percent)
+- SL/TP close-based (без intrabar), UI-editable (шаг 0.1%)
+- комиссии/slippage UI-editable:
+  - fee defaults: spot `0.075%`, futures `0.1%` (шаг 0.01%)
+  - slippage default: `0.01%` (шаг 0.01%)
+- signals-from-indicators v1:
+  - каждый индикатор выдаёт `LONG|SHORT|NEUTRAL` по зафиксированным правилам
+  - финальный long/short = AND по всем индикаторам; конфликт long+short → no-trade
+- API: sync запуск backtest только для “малого периода и ограниченного grid” + guards по variants/bars/time; большие сетки уходят в Jobs (Milestone 5)
+- отчёт: таблица `|Metric|Value|` с расширенным набором метрик (PnL/DD/Trades/Winrate + benchmark + Sharpe/Sortino/Calmar и др.)
+  - benchmark: buy&hold long без fee/slippage
+  - ratios: по дневным доходностям equity (resample 1d), risk-free=0, annualization=365
 
 **DoD:**
-- результаты воспроизводимы (spec фиксируется),
-- время ответа приемлемо на “маленьком тесте”.
+- результаты детерминированы и воспроизводимы (spec/grid request + параметры модели фиксируются)
+- backtest умеет прогнать grid (варианты) по диапазонам параметров индикаторов и вернуть отчёт для каждого варианта
+- время ответа приемлемо на “маленьком тесте” и ограничителях sync
+- результаты backtest не сохраняются (v1), но полностью возвращаются в UI
 
 ---
 
