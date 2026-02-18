@@ -5,8 +5,6 @@ from types import SimpleNamespace
 
 from fastapi import APIRouter
 
-app_module = importlib.import_module("apps.api.main.app")
-
 
 def _build_ping_router(*, path: str) -> APIRouter:
     """
@@ -46,7 +44,27 @@ def _build_ping_router(*, path: str) -> APIRouter:
     return router
 
 
-def _patch_create_app_dependencies(*, monkeypatch, strategy_enabled: bool) -> None:
+def _load_app_module(*, monkeypatch):
+    """
+    Import API app module with deterministic low-thread Numba env for CI stability.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+    Returns:
+        module: Imported `apps.api.main.app` module object.
+    Assumptions:
+        Importing module executes `app = create_app()` once at module load.
+    Raises:
+        Exception: Propagates import-time runtime/configuration errors.
+    Side Effects:
+        Sets process env variables controlling Numba threads for this test scope.
+    """
+    monkeypatch.setenv("ROEHUB_NUMBA_NUM_THREADS", "1")
+    monkeypatch.setenv("NUMBA_NUM_THREADS", "1")
+    return importlib.import_module("apps.api.main.app")
+
+
+def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled: bool) -> None:
     """
     Patch heavy runtime dependencies in API app factory for isolated router-toggle checks.
 
@@ -128,7 +146,12 @@ def test_create_app_includes_strategy_router_when_enabled(monkeypatch) -> None:
     Side Effects:
         None.
     """
-    _patch_create_app_dependencies(monkeypatch=monkeypatch, strategy_enabled=True)
+    app_module = _load_app_module(monkeypatch=monkeypatch)
+    _patch_create_app_dependencies(
+        app_module=app_module,
+        monkeypatch=monkeypatch,
+        strategy_enabled=True,
+    )
 
     app = app_module.create_app(environ={})
     paths = {
@@ -155,7 +178,12 @@ def test_create_app_skips_strategy_router_when_disabled(monkeypatch) -> None:
     Side Effects:
         None.
     """
-    _patch_create_app_dependencies(monkeypatch=monkeypatch, strategy_enabled=False)
+    app_module = _load_app_module(monkeypatch=monkeypatch)
+    _patch_create_app_dependencies(
+        app_module=app_module,
+        monkeypatch=monkeypatch,
+        strategy_enabled=False,
+    )
 
     app = app_module.create_app(environ={})
     paths = {
