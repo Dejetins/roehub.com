@@ -176,6 +176,71 @@ class StrategyLiveRunnerRealtimeOutputConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class StrategyLiveRunnerTelegramConfig:
+    """
+    StrategyLiveRunnerTelegramConfig — runtime config for Strategy Telegram notifier v1.
+
+    Docs:
+      - docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md
+    Related:
+      - src/trading/contexts/strategy/application/services/telegram_notification_policy.py
+      - apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py
+      - configs/prod/strategy_live_runner.yaml
+    """
+
+    enabled: bool
+    mode: str
+    bot_token_env: str | None
+    api_base_url: str
+    send_timeout_s: float
+    debounce_failed_seconds: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate Telegram notifier runtime config invariants.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            `mode` is fixed to `log_only` or `telegram` in Strategy notifier v1.
+        Raises:
+            ValueError: If one of config values is invalid.
+        Side Effects:
+            None.
+        """
+        normalized_mode = self.mode.strip()
+        if normalized_mode not in {"log_only", "telegram"}:
+            raise ValueError(
+                "strategy_live_runner.telegram.mode must be one of: log_only, telegram"
+            )
+        if self.send_timeout_s <= 0:
+            raise ValueError("strategy_live_runner.telegram.send_timeout_s must be > 0")
+        if self.debounce_failed_seconds < 0:
+            raise ValueError(
+                "strategy_live_runner.telegram.debounce_failed_seconds must be >= 0"
+            )
+
+        normalized_api_base = self.api_base_url.strip()
+        if not normalized_api_base:
+            raise ValueError("strategy_live_runner.telegram.api_base_url must be non-empty")
+
+        normalized_bot_token_env = None
+        if self.bot_token_env is not None:
+            normalized_bot_token_env = self.bot_token_env.strip() or None
+
+        if self.enabled and normalized_mode == "telegram" and normalized_bot_token_env is None:
+            raise ValueError(
+                "strategy_live_runner.telegram.bot_token_env is required for mode=telegram"
+            )
+
+        object.__setattr__(self, "mode", normalized_mode)
+        object.__setattr__(self, "api_base_url", normalized_api_base.rstrip("/"))
+        object.__setattr__(self, "bot_token_env", normalized_bot_token_env)
+
+
+@dataclass(frozen=True, slots=True)
 class StrategyLiveRunnerRuntimeConfig:
     """
     StrategyLiveRunnerRuntimeConfig — top-level runtime config for Strategy live-runner worker.
@@ -192,6 +257,7 @@ class StrategyLiveRunnerRuntimeConfig:
     poll_interval_seconds: int
     redis_streams: StrategyLiveRunnerRedisConfig
     realtime_output: StrategyLiveRunnerRealtimeOutputConfig
+    telegram: StrategyLiveRunnerTelegramConfig
     repair: StrategyLiveRunnerRepairConfig
 
     def __post_init__(self) -> None:
@@ -241,6 +307,7 @@ def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRu
     runner_map = _get_mapping(payload, "strategy_live_runner", required=True)
     redis_map = _get_mapping(runner_map, "redis_streams", required=False)
     realtime_output_map = _get_mapping(runner_map, "realtime_output", required=False)
+    telegram_map = _get_mapping(runner_map, "telegram", required=False)
     repair_map = _get_mapping(runner_map, "repair", required=False)
 
     return StrategyLiveRunnerRuntimeConfig(
@@ -308,6 +375,30 @@ def load_strategy_live_runner_runtime_config(path: str | Path) -> StrategyLiveRu
                 realtime_output_map,
                 "events_stream_prefix",
                 default="strategy.events.v1.user",
+            ),
+        ),
+        telegram=StrategyLiveRunnerTelegramConfig(
+            enabled=_get_bool_with_default(telegram_map, "enabled", default=False),
+            mode=_get_str_with_default(telegram_map, "mode", default="log_only"),
+            bot_token_env=_get_optional_str_with_default(
+                telegram_map,
+                "bot_token_env",
+                default="TELEGRAM_BOT_TOKEN",
+            ),
+            api_base_url=_get_str_with_default(
+                telegram_map,
+                "api_base_url",
+                default="https://api.telegram.org",
+            ),
+            send_timeout_s=_get_float_with_default(
+                telegram_map,
+                "send_timeout_s",
+                default=3.0,
+            ),
+            debounce_failed_seconds=_get_int_with_default(
+                telegram_map,
+                "debounce_failed_seconds",
+                default=600,
             ),
         ),
         repair=StrategyLiveRunnerRepairConfig(

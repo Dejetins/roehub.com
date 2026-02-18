@@ -19,6 +19,8 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ThreadLocalClickHouseConnectGateway,
 )
 from trading.contexts.strategy.adapters.outbound import (
+    LogOnlyTelegramNotifier,
+    PostgresConfirmedTelegramChatBindingResolver,
     PostgresStrategyRepository,
     PostgresStrategyRunRepository,
     PsycopgStrategyPostgresGateway,
@@ -29,12 +31,17 @@ from trading.contexts.strategy.adapters.outbound import (
     RedisStrategyRealtimeOutputPublisherHooks,
     SystemRunnerSleeper,
     SystemStrategyClock,
+    TelegramBotApiNotifier,
+    TelegramBotApiNotifierConfig,
+    TelegramNotifierHooks,
     load_strategy_live_runner_runtime_config,
 )
 from trading.contexts.strategy.application import (
     NoOpStrategyRealtimeOutputPublisher,
+    NoOpTelegramNotifier,
     StrategyLiveRunner,
     StrategyLiveRunnerIterationReport,
+    TelegramNotificationPolicy,
 )
 from trading.platform.time.system_clock import SystemClock
 
@@ -107,6 +114,18 @@ class StrategyLiveRunnerMetrics:
             "strategy_realtime_output_publish_duplicates_total",
             "Strategy realtime output duplicate/out-of-order publish count",
         )
+        self.telegram_notify_total = Counter(
+            "strategy_telegram_notify_total",
+            "Strategy telegram notifications successfully sent count",
+        )
+        self.telegram_notify_errors_total = Counter(
+            "strategy_telegram_notify_errors_total",
+            "Strategy telegram notifications failed send count",
+        )
+        self.telegram_notify_skipped_total = Counter(
+            "strategy_telegram_notify_skipped_total",
+            "Strategy telegram notifications skipped due to missing confirmed chat binding",
+        )
 
     def observe_iteration(
         self,
@@ -154,6 +173,27 @@ class StrategyLiveRunnerMetrics:
             on_publish_success=self.realtime_output_publish_total.inc,
             on_publish_error=self.realtime_output_publish_errors_total.inc,
             on_publish_duplicate=self.realtime_output_publish_duplicates_total.inc,
+        )
+
+    def telegram_notifier_hooks(self) -> TelegramNotifierHooks:
+        """
+        Build metrics callbacks bundle for Telegram notifier adapters.
+
+        Args:
+            None.
+        Returns:
+            TelegramNotifierHooks: Hook callbacks bound to Prometheus counters.
+        Assumptions:
+            Hook callbacks are lightweight and thread-safe in single worker process.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return TelegramNotifierHooks(
+            on_notify_sent=self.telegram_notify_total.inc,
+            on_notify_error=self.telegram_notify_errors_total.inc,
+            on_notify_skipped=self.telegram_notify_skipped_total.inc,
         )
 
 
@@ -317,6 +357,36 @@ def build_strategy_live_runner_app(
             hooks=metrics.realtime_output_hooks(),
         )
 
+    telegram_config = runtime_config.telegram
+    telegram_notifier = NoOpTelegramNotifier()
+    telegram_notification_policy = TelegramNotificationPolicy(
+        failed_debounce_seconds=telegram_config.debounce_failed_seconds
+    )
+    if telegram_config.enabled:
+        chat_binding_resolver = PostgresConfirmedTelegramChatBindingResolver(
+            gateway=postgres_gateway
+        )
+        if telegram_config.mode == "log_only":
+            telegram_notifier = LogOnlyTelegramNotifier(
+                chat_binding_resolver=chat_binding_resolver,
+                hooks=metrics.telegram_notifier_hooks(),
+            )
+        elif telegram_config.mode == "telegram":
+            bot_token = _require_non_empty_env_value(
+                environ=environ,
+                key=telegram_config.bot_token_env,
+                setting_name="strategy_live_runner.telegram.bot_token_env",
+            )
+            telegram_notifier = TelegramBotApiNotifier(
+                config=TelegramBotApiNotifierConfig(
+                    bot_token=bot_token,
+                    api_base_url=telegram_config.api_base_url,
+                    send_timeout_s=telegram_config.send_timeout_s,
+                ),
+                chat_binding_resolver=chat_binding_resolver,
+                hooks=metrics.telegram_notifier_hooks(),
+            )
+
     runner = StrategyLiveRunner(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
@@ -327,6 +397,8 @@ def build_strategy_live_runner_app(
         repair_retry_attempts=runtime_config.repair.retry_attempts,
         repair_backoff_seconds=runtime_config.repair.retry_backoff_seconds,
         realtime_output_publisher=realtime_output_publisher,
+        telegram_notifier=telegram_notifier,
+        telegram_notification_policy=telegram_notification_policy,
     )
     return StrategyLiveRunnerApp(
         poll_interval_seconds=runtime_config.poll_interval_seconds,
@@ -353,3 +425,39 @@ def _build_consumer_name() -> str:
     """
     hostname = socket.gethostname().strip() or "unknown-host"
     return f"{hostname}-{os.getpid()}"
+
+
+def _require_non_empty_env_value(
+    *,
+    environ: Mapping[str, str],
+    key: str | None,
+    setting_name: str,
+) -> str:
+    """
+    Resolve required environment variable and fail fast when missing or blank.
+
+    Args:
+        environ: Runtime environment mapping.
+        key: Environment variable name.
+        setting_name: Config setting path used in deterministic error messages.
+    Returns:
+        str: Non-empty environment variable value.
+    Assumptions:
+        Function is used for required secrets like `TELEGRAM_BOT_TOKEN`.
+    Raises:
+        ValueError: If environment variable name or value is missing.
+    Side Effects:
+        None.
+    """
+    if key is None or not key.strip():
+        raise ValueError(f"{setting_name} must be non-empty")
+    raw_value = environ.get(key, "")
+    value = raw_value.strip()
+    if not value:
+        raise ValueError(
+            (
+                f"{setting_name} requires environment variable {key} "
+                "with non-empty value"
+            )
+        )
+    return value

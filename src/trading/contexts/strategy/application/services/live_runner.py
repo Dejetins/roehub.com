@@ -12,6 +12,7 @@ from trading.contexts.strategy.application.ports import (
     EventTypeV1,
     MetricTypeV1,
     NoOpStrategyRealtimeOutputPublisher,
+    NoOpTelegramNotifier,
     StrategyClock,
     StrategyLiveCandleStream,
     StrategyRealtimeEventV1,
@@ -20,6 +21,8 @@ from trading.contexts.strategy.application.ports import (
     StrategyRepository,
     StrategyRunnerSleeper,
     StrategyRunRepository,
+    StrategyTelegramNotificationEventV1,
+    TelegramNotifier,
     serialize_realtime_event_payload_json,
 )
 from trading.contexts.strategy.domain.entities import (
@@ -30,6 +33,7 @@ from trading.contexts.strategy.domain.entities import (
 )
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
+from .telegram_notification_policy import TelegramNotificationPolicy
 from .timeframe_rollup import TimeframeRollupPolicy, TimeframeRollupProgress
 from .warmup_estimator import estimate_strategy_warmup_bars
 
@@ -126,6 +130,8 @@ class StrategyLiveRunner:
         repair_retry_attempts: int,
         repair_backoff_seconds: float,
         realtime_output_publisher: StrategyRealtimeOutputPublisher | None = None,
+        telegram_notifier: TelegramNotifier | None = None,
+        telegram_notification_policy: TelegramNotificationPolicy | None = None,
         warmup_estimator: Callable[..., int] | None = None,
         rollup_policy: TimeframeRollupPolicy | None = None,
     ) -> None:
@@ -142,6 +148,8 @@ class StrategyLiveRunner:
             repair_retry_attempts: Maximum canonical repair retries per gap.
             repair_backoff_seconds: Base retry backoff in seconds.
             realtime_output_publisher: Optional realtime output publisher port.
+            telegram_notifier: Optional Telegram notifier port.
+            telegram_notification_policy: Optional Telegram notification policy.
             warmup_estimator: Optional warmup estimator override.
             rollup_policy: Optional timeframe rollup closure policy override.
         Returns:
@@ -182,6 +190,16 @@ class StrategyLiveRunner:
             realtime_output_publisher
             if realtime_output_publisher is not None
             else NoOpStrategyRealtimeOutputPublisher()
+        )
+        self._telegram_notifier = (
+            telegram_notifier
+            if telegram_notifier is not None
+            else NoOpTelegramNotifier()
+        )
+        self._telegram_notification_policy = (
+            telegram_notification_policy
+            if telegram_notification_policy is not None
+            else TelegramNotificationPolicy()
         )
         self._warmup_estimator = warmup_estimator or estimate_strategy_warmup_bars
         self._rollup_policy = rollup_policy or TimeframeRollupPolicy()
@@ -905,6 +923,54 @@ class StrategyLiveRunner:
                 )
             )
         self._realtime_output_publisher.publish_records_v1(records=tuple(events))
+        if current.state == "failed":
+            self._publish_telegram_notification_event(
+                event=StrategyTelegramNotificationEventV1(
+                    user_id=current.user_id,
+                    ts=current.updated_at,
+                    strategy_id=current.strategy_id,
+                    run_id=current.run_id,
+                    event_type="failed",
+                    instrument_key=spec.instrument_key,
+                    timeframe=spec.timeframe.code,
+                    payload_json={"error": current.last_error or ""},
+                )
+            )
+
+    def _publish_telegram_notification_event(
+        self,
+        *,
+        event: StrategyTelegramNotificationEventV1,
+    ) -> None:
+        """
+        Publish one Telegram notification candidate with strict best-effort semantics.
+
+        Args:
+            event: Strategy event candidate for Telegram policy evaluation.
+        Returns:
+            None.
+        Assumptions:
+            Delivery failures must never break live-runner event processing loop.
+        Raises:
+            None.
+        Side Effects:
+            May emit logs/metrics and outbound Telegram adapter IO.
+        """
+        try:
+            notification = self._telegram_notification_policy.build_notification(event=event)
+            if notification is None:
+                return
+            self._telegram_notifier.notify(notification=notification)
+        except Exception:  # noqa: BLE001
+            log.exception(
+                (
+                    "strategy telegram notification failed "
+                    "event_type=%s strategy_id=%s run_id=%s"
+                ),
+                event.event_type,
+                event.strategy_id,
+                event.run_id,
+            )
 
     def _event_record(
         self,

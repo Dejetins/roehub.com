@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 from uuid import UUID
 
 from trading.contexts.market_data.application.dto import CandleWithMeta
@@ -15,6 +15,8 @@ from trading.contexts.strategy.application import (
     StrategyRealtimeEventV1,
     StrategyRealtimeMetricV1,
     StrategyRealtimeOutputRecordV1,
+    StrategyTelegramNotificationV1,
+    TelegramNotificationPolicy,
 )
 from trading.contexts.strategy.application.services import (
     TimeframeRollupPolicy,
@@ -328,6 +330,81 @@ class _RealtimeOutputProbe:
             Appends immutable batch snapshot to probe storage.
         """
         self.batches.append(tuple(records))
+
+
+class _TelegramNotifierProbe:
+    """
+    In-memory Telegram notifier probe recording notifications and optional injected failures.
+    """
+
+    def __init__(self, *, error: Exception | None = None) -> None:
+        """
+        Initialize Telegram notifier probe.
+
+        Args:
+            error: Optional error raised by notify call.
+        Returns:
+            None.
+        Assumptions:
+            Probe is used for deterministic best-effort behavior assertions.
+        Raises:
+            None.
+        Side Effects:
+            Creates mutable notification call log.
+        """
+        self._error = error
+        self.notifications: list[StrategyTelegramNotificationV1] = []
+
+    def notify(self, *, notification: StrategyTelegramNotificationV1) -> None:
+        """
+        Record notification payload and optionally raise injected error.
+
+        Args:
+            notification: Telegram notification payload.
+        Returns:
+            None.
+        Assumptions:
+            Notifier is called only after policy filtering.
+        Raises:
+            Exception: Injected error configured by test.
+        Side Effects:
+            Appends notification to in-memory call log.
+        """
+        self.notifications.append(notification)
+        if self._error is not None:
+            raise self._error
+
+
+class _FailingRollupPolicy(TimeframeRollupPolicy):
+    """
+    Timeframe rollup policy stub that always fails for deterministic failure-path tests.
+    """
+
+    def advance(
+        self,
+        *,
+        timeframe: Timeframe,
+        progress: TimeframeRollupProgress,
+        candle_ts_open: datetime,
+    ):
+        """
+        Raise deterministic failure from rollup policy advance.
+
+        Args:
+            timeframe: Strategy timeframe value object.
+            progress: Current rollup progress.
+            candle_ts_open: Candle timestamp.
+        Returns:
+            TimeframeRollupProgress: This method never returns.
+        Assumptions:
+            Live-runner catches processing-stage exceptions and marks run failed.
+        Raises:
+            RuntimeError: Always raised for failure-path assertions.
+        Side Effects:
+            None.
+        """
+        _ = (timeframe, progress, candle_ts_open)
+        raise RuntimeError("rollup policy failed")
 
 
 def test_live_runner_checkpoint_monotonicity_ignores_duplicates_and_out_of_order() -> None:
@@ -676,6 +753,103 @@ def test_live_runner_publishes_realtime_output_records_after_persistence() -> No
     )
 
 
+def test_live_runner_emits_failed_telegram_notification_on_failed_run() -> None:
+    """
+    Ensure live-runner emits Telegram `failed` notification payload after run failure transition.
+    """
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000907")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m")
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    strategy_repository.create(strategy=strategy)
+
+    started_run = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-00000000E907"),
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        started_at=datetime(2026, 2, 17, 17, 0, tzinfo=timezone.utc),
+        metadata_json={},
+    )
+    run_repository.create(run=started_run)
+
+    stream = _StreamStub(
+        messages_by_instrument={
+            strategy.spec.instrument_key: (
+                _message("m-fail", _candle_at(datetime(2026, 2, 17, 17, 0, tzinfo=timezone.utc))),
+            ),
+        }
+    )
+    notifier_probe = _TelegramNotifierProbe()
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=stream,
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+        telegram_notifier_probe=notifier_probe,
+        rollup_policy=_FailingRollupPolicy(),
+    )
+
+    runner.run_once()
+    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=started_run.run_id)
+
+    assert persisted is not None
+    assert persisted.state == "failed"
+    assert len(notifier_probe.notifications) == 1
+    notification = notifier_probe.notifications[0]
+    assert notification.event_type == "failed"
+    assert notification.message_text == (
+        f"FAILED | strategy_id={strategy.strategy_id} "
+        f"| run_id={started_run.run_id} "
+        "| error=rollup policy failed"
+    )
+
+
+def test_live_runner_keeps_best_effort_when_telegram_notifier_raises() -> None:
+    """
+    Ensure Telegram notifier exceptions never break live-runner iteration processing.
+    """
+    user_id = UserId.from_string("00000000-0000-0000-0000-000000000908")
+    strategy = _create_strategy(user_id=user_id, timeframe_code="1m")
+    run_repository = _TrackingRunRepository()
+    strategy_repository = InMemoryStrategyRepository()
+    strategy_repository.create(strategy=strategy)
+
+    started_run = StrategyRun.start(
+        run_id=UUID("00000000-0000-0000-0000-00000000E908"),
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+        started_at=datetime(2026, 2, 17, 18, 0, tzinfo=timezone.utc),
+        metadata_json={},
+    )
+    run_repository.create(run=started_run)
+
+    stream = _StreamStub(
+        messages_by_instrument={
+            strategy.spec.instrument_key: (
+                _message("m-fail", _candle_at(datetime(2026, 2, 17, 18, 0, tzinfo=timezone.utc))),
+            ),
+        }
+    )
+    runner = _build_runner(
+        strategy_repository=strategy_repository,
+        run_repository=run_repository,
+        stream=stream,
+        canonical_reader=_CanonicalReaderStub(responses=()),
+        retry_attempts=0,
+        telegram_notifier_probe=_TelegramNotifierProbe(error=RuntimeError("telegram down")),
+        rollup_policy=_FailingRollupPolicy(),
+    )
+
+    report = runner.run_once()
+    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=started_run.run_id)
+
+    assert persisted is not None
+    assert persisted.state == "failed"
+    assert report.failed_runs == 1
+    assert report.acked_messages == 1
+
+
 def _build_runner(
     *,
     strategy_repository: InMemoryStrategyRepository,
@@ -685,6 +859,10 @@ def _build_runner(
     retry_attempts: int,
     sleeper: _SleeperProbe | None = None,
     realtime_output_probe: _RealtimeOutputProbe | None = None,
+    telegram_notifier_probe: _TelegramNotifierProbe | None = None,
+    telegram_policy: TelegramNotificationPolicy | None = None,
+    warmup_estimator: Callable[..., int] | None = None,
+    rollup_policy: TimeframeRollupPolicy | None = None,
 ) -> StrategyLiveRunner:
     """
     Build StrategyLiveRunner with deterministic test doubles.
@@ -697,6 +875,10 @@ def _build_runner(
         retry_attempts: Gap repair retries.
         sleeper: Optional sleeper probe.
         realtime_output_probe: Optional realtime output publisher probe.
+        telegram_notifier_probe: Optional Telegram notifier probe.
+        telegram_policy: Optional Telegram notification policy override.
+        warmup_estimator: Optional warmup estimator override.
+        rollup_policy: Optional timeframe rollup policy override.
     Returns:
         StrategyLiveRunner: Configured runner instance.
     Assumptions:
@@ -716,6 +898,10 @@ def _build_runner(
         repair_retry_attempts=retry_attempts,
         repair_backoff_seconds=1.0,
         realtime_output_publisher=realtime_output_probe,
+        telegram_notifier=telegram_notifier_probe,
+        telegram_notification_policy=telegram_policy,
+        warmup_estimator=warmup_estimator,
+        rollup_policy=rollup_policy,
     )
 
 

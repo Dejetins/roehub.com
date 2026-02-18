@@ -17,6 +17,14 @@ from .realtime_output_publisher import (
 )
 from .repositories import StrategyEventRepository, StrategyRepository, StrategyRunRepository
 from .sleeper import StrategyRunnerSleeper
+from .telegram_notifier import (
+    TELEGRAM_NOTIFICATION_EVENT_TYPES_V1,
+    ConfirmedTelegramChatBindingResolver,
+    NoOpTelegramNotifier,
+    StrategyTelegramNotificationEventV1,
+    StrategyTelegramNotificationV1,
+    TelegramNotifier,
+)
 
 __all__ = [
     "CurrentUser",
@@ -40,4 +48,10 @@ __all__ = [
     "StrategyRealtimeOutputPublisher",
     "NoOpStrategyRealtimeOutputPublisher",
     "serialize_realtime_event_payload_json",
+    "TELEGRAM_NOTIFICATION_EVENT_TYPES_V1",
+    "StrategyTelegramNotificationEventV1",
+    "StrategyTelegramNotificationV1",
+    "ConfirmedTelegramChatBindingResolver",
+    "TelegramNotifier",
+    "NoOpTelegramNotifier",
 ]

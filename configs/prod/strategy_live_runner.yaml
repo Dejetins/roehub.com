@@ -27,6 +27,14 @@ strategy_live_runner:
     metrics_stream_prefix: "strategy.metrics.v1.user"
     events_stream_prefix: "strategy.events.v1.user"
 
+  telegram:
+    enabled: true
+    mode: "telegram"
+    bot_token_env: "TELEGRAM_BOT_TOKEN"
+    api_base_url: "https://api.telegram.org"
+    send_timeout_s: 2.0
+    debounce_failed_seconds: 600
+
   repair:
     retry_attempts: 5
     retry_backoff_seconds: 1.0

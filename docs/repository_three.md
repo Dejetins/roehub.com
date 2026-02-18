@@ -188,7 +188,8 @@
 |   |       |-- strategy-domain-spec-immutable-storage-runs-events-v1.md
 |   |       |-- strategy-live-runner-redis-streams-v1.md
 |   |       |-- strategy-milestone-3-epics-v1.md
-|   |       `-- strategy-realtime-output-redis-streams-v1.md
+|   |       |-- strategy-realtime-output-redis-streams-v1.md
+|   |       `-- strategy-telegram-notifier-best-effort-policy-v1.md
 |   |-- decisions/
 |   |-- repository_three.md
 |   `-- runbooks/
@@ -613,6 +614,11 @@
 |       |       |   |-- inbound/
 |       |       |   `-- outbound/
 |       |       |       |-- __init__.py
+|       |       |       |-- acl/
+|       |       |       |   |-- __init__.py
+|       |       |       |   `-- identity/
+|       |       |       |       |-- __init__.py
+|       |       |       |       `-- confirmed_telegram_chat_binding_resolver.py
 |       |       |       |-- config/
 |       |       |       |   |-- __init__.py
 |       |       |       |   `-- live_runner_runtime_config.py
@@ -620,10 +626,15 @@
 |       |       |       |   `-- market_data_acl/
 |       |       |       |-- messaging/
 |       |       |       |   |-- __init__.py
-|       |       |       |   `-- redis/
+|       |       |       |   |-- redis/
+|       |       |       |   |   |-- __init__.py
+|       |       |       |   |   |-- redis_streams_live_candle_stream.py
+|       |       |       |   |   `-- redis_streams_realtime_output_publisher.py
+|       |       |       |   `-- telegram/
 |       |       |       |       |-- __init__.py
-|       |       |       |       |-- redis_streams_live_candle_stream.py
-|       |       |       |       `-- redis_streams_realtime_output_publisher.py
+|       |       |       |       |-- log_only_telegram_notifier.py
+|       |       |       |       |-- telegram_bot_api_notifier.py
+|       |       |       |       `-- telegram_notifier_hooks.py
 |       |       |       |-- persistence/
 |       |       |       |   |-- __init__.py
 |       |       |       |   |-- in_memory/
@@ -661,10 +672,12 @@
 |       |       |   |   |   |-- strategy_repository.py
 |       |       |   |   |   `-- strategy_run_repository.py
 |       |       |   |   |-- sinks/
-|       |       |   |   `-- sleeper.py
+|       |       |   |   |-- sleeper.py
+|       |       |   |   `-- telegram_notifier.py
 |       |       |   |-- services/
 |       |       |   |   |-- __init__.py
 |       |       |   |   |-- live_runner.py
+|       |       |   |   |-- telegram_notification_policy.py
 |       |       |   |   |-- timeframe_rollup.py
 |       |       |   |   `-- warmup_estimator.py
 |       |       |   `-- use_cases/
@@ -863,13 +876,18 @@
 |       |   |           `-- test_time_slicing.py
 |       |   `-- strategy/
 |       |       |-- adapters/
+|       |       |   |-- test_log_only_telegram_notifier.py
+|       |       |   |-- test_postgres_confirmed_telegram_chat_binding_resolver.py
 |       |       |   |-- test_postgres_strategy_repositories.py
 |       |       |   |-- test_redis_strategy_live_candle_stream.py
 |       |       |   |-- test_redis_strategy_realtime_output_publisher.py
-|       |       |   `-- test_strategy_live_runner_runtime_config.py
+|       |       |   |-- test_strategy_live_runner_runtime_config.py
+|       |       |   |-- test_strategy_live_runner_wiring_module.py
+|       |       |   `-- test_telegram_bot_api_notifier.py
 |       |       |-- application/
 |       |       |   |-- test_strategy_live_runner.py
-|       |       |   `-- test_strategy_use_cases.py
+|       |       |   |-- test_strategy_use_cases.py
+|       |       |   `-- test_telegram_notification_policy.py
 |       |       `-- domain/
 |       |           `-- test_strategy_domain.py
 |       |-- platform/
@@ -894,4 +912,4 @@
 |   `-- lint/
 `-- uv.lock
 
-366 directories, 529 files
+369 directories, 544 files

@@ -1,16 +1,22 @@
+from .acl import PostgresConfirmedTelegramChatBindingResolver
 from .config import (
     StrategyLiveRunnerRealtimeOutputConfig,
     StrategyLiveRunnerRedisConfig,
     StrategyLiveRunnerRepairConfig,
     StrategyLiveRunnerRuntimeConfig,
+    StrategyLiveRunnerTelegramConfig,
     load_strategy_live_runner_runtime_config,
 )
 from .messaging import (
+    LogOnlyTelegramNotifier,
     RedisStrategyLiveCandleStream,
     RedisStrategyLiveCandleStreamConfig,
     RedisStrategyRealtimeOutputPublisher,
     RedisStrategyRealtimeOutputPublisherConfig,
     RedisStrategyRealtimeOutputPublisherHooks,
+    TelegramBotApiNotifier,
+    TelegramBotApiNotifierConfig,
+    TelegramNotifierHooks,
 )
 from .persistence import (
     InMemoryStrategyEventRepository,
@@ -32,8 +38,10 @@ __all__ = [
     "PostgresStrategyRepository",
     "PostgresStrategyRunRepository",
     "PsycopgStrategyPostgresGateway",
+    "PostgresConfirmedTelegramChatBindingResolver",
     "StrategyLiveRunnerRedisConfig",
     "StrategyLiveRunnerRealtimeOutputConfig",
+    "StrategyLiveRunnerTelegramConfig",
     "StrategyLiveRunnerRepairConfig",
     "StrategyLiveRunnerRuntimeConfig",
     "load_strategy_live_runner_runtime_config",
@@ -42,6 +50,10 @@ __all__ = [
     "RedisStrategyRealtimeOutputPublisher",
     "RedisStrategyRealtimeOutputPublisherConfig",
     "RedisStrategyRealtimeOutputPublisherHooks",
+    "TelegramBotApiNotifierConfig",
+    "TelegramNotifierHooks",
+    "LogOnlyTelegramNotifier",
+    "TelegramBotApiNotifier",
     "SystemRunnerSleeper",
     "SystemStrategyClock",
     "StrategyPostgresGateway",
