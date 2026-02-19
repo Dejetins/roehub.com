@@ -9,7 +9,10 @@ __pycache__/
 .codex/*
 .codex/
 # Secrets / env files
-/data_load
+/data_load/*
+!/data_load/promts/
+/data_load/promts/*
+!/data_load/promts/*.md
 .env
 .env.*
 !.env.example

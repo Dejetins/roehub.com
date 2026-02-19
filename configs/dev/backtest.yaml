@@ -1,0 +1,6 @@
+version: 1
+backtest:
+  warmup_bars_default: 200
+  top_k_default: 300
+  preselect_default: 20000
+
