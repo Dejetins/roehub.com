@@ -310,29 +310,256 @@ UI может спросить:
 
 ## Milestone 4 — Backtest v1 (close-fill, single instrument; multi-variant grid)
 
-**Цель:** запускать backtest по одному инструменту для saved strategy и для ad-hoc grid из UI (любые комбинации индикаторов + диапазоны параметров из `configs/prod/indicators.yaml`).
+### Цель
 
-**Что делаем:**
-- close-fill модель: на закрытии бара пересчитываем индикаторы/сигналы и исполняем сделки на `close[t]` (deterministic порядок exit→entry)
-- direction modes: `long-only`, `short-only`, `long-short` (с переворотом); spot/futures одинаковая упрощённая модель (без funding/liq)
-- position sizing (4 режима): `all-in`, `fixed_quote`, `strategy_compound`, `strategy_compound_profit_lock` (с параметром safe_profit_percent)
-- SL/TP close-based (без intrabar), UI-editable (шаг 0.1%)
-- комиссии/slippage UI-editable:
-  - fee defaults: spot `0.075%`, futures `0.1%` (шаг 0.01%)
-  - slippage default: `0.01%` (шаг 0.01%)
-- signals-from-indicators v1:
-  - каждый индикатор выдаёт `LONG|SHORT|NEUTRAL` по зафиксированным правилам
-  - финальный long/short = AND по всем индикаторам; конфликт long+short → no-trade
-- API: sync запуск backtest только для “малого периода и ограниченного grid” + guards по variants/bars/time; большие сетки уходят в Jobs (Milestone 5)
-- отчёт: таблица `|Metric|Value|` с расширенным набором метрик (PnL/DD/Trades/Winrate + benchmark + Sharpe/Sortino/Calmar и др.)
-  - benchmark: buy&hold long без fee/slippage
-  - ratios: по дневным доходностям equity (resample 1d), risk-free=0, annualization=365
+Запустить backtest по **одному инструменту** (Binance/Bybit × spot/futures на уровне данных), где:
 
-**DoD:**
-- результаты детерминированы и воспроизводимы (spec/grid request + параметры модели фиксируются)
-- backtest умеет прогнать grid (варианты) по диапазонам параметров индикаторов и вернуть отчёт для каждого варианта
-- время ответа приемлемо на “маленьком тесте” и ограничителях sync
-- результаты backtest не сохраняются (v1), но полностью возвращаются в UI
+- сигнал строится из **индикаторов библиотеки**,
+- backtest умеет запускать **набор вариантов** (grid) по комбинациям индикаторов и диапазонам их параметров,
+- поддерживаются **режимы направления**: `long-only`, `short-only`, `long-short` (с переворотом),
+- поддерживаются **4 режима position sizing**,
+- есть **close-based SL/TP** (триггер только по `close`, без intrabar),
+- есть **комиссии** и **slippage**, настраиваемые из UI (через API параметры),
+- результаты детерминированы и воспроизводимы.
+
+### Что делаем
+
+1) **Bounded context `backtest` (v1)**
+
+- Завести контракты домена и application use-case в `src/trading/contexts/backtest/*`.
+- Интеграции:
+  - Market data → свечи через порт `CanonicalCandleReader` (источник правды: `canonical_candles_1m`).
+  - Rollup таймфреймов по правилам shared-kernel (только закрытые и полные бакеты).
+  - Indicators → вычисление рядов на базе существующего `indicators` compute:
+    - для backtest v1 нужен режим `V>=1` (grid), чтобы считать индикаторы на диапазонах параметров,
+    - допускается стратегия “сначала indicator tensors, затем backtest loop”, если укладывается в бюджет.
+  - Strategy → в Milestone 4 допускаются 2 режима запуска:
+    - (A) backtest “сохранённой стратегии” (по `strategy_id` / `StrategySpecV1`),
+    - (B) backtest “ad-hoc grid” из UI: пользователь выбирает набор индикаторов и их диапазоны параметров (по `configs/prod/indicators.yaml`).
+
+2) **Signal engine v1: “signals-from-indicators”**
+
+- StrategySpec использует `indicators[]` как список активных индикаторов (для saved strategy) или input grid (для ad-hoc backtest).
+- Для каждого индикатора вычисляется дискретный сигнал на бар:
+  - `LONG` | `SHORT` | `NEUTRAL`.
+- Финальный сигнал стратегии строится как AND-политика:
+  - `final_long = all(indicator_signal == LONG)`
+  - `final_short = all(indicator_signal == SHORT)`
+  - если индикаторов > 1, то “лонг/шорт” возникает только при согласии всех.
+- Коллизии (детерминированно):
+  - если `final_long=true` и `final_short=true` на одном баре → `NEUTRAL` (no-trade) + событие/метрика “conflicting_signals”.
+
+3) **Каталог “как индикатор даёт long/short” (v1 контракт)**
+
+- Расширить/зафиксировать правила сигналов на основе формул индикаторов.
+- Источник описания формул индикаторов: `docs/architecture/indicators/indicators_formula.yaml`.
+- Вариант реализации v1 (зафиксировать одним решением и соблюдать):
+  - либо расширить `docs/architecture/indicators/indicators_formula.yaml` секцией `signals:` для каждого `indicator_id`,
+  - либо завести отдельный файл `docs/architecture/indicators/indicators_signals.yaml`, но формально ссылаться на outputs из `indicators_formula.yaml`.
+
+Минимальный контракт для signal rule v1:
+
+- правило должно быть вычислимо **по данным одного индикатора** (без сравнений “индикатор A против индикатора B”),
+- правило должно быть вычислимо **на закрытии бара** (используем значение ряда на close-бара),
+- NaN-политика: если в моменте нет валидного значения (NaN/warmup) → `NEUTRAL`.
+
+4) **Backtest execution model v1 (close-fill)**
+
+- Таймфрейм: `1m` как база; `5m/15m/1h/4h/1d` как derived (строго по rollup).
+- На каждом закрытии бара `t`:
+  1) обновляем индикаторы на данных до и включая бар `t`,
+  2) считаем `final_long/final_short`,
+  3) проверяем SL/TP (close-based) для уже открытой позиции,
+  4) при необходимости закрываем позицию на **close[t]** с учётом slippage+fee,
+  5) затем (если режим разрешает) открываем/переворачиваем позицию на **close[t]** с учётом slippage+fee.
+
+Warmup lookback (v1):
+
+- по умолчанию `warmup_bars_default = 200` (конфигурируемо)
+- если истории недостаточно — начинаем с первого доступного бара
+
+5) **Режимы направления (direction modes) v1**
+
+- `long-only`: разрешены только вход/выход в long.
+- `short-only`: разрешены только вход/выход в short.
+- `long-short`: разрешены long и short, допускается “переворот” (close текущей позиции и open противоположной) на одном баре.
+
+Примечание v1 (чтобы не блокировать spot):
+
+- short в `spot` трактуется как “синтетический short” (как будто маржа доступна), без borrow/funding/liq. Это осознанное упрощение модели исполнения в Milestone 4.
+
+6) **SL/TP close-based v1**
+
+- SL и TP задаются в процентах (например `sl_pct=1.5`, `tp_pct=3.0`).
+- SL/TP предполагаются UI-editable (шаг 0.1%), но в backtest v1 передаются как числа (percent) в API.
+- Триггер только по `close`:
+  - для long: SL если `close <= entry_price * (1 - sl_pct)`; TP если `close >= entry_price * (1 + tp_pct)`
+  - для short: SL если `close >= entry_price * (1 + sl_pct)`; TP если `close <= entry_price * (1 - tp_pct)`
+- Коллизии (детерминированно):
+  - если в одном баре одновременно SL и TP “истинны” (редко на close-based, но возможно при sl_pct=0) → приоритет SL.
+
+7) **Комиссии и slippage (UI-editable параметры)**
+
+- Fee defaults:
+  - `spot_fee_pct_default = 0.075%`
+  - `futures_fee_pct_default = 0.1%`
+  - параметр изменяемый (UI шаг 0.01%)
+- Slippage default:
+  - `slippage_pct_default = 0.01%`
+  - параметр изменяемый (UI шаг 0.01%)
+
+v1 модель применения (фикс):
+
+- slippage применяется к цене fill;
+- комиссия применяется к notional fill;
+- обе операции должны быть реализованы симметрично для long/short.
+
+8) **Position sizing v1 (4 режима)**
+
+Требование: заложить механику сразу, даже при backtest на одном инструменте.
+
+Предлагаемые имена режимов:
+
+- `all_in` — использовать весь доступный баланс.
+- `fixed_quote` — на каждый вход использовать фиксированный notional в quote (например 100 USDT).
+- `strategy_compound` (аналог `fixed_quote_strategy`) — стратегия стартует с выделенным бюджетом (например 100 USDT) и компаундит: следующий вход использует весь текущий баланс стратегии (например 110 после прибыли или меньше после убытка).
+- `strategy_compound_profit_lock` (аналог `fixed_quote_strategy + fixed_safe_percent`) — как `strategy_compound`, но часть прибыли фиксируется в “safe balance” и больше не используется стратегией.
+
+Ключевая деталь v1: в домене backtest должна появиться “стратегийная бухгалтерия”:
+
+- `strategy_equity_quote`
+- `strategy_safe_quote` (только для profit_lock режима)
+- `strategy_available_quote = strategy_equity_quote - strategy_safe_quote`
+
+Profit lock policy v1:
+
+- параметр `safe_profit_percent` (например `30.0` = 30%)
+- после *закрытия* каждой сделки:
+  - считаем `trade_pnl_quote_net` (уже после slippage+fees),
+  - если `trade_pnl_quote_net > 0`, то
+    - `locked = trade_pnl_quote_net * safe_profit_percent/100`
+    - `strategy_safe_quote += locked`
+    - `strategy_equity_quote` остаётся как есть (safe — это “заморозка части equity”)
+- входы/перевороты используют только `strategy_available_quote`.
+
+9) **API: запуск backtest (sync small) + grid budgets**
+
+- Backtest запускается из UI, но Milestone 4 фиксирует API и синхронный режим только для **малого периода и ограниченного grid**.
+- Большие сетки и длительные периоды должны уходить в jobs/progress (Milestone 5).
+- Endpoint (v1): `POST /backtests`.
+  - режим A (saved): body содержит `strategy_id`
+  - режим B (ad-hoc): body содержит grid template (индикаторы + параметры + оси SL/TP)
+
+Runner v1: staged pipeline:
+
+- Stage A: быстрый прогон по базовому grid (без SL/TP) и shortlist `preselect` (конфиг, default 20_000)
+- Stage B: расширение shortlist по SL/TP осям и точный расчёт; возвращаем только top-K
+
+Вход (общее):
+
+- `time_range` (`[start, end)` UTC)
+- `direction_mode`
+- `position_sizing_mode` + параметры режима
+- `market_fee_pct` (default по рынку)
+- `slippage_pct` (default)
+
+Вход (grid):
+
+- `indicators[]` как список выбранных индикаторов (из библиотеки) + их grid specs
+  - диапазоны параметров и шаги берутся из `configs/prod/indicators.yaml` (или из выбранного `configs/<env>/indicators.yaml` на сервере),
+  - запрос может сужать диапазоны, но не расширять их за hard-bounds.
+- `risk` как grid оси SL/TP (close-based):
+  - `sl` и `tp` задаются диапазонами/шагами (step регулируется)
+  - SL/TP входят в комбинаторику Stage B мультипликативно
+- guards (v1): используем только лимиты `MAX_VARIANTS_PER_COMPUTE_DEFAULT` и `MAX_COMPUTE_BYTES_TOTAL_DEFAULT`.
+
+Выход:
+
+- возвращаем только top-K вариантов (по умолчанию K=300, конфигурируемо), отсортированных по `Total Return [%]` (desc),
+- для каждого варианта в top-K возвращается один отчёт-таблица метрик (см. ниже),
+- (опционально) возвращаются trades для выбранных N лучших вариантов (чтобы не раздувать response),
+- подтверждение воспроизводимости: `spec_hash` (для saved strategy) или `grid_request_hash` (для ad-hoc) + “engine params hash”.
+
+UX/flow v1:
+
+- пользователь может сохранить стратегию только после завершения backtest по всем вариантам
+- backtest response должен содержать достаточно данных, чтобы UI мог сохранить выбранный вариант как immutable Strategy (конкретные параметры индикаторов и risk/sizing)
+
+### Отчёт backtest (метрики v1)
+
+Backtest v1 обязан строить отчёт в виде таблицы `|Metric|Value|` со следующими метриками (минимум):
+
+|Metric|Value|
+|---|---|
+|Start|...|
+|End|...|
+|Duration|...|
+|Init. Cash|...|
+|Total Profit|...|
+|Total Return [%]|...|
+|Benchmark Return [%]|...|
+|Position Coverage [%]|...|
+|Max. Drawdown [%]|...|
+|Avg. Drawdown [%]|...|
+|Max. Drawdown Duration|...|
+|Avg. Drawdown Duration|...|
+|Num. Trades|...|
+|Win Rate [%]|...|
+|Best Trade [%]|...|
+|Worst Trade [%]|...|
+|Avg. Trade [%]|...|
+|Max. Trade Duration|...|
+|Avg. Trade Duration|...|
+|Expectancy|...|
+|SQN|...|
+|Gross Exposure|...|
+|Sharpe Ratio|...|
+|Sortino Ratio|...|
+|Calmar Ratio|...|
+
+Примечания v1:
+
+- `Benchmark Return [%]`: buy-and-hold long по тому же инструменту на том же `time_range`, **без fee/slippage**.
+- `Position Coverage [%]`: доля баров, когда позиция была открыта (long или short), относительно общего числа баров.
+- `Gross Exposure`: средняя доля капитала в позиции; для `all_in` обычно близко к coverage, для `fixed_quote` может быть меньше.
+- `Expectancy`, `SQN`: вычисляются детерминированно по одной зафиксированной методике (в коде).
+- `Sharpe Ratio`, `Sortino Ratio`, `Calmar Ratio` (фикс v1):
+  - строим equity curve по закрытиям баров,
+  - ресэмплим equity в 1d,
+  - считаем дневные доходности,
+  - `risk_free = 0`,
+  - annualization = `365`.
+
+### Результат / DoD
+
+- Backtest детерминирован: одинаковый вход (saved spec или grid request) + одинаковые параметры backtest → одинаковый результат.
+- Поддерживаются режимы направления: `long-only`, `short-only`, `long-short` (с переворотом).
+- Поддерживаются 4 режима position sizing (включая profit lock) и они дают ожидаемую “бухгалтерию”.
+- SL/TP работают в close-based логике и не используют intrabar.
+- Комиссия/Slippage применяются и настраиваемы параметрами (с дефолтами: spot 0.075%, futures 0.1%, slippage 0.01%).
+- API позволяет запустить backtest синхронно на малом периоде и ограниченном grid (latency приемлемая; есть guards).
+- Результаты **не сохраняются** в БД (v1), но возвращаются как response для UI.
+
+### Ключевые детали и риски
+
+- **Сигналы “из любых индикаторов”**: требование покрыть сигнал-правила для всего списка `configs/prod/indicators.yaml` может существенно расширить объём Milestone 4.
+- **Сигнальный DSL**: если правила long/short будут слишком “богатые” (сравнения нескольких outputs, окна, кроссы), быстро получится полноценный DSL — это риск scope creep.
+- **Lookahead**: исполнение на `close[t]` при сигнале на `close[t]` допустимо, но нужно фиксировать порядок “exit → entry” и поведение при конфликте long/short.
+- **Spot vs futures**: модель исполнения одинаковая (требование), но нужно явно зафиксировать, что funding/ликвидации/маржинальные ограничения — не делаем в v1.
+
+### Что это меняет в roadmap (важно)
+
+Фактически Milestone 4 включает **grid backtest**. Чтобы не перегрузить синхронный API:
+
+- Milestone 4: sync small с жёсткими guards по числу вариантов и длине периода.
+- Milestone 5: jobs/progress обязательны для больших сеток.
+- Milestone 6: top-k / pruning / batching — отдельный слой оптимизации.
+
+### Кандидаты на вынос в следующий milestone (если не влезает в Milestone 4)
+
+- Полное покрытие signal rules для всех индикаторов из `configs/prod/indicators.yaml`.
+- Расширенные правила сигналов (кроссы между индикаторами, сравнения A vs B, сложные композиции) — отдельный milestone как “Signal DSL v2”.
+- Сохранение результатов backtest, история запусков, прогресс и “тяжёлые” задачи — Milestone 5 (jobs).
 
 ---
 
