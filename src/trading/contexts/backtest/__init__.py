@@ -4,6 +4,8 @@ from .adapters import (
     resolve_backtest_config_path,
 )
 from .application import (
+    BacktestCandleTimeline,
+    BacktestCandleTimelineBuilder,
     BacktestRequestScalar,
     BacktestStrategyReader,
     BacktestStrategySnapshot,
@@ -16,7 +18,10 @@ from .application import (
     backtest_conflict,
     backtest_forbidden,
     backtest_not_found,
+    compute_target_slice_by_bar_close_ts,
     map_backtest_exception,
+    normalize_1m_load_time_range,
+    rollup_1m_candles_best_effort,
     validation_error,
 )
 from .domain import (
@@ -41,6 +46,8 @@ __all__ = [
     "BacktestNotFoundError",
     "BacktestPositionPlaceholder",
     "BacktestRequestScalar",
+    "BacktestCandleTimeline",
+    "BacktestCandleTimelineBuilder",
     "BacktestResultPlaceholder",
     "BacktestRuntimeConfig",
     "BacktestStorageError",
@@ -56,12 +63,15 @@ __all__ = [
     "RunBacktestResponse",
     "RunBacktestTemplate",
     "RunBacktestUseCase",
+    "compute_target_slice_by_bar_close_ts",
+    "normalize_1m_load_time_range",
     "backtest_conflict",
     "backtest_forbidden",
     "backtest_not_found",
     "build_backtest_variant_key_v1",
     "load_backtest_runtime_config",
     "map_backtest_exception",
+    "rollup_1m_candles_best_effort",
     "resolve_backtest_config_path",
     "validation_error",
 ]

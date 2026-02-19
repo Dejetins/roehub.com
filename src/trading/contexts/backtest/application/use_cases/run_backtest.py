@@ -14,6 +14,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestStrategySnapshot,
     CurrentUser,
 )
+from trading.contexts.backtest.application.services import BacktestCandleTimelineBuilder
 from trading.contexts.backtest.application.use_cases.errors import map_backtest_exception
 from trading.contexts.backtest.domain.errors import (
     BacktestForbiddenError,
@@ -75,6 +76,7 @@ class RunBacktestUseCase:
         candle_feed: CandleFeed,
         indicator_compute: IndicatorCompute,
         strategy_reader: BacktestStrategyReader,
+        candle_timeline_builder: BacktestCandleTimelineBuilder | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
@@ -82,10 +84,19 @@ class RunBacktestUseCase:
         """
         Initialize backtest use-case dependencies and runtime defaults.
 
+        Docs:
+          - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+          - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/candle_timeline_builder.py
+          - src/trading/contexts/indicators/application/ports/feeds/candle_feed.py
+          - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+
         Args:
             candle_feed: Indicators candle-feed port producing dense timeline arrays.
             indicator_compute: Indicators compute port.
             strategy_reader: Backtest ACL strategy reader without owner filtering.
+            candle_timeline_builder: Optional custom timeline builder (BKT-EPIC-02).
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
@@ -111,7 +122,11 @@ class RunBacktestUseCase:
         if preselect_default <= 0:
             raise ValueError("RunBacktestUseCase.preselect_default must be > 0")
 
-        self._candle_feed = candle_feed
+        resolved_timeline_builder = candle_timeline_builder
+        if resolved_timeline_builder is None:
+            resolved_timeline_builder = BacktestCandleTimelineBuilder(candle_feed=candle_feed)
+
+        self._candle_timeline_builder = resolved_timeline_builder
         self._indicator_compute = indicator_compute
         self._strategy_reader = strategy_reader
         self._warmup_bars_default = warmup_bars_default
@@ -127,6 +142,14 @@ class RunBacktestUseCase:
         """
         Execute backtest skeleton flow and return deterministic variant preview response.
 
+        Docs:
+          - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+          - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/candle_timeline_builder.py
+          - src/trading/contexts/backtest/application/dto/run_backtest.py
+          - src/trading/contexts/indicators/application/dto/compute_request.py
+
         Args:
             request: Saved/ad-hoc backtest request.
             current_user: Authenticated user for ownership checks in saved mode.
@@ -138,8 +161,8 @@ class RunBacktestUseCase:
             RoehubError: Canonical mapped error for validation/forbidden/not-found/conflict/
                 unexpected.
         Side Effects:
-            Reads candles, invokes indicators compute, and loads saved strategy snapshot
-                when needed.
+            Reads canonical-based candles via `CandleFeed`, invokes indicators compute, and
+                loads saved strategy snapshot when needed.
         """
         try:
             if request is None:  # type: ignore[truthy-bool]
@@ -148,13 +171,15 @@ class RunBacktestUseCase:
                 raise BacktestValidationError("RunBacktestUseCase.execute requires current_user")
 
             resolved = self._resolve_run_context(request=request, current_user=current_user)
-            candles = self._candle_feed.load_1m_dense(
+            timeline = self._candle_timeline_builder.build(
                 market_id=resolved.template.instrument_id.market_id,
                 symbol=resolved.template.instrument_id.symbol,
-                time_range=request.time_range,
+                timeframe=resolved.template.timeframe,
+                requested_time_range=request.time_range,
+                warmup_bars=resolved.warmup_bars,
             )
             compute_calls = self._run_indicator_compute(
-                candles=candles,
+                candles=timeline.candles,
                 template=resolved.template,
                 preselect=resolved.preselect,
             )

@@ -133,12 +133,20 @@ Milestone 4 делится на 3 логических трека:
 **Цель:** детерминированно получить свечи для backtest на выбранном timeframe, используя canonical 1m как источник правды, и определить warmup-правила для индикаторов/сигналов.
 
 **Scope:**
-- Read canonical 1m свечей через `CanonicalCandleReader`.
-- Rollup derived TF (`5m/15m/1h/4h/1d`) по тем же правилам, что и Strategy live-runner.
+- Canonical 1m — source of truth: чтение через `CanonicalCandleReader`, в backtest используем `CandleFeed.load_1m_dense(...)` (ACL indicators -> market_data) для получения dense 1m + NaN holes.
+- Пользователь задаёт произвольные `Start/End` (без требования выравнивания). Внутри backtest:
+  - `start_1m = floor_to_minute(Start - warmup_duration)`
+  - `end_1m = ceil_to_minute(End)`
+- Derived TF (`5m/15m/1h/4h/1d`) строим по epoch-aligned bucket границам через `Timeframe.bucket_open/bucket_close` (UTC).
+- Rollup v1 для backtest — best-effort:
+  - missing 1m внутри бакета не “убивают” бакет,
+  - derived OHLCV агрегируется по доступным 1m (NaN минуты игнорируются),
+  - полностью пустой бакет → carry-forward: `OHLC=prev_close`, `volume=0`,
+  - derived candles не содержат NaN.
 - Warmup lookback policy:
-  - `warmup_bars_default = 200` (конфигурируемо),
-  - если истории недостаточно — начинаем с первого доступного бара.
-  - метрики/отчёт считаем только на целевом интервале `[Start, End)`.
+  - `warmup_bars_default = 200` (конфигурируемо, в барах целевого timeframe),
+  - если истории недостаточно — начинаем с первого доступного бара (без ошибки),
+  - метрики/отчёт downstream считаем только на целевом интервале `[Start, End)` по правилу `Start <= bar_close_ts < End`.
 
 **Non-goals:**
 - live ingestion/repair (это market_data и Strategy runner)
@@ -146,11 +154,14 @@ Milestone 4 делится на 3 логических трека:
 **DoD:**
 - Свечи на выходе backtest одинаковы при повторе запроса.
 - Warmup policy описана и тестируема.
+- Rollup policy описана и тестируема (missing minutes не удаляют бакет; carry-forward работает).
 
 **Paths:**
 - `src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py`
-- `src/trading/contexts/strategy/application/services/timeframe_rollup.py`
 - `src/trading/shared_kernel/primitives/timeframe.py`
+- `src/trading/contexts/indicators/application/ports/feeds/candle_feed.py`
+- `src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/market_data_candle_feed.py`
+- `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
 
 ---
 
