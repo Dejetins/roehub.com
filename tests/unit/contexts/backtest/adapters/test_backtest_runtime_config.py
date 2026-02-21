@@ -52,6 +52,16 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.warmup_bars_default == 200
     assert config.top_k_default == 300
     assert config.preselect_default == 20000
+    assert config.execution.init_cash_quote_default == 10000.0
+    assert config.execution.fixed_quote_default == 100.0
+    assert config.execution.safe_profit_percent_default == 30.0
+    assert config.execution.slippage_pct_default == 0.01
+    assert dict(config.execution.fee_pct_default_by_market_id) == {
+        1: 0.075,
+        2: 0.1,
+        3: 0.075,
+        4: 0.1,
+    }
 
 
 def test_load_backtest_runtime_config_uses_defaults_when_keys_absent(tmp_path: Path) -> None:
@@ -82,6 +92,16 @@ backtest: {}
     assert config.warmup_bars_default == 200
     assert config.top_k_default == 300
     assert config.preselect_default == 20000
+    assert config.execution.init_cash_quote_default == 10000.0
+    assert config.execution.fixed_quote_default == 100.0
+    assert config.execution.safe_profit_percent_default == 30.0
+    assert config.execution.slippage_pct_default == 0.01
+    assert dict(config.execution.fee_pct_default_by_market_id) == {
+        1: 0.075,
+        2: 0.1,
+        3: 0.075,
+        4: 0.1,
+    }
 
 
 def test_resolve_backtest_config_path_precedence() -> None:
@@ -133,3 +153,48 @@ def test_resolve_backtest_config_path_rejects_invalid_env_name() -> None:
     with pytest.raises(ValueError, match="ROEHUB_ENV"):
         resolve_backtest_config_path(environ={"ROEHUB_ENV": "stage"})
 
+
+def test_load_backtest_runtime_config_reads_execution_overrides(tmp_path: Path) -> None:
+    """
+    Verify loader parses explicit execution defaults with fail-fast validation semantics.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `backtest.execution` mapping follows v1 execution-engine runtime schema.
+    Raises:
+        AssertionError: If parsed execution values mismatch YAML payload.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  warmup_bars_default: 10
+  top_k_default: 20
+  preselect_default: 30
+  execution:
+    init_cash_quote_default: 5000
+    fixed_quote_default: 250
+    safe_profit_percent_default: 15
+    slippage_pct_default: 0.05
+    fee_pct_default_by_market_id:
+      1: 0.05
+      8: 0.2
+""".strip(),
+    )
+
+    config = load_backtest_runtime_config(config_path)
+
+    assert config.warmup_bars_default == 10
+    assert config.top_k_default == 20
+    assert config.preselect_default == 30
+    assert config.execution.init_cash_quote_default == 5000.0
+    assert config.execution.fixed_quote_default == 250.0
+    assert config.execution.safe_profit_percent_default == 15.0
+    assert config.execution.slippage_pct_default == 0.05
+    assert dict(config.execution.fee_pct_default_by_market_id) == {1: 0.05, 8: 0.2}

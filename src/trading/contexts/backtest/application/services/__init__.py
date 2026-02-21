@@ -5,6 +5,8 @@ from .candle_timeline_builder import (
     normalize_1m_load_time_range,
     rollup_1m_candles_best_effort,
 )
+from .close_fill_scorer_v1 import CloseFillBacktestStagedScorerV1
+from .execution_engine_v1 import BacktestExecutionEngineV1
 from .grid_builder_v1 import (
     STAGE_A_LITERAL,
     STAGE_B_LITERAL,
@@ -41,7 +43,9 @@ __all__ = [
     "BacktestStageABaseVariant",
     "BacktestCandleTimeline",
     "BacktestCandleTimelineBuilder",
+    "BacktestExecutionEngineV1",
     "IndicatorSignalEvaluationInputV1",
+    "CloseFillBacktestStagedScorerV1",
     "STAGE_A_LITERAL",
     "STAGE_B_LITERAL",
     "SignalRuleSpecV1",

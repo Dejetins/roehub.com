@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Mapping
 from uuid import UUID
 
@@ -17,9 +18,9 @@ from trading.contexts.backtest.application.ports import (
     CurrentUser,
 )
 from trading.contexts.backtest.application.services import (
-    TOTAL_RETURN_METRIC_LITERAL,
     BacktestCandleTimelineBuilder,
     BacktestStagedRunnerV1,
+    CloseFillBacktestStagedScorerV1,
 )
 from trading.contexts.backtest.application.use_cases.errors import map_backtest_exception
 from trading.contexts.backtest.domain.errors import (
@@ -27,8 +28,6 @@ from trading.contexts.backtest.domain.errors import (
     BacktestNotFoundError,
     BacktestValidationError,
 )
-from trading.contexts.backtest.domain.value_objects import BacktestVariantScalar
-from trading.contexts.indicators.application.dto import CandleArrays, IndicatorVariantSelection
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.ports.feeds import CandleFeed
 from trading.contexts.indicators.application.services.grid_builder import (
@@ -36,6 +35,13 @@ from trading.contexts.indicators.application.services.grid_builder import (
     MAX_VARIANTS_PER_COMPUTE_DEFAULT,
 )
 from trading.platform.errors import RoehubError
+
+_DEFAULT_FEE_PCT_BY_MARKET_ID = {
+    1: 0.075,
+    2: 0.1,
+    3: 0.075,
+    4: 0.1,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,62 +63,6 @@ class _ResolvedRunContext:
     warmup_bars: int
     top_k: int
     preselect: int
-
-
-class _ConstantBacktestStagedScorer:
-    """
-    Deterministic fallback scorer returning constant `Total Return [%]` value.
-
-    Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-      - docs/architecture/roadmap/milestone-4-epics-v1.md
-    Related:
-      - src/trading/contexts/backtest/application/ports/staged_runner.py
-      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
-      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
-    """
-
-    def score_variant(
-        self,
-        *,
-        stage: str,
-        candles: CandleArrays,
-        indicator_selections: tuple[IndicatorVariantSelection, ...],
-        signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]],
-        risk_params: Mapping[str, BacktestVariantScalar],
-        indicator_variant_key: str,
-        variant_key: str,
-    ) -> Mapping[str, float]:
-        """
-        Return deterministic constant ranking metric for fallback staged execution.
-
-        Args:
-            stage: Stage literal (`stage_a` or `stage_b`).
-            candles: Dense candles payload.
-            indicator_selections: Explicit indicator selections for the variant.
-            signal_params: Signal parameters for the variant.
-            risk_params: Risk payload for the variant.
-            indicator_variant_key: Deterministic indicator key.
-            variant_key: Deterministic backtest variant key.
-        Returns:
-            Mapping[str, float]: Constant metric payload with `Total Return [%]` key.
-        Assumptions:
-            Fallback scorer is used only when no scorer port is injected by composition root.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        _ = (
-            stage,
-            candles,
-            indicator_selections,
-            signal_params,
-            risk_params,
-            indicator_variant_key,
-            variant_key,
-        )
-        return {TOTAL_RETURN_METRIC_LITERAL: 0.0}
 
 
 class RunBacktestUseCase:
@@ -142,6 +92,11 @@ class RunBacktestUseCase:
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
+        init_cash_quote_default: float = 10000.0,
+        fixed_quote_default: float = 100.0,
+        safe_profit_percent_default: float = 30.0,
+        slippage_pct_default: float = 0.01,
+        fee_pct_default_by_market_id: Mapping[int, float] | None = None,
         max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     ) -> None:
@@ -168,6 +123,11 @@ class RunBacktestUseCase:
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
+            init_cash_quote_default: Runtime default initial strategy quote balance.
+            fixed_quote_default: Runtime default fixed quote notional for `fixed_quote`.
+            safe_profit_percent_default: Runtime default profit-lock percent.
+            slippage_pct_default: Runtime default slippage percent.
+            fee_pct_default_by_market_id: Runtime default fee mapping by market id.
             max_variants_per_compute: Stage variants guard limit.
             max_compute_bytes_total: Stage memory guard limit.
         Returns:
@@ -191,6 +151,16 @@ class RunBacktestUseCase:
             raise ValueError("RunBacktestUseCase.top_k_default must be > 0")
         if preselect_default <= 0:
             raise ValueError("RunBacktestUseCase.preselect_default must be > 0")
+        if init_cash_quote_default <= 0.0:
+            raise ValueError("RunBacktestUseCase.init_cash_quote_default must be > 0")
+        if fixed_quote_default <= 0.0:
+            raise ValueError("RunBacktestUseCase.fixed_quote_default must be > 0")
+        if safe_profit_percent_default < 0.0 or safe_profit_percent_default > 100.0:
+            raise ValueError(
+                "RunBacktestUseCase.safe_profit_percent_default must be in [0, 100]"
+            )
+        if slippage_pct_default < 0.0:
+            raise ValueError("RunBacktestUseCase.slippage_pct_default must be >= 0")
         if max_variants_per_compute <= 0:
             raise ValueError("RunBacktestUseCase.max_variants_per_compute must be > 0")
         if max_compute_bytes_total <= 0:
@@ -204,11 +174,18 @@ class RunBacktestUseCase:
         self._indicator_compute = indicator_compute
         self._strategy_reader = strategy_reader
         self._staged_runner = staged_runner or BacktestStagedRunnerV1()
-        self._staged_scorer = staged_scorer or _ConstantBacktestStagedScorer()
+        self._staged_scorer = staged_scorer
         self._defaults_provider = defaults_provider
         self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
+        self._init_cash_quote_default = init_cash_quote_default
+        self._fixed_quote_default = fixed_quote_default
+        self._safe_profit_percent_default = safe_profit_percent_default
+        self._slippage_pct_default = slippage_pct_default
+        self._fee_pct_default_by_market_id = _normalize_fee_defaults(
+            values=fee_pct_default_by_market_id
+        )
         self._max_variants_per_compute = max_variants_per_compute
         self._max_compute_bytes_total = max_compute_bytes_total
 
@@ -256,13 +233,17 @@ class RunBacktestUseCase:
                 requested_time_range=request.time_range,
                 warmup_bars=resolved.warmup_bars,
             )
+            resolved_scorer = self._resolve_staged_scorer(
+                template=resolved.template,
+                target_slice=timeline.target_slice,
+            )
             staged = self._staged_runner.run(
                 template=resolved.template,
                 candles=timeline.candles,
                 preselect=resolved.preselect,
                 top_k=resolved.top_k,
                 indicator_compute=self._indicator_compute,
-                scorer=self._staged_scorer,
+                scorer=resolved_scorer,
                 defaults_provider=self._defaults_provider,
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
@@ -409,3 +390,76 @@ class RunBacktestUseCase:
         if value <= 0:
             raise BacktestValidationError("Backtest request override values must be > 0")
         return value
+
+    def _resolve_staged_scorer(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        target_slice: slice,
+    ) -> BacktestStagedVariantScorer:
+        """
+        Resolve scorer for current execution, building default close-fill scorer when absent.
+
+        Args:
+            template: Resolved run template containing direction/sizing/execution settings.
+            target_slice: Trading/reporting target slice inside warmup-inclusive timeline.
+        Returns:
+            BacktestStagedVariantScorer: Scorer used by staged runner.
+        Assumptions:
+            Injected scorer takes precedence over default close-fill scorer composition.
+        Raises:
+            ValueError: Propagated from default scorer constructor on invalid settings.
+        Side Effects:
+            None.
+        """
+        if self._staged_scorer is not None:
+            return self._staged_scorer
+
+        return CloseFillBacktestStagedScorerV1(
+            indicator_compute=self._indicator_compute,
+            direction_mode=template.direction_mode,
+            sizing_mode=template.sizing_mode,
+            execution_params=template.execution_params or {},
+            market_id=template.instrument_id.market_id.value,
+            target_slice=target_slice,
+            init_cash_quote_default=self._init_cash_quote_default,
+            fixed_quote_default=self._fixed_quote_default,
+            safe_profit_percent_default=self._safe_profit_percent_default,
+            slippage_pct_default=self._slippage_pct_default,
+            fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
+            max_variants_guard=self._max_variants_per_compute,
+        )
+
+
+def _normalize_fee_defaults(
+    *,
+    values: Mapping[int, float] | None,
+) -> Mapping[int, float]:
+    """
+    Normalize and validate runtime fee-default mapping by market id.
+
+    Args:
+        values: Optional mapping `market_id -> fee_pct`.
+    Returns:
+        Mapping[int, float]: Immutable normalized mapping.
+    Assumptions:
+        Fee values are human percent units and must be non-negative.
+    Raises:
+        ValueError: If one market id/fee value is invalid or mapping is empty.
+    Side Effects:
+        None.
+    """
+    source = _DEFAULT_FEE_PCT_BY_MARKET_ID if values is None else values
+    normalized: dict[int, float] = {}
+    for raw_market_id in sorted(source.keys()):
+        market_id = int(raw_market_id)
+        fee_pct = float(source[raw_market_id])
+        if market_id <= 0:
+            raise ValueError("fee_pct_default_by_market_id keys must be > 0")
+        if fee_pct < 0.0:
+            raise ValueError("fee_pct_default_by_market_id values must be >= 0")
+        normalized[market_id] = fee_pct
+
+    if len(normalized) == 0:
+        raise ValueError("fee_pct_default_by_market_id must be non-empty")
+    return MappingProxyType(normalized)

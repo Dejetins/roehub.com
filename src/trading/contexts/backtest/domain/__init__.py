@@ -1,7 +1,11 @@
 from .entities import (
+    AccountStateV1,
     BacktestPositionPlaceholder,
     BacktestResultPlaceholder,
     BacktestTradePlaceholder,
+    ExecutionOutcomeV1,
+    PositionV1,
+    TradeV1,
 )
 from .errors import (
     BacktestConflictError,
@@ -15,12 +19,15 @@ from .value_objects import (
     AggregatedSignalsV1,
     BacktestVariantIdentity,
     BacktestVariantScalar,
+    ExecutionParamsV1,
     IndicatorSignalsV1,
+    RiskParamsV1,
     SignalV1,
     build_backtest_variant_key_v1,
 )
 
 __all__ = [
+    "AccountStateV1",
     "AggregatedSignalsV1",
     "BacktestConflictError",
     "BacktestDomainError",
@@ -33,7 +40,12 @@ __all__ = [
     "BacktestValidationError",
     "BacktestVariantIdentity",
     "BacktestVariantScalar",
+    "ExecutionOutcomeV1",
+    "ExecutionParamsV1",
     "IndicatorSignalsV1",
+    "PositionV1",
+    "RiskParamsV1",
     "SignalV1",
+    "TradeV1",
     "build_backtest_variant_key_v1",
 ]

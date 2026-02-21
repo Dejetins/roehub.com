@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Mapping
 
 import yaml
@@ -13,6 +14,89 @@ _ALLOWED_ENVS = ("dev", "prod", "test")
 _WARMUP_BARS_DEFAULT = 200
 _TOP_K_DEFAULT = 300
 _PRESELECT_DEFAULT = 20000
+
+_INIT_CASH_QUOTE_DEFAULT = 10000.0
+_FIXED_QUOTE_DEFAULT = 100.0
+_SAFE_PROFIT_PERCENT_DEFAULT = 30.0
+_SLIPPAGE_PCT_DEFAULT = 0.01
+_FEE_PCT_DEFAULT_BY_MARKET_ID = {
+    1: 0.075,
+    2: 0.1,
+    3: 0.075,
+    4: 0.1,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestExecutionRuntimeConfig:
+    """
+    Runtime defaults for execution engine v1 loaded from `backtest.execution` section.
+
+    Docs:
+      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/roadmap/base_milestone_plan.md
+    Related:
+      - configs/dev/backtest.yaml
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+    """
+
+    init_cash_quote_default: float = _INIT_CASH_QUOTE_DEFAULT
+    fixed_quote_default: float = _FIXED_QUOTE_DEFAULT
+    safe_profit_percent_default: float = _SAFE_PROFIT_PERCENT_DEFAULT
+    slippage_pct_default: float = _SLIPPAGE_PCT_DEFAULT
+    fee_pct_default_by_market_id: Mapping[int, float] = field(
+        default_factory=lambda: MappingProxyType(dict(_FEE_PCT_DEFAULT_BY_MARKET_ID))
+    )
+
+    def __post_init__(self) -> None:
+        """
+        Validate runtime execution defaults and normalize fee mapping immutability.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Percent fields use human percent units (`0.1 == 0.1%`).
+        Raises:
+            ValueError: If one scalar value or fee mapping entry is invalid.
+        Side Effects:
+            Replaces fee mapping with immutable key-sorted mapping proxy.
+        """
+        if self.init_cash_quote_default <= 0.0:
+            raise ValueError("backtest.execution.init_cash_quote_default must be > 0")
+        if self.fixed_quote_default <= 0.0:
+            raise ValueError("backtest.execution.fixed_quote_default must be > 0")
+        if self.safe_profit_percent_default < 0.0 or self.safe_profit_percent_default > 100.0:
+            raise ValueError(
+                "backtest.execution.safe_profit_percent_default must be in [0, 100]"
+            )
+        if self.slippage_pct_default < 0.0:
+            raise ValueError("backtest.execution.slippage_pct_default must be >= 0")
+
+        normalized_fee_map: dict[int, float] = {}
+        for raw_market_id in sorted(self.fee_pct_default_by_market_id.keys()):
+            market_id = int(raw_market_id)
+            fee_pct = float(self.fee_pct_default_by_market_id[raw_market_id])
+            if market_id <= 0:
+                raise ValueError(
+                    "backtest.execution.fee_pct_default_by_market_id keys must be > 0"
+                )
+            if fee_pct < 0.0:
+                raise ValueError(
+                    "backtest.execution.fee_pct_default_by_market_id values must be >= 0"
+                )
+            normalized_fee_map[market_id] = fee_pct
+
+        if len(normalized_fee_map) == 0:
+            raise ValueError("backtest.execution.fee_pct_default_by_market_id must be non-empty")
+
+        object.__setattr__(
+            self,
+            "fee_pct_default_by_market_id",
+            MappingProxyType(normalized_fee_map),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +117,9 @@ class BacktestRuntimeConfig:
     warmup_bars_default: int = _WARMUP_BARS_DEFAULT
     top_k_default: int = _TOP_K_DEFAULT
     preselect_default: int = _PRESELECT_DEFAULT
+    execution: BacktestExecutionRuntimeConfig = field(
+        default_factory=BacktestExecutionRuntimeConfig
+    )
 
     def __post_init__(self) -> None:
         """
@@ -43,9 +130,9 @@ class BacktestRuntimeConfig:
         Returns:
             None.
         Assumptions:
-            Version remains fixed to `1` for BKT-EPIC-01 contract.
+            Version remains fixed to `1` for BKT contracts.
         Raises:
-            ValueError: If version is not 1 or any integer defaults are non-positive.
+            ValueError: If version is not 1 or integer defaults are non-positive.
         Side Effects:
             None.
         """
@@ -98,7 +185,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
 
     Docs:
       - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
-      - docs/architecture/roadmap/milestone-4-epics-v1.md
+      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
     Related:
       - configs/dev/backtest.yaml
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -126,6 +213,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
 
     version = _get_int(payload, "version", required=True)
     backtest_map = _get_mapping(payload, "backtest", required=False)
+    execution_map = _get_mapping(backtest_map, "execution", required=False)
 
     warmup_bars_default = _get_int_with_default(
         backtest_map,
@@ -143,11 +231,38 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         default=_PRESELECT_DEFAULT,
     )
 
+    execution = BacktestExecutionRuntimeConfig(
+        init_cash_quote_default=_get_float_with_default(
+            execution_map,
+            "init_cash_quote_default",
+            default=_INIT_CASH_QUOTE_DEFAULT,
+        ),
+        fixed_quote_default=_get_float_with_default(
+            execution_map,
+            "fixed_quote_default",
+            default=_FIXED_QUOTE_DEFAULT,
+        ),
+        safe_profit_percent_default=_get_float_with_default(
+            execution_map,
+            "safe_profit_percent_default",
+            default=_SAFE_PROFIT_PERCENT_DEFAULT,
+        ),
+        slippage_pct_default=_get_float_with_default(
+            execution_map,
+            "slippage_pct_default",
+            default=_SLIPPAGE_PCT_DEFAULT,
+        ),
+        fee_pct_default_by_market_id=_parse_market_fee_defaults(
+            data=_get_mapping(execution_map, "fee_pct_default_by_market_id", required=False)
+        ),
+    )
+
     return BacktestRuntimeConfig(
         version=version,
         warmup_bars_default=warmup_bars_default,
         top_k_default=top_k_default,
         preselect_default=preselect_default,
+        execution=execution,
     )
 
 
@@ -239,7 +354,7 @@ def _get_int_with_default(data: Mapping[str, Any], key: str, *, default: int) ->
     Returns:
         int: Parsed integer.
     Assumptions:
-        Fallback defaults are already validated by dataclass constructor.
+        Fallback defaults are validated by dataclass constructor.
     Raises:
         ValueError: If provided value type is invalid.
     Side Effects:
@@ -250,9 +365,95 @@ def _get_int_with_default(data: Mapping[str, Any], key: str, *, default: int) ->
     return _get_int(data, key, required=True)
 
 
+def _get_float(data: Mapping[str, Any], key: str, *, required: bool) -> float:
+    """
+    Read float-compatible numeric value from payload while rejecting bools.
+
+    Args:
+        data: Source mapping.
+        key: Numeric key name.
+        required: Whether key is mandatory.
+    Returns:
+        float: Parsed floating-point value.
+    Assumptions:
+        Integer values are accepted and converted to float.
+    Raises:
+        ValueError: If required value is missing or type is invalid.
+    Side Effects:
+        None.
+    """
+    value = data.get(key)
+    if value is None:
+        if required:
+            raise ValueError(f"missing required key: {key}")
+        return 0.0
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"expected float at key '{key}', got {type(value).__name__}")
+    return float(value)
+
+
+def _get_float_with_default(data: Mapping[str, Any], key: str, *, default: float) -> float:
+    """
+    Read optional numeric value with explicit fallback default.
+
+    Args:
+        data: Source mapping.
+        key: Numeric key name.
+        default: Fallback value for absent key.
+    Returns:
+        float: Parsed floating-point value.
+    Assumptions:
+        Fallback defaults are validated by dataclass constructor.
+    Raises:
+        ValueError: If provided value type is invalid.
+    Side Effects:
+        None.
+    """
+    if key not in data:
+        return default
+    return _get_float(data, key, required=True)
+
+
+def _parse_market_fee_defaults(*, data: Mapping[str, Any]) -> Mapping[int, float]:
+    """
+    Parse optional market-fee mapping from YAML execution section.
+
+    Args:
+        data: Raw mapping payload from YAML.
+    Returns:
+        Mapping[int, float]: Parsed immutable market-fee mapping.
+    Assumptions:
+        Empty payload falls back to fixed v1 defaults.
+    Raises:
+        ValueError: If key/value cannot be parsed into valid market id / fee pair.
+    Side Effects:
+        None.
+    """
+    if len(data) == 0:
+        return MappingProxyType(dict(_FEE_PCT_DEFAULT_BY_MARKET_ID))
+
+    normalized: dict[int, float] = {}
+    for raw_key in sorted(data.keys(), key=lambda item: str(item).strip()):
+        raw_value = data[raw_key]
+        key_literal = str(raw_key).strip()
+        if not key_literal:
+            raise ValueError("fee_pct_default_by_market_id keys must be non-empty")
+        try:
+            market_id = int(key_literal)
+        except ValueError as error:
+            raise ValueError(
+                "fee_pct_default_by_market_id keys must be integer literals"
+            ) from error
+
+        if isinstance(raw_value, bool) or not isinstance(raw_value, int | float):
+            raise ValueError("fee_pct_default_by_market_id values must be numeric")
+        normalized[market_id] = float(raw_value)
+    return MappingProxyType(normalized)
+
+
 __all__ = [
+    "BacktestExecutionRuntimeConfig",
     "BacktestRuntimeConfig",
     "load_backtest_runtime_config",
     "resolve_backtest_config_path",
 ]
-

@@ -302,6 +302,7 @@ def test_run_backtest_use_case_normalizes_non_aligned_range_via_timeline_builder
         candle_feed=candle_feed,
         indicator_compute=indicator_compute,
         strategy_reader=_UnusedStrategyReader(),
+        staged_scorer=_DeterministicScorer(),
     )
     request = RunBacktestRequest(
         time_range=TimeRange(

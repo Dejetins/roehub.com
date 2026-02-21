@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Mapping
 
@@ -16,9 +18,10 @@ from trading.contexts.backtest.application.services.grid_builder_v1 import (
     BacktestStageABaseVariant,
 )
 from trading.contexts.backtest.domain.value_objects import (
+    BacktestVariantScalar,
     build_backtest_variant_key_v1,
 )
-from trading.contexts.indicators.application.dto import CandleArrays
+from trading.contexts.indicators.application.dto import CandleArrays, IndicatorVariantSelection
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.services.grid_builder import (
     MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
@@ -111,6 +114,28 @@ class _StageBScoredVariant:
     total_return_pct: float
 
 
+@dataclass(frozen=True, slots=True)
+class _StageBTask:
+    """
+    Internal Stage B scoring task payload for optional CPU-parallel execution.
+
+    Docs:
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/ports/staged_runner.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    """
+
+    variant_index: int
+    indicator_variant_key: str
+    variant_key: str
+    indicator_selections: tuple[IndicatorVariantSelection, ...]
+    signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]]
+    risk_params: Mapping[str, BacktestVariantScalar]
+
+
 class BacktestStagedRunnerV1:
     """
     Run deterministic staged pipeline (Stage A shortlist -> Stage B expand -> top-K).
@@ -128,22 +153,27 @@ class BacktestStagedRunnerV1:
         self,
         *,
         grid_builder: BacktestGridBuilderV1 | None = None,
+        parallel_workers: int | None = None,
     ) -> None:
         """
         Initialize staged runner with optional custom grid-builder implementation.
 
         Args:
             grid_builder: Optional custom grid builder for Stage A/Stage B context.
+            parallel_workers: Optional number of worker threads for variant scoring.
         Returns:
             None.
         Assumptions:
             Default grid builder follows EPIC-04 deterministic guard contracts.
         Raises:
-            None.
+            ValueError: If provided workers count is non-positive.
         Side Effects:
             None.
         """
+        if parallel_workers is not None and parallel_workers <= 0:
+            raise ValueError("BacktestStagedRunnerV1.parallel_workers must be > 0")
         self._grid_builder = grid_builder or BacktestGridBuilderV1()
+        self._parallel_workers = parallel_workers
 
     def run(
         self,
@@ -252,28 +282,30 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
+        base_variants = tuple(grid_context.iter_stage_a_variants())
+        workers = self._resolve_parallel_workers(total_tasks=len(base_variants))
+
         rows: list[_StageAScoredVariant] = []
-        for base_variant in grid_context.iter_stage_a_variants():
-            metrics = scorer.score_variant(
-                stage=STAGE_A_LITERAL,
-                candles=candles,
-                indicator_selections=base_variant.indicator_selections,
-                signal_params=base_variant.signal_params,
-                risk_params={
-                    "sl_enabled": False,
-                    "sl_pct": None,
-                    "tp_enabled": False,
-                    "tp_pct": None,
-                },
-                indicator_variant_key=base_variant.indicator_variant_key,
-                variant_key=base_variant.base_variant_key,
-            )
-            rows.append(
-                _StageAScoredVariant(
-                    base_variant=base_variant,
-                    total_return_pct=_extract_total_return_pct(metrics=metrics),
+        if workers <= 1:
+            for base_variant in base_variants:
+                rows.append(
+                    self._score_stage_a_variant(
+                        base_variant=base_variant,
+                        candles=candles,
+                        scorer=scorer,
+                    )
                 )
-            )
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for row in executor.map(
+                    lambda item: self._score_stage_a_variant(
+                        base_variant=item,
+                        candles=candles,
+                        scorer=scorer,
+                    ),
+                    base_variants,
+                ):
+                    rows.append(row)
         return sorted(
             rows,
             key=lambda row: (-row.total_return_pct, row.base_variant.base_variant_key),
@@ -306,7 +338,95 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
+        tasks = self._stage_b_tasks(
+            template=template,
+            grid_context=grid_context,
+            shortlist=shortlist,
+        )
+        workers = self._resolve_parallel_workers(total_tasks=len(tasks))
         rows: list[_StageBScoredVariant] = []
+        if workers <= 1:
+            for task in tasks:
+                rows.append(self._score_stage_b_task(task=task, candles=candles, scorer=scorer))
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for row in executor.map(
+                    lambda item: self._score_stage_b_task(
+                        task=item,
+                        candles=candles,
+                        scorer=scorer,
+                    ),
+                    tasks,
+                ):
+                    rows.append(row)
+        return sorted(rows, key=lambda row: (-row.total_return_pct, row.variant_key))
+
+    def _score_stage_a_variant(
+        self,
+        *,
+        base_variant: BacktestStageABaseVariant,
+        candles: CandleArrays,
+        scorer: BacktestStagedVariantScorer,
+    ) -> _StageAScoredVariant:
+        """
+        Score one Stage A base variant and return deterministic ranking row.
+
+        Args:
+            base_variant: Stage A base variant.
+            candles: Dense candles forwarded to scorer.
+            scorer: Stage scorer port.
+        Returns:
+            _StageAScoredVariant: Scored row for stable Stage A sorting.
+        Assumptions:
+            Stage A always disables SL/TP for shortlist ranking.
+        Raises:
+            ValueError: If scorer payload lacks required ranking metric.
+        Side Effects:
+            None.
+        """
+        metrics = scorer.score_variant(
+            stage=STAGE_A_LITERAL,
+            candles=candles,
+            indicator_selections=base_variant.indicator_selections,
+            signal_params=base_variant.signal_params,
+            risk_params={
+                "sl_enabled": False,
+                "sl_pct": None,
+                "tp_enabled": False,
+                "tp_pct": None,
+            },
+            indicator_variant_key=base_variant.indicator_variant_key,
+            variant_key=base_variant.base_variant_key,
+        )
+        return _StageAScoredVariant(
+            base_variant=base_variant,
+            total_return_pct=_extract_total_return_pct(metrics=metrics),
+        )
+
+    def _stage_b_tasks(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        grid_context: BacktestGridBuildContextV1,
+        shortlist: list[_StageAScoredVariant],
+    ) -> tuple[_StageBTask, ...]:
+        """
+        Build deterministic Stage B scoring task list from shortlist and risk variants.
+
+        Args:
+            template: Resolved backtest template payload.
+            grid_context: Built staged grid context.
+            shortlist: Stage A shortlist rows.
+        Returns:
+            tuple[_StageBTask, ...]: Deterministic Stage B task payloads.
+        Assumptions:
+            Variant index follows `(shortlist_index * risk_total) + risk_index` contract.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        tasks: list[_StageBTask] = []
         risk_variants = grid_context.risk_variants
         risk_total = len(risk_variants)
         for shortlist_index, stage_a_row in enumerate(shortlist):
@@ -321,24 +441,78 @@ class BacktestStagedRunnerV1:
                     risk_params=risk_variant.risk_params,
                     execution_params=template.execution_params,
                 )
-                metrics = scorer.score_variant(
-                    stage=STAGE_B_LITERAL,
-                    candles=candles,
-                    indicator_selections=base_variant.indicator_selections,
-                    signal_params=base_variant.signal_params,
-                    risk_params=risk_variant.risk_params,
-                    indicator_variant_key=base_variant.indicator_variant_key,
-                    variant_key=variant_key,
-                )
-                rows.append(
-                    _StageBScoredVariant(
+                tasks.append(
+                    _StageBTask(
                         variant_index=variant_index,
                         indicator_variant_key=base_variant.indicator_variant_key,
                         variant_key=variant_key,
-                        total_return_pct=_extract_total_return_pct(metrics=metrics),
+                        indicator_selections=base_variant.indicator_selections,
+                        signal_params=base_variant.signal_params,
+                        risk_params=risk_variant.risk_params,
                     )
                 )
-        return sorted(rows, key=lambda row: (-row.total_return_pct, row.variant_key))
+        return tuple(tasks)
+
+    def _score_stage_b_task(
+        self,
+        *,
+        task: _StageBTask,
+        candles: CandleArrays,
+        scorer: BacktestStagedVariantScorer,
+    ) -> _StageBScoredVariant:
+        """
+        Score one Stage B task payload and return deterministic ranking row.
+
+        Args:
+            task: Stage B scoring task.
+            candles: Dense candles forwarded to scorer.
+            scorer: Stage scorer port.
+        Returns:
+            _StageBScoredVariant: Scored row for Stage B stable sorting.
+        Assumptions:
+            Stage B scorer evaluates risk-enabled variants by task payload.
+        Raises:
+            ValueError: If scorer payload lacks required ranking metric.
+        Side Effects:
+            None.
+        """
+        metrics = scorer.score_variant(
+            stage=STAGE_B_LITERAL,
+            candles=candles,
+            indicator_selections=task.indicator_selections,
+            signal_params=task.signal_params,
+            risk_params=task.risk_params,
+            indicator_variant_key=task.indicator_variant_key,
+            variant_key=task.variant_key,
+        )
+        return _StageBScoredVariant(
+            variant_index=task.variant_index,
+            indicator_variant_key=task.indicator_variant_key,
+            variant_key=task.variant_key,
+            total_return_pct=_extract_total_return_pct(metrics=metrics),
+        )
+
+    def _resolve_parallel_workers(self, *, total_tasks: int) -> int:
+        """
+        Resolve deterministic worker count for optional CPU-parallel scoring.
+
+        Args:
+            total_tasks: Number of scoring tasks.
+        Returns:
+            int: Worker count (`1` for sequential execution).
+        Assumptions:
+            `parallel_workers=None` means auto-detect by CPU count.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if total_tasks <= 1:
+            return 1
+        if self._parallel_workers is not None:
+            return min(self._parallel_workers, total_tasks)
+        detected = os.cpu_count() or 1
+        return min(max(detected, 1), total_tasks)
 
 
 def _extract_total_return_pct(*, metrics: Mapping[str, float]) -> float:
@@ -369,4 +543,3 @@ __all__ = [
     "BacktestStagedRunnerV1",
     "TOTAL_RETURN_METRIC_LITERAL",
 ]
-

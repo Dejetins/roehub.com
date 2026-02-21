@@ -285,6 +285,44 @@ def test_staged_runner_v1_applies_preselect_and_top_k_limits() -> None:
     assert result.stage_b_variants_total == 2
 
 
+def test_staged_runner_v1_is_deterministic_with_parallel_scoring() -> None:
+    """
+    Verify CPU-parallel scoring path keeps deterministic variant ordering across runs.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Final ordering is always stable by ranking key and tie-break keys.
+    Raises:
+        AssertionError: If repeated parallel runs produce different ordered variant keys.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1(parallel_workers=4)
+    first = runner.run(
+        template=_template_for_tie_breaks(),
+        candles=_build_candles(bars=60),
+        preselect=3,
+        top_k=4,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=_ConstantTieScorer(),
+    )
+    second = runner.run(
+        template=_template_for_tie_breaks(),
+        candles=_build_candles(bars=60),
+        preselect=3,
+        top_k=4,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=_ConstantTieScorer(),
+    )
+
+    assert tuple(item.variant_key for item in first.variants) == tuple(
+        item.variant_key for item in second.variants
+    )
+
+
 def _template_for_tie_breaks() -> RunBacktestTemplate:
     """
     Build template fixture with Stage B risk expansion for tie-break ordering checks.
