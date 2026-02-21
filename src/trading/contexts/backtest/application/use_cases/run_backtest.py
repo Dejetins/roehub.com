@@ -14,7 +14,10 @@ from trading.contexts.backtest.application.ports import (
     BacktestStrategySnapshot,
     CurrentUser,
 )
-from trading.contexts.backtest.application.services import BacktestCandleTimelineBuilder
+from trading.contexts.backtest.application.services import (
+    BacktestCandleTimelineBuilder,
+    expand_indicator_grids_with_signal_dependencies_v1,
+)
 from trading.contexts.backtest.application.use_cases.errors import map_backtest_exception
 from trading.contexts.backtest.domain.errors import (
     BacktestForbiddenError,
@@ -320,15 +323,18 @@ class RunBacktestUseCase:
         Returns:
             int: Number of compute invocations performed.
         Assumptions:
-            EPIC-01 validates orchestration wiring, not full staged variant execution semantics.
+            Signal-rule v1 dependencies are expanded deterministically before compute calls.
         Raises:
             GridValidationError: Propagated from indicators compute for invalid grid payloads.
             MissingInputSeriesError: Propagated when feed cannot satisfy series requirements.
         Side Effects:
-            Calls indicators compute port one time per template indicator grid.
+            Calls indicators compute port for each base grid and required signal dependencies.
         """
         compute_calls = 0
-        for indicator_grid in template.indicator_grids:
+        expanded_indicator_grids = expand_indicator_grids_with_signal_dependencies_v1(
+            indicator_grids=template.indicator_grids
+        )
+        for indicator_grid in expanded_indicator_grids:
             self._indicator_compute.compute(
                 ComputeRequest(
                     candles=candles,

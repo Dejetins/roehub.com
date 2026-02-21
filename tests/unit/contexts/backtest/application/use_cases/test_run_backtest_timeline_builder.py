@@ -122,6 +122,7 @@ class _NoOpIndicatorCompute:
             None.
         """
         self.compute_calls = 0
+        self.compute_indicator_ids: list[str] = []
 
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
@@ -157,7 +158,7 @@ class _NoOpIndicatorCompute:
         Side Effects:
             Increments compute call counter.
         """
-        _ = req
+        self.compute_indicator_ids.append(req.grid.indicator_id.value)
         self.compute_calls += 1
         return cast(IndicatorTensor, object())
 
@@ -256,6 +257,50 @@ def test_run_backtest_use_case_normalizes_non_aligned_range_via_timeline_builder
     assert response.warmup_bars == 2
 
 
+def test_run_backtest_use_case_expands_pivot_signal_dependencies() -> None:
+    """
+    Verify use-case compute plan includes pivot wrapper dependencies for signal rules v1.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `structure.pivots` requires `structure.pivot_high` and `structure.pivot_low`.
+    Raises:
+        AssertionError: If dependency ids are missing or compute call count is incorrect.
+    Side Effects:
+        None.
+    """
+    candle_feed = _AlignedOnlyCandleFeed()
+    indicator_compute = _NoOpIndicatorCompute()
+    use_case = RunBacktestUseCase(
+        candle_feed=candle_feed,
+        indicator_compute=indicator_compute,
+        strategy_reader=_UnusedStrategyReader(),
+    )
+    request = RunBacktestRequest(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+        ),
+        template=_build_pivots_template(),
+    )
+
+    response = use_case.execute(
+        request=request,
+        current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
+    )
+
+    assert response.total_indicator_compute_calls == 3
+    assert indicator_compute.compute_calls == 3
+    assert indicator_compute.compute_indicator_ids == [
+        "structure.pivots",
+        "structure.pivot_high",
+        "structure.pivot_low",
+    ]
+
+
 def _build_template() -> RunBacktestTemplate:
     """
     Build deterministic minimal template payload for run use-case tests.
@@ -287,6 +332,43 @@ def _build_template() -> RunBacktestTemplate:
                 indicator_id="ma.sma",
                 inputs={"source": "close"},
                 params={"window": 20},
+            ),
+        ),
+    )
+
+
+def _build_pivots_template() -> RunBacktestTemplate:
+    """
+    Build template payload that includes `structure.pivots` for dependency expansion tests.
+
+    Args:
+        None.
+    Returns:
+        RunBacktestTemplate: Valid template with one pivots grid and selection.
+    Assumptions:
+        Pivots params use explicit integer values for left/right windows.
+    Raises:
+        ValueError: If primitive/grid invariants fail.
+    Side Effects:
+        None.
+    """
+    return RunBacktestTemplate(
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        indicator_grids=(
+            GridSpec(
+                indicator_id=IndicatorId("structure.pivots"),
+                params={
+                    "left": ExplicitValuesSpec(name="left", values=(3,)),
+                    "right": ExplicitValuesSpec(name="right", values=(2,)),
+                },
+            ),
+        ),
+        indicator_selections=(
+            IndicatorVariantSelection(
+                indicator_id="structure.pivots",
+                inputs={},
+                params={"left": 3, "right": 2},
             ),
         ),
     )

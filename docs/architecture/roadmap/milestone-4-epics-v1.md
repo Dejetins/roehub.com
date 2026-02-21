@@ -176,6 +176,12 @@ Milestone 4 делится на 3 логических трека:
   - конфликты и детерминизм.
 - Реализация сигналов для всех индикаторов, доступных в `configs/prod/indicators.yaml`.
 
+Уточнения v1:
+- `docs/architecture/indicators/indicators_formula.yaml` остаётся спецификацией; реализация signal rules делается кодом (1 раз) и далее используется.
+- signal rules могут использовать primary output индикатора и candle series (`open/high/low/close/volume`).
+- для “не направленных” индикаторов допускается параметризуемый `delta rule` (lag для LONG и SHORT задаётся в UI как значения/диапазоны, step=1).
+- signal параметры (thresholds/delta periods и т.п.) должны быть доступны как grid и хранятся в `configs/<env>/indicators.yaml` рядом с defaults индикаторов (в отдельной секции, чтобы не ломать compute grid).
+
 **Non-goals:**
 - “богатый DSL” сигналов, сравнение нескольких индикаторов друг с другом
 
@@ -187,6 +193,7 @@ Milestone 4 делится на 3 логических трека:
 - `configs/prod/indicators.yaml`
 - `docs/architecture/indicators/indicators_formula.yaml`
 - `docs/architecture/indicators/indicators-overview.md`
+- `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
 
 ---
 

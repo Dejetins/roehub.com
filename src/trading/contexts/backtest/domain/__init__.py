@@ -12,12 +12,16 @@ from .errors import (
     BacktestValidationError,
 )
 from .value_objects import (
+    AggregatedSignalsV1,
     BacktestVariantIdentity,
     BacktestVariantScalar,
+    IndicatorSignalsV1,
+    SignalV1,
     build_backtest_variant_key_v1,
 )
 
 __all__ = [
+    "AggregatedSignalsV1",
     "BacktestConflictError",
     "BacktestDomainError",
     "BacktestForbiddenError",
@@ -29,6 +33,7 @@ __all__ = [
     "BacktestValidationError",
     "BacktestVariantIdentity",
     "BacktestVariantScalar",
+    "IndicatorSignalsV1",
+    "SignalV1",
     "build_backtest_variant_key_v1",
 ]
-
