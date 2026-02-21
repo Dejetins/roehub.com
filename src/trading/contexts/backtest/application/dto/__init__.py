@@ -1,5 +1,6 @@
 from .run_backtest import (
     BacktestRequestScalar,
+    BacktestRiskGridSpec,
     BacktestVariantPreview,
     RunBacktestRequest,
     RunBacktestResponse,
@@ -7,10 +8,10 @@ from .run_backtest import (
 )
 
 __all__ = [
+    "BacktestRiskGridSpec",
     "BacktestRequestScalar",
     "BacktestVariantPreview",
     "RunBacktestRequest",
     "RunBacktestResponse",
     "RunBacktestTemplate",
 ]
-

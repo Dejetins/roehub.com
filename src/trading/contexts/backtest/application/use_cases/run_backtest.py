@@ -1,22 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Mapping
 from uuid import UUID
 
 from trading.contexts.backtest.application.dto import (
-    BacktestVariantPreview,
     RunBacktestRequest,
     RunBacktestResponse,
     RunBacktestTemplate,
 )
 from trading.contexts.backtest.application.ports import (
+    BacktestGridDefaultsProvider,
+    BacktestStagedVariantScorer,
     BacktestStrategyReader,
     BacktestStrategySnapshot,
     CurrentUser,
 )
 from trading.contexts.backtest.application.services import (
+    TOTAL_RETURN_METRIC_LITERAL,
     BacktestCandleTimelineBuilder,
-    expand_indicator_grids_with_signal_dependencies_v1,
+    BacktestStagedRunnerV1,
 )
 from trading.contexts.backtest.application.use_cases.errors import map_backtest_exception
 from trading.contexts.backtest.domain.errors import (
@@ -24,19 +27,15 @@ from trading.contexts.backtest.domain.errors import (
     BacktestNotFoundError,
     BacktestValidationError,
 )
-from trading.contexts.backtest.domain.value_objects import (
-    BacktestVariantIdentity,
-    build_backtest_variant_key_v1,
-)
-from trading.contexts.indicators.application.dto import (
-    CandleArrays,
-    ComputeRequest,
-    build_variant_key_v1,
-)
+from trading.contexts.backtest.domain.value_objects import BacktestVariantScalar
+from trading.contexts.indicators.application.dto import CandleArrays, IndicatorVariantSelection
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.ports.feeds import CandleFeed
+from trading.contexts.indicators.application.services.grid_builder import (
+    MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+    MAX_VARIANTS_PER_COMPUTE_DEFAULT,
+)
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import InstrumentId
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,17 +59,74 @@ class _ResolvedRunContext:
     preselect: int
 
 
+class _ConstantBacktestStagedScorer:
+    """
+    Deterministic fallback scorer returning constant `Total Return [%]` value.
+
+    Docs:
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/roadmap/milestone-4-epics-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/ports/staged_runner.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
+    """
+
+    def score_variant(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]],
+        risk_params: Mapping[str, BacktestVariantScalar],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return deterministic constant ranking metric for fallback staged execution.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections for the variant.
+            signal_params: Signal parameters for the variant.
+            risk_params: Risk payload for the variant.
+            indicator_variant_key: Deterministic indicator key.
+            variant_key: Deterministic backtest variant key.
+        Returns:
+            Mapping[str, float]: Constant metric payload with `Total Return [%]` key.
+        Assumptions:
+            Fallback scorer is used only when no scorer port is injected by composition root.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = (
+            stage,
+            candles,
+            indicator_selections,
+            signal_params,
+            risk_params,
+            indicator_variant_key,
+            variant_key,
+        )
+        return {TOTAL_RETURN_METRIC_LITERAL: 0.0}
+
+
 class RunBacktestUseCase:
     """
-    RunBacktestUseCase — BKT-EPIC-01 orchestration skeleton for saved/ad-hoc modes.
+    RunBacktestUseCase — staged sync backtest orchestration for saved/ad-hoc modes.
 
     Docs:
       - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
-      - src/trading/contexts/backtest/application/ports/strategy_reader.py
-      - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/ports/staged_runner.py
     """
 
     def __init__(
@@ -80,35 +136,46 @@ class RunBacktestUseCase:
         indicator_compute: IndicatorCompute,
         strategy_reader: BacktestStrategyReader,
         candle_timeline_builder: BacktestCandleTimelineBuilder | None = None,
+        staged_runner: BacktestStagedRunnerV1 | None = None,
+        staged_scorer: BacktestStagedVariantScorer | None = None,
+        defaults_provider: BacktestGridDefaultsProvider | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
+        max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
+        max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     ) -> None:
         """
-        Initialize backtest use-case dependencies and runtime defaults.
+        Initialize staged backtest use-case dependencies and runtime defaults.
 
         Docs:
           - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
-          - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/candle_timeline_builder.py
-          - src/trading/contexts/indicators/application/ports/feeds/candle_feed.py
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
           - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
 
         Args:
             candle_feed: Indicators candle-feed port producing dense timeline arrays.
-            indicator_compute: Indicators compute port.
+            indicator_compute:
+                Indicators compute port used for staged grid estimate/materialization.
             strategy_reader: Backtest ACL strategy reader without owner filtering.
             candle_timeline_builder: Optional custom timeline builder (BKT-EPIC-02).
+            staged_runner: Optional custom staged runner implementation.
+            staged_scorer: Optional Stage A/Stage B scorer port implementation.
+            defaults_provider: Optional defaults provider for compute/signal grid fallback.
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
+            max_variants_per_compute: Stage variants guard limit.
+            max_compute_bytes_total: Stage memory guard limit.
         Returns:
             None.
         Assumptions:
             Runtime defaults come from fail-fast `configs/<env>/backtest.yaml` loader.
         Raises:
-            ValueError: If dependencies are missing or defaults are non-positive.
+            ValueError: If dependencies are missing or scalar defaults/guards are non-positive.
         Side Effects:
             None.
         """
@@ -124,6 +191,10 @@ class RunBacktestUseCase:
             raise ValueError("RunBacktestUseCase.top_k_default must be > 0")
         if preselect_default <= 0:
             raise ValueError("RunBacktestUseCase.preselect_default must be > 0")
+        if max_variants_per_compute <= 0:
+            raise ValueError("RunBacktestUseCase.max_variants_per_compute must be > 0")
+        if max_compute_bytes_total <= 0:
+            raise ValueError("RunBacktestUseCase.max_compute_bytes_total must be > 0")
 
         resolved_timeline_builder = candle_timeline_builder
         if resolved_timeline_builder is None:
@@ -132,9 +203,14 @@ class RunBacktestUseCase:
         self._candle_timeline_builder = resolved_timeline_builder
         self._indicator_compute = indicator_compute
         self._strategy_reader = strategy_reader
+        self._staged_runner = staged_runner or BacktestStagedRunnerV1()
+        self._staged_scorer = staged_scorer or _ConstantBacktestStagedScorer()
+        self._defaults_provider = defaults_provider
         self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
+        self._max_variants_per_compute = max_variants_per_compute
+        self._max_compute_bytes_total = max_compute_bytes_total
 
     def execute(
         self,
@@ -143,29 +219,28 @@ class RunBacktestUseCase:
         current_user: CurrentUser,
     ) -> RunBacktestResponse:
         """
-        Execute backtest skeleton flow and return deterministic variant preview response.
+        Execute staged sync flow and return deterministic top-k variant preview response.
 
         Docs:
-          - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
           - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
         Related:
-          - src/trading/contexts/backtest/application/services/candle_timeline_builder.py
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
           - src/trading/contexts/backtest/application/dto/run_backtest.py
-          - src/trading/contexts/indicators/application/dto/compute_request.py
+          - src/trading/contexts/backtest/application/use_cases/errors.py
 
         Args:
             request: Saved/ad-hoc backtest request.
             current_user: Authenticated user for ownership checks in saved mode.
         Returns:
-            RunBacktestResponse: Deterministic skeleton response with one variant identity.
+            RunBacktestResponse: Deterministic staged response with ranked top-k variants.
         Assumptions:
-            EPIC-01 intentionally runs minimal compute orchestration and does not execute trades.
+            Trade execution/metrics engine is delegated to scorer port implementation.
         Raises:
             RoehubError: Canonical mapped error for validation/forbidden/not-found/conflict/
                 unexpected.
         Side Effects:
-            Reads canonical-based candles via `CandleFeed`, invokes indicators compute, and
-                loads saved strategy snapshot when needed.
+            Reads candles via `CandleFeed`, resolves staged variants, and calls scorer port.
         """
         try:
             if request is None:  # type: ignore[truthy-bool]
@@ -181,12 +256,17 @@ class RunBacktestUseCase:
                 requested_time_range=request.time_range,
                 warmup_bars=resolved.warmup_bars,
             )
-            compute_calls = self._run_indicator_compute(
-                candles=timeline.candles,
+            staged = self._staged_runner.run(
                 template=resolved.template,
+                candles=timeline.candles,
                 preselect=resolved.preselect,
+                top_k=resolved.top_k,
+                indicator_compute=self._indicator_compute,
+                scorer=self._staged_scorer,
+                defaults_provider=self._defaults_provider,
+                max_variants_per_compute=self._max_variants_per_compute,
+                max_compute_bytes_total=self._max_compute_bytes_total,
             )
-            variant_preview = self._build_variant_preview(template=resolved.template)
 
             return RunBacktestResponse(
                 mode=resolved.mode,
@@ -196,8 +276,8 @@ class RunBacktestUseCase:
                 warmup_bars=resolved.warmup_bars,
                 top_k=resolved.top_k,
                 preselect=resolved.preselect,
-                variants=(variant_preview,),
-                total_indicator_compute_calls=compute_calls,
+                variants=staged.variants,
+                total_indicator_compute_calls=staged.indicator_estimate_calls,
             )
         except RoehubError:
             raise
@@ -285,7 +365,7 @@ class RunBacktestUseCase:
             snapshot: Loaded snapshot or `None`.
             current_user: Authenticated principal.
         Returns:
-            RunBacktestTemplate: Template equivalent used by compute flow.
+            RunBacktestTemplate: Template equivalent used by staged flow.
         Assumptions:
             Missing and deleted snapshots are hidden behind one `not_found` contract.
         Raises:
@@ -304,82 +384,8 @@ class RunBacktestUseCase:
             timeframe=snapshot.timeframe,
             indicator_grids=snapshot.indicator_grids,
             indicator_selections=snapshot.indicator_selections,
-        )
-
-    def _run_indicator_compute(
-        self,
-        *,
-        candles: CandleArrays,
-        template: RunBacktestTemplate,
-        preselect: int,
-    ) -> int:
-        """
-        Invoke indicators compute for each template indicator block in deterministic order.
-
-        Args:
-            candles: Dense candle arrays from candle-feed port.
-            template: Resolved run template.
-            preselect: Current preselect limit used as compute variants guard in skeleton.
-        Returns:
-            int: Number of compute invocations performed.
-        Assumptions:
-            Signal-rule v1 dependencies are expanded deterministically before compute calls.
-        Raises:
-            GridValidationError: Propagated from indicators compute for invalid grid payloads.
-            MissingInputSeriesError: Propagated when feed cannot satisfy series requirements.
-        Side Effects:
-            Calls indicators compute port for each base grid and required signal dependencies.
-        """
-        compute_calls = 0
-        expanded_indicator_grids = expand_indicator_grids_with_signal_dependencies_v1(
-            indicator_grids=template.indicator_grids
-        )
-        for indicator_grid in expanded_indicator_grids:
-            self._indicator_compute.compute(
-                ComputeRequest(
-                    candles=candles,
-                    grid=indicator_grid,
-                    max_variants_guard=preselect,
-                )
-            )
-            compute_calls += 1
-        return compute_calls
-
-    def _build_variant_preview(self, *, template: RunBacktestTemplate) -> BacktestVariantPreview:
-        """
-        Build deterministic variant preview with `variant_index` and composed `variant_key` v1.
-
-        Args:
-            template: Resolved template payload.
-        Returns:
-            BacktestVariantPreview: Deterministic one-variant skeleton identity.
-        Assumptions:
-            Indicator key semantics are delegated to indicators `build_variant_key_v1`.
-        Raises:
-            ValueError: If key canonicalization inputs are invalid.
-        Side Effects:
-            None.
-        """
-        indicator_variant_key = build_variant_key_v1(
-            instrument_id=self._instrument_id_literal(instrument_id=template.instrument_id),
-            timeframe=template.timeframe.code,
-            indicators=template.indicator_selections,
-        )
-        variant_key = build_backtest_variant_key_v1(
-            indicator_variant_key=indicator_variant_key,
-            direction_mode=template.direction_mode,
-            sizing_mode=template.sizing_mode,
-            risk_params=template.risk_params,
-            execution_params=template.execution_params,
-        )
-        identity = BacktestVariantIdentity(
-            variant_index=0,
-            variant_key=variant_key,
-        )
-        return BacktestVariantPreview(
-            variant_index=identity.variant_index,
-            variant_key=identity.variant_key,
-            indicator_variant_key=indicator_variant_key,
+            signal_grids=snapshot.signal_grids,
+            risk_grid=snapshot.risk_grid,
         )
 
     def _resolve_with_default(self, *, value: int | None, default: int) -> int:
@@ -403,20 +409,3 @@ class RunBacktestUseCase:
         if value <= 0:
             raise BacktestValidationError("Backtest request override values must be > 0")
         return value
-
-    def _instrument_id_literal(self, *, instrument_id: InstrumentId) -> str:
-        """
-        Build deterministic instrument literal for indicators variant-key builder.
-
-        Args:
-            instrument_id: Shared-kernel instrument identity.
-        Returns:
-            str: Canonical `<market_id>:<symbol>` string.
-        Assumptions:
-            `market_id` and `symbol` value objects are already validated.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        return f"{instrument_id.market_id.value}:{instrument_id.symbol.value}"

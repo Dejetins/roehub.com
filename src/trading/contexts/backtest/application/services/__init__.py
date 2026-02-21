@@ -5,6 +5,14 @@ from .candle_timeline_builder import (
     normalize_1m_load_time_range,
     rollup_1m_candles_best_effort,
 )
+from .grid_builder_v1 import (
+    STAGE_A_LITERAL,
+    STAGE_B_LITERAL,
+    BacktestGridBuildContextV1,
+    BacktestGridBuilderV1,
+    BacktestRiskVariantV1,
+    BacktestStageABaseVariant,
+)
 from .signals_from_indicators_v1 import (
     IndicatorSignalEvaluationInputV1,
     SignalRuleSpecV1,
@@ -18,12 +26,26 @@ from .signals_from_indicators_v1 import (
     signal_rule_spec_v1,
     supported_indicator_ids_for_signals_v1,
 )
+from .staged_runner_v1 import (
+    TOTAL_RETURN_METRIC_LITERAL,
+    BacktestStagedRunnerV1,
+    BacktestStagedRunResultV1,
+)
 
 __all__ = [
+    "BacktestGridBuildContextV1",
+    "BacktestGridBuilderV1",
+    "BacktestRiskVariantV1",
+    "BacktestStagedRunResultV1",
+    "BacktestStagedRunnerV1",
+    "BacktestStageABaseVariant",
     "BacktestCandleTimeline",
     "BacktestCandleTimelineBuilder",
     "IndicatorSignalEvaluationInputV1",
+    "STAGE_A_LITERAL",
+    "STAGE_B_LITERAL",
     "SignalRuleSpecV1",
+    "TOTAL_RETURN_METRIC_LITERAL",
     "aggregate_indicator_signals_v1",
     "build_indicator_signal_inputs_from_tensors_v1",
     "compute_target_slice_by_bar_close_ts",

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import cast
+from typing import Mapping, cast
 from uuid import UUID
 
 import numpy as np
 
-from trading.contexts.backtest.application.dto import RunBacktestRequest, RunBacktestTemplate
-from trading.contexts.backtest.application.ports import BacktestStrategySnapshot, CurrentUser
+from trading.contexts.backtest.application.dto import (
+    RunBacktestRequest,
+    RunBacktestTemplate,
+)
+from trading.contexts.backtest.application.ports import CurrentUser
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
@@ -16,7 +19,7 @@ from trading.contexts.indicators.application.dto import (
     IndicatorTensor,
     IndicatorVariantSelection,
 )
-from trading.contexts.indicators.domain.entities import IndicatorId
+from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
 from trading.shared_kernel.primitives import (
     InstrumentId,
@@ -95,71 +98,91 @@ class _AlignedOnlyCandleFeed:
         return _build_dense_1m_from_time_range(time_range=time_range)
 
 
-class _NoOpIndicatorCompute:
+class _EstimateOnlyIndicatorCompute:
     """
-    IndicatorCompute stub that records compute invocations.
+    IndicatorCompute stub that materializes estimate axes from request grid specs.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
     Related:
-      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
       - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
+      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
     """
 
     def __init__(self) -> None:
         """
-        Initialize deterministic call counter.
+        Initialize deterministic estimate call recorder.
 
         Args:
             None.
         Returns:
             None.
         Assumptions:
-            Estimate and warmup are not used in this wiring test.
+            `compute` is not used by staged wiring tests.
         Raises:
             None.
         Side Effects:
             None.
         """
-        self.compute_calls = 0
-        self.compute_indicator_ids: list[str] = []
+        self.estimate_calls = 0
 
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
-        Return placeholder estimate result for protocol compatibility in tests.
+        Materialize axes from explicit specs and return deterministic estimate payload.
 
         Args:
             grid: Indicator grid payload.
             max_variants_guard: Variants guard value.
         Returns:
-            EstimateResult: Placeholder casted object.
+            EstimateResult: Deterministic estimate with axis values and variants count.
         Assumptions:
-            Method is not used in this test scenario.
+            Test fixtures use explicit axis specs only.
         Raises:
-            None.
+            ValueError: If variants exceed guard.
         Side Effects:
-            None.
+            Increments in-memory estimate calls counter.
         """
-        _ = grid, max_variants_guard
-        return cast(EstimateResult, object())
+        self.estimate_calls += 1
+        axes: list[AxisDef] = []
+        variants = 1
+
+        if grid.source is not None:
+            source_values = tuple(str(value) for value in grid.source.materialize())
+            axes.append(AxisDef(name="source", values_enum=source_values))
+            variants *= len(source_values)
+
+        for param_name in sorted(grid.params.keys()):
+            values = tuple(grid.params[param_name].materialize())
+            variants *= len(values)
+            axes.append(_axis_def(name=param_name, values=values))
+
+        if variants > max_variants_guard:
+            raise ValueError("variants exceed max_variants_guard")
+
+        return EstimateResult(
+            indicator_id=grid.indicator_id,
+            axes=tuple(axes),
+            variants=variants,
+            max_variants_guard=max_variants_guard,
+        )
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:
         """
-        Record compute call and return placeholder tensor.
+        Return placeholder tensor for protocol compatibility.
 
         Args:
             req: Compute request payload.
         Returns:
             IndicatorTensor: Placeholder casted object.
         Assumptions:
-            RunBacktestUseCase ignores returned tensor in current skeleton.
+            Staged runner tests do not invoke compute.
         Raises:
             None.
         Side Effects:
-            Increments compute call counter.
+            None.
         """
-        self.compute_indicator_ids.append(req.grid.indicator_id.value)
-        self.compute_calls += 1
+        _ = req
         return cast(IndicatorTensor, object())
 
     def warmup(self) -> None:
@@ -171,13 +194,61 @@ class _NoOpIndicatorCompute:
         Returns:
             None.
         Assumptions:
-            Warmup is irrelevant for this test.
+            Warmup is irrelevant for staged wiring tests.
         Raises:
             None.
         Side Effects:
             None.
         """
         return None
+
+
+class _DeterministicScorer:
+    """
+    Staged scorer fake returning deterministic metric based on indicator selection.
+
+    Docs:
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/ports/staged_runner.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
+    """
+
+    def score_variant(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> dict[str, float]:
+        """
+        Return deterministic `Total Return [%]` derived from `window` parameter value.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicator key for deterministic identity.
+            variant_key: Backtest variant key for deterministic identity.
+        Returns:
+            dict[str, float]: Deterministic metric payload.
+        Assumptions:
+            Test fixture contains one indicator selection with integer `window` parameter.
+        Raises:
+            KeyError: If expected `window` parameter is missing.
+        Side Effects:
+            None.
+        """
+        _ = stage, candles, signal_params, risk_params, indicator_variant_key, variant_key
+        window = int(indicator_selections[0].params["window"])
+        return {"Total Return [%]": float(window)}
 
 
 class _UnusedStrategyReader:
@@ -191,16 +262,16 @@ class _UnusedStrategyReader:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
     """
 
-    def load_any(self, *, strategy_id: UUID) -> BacktestStrategySnapshot | None:
+    def load_any(self, *, strategy_id: UUID) -> None:
         """
         Return no snapshot because template mode does not need saved strategy lookup.
 
         Args:
             strategy_id: Requested saved strategy id.
         Returns:
-            BacktestStrategySnapshot | None: Always `None`.
+            None: Always `None` for template mode tests.
         Assumptions:
-            Caller runs in template mode and never consumes snapshot.
+            Caller runs only in template mode.
         Raises:
             None.
         Side Effects:
@@ -212,7 +283,7 @@ class _UnusedStrategyReader:
 
 def test_run_backtest_use_case_normalizes_non_aligned_range_via_timeline_builder() -> None:
     """
-    Verify use-case succeeds for non-aligned request range by delegating candle loading to builder.
+    Verify use-case normalizes non-aligned request range before candle feed call.
 
     Args:
         None.
@@ -221,12 +292,12 @@ def test_run_backtest_use_case_normalizes_non_aligned_range_via_timeline_builder
     Assumptions:
         Timeline builder is responsible for minute normalization and warmup lookback.
     Raises:
-        AssertionError: If use-case calls feed with non-aligned range or misses compute call.
+        AssertionError: If feed call range or staged output counters are incorrect.
     Side Effects:
         None.
     """
     candle_feed = _AlignedOnlyCandleFeed()
-    indicator_compute = _NoOpIndicatorCompute()
+    indicator_compute = _EstimateOnlyIndicatorCompute()
     use_case = RunBacktestUseCase(
         candle_feed=candle_feed,
         indicator_compute=indicator_compute,
@@ -237,7 +308,7 @@ def test_run_backtest_use_case_normalizes_non_aligned_range_via_timeline_builder
             start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, 45, tzinfo=timezone.utc)),
             end=UtcTimestamp(datetime(2026, 2, 16, 12, 10, 5, tzinfo=timezone.utc)),
         ),
-        template=_build_template(),
+        template=_build_template(windows=(20,)),
         warmup_bars=2,
     )
 
@@ -252,39 +323,40 @@ def test_run_backtest_use_case_normalizes_non_aligned_range_via_timeline_builder
         datetime(2026, 2, 16, 11, 58, tzinfo=timezone.utc)
     )
     assert normalized_range.end == UtcTimestamp(datetime(2026, 2, 16, 12, 11, tzinfo=timezone.utc))
-    assert indicator_compute.compute_calls == 1
     assert response.total_indicator_compute_calls == 1
     assert response.warmup_bars == 2
+    assert len(response.variants) == 1
 
 
-def test_run_backtest_use_case_expands_pivot_signal_dependencies() -> None:
+def test_run_backtest_use_case_applies_staged_top_k_limit() -> None:
     """
-    Verify use-case compute plan includes pivot wrapper dependencies for signal rules v1.
+    Verify use-case forwards top-k settings to staged pipeline and returns ranked variants.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        `structure.pivots` requires `structure.pivot_high` and `structure.pivot_low`.
+        Deterministic scorer ranks by `window` parameter value.
     Raises:
-        AssertionError: If dependency ids are missing or compute call count is incorrect.
+        AssertionError: If staged ranking or top-k truncation behavior is incorrect.
     Side Effects:
         None.
     """
-    candle_feed = _AlignedOnlyCandleFeed()
-    indicator_compute = _NoOpIndicatorCompute()
     use_case = RunBacktestUseCase(
-        candle_feed=candle_feed,
-        indicator_compute=indicator_compute,
+        candle_feed=_AlignedOnlyCandleFeed(),
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
         strategy_reader=_UnusedStrategyReader(),
+        staged_scorer=_DeterministicScorer(),
     )
     request = RunBacktestRequest(
         time_range=TimeRange(
             start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
             end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
         ),
-        template=_build_pivots_template(),
+        template=_build_template(windows=(20, 25)),
+        top_k=1,
+        preselect=2,
     )
 
     response = use_case.execute(
@@ -292,25 +364,20 @@ def test_run_backtest_use_case_expands_pivot_signal_dependencies() -> None:
         current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
     )
 
-    assert response.total_indicator_compute_calls == 3
-    assert indicator_compute.compute_calls == 3
-    assert indicator_compute.compute_indicator_ids == [
-        "structure.pivots",
-        "structure.pivot_high",
-        "structure.pivot_low",
-    ]
+    assert len(response.variants) == 1
+    assert response.variants[0].total_return_pct == 25.0
 
 
-def _build_template() -> RunBacktestTemplate:
+def _build_template(*, windows: tuple[int, ...]) -> RunBacktestTemplate:
     """
-    Build deterministic minimal template payload for run use-case tests.
+    Build deterministic template payload for staged use-case tests.
 
     Args:
-        None.
+        windows: Explicit `window` axis values for `ma.sma` indicator grid.
     Returns:
         RunBacktestTemplate: Valid template-mode request payload.
     Assumptions:
-        One indicator grid/selection is enough for skeleton compute wiring.
+        One indicator grid is sufficient to test staged runner wiring.
     Raises:
         ValueError: If any primitive/grid invariant fails.
     Side Effects:
@@ -323,52 +390,8 @@ def _build_template() -> RunBacktestTemplate:
             GridSpec(
                 indicator_id=IndicatorId("ma.sma"),
                 params={
-                    "window": ExplicitValuesSpec(name="window", values=(20,)),
+                    "window": ExplicitValuesSpec(name="window", values=windows),
                 },
-            ),
-        ),
-        indicator_selections=(
-            IndicatorVariantSelection(
-                indicator_id="ma.sma",
-                inputs={"source": "close"},
-                params={"window": 20},
-            ),
-        ),
-    )
-
-
-def _build_pivots_template() -> RunBacktestTemplate:
-    """
-    Build template payload that includes `structure.pivots` for dependency expansion tests.
-
-    Args:
-        None.
-    Returns:
-        RunBacktestTemplate: Valid template with one pivots grid and selection.
-    Assumptions:
-        Pivots params use explicit integer values for left/right windows.
-    Raises:
-        ValueError: If primitive/grid invariants fail.
-    Side Effects:
-        None.
-    """
-    return RunBacktestTemplate(
-        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
-        timeframe=Timeframe("1m"),
-        indicator_grids=(
-            GridSpec(
-                indicator_id=IndicatorId("structure.pivots"),
-                params={
-                    "left": ExplicitValuesSpec(name="left", values=(3,)),
-                    "right": ExplicitValuesSpec(name="right", values=(2,)),
-                },
-            ),
-        ),
-        indicator_selections=(
-            IndicatorVariantSelection(
-                indicator_id="structure.pivots",
-                inputs={},
-                params={"left": 3, "right": 2},
             ),
         ),
     )
@@ -430,3 +453,32 @@ def _to_epoch_millis(dt: datetime) -> int:
         raise ValueError("datetime must be timezone-aware")
     delta = dt.astimezone(timezone.utc) - _EPOCH_UTC
     return int(delta // timedelta(milliseconds=1))
+
+
+def _axis_def(name: str, values: tuple[int | float | str, ...]) -> AxisDef:
+    """
+    Build `AxisDef` using value-family type inferred from materialized axis tuple.
+
+    Args:
+        name: Axis name.
+        values: Materialized axis values.
+    Returns:
+        AxisDef: Deterministic axis definition instance.
+    Assumptions:
+        Axis values are homogeneous (`int`, `float`, or `str`).
+    Raises:
+        ValueError: If values are empty or contain unsupported scalar types.
+    Side Effects:
+        None.
+    """
+    if len(values) == 0:
+        raise ValueError("axis values must be non-empty")
+
+    first = values[0]
+    if isinstance(first, str):
+        return AxisDef(name=name, values_enum=tuple(str(value) for value in values))
+    if isinstance(first, int):
+        return AxisDef(name=name, values_int=tuple(int(value) for value in values))
+    if isinstance(first, float):
+        return AxisDef(name=name, values_float=tuple(float(value) for value in values))
+    raise ValueError(f"unsupported axis value type: {type(first).__name__}")

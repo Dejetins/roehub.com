@@ -6,10 +6,11 @@ from typing import Mapping
 from uuid import UUID
 
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
-from trading.contexts.indicators.domain.specifications import GridSpec
+from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 from trading.shared_kernel.primitives import InstrumentId, Timeframe, TimeRange
 
 BacktestRequestScalar = int | float | str | bool | None
+BacktestSignalGridMap = Mapping[str, Mapping[str, GridParamSpec]]
 _ALLOWED_DIRECTION_MODES = {"long-only", "short-only", "long-short"}
 _ALLOWED_SIZING_MODES = {
     "all_in",
@@ -17,6 +18,50 @@ _ALLOWED_SIZING_MODES = {
     "strategy_compound",
     "strategy_compound_profit_lock",
 }
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestRiskGridSpec:
+    """
+    Stage B risk axes specification with explicit enable flags and percent semantics.
+
+    Docs:
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/roadmap/milestone-4-epics-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
+    """
+
+    sl_enabled: bool = False
+    tp_enabled: bool = False
+    sl: GridParamSpec | None = None
+    tp: GridParamSpec | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate risk-grid semantic invariants for Stage B expansion.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            SL/TP values are percentages where `3.0 == 3%`.
+        Raises:
+            ValueError: If enabled axis does not provide a materializable specification.
+        Side Effects:
+            None.
+        """
+        if self.sl_enabled and self.sl is None:
+            raise ValueError("BacktestRiskGridSpec.sl must be provided when sl_enabled is true")
+        if self.tp_enabled and self.tp is None:
+            raise ValueError("BacktestRiskGridSpec.tp must be provided when tp_enabled is true")
+        if self.sl is not None and len(self.sl.materialize()) == 0:
+            raise ValueError("BacktestRiskGridSpec.sl materialized to empty values")
+        if self.tp is not None and len(self.tp.materialize()) == 0:
+            raise ValueError("BacktestRiskGridSpec.tp materialized to empty values")
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,7 +81,9 @@ class RunBacktestTemplate:
     instrument_id: InstrumentId
     timeframe: Timeframe
     indicator_grids: tuple[GridSpec, ...]
-    indicator_selections: tuple[IndicatorVariantSelection, ...]
+    indicator_selections: tuple[IndicatorVariantSelection, ...] = ()
+    signal_grids: BacktestSignalGridMap | None = None
+    risk_grid: BacktestRiskGridSpec | None = None
     direction_mode: str = "long-short"
     sizing_mode: str = "all_in"
     risk_params: Mapping[str, BacktestRequestScalar] | None = None
@@ -63,8 +110,6 @@ class RunBacktestTemplate:
             raise ValueError("RunBacktestTemplate.timeframe is required")
         if len(self.indicator_grids) == 0:
             raise ValueError("RunBacktestTemplate.indicator_grids must be non-empty")
-        if len(self.indicator_selections) == 0:
-            raise ValueError("RunBacktestTemplate.indicator_selections must be non-empty")
 
         normalized_direction_mode = self.direction_mode.strip().lower()
         object.__setattr__(self, "direction_mode", normalized_direction_mode)
@@ -87,6 +132,15 @@ class RunBacktestTemplate:
             "risk_params",
             MappingProxyType(_normalize_scalar_mapping(values=self.risk_params)),
         )
+        object.__setattr__(
+            self,
+            "signal_grids",
+            MappingProxyType(_normalize_signal_grid_mapping(values=self.signal_grids)),
+        )
+        resolved_risk_grid = self.risk_grid
+        if resolved_risk_grid is None:
+            resolved_risk_grid = BacktestRiskGridSpec()
+        object.__setattr__(self, "risk_grid", resolved_risk_grid)
         object.__setattr__(
             self,
             "execution_params",
@@ -182,6 +236,7 @@ class BacktestVariantPreview:
     variant_index: int
     variant_key: str
     indicator_variant_key: str
+    total_return_pct: float = 0.0
 
     def __post_init__(self) -> None:
         """
@@ -210,6 +265,13 @@ class BacktestVariantPreview:
         object.__setattr__(self, "indicator_variant_key", normalized_indicator_key)
         if len(normalized_indicator_key) != 64:
             raise ValueError("BacktestVariantPreview.indicator_variant_key must be 64 hex chars")
+
+        if (
+            isinstance(self.total_return_pct, bool)
+            or not isinstance(self.total_return_pct, int | float)
+        ):
+            raise ValueError("BacktestVariantPreview.total_return_pct must be numeric")
+        object.__setattr__(self, "total_return_pct", float(self.total_return_pct))
 
 
 @dataclass(frozen=True, slots=True)
@@ -273,8 +335,25 @@ class RunBacktestResponse:
         variant_indexes = tuple(item.variant_index for item in self.variants)
         if len(set(variant_indexes)) != len(variant_indexes):
             raise ValueError("RunBacktestResponse variants must contain unique variant_index")
-        if tuple(sorted(variant_indexes)) != variant_indexes:
-            raise ValueError("RunBacktestResponse variants must be sorted by variant_index")
+
+        previous_variant: BacktestVariantPreview | None = None
+        for current in self.variants:
+            if previous_variant is None:
+                previous_variant = current
+                continue
+            if current.total_return_pct > previous_variant.total_return_pct:
+                raise ValueError(
+                    "RunBacktestResponse variants must be sorted by total_return_pct desc"
+                )
+            if (
+                current.total_return_pct == previous_variant.total_return_pct
+                and current.variant_key < previous_variant.variant_key
+            ):
+                raise ValueError(
+                    "RunBacktestResponse variants with equal total_return_pct must be sorted "
+                    "by variant_key asc"
+                )
+            previous_variant = current
 
 
 def _validate_positive_optional_int(*, name: str, value: int | None) -> None:
@@ -326,3 +405,45 @@ def _normalize_scalar_mapping(
         normalized[normalized_key] = values[key]
     return normalized
 
+
+def _normalize_signal_grid_mapping(
+    *,
+    values: BacktestSignalGridMap | None,
+) -> dict[str, Mapping[str, GridParamSpec]]:
+    """
+    Normalize nested signal-grid mapping with deterministic lowercase key ordering.
+
+    Args:
+        values: Optional `indicator_id -> signal_param_name -> GridParamSpec` mapping.
+    Returns:
+        dict[str, Mapping[str, GridParamSpec]]: Deterministic normalized nested mapping.
+    Assumptions:
+        Every `GridParamSpec` materializes non-empty value sequence.
+    Raises:
+        ValueError: If one indicator or signal parameter key is blank.
+    Side Effects:
+        None.
+    """
+    if values is None:
+        return {}
+
+    normalized: dict[str, Mapping[str, GridParamSpec]] = {}
+    for raw_indicator_id in sorted(values.keys(), key=lambda key: str(key).strip().lower()):
+        indicator_id = str(raw_indicator_id).strip().lower()
+        if not indicator_id:
+            raise ValueError("RunBacktestTemplate.signal_grids indicator_id keys must be non-empty")
+        signal_axes = values[raw_indicator_id]
+        signal_axis_map: dict[str, GridParamSpec] = {}
+        for raw_param_name in sorted(signal_axes.keys(), key=lambda key: str(key).strip().lower()):
+            param_name = str(raw_param_name).strip().lower()
+            if not param_name:
+                raise ValueError(
+                    "RunBacktestTemplate.signal_grids param keys must be non-empty"
+                )
+            if len(signal_axes[raw_param_name].materialize()) == 0:
+                raise ValueError(
+                    "RunBacktestTemplate.signal_grids parameter materialized to empty values"
+                )
+            signal_axis_map[param_name] = signal_axes[raw_param_name]
+        normalized[indicator_id] = MappingProxyType(signal_axis_map)
+    return normalized

@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from typing import Protocol
 from uuid import UUID
 
+from trading.contexts.backtest.application.dto import BacktestRiskGridSpec
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
-from trading.contexts.indicators.domain.specifications import GridSpec
+from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 from trading.shared_kernel.primitives import InstrumentId, Timeframe, UserId
 
 
@@ -30,6 +31,8 @@ class BacktestStrategySnapshot:
     timeframe: Timeframe
     indicator_grids: tuple[GridSpec, ...]
     indicator_selections: tuple[IndicatorVariantSelection, ...]
+    signal_grids: dict[str, dict[str, GridParamSpec]] | None = None
+    risk_grid: BacktestRiskGridSpec | None = None
 
     def __post_init__(self) -> None:
         """
@@ -87,4 +90,3 @@ class BacktestStrategyReader(Protocol):
             Reads saved strategy from outbound storage.
         """
         ...
-

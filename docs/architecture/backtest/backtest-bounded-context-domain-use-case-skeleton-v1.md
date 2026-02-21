@@ -139,7 +139,8 @@ Backtest результаты (в т.ч. top-K) должны возвращат�
 
 Как строится `variant_key`:
 - sha256 от canonical JSON payload v1;
-- indicator часть должна быть совместима с `indicators` variant_key semantics (`build_variant_key_v1`) и расширяется параметрами backtest (risk/sizing/fees/slippage).
+- indicator часть должна быть совместима с `indicators` variant_key semantics (`build_variant_key_v1`) и расширяется параметрами backtest (signals/risk/sizing/fees/slippage).
+- начиная с BKT-EPIC-04 `backtest.variant_key` включает отдельный `signals` payload (детерминированно нормализованный по `indicator_id` и имени параметра).
 
 ### 7) Runtime config: отдельный `configs/<env>/backtest.yaml` с fail-fast loader/validator
 
@@ -166,7 +167,10 @@ Backtest use-case мапит доменные и интеграционные о
 - Saved strategy: backtest use-case обязан проверить owner и `is_deleted` (если стратегия удалена — `not_found`).
 - Детерминизм:
   - порядок materialization grid/variants должен быть детерминирован (фиксируется в BKT-EPIC-04),
-  - `variant_key` должен быть воспроизводим.
+  - `variant_key` должен быть воспроизводим и учитывать `signals` + risk flags.
+- Grid/staged ports:
+  - `BacktestGridDefaultsProvider` отвечает за fallback defaults (`compute` + `signals`) из конфигурации.
+  - `BacktestStagedVariantScorer` отвечает за ranking по `Total Return [%]` в Stage A/Stage B.
 - Errors:
   - 422 payload детерминированно сортирован как в `apps/api/common/errors.py`.
 
@@ -196,6 +200,8 @@ Backtest (будет создано в реализации EPIC):
 - `src/trading/contexts/backtest/domain/`
 - `src/trading/contexts/backtest/application/dto/`
 - `src/trading/contexts/backtest/application/ports/`
+- `src/trading/contexts/backtest/application/services/grid_builder_v1.py`
+- `src/trading/contexts/backtest/application/services/staged_runner_v1.py`
 - `src/trading/contexts/backtest/application/use_cases/run_backtest.py`
 - `src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py`
 - `configs/dev/backtest.yaml`, `configs/test/backtest.yaml`, `configs/prod/backtest.yaml`

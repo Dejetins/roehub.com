@@ -5,6 +5,7 @@
 ## Ключевые документы
 
 - [Indicators Architecture](docs/architecture/indicators/README.md)
+- [Backtest v1 — Grid Builder + Staged Runner + Sync Guards (BKT-EPIC-04)](docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md)
 - [Market Data — Application Ports (Walking Skeleton v1)](docs/architecture/market_data/market-data-application-ports.md)
 - [Strategy — Milestone 3 Epics](docs/architecture/strategy/strategy-milestone-3-epics-v1.md)
 - [Shared Kernel — Primitives](docs/architecture/shared-kernel-primitives.md)
