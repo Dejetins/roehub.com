@@ -205,11 +205,11 @@ def ewma_grid_f64(source: np.ndarray, windows: np.ndarray, use_rma_alpha: bool) 
     for window_index in nb.prange(w_size):
         window = windows[window_index]
         alpha = 1.0 / window if use_rma_alpha else 2.0 / (window + 1.0)
-        previous = np.nan
+        previous: float = math.nan
         for time_index in range(t_size):
             value = float(source[time_index])
             if is_nan(value):
-                previous = np.nan
+                previous = math.nan
                 out[time_index, window_index] = np.nan
                 continue
             if is_nan(previous):

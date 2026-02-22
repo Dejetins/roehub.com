@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-import numba
 import pytest
 
 from trading.contexts.indicators.adapters.outbound.compute_numba import (
@@ -11,6 +10,8 @@ from trading.contexts.indicators.adapters.outbound.compute_numba import (
     ensure_numba_cache_dir_writable,
 )
 from trading.platform.config import IndicatorsComputeNumbaConfig
+
+numba = pytest.importorskip("numba")
 
 
 def test_apply_numba_runtime_config_sets_effective_threads(tmp_path: Path) -> None:

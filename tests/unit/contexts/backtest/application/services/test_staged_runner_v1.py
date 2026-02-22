@@ -9,6 +9,7 @@ from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunB
 from trading.contexts.backtest.application.services import (
     TOTAL_RETURN_METRIC_LITERAL,
     BacktestStagedRunnerV1,
+    CloseFillBacktestStagedScorerV1,
 )
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
@@ -16,8 +17,9 @@ from trading.contexts.indicators.application.dto import (
     EstimateResult,
     IndicatorTensor,
     IndicatorVariantSelection,
+    TensorMeta,
 )
-from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId
+from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId, Layout
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
 from trading.shared_kernel.primitives import (
     InstrumentId,
@@ -111,6 +113,139 @@ class _EstimateOnlyIndicatorCompute:
             None.
         Assumptions:
             Warmup is out of scope for staged runner tests.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return None
+
+
+class _InstrumentedSignalIndicatorCompute:
+    """
+    IndicatorCompute fake with deterministic signal outputs and in-memory compute call counter.
+
+    Docs:
+      - docs/architecture/backtest/backtest-tests-determinism-golden-perf-smoke-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize deterministic in-memory compute instrumentation state.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Compute calls are counted across both Stage A and Stage B invocations.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        self.compute_calls = 0
+
+    def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
+        """
+        Materialize deterministic estimate payload from explicit source/params axes.
+
+        Args:
+            grid: Indicator grid payload.
+            max_variants_guard: Variants guard threshold.
+        Returns:
+            EstimateResult: Deterministic estimate result for staged grid builder.
+        Assumptions:
+            Grid axes are explicit and materializable in-memory.
+        Raises:
+            ValueError: If materialized variants exceed provided guard.
+        Side Effects:
+            None.
+        """
+        axes: list[AxisDef] = []
+        variants = 1
+
+        if grid.source is not None:
+            source_values = tuple(str(value) for value in grid.source.materialize())
+            axes.append(AxisDef(name="source", values_enum=source_values))
+            variants *= len(source_values)
+
+        for param_name in sorted(grid.params.keys()):
+            values = tuple(grid.params[param_name].materialize())
+            axes.append(_axis_def(name=param_name, values=values))
+            variants *= len(values)
+
+        if variants > max_variants_guard:
+            raise ValueError("variants exceed max_variants_guard")
+
+        return EstimateResult(
+            indicator_id=grid.indicator_id,
+            axes=tuple(axes),
+            variants=variants,
+            max_variants_guard=max_variants_guard,
+        )
+
+    def compute(self, req: ComputeRequest) -> IndicatorTensor:
+        """
+        Return deterministic one-variant tensor with neutral bars between sign flips.
+
+        Args:
+            req: Compute request payload with explicit single-value axes.
+        Returns:
+            IndicatorTensor: Deterministic time-major tensor for scorer signal evaluation.
+        Assumptions:
+            Staged scorer requests one explicit selection variant at a time.
+        Raises:
+            ValueError: If bars count is non-positive.
+        Side Effects:
+            Increments `compute_calls` instrumentation counter.
+        """
+        bars = int(req.candles.close.shape[0])
+        if bars <= 0:
+            raise ValueError("bars must be > 0")
+
+        self.compute_calls += 1
+        pattern = np.asarray((1.0, 0.0, -1.0, 0.0), dtype=np.float32)
+        series = np.resize(pattern, bars).astype(np.float32)
+
+        window_spec = req.grid.params.get("window")
+        if window_spec is not None:
+            materialized = tuple(window_spec.materialize())
+            if len(materialized) > 0:
+                window = int(materialized[0])
+                shift = int(window % 4)
+                if shift > 0:
+                    series = np.roll(series, shift=shift)
+
+        values = np.ascontiguousarray(series.reshape(bars, 1), dtype=np.float32)
+        return IndicatorTensor(
+            indicator_id=req.grid.indicator_id,
+            layout=Layout.TIME_MAJOR,
+            axes=(AxisDef(name="variant", values_int=(0,)),),
+            values=values,
+            meta=TensorMeta(
+                t=bars,
+                variants=1,
+                nan_policy="propagate",
+                compute_ms=0,
+            ),
+        )
+
+    def warmup(self) -> None:
+        """
+        Provide no-op warmup implementation for protocol compatibility.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Warmup is unnecessary for deterministic in-memory fake.
         Raises:
             None.
         Side Effects:
@@ -323,6 +458,100 @@ def test_staged_runner_v1_is_deterministic_with_parallel_scoring() -> None:
     )
 
 
+def test_staged_runner_v1_stage_b_risk_expansion_reuses_signal_cache() -> None:
+    """
+    Verify Stage B risk expansion reuses Stage A signals cache without extra compute calls.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Signal cache identity is based on indicator variant key and signal params only.
+    Raises:
+        AssertionError: If Stage B expansion triggers additional indicator compute calls.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1()
+    candles = _build_candles(bars=64)
+    indicator_compute = _InstrumentedSignalIndicatorCompute()
+    scorer = CloseFillBacktestStagedScorerV1(
+        indicator_compute=indicator_compute,
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={
+            "init_cash_quote": 1000.0,
+            "fee_pct": 0.0,
+            "slippage_pct": 0.0,
+        },
+        market_id=1,
+        target_slice=slice(8, 64),
+        init_cash_quote_default=1000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.0,
+    )
+
+    result = runner.run(
+        template=_template_for_signal_cache_reuse(),
+        candles=candles,
+        preselect=2,
+        top_k=4,
+        indicator_compute=indicator_compute,
+        scorer=scorer,
+    )
+
+    assert result.stage_a_variants_total == 2
+    assert result.stage_b_variants_total == 6
+    assert indicator_compute.compute_calls == result.stage_a_variants_total
+
+
+def test_staged_runner_v1_ordering_is_independent_from_mapping_insertion_order() -> None:
+    """
+    Verify deterministic variant ordering is invariant to equivalent mapping insertion order.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Variant keys are built from canonical sorted mapping serialization.
+    Raises:
+        AssertionError: If reordered template mappings change output ordering.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1()
+    candles = _build_candles(bars=60)
+
+    first = runner.run(
+        template=_template_for_ordering_invariance_variant_a(),
+        candles=candles,
+        preselect=3,
+        top_k=4,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=_ConstantTieScorer(),
+    )
+    second = runner.run(
+        template=_template_for_ordering_invariance_variant_b(),
+        candles=candles,
+        preselect=3,
+        top_k=4,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=_ConstantTieScorer(),
+    )
+
+    assert first.stage_a_variants_total == second.stage_a_variants_total
+    assert first.stage_b_variants_total == second.stage_b_variants_total
+    assert tuple(item.variant_key for item in first.variants) == tuple(
+        item.variant_key for item in second.variants
+    )
+    assert tuple(item.variant_index for item in first.variants) == tuple(
+        item.variant_index for item in second.variants
+    )
+
+
 def _template_for_tie_breaks() -> RunBacktestTemplate:
     """
     Build template fixture with Stage B risk expansion for tie-break ordering checks.
@@ -385,6 +614,138 @@ def _template_for_top_k() -> RunBacktestTemplate:
                 },
             ),
         ),
+    )
+
+
+def _template_for_signal_cache_reuse() -> RunBacktestTemplate:
+    """
+    Build Stage B template where multiple risk variants share each Stage A base signal payload.
+
+    Args:
+        None.
+    Returns:
+        RunBacktestTemplate: Deterministic template for signal-cache reuse invariant test.
+    Assumptions:
+        Stage A has two base indicator variants and Stage B expands each to three risk variants.
+    Raises:
+        ValueError: If fixture payload violates DTO invariants.
+    Side Effects:
+        None.
+    """
+    return RunBacktestTemplate(
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        indicator_grids=(
+            GridSpec(
+                indicator_id=IndicatorId("momentum.roc"),
+                source=ExplicitValuesSpec(name="source", values=("close",)),
+                params={
+                    "window": ExplicitValuesSpec(name="window", values=(5, 10)),
+                },
+            ),
+        ),
+        risk_grid=BacktestRiskGridSpec(
+            sl_enabled=True,
+            tp_enabled=False,
+            sl=ExplicitValuesSpec(name="sl", values=(1.0, 2.0, 3.0)),
+        ),
+        execution_params={
+            "init_cash_quote": 1000.0,
+            "fee_pct": 0.0,
+            "slippage_pct": 0.0,
+        },
+    )
+
+
+def _template_for_ordering_invariance_variant_a() -> RunBacktestTemplate:
+    """
+    Build deterministic template with one concrete insertion order for nested mappings.
+
+    Args:
+        None.
+    Returns:
+        RunBacktestTemplate: Baseline template for ordering-invariance comparison.
+    Assumptions:
+        Mapping content is semantically equivalent to variant B template.
+    Raises:
+        ValueError: If fixture payload violates DTO invariants.
+    Side Effects:
+        None.
+    """
+    return RunBacktestTemplate(
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        indicator_grids=(
+            GridSpec(
+                indicator_id=IndicatorId("ma.sma"),
+                source=ExplicitValuesSpec(name="source", values=("close",)),
+                params={
+                    "window": ExplicitValuesSpec(name="window", values=(10, 20)),
+                },
+            ),
+        ),
+        signal_grids={
+            "ma.sma": {
+                "long_threshold": ExplicitValuesSpec(name="long_threshold", values=(0.0, 1.0)),
+                "short_threshold": ExplicitValuesSpec(name="short_threshold", values=(0.0, -1.0)),
+            }
+        },
+        risk_grid=BacktestRiskGridSpec(
+            sl_enabled=True,
+            tp_enabled=False,
+            sl=ExplicitValuesSpec(name="sl", values=(1.0, 2.0)),
+        ),
+        execution_params={
+            "fee_pct": 0.0,
+            "init_cash_quote": 1000.0,
+            "slippage_pct": 0.0,
+        },
+    )
+
+
+def _template_for_ordering_invariance_variant_b() -> RunBacktestTemplate:
+    """
+    Build semantically equivalent template with reversed insertion order for mappings.
+
+    Args:
+        None.
+    Returns:
+        RunBacktestTemplate: Alternate insertion-order template for invariance checks.
+    Assumptions:
+        Canonical key normalization removes insertion-order effects.
+    Raises:
+        ValueError: If fixture payload violates DTO invariants.
+    Side Effects:
+        None.
+    """
+    return RunBacktestTemplate(
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        indicator_grids=(
+            GridSpec(
+                indicator_id=IndicatorId("ma.sma"),
+                source=ExplicitValuesSpec(name="source", values=("close",)),
+                params={
+                    "window": ExplicitValuesSpec(name="window", values=(10, 20)),
+                },
+            ),
+        ),
+        signal_grids={
+            "ma.sma": {
+                "short_threshold": ExplicitValuesSpec(name="short_threshold", values=(0.0, -1.0)),
+                "long_threshold": ExplicitValuesSpec(name="long_threshold", values=(0.0, 1.0)),
+            }
+        },
+        risk_grid=BacktestRiskGridSpec(
+            sl_enabled=True,
+            tp_enabled=False,
+            sl=ExplicitValuesSpec(name="sl", values=(1.0, 2.0)),
+        ),
+        execution_params={
+            "slippage_pct": 0.0,
+            "init_cash_quote": 1000.0,
+            "fee_pct": 0.0,
+        },
     )
 
 
