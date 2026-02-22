@@ -14,6 +14,7 @@ _ALLOWED_ENVS = ("dev", "prod", "test")
 _WARMUP_BARS_DEFAULT = 200
 _TOP_K_DEFAULT = 300
 _PRESELECT_DEFAULT = 20000
+_TOP_TRADES_N_DEFAULT = 3
 
 _INIT_CASH_QUOTE_DEFAULT = 10000.0
 _FIXED_QUOTE_DEFAULT = 100.0
@@ -100,6 +101,41 @@ class BacktestExecutionRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestReportingRuntimeConfig:
+    """
+    Runtime defaults for reporting v1 loaded from `backtest.reporting` section.
+
+    Docs:
+      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/roadmap/base_milestone_plan.md
+    Related:
+      - configs/dev/backtest.yaml
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+    """
+
+    top_trades_n_default: int = _TOP_TRADES_N_DEFAULT
+
+    def __post_init__(self) -> None:
+        """
+        Validate reporting defaults with fail-fast startup semantics.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Trades payload is returned only for top-ranked variants to limit response size.
+        Raises:
+            ValueError: If `top_trades_n_default` is non-positive.
+        Side Effects:
+            None.
+        """
+        if self.top_trades_n_default <= 0:
+            raise ValueError("backtest.reporting.top_trades_n_default must be > 0")
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestRuntimeConfig:
     """
     Backtest runtime config v1 loaded from `configs/<env>/backtest.yaml`.
@@ -119,6 +155,9 @@ class BacktestRuntimeConfig:
     preselect_default: int = _PRESELECT_DEFAULT
     execution: BacktestExecutionRuntimeConfig = field(
         default_factory=BacktestExecutionRuntimeConfig
+    )
+    reporting: BacktestReportingRuntimeConfig = field(
+        default_factory=BacktestReportingRuntimeConfig
     )
 
     def __post_init__(self) -> None:
@@ -144,6 +183,10 @@ class BacktestRuntimeConfig:
             raise ValueError("backtest.top_k_default must be > 0")
         if self.preselect_default <= 0:
             raise ValueError("backtest.preselect_default must be > 0")
+        if self.execution is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.execution section must be configured")
+        if self.reporting is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.reporting section must be configured")
 
 
 def resolve_backtest_config_path(
@@ -214,6 +257,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     version = _get_int(payload, "version", required=True)
     backtest_map = _get_mapping(payload, "backtest", required=False)
     execution_map = _get_mapping(backtest_map, "execution", required=False)
+    reporting_map = _get_mapping(backtest_map, "reporting", required=False)
 
     warmup_bars_default = _get_int_with_default(
         backtest_map,
@@ -256,6 +300,13 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
             data=_get_mapping(execution_map, "fee_pct_default_by_market_id", required=False)
         ),
     )
+    reporting = BacktestReportingRuntimeConfig(
+        top_trades_n_default=_get_int_with_default(
+            reporting_map,
+            "top_trades_n_default",
+            default=_TOP_TRADES_N_DEFAULT,
+        ),
+    )
 
     return BacktestRuntimeConfig(
         version=version,
@@ -263,6 +314,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         top_k_default=top_k_default,
         preselect_default=preselect_default,
         execution=execution,
+        reporting=reporting,
     )
 
 
@@ -453,6 +505,7 @@ def _parse_market_fee_defaults(*, data: Mapping[str, Any]) -> Mapping[int, float
 
 __all__ = [
     "BacktestExecutionRuntimeConfig",
+    "BacktestReportingRuntimeConfig",
     "BacktestRuntimeConfig",
     "load_backtest_runtime_config",
     "resolve_backtest_config_path",

@@ -10,8 +10,13 @@ from trading.contexts.backtest.application.dto import (
     RunBacktestRequest,
     RunBacktestTemplate,
 )
-from trading.contexts.backtest.application.ports import CurrentUser
+from trading.contexts.backtest.application.ports import (
+    BacktestVariantScoreDetailsV1,
+    CurrentUser,
+)
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
+from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1, TradeV1
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
     ComputeRequest,
@@ -251,6 +256,109 @@ class _DeterministicScorer:
         return {"Total Return [%]": float(window)}
 
 
+class _DeterministicScorerWithDetails:
+    """
+    Deterministic scorer fake that also returns Stage-B details for reporting integration tests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/ports/staged_runner.py
+      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
+    """
+
+    def score_variant(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> dict[str, float]:
+        """
+        Return deterministic `Total Return [%]` metric based on `window` parameter.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicator key for deterministic identity.
+            variant_key: Backtest variant key for deterministic identity.
+        Returns:
+            dict[str, float]: Deterministic ranking metric payload.
+        Assumptions:
+            Fixture includes one indicator with integer `window` parameter.
+        Raises:
+            KeyError: If `window` parameter is absent.
+        Side Effects:
+            None.
+        """
+        _ = stage, candles, signal_params, risk_params, indicator_variant_key, variant_key
+        window = int(indicator_selections[0].params["window"])
+        return {"Total Return [%]": float(window)}
+
+    def score_variant_with_details(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> BacktestVariantScoreDetailsV1:
+        """
+        Return deterministic detailed payload used by Stage-B reporting assembly.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicator key for deterministic identity.
+            variant_key: Backtest variant key for deterministic identity.
+        Returns:
+            BacktestVariantScoreDetailsV1: Detailed scorer payload for reporting integration.
+        Assumptions:
+            Reporting integration test does not verify exact trade economics.
+        Raises:
+            KeyError: If `window` parameter is absent.
+        Side Effects:
+            None.
+        """
+        _ = stage, signal_params, risk_params, indicator_variant_key, variant_key
+        window = int(indicator_selections[0].params["window"])
+        metric_value = float(window)
+        return BacktestVariantScoreDetailsV1(
+            metrics={"Total Return [%]": metric_value},
+            target_slice=slice(0, int(candles.close.shape[0])),
+            execution_params=ExecutionParamsV1(
+                direction_mode="long-short",
+                sizing_mode="all_in",
+                init_cash_quote=1000.0,
+                fixed_quote=100.0,
+                safe_profit_percent=30.0,
+                fee_pct=0.0,
+                slippage_pct=0.0,
+            ),
+            risk_params=RiskParamsV1(
+                sl_enabled=False,
+                sl_pct=None,
+                tp_enabled=False,
+                tp_pct=None,
+            ),
+            execution_outcome=_execution_outcome_with_single_trade(total_return_pct=metric_value),
+        )
+
+
 class _UnusedStrategyReader:
     """
     Backtest strategy reader stub for template-mode tests.
@@ -367,6 +475,102 @@ def test_run_backtest_use_case_applies_staged_top_k_limit() -> None:
 
     assert len(response.variants) == 1
     assert response.variants[0].total_return_pct == 25.0
+
+
+def test_run_backtest_use_case_returns_trades_only_for_configured_top_n() -> None:
+    """
+    Verify reporting payload keeps full trades only for configured best N variants.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Variant ranking is deterministic by `Total Return [%]` descending.
+    Raises:
+        AssertionError: If trades are not restricted to configured top-N variants.
+    Side Effects:
+        None.
+    """
+    use_case = RunBacktestUseCase(
+        candle_feed=_AlignedOnlyCandleFeed(),
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        strategy_reader=_UnusedStrategyReader(),
+        staged_scorer=_DeterministicScorerWithDetails(),
+        top_trades_n_default=2,
+    )
+    request = RunBacktestRequest(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+        ),
+        template=_build_template(windows=(20, 25, 30)),
+        top_k=3,
+        preselect=3,
+    )
+
+    response = use_case.execute(
+        request=request,
+        current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
+    )
+
+    assert len(response.variants) == 3
+    assert response.variants[0].total_return_pct == 30.0
+    assert response.variants[1].total_return_pct == 25.0
+    assert response.variants[2].total_return_pct == 20.0
+
+    assert response.variants[0].report is not None
+    assert response.variants[1].report is not None
+    assert response.variants[2].report is not None
+    assert response.variants[0].report is not None
+    assert response.variants[0].report.trades is not None
+    assert response.variants[1].report is not None
+    assert response.variants[1].report.trades is not None
+    assert response.variants[2].report is not None
+    assert response.variants[2].report.trades is None
+    assert response.variants[0].report.table_md is not None
+    assert response.variants[0].report.table_md.startswith("|Metric|Value|")
+
+
+def _execution_outcome_with_single_trade(*, total_return_pct: float) -> ExecutionOutcomeV1:
+    """
+    Build deterministic execution outcome fixture with one closed trade.
+
+    Args:
+        total_return_pct: Total return metric mirrored into outcome payload.
+    Returns:
+        ExecutionOutcomeV1: Execution fixture used by scorer-details test double.
+    Assumptions:
+        Trade economics are minimal and only required to satisfy domain invariants.
+    Raises:
+        ValueError: If execution/trade payload violates domain invariants.
+    Side Effects:
+        None.
+    """
+    trade = TradeV1(
+        trade_id=1,
+        direction="long",
+        entry_bar_index=0,
+        exit_bar_index=1,
+        entry_fill_price=100.0,
+        exit_fill_price=101.0,
+        qty_base=1.0,
+        entry_quote_amount=100.0,
+        exit_quote_amount=101.0,
+        entry_fee_quote=0.0,
+        exit_fee_quote=0.0,
+        gross_pnl_quote=1.0,
+        net_pnl_quote=1.0,
+        locked_profit_quote=0.0,
+        exit_reason="signal_exit",
+    )
+    return ExecutionOutcomeV1(
+        trades=(trade,),
+        equity_end_quote=1000.0 + total_return_pct,
+        available_quote=1000.0 + total_return_pct,
+        safe_quote=0.0,
+        total_return_pct=total_return_pct,
+    )
 
 
 def _build_template(*, windows: tuple[int, ...]) -> RunBacktestTemplate:

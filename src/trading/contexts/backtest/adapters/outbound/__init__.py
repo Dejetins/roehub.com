@@ -1,5 +1,6 @@
 from .config import (
     BacktestExecutionRuntimeConfig,
+    BacktestReportingRuntimeConfig,
     BacktestRuntimeConfig,
     load_backtest_runtime_config,
     resolve_backtest_config_path,
@@ -7,6 +8,7 @@ from .config import (
 
 __all__ = [
     "BacktestExecutionRuntimeConfig",
+    "BacktestReportingRuntimeConfig",
     "BacktestRuntimeConfig",
     "load_backtest_runtime_config",
     "resolve_backtest_config_path",

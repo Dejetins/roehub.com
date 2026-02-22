@@ -6,6 +6,7 @@ from .candle_timeline_builder import (
     rollup_1m_candles_best_effort,
 )
 from .close_fill_scorer_v1 import CloseFillBacktestStagedScorerV1
+from .equity_curve_builder_v1 import BacktestEquityCurveBuilderV1, BacktestEquityCurveV1
 from .execution_engine_v1 import BacktestExecutionEngineV1
 from .grid_builder_v1 import (
     STAGE_A_LITERAL,
@@ -15,6 +16,8 @@ from .grid_builder_v1 import (
     BacktestRiskVariantV1,
     BacktestStageABaseVariant,
 )
+from .metrics_calculator_v1 import BACKTEST_METRIC_ORDER_V1, BacktestMetricsCalculatorV1
+from .reporting_service_v1 import BacktestReportingServiceV1
 from .signals_from_indicators_v1 import (
     IndicatorSignalEvaluationInputV1,
     SignalRuleSpecV1,
@@ -33,8 +36,10 @@ from .staged_runner_v1 import (
     BacktestStagedRunnerV1,
     BacktestStagedRunResultV1,
 )
+from .table_formatter_v1 import BacktestMetricsTableFormatterV1
 
 __all__ = [
+    "BACKTEST_METRIC_ORDER_V1",
     "BacktestGridBuildContextV1",
     "BacktestGridBuilderV1",
     "BacktestRiskVariantV1",
@@ -43,7 +48,12 @@ __all__ = [
     "BacktestStageABaseVariant",
     "BacktestCandleTimeline",
     "BacktestCandleTimelineBuilder",
+    "BacktestEquityCurveBuilderV1",
+    "BacktestEquityCurveV1",
     "BacktestExecutionEngineV1",
+    "BacktestMetricsCalculatorV1",
+    "BacktestMetricsTableFormatterV1",
+    "BacktestReportingServiceV1",
     "IndicatorSignalEvaluationInputV1",
     "CloseFillBacktestStagedScorerV1",
     "STAGE_A_LITERAL",

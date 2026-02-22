@@ -8,7 +8,10 @@ from typing import Mapping
 
 import numpy as np
 
-from trading.contexts.backtest.application.ports import BacktestStagedVariantScorer
+from trading.contexts.backtest.application.ports import (
+    BacktestStagedVariantScorer,
+    BacktestVariantScoreDetailsV1,
+)
 from trading.contexts.backtest.domain.value_objects import (
     BacktestVariantScalar,
     ExecutionParamsV1,
@@ -188,6 +191,48 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         Side Effects:
             Uses internal in-memory signal cache keyed by compute+signal identity.
         """
+        details = self.score_variant_with_details(
+            stage=stage,
+            candles=candles,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
+        )
+        return details.metrics
+
+    def score_variant_with_details(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]],
+        risk_params: Mapping[str, BacktestVariantScalar],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> BacktestVariantScoreDetailsV1:
+        """
+        Score one variant and return detailed deterministic execution payload for reporting.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Warmup-inclusive candles.
+            indicator_selections: Deterministic explicit indicator selections for variant.
+            signal_params: Signal parameter mapping per indicator.
+            risk_params: Risk payload for Stage B variant expansion.
+            indicator_variant_key: Deterministic indicators-only variant key.
+            variant_key: Deterministic full backtest variant key.
+        Returns:
+            BacktestVariantScoreDetailsV1: Detailed payload with score metrics and execution data.
+        Assumptions:
+            Stage A still disables SL/TP regardless of provided `risk_params` values.
+        Raises:
+            ValueError: If stage literal is unsupported or one scalar payload is invalid.
+        Side Effects:
+            Uses internal in-memory signal cache keyed by compute+signal identity.
+        """
         _ = variant_key
         resolved_stage = stage.strip().lower()
         if resolved_stage not in {STAGE_A_LITERAL, STAGE_B_LITERAL}:
@@ -222,7 +267,14 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             execution_params=execution_params,
             risk_params=resolved_risk_params,
         )
-        return {TOTAL_RETURN_METRIC_LITERAL: float(outcome.total_return_pct)}
+        metrics = MappingProxyType({TOTAL_RETURN_METRIC_LITERAL: float(outcome.total_return_pct)})
+        return BacktestVariantScoreDetailsV1(
+            metrics=metrics,
+            target_slice=self._target_slice,
+            execution_params=execution_params,
+            risk_params=resolved_risk_params,
+            execution_outcome=outcome,
+        )
 
     def _cached_signal(self, *, cache_key: str) -> _SignalCacheValue | None:
         """

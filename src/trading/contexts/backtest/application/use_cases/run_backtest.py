@@ -92,6 +92,7 @@ class RunBacktestUseCase:
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
+        top_trades_n_default: int = 3,
         init_cash_quote_default: float = 10000.0,
         fixed_quote_default: float = 100.0,
         safe_profit_percent_default: float = 30.0,
@@ -123,6 +124,7 @@ class RunBacktestUseCase:
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
+            top_trades_n_default: Runtime default number of variants with full trades payload.
             init_cash_quote_default: Runtime default initial strategy quote balance.
             fixed_quote_default: Runtime default fixed quote notional for `fixed_quote`.
             safe_profit_percent_default: Runtime default profit-lock percent.
@@ -151,6 +153,8 @@ class RunBacktestUseCase:
             raise ValueError("RunBacktestUseCase.top_k_default must be > 0")
         if preselect_default <= 0:
             raise ValueError("RunBacktestUseCase.preselect_default must be > 0")
+        if top_trades_n_default <= 0:
+            raise ValueError("RunBacktestUseCase.top_trades_n_default must be > 0")
         if init_cash_quote_default <= 0.0:
             raise ValueError("RunBacktestUseCase.init_cash_quote_default must be > 0")
         if fixed_quote_default <= 0.0:
@@ -179,6 +183,7 @@ class RunBacktestUseCase:
         self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
+        self._top_trades_n_default = top_trades_n_default
         self._init_cash_quote_default = init_cash_quote_default
         self._fixed_quote_default = fixed_quote_default
         self._safe_profit_percent_default = safe_profit_percent_default
@@ -247,6 +252,8 @@ class RunBacktestUseCase:
                 defaults_provider=self._defaults_provider,
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
+                requested_time_range=request.time_range,
+                top_trades_n=self._top_trades_n_default,
             )
 
             return RunBacktestResponse(

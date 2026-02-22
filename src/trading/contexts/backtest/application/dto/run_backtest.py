@@ -5,6 +5,7 @@ from types import MappingProxyType
 from typing import Mapping
 from uuid import UUID
 
+from trading.contexts.backtest.domain.entities import TradeV1
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 from trading.shared_kernel.primitives import InstrumentId, Timeframe, TimeRange
@@ -220,6 +221,96 @@ class RunBacktestRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestMetricRowV1:
+    """
+    One deterministic reporting row rendered in `|Metric|Value|` table contract.
+
+    Docs:
+      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/roadmap/base_milestone_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/services/table_formatter_v1.py
+      - src/trading/contexts/backtest/application/services/reporting_service_v1.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+    """
+
+    metric: str
+    value: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate one reporting metric row payload.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Value string is already deterministically formatted by reporting formatter.
+        Raises:
+            ValueError: If metric name or formatted value is empty.
+        Side Effects:
+            Normalizes metric/value literals by stripping surrounding whitespace.
+        """
+        normalized_metric = self.metric.strip()
+        object.__setattr__(self, "metric", normalized_metric)
+        if not normalized_metric:
+            raise ValueError("BacktestMetricRowV1.metric must be non-empty")
+
+        normalized_value = self.value.strip()
+        object.__setattr__(self, "value", normalized_value)
+        if not normalized_value:
+            raise ValueError("BacktestMetricRowV1.value must be non-empty")
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestReportV1:
+    """
+    Deterministic reporting payload with metric rows, markdown table, and optional trades.
+
+    Docs:
+      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/roadmap/base_milestone_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/services/reporting_service_v1.py
+      - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+    """
+
+    rows: tuple[BacktestMetricRowV1, ...]
+    table_md: str | None = None
+    trades: tuple[TradeV1, ...] | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate deterministic report payload shape and markdown-table contract.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Rows are provided in fixed contract order by reporting formatter.
+        Raises:
+            ValueError: If rows are empty, table header is invalid, or trades are not sorted.
+        Side Effects:
+            None.
+        """
+        if len(self.rows) == 0:
+            raise ValueError("BacktestReportV1.rows must be non-empty")
+
+        if self.table_md is not None and not self.table_md.startswith("|Metric|Value|"):
+            raise ValueError("BacktestReportV1.table_md must start with '|Metric|Value|'")
+
+        if self.trades is not None:
+            previous_trade_id = 0
+            for trade in self.trades:
+                if trade.trade_id < previous_trade_id:
+                    raise ValueError("BacktestReportV1.trades must be ordered by trade_id asc")
+                previous_trade_id = trade.trade_id
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestVariantPreview:
     """
     One deterministic variant preview identity returned by skeleton use-case.
@@ -237,6 +328,7 @@ class BacktestVariantPreview:
     variant_key: str
     indicator_variant_key: str
     total_return_pct: float = 0.0
+    report: BacktestReportV1 | None = None
 
     def __post_init__(self) -> None:
         """

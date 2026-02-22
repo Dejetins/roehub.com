@@ -3,6 +3,8 @@ backtest:
   warmup_bars_default: 200
   top_k_default: 300
   preselect_default: 20000
+  reporting:
+    top_trades_n_default: 3
   execution:
     init_cash_quote_default: 10000
     fixed_quote_default: 100

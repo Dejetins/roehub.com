@@ -52,6 +52,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.warmup_bars_default == 200
     assert config.top_k_default == 300
     assert config.preselect_default == 20000
+    assert config.reporting.top_trades_n_default == 3
     assert config.execution.init_cash_quote_default == 10000.0
     assert config.execution.fixed_quote_default == 100.0
     assert config.execution.safe_profit_percent_default == 30.0
@@ -92,6 +93,7 @@ backtest: {}
     assert config.warmup_bars_default == 200
     assert config.top_k_default == 300
     assert config.preselect_default == 20000
+    assert config.reporting.top_trades_n_default == 3
     assert config.execution.init_cash_quote_default == 10000.0
     assert config.execution.fixed_quote_default == 100.0
     assert config.execution.safe_profit_percent_default == 30.0
@@ -177,6 +179,8 @@ backtest:
   warmup_bars_default: 10
   top_k_default: 20
   preselect_default: 30
+  reporting:
+    top_trades_n_default: 5
   execution:
     init_cash_quote_default: 5000
     fixed_quote_default: 250
@@ -193,8 +197,38 @@ backtest:
     assert config.warmup_bars_default == 10
     assert config.top_k_default == 20
     assert config.preselect_default == 30
+    assert config.reporting.top_trades_n_default == 5
     assert config.execution.init_cash_quote_default == 5000.0
     assert config.execution.fixed_quote_default == 250.0
     assert config.execution.safe_profit_percent_default == 15.0
     assert config.execution.slippage_pct_default == 0.05
     assert dict(config.execution.fee_pct_default_by_market_id) == {1: 0.05, 8: 0.2}
+
+
+def test_load_backtest_runtime_config_rejects_invalid_reporting_defaults(tmp_path: Path) -> None:
+    """
+    Verify loader fails fast when reporting defaults violate deterministic schema bounds.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `backtest.reporting.top_trades_n_default` must be strictly positive.
+    Raises:
+        AssertionError: If invalid reporting payload does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  reporting:
+    top_trades_n_default: 0
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="backtest.reporting.top_trades_n_default"):
+        load_backtest_runtime_config(config_path)

@@ -3,12 +3,17 @@ from __future__ import annotations
 import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Mapping, cast
 
-from trading.contexts.backtest.application.dto import BacktestVariantPreview, RunBacktestTemplate
+from trading.contexts.backtest.application.dto import (
+    BacktestReportV1,
+    BacktestVariantPreview,
+    RunBacktestTemplate,
+)
 from trading.contexts.backtest.application.ports import (
     BacktestGridDefaultsProvider,
     BacktestStagedVariantScorer,
+    BacktestStagedVariantScorerWithDetails,
 )
 from trading.contexts.backtest.application.services.grid_builder_v1 import (
     STAGE_A_LITERAL,
@@ -27,6 +32,9 @@ from trading.contexts.indicators.application.services.grid_builder import (
     MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     MAX_VARIANTS_PER_COMPUTE_DEFAULT,
 )
+from trading.shared_kernel.primitives import TimeRange
+
+from .reporting_service_v1 import BacktestReportingServiceV1
 
 TOTAL_RETURN_METRIC_LITERAL = "Total Return [%]"
 
@@ -154,6 +162,7 @@ class BacktestStagedRunnerV1:
         *,
         grid_builder: BacktestGridBuilderV1 | None = None,
         parallel_workers: int | None = None,
+        reporting_service: BacktestReportingServiceV1 | None = None,
     ) -> None:
         """
         Initialize staged runner with optional custom grid-builder implementation.
@@ -161,6 +170,7 @@ class BacktestStagedRunnerV1:
         Args:
             grid_builder: Optional custom grid builder for Stage A/Stage B context.
             parallel_workers: Optional number of worker threads for variant scoring.
+            reporting_service: Optional reporting service used for Stage-B top-k payloads.
         Returns:
             None.
         Assumptions:
@@ -174,6 +184,7 @@ class BacktestStagedRunnerV1:
             raise ValueError("BacktestStagedRunnerV1.parallel_workers must be > 0")
         self._grid_builder = grid_builder or BacktestGridBuilderV1()
         self._parallel_workers = parallel_workers
+        self._reporting_service = reporting_service or BacktestReportingServiceV1()
 
     def run(
         self,
@@ -187,6 +198,8 @@ class BacktestStagedRunnerV1:
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+        requested_time_range: TimeRange | None = None,
+        top_trades_n: int = 3,
     ) -> BacktestStagedRunResultV1:
         """
         Execute staged ranking flow and return deterministic top-K variant previews.
@@ -201,6 +214,10 @@ class BacktestStagedRunnerV1:
             defaults_provider: Optional defaults provider for compute/signal fallback.
             max_variants_per_compute: Stage variants guard limit.
             max_compute_bytes_total: Stage memory guard limit.
+            requested_time_range:
+                Optional request range for reporting rows (`Start/End/Duration`).
+            top_trades_n:
+                Number of best variants for which full trades payload is included.
         Returns:
             BacktestStagedRunResultV1: Deterministic staged-run output summary.
         Assumptions:
@@ -215,6 +232,8 @@ class BacktestStagedRunnerV1:
             raise ValueError("BacktestStagedRunnerV1 preselect must be > 0")
         if top_k <= 0:
             raise ValueError("BacktestStagedRunnerV1 top_k must be > 0")
+        if top_trades_n <= 0:
+            raise ValueError("BacktestStagedRunnerV1 top_trades_n must be > 0")
 
         grid_context = self._grid_builder.build(
             template=template,
@@ -234,7 +253,7 @@ class BacktestStagedRunnerV1:
         shortlist_len = min(preselect, len(stage_a_rows))
         shortlist = stage_a_rows[:shortlist_len]
 
-        stage_b_rows = self._score_stage_b(
+        stage_b_rows, stage_b_tasks = self._score_stage_b(
             template=template,
             grid_context=grid_context,
             shortlist=shortlist,
@@ -242,12 +261,21 @@ class BacktestStagedRunnerV1:
             scorer=scorer,
         )
         top_rows = stage_b_rows[: min(top_k, len(stage_b_rows))]
+        reports_by_variant_key = self._build_top_reports(
+            requested_time_range=requested_time_range,
+            top_rows=top_rows,
+            stage_b_tasks=stage_b_tasks,
+            candles=candles,
+            scorer=scorer,
+            top_trades_n=top_trades_n,
+        )
         variants = tuple(
             BacktestVariantPreview(
                 variant_index=row.variant_index,
                 variant_key=row.variant_key,
                 indicator_variant_key=row.indicator_variant_key,
                 total_return_pct=row.total_return_pct,
+                report=reports_by_variant_key.get(row.variant_key),
             )
             for row in top_rows
         )
@@ -319,7 +347,7 @@ class BacktestStagedRunnerV1:
         shortlist: list[_StageAScoredVariant],
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
-    ) -> list[_StageBScoredVariant]:
+    ) -> tuple[list[_StageBScoredVariant], Mapping[str, _StageBTask]]:
         """
         Score Stage B expanded variants from Stage A shortlist and risk cartesian axes.
 
@@ -330,7 +358,8 @@ class BacktestStagedRunnerV1:
             candles: Dense candles forwarded to scorer.
             scorer: Stage scorer port.
         Returns:
-            list[_StageBScoredVariant]: Sorted Stage B rows by ranking and tie-break key.
+            tuple[list[_StageBScoredVariant], Mapping[str, _StageBTask]]:
+                Sorted Stage B rows and variant-key lookup for top-k reporting phase.
         Assumptions:
             Stage B tie-break key is full `variant_key`.
         Raises:
@@ -343,6 +372,11 @@ class BacktestStagedRunnerV1:
             grid_context=grid_context,
             shortlist=shortlist,
         )
+        task_by_variant_key: dict[str, _StageBTask] = {}
+        for task in tasks:
+            if task.variant_key in task_by_variant_key:
+                raise ValueError("duplicate Stage B variant_key is not allowed")
+            task_by_variant_key[task.variant_key] = task
         workers = self._resolve_parallel_workers(total_tasks=len(tasks))
         rows: list[_StageBScoredVariant] = []
         if workers <= 1:
@@ -359,7 +393,10 @@ class BacktestStagedRunnerV1:
                     tasks,
                 ):
                     rows.append(row)
-        return sorted(rows, key=lambda row: (-row.total_return_pct, row.variant_key))
+        return (
+            sorted(rows, key=lambda row: (-row.total_return_pct, row.variant_key)),
+            task_by_variant_key,
+        )
 
     def _score_stage_a_variant(
         self,
@@ -492,6 +529,71 @@ class BacktestStagedRunnerV1:
             total_return_pct=_extract_total_return_pct(metrics=metrics),
         )
 
+    def _build_top_reports(
+        self,
+        *,
+        requested_time_range: TimeRange | None,
+        top_rows: list[_StageBScoredVariant],
+        stage_b_tasks: Mapping[str, _StageBTask],
+        candles: CandleArrays,
+        scorer: BacktestStagedVariantScorer,
+        top_trades_n: int,
+    ) -> Mapping[str, BacktestReportV1]:
+        """
+        Build deterministic EPIC-06 report payloads for selected Stage-B top-k variants.
+
+        Args:
+            requested_time_range: User request range for reporting rows.
+            top_rows: Already ranked Stage-B top rows.
+            stage_b_tasks: Stage-B task lookup by deterministic `variant_key`.
+            candles: Warmup-inclusive candles forwarded to scorer/reporting services.
+            scorer: Stage scorer port optionally supporting details extension.
+            top_trades_n: Number of best variants to include full trades list for.
+        Returns:
+            Mapping[str, BacktestReportV1]: Variant-key to reporting payload mapping.
+        Assumptions:
+            Ranking order in `top_rows` is deterministic and already final.
+        Raises:
+            ValueError: If top-row task mapping is missing or scorer detail payload mismatches.
+        Side Effects:
+            Re-scores top variants through details extension when supported by scorer.
+        """
+        if requested_time_range is None:
+            return {}
+        details_scorer = _details_scorer(scorer=scorer)
+        if details_scorer is None:
+            return {}
+
+        reports_by_variant_key: dict[str, BacktestReportV1] = {}
+        for ranked_index, row in enumerate(top_rows):
+            task = stage_b_tasks.get(row.variant_key)
+            if task is None:
+                raise ValueError("missing Stage B task for top-row variant_key")
+
+            details = details_scorer.score_variant_with_details(
+                stage=STAGE_B_LITERAL,
+                candles=candles,
+                indicator_selections=task.indicator_selections,
+                signal_params=task.signal_params,
+                risk_params=task.risk_params,
+                indicator_variant_key=task.indicator_variant_key,
+                variant_key=task.variant_key,
+            )
+            detailed_total_return_pct = _extract_total_return_pct(metrics=details.metrics)
+            if abs(detailed_total_return_pct - row.total_return_pct) > 1e-12:
+                raise ValueError("detailed scorer payload must match ranked total return value")
+
+            reports_by_variant_key[row.variant_key] = self._reporting_service.build_report(
+                requested_time_range=requested_time_range,
+                candles=candles,
+                target_slice=details.target_slice,
+                execution_params=details.execution_params,
+                execution_outcome=details.execution_outcome,
+                include_table_md=True,
+                include_trades=ranked_index < top_trades_n,
+            )
+        return reports_by_variant_key
+
     def _resolve_parallel_workers(self, *, total_tasks: int) -> int:
         """
         Resolve deterministic worker count for optional CPU-parallel scoring.
@@ -513,6 +615,30 @@ class BacktestStagedRunnerV1:
             return min(self._parallel_workers, total_tasks)
         detected = os.cpu_count() or 1
         return min(max(detected, 1), total_tasks)
+
+
+def _details_scorer(
+    *,
+    scorer: BacktestStagedVariantScorer,
+) -> BacktestStagedVariantScorerWithDetails | None:
+    """
+    Resolve optional details extension from scorer without breaking base scorer contract.
+
+    Args:
+        scorer: Base Stage A/Stage B scorer port.
+    Returns:
+        BacktestStagedVariantScorerWithDetails | None:
+            Scorer cast to details extension when available.
+    Assumptions:
+        Scorer extension is detected by method presence and validated by static typing.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if getattr(scorer, "score_variant_with_details", None) is None:
+        return None
+    return cast(BacktestStagedVariantScorerWithDetails, scorer)
 
 
 def _extract_total_return_pct(*, metrics: Mapping[str, float]) -> float:
