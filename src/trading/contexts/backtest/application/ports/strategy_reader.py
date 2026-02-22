@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from types import MappingProxyType
+from typing import Any, Mapping, Protocol
 from uuid import UUID
 
-from trading.contexts.backtest.application.dto import BacktestRiskGridSpec
+from trading.contexts.backtest.application.dto import BacktestRequestScalar, BacktestRiskGridSpec
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 from trading.shared_kernel.primitives import InstrumentId, Timeframe, UserId
@@ -33,6 +34,11 @@ class BacktestStrategySnapshot:
     indicator_selections: tuple[IndicatorVariantSelection, ...]
     signal_grids: dict[str, dict[str, GridParamSpec]] | None = None
     risk_grid: BacktestRiskGridSpec | None = None
+    direction_mode: str = "long-short"
+    sizing_mode: str = "all_in"
+    risk_params: Mapping[str, BacktestRequestScalar] | None = None
+    execution_params: Mapping[str, BacktestRequestScalar] | None = None
+    spec_payload: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """
@@ -59,6 +65,22 @@ class BacktestStrategySnapshot:
             raise ValueError("BacktestStrategySnapshot.indicator_grids must be non-empty")
         if len(self.indicator_selections) == 0:
             raise ValueError("BacktestStrategySnapshot.indicator_selections must be non-empty")
+
+        object.__setattr__(
+            self,
+            "risk_params",
+            MappingProxyType(_normalize_scalar_mapping(values=self.risk_params)),
+        )
+        object.__setattr__(
+            self,
+            "execution_params",
+            MappingProxyType(_normalize_scalar_mapping(values=self.execution_params)),
+        )
+        object.__setattr__(
+            self,
+            "spec_payload",
+            MappingProxyType(_normalize_object_mapping(values=self.spec_payload)),
+        )
 
 
 class BacktestStrategyReader(Protocol):
@@ -90,3 +112,60 @@ class BacktestStrategyReader(Protocol):
             Reads saved strategy from outbound storage.
         """
         ...
+
+
+def _normalize_scalar_mapping(
+    *,
+    values: Mapping[str, BacktestRequestScalar] | None,
+) -> dict[str, BacktestRequestScalar]:
+    """
+    Normalize optional scalar mapping into deterministic key-sorted plain dictionary.
+
+    Args:
+        values: Optional scalar payload mapping.
+    Returns:
+        dict[str, BacktestRequestScalar]: Deterministic normalized mapping.
+    Assumptions:
+        Values are JSON-compatible scalars consumed by template mapping layer.
+    Raises:
+        ValueError: If one key is blank after normalization.
+    Side Effects:
+        None.
+    """
+    if values is None:
+        return {}
+
+    normalized: dict[str, BacktestRequestScalar] = {}
+    for raw_key in sorted(values.keys()):
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError("BacktestStrategySnapshot scalar mapping keys must be non-empty")
+        normalized[key] = values[raw_key]
+    return normalized
+
+
+def _normalize_object_mapping(*, values: Mapping[str, Any] | None) -> dict[str, Any]:
+    """
+    Normalize optional object mapping into deterministic key-sorted plain dictionary.
+
+    Args:
+        values: Optional mapping payload.
+    Returns:
+        dict[str, Any]: Deterministic normalized mapping.
+    Assumptions:
+        Payload is used for reproducibility-hash source in API layer.
+    Raises:
+        ValueError: If one key is blank after normalization.
+    Side Effects:
+        None.
+    """
+    if values is None:
+        return {}
+
+    normalized: dict[str, Any] = {}
+    for raw_key in sorted(values.keys()):
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError("BacktestStrategySnapshot object mapping keys must be non-empty")
+        normalized[key] = values[raw_key]
+    return normalized

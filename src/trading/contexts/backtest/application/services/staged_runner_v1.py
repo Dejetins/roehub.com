@@ -7,6 +7,7 @@ from typing import Mapping, cast
 
 from trading.contexts.backtest.application.dto import (
     BacktestReportV1,
+    BacktestVariantPayloadV1,
     BacktestVariantPreview,
     RunBacktestTemplate,
 )
@@ -24,6 +25,8 @@ from trading.contexts.backtest.application.services.grid_builder_v1 import (
 )
 from trading.contexts.backtest.domain.value_objects import (
     BacktestVariantScalar,
+    ExecutionParamsV1,
+    RiskParamsV1,
     build_backtest_variant_key_v1,
 )
 from trading.contexts.indicators.application.dto import CandleArrays, IndicatorVariantSelection
@@ -144,6 +147,25 @@ class _StageBTask:
     risk_params: Mapping[str, BacktestVariantScalar]
 
 
+@dataclass(frozen=True, slots=True)
+class _TopVariantPayloadContext:
+    """
+    Internal deterministic payload context for top-ranked Stage-B variants.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/dto/backtests.py
+    """
+
+    reports_by_variant_key: Mapping[str, BacktestReportV1]
+    execution_params_by_variant_key: Mapping[str, Mapping[str, BacktestVariantScalar]]
+    risk_params_by_variant_key: Mapping[str, Mapping[str, BacktestVariantScalar]]
+
+
 class BacktestStagedRunnerV1:
     """
     Run deterministic staged pipeline (Stage A shortlist -> Stage B expand -> top-K).
@@ -261,7 +283,7 @@ class BacktestStagedRunnerV1:
             scorer=scorer,
         )
         top_rows = stage_b_rows[: min(top_k, len(stage_b_rows))]
-        reports_by_variant_key = self._build_top_reports(
+        top_payload_context = self._build_top_reports(
             requested_time_range=requested_time_range,
             top_rows=top_rows,
             stage_b_tasks=stage_b_tasks,
@@ -269,16 +291,38 @@ class BacktestStagedRunnerV1:
             scorer=scorer,
             top_trades_n=top_trades_n,
         )
-        variants = tuple(
-            BacktestVariantPreview(
-                variant_index=row.variant_index,
-                variant_key=row.variant_key,
-                indicator_variant_key=row.indicator_variant_key,
-                total_return_pct=row.total_return_pct,
-                report=reports_by_variant_key.get(row.variant_key),
+        variants_list: list[BacktestVariantPreview] = []
+        for row in top_rows:
+            task = stage_b_tasks.get(row.variant_key)
+            if task is None:
+                raise ValueError("missing Stage B task for top-row variant_key")
+
+            execution_params = top_payload_context.execution_params_by_variant_key.get(
+                row.variant_key,
+                template.execution_params or {},
             )
-            for row in top_rows
-        )
+            risk_params = top_payload_context.risk_params_by_variant_key.get(
+                row.variant_key,
+                task.risk_params,
+            )
+            variants_list.append(
+                BacktestVariantPreview(
+                    variant_index=row.variant_index,
+                    variant_key=row.variant_key,
+                    indicator_variant_key=row.indicator_variant_key,
+                    total_return_pct=row.total_return_pct,
+                    payload=BacktestVariantPayloadV1(
+                        indicator_selections=task.indicator_selections,
+                        signal_params=task.signal_params,
+                        risk_params=risk_params,
+                        execution_params=execution_params,
+                        direction_mode=template.direction_mode,
+                        sizing_mode=template.sizing_mode,
+                    ),
+                    report=top_payload_context.reports_by_variant_key.get(row.variant_key),
+                )
+            )
+        variants = tuple(variants_list)
         return BacktestStagedRunResultV1(
             variants=variants,
             stage_a_variants_total=grid_context.stage_a_variants_total,
@@ -538,7 +582,7 @@ class BacktestStagedRunnerV1:
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
         top_trades_n: int,
-    ) -> Mapping[str, BacktestReportV1]:
+    ) -> _TopVariantPayloadContext:
         """
         Build deterministic EPIC-06 report payloads for selected Stage-B top-k variants.
 
@@ -550,7 +594,7 @@ class BacktestStagedRunnerV1:
             scorer: Stage scorer port optionally supporting details extension.
             top_trades_n: Number of best variants to include full trades list for.
         Returns:
-            Mapping[str, BacktestReportV1]: Variant-key to reporting payload mapping.
+            _TopVariantPayloadContext: Report and effective execution/risk payload maps.
         Assumptions:
             Ranking order in `top_rows` is deterministic and already final.
         Raises:
@@ -559,12 +603,22 @@ class BacktestStagedRunnerV1:
             Re-scores top variants through details extension when supported by scorer.
         """
         if requested_time_range is None:
-            return {}
+            return _TopVariantPayloadContext(
+                reports_by_variant_key={},
+                execution_params_by_variant_key={},
+                risk_params_by_variant_key={},
+            )
         details_scorer = _details_scorer(scorer=scorer)
         if details_scorer is None:
-            return {}
+            return _TopVariantPayloadContext(
+                reports_by_variant_key={},
+                execution_params_by_variant_key={},
+                risk_params_by_variant_key={},
+            )
 
         reports_by_variant_key: dict[str, BacktestReportV1] = {}
+        execution_params_by_variant_key: dict[str, Mapping[str, BacktestVariantScalar]] = {}
+        risk_params_by_variant_key: dict[str, Mapping[str, BacktestVariantScalar]] = {}
         for ranked_index, row in enumerate(top_rows):
             task = stage_b_tasks.get(row.variant_key)
             if task is None:
@@ -592,7 +646,17 @@ class BacktestStagedRunnerV1:
                 include_table_md=True,
                 include_trades=ranked_index < top_trades_n,
             )
-        return reports_by_variant_key
+            execution_params_by_variant_key[row.variant_key] = _execution_params_to_mapping(
+                params=details.execution_params
+            )
+            risk_params_by_variant_key[row.variant_key] = _risk_params_to_mapping(
+                params=details.risk_params
+            )
+        return _TopVariantPayloadContext(
+            reports_by_variant_key=reports_by_variant_key,
+            execution_params_by_variant_key=execution_params_by_variant_key,
+            risk_params_by_variant_key=risk_params_by_variant_key,
+        )
 
     def _resolve_parallel_workers(self, *, total_tasks: int) -> int:
         """
@@ -662,6 +726,58 @@ def _extract_total_return_pct(*, metrics: Mapping[str, float]) -> float:
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError(f"metric '{TOTAL_RETURN_METRIC_LITERAL}' must be numeric")
     return float(value)
+
+
+def _execution_params_to_mapping(
+    *,
+    params: ExecutionParamsV1,
+) -> Mapping[str, BacktestVariantScalar]:
+    """
+    Convert execution params value-object into deterministic scalar mapping payload.
+
+    Args:
+        params: Effective execution params value object from scorer details payload.
+    Returns:
+        Mapping[str, BacktestVariantScalar]: Deterministic execution scalar mapping.
+    Assumptions:
+        Params object already passed value-object validation invariants.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return {
+        "direction_mode": params.direction_mode,
+        "sizing_mode": params.sizing_mode,
+        "init_cash_quote": float(params.init_cash_quote),
+        "fixed_quote": float(params.fixed_quote),
+        "safe_profit_percent": float(params.safe_profit_percent),
+        "fee_pct": float(params.fee_pct),
+        "slippage_pct": float(params.slippage_pct),
+    }
+
+
+def _risk_params_to_mapping(*, params: RiskParamsV1) -> Mapping[str, BacktestVariantScalar]:
+    """
+    Convert risk params value-object into deterministic scalar mapping payload.
+
+    Args:
+        params: Effective risk params value object from scorer details payload.
+    Returns:
+        Mapping[str, BacktestVariantScalar]: Deterministic risk scalar mapping.
+    Assumptions:
+        Params object already passed value-object validation invariants.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return {
+        "sl_enabled": bool(params.sl_enabled),
+        "sl_pct": float(params.sl_pct) if params.sl_pct is not None else None,
+        "tp_enabled": bool(params.tp_enabled),
+        "tp_pct": float(params.tp_pct) if params.tp_pct is not None else None,
+    }
 
 
 __all__ = [

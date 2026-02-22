@@ -3,9 +3,11 @@ from .dto import (
     BacktestReportV1,
     BacktestRequestScalar,
     BacktestRiskGridSpec,
+    BacktestVariantPayloadV1,
     BacktestVariantPreview,
     RunBacktestRequest,
     RunBacktestResponse,
+    RunBacktestSavedOverrides,
     RunBacktestTemplate,
 )
 from .ports import (
@@ -75,6 +77,7 @@ __all__ = [
     "BacktestRiskGridSpec",
     "BacktestRiskVariantV1",
     "BacktestRequestScalar",
+    "BacktestVariantPayloadV1",
     "BacktestSignalParamsMap",
     "BacktestStagedVariantScorerWithDetails",
     "BacktestVariantScoreDetailsV1",
@@ -101,6 +104,7 @@ __all__ = [
     "CurrentUser",
     "RunBacktestRequest",
     "RunBacktestResponse",
+    "RunBacktestSavedOverrides",
     "RunBacktestTemplate",
     "RunBacktestUseCase",
     "compute_target_slice_by_bar_close_ts",

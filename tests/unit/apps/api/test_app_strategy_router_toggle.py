@@ -82,6 +82,7 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
     identity_router = _build_ping_router(path="/identity/ping")
     strategy_router = _build_ping_router(path="/strategies/ping")
     indicators_router = _build_ping_router(path="/indicators/ping")
+    backtests_router = _build_ping_router(path="/backtests/ping")
 
     monkeypatch.setattr(app_module, "build_indicators_registry", lambda *, environ: object())
     monkeypatch.setattr(
@@ -129,6 +130,11 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
         "build_strategy_router",
         lambda *, environ, current_user_dependency: strategy_router,
     )
+    monkeypatch.setattr(
+        app_module,
+        "build_backtest_router",
+        lambda *, environ, current_user_dependency, indicator_compute: backtests_router,
+    )
 
 
 def test_create_app_includes_strategy_router_when_enabled(monkeypatch) -> None:
@@ -161,6 +167,7 @@ def test_create_app_includes_strategy_router_when_enabled(monkeypatch) -> None:
     }
 
     assert "/strategies/ping" in paths
+    assert "/backtests/ping" in paths
 
 
 def test_create_app_skips_strategy_router_when_disabled(monkeypatch) -> None:
@@ -195,3 +202,4 @@ def test_create_app_skips_strategy_router_when_disabled(monkeypatch) -> None:
     assert "/strategies/ping" not in paths
     assert "/identity/ping" in paths
     assert "/indicators/ping" in paths
+    assert "/backtests/ping" in paths

@@ -3,9 +3,11 @@ from .run_backtest import (
     BacktestReportV1,
     BacktestRequestScalar,
     BacktestRiskGridSpec,
+    BacktestVariantPayloadV1,
     BacktestVariantPreview,
     RunBacktestRequest,
     RunBacktestResponse,
+    RunBacktestSavedOverrides,
     RunBacktestTemplate,
 )
 
@@ -14,8 +16,10 @@ __all__ = [
     "BacktestMetricRowV1",
     "BacktestReportV1",
     "BacktestRequestScalar",
+    "BacktestVariantPayloadV1",
     "BacktestVariantPreview",
     "RunBacktestRequest",
     "RunBacktestResponse",
+    "RunBacktestSavedOverrides",
     "RunBacktestTemplate",
 ]

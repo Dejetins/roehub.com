@@ -12,6 +12,7 @@ from trading.shared_kernel.primitives import InstrumentId, Timeframe, TimeRange
 
 BacktestRequestScalar = int | float | str | bool | None
 BacktestSignalGridMap = Mapping[str, Mapping[str, GridParamSpec]]
+BacktestSignalScalarMap = Mapping[str, Mapping[str, BacktestRequestScalar]]
 _ALLOWED_DIRECTION_MODES = {"long-only", "short-only", "long-short"}
 _ALLOWED_SIZING_MODES = {
     "all_in",
@@ -150,6 +151,77 @@ class RunBacktestTemplate:
 
 
 @dataclass(frozen=True, slots=True)
+class RunBacktestSavedOverrides:
+    """
+    Optional saved-mode override payload applied over loaded strategy snapshot template.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/ports/strategy_reader.py
+      - apps/api/dto/backtests.py
+    """
+
+    direction_mode: str | None = None
+    sizing_mode: str | None = None
+    signal_grids: BacktestSignalGridMap | None = None
+    risk_grid: BacktestRiskGridSpec | None = None
+    risk_params: Mapping[str, BacktestRequestScalar] | None = None
+    execution_params: Mapping[str, BacktestRequestScalar] | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate optional saved-mode overrides and normalize nested payload mappings.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Missing fields keep loaded saved-strategy values unchanged.
+        Raises:
+            ValueError: If provided mode literal is unsupported.
+        Side Effects:
+            Freezes mapping fields into deterministic immutable mapping proxies.
+        """
+        if self.direction_mode is not None:
+            normalized_direction_mode = self.direction_mode.strip().lower()
+            object.__setattr__(self, "direction_mode", normalized_direction_mode)
+            if normalized_direction_mode not in _ALLOWED_DIRECTION_MODES:
+                raise ValueError(
+                    "RunBacktestSavedOverrides.direction_mode must be one of: "
+                    f"{sorted(_ALLOWED_DIRECTION_MODES)}"
+                )
+
+        if self.sizing_mode is not None:
+            normalized_sizing_mode = self.sizing_mode.strip().lower()
+            object.__setattr__(self, "sizing_mode", normalized_sizing_mode)
+            if normalized_sizing_mode not in _ALLOWED_SIZING_MODES:
+                raise ValueError(
+                    "RunBacktestSavedOverrides.sizing_mode must be one of: "
+                    f"{sorted(_ALLOWED_SIZING_MODES)}"
+                )
+
+        object.__setattr__(
+            self,
+            "signal_grids",
+            MappingProxyType(_normalize_signal_grid_mapping(values=self.signal_grids)),
+        )
+        object.__setattr__(
+            self,
+            "risk_params",
+            MappingProxyType(_normalize_scalar_mapping(values=self.risk_params)),
+        )
+        object.__setattr__(
+            self,
+            "execution_params",
+            MappingProxyType(_normalize_scalar_mapping(values=self.execution_params)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RunBacktestRequest:
     """
     Backtest use-case request supporting both `saved` and `template` modes.
@@ -166,9 +238,11 @@ class RunBacktestRequest:
     time_range: TimeRange
     strategy_id: UUID | None = None
     template: RunBacktestTemplate | None = None
+    overrides: RunBacktestSavedOverrides | None = None
     warmup_bars: int | None = None
     top_k: int | None = None
     preselect: int | None = None
+    top_trades_n: int | None = None
 
     def __post_init__(self) -> None:
         """
@@ -194,10 +268,15 @@ class RunBacktestRequest:
             raise ValueError(
                 "RunBacktestRequest requires exactly one mode: strategy_id xor template"
             )
+        if self.overrides is not None and not has_saved_mode:
+            raise ValueError(
+                "RunBacktestRequest.overrides is allowed only in saved mode"
+            )
 
         _validate_positive_optional_int(name="warmup_bars", value=self.warmup_bars)
         _validate_positive_optional_int(name="top_k", value=self.top_k)
         _validate_positive_optional_int(name="preselect", value=self.preselect)
+        _validate_positive_optional_int(name="top_trades_n", value=self.top_trades_n)
 
     @property
     def mode(self) -> str:
@@ -311,6 +390,78 @@ class BacktestReportV1:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestVariantPayloadV1:
+    """
+    Explicit deterministic variant payload required for saveable API response contract.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/roadmap/base_milestone_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/dto/backtests.py
+    """
+
+    indicator_selections: tuple[IndicatorVariantSelection, ...]
+    signal_params: BacktestSignalScalarMap | None = None
+    risk_params: Mapping[str, BacktestRequestScalar] | None = None
+    execution_params: Mapping[str, BacktestRequestScalar] | None = None
+    direction_mode: str = "long-short"
+    sizing_mode: str = "all_in"
+
+    def __post_init__(self) -> None:
+        """
+        Validate payload fields and freeze nested mappings into deterministic forms.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Payload is assembled from Stage-B deterministic variant task data.
+        Raises:
+            ValueError: If one mode literal is unsupported.
+        Side Effects:
+            Normalizes mode literals and replaces mapping payloads with immutable proxies.
+        """
+        if len(self.indicator_selections) == 0:
+            raise ValueError("BacktestVariantPayloadV1.indicator_selections must be non-empty")
+
+        normalized_direction_mode = self.direction_mode.strip().lower()
+        object.__setattr__(self, "direction_mode", normalized_direction_mode)
+        if normalized_direction_mode not in _ALLOWED_DIRECTION_MODES:
+            raise ValueError(
+                "BacktestVariantPayloadV1.direction_mode must be one of: "
+                f"{sorted(_ALLOWED_DIRECTION_MODES)}"
+            )
+
+        normalized_sizing_mode = self.sizing_mode.strip().lower()
+        object.__setattr__(self, "sizing_mode", normalized_sizing_mode)
+        if normalized_sizing_mode not in _ALLOWED_SIZING_MODES:
+            raise ValueError(
+                "BacktestVariantPayloadV1.sizing_mode must be one of: "
+                f"{sorted(_ALLOWED_SIZING_MODES)}"
+            )
+
+        object.__setattr__(
+            self,
+            "signal_params",
+            MappingProxyType(_normalize_nested_scalar_mapping(values=self.signal_params)),
+        )
+        object.__setattr__(
+            self,
+            "risk_params",
+            MappingProxyType(_normalize_scalar_mapping(values=self.risk_params)),
+        )
+        object.__setattr__(
+            self,
+            "execution_params",
+            MappingProxyType(_normalize_scalar_mapping(values=self.execution_params)),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestVariantPreview:
     """
     One deterministic variant preview identity returned by skeleton use-case.
@@ -328,6 +479,7 @@ class BacktestVariantPreview:
     variant_key: str
     indicator_variant_key: str
     total_return_pct: float = 0.0
+    payload: BacktestVariantPayloadV1 | None = None
     report: BacktestReportV1 | None = None
 
     def __post_init__(self) -> None:
@@ -365,6 +517,9 @@ class BacktestVariantPreview:
             raise ValueError("BacktestVariantPreview.total_return_pct must be numeric")
         object.__setattr__(self, "total_return_pct", float(self.total_return_pct))
 
+        if self.payload is None:  # pragma: no cover - guarded by staged runner payload assembly
+            raise ValueError("BacktestVariantPreview.payload is required")
+
 
 @dataclass(frozen=True, slots=True)
 class RunBacktestResponse:
@@ -387,6 +542,7 @@ class RunBacktestResponse:
     warmup_bars: int
     top_k: int
     preselect: int
+    top_trades_n: int
     variants: tuple[BacktestVariantPreview, ...]
     total_indicator_compute_calls: int
 
@@ -421,6 +577,10 @@ class RunBacktestResponse:
             raise ValueError("RunBacktestResponse.top_k must be > 0")
         if self.preselect <= 0:
             raise ValueError("RunBacktestResponse.preselect must be > 0")
+        if self.top_trades_n <= 0:
+            raise ValueError("RunBacktestResponse.top_trades_n must be > 0")
+        if self.top_trades_n > self.top_k:
+            raise ValueError("RunBacktestResponse.top_trades_n must be <= top_k")
         if self.total_indicator_compute_calls < 0:
             raise ValueError("RunBacktestResponse.total_indicator_compute_calls must be >= 0")
 
@@ -538,4 +698,36 @@ def _normalize_signal_grid_mapping(
                 )
             signal_axis_map[param_name] = signal_axes[raw_param_name]
         normalized[indicator_id] = MappingProxyType(signal_axis_map)
+    return normalized
+
+
+def _normalize_nested_scalar_mapping(
+    *,
+    values: BacktestSignalScalarMap | None,
+) -> dict[str, Mapping[str, BacktestRequestScalar]]:
+    """
+    Normalize nested scalar mapping with deterministic lowercase key ordering.
+
+    Args:
+        values: Optional `indicator_id -> parameter -> scalar` payload mapping.
+    Returns:
+        dict[str, Mapping[str, BacktestRequestScalar]]: Deterministic normalized nested mapping.
+    Assumptions:
+        Scalar payload values are JSON-compatible by API/use-case contracts.
+    Raises:
+        ValueError: If one indicator id or nested parameter key is blank.
+    Side Effects:
+        None.
+    """
+    if values is None:
+        return {}
+
+    normalized: dict[str, Mapping[str, BacktestRequestScalar]] = {}
+    for raw_indicator_id in sorted(values.keys(), key=lambda key: str(key).strip().lower()):
+        indicator_id = str(raw_indicator_id).strip().lower()
+        if not indicator_id:
+            raise ValueError("nested scalar mapping indicator_id keys must be non-empty")
+        normalized[indicator_id] = MappingProxyType(
+            _normalize_scalar_mapping(values=values[raw_indicator_id])
+        )
     return normalized

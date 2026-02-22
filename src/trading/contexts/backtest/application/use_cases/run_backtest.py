@@ -8,6 +8,7 @@ from uuid import UUID
 from trading.contexts.backtest.application.dto import (
     RunBacktestRequest,
     RunBacktestResponse,
+    RunBacktestSavedOverrides,
     RunBacktestTemplate,
 )
 from trading.contexts.backtest.application.ports import (
@@ -34,6 +35,7 @@ from trading.contexts.indicators.application.services.grid_builder import (
     MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     MAX_VARIANTS_PER_COMPUTE_DEFAULT,
 )
+from trading.contexts.indicators.domain.specifications import GridParamSpec
 from trading.platform.errors import RoehubError
 
 _DEFAULT_FEE_PCT_BY_MARKET_ID = {
@@ -63,6 +65,7 @@ class _ResolvedRunContext:
     warmup_bars: int
     top_k: int
     preselect: int
+    top_trades_n: int
 
 
 class RunBacktestUseCase:
@@ -253,7 +256,7 @@ class RunBacktestUseCase:
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
                 requested_time_range=request.time_range,
-                top_trades_n=self._top_trades_n_default,
+                top_trades_n=resolved.top_trades_n,
             )
 
             return RunBacktestResponse(
@@ -264,6 +267,7 @@ class RunBacktestUseCase:
                 warmup_bars=resolved.warmup_bars,
                 top_k=resolved.top_k,
                 preselect=resolved.preselect,
+                top_trades_n=resolved.top_trades_n,
                 variants=staged.variants,
                 total_indicator_compute_calls=staged.indicator_estimate_calls,
             )
@@ -307,13 +311,25 @@ class RunBacktestUseCase:
             value=request.preselect,
             default=self._preselect_default,
         )
+        top_trades_n = self._resolve_with_default(
+            value=request.top_trades_n,
+            default=self._top_trades_n_default,
+        )
+        if request.top_trades_n is not None and top_trades_n > top_k:
+            raise BacktestValidationError("Backtest request top_trades_n must be <= top_k")
+        if top_trades_n > top_k:
+            top_trades_n = top_k
 
         if request.strategy_id is not None:
             snapshot = self._strategy_reader.load_any(strategy_id=request.strategy_id)
-            template = self._template_from_snapshot(
+            base_template = self._template_from_snapshot(
                 strategy_id=request.strategy_id,
                 snapshot=snapshot,
                 current_user=current_user,
+            )
+            template = self._apply_saved_overrides(
+                base_template=base_template,
+                overrides=request.overrides,
             )
             return _ResolvedRunContext(
                 mode="saved",
@@ -322,6 +338,7 @@ class RunBacktestUseCase:
                 warmup_bars=warmup_bars,
                 top_k=top_k,
                 preselect=preselect,
+                top_trades_n=top_trades_n,
             )
 
         if request.template is None:  # pragma: no cover - guarded by request DTO invariant
@@ -336,6 +353,7 @@ class RunBacktestUseCase:
             warmup_bars=warmup_bars,
             top_k=top_k,
             preselect=preselect,
+            top_trades_n=top_trades_n,
         )
 
     def _template_from_snapshot(
@@ -374,6 +392,75 @@ class RunBacktestUseCase:
             indicator_selections=snapshot.indicator_selections,
             signal_grids=snapshot.signal_grids,
             risk_grid=snapshot.risk_grid,
+            direction_mode=snapshot.direction_mode,
+            sizing_mode=snapshot.sizing_mode,
+            risk_params=snapshot.risk_params,
+            execution_params=snapshot.execution_params,
+        )
+
+    def _apply_saved_overrides(
+        self,
+        *,
+        base_template: RunBacktestTemplate,
+        overrides: RunBacktestSavedOverrides | None,
+    ) -> RunBacktestTemplate:
+        """
+        Merge optional saved-mode overrides over loaded snapshot template deterministically.
+
+        Args:
+            base_template: Template resolved from saved strategy snapshot.
+            overrides: Optional saved-mode overrides from request payload.
+        Returns:
+            RunBacktestTemplate: Effective template used for staged run execution.
+        Assumptions:
+            Ownership/deletion checks already passed before this merge step.
+        Raises:
+            ValueError: Propagated from template/override value-object validation.
+        Side Effects:
+            None.
+        """
+        if overrides is None:
+            return base_template
+
+        direction_mode = (
+            overrides.direction_mode
+            if overrides.direction_mode is not None
+            else base_template.direction_mode
+        )
+        sizing_mode = (
+            overrides.sizing_mode
+            if overrides.sizing_mode is not None
+            else base_template.sizing_mode
+        )
+        signal_grids = _merge_signal_grids(
+            base=base_template.signal_grids or {},
+            updates=overrides.signal_grids or {},
+        )
+        risk_params = _merge_scalar_mappings(
+            base=base_template.risk_params or {},
+            updates=overrides.risk_params or {},
+        )
+        execution_params = _merge_scalar_mappings(
+            base=base_template.execution_params or {},
+            updates=overrides.execution_params or {},
+        )
+        risk_grid = (
+            overrides.risk_grid
+            if overrides.risk_grid is not None
+            else base_template.risk_grid
+        )
+
+        return RunBacktestTemplate(
+            instrument_id=base_template.instrument_id,
+            timeframe=base_template.timeframe,
+            indicator_grids=base_template.indicator_grids,
+            indicator_selections=base_template.indicator_selections,
+            signal_grids=signal_grids,
+            risk_grid=risk_grid,
+            direction_mode=direction_mode,
+            sizing_mode=sizing_mode,
+            risk_params=risk_params,
+            execution_params=execution_params,
         )
 
     def _resolve_with_default(self, *, value: int | None, default: int) -> int:
@@ -436,6 +523,86 @@ class RunBacktestUseCase:
             fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
             max_variants_guard=self._max_variants_per_compute,
         )
+
+
+def _merge_scalar_mappings(
+    *,
+    base: Mapping[str, int | float | str | bool | None],
+    updates: Mapping[str, int | float | str | bool | None],
+) -> Mapping[str, int | float | str | bool | None]:
+    """
+    Merge scalar mappings deterministically with update precedence and sorted keys.
+
+    Args:
+        base: Base scalar payload mapping.
+        updates: Override scalar payload mapping.
+    Returns:
+        Mapping[str, int | float | str | bool | None]: Immutable merged scalar mapping.
+    Assumptions:
+        Input mappings use non-empty string keys and JSON-compatible scalar values.
+    Raises:
+        ValueError: If one key is blank after normalization.
+    Side Effects:
+        None.
+    """
+    merged: dict[str, int | float | str | bool | None] = {}
+    for raw_key in sorted(base.keys(), key=lambda key: str(key).strip()):
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError("saved-mode scalar override key must be non-empty")
+        merged[key] = base[raw_key]
+    for raw_key in sorted(updates.keys(), key=lambda key: str(key).strip()):
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError("saved-mode scalar override key must be non-empty")
+        merged[key] = updates[raw_key]
+    return MappingProxyType(merged)
+
+
+def _merge_signal_grids(
+    *,
+    base: Mapping[str, Mapping[str, GridParamSpec]],
+    updates: Mapping[str, Mapping[str, GridParamSpec]],
+) -> Mapping[str, Mapping[str, GridParamSpec]]:
+    """
+    Merge nested signal-grid mappings deterministically by indicator id and param key.
+
+    Args:
+        base: Base signal-grid mapping loaded from saved strategy snapshot.
+        updates: Saved-mode signal-grid overrides from request payload.
+    Returns:
+        Mapping[str, Mapping[str, object]]: Immutable merged nested mapping.
+    Assumptions:
+        Values are GridParamSpec-compatible objects validated by template DTO.
+    Raises:
+        ValueError: If one indicator id or param key is blank.
+    Side Effects:
+        None.
+    """
+    merged: dict[str, Mapping[str, GridParamSpec]] = {}
+    indicator_ids = set(base.keys()) | set(updates.keys())
+    for raw_indicator_id in sorted(indicator_ids, key=lambda key: str(key).strip().lower()):
+        indicator_id = str(raw_indicator_id).strip().lower()
+        if not indicator_id:
+            raise ValueError("saved-mode signal override indicator_id must be non-empty")
+        merged_params: dict[str, GridParamSpec] = {}
+        base_params = base.get(raw_indicator_id, {})
+        updates_params = updates.get(raw_indicator_id, {})
+        for raw_param_name in sorted(base_params.keys(), key=lambda key: str(key).strip().lower()):
+            param_name = str(raw_param_name).strip().lower()
+            if not param_name:
+                raise ValueError("saved-mode signal override param key must be non-empty")
+            merged_params[param_name] = base_params[raw_param_name]
+        for raw_param_name in sorted(
+            updates_params.keys(),
+            key=lambda key: str(key).strip().lower(),
+        ):
+            param_name = str(raw_param_name).strip().lower()
+            if not param_name:
+                raise ValueError("saved-mode signal override param key must be non-empty")
+            merged_params[param_name] = updates_params[raw_param_name]
+        merged[indicator_id] = MappingProxyType(merged_params)
+    return MappingProxyType(merged)
 
 
 def _normalize_fee_defaults(
