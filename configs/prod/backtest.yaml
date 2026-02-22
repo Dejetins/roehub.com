@@ -3,6 +3,16 @@ backtest:
   warmup_bars_default: 200
   top_k_default: 300
   preselect_default: 20000
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1.0
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    snapshot_seconds: 30
+    snapshot_variants_step: 1000
+    parallel_workers: 1
   reporting:
     top_trades_n_default: 3
   execution:

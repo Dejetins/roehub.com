@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
+from uuid import UUID
 
 import yaml
 
@@ -136,13 +140,73 @@ class BacktestReportingRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestJobsRuntimeConfig:
+    """
+    Runtime jobs settings loaded from strict required `backtest.jobs.*` YAML section.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/milestone-5-epics-v1.md
+    Related:
+      - configs/dev/backtest.yaml
+      - apps/worker/backtest_job_runner/main/main.py
+      - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
+    """
+
+    enabled: bool
+    top_k_persisted_default: int
+    max_active_jobs_per_user: int
+    claim_poll_seconds: float
+    lease_seconds: int
+    heartbeat_seconds: int
+    parallel_workers: int
+    snapshot_seconds: int | None = None
+    snapshot_variants_step: int | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate strict jobs runtime fields with fail-fast startup behavior.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Required keys are always present in YAML and validated by loader.
+        Raises:
+            ValueError: If one field violates deterministic bounds.
+        Side Effects:
+            None.
+        """
+        if self.top_k_persisted_default <= 0:
+            raise ValueError("backtest.jobs.top_k_persisted_default must be > 0")
+        if self.max_active_jobs_per_user <= 0:
+            raise ValueError("backtest.jobs.max_active_jobs_per_user must be > 0")
+        if self.claim_poll_seconds <= 0:
+            raise ValueError("backtest.jobs.claim_poll_seconds must be > 0")
+        if self.lease_seconds <= 0:
+            raise ValueError("backtest.jobs.lease_seconds must be > 0")
+        if self.heartbeat_seconds <= 0:
+            raise ValueError("backtest.jobs.heartbeat_seconds must be > 0")
+        if self.parallel_workers <= 0:
+            raise ValueError("backtest.jobs.parallel_workers must be > 0")
+
+        if self.snapshot_seconds is not None and self.snapshot_seconds <= 0:
+            raise ValueError("backtest.jobs.snapshot_seconds must be > 0 when provided")
+        if self.snapshot_variants_step is not None and self.snapshot_variants_step <= 0:
+            raise ValueError(
+                "backtest.jobs.snapshot_variants_step must be > 0 when provided"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestRuntimeConfig:
     """
     Backtest runtime config v1 loaded from `configs/<env>/backtest.yaml`.
 
     Docs:
       - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
-      - docs/architecture/roadmap/milestone-4-epics-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
     Related:
       - configs/dev/backtest.yaml
       - configs/test/backtest.yaml
@@ -150,6 +214,7 @@ class BacktestRuntimeConfig:
     """
 
     version: int
+    jobs: BacktestJobsRuntimeConfig
     warmup_bars_default: int = _WARMUP_BARS_DEFAULT
     top_k_default: int = _TOP_K_DEFAULT
     preselect_default: int = _PRESELECT_DEFAULT
@@ -187,6 +252,9 @@ class BacktestRuntimeConfig:
             raise ValueError("backtest.execution section must be configured")
         if self.reporting is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest.reporting section must be configured")
+        if self.jobs is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.jobs section must be configured")
+
 
 
 def resolve_backtest_config_path(
@@ -222,24 +290,25 @@ def resolve_backtest_config_path(
     return Path("configs") / env_name / "backtest.yaml"
 
 
+
 def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     """
     Load and validate source-of-truth Backtest runtime YAML configuration.
 
     Docs:
       - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
     Related:
       - configs/dev/backtest.yaml
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
-      - apps/api/wiring/modules
+      - apps/api/wiring/modules/backtest.py
 
     Args:
         path: Path to `backtest.yaml`.
     Returns:
         BacktestRuntimeConfig: Parsed validated config object.
     Assumptions:
-        Missing scalar keys fallback to documented defaults.
+        Missing non-jobs scalar keys fallback to documented defaults.
     Raises:
         FileNotFoundError: If path does not exist.
         ValueError: If YAML shape or values are invalid.
@@ -258,6 +327,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     backtest_map = _get_mapping(payload, "backtest", required=False)
     execution_map = _get_mapping(backtest_map, "execution", required=False)
     reporting_map = _get_mapping(backtest_map, "reporting", required=False)
+    jobs_map = _get_mapping(backtest_map, "jobs", required=True)
 
     warmup_bars_default = _get_int_with_default(
         backtest_map,
@@ -307,15 +377,84 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
             default=_TOP_TRADES_N_DEFAULT,
         ),
     )
+    jobs = BacktestJobsRuntimeConfig(
+        enabled=_get_bool(jobs_map, "enabled", required=True),
+        top_k_persisted_default=_get_int(jobs_map, "top_k_persisted_default", required=True),
+        max_active_jobs_per_user=_get_int(jobs_map, "max_active_jobs_per_user", required=True),
+        claim_poll_seconds=_get_float(jobs_map, "claim_poll_seconds", required=True),
+        lease_seconds=_get_int(jobs_map, "lease_seconds", required=True),
+        heartbeat_seconds=_get_int(jobs_map, "heartbeat_seconds", required=True),
+        parallel_workers=_get_int(jobs_map, "parallel_workers", required=True),
+        snapshot_seconds=_get_optional_int(jobs_map, "snapshot_seconds"),
+        snapshot_variants_step=_get_optional_int(jobs_map, "snapshot_variants_step"),
+    )
 
     return BacktestRuntimeConfig(
         version=version,
+        jobs=jobs,
         warmup_bars_default=warmup_bars_default,
         top_k_default=top_k_default,
         preselect_default=preselect_default,
         execution=execution,
         reporting=reporting,
     )
+
+
+
+def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
+    """
+    Build deterministic runtime hash from result-affecting Backtest runtime sections only.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - configs/dev/backtest.yaml
+      - apps/api/dto/backtests.py
+
+    Args:
+        config: Parsed runtime config object.
+    Returns:
+        str: Canonical SHA-256 hash string.
+    Assumptions:
+        Hash must include `backtest.jobs.top_k_persisted_default` and exclude operational knobs.
+    Raises:
+        TypeError: If payload normalization fails for unsupported node type.
+    Side Effects:
+        None.
+    """
+    payload = {
+        "backtest": {
+            "warmup_bars_default": config.warmup_bars_default,
+            "top_k_default": config.top_k_default,
+            "preselect_default": config.preselect_default,
+            "execution": {
+                "init_cash_quote_default": config.execution.init_cash_quote_default,
+                "fixed_quote_default": config.execution.fixed_quote_default,
+                "safe_profit_percent_default": config.execution.safe_profit_percent_default,
+                "slippage_pct_default": config.execution.slippage_pct_default,
+                "fee_pct_default_by_market_id": {
+                    str(market_id): config.execution.fee_pct_default_by_market_id[market_id]
+                    for market_id in sorted(config.execution.fee_pct_default_by_market_id.keys())
+                },
+            },
+            "reporting": {
+                "top_trades_n_default": config.reporting.top_trades_n_default,
+            },
+            "jobs": {
+                "top_k_persisted_default": config.jobs.top_k_persisted_default,
+            },
+        }
+    }
+    canonical_json = json.dumps(
+        _normalize_json_value(value=payload),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
 
 
 def _resolve_env_name(*, environ: Mapping[str, str]) -> str:
@@ -339,6 +478,7 @@ def _resolve_env_name(*, environ: Mapping[str, str]) -> str:
             f"{_ENV_NAME_KEY} must be one of {_ALLOWED_ENVS}, got {raw_env_name!r}"
         )
     return raw_env_name
+
 
 
 def _get_mapping(data: Mapping[str, Any], key: str, *, required: bool) -> Mapping[str, Any]:
@@ -368,6 +508,35 @@ def _get_mapping(data: Mapping[str, Any], key: str, *, required: bool) -> Mappin
     return value
 
 
+
+def _get_bool(data: Mapping[str, Any], key: str, *, required: bool) -> bool:
+    """
+    Read boolean value from payload.
+
+    Args:
+        data: Source mapping.
+        key: Boolean key name.
+        required: Whether key is mandatory.
+    Returns:
+        bool: Parsed boolean value.
+    Assumptions:
+        Bool type is strict and does not coerce integers.
+    Raises:
+        ValueError: If required key missing or value has invalid type.
+    Side Effects:
+        None.
+    """
+    value = data.get(key)
+    if value is None:
+        if required:
+            raise ValueError(f"missing required key: {key}")
+        return False
+    if not isinstance(value, bool):
+        raise ValueError(f"expected bool at key '{key}', got {type(value).__name__}")
+    return value
+
+
+
 def _get_int(data: Mapping[str, Any], key: str, *, required: bool) -> int:
     """
     Read integer value from payload while rejecting bools.
@@ -395,6 +564,29 @@ def _get_int(data: Mapping[str, Any], key: str, *, required: bool) -> int:
     return value
 
 
+
+def _get_optional_int(data: Mapping[str, Any], key: str) -> int | None:
+    """
+    Read optional integer value from payload while rejecting bools.
+
+    Args:
+        data: Source mapping.
+        key: Integer key name.
+    Returns:
+        int | None: Parsed integer value or `None` when key is absent.
+    Assumptions:
+        Optional field absence means no runtime override is configured.
+    Raises:
+        ValueError: If provided value type is invalid.
+    Side Effects:
+        None.
+    """
+    if key not in data:
+        return None
+    return _get_int(data, key, required=True)
+
+
+
 def _get_int_with_default(data: Mapping[str, Any], key: str, *, default: int) -> int:
     """
     Read optional integer with explicit fallback default.
@@ -415,6 +607,7 @@ def _get_int_with_default(data: Mapping[str, Any], key: str, *, default: int) ->
     if key not in data:
         return default
     return _get_int(data, key, required=True)
+
 
 
 def _get_float(data: Mapping[str, Any], key: str, *, required: bool) -> float:
@@ -444,6 +637,7 @@ def _get_float(data: Mapping[str, Any], key: str, *, required: bool) -> float:
     return float(value)
 
 
+
 def _get_float_with_default(data: Mapping[str, Any], key: str, *, default: float) -> float:
     """
     Read optional numeric value with explicit fallback default.
@@ -464,6 +658,7 @@ def _get_float_with_default(data: Mapping[str, Any], key: str, *, default: float
     if key not in data:
         return default
     return _get_float(data, key, required=True)
+
 
 
 def _parse_market_fee_defaults(*, data: Mapping[str, Any]) -> Mapping[int, float]:
@@ -503,10 +698,46 @@ def _parse_market_fee_defaults(*, data: Mapping[str, Any]) -> Mapping[int, float
     return MappingProxyType(normalized)
 
 
+
+def _normalize_json_value(*, value: Any) -> Any:
+    """
+    Normalize arbitrary payload node into deterministic JSON-serializable value.
+
+    Args:
+        value: Arbitrary payload node.
+    Returns:
+        Any: JSON-serializable normalized value.
+    Assumptions:
+        Mapping keys are converted to strings and sorted recursively.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, Mapping):
+        normalized: dict[str, Any] = {}
+        for raw_key in sorted(value.keys(), key=lambda key: str(key)):
+            normalized[str(raw_key)] = _normalize_json_value(value=value[raw_key])
+        return normalized
+
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [_normalize_json_value(value=item) for item in value]
+
+    if isinstance(value, datetime):
+        return value.isoformat()
+
+    if isinstance(value, UUID):
+        return str(value)
+
+    return value
+
+
 __all__ = [
     "BacktestExecutionRuntimeConfig",
+    "BacktestJobsRuntimeConfig",
     "BacktestReportingRuntimeConfig",
     "BacktestRuntimeConfig",
+    "build_backtest_runtime_config_hash",
     "load_backtest_runtime_config",
     "resolve_backtest_config_path",
 ]

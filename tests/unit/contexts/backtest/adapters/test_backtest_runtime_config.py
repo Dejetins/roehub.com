@@ -5,12 +5,27 @@ from pathlib import Path
 import pytest
 
 from trading.contexts.backtest.adapters.outbound.config import (
+    build_backtest_runtime_config_hash,
     load_backtest_runtime_config,
     resolve_backtest_config_path,
 )
 
+_DEFAULT_JOBS_BLOCK = """
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1.0
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    snapshot_seconds: 30
+    snapshot_variants_step: 1000
+    parallel_workers: 1
+""".rstrip()
 
-def _write_backtest_config(tmp_path: Path, *, body: str) -> Path:
+
+
+def _write_backtest_config(tmp_path: Path, *, body: str, filename: str = "backtest.yaml") -> Path:
     """
     Write temporary Backtest runtime YAML used by config-loader tests.
 
@@ -26,9 +41,10 @@ def _write_backtest_config(tmp_path: Path, *, body: str) -> Path:
     Side Effects:
         Creates one temp YAML file.
     """
-    config_path = tmp_path / "backtest.yaml"
+    config_path = tmp_path / filename
     config_path.write_text(body, encoding="utf-8")
     return config_path
+
 
 
 def test_load_backtest_runtime_config_reads_yaml_values() -> None:
@@ -40,7 +56,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     Returns:
         None.
     Assumptions:
-        Config schema follows BKT-EPIC-01 runtime contract.
+        Config schema follows BKT Milestone 5 runtime contract.
     Raises:
         AssertionError: If parsed values differ from YAML payload.
     Side Effects:
@@ -63,18 +79,30 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         3: 0.075,
         4: 0.1,
     }
+    assert config.jobs.enabled is True
+    assert config.jobs.top_k_persisted_default == 300
+    assert config.jobs.max_active_jobs_per_user == 3
+    assert config.jobs.claim_poll_seconds == 1.0
+    assert config.jobs.lease_seconds == 60
+    assert config.jobs.heartbeat_seconds == 15
+    assert config.jobs.snapshot_seconds == 30
+    assert config.jobs.snapshot_variants_step == 1000
+    assert config.jobs.parallel_workers == 1
 
 
-def test_load_backtest_runtime_config_uses_defaults_when_keys_absent(tmp_path: Path) -> None:
+
+def test_load_backtest_runtime_config_uses_defaults_when_optional_keys_absent(
+    tmp_path: Path,
+) -> None:
     """
-    Verify missing optional scalar keys fallback to documented defaults.
+    Verify optional non-jobs scalar keys fallback to documented defaults.
 
     Args:
         tmp_path: pytest temporary path fixture.
     Returns:
         None.
     Assumptions:
-        Only `version` is required at top level in current runtime schema.
+        `backtest.jobs.*` keys are strict-required and provided in fixture.
     Raises:
         AssertionError: If fallback defaults are not applied.
     Side Effects:
@@ -82,10 +110,13 @@ def test_load_backtest_runtime_config_uses_defaults_when_keys_absent(tmp_path: P
     """
     config_path = _write_backtest_config(
         tmp_path,
-        body="""
+        body=(
+            """
 version: 1
-backtest: {}
-""".strip(),
+backtest:
+"""
+            + _DEFAULT_JOBS_BLOCK
+        ).strip(),
     )
 
     config = load_backtest_runtime_config(config_path)
@@ -106,6 +137,70 @@ backtest: {}
     }
 
 
+
+def test_load_backtest_runtime_config_requires_jobs_section(tmp_path: Path) -> None:
+    """
+    Verify runtime loader fails fast when `backtest.jobs` section is absent.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Milestone 5 contract marks jobs section as strict-required.
+    Raises:
+        AssertionError: If missing jobs section does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest: {}
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="jobs"):
+        load_backtest_runtime_config(config_path)
+
+
+
+def test_load_backtest_runtime_config_requires_jobs_required_keys(tmp_path: Path) -> None:
+    """
+    Verify runtime loader fails fast for missing strict-required jobs key.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Required key list includes `backtest.jobs.top_k_persisted_default`.
+    Raises:
+        AssertionError: If missing required key does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  jobs:
+    enabled: true
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="top_k_persisted_default"):
+        load_backtest_runtime_config(config_path)
+
+
+
 def test_resolve_backtest_config_path_precedence() -> None:
     """
     Verify path resolution precedence is override env first, then env fallback.
@@ -117,7 +212,7 @@ def test_resolve_backtest_config_path_precedence() -> None:
     Assumptions:
         Fallback format is `configs/<ROEHUB_ENV>/backtest.yaml`.
     Raises:
-        AssertionError: If precedence order differs from BKT-EPIC-01 contract.
+        AssertionError: If precedence order differs from runtime contract.
     Side Effects:
         None.
     """
@@ -135,6 +230,7 @@ def test_resolve_backtest_config_path_precedence() -> None:
     )
 
     assert resolve_backtest_config_path(environ={}) == Path("configs/dev/backtest.yaml")
+
 
 
 def test_resolve_backtest_config_path_rejects_invalid_env_name() -> None:
@@ -156,18 +252,19 @@ def test_resolve_backtest_config_path_rejects_invalid_env_name() -> None:
         resolve_backtest_config_path(environ={"ROEHUB_ENV": "stage"})
 
 
+
 def test_load_backtest_runtime_config_reads_execution_overrides(tmp_path: Path) -> None:
     """
-    Verify loader parses explicit execution defaults with fail-fast validation semantics.
+    Verify loader parses explicit execution/jobs defaults with fail-fast semantics.
 
     Args:
         tmp_path: pytest temporary path fixture.
     Returns:
         None.
     Assumptions:
-        `backtest.execution` mapping follows v1 execution-engine runtime schema.
+        `backtest.execution` and `backtest.jobs` sections follow runtime schema.
     Raises:
-        AssertionError: If parsed execution values mismatch YAML payload.
+        AssertionError: If parsed values mismatch YAML payload.
     Side Effects:
         None.
     """
@@ -189,6 +286,16 @@ backtest:
     fee_pct_default_by_market_id:
       1: 0.05
       8: 0.2
+  jobs:
+    enabled: false
+    top_k_persisted_default: 42
+    max_active_jobs_per_user: 8
+    claim_poll_seconds: 0.5
+    lease_seconds: 120
+    heartbeat_seconds: 20
+    snapshot_seconds: 10
+    snapshot_variants_step: 200
+    parallel_workers: 4
 """.strip(),
     )
 
@@ -203,20 +310,30 @@ backtest:
     assert config.execution.safe_profit_percent_default == 15.0
     assert config.execution.slippage_pct_default == 0.05
     assert dict(config.execution.fee_pct_default_by_market_id) == {1: 0.05, 8: 0.2}
+    assert config.jobs.enabled is False
+    assert config.jobs.top_k_persisted_default == 42
+    assert config.jobs.max_active_jobs_per_user == 8
+    assert config.jobs.claim_poll_seconds == 0.5
+    assert config.jobs.lease_seconds == 120
+    assert config.jobs.heartbeat_seconds == 20
+    assert config.jobs.snapshot_seconds == 10
+    assert config.jobs.snapshot_variants_step == 200
+    assert config.jobs.parallel_workers == 4
 
 
-def test_load_backtest_runtime_config_rejects_invalid_reporting_defaults(tmp_path: Path) -> None:
+
+def test_load_backtest_runtime_config_rejects_invalid_jobs_defaults(tmp_path: Path) -> None:
     """
-    Verify loader fails fast when reporting defaults violate deterministic schema bounds.
+    Verify loader fails fast when jobs defaults violate deterministic schema bounds.
 
     Args:
         tmp_path: pytest temporary path fixture.
     Returns:
         None.
     Assumptions:
-        `backtest.reporting.top_trades_n_default` must be strictly positive.
+        `backtest.jobs.top_k_persisted_default` must be strictly positive.
     Raises:
-        AssertionError: If invalid reporting payload does not raise ValueError.
+        AssertionError: If invalid jobs payload does not raise ValueError.
     Side Effects:
         None.
     """
@@ -225,10 +342,191 @@ def test_load_backtest_runtime_config_rejects_invalid_reporting_defaults(tmp_pat
         body="""
 version: 1
 backtest:
-  reporting:
-    top_trades_n_default: 0
+  jobs:
+    enabled: true
+    top_k_persisted_default: 0
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
 """.strip(),
     )
 
-    with pytest.raises(ValueError, match="backtest.reporting.top_trades_n_default"):
+    with pytest.raises(ValueError, match="top_k_persisted_default"):
         load_backtest_runtime_config(config_path)
+
+
+
+def test_build_backtest_runtime_config_hash_is_deterministic_for_same_config() -> None:
+    """
+    Verify runtime hash is deterministic for identical config payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical JSON hashing uses sorted keys and compact separators.
+    Raises:
+        AssertionError: If hash value differs between identical evaluations.
+    Side Effects:
+        None.
+    """
+    config = load_backtest_runtime_config(Path("configs/dev/backtest.yaml"))
+
+    assert build_backtest_runtime_config_hash(config=config) == build_backtest_runtime_config_hash(
+        config=config
+    )
+
+
+
+def test_build_backtest_runtime_config_hash_changes_on_result_affecting_jobs_field(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify runtime hash changes when result-affecting jobs field is modified.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `backtest.jobs.top_k_persisted_default` participates in runtime hash payload.
+    Raises:
+        AssertionError: If hash value does not change.
+    Side Effects:
+        None.
+    """
+    config_a = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  top_k_default: 300
+  warmup_bars_default: 200
+  preselect_default: 20000
+  reporting:
+    top_trades_n_default: 3
+  execution:
+    init_cash_quote_default: 10000
+    fixed_quote_default: 100
+    safe_profit_percent_default: 30
+    slippage_pct_default: 0.01
+    fee_pct_default_by_market_id:
+      1: 0.075
+      2: 0.1
+      3: 0.075
+      4: 0.1
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+        filename="backtest_a.yaml",
+    )
+    config_b = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  top_k_default: 300
+  warmup_bars_default: 200
+  preselect_default: 20000
+  reporting:
+    top_trades_n_default: 3
+  execution:
+    init_cash_quote_default: 10000
+    fixed_quote_default: 100
+    safe_profit_percent_default: 30
+    slippage_pct_default: 0.01
+    fee_pct_default_by_market_id:
+      1: 0.075
+      2: 0.1
+      3: 0.075
+      4: 0.1
+  jobs:
+    enabled: true
+    top_k_persisted_default: 250
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+        filename="backtest_b.yaml",
+    )
+
+    hash_a = build_backtest_runtime_config_hash(config=load_backtest_runtime_config(config_a))
+    hash_b = build_backtest_runtime_config_hash(config=load_backtest_runtime_config(config_b))
+
+    assert hash_a != hash_b
+
+
+
+def test_build_backtest_runtime_config_hash_ignores_operational_jobs_fields(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify runtime hash ignores operational-only jobs fields.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Operational jobs knobs are excluded from result-affecting hash payload.
+    Raises:
+        AssertionError: If hash value changes for operational-only modifications.
+    Side Effects:
+        None.
+    """
+    config_path_a = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    snapshot_seconds: 30
+    snapshot_variants_step: 1000
+    parallel_workers: 1
+""".strip(),
+        filename="backtest_operational_a.yaml",
+    )
+    hash_a = build_backtest_runtime_config_hash(
+        config=load_backtest_runtime_config(config_path_a)
+    )
+
+    config_path_b = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  jobs:
+    enabled: false
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 99
+    claim_poll_seconds: 0.25
+    lease_seconds: 300
+    heartbeat_seconds: 30
+    snapshot_seconds: 5
+    snapshot_variants_step: 50
+    parallel_workers: 8
+""".strip(),
+        filename="backtest_operational_b.yaml",
+    )
+    hash_b = build_backtest_runtime_config_hash(
+        config=load_backtest_runtime_config(config_path_b)
+    )
+
+    assert hash_a == hash_b

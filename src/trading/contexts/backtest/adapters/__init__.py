@@ -1,19 +1,33 @@
 from .outbound import (
     BacktestExecutionRuntimeConfig,
+    BacktestJobsRuntimeConfig,
+    BacktestPostgresGateway,
     BacktestReportingRuntimeConfig,
     BacktestRuntimeConfig,
+    PostgresBacktestJobLeaseRepository,
+    PostgresBacktestJobRepository,
+    PostgresBacktestJobResultsRepository,
+    PsycopgBacktestPostgresGateway,
     StrategyRepositoryBacktestStrategyReader,
     YamlBacktestGridDefaultsProvider,
+    build_backtest_runtime_config_hash,
     load_backtest_runtime_config,
     resolve_backtest_config_path,
 )
 
 __all__ = [
+    "BacktestPostgresGateway",
     "BacktestExecutionRuntimeConfig",
+    "BacktestJobsRuntimeConfig",
     "BacktestReportingRuntimeConfig",
     "BacktestRuntimeConfig",
+    "PostgresBacktestJobLeaseRepository",
+    "PostgresBacktestJobRepository",
+    "PostgresBacktestJobResultsRepository",
+    "PsycopgBacktestPostgresGateway",
     "StrategyRepositoryBacktestStrategyReader",
     "YamlBacktestGridDefaultsProvider",
+    "build_backtest_runtime_config_hash",
     "load_backtest_runtime_config",
     "resolve_backtest_config_path",
 ]

@@ -244,3 +244,32 @@ class BacktestStorageError(BacktestDomainError):
       - src/trading/contexts/strategy/application/ports/repositories/strategy_repository.py
     """
 
+
+class BacktestJobTransitionError(BacktestDomainError):
+    """
+    Raised when Backtest job lifecycle transition violates state-machine contract.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/milestone-5-epics-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_repository.py
+    """
+
+
+class BacktestJobLeaseError(BacktestDomainError):
+    """
+    Raised when Backtest job lease-owner invariants are violated.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/milestone-5-epics-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_lease_repository.py
+    """

@@ -12,6 +12,11 @@ from .dto import (
 )
 from .ports import (
     BacktestGridDefaultsProvider,
+    BacktestJobLeaseRepository,
+    BacktestJobListPage,
+    BacktestJobListQuery,
+    BacktestJobRepository,
+    BacktestJobResultsRepository,
     BacktestSignalParamsMap,
     BacktestStagedVariantScorer,
     BacktestStagedVariantScorerWithDetails,
@@ -66,6 +71,11 @@ from .use_cases import (
 
 __all__ = [
     "BACKTEST_METRIC_ORDER_V1",
+    "BacktestJobLeaseRepository",
+    "BacktestJobListPage",
+    "BacktestJobListQuery",
+    "BacktestJobRepository",
+    "BacktestJobResultsRepository",
     "BacktestGridBuildContextV1",
     "BacktestGridBuilderV1",
     "BacktestGridDefaultsProvider",
