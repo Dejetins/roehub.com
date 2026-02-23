@@ -23,6 +23,9 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY src /app/src
 COPY apps /app/apps
 COPY configs /app/configs
+COPY alembic /app/alembic
+COPY alembic.ini /app/alembic.ini
+COPY migrations /app/migrations
 
 ENV PYTHONPATH=/app/src:/app
 

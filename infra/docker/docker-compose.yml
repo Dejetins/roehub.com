@@ -22,6 +22,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-roehub} -d ${POSTGRES_DB:-roehub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
     volumes:
       - pg_data:/var/lib/postgresql/data
 
@@ -52,6 +57,98 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis_data:/data
+
+  db-bootstrap:
+    profiles: ["ui"]
+    build:
+      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
+      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      IDENTITY_PG_DSN: ${IDENTITY_PG_DSN:-postgresql://roehub:roehub@postgres:5432/roehub}
+      POSTGRES_DSN: ${POSTGRES_DSN:-postgresql://roehub:roehub@postgres:5432/roehub}
+    command:
+      - python
+      - -m
+      - apps.migrations.bootstrap_main
+
+  api:
+    profiles: ["ui"]
+    build:
+      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
+      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    depends_on:
+      clickhouse:
+        condition: service_started
+      redis:
+        condition: service_started
+      db-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      ROEHUB_ENV: ${ROEHUB_ENV:-dev}
+      IDENTITY_FAIL_FAST: ${IDENTITY_FAIL_FAST:-false}
+      STRATEGY_FAIL_FAST: ${STRATEGY_FAIL_FAST:-false}
+      BACKTEST_FAIL_FAST: ${BACKTEST_FAIL_FAST:-false}
+      IDENTITY_PG_DSN: ${IDENTITY_PG_DSN:-postgresql://roehub:roehub@postgres:5432/roehub}
+      STRATEGY_PG_DSN: ${STRATEGY_PG_DSN:-postgresql://roehub:roehub@postgres:5432/roehub}
+      CH_HOST: ${CH_HOST:-clickhouse}
+      CH_PORT: ${CH_PORT:-8123}
+      CH_DATABASE: ${CH_DATABASE:-market_data}
+      CH_USER: ${CH_USER:-default}
+      CH_PASSWORD: ${CH_PASSWORD:-}
+      CH_SECURE: ${CH_SECURE:-0}
+      CH_VERIFY: ${CH_VERIFY:-1}
+      ROEHUB_REDIS_PASSWORD: ${ROEHUB_REDIS_PASSWORD:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    command:
+      - python
+      - -m
+      - apps.api.main.main
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    expose:
+      - "8000"
+
+  web:
+    profiles: ["ui"]
+    build:
+      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
+      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      WEB_API_BASE_URL: ${WEB_API_BASE_URL:-http://gateway}
+    command:
+      - python
+      - -m
+      - apps.web.main.main
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8010"
+    expose:
+      - "8010"
+
+  gateway:
+    profiles: ["ui"]
+    build:
+      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
+      dockerfile: infra/docker/Dockerfile.gateway
+    depends_on:
+      api:
+        condition: service_started
+      web:
+        condition: service_started
+    expose:
+      - "80"
+    ports:
+      - "${GATEWAY_HOST_BIND:-127.0.0.1}:${GATEWAY_HOST_PORT:-8080}:80"
 
   market-data-ws-worker:
     build:

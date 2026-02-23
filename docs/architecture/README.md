@@ -94,6 +94,7 @@
 - [Market Data Metrics](docs/runbooks/market-data-metrics.md) — `docs/runbooks/market-data-metrics.md` — Документ фиксирует основные Prometheus-метрики для:
 - [Runbook — Market Data Redis Streams](docs/runbooks/market-data-redis-streams.md) — `docs/runbooks/market-data-redis-streams.md` — Операционные команды для live feed stream’ов, которые публикует `market-data-ws-worker`.
 - [Strategy live worker runbook](docs/runbooks/strategy-live-worker.md) — `docs/runbooks/strategy-live-worker.md` — Runbook для `apps/worker/strategy_live_runner`: как поднять worker, проверить метрики, проверить Redis Streams realtime output и (опционально) Telegram notify.
+- [Web UI Gateway Same-Origin (WEB-EPIC-02)](docs/runbooks/web-ui-gateway-same-origin.md) — `docs/runbooks/web-ui-gateway-same-origin.md` — Runbook for local and server startup of the same-origin `web + api + gateway` stack.
 
 ### API
 
