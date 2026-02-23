@@ -59,14 +59,28 @@ def test_create_app_fails_fast_when_web_api_base_url_is_missing() -> None:
     with pytest.raises(ValueError, match="WEB_API_BASE_URL"):
         create_app(environ={})
 
-
-
-def test_protected_page_redirects_to_login_on_unauthorized_current_user() -> None:
+@pytest.mark.parametrize(
+    ("path", "expected_location"),
+    [
+        ("/backtests/jobs", "/login?next=%2Fbacktests%2Fjobs"),
+        ("/strategies", "/login?next=%2Fstrategies"),
+        ("/strategies/new", "/login?next=%2Fstrategies%2Fnew"),
+        (
+            "/strategies/00000000-0000-0000-0000-000000000123",
+            "/login?next=%2Fstrategies%2F00000000-0000-0000-0000-000000000123",
+        ),
+    ],
+)
+def test_protected_page_redirects_to_login_on_unauthorized_current_user(
+    path: str,
+    expected_location: str,
+) -> None:
     """
     Verify login gate redirects protected page requests to `/login?next=...` on 401.
 
     Args:
-        None.
+        path: Protected route path requested by test client.
+        expected_location: Expected redirect location with guarded `next` query.
     Returns:
         None.
     Assumptions:
@@ -80,10 +94,10 @@ def test_protected_page_redirects_to_login_on_unauthorized_current_user() -> Non
         api_result=CurrentUserApiResult(status_code=401, user=None, error_message=None)
     )
 
-    response = client.get("/backtests/jobs", follow_redirects=False)
+    response = client.get(path, follow_redirects=False)
 
     assert response.status_code == 307
-    assert response.headers["location"] == "/login?next=%2Fbacktests%2Fjobs"
+    assert response.headers["location"] == expected_location
 
 
 
@@ -136,3 +150,85 @@ def test_logout_page_contains_api_logout_call_and_login_redirect() -> None:
     assert response.status_code == 200
     assert "/api/auth/logout" in response.text
     assert "window.location.assign('/login')" in response.text
+
+
+def test_strategies_list_page_renders_required_strategy_ui_hooks() -> None:
+    """
+    Verify `/strategies` renders list-page hooks and API paths for Strategy UI module.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Authorized user receives HTML page that bootstraps browser-side API calls.
+    Raises:
+        AssertionError: If required hooks or API path literals are missing from SSR output.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+
+    response = client.get("/strategies")
+
+    assert response.status_code == 200
+    assert 'data-strategy-page="list"' in response.text
+    assert "/assets/strategy_ui.js" in response.text
+    assert "/strategies/new" in response.text
+    assert "/api/strategies" in response.text
+    assert "/api/strategies/clone" in response.text
+
+
+def test_strategy_builder_page_renders_required_reference_api_hooks() -> None:
+    """
+    Verify `/strategies/new` renders builder hooks for create and reference API endpoints.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Builder page uses browser-side fetch calls and does not expose JSON textarea input.
+    Raises:
+        AssertionError: If required endpoint literals or hooks are absent from SSR output.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+
+    response = client.get("/strategies/new")
+
+    assert response.status_code == 200
+    assert 'data-strategy-page="builder"' in response.text
+    assert "/api/strategies" in response.text
+    assert "/api/market-data/markets" in response.text
+    assert "/api/market-data/instruments" in response.text
+    assert "/api/indicators" in response.text
+    assert "<textarea" not in response.text
+
+
+def test_strategy_details_page_renders_required_strategy_id_and_hooks() -> None:
+    """
+    Verify `/strategies/{strategy_id}` renders details hooks with route strategy identifier.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Page receives strategy id from route and performs browser-side API loading.
+    Raises:
+        AssertionError: If strategy-id hook or required API literals are missing.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+    strategy_id = "00000000-0000-0000-0000-000000000123"
+
+    response = client.get(f"/strategies/{strategy_id}")
+
+    assert response.status_code == 200
+    assert 'data-strategy-page="details"' in response.text
+    assert f'data-strategy-id="{strategy_id}"' in response.text
+    assert "/api/strategies/{strategy_id}" in response.text
+    assert "/api/strategies/clone" in response.text

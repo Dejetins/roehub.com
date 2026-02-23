@@ -177,7 +177,7 @@ def _register_routes(
     @app.get("/strategies", response_class=HTMLResponse)
     def get_strategies_page(request: Request) -> Response:
         """
-        Render protected strategies skeleton page behind current-user login gate.
+        Render protected strategies list page behind current-user login gate.
 
         Args:
             request: HTTP request object.
@@ -195,9 +195,57 @@ def _register_routes(
             templates=templates,
             page_path="/strategies",
             page_title="Strategies",
-            page_description=(
-                "Strategy UI arrives in WEB-EPIC-04. This page is a protected skeleton."
-            ),
+            template_name="strategies_list.html",
+        )
+
+    @app.get("/strategies/new", response_class=HTMLResponse)
+    def get_new_strategy_page(request: Request) -> Response:
+        """
+        Render protected strategy creation builder page behind current-user login gate.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            Response: HTML strategy builder page or login redirect response.
+        Assumptions:
+            Identity API determines current user via forwarded cookies.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/strategies",
+            page_title="Create Strategy",
+            template_name="strategy_builder.html",
+        )
+
+    @app.get("/strategies/{strategy_id}", response_class=HTMLResponse)
+    def get_strategy_details_page(request: Request, strategy_id: str) -> Response:
+        """
+        Render protected strategy details page behind current-user login gate.
+
+        Args:
+            request: HTTP request object.
+            strategy_id: Target strategy identifier string from route path.
+        Returns:
+            Response: HTML strategy details page or login redirect response.
+        Assumptions:
+            Identity API determines current user via forwarded cookies.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/strategies",
+            page_title="Strategy Details",
+            template_name="strategy_details.html",
+            template_context={"strategy_id": strategy_id},
         )
 
     @app.get("/backtests", response_class=HTMLResponse)
@@ -318,19 +366,23 @@ def _render_protected_page(
     templates: Jinja2Templates,
     page_path: str,
     page_title: str,
-    page_description: str,
+    page_description: str | None = None,
+    template_name: str = "protected_page.html",
+    template_context: Mapping[str, Any] | None = None,
 ) -> Response:
     """
-    Enforce login gate and render protected page skeleton with user badge.
+    Enforce login gate and render protected page template with shared context.
 
     Args:
         request: HTTP request object.
         templates: Jinja2 template renderer.
         page_path: Canonical route path for navigation state.
-        page_title: Page title shown in skeleton content.
-        page_description: Placeholder page description.
+        page_title: Page title shown in rendered HTML document.
+        page_description: Optional description for skeleton-like templates.
+        template_name: Template file name to render after login gate passes.
+        template_context: Optional template-specific key-value context mapping.
     Returns:
-        Response: Login redirect or SSR protected page response.
+        Response: Login redirect or rendered protected page response.
     Assumptions:
         Auth state comes exclusively from `/api/auth/current-user` response status.
     Raises:
@@ -355,10 +407,13 @@ def _render_protected_page(
         current_user=current_user,
         error_message=error_message,
     )
-    context["page_description"] = page_description
+    if page_description is not None:
+        context["page_description"] = page_description
+    if template_context is not None:
+        context.update(template_context)
     return templates.TemplateResponse(
         request,
-        "protected_page.html",
+        template_name,
         context=context,
         status_code=status_code,
     )

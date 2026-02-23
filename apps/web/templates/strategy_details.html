@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="panel"
+    data-strategy-page="details"
+    data-strategy-id="{{ strategy_id }}"
+    data-api-get-path-template="/api/strategies/{strategy_id}"
+    data-api-clone-path="/api/strategies/clone"
+    data-api-delete-path-template="/api/strategies/{strategy_id}"
+    data-list-path="/strategies"
+  >
+    <div class="panel-heading">
+      <h1>Strategy details</h1>
+      <a class="button-link button-link--secondary" href="/strategies">Back to list</a>
+    </div>
+
+    <div class="inline-actions">
+      <button id="strategy-detail-clone" class="button-link" type="button">Clone</button>
+      <button id="strategy-detail-delete" class="button-link button-link--danger" type="button">
+        Delete
+      </button>
+    </div>
+
+    <div id="strategy-error-banner" class="error-banner hidden" role="alert"></div>
+    <div id="strategy-validation-errors" class="validation-list hidden"></div>
+    <p id="strategy-details-loading">Loading strategy...</p>
+
+    <div id="strategy-details-content" class="hidden">
+      <section class="panel panel--soft">
+        <h2>Summary</h2>
+        <dl class="key-value-grid">
+          <dt>strategy_id</dt>
+          <dd id="strategy-field-id"></dd>
+
+          <dt>Name</dt>
+          <dd id="strategy-field-name"></dd>
+
+          <dt>Created</dt>
+          <dd id="strategy-field-created-at"></dd>
+
+          <dt>Market</dt>
+          <dd id="strategy-field-market-id"></dd>
+
+          <dt>Symbol</dt>
+          <dd id="strategy-field-symbol"></dd>
+
+          <dt>market_type</dt>
+          <dd id="strategy-field-market-type"></dd>
+
+          <dt>instrument_key</dt>
+          <dd id="strategy-field-instrument-key"></dd>
+
+          <dt>Timeframe</dt>
+          <dd id="strategy-field-timeframe"></dd>
+        </dl>
+      </section>
+
+      <section class="panel panel--soft">
+        <h2>Indicators</h2>
+        <ol id="strategy-indicators-list" class="indicator-list"></ol>
+      </section>
+
+      <details class="panel panel--soft">
+        <summary>Raw spec JSON</summary>
+        <pre id="strategy-raw-spec" class="json-pre"></pre>
+      </details>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/strategy_ui.js"></script>
+{% endblock %}

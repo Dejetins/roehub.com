@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="panel"
+    data-strategy-page="list"
+    data-api-list-path="/api/strategies"
+    data-api-clone-path="/api/strategies/clone"
+    data-api-delete-path-template="/api/strategies/{strategy_id}"
+    data-details-path-template="/strategies/{strategy_id}"
+  >
+    <div class="panel-heading">
+      <h1>Strategies</h1>
+      <a class="button-link" href="/strategies/new">Create strategy</a>
+    </div>
+    <p>
+      Manage immutable strategies for Roehub. Clone and delete actions call JSON API directly
+      from the browser.
+    </p>
+
+    <div id="strategy-error-banner" class="error-banner hidden" role="alert"></div>
+
+    <section class="panel panel--soft">
+      <h2>Filters</h2>
+      <div class="filters-grid">
+        <label for="strategy-filter-symbol">Symbol</label>
+        <input id="strategy-filter-symbol" type="text" placeholder="BTCUSDT">
+
+        <label for="strategy-filter-market-type">Market type</label>
+        <select id="strategy-filter-market-type">
+          <option value="">All</option>
+        </select>
+
+        <label for="strategy-filter-timeframe">Timeframe</label>
+        <select id="strategy-filter-timeframe">
+          <option value="">All</option>
+        </select>
+      </div>
+      <button id="strategy-filter-reset" class="button-link button-link--secondary" type="button">
+        Reset filters
+      </button>
+    </section>
+
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">Created</th>
+            <th scope="col">Strategy</th>
+            <th scope="col">Symbol</th>
+            <th scope="col">Market type</th>
+            <th scope="col">Timeframe</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="strategies-table-body">
+          <tr>
+            <td colspan="6">Loading strategies...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/strategy_ui.js"></script>
+{% endblock %}
