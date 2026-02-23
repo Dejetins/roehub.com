@@ -553,7 +553,7 @@ Backtest v1 обязан строить отчёт в виде таблицы `|
 
 - Milestone 4: sync small с жёсткими guards по числу вариантов и длине периода.
 - Milestone 5: jobs/progress обязательны для больших сеток.
-- Milestone 6: top-k / pruning / batching — отдельный слой оптимизации.
+- Milestone 7: top-k / pruning / batching — отдельный слой оптимизации.
 
 ### Кандидаты на вынос в следующий milestone (если не влезает в Milestone 4)
 
@@ -811,7 +811,61 @@ Milestone 5 добавляет асинхронный путь, который �
 ---
 
 
-## Milestone 6 — Optimize/Grid + Pruning
+## Milestone 6 — Web UI v1 (Backtest + Jobs + Strategy + Auth)
+
+**Цель:** можно начать строить и развивать продукт через браузерный UI, используя уже реализованные системы (identity/strategy/backtest/backtest-jobs) без CORS, с same-origin доставкой через reverse-proxy.
+
+**Ключевая топология (фикс):**
+
+- один origin: `https://roehub.com`
+- gateway (Nginx) маршрутизирует:
+  - UI: `/` → web UI
+  - API: `/api/*` → Roehub API (с strip префикса `/api`)
+- UI **всегда** вызывает JSON API только по `/api/...` (cookie auth, `credentials=include`).
+  HTML страницы UI обслуживаются web UI роутами без `/api`.
+
+**Что делаем:**
+
+- Web UI app:
+  - `apps/web` (Python SSR + Jinja2 + HTMX; без React/SPA),
+  - сборка статических ассетов в `apps/web/dist` (CSS/JS),
+  - UI интегрирует Telegram Login Widget (Variant A) и опирается на HttpOnly JWT cookie.
+
+- Reverse proxy:
+  - Nginx gateway в `infra/docker` (и/или отдельный prod конфиг),
+  - deterministic routing: `/api/*` всегда уходит на API upstream.
+  - default routing: всё остальное (UI HTML) уходит на web upstream; статические ассеты отдаёт gateway из `apps/web/dist`.
+
+- Reference data для выбора инструментов в UI:
+  - добавить auth-only API endpoints, которые читают ClickHouse `market_data.ref_market` и `market_data.ref_instruments`:
+    - `GET /market-data/markets` — список доступных рынков (market_id, exchange_name, market_type)
+    - `GET /market-data/instruments?market_id=&q=&limit=` — поиск/листинг `symbol` (только enabled+tradable)
+  - ordering детерминированный (для UI и тестов).
+
+- UI flows v1:
+  - identity: login/logout/current-user;
+  - strategy: list/get/create/clone + "Save variant as Strategy" из результатов backtest.
+    - create UI = визуальный builder (market/symbol/timeframe + выбор индикаторов/параметров по `/api/indicators`), без JSON textarea.
+    - "Save variant" сохраняет StrategySpec v1 только в пределах текущего доменного контракта (индикаторы + instrument/timeframe tags); risk/execution/direction/sizing остаются настройками backtest.
+  - backtest sync: `POST /backtests` (small-run) + отображение top-K (`report_table_md`, trades только для `top_trades_n`);
+  - backtest jobs: create/list/status/top/cancel, polling прогресса и best-so-far top во время `running`.
+    Важно для UX: при reclaim attempt возможны сброс `stage/progress` и временно stale `/top` snapshot до первой перезаписи.
+
+- Ops/runbooks:
+  - runbook запуска web+api+nginx локально;
+  - runbook настройки Telegram (allowed domains) для dev/prod.
+  - обеспечить применение Alembic миграций (strategy/backtest/backtest-jobs) перед стартом сервисов через migrations runner (`POSTGRES_DSN`).
+
+**DoD:**
+
+- Пользователь может сделать end-to-end сценарий в UI:
+  - login → выбрать market/symbol/timeframe → создать/клонировать strategy → запустить backtest (sync или jobs) → увидеть top результаты (таблица+trades) → сохранить вариант как Strategy → cancel job при необходимости.
+- Один origin работает в dev/prod через Nginx gateway, без CORS.
+- CSRF-стратегию для mutating endpoints сознательно откладываем (same-origin + `SameSite=lax` в v1).
+
+---
+
+## Milestone 7 — Optimize/Grid + Pruning
 
 **Цель:** сотни тысяч комбинаций параметров → top-500 без OOM.
 
@@ -827,7 +881,7 @@ Milestone 5 добавляет асинхронный путь, который �
 
 ---
 
-## Milestone 7 — Backtest v2: intrabar + portfolio + risk
+## Milestone 8 — Backtest v2: intrabar + portfolio + risk
 
 **Цель:** более реалистичная модель исполнения в OHLC + портфель стратегий.
 
@@ -842,7 +896,7 @@ Milestone 5 добавляет асинхронный путь, который �
 
 ---
 
-## Milestone 8 — ML каркас (optional/parallel)
+## Milestone 9 — ML каркас (optional/parallel)
 
 **Цель:** ML как источник сигналов, совместимый со spec/backtest/jobs.
 
@@ -855,7 +909,7 @@ Milestone 5 добавляет асинхронный путь, который �
 
 ---
 
-## Milestone 9 — Live execution (контуры/контракты, реализация позже)
+## Milestone 10 — Live execution (контуры/контракты, реализация позже)
 
 **Цель:** заложить правильные границы, не делая реальный трейдинг.
 
