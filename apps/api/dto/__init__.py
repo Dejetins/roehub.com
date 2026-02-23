@@ -71,6 +71,14 @@ from .indicators import (
     build_time_range,
     build_timeframe,
 )
+from .market_data_reference import (
+    MarketDataInstrumentItemResponse,
+    MarketDataInstrumentsResponse,
+    MarketDataMarketItemResponse,
+    MarketDataMarketsResponse,
+    build_market_data_instruments_response,
+    build_market_data_markets_response,
+)
 
 __all__ = [
     "ComputeAxisResponse",
@@ -105,6 +113,12 @@ __all__ = [
     "build_risk_specs",
     "build_time_range",
     "build_timeframe",
+    "MarketDataMarketItemResponse",
+    "MarketDataMarketsResponse",
+    "MarketDataInstrumentItemResponse",
+    "MarketDataInstrumentsResponse",
+    "build_market_data_markets_response",
+    "build_market_data_instruments_response",
     "BacktestJobErrorResponse",
     "BacktestJobStatusResponse",
     "BacktestJobsListItemResponse",

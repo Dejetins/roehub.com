@@ -1,6 +1,10 @@
 from .canonical_candle_index_reader import ClickHouseCanonicalCandleIndexReader
 from .canonical_candle_reader import ClickHouseCanonicalCandleReader
 from .enabled_instrument_reader import ClickHouseEnabledInstrumentReader
+from .enabled_market_reader import ClickHouseEnabledMarketReader
+from .enabled_tradable_instrument_search_reader import (
+    ClickHouseEnabledTradableInstrumentSearchReader,
+)
 from .gateway import (
     ClickHouseConnectGateway,
     ClickHouseGateway,
@@ -14,6 +18,8 @@ __all__ = [
     "ClickHouseCanonicalCandleReader",
     "ClickHouseCanonicalCandleIndexReader",
     "ClickHouseEnabledInstrumentReader",
+    "ClickHouseEnabledMarketReader",
+    "ClickHouseEnabledTradableInstrumentSearchReader",
     "ClickHouseGateway",
     "ClickHouseConnectGateway",
     "ThreadLocalClickHouseConnectGateway",

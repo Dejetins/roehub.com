@@ -18,6 +18,7 @@ from apps.api.wiring.modules import (
     build_identity_api_module,
     build_indicators_compute,
     build_indicators_registry,
+    build_market_data_reference_router,
     build_strategy_router,
     is_strategy_api_enabled,
 )
@@ -37,6 +38,7 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
       docs/architecture/identity/identity-telegram-login-user-model-v1.md,
       docs/architecture/identity/identity-2fa-totp-policy-v1.md,
       docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md,
+      docs/architecture/market_data/market-data-reference-api-v1.md,
       docs/architecture/backtest/backtest-api-post-backtests-v1.md,
       docs/architecture/api/api-errors-and-422-payload-v1.md
     Related: apps.api.routes.indicators,
@@ -88,6 +90,12 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
             environ=effective_environ,
             current_user_dependency=identity_module.current_user_dependency,
             indicator_compute=compute,
+        )
+    )
+    app.include_router(
+        build_market_data_reference_router(
+            environ=effective_environ,
+            current_user_dependency=identity_module.current_user_dependency,
         )
     )
     bind_indicators_runtime_dependencies(

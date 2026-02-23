@@ -1,6 +1,7 @@
 from .backfill_1m_command import Backfill1mCommand
 from .backfill_1m_report import Backfill1mReport
 from .candle_with_meta import CandleWithMeta
+from .reference_api import EnabledMarketReference
 from .reference_data import (
     ExchangeInstrumentMetadata,
     InstrumentRefEnrichmentSnapshot,
@@ -23,4 +24,5 @@ __all__ = [
     "InstrumentRefEnrichmentUpsert",
     "InstrumentRefUpsert",
     "RefMarketRow",
+    "EnabledMarketReference",
 ]
