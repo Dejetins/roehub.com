@@ -30,7 +30,7 @@ docker compose -f infra/docker/docker-compose.yml \
   --profile ui up -d --build
 ```
 
-Ожидаемый endpoint:
+Ожидаемый адрес:
 
 - `http://127.0.0.1:8080`
 
@@ -54,7 +54,7 @@ curl -i http://127.0.0.1:8080/assets/site.css
    - применяет `0001_identity_v1.sql`
    - применяет `0002_identity_2fa_totp_v1.sql`
    - применяет `0003_identity_exchange_keys_v1.sql`
-3. Guarded `0004_identity_exchange_keys_v2.sql`:
+3. Защищённая миграция `0004_identity_exchange_keys_v2.sql`:
    - пропускает, если колонки v2 уже существуют
    - применяет только если layout v1 существует и таблица пустая
    - завершает запуск с ошибкой, если в layout v1 уже есть строки (небезопасный путь миграции)
@@ -83,10 +83,10 @@ curl -i http://127.0.0.1:8080/assets/site.css
   для dev-туннеля может сломать login widget в проде
 - рекомендация: используйте отдельного staging/dev-бота для локального тестирования через туннель
 
-## Troubleshooting: "bot domain invalid"
+## Диагностика: "bot domain invalid"
 
-- Убедитесь, что host в браузере точно совпадает с доменом из BotFather (без лишнего subdomain или порта).
-- Убедитесь, что страница логина открыта через `https` URL туннеля.
+- Убедитесь, что host в браузере точно совпадает с доменом из BotFather (без лишнего поддомена или порта).
+- Убедитесь, что страница логина открыта через `https`-URL туннеля.
 - Повторите `/setdomain` и подождите до нескольких минут, пока изменения распространятся на стороне Telegram.
 - Проверьте, что widget использует ожидаемый username бота.
 

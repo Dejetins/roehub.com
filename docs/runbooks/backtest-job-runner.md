@@ -1,45 +1,45 @@
-# Backtest job runner runbook
+# Ранбук backtest job runner
 
-Runbook for the `backtest-job-runner` worker process used by Backtest Jobs v1.
+Ранбук для worker-процесса `backtest-job-runner`, который используется в Backtest Jobs v1.
 
-## 1) Scope and references
+## 1) Область и ссылки
 
-This runbook covers:
-- startup and toggles
-- required env vars
-- metrics and logs
-- stuck jobs diagnosis
-- cancel and lease-lost behavior
+Этот ранбук покрывает:
+- запуск и toggles
+- обязательные переменные окружения
+- метрики и логи
+- диагностику зависших jobs
+- поведение cancel и lease-lost
 
-Architecture references:
+Архитектурные ссылки:
 - `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
 - `docs/architecture/backtest/backtest-jobs-api-v1.md`
 
-## 2) Required environment
+## 2) Обязательное окружение
 
-Minimum required variables for worker runtime:
-- `STRATEGY_PG_DSN` (runtime Postgres DSN for jobs storage)
-- `ROEHUB_ENV` (`dev`, `test`, or `prod`)
+Минимально обязательные переменные для runtime worker:
+- `STRATEGY_PG_DSN` (runtime Postgres DSN для jobs storage)
+- `ROEHUB_ENV` (`dev`, `test` или `prod`)
 
-Optional config path override:
-- `ROEHUB_BACKTEST_CONFIG` (path to `backtest.yaml`)
+Опциональный override пути к конфигу:
+- `ROEHUB_BACKTEST_CONFIG` (путь к `backtest.yaml`)
 
-Migration variable (not used by worker runtime, used by migration runner):
+Переменная для миграций (в runtime worker не используется, используется migration runner):
 - `POSTGRES_DSN`
 
-ClickHouse vars (used by candle reader wiring):
+Переменные ClickHouse (используются в wiring candle reader):
 - `CH_HOST`
 - `CH_PORT`
 - `CH_DATABASE`
-- `CH_USER` (or `CLICKHOUSE_USER`)
-- `CH_PASSWORD` (or `CLICKHOUSE_PASSWORD`)
-- `CH_SECURE` (`0` or `1`)
-- `CH_VERIFY` (`0` or `1`)
+- `CH_USER` (или `CLICKHOUSE_USER`)
+- `CH_PASSWORD` (или `CLICKHOUSE_PASSWORD`)
+- `CH_SECURE` (`0` или `1`)
+- `CH_VERIFY` (`0` или `1`)
 
-## 3) Start commands
+## 3) Команды запуска
 
-Local run (dev config):
+Локальный запуск (dev-конфиг):
 
 ```bash
 export STRATEGY_PG_DSN='postgresql://user:pass@127.0.0.1:5432/roehub'
@@ -47,7 +47,7 @@ export ROEHUB_ENV='dev'
 uv run python -m apps.worker.backtest_job_runner.main.main --config configs/dev/backtest.yaml --metrics-port 9204
 ```
 
-Local run with env-based config resolution:
+Локальный запуск с выбором конфига через env:
 
 ```bash
 export STRATEGY_PG_DSN='postgresql://user:pass@127.0.0.1:5432/roehub'
@@ -56,45 +56,45 @@ export ROEHUB_BACKTEST_CONFIG='configs/prod/backtest.yaml'
 uv run python -m apps.worker.backtest_job_runner.main.main
 ```
 
-## 4) Toggle semantics
+## 4) Семантика toggle
 
-If `backtest.jobs.enabled=false` in runtime config:
-- worker logs `component=backtest-job-runner status=disabled`
-- process exits with code `0`
-- no claim loop starts
+Если `backtest.jobs.enabled=false` в runtime-конфиге:
+- worker пишет лог `component=backtest-job-runner status=disabled`
+- процесс завершается с кодом `0`
+- claim loop не запускается
 
-This behavior is expected and safe for maintenance windows.
+Такое поведение ожидаемо и безопасно для maintenance window.
 
-## 5) Health signals
+## 5) Сигналы здоровья
 
-Metrics endpoint:
+Endpoint метрик:
 
 ```bash
 curl -fsS http://127.0.0.1:9204/metrics | head
 ```
 
-Primary counters:
+Основные counters:
 - `backtest_job_runner_claim_total`
 - `backtest_job_runner_succeeded_total`
 - `backtest_job_runner_failed_total`
 - `backtest_job_runner_cancelled_total`
 - `backtest_job_runner_lease_lost_total`
 
-Primary histograms and gauges:
+Основные histograms и gauges:
 - `backtest_job_runner_job_duration_seconds`
 - `backtest_job_runner_stage_duration_seconds`
 - `backtest_job_runner_active_claimed_jobs`
 
-Key log fields to monitor:
+Ключевые поля логов для мониторинга:
 - `job_id`
 - `attempt`
 - `locked_by`
 - `stage`
 - `event`
 
-## 6) Stuck jobs diagnosis
+## 6) Диагностика зависших jobs
 
-### 6.1 Find running jobs with expired lease
+### 6.1 Найти running jobs с истекшим lease
 
 ```sql
 SELECT
@@ -112,20 +112,20 @@ WHERE state = 'running'
 ORDER BY lease_expires_at ASC, created_at ASC, job_id ASC;
 ```
 
-If `lease_expires_at < now()`, reclaim is expected. Claim SQL uses `FOR UPDATE SKIP LOCKED`.
+Если `lease_expires_at < now()`, reclaim ожидаем. Claim SQL использует `FOR UPDATE SKIP LOCKED`.
 
-### 6.2 Reclaim semantics in v1
+### 6.2 Семантика reclaim в v1
 
-On reclaim attempt:
-- worker may restart from `stage_a`
-- `processed_units` and `stage` can reset
-- `attempt` increases
+При попытке reclaim:
+- worker может перезапустить job с `stage_a`
+- `processed_units` и `stage` могут сбрасываться
+- `attempt` увеличивается
 
-Observed `/top` behavior:
-- previous persisted rows may remain visible until first overwrite in new attempt
-- this temporary stale `/top` is expected in v1
+Наблюдаемое поведение `/top`:
+- предыдущие сохранённые строки могут оставаться видимыми до первой перезаписи в новой попытке
+- такая временная stale-выдача `/top` ожидаема в v1
 
-### 6.3 Stage A shortlist and snapshot checks
+### 6.3 Проверки shortlist Stage A и snapshot
 
 ```sql
 SELECT job_id, stage_a_variants_total, risk_total, preselect_used, updated_at
@@ -140,45 +140,45 @@ WHERE job_id = '00000000-0000-0000-0000-000000000000'
 ORDER BY rank ASC, variant_key ASC;
 ```
 
-## 7) Cancel runbook
+## 7) Ранбук отмены (cancel)
 
-Request cancel:
+Отправить cancel:
 
 ```bash
 curl -fsS -X POST -b cookies.txt \
   http://127.0.0.1:8000/backtests/jobs/<job_id>/cancel
 ```
 
-Expected behavior:
-- `queued` job: immediate `cancelled`
-- `running` job: best-effort, cancellation happens on batch boundaries
+Ожидаемое поведение:
+- job в `queued`: сразу `cancelled`
+- job в `running`: best-effort, отмена происходит на границах батчей
 
-Check status:
+Проверить статус:
 
 ```bash
 curl -fsS -b cookies.txt http://127.0.0.1:8000/backtests/jobs/<job_id>
 ```
 
-Check top rows policy:
+Проверить политику по top-строкам:
 
 ```bash
 curl -fsS -b cookies.txt "http://127.0.0.1:8000/backtests/jobs/<job_id>/top?limit=10"
 ```
 
-For non-succeeded jobs, `report_table_md` and `trades` are not returned.
+Для jobs, которые не в `succeeded`, `report_table_md` и `trades` не возвращаются.
 
-## 8) Lease-lost runbook
+## 8) Ранбук lease-lost
 
-Symptoms:
-- worker log contains `event=lease_lost`
-- `backtest_job_runner_lease_lost_total` increases
+Симптомы:
+- в логах worker есть `event=lease_lost`
+- растёт `backtest_job_runner_lease_lost_total`
 
-Expected behavior:
-- worker that lost lease stops writing for this job immediately
-- no terminal finish write by that worker instance
-- another worker can reclaim and continue
+Ожидаемое поведение:
+- worker, потерявший lease, немедленно перестаёт писать по этой job
+- terminal finish write этим экземпляром worker не выполняется
+- другой worker может reclaim-нуть job и продолжить
 
-Useful check:
+Полезная проверка:
 
 ```sql
 SELECT
@@ -192,19 +192,19 @@ FROM backtest_jobs
 WHERE job_id = '00000000-0000-0000-0000-000000000000';
 ```
 
-## 9) API list cursor smoke
+## 9) Smoke для API list cursor
 
-`GET /backtests/jobs` returns opaque `next_cursor` in `base64url(json)` format.
+`GET /backtests/jobs` возвращает opaque `next_cursor` в формате `base64url(json)`.
 
 Round trip smoke:
-1. call `GET /backtests/jobs?limit=25`
-2. copy `next_cursor` from response
-3. call `GET /backtests/jobs?limit=25&cursor=<next_cursor>`
-4. verify deterministic order by `created_at DESC, job_id DESC`
+1. вызвать `GET /backtests/jobs?limit=25`
+2. скопировать `next_cursor` из ответа
+3. вызвать `GET /backtests/jobs?limit=25&cursor=<next_cursor>`
+4. проверить детерминированный порядок `created_at DESC, job_id DESC`
 
-## 10) Common failures and actions
+## 10) Частые сбои и действия
 
-- Missing `STRATEGY_PG_DSN`: startup fails fast, set env var and restart.
-- Invalid `CH_*` values: startup fails in ClickHouse settings loader.
-- Disabled jobs toggle: check config for `backtest.jobs.enabled=false`.
-- Rising failed counter: inspect `last_error` and `last_error_json` in `backtest_jobs`.
+- Нет `STRATEGY_PG_DSN`: startup падает сразу, задайте переменную и перезапустите.
+- Некорректные значения `CH_*`: startup падает в loader настроек ClickHouse.
+- Jobs отключены toggle-ом: проверьте конфиг `backtest.jobs.enabled=false`.
+- Растёт failed counter: проверьте `last_error` и `last_error_json` в `backtest_jobs`.

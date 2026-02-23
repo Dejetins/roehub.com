@@ -88,7 +88,7 @@
 
 ### Ранбуки
 
-- [Backtest job runner runbook](docs/runbooks/backtest-job-runner.md) — `docs/runbooks/backtest-job-runner.md` — Runbook for the `backtest-job-runner` worker process used by Backtest Jobs v1.
+- [Ранбук backtest job runner](docs/runbooks/backtest-job-runner.md) — `docs/runbooks/backtest-job-runner.md` — Ранбук для worker-процесса `backtest-job-runner`, который используется в Backtest Jobs v1.
 - [help commands](docs/runbooks/help_commands.md) — `docs/runbooks/help_commands.md`
 - [Runbook — Numba cache dir + threads](docs/runbooks/indicators-numba-cache-and-threads.md) — `docs/runbooks/indicators-numba-cache-and-threads.md` — Документ описывает, как управлять `numba_cache_dir` и количеством потоков (`NUMBA_NUM_THREADS`) для `indicators` compute.
 - [Runbook — Numba warmup / JIT](docs/runbooks/indicators-numba-warmup-jit.md) — `docs/runbooks/indicators-numba-warmup-jit.md` — Документ помогает диагностировать задержки первого расчёта индикаторов и отличать ожидаемый JIT warmup от неисправности.
@@ -98,7 +98,7 @@
 - [Market Data Metrics](docs/runbooks/market-data-metrics.md) — `docs/runbooks/market-data-metrics.md` — Документ фиксирует основные Prometheus-метрики для:
 - [Runbook — Market Data Redis Streams](docs/runbooks/market-data-redis-streams.md) — `docs/runbooks/market-data-redis-streams.md` — Операционные команды для live feed stream’ов, которые публикует `market-data-ws-worker`.
 - [Strategy live worker runbook](docs/runbooks/strategy-live-worker.md) — `docs/runbooks/strategy-live-worker.md` — Runbook для `apps/worker/strategy_live_runner`: как поднять worker, проверить метрики, проверить Redis Streams realtime output и (опционально) Telegram notify.
-- [Web UI Gateway Same-Origin (WEB-EPIC-02)](docs/runbooks/web-ui-gateway-same-origin.md) — `docs/runbooks/web-ui-gateway-same-origin.md` — Runbook for local and server startup of the same-origin `web + api + gateway` stack.
+- [Шлюз Web UI с same-origin (WEB-EPIC-02)](docs/runbooks/web-ui-gateway-same-origin.md) — `docs/runbooks/web-ui-gateway-same-origin.md` — Ранбук для локального и серверного запуска same-origin стека `web + api + gateway`.
 
 ### API
 
