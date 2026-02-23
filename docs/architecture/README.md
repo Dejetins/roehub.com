@@ -81,6 +81,7 @@
 
 ### Ранбуки
 
+- [Backtest job runner runbook](docs/runbooks/backtest-job-runner.md) — `docs/runbooks/backtest-job-runner.md` — Runbook for the `backtest-job-runner` worker process used by Backtest Jobs v1.
 - [help commands](docs/runbooks/help_commands.md) — `docs/runbooks/help_commands.md`
 - [Runbook — Numba cache dir + threads](docs/runbooks/indicators-numba-cache-and-threads.md) — `docs/runbooks/indicators-numba-cache-and-threads.md` — Документ описывает, как управлять `numba_cache_dir` и количеством потоков (`NUMBA_NUM_THREADS`) для `indicators` compute.
 - [Runbook — Numba warmup / JIT](docs/runbooks/indicators-numba-warmup-jit.md) — `docs/runbooks/indicators-numba-warmup-jit.md` — Документ помогает диагностировать задержки первого расчёта индикаторов и отличать ожидаемый JIT warmup от неисправности.

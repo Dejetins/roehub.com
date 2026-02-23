@@ -999,6 +999,66 @@ def test_process_claimed_job_stops_when_lease_lost_during_snapshot_write() -> No
     assert lease_repository.finish_calls == []
 
 
+def test_process_claimed_job_persists_running_snapshots_by_time_trigger() -> None:
+    """
+    Verify running snapshots are persisted when `snapshot_seconds` threshold is reached.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Variants-step trigger is effectively disabled by large `snapshot_variants_step`.
+    Raises:
+        AssertionError: If time trigger does not persist running snapshots.
+    Side Effects:
+        None.
+    """
+    job = _build_running_job()
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    risk_variants = _build_risk_variants()
+    scorer = _DeterministicScorerWithDetails(
+        stage_a_scores={
+            base_variants[0].base_variant_key: 3.0,
+            base_variants[1].base_variant_key: 2.0,
+        }
+    )
+    job_repository = _FakeJobRepository(default_job=job)
+    lease_repository = _FakeLeaseRepository()
+    results_repository = _FakeResultsRepository()
+    use_case = _build_use_case(
+        request=request,
+        job_repository=job_repository,
+        lease_repository=lease_repository,
+        results_repository=results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=risk_variants,
+        ),
+        scorer=scorer,
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=1,
+        snapshot_variants_step=10_000,
+        stage_batch_size=1,
+        now_provider=_NowProvider(
+            current=_utc(2026, 2, 23, 10, 30, 0),
+            step_seconds=2,
+        ),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    running_snapshots = [
+        call
+        for call in results_repository.replace_calls
+        if all(row.report_table_md is None for row in call["rows"])
+    ]
+    assert report.status == "succeeded"
+    assert len(running_snapshots) >= 2
+
+
 def test_process_claimed_job_persists_running_snapshots_by_variants_step() -> None:
     """
     Verify running snapshots are persisted when `snapshot_variants_step` threshold is reached.

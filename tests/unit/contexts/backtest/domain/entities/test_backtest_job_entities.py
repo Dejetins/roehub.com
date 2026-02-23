@@ -9,7 +9,10 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobErrorPayload,
 )
-from trading.contexts.backtest.domain.errors import BacktestJobTransitionError
+from trading.contexts.backtest.domain.errors import (
+    BacktestJobLeaseError,
+    BacktestJobTransitionError,
+)
 from trading.shared_kernel.primitives import UserId
 
 
@@ -145,6 +148,54 @@ def test_backtest_job_claim_sets_running_state_and_lease_fields() -> None:
 
 
 
+def test_backtest_job_rejects_lease_fields_outside_running_state() -> None:
+    """
+    Verify aggregate rejects non-null lease fields when state is not `running`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Lease tuple is valid only for running jobs.
+    Raises:
+        AssertionError: If queued state accepts lease fields.
+    Side Effects:
+        None.
+    """
+    queued = _build_queued_job()
+
+    with pytest.raises(BacktestJobLeaseError, match="lease fields must be null"):
+        BacktestJob(
+            job_id=queued.job_id,
+            user_id=queued.user_id,
+            mode=queued.mode,
+            state=queued.state,
+            created_at=queued.created_at,
+            updated_at=queued.updated_at + timedelta(seconds=1),
+            started_at=queued.started_at,
+            finished_at=queued.finished_at,
+            cancel_requested_at=queued.cancel_requested_at,
+            request_json=queued.request_json,
+            request_hash=queued.request_hash,
+            spec_hash=queued.spec_hash,
+            spec_payload_json=queued.spec_payload_json,
+            engine_params_hash=queued.engine_params_hash,
+            backtest_runtime_config_hash=queued.backtest_runtime_config_hash,
+            stage=queued.stage,
+            processed_units=queued.processed_units,
+            total_units=queued.total_units,
+            progress_updated_at=queued.progress_updated_at,
+            locked_by="worker-a-123",
+            locked_at=queued.updated_at + timedelta(seconds=1),
+            lease_expires_at=queued.updated_at + timedelta(seconds=61),
+            heartbeat_at=queued.updated_at + timedelta(seconds=1),
+            attempt=queued.attempt,
+            last_error=queued.last_error,
+            last_error_json=queued.last_error_json,
+        )
+
+
 def test_backtest_job_request_cancel_converts_queued_to_cancelled() -> None:
     """
     Verify cancel request immediately transitions queued jobs to terminal cancelled state.
@@ -170,6 +221,64 @@ def test_backtest_job_request_cancel_converts_queued_to_cancelled() -> None:
     assert cancelled.cancel_requested_at == cancelled_at
     assert cancelled.locked_by is None
 
+
+
+def test_backtest_job_request_cancel_for_running_marks_cancel_requested_only() -> None:
+    """
+    Verify running cancel request sets marker and keeps job in running state.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Running cancel is deferred to worker batch boundaries.
+    Raises:
+        AssertionError: If running cancel transitions to terminal state immediately.
+    Side Effects:
+        None.
+    """
+    running = _build_queued_job().claim(
+        changed_at=datetime(2026, 2, 22, 18, 0, 1, tzinfo=timezone.utc),
+        locked_by="worker-a-123",
+        lease_expires_at=datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc),
+    )
+    cancel_requested_at = datetime(2026, 2, 22, 18, 0, 30, tzinfo=timezone.utc)
+
+    updated = running.request_cancel(changed_at=cancel_requested_at)
+
+    assert updated.state == "running"
+    assert updated.cancel_requested_at == cancel_requested_at
+    assert updated.finished_at is None
+    assert updated.locked_by == "worker-a-123"
+
+
+def test_backtest_job_request_cancel_is_idempotent_for_terminal_state() -> None:
+    """
+    Verify repeated cancel requests on terminal job are idempotent.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Terminal jobs must not mutate on repeated cancel.
+    Raises:
+        AssertionError: If second cancel mutates terminal snapshot.
+    Side Effects:
+        None.
+    """
+    cancelled = _build_queued_job().request_cancel(
+        changed_at=datetime(2026, 2, 22, 18, 0, 2, tzinfo=timezone.utc)
+    )
+
+    repeated = cancelled.request_cancel(
+        changed_at=datetime(2026, 2, 22, 18, 0, 3, tzinfo=timezone.utc)
+    )
+
+    assert repeated is cancelled
+    assert repeated.state == "cancelled"
+    assert repeated.finished_at == cancelled.finished_at
 
 
 def test_backtest_job_finish_failed_requires_error_payload() -> None:

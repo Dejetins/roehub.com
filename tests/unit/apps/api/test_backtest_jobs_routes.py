@@ -17,6 +17,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
+from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
 
@@ -343,6 +344,88 @@ def test_get_backtest_job_status_returns_failed_last_error_payload() -> None:
         "details": {"stage": "stage_b"},
     }
 
+
+
+def test_get_backtest_job_status_maps_forbidden_to_403_payload() -> None:
+    """
+    Verify status route maps owner-policy `forbidden` error to stable HTTP 403 payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Status use-case raises RoehubError for foreign existing job.
+    Raises:
+        AssertionError: If status code or payload diverges from canonical error contract.
+    Side Effects:
+        None.
+    """
+    status_fake = _StatusUseCaseFake(
+        error=RoehubError(
+            code="forbidden",
+            message="Backtest job is forbidden",
+            details={"job_id": "00000000-0000-0000-0000-000000000912"},
+        )
+    )
+    client, _ = _build_client(status_use_case=status_fake)
+
+    response = client.get(
+        "/backtests/jobs/00000000-0000-0000-0000-000000000912",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 403
+    assert response.json() == {
+        "error": {
+            "code": "forbidden",
+            "message": "Backtest job is forbidden",
+            "details": {
+                "job_id": "00000000-0000-0000-0000-000000000912",
+            },
+        }
+    }
+
+
+def test_get_backtest_job_status_maps_not_found_to_404_payload() -> None:
+    """
+    Verify status route maps missing-job `not_found` error to stable HTTP 404 payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Status use-case raises RoehubError when job id is absent.
+    Raises:
+        AssertionError: If status code or payload diverges from canonical error contract.
+    Side Effects:
+        None.
+    """
+    status_fake = _StatusUseCaseFake(
+        error=RoehubError(
+            code="not_found",
+            message="Backtest job not found",
+            details={"job_id": "00000000-0000-0000-0000-000000000913"},
+        )
+    )
+    client, _ = _build_client(status_use_case=status_fake)
+
+    response = client.get(
+        "/backtests/jobs/00000000-0000-0000-0000-000000000913",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {
+            "code": "not_found",
+            "message": "Backtest job not found",
+            "details": {
+                "job_id": "00000000-0000-0000-0000-000000000913",
+            },
+        }
+    }
 
 
 def test_get_backtest_job_top_hides_details_for_non_succeeded_jobs() -> None:
