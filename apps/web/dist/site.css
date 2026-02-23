@@ -1,0 +1,144 @@
+:root {
+  --bg: #f3f6fb;
+  --surface: #ffffff;
+  --surface-soft: #f8fafc;
+  --text: #1d2532;
+  --muted: #5b6577;
+  --line: #d9e0ea;
+  --accent: #1f5cff;
+  --danger-bg: #ffe9e9;
+  --danger-text: #7e1f1f;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+  background: linear-gradient(180deg, #f3f6fb 0%, #edf2fb 100%);
+  color: var(--text);
+}
+
+.site-header {
+  position: sticky;
+  top: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.9rem 1.2rem;
+  background: rgba(255, 255, 255, 0.93);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.site-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.35rem 0.55rem;
+  border-radius: 0.45rem;
+}
+
+.site-nav a.active,
+.site-nav a:hover {
+  background: var(--surface-soft);
+  color: var(--accent);
+}
+
+.header-badge {
+  min-width: 6rem;
+  text-align: right;
+}
+
+.content {
+  width: min(980px, calc(100% - 2rem));
+  margin: 1.3rem auto 2rem;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 0.9rem;
+  padding: 1rem 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.panel--soft {
+  background: var(--surface-soft);
+}
+
+.panel h1,
+.panel h2 {
+  margin-top: 0;
+}
+
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  padding: 0.3rem 0.55rem;
+  font-size: 0.82rem;
+}
+
+.user-badge-level {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.user-badge-id {
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.user-badge--guest,
+.user-badge--error {
+  color: var(--muted);
+}
+
+.error-banner {
+  border: 1px solid #f0b1b1;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-radius: 0.7rem;
+  padding: 0.7rem 0.9rem;
+  margin-bottom: 0.8rem;
+}
+
+.hidden {
+  display: none;
+}
+
+.skeleton-row {
+  height: 0.85rem;
+  margin-bottom: 0.55rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e6edf8 0%, #dfe7f5 60%, #edf3ff 100%);
+}
+
+@media (max-width: 720px) {
+  .site-header {
+    grid-template-columns: 1fr;
+  }
+
+  .header-badge {
+    text-align: left;
+  }
+}

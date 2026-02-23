@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <h1>{{ page_title }}</h1>
+    <p>{{ page_description }}</p>
+
+    <section class="panel panel--soft">
+      <h2>Authenticated user</h2>
+      <div
+        id="user-badge-slot"
+        hx-get="/_partial/user_badge"
+        hx-trigger="load"
+        hx-swap="innerHTML"
+      >
+        {% include "partials/user_badge.html" %}
+      </div>
+    </section>
+
+    <section class="panel panel--soft">
+      <h2>Placeholder</h2>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+      <div class="skeleton-row"></div>
+    </section>
+  </section>
+{% endblock %}

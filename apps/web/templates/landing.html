@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Roehub Web UI</h1>
+    <p>
+      This SSR facade is intentionally small. It renders HTML pages and relies on the JSON
+      API for all protected data and auth state.
+    </p>
+    <p>
+      Open <a href="/login">/login</a> to authenticate, then visit protected routes:
+      <a href="/strategies">strategies</a>, <a href="/backtests">backtests</a>,
+      <a href="/backtests/jobs">backtests jobs</a>.
+    </p>
+  </section>
+{% endblock %}

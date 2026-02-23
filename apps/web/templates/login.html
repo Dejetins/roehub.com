@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Login</h1>
+    <p>Authenticate with Telegram and continue to your requested protected page.</p>
+    <div id="login-error" class="error-banner hidden" role="alert"></div>
+
+    <script>
+      const nextPath = {{ next_path | tojson }};
+
+      function onTelegramAuth(payload) {
+        const request = fetch('/api/auth/telegram/login', {method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        request
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error('Login failed with status ' + response.status);
+            }
+            return response.json();
+          })
+          .then(() => {
+            window.location.assign(nextPath);
+          })
+          .catch((error) => {
+            const errorBanner = document.getElementById('login-error');
+            if (errorBanner !== null) {
+              errorBanner.textContent = error.message;
+              errorBanner.classList.remove('hidden');
+            }
+          });
+      }
+
+      window.onTelegramAuth = onTelegramAuth;
+    </script>
+
+    <script
+      async
+      src="https://telegram.org/js/telegram-widget.js?22"
+      data-telegram-login="{{ bot_username }}"
+      data-size="large"
+      data-request-access="write"
+      data-onauth="onTelegramAuth(user)"
+    ></script>
+  </section>
+{% endblock %}

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} | Roehub</title>
+    <link rel="stylesheet" href="/assets/site.css">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">Roehub</a>
+      <nav class="site-nav">
+        <a class="{% if page_path == '/' %}active{% endif %}" href="/">Home</a>
+        <a class="{% if page_path == '/strategies' %}active{% endif %}" href="/strategies">
+          Strategies
+        </a>
+        <a class="{% if page_path == '/backtests' %}active{% endif %}" href="/backtests">
+          Backtests
+        </a>
+        <a class="{% if page_path == '/backtests/jobs' %}active{% endif %}" href="/backtests/jobs">
+          Jobs
+        </a>
+        <a class="{% if page_path == '/login' %}active{% endif %}" href="/login">Login</a>
+        <a class="{% if page_path == '/logout' %}active{% endif %}" href="/logout">Logout</a>
+      </nav>
+      <div class="header-badge">
+        {% include "partials/user_badge.html" %}
+      </div>
+    </header>
+
+    <main class="content">
+      {% if error_message %}
+        <div class="error-banner" role="alert">{{ error_message }}</div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

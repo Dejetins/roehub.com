@@ -1,0 +1,8 @@
+{% if current_user %}
+  <span class="user-badge" title="{{ current_user.user_id }}">
+    <span class="user-badge-level">{{ current_user.paid_level|upper }}</span>
+    <span class="user-badge-id">{{ current_user.user_id[:8] }}</span>
+  </span>
+{% else %}
+  <span class="user-badge user-badge--guest">guest</span>
+{% endif %}

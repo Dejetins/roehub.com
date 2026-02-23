@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="panel">
+    <h1>Logout</h1>
+    <p>Ending your session and redirecting to /login.</p>
+  </section>
+
+  <script>
+    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+      .catch(() => null)
+      .finally(() => {
+        window.location.assign('/login');
+      });
+  </script>
+{% endblock %}
