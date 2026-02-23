@@ -1,15 +1,15 @@
-# Web UI Gateway Same-Origin (WEB-EPIC-02)
+# Шлюз Web UI с same-origin (WEB-EPIC-02)
 
-Runbook for local and server startup of the same-origin `web + api + gateway` stack.
+Ранбук для локального и серверного запуска same-origin стека `web + api + gateway`.
 
-## Required environment file
+## Обязательный файл окружения
 
-Use the same env-file pattern as deployment:
+Используйте тот же шаблон env-файла, что и в деплое:
 
-- `/etc/roehub/roehub.env` on servers
-- local equivalent path (example: `./infra/docker/.env.local`)
+- `/etc/roehub/roehub.env` на серверах
+- локальный эквивалентный путь (пример: `./infra/docker/.env.local`)
 
-Minimum keys for UI profile:
+Минимальные ключи для UI-профиля:
 
 - `POSTGRES_PASSWORD`
 - `IDENTITY_PG_DSN`
@@ -18,11 +18,11 @@ Minimum keys for UI profile:
 - `WEB_API_BASE_URL`
 - `TELEGRAM_BOT_TOKEN`
 
-Reference placeholders:
+Референс с плейсхолдерами:
 
 - `infra/docker/.env.example`
 
-## One-command dev start
+## Запуск dev одной командой
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml \
@@ -30,11 +30,11 @@ docker compose -f infra/docker/docker-compose.yml \
   --profile ui up -d --build
 ```
 
-Expected endpoint:
+Ожидаемый endpoint:
 
 - `http://127.0.0.1:8080`
 
-Quick checks:
+Быстрые проверки:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml \
@@ -45,55 +45,55 @@ curl -i http://127.0.0.1:8080/api/auth/current-user
 curl -i http://127.0.0.1:8080/assets/site.css
 ```
 
-## DB bootstrap behavior
+## Поведение bootstrap БД
 
-`db-bootstrap` runs before `api` in UI profile and executes:
+`db-bootstrap` запускается перед `api` в UI-профиле и выполняет:
 
 1. `python -m apps.migrations.bootstrap_main`
-2. Identity SQL baseline in `IDENTITY_PG_DSN`:
-   - apply `0001_identity_v1.sql`
-   - apply `0002_identity_2fa_totp_v1.sql`
-   - apply `0003_identity_exchange_keys_v1.sql`
+2. Базовую SQL-миграцию Identity в `IDENTITY_PG_DSN`:
+   - применяет `0001_identity_v1.sql`
+   - применяет `0002_identity_2fa_totp_v1.sql`
+   - применяет `0003_identity_exchange_keys_v1.sql`
 3. Guarded `0004_identity_exchange_keys_v2.sql`:
-   - skip if v2 columns already exist
-   - apply only if v1 layout exists and table is empty
-   - fail fast if v1 layout has rows (unsafe migration path)
-4. Alembic head in `POSTGRES_DSN` via existing runner:
+   - пропускает, если колонки v2 уже существуют
+   - применяет только если layout v1 существует и таблица пустая
+   - завершает запуск с ошибкой, если в layout v1 уже есть строки (небезопасный путь миграции)
+4. Alembic head в `POSTGRES_DSN` через существующий runner:
    - `python -m apps.migrations.main --dsn "$POSTGRES_DSN"`
 
-The service is one-shot (`restart: "no"`). If bootstrap fails, `api` does not start.
+Сервис одноразовый (`restart: "no"`). Если bootstrap падает, `api` не стартует.
 
-## Telegram Login Widget domain
+## Домен Telegram Login Widget
 
-Production:
+Прод:
 
-1. Open `@BotFather`.
-2. Run `/setdomain`.
-3. Set domain to `roehub.com`.
+1. Откройте `@BotFather`.
+2. Выполните `/setdomain`.
+3. Установите домен `roehub.com`.
 
-Development:
+Разработка:
 
-1. Expose gateway `127.0.0.1:8080` through a tunnel (`cloudflared` or `ngrok`).
-2. Set tunnel domain in `@BotFather /setdomain`.
-3. Open login page via tunnel URL.
+1. Пробросьте `127.0.0.1:8080` через туннель (`cloudflared` или `ngrok`).
+2. Установите домен туннеля в `@BotFather /setdomain`.
+3. Откройте страницу логина через URL туннеля.
 
-Trade-off:
+Ограничение:
 
-- one bot can have only one active domain, so using the production bot for dev tunnel can break prod
-  login widget
-- recommended: separate staging/dev bot for local tunnel testing
+- у одного бота может быть только один активный домен, поэтому использование production-бота
+  для dev-туннеля может сломать login widget в проде
+- рекомендация: используйте отдельного staging/dev-бота для локального тестирования через туннель
 
 ## Troubleshooting: "bot domain invalid"
 
-- Ensure browser host exactly matches BotFather domain (no extra subdomain or port).
-- Ensure you open login page via `https` URL from tunnel.
-- Re-run `/setdomain` and wait up to a few minutes for Telegram-side propagation.
-- Confirm widget uses the expected bot username.
+- Убедитесь, что host в браузере точно совпадает с доменом из BotFather (без лишнего subdomain или порта).
+- Убедитесь, что страница логина открыта через `https` URL туннеля.
+- Повторите `/setdomain` и подождите до нескольких минут, пока изменения распространятся на стороне Telegram.
+- Проверьте, что widget использует ожидаемый username бота.
 
-## Health routing note
+## Примечание по health-маршрутизации
 
-Gateway strips `/api` and proxies to API upstream:
+Gateway отрезает префикс `/api` и проксирует запрос в API upstream:
 
-- `/api/<path>` at gateway -> `/<path>` at API.
+- `/api/<path>` на gateway -> `/<path>` на API.
 
-If API later adds `/health`, it will be reachable as `/api/health` through gateway.
+Если позже в API появится `/health`, через gateway он будет доступен как `/api/health`.
