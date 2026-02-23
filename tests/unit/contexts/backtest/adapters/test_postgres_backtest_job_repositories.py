@@ -313,6 +313,7 @@ def test_results_repository_replace_snapshot_uses_delete_insert_single_statement
     assert "INSERT INTO backtest_job_top_variants" in gateway.fetch_one_queries[0]
     assert "state = 'running'" in gateway.fetch_one_queries[0]
     assert "lease_expires_at > %(now)s" in gateway.fetch_one_queries[0]
+    assert "item ->> 'report_table_md' AS report_table_md" in gateway.fetch_one_queries[0]
 
 
 

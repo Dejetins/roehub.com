@@ -144,7 +144,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                 (item ->> 'variant_index')::INTEGER AS variant_index,
                 (item ->> 'total_return_pct')::DOUBLE PRECISION AS total_return_pct,
                 item -> 'payload_json' AS payload_json,
-                NULL::TEXT AS report_table_md,
+                item ->> 'report_table_md' AS report_table_md,
                 item -> 'trades_json' AS trades_json,
                 %(now)s AS updated_at
             FROM source_rows
@@ -384,6 +384,7 @@ def _serialize_top_rows(
                 "variant_index": row.variant_index,
                 "total_return_pct": row.total_return_pct,
                 "payload_json": dict(row.payload_json),
+                "report_table_md": row.report_table_md,
                 "trades_json": [dict(item) for item in row.trades_json]
                 if row.trades_json is not None
                 else None,

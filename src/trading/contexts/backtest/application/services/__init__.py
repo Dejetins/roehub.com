@@ -16,6 +16,15 @@ from .grid_builder_v1 import (
     BacktestRiskVariantV1,
     BacktestStageABaseVariant,
 )
+from .job_runner_streaming_v1 import (
+    BacktestJobSnapshotCadenceV1,
+    BacktestJobTopKBufferV1,
+    BacktestJobTopVariantCandidateV1,
+    build_finalized_snapshot_rows,
+    build_running_snapshot_rows,
+    build_trades_json_payload,
+    build_variant_payload_json,
+)
 from .metrics_calculator_v1 import BACKTEST_METRIC_ORDER_V1, BacktestMetricsCalculatorV1
 from .reporting_service_v1 import BacktestReportingServiceV1
 from .signals_from_indicators_v1 import (
@@ -42,6 +51,9 @@ __all__ = [
     "BACKTEST_METRIC_ORDER_V1",
     "BacktestGridBuildContextV1",
     "BacktestGridBuilderV1",
+    "BacktestJobSnapshotCadenceV1",
+    "BacktestJobTopKBufferV1",
+    "BacktestJobTopVariantCandidateV1",
     "BacktestRiskVariantV1",
     "BacktestStagedRunResultV1",
     "BacktestStagedRunnerV1",
@@ -66,6 +78,10 @@ __all__ = [
     "evaluate_and_aggregate_signals_v1",
     "evaluate_indicator_signal_v1",
     "expand_indicator_grids_with_signal_dependencies_v1",
+    "build_finalized_snapshot_rows",
+    "build_running_snapshot_rows",
+    "build_trades_json_payload",
+    "build_variant_payload_json",
     "indicator_primary_output_series_from_tensor_v1",
     "list_signal_rule_registry_v1",
     "normalize_1m_load_time_range",

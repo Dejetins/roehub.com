@@ -6,8 +6,16 @@ from .errors import (
     validation_error,
 )
 from .run_backtest import RunBacktestUseCase
+from .run_backtest_job_runner_v1 import (
+    BacktestJobRunReportV1,
+    BacktestJobRunStatus,
+    RunBacktestJobRunnerV1,
+)
 
 __all__ = [
+    "BacktestJobRunReportV1",
+    "BacktestJobRunStatus",
+    "RunBacktestJobRunnerV1",
     "RunBacktestUseCase",
     "backtest_conflict",
     "backtest_forbidden",
@@ -15,4 +23,3 @@ __all__ = [
     "map_backtest_exception",
     "validation_error",
 ]
-

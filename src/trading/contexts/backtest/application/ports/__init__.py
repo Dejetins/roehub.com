@@ -5,6 +5,7 @@ from .backtest_job_repositories import (
     BacktestJobRepository,
     BacktestJobResultsRepository,
 )
+from .backtest_job_request_decoder import BacktestJobRequestDecoder
 from .current_user import CurrentUser
 from .staged_runner import (
     BacktestGridDefaultsProvider,
@@ -21,6 +22,7 @@ __all__ = [
     "BacktestJobListQuery",
     "BacktestJobRepository",
     "BacktestJobResultsRepository",
+    "BacktestJobRequestDecoder",
     "BacktestGridDefaultsProvider",
     "BacktestSignalParamsMap",
     "BacktestStagedVariantScorerWithDetails",
