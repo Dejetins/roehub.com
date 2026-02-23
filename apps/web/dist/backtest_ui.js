@@ -16,14 +16,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initBacktestPage(pageRoot) {
   const backtestsPath = requireDataAttr(pageRoot, "apiBacktestsPath");
+  const backtestJobsPath = requireDataAttr(pageRoot, "apiBacktestJobsPath");
   const estimatePath = requireDataAttr(pageRoot, "apiEstimatePath");
   const strategiesPath = requireDataAttr(pageRoot, "apiStrategiesPath");
   const marketsPath = requireDataAttr(pageRoot, "apiMarketsPath");
   const instrumentsPath = requireDataAttr(pageRoot, "apiInstrumentsPath");
   const indicatorsPath = requireDataAttr(pageRoot, "apiIndicatorsPath");
   const strategyBuilderPath = requireDataAttr(pageRoot, "strategyBuilderPath");
+  const jobsListPath = requireDataAttr(pageRoot, "jobsListPath");
   const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
   const prefillStorage = requireDataAttr(pageRoot, "prefillStorage");
+  const jobContextStoragePrefix = requireDataAttr(pageRoot, "jobContextStoragePrefix");
 
   const form = pageRoot.querySelector("#backtest-form");
   const modeTemplate = pageRoot.querySelector("input[name=\"backtest-mode\"][value=\"template\"]");
@@ -33,6 +36,7 @@ function initBacktestPage(pageRoot) {
   const templateModeSection = pageRoot.querySelector("#backtest-template-mode");
   const savedModeSection = pageRoot.querySelector("#backtest-saved-mode");
   const jobNotice = pageRoot.querySelector("#backtest-job-notice");
+  const jobDisabledBanner = pageRoot.querySelector("#backtest-job-disabled-banner");
   const runButton = pageRoot.querySelector("#backtest-run-button");
   const runLoading = pageRoot.querySelector("#backtest-run-loading");
 
@@ -94,6 +98,7 @@ function initBacktestPage(pageRoot) {
     || templateModeSection === null
     || savedModeSection === null
     || jobNotice === null
+    || jobDisabledBanner === null
     || runButton === null
     || runLoading === null
     || marketSelect === null
@@ -149,6 +154,7 @@ function initBacktestPage(pageRoot) {
     runType: "sync",
     isRunning: false,
     preflightReady: false,
+    jobsDisabled: false,
     markets: [],
     marketsById: new Map(),
     indicators: [],
@@ -193,20 +199,33 @@ function initBacktestPage(pageRoot) {
     jobNotice.classList.toggle("hidden", !isJob);
     runButton.textContent = isJob ? "Run as job" : "Run sync";
     runButton.disabled = true;
+    runTypeJob.disabled = state.jobsDisabled;
 
     if (state.isRunning) {
       return;
     }
-    if (isJob) {
+    if (isJob && state.jobsDisabled) {
       return;
     }
-    if (state.mode === "template" && !state.preflightReady) {
+    if (state.mode === "template" && !isJob && !state.preflightReady) {
       return;
     }
     if (state.mode === "saved" && String(strategiesSelect.value || "").trim().length === 0) {
       return;
     }
     runButton.disabled = false;
+  };
+
+  const setJobsDisabled = () => {
+    state.jobsDisabled = true;
+    jobDisabledBanner.classList.remove("hidden");
+    runTypeJob.disabled = true;
+    if (state.runType === "job") {
+      state.runType = "sync";
+      runTypeSync.checked = true;
+      runTypeJob.checked = false;
+    }
+    updateRunAvailability();
   };
 
   const renderSuggestionButtons = (symbols) => {
@@ -1273,6 +1292,86 @@ function initBacktestPage(pageRoot) {
     }
   };
 
+  const buildJobContextPayload = (request) => {
+    const requestPayload = asRecord(request.payload);
+    const context = asRecord(request.context);
+
+    if (context.mode === "saved") {
+      const strategy = asRecord(context.strategy);
+      const strategySpec = asRecord(strategy.spec);
+      const instrument = asRecord(strategySpec.instrument_id);
+      const marketId = Number(instrument.market_id || 0);
+      const symbol = String(instrument.symbol || "").trim();
+      const timeframe = String(strategySpec.timeframe || "").trim();
+      const marketType = String(strategySpec.market_type || "").trim();
+      const instrumentKey = String(strategySpec.instrument_key || "").trim();
+      if (
+        marketId <= 0
+        || symbol.length === 0
+        || timeframe.length === 0
+        || marketType.length === 0
+        || instrumentKey.length === 0
+      ) {
+        return null;
+      }
+      return {
+        mode: "saved",
+        instrument_id: {
+          market_id: marketId,
+          symbol,
+        },
+        timeframe,
+        market_type: marketType,
+        instrument_key: instrumentKey,
+      };
+    }
+
+    const templatePayload = asRecord(requestPayload.template);
+    const instrument = asRecord(templatePayload.instrument_id);
+    const market = asRecord(context.market);
+    const marketId = Number(instrument.market_id || 0);
+    const symbol = String(instrument.symbol || "").trim();
+    const timeframe = String(templatePayload.timeframe || "").trim();
+    const marketType = String(market.market_type || "").trim();
+    const marketCode = String(market.market_code || "").trim();
+    if (
+      marketId <= 0
+      || symbol.length === 0
+      || timeframe.length === 0
+      || marketType.length === 0
+      || marketCode.length === 0
+    ) {
+      return null;
+    }
+
+    return {
+      mode: "template",
+      instrument_id: {
+        market_id: marketId,
+        symbol,
+      },
+      timeframe,
+      market_type: marketType,
+      instrument_key: `${marketCode}:${marketType}:${symbol}`,
+    };
+  };
+
+  const persistJobContext = ({ jobId, request }) => {
+    if (typeof window.sessionStorage === "undefined") {
+      return;
+    }
+    const contextPayload = buildJobContextPayload(request);
+    if (contextPayload === null) {
+      return;
+    }
+    const storageKey = `${jobContextStoragePrefix}${jobId}`;
+    window.sessionStorage.setItem(storageKey, JSON.stringify(contextPayload));
+  };
+
+  const renderJobDetailsPath = (jobId) => (
+    `${jobsListPath}/${encodeURIComponent(jobId)}`
+  );
+
   const runPreflight = async () => {
     clearPageError(pageRoot);
     if (state.mode !== "template") {
@@ -1318,18 +1417,12 @@ function initBacktestPage(pageRoot) {
     }
   };
 
-  const runBacktest = async () => {
-    clearPageError(pageRoot);
-    if (state.runType === "job") {
-      showPageError(pageRoot, "Jobs UI is in WEB-EPIC-06.", []);
-      return;
-    }
+  const runBacktestSync = async () => {
+    const request = buildRunRequest();
+    state.isRunning = true;
+    updateRunAvailability();
+    runLoading.classList.remove("hidden");
     try {
-      const request = buildRunRequest();
-      state.isRunning = true;
-      updateRunAvailability();
-      runLoading.classList.remove("hidden");
-
       const response = await fetch(backtestsPath, {
         method: "POST",
         credentials: 'include',
@@ -1345,13 +1438,63 @@ function initBacktestPage(pageRoot) {
         context: request.context,
       };
       renderResults(payload);
-    } catch (error) {
-      const normalized = normalizeError(error);
-      showPageError(pageRoot, normalized.message, normalized.details);
     } finally {
       state.isRunning = false;
       runLoading.classList.add("hidden");
       updateRunAvailability();
+    }
+  };
+
+  const runBacktestJob = async () => {
+    if (state.jobsDisabled) {
+      showPageError(pageRoot, "Jobs disabled by config", []);
+      return;
+    }
+    const request = buildRunRequest();
+    state.isRunning = true;
+    updateRunAvailability();
+    runLoading.classList.remove("hidden");
+    try {
+      const response = await fetch(backtestJobsPath, {
+        method: "POST",
+        credentials: 'include',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request.payload),
+      });
+      if (response.status === 404) {
+        setJobsDisabled();
+        showPageError(pageRoot, "Jobs disabled by config", []);
+        return;
+      }
+      if (!response.ok) {
+        throw await buildHttpError(response);
+      }
+
+      const payload = await response.json();
+      const jobId = String(payload.job_id || "").trim();
+      if (jobId.length === 0) {
+        throw new Error("Job create response does not contain job_id.");
+      }
+      persistJobContext({ jobId, request });
+      window.location.assign(renderJobDetailsPath(jobId));
+    } finally {
+      state.isRunning = false;
+      runLoading.classList.add("hidden");
+      updateRunAvailability();
+    }
+  };
+
+  const runBacktest = async () => {
+    clearPageError(pageRoot);
+    try {
+      if (state.runType === "job") {
+        await runBacktestJob();
+      } else {
+        await runBacktestSync();
+      }
+    } catch (error) {
+      const normalized = normalizeError(error);
+      showPageError(pageRoot, normalized.message, normalized.details);
     }
   };
 
@@ -1459,6 +1602,14 @@ function initBacktestPage(pageRoot) {
     event.preventDefault();
     await runBacktest();
   });
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const runTypeParam = String(searchParams.get("run_type") || "").trim().toLowerCase();
+  if (runTypeParam === "job") {
+    state.runType = "job";
+    runTypeJob.checked = true;
+    runTypeSync.checked = false;
+  }
 
   applyRangePreset("90d");
   updateModeSections();

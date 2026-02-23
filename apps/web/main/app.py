@@ -275,12 +275,12 @@ def _register_routes(
     @app.get("/backtests/jobs", response_class=HTMLResponse)
     def get_backtest_jobs_page(request: Request) -> Response:
         """
-        Render protected backtest jobs skeleton page behind current-user login gate.
+        Render protected Backtest jobs list page behind current-user login gate.
 
         Args:
             request: HTTP request object.
         Returns:
-            Response: HTML jobs page or login redirect response.
+            Response: HTML jobs list page or login redirect response.
         Assumptions:
             Identity API determines current user via forwarded cookies.
         Raises:
@@ -293,9 +293,33 @@ def _register_routes(
             templates=templates,
             page_path="/backtests/jobs",
             page_title="Backtest Jobs",
-            page_description=(
-                "Backtest jobs UI arrives in WEB-EPIC-06. This page is a protected skeleton."
-            ),
+            template_name="backtest_jobs_list.html",
+        )
+
+    @app.get("/backtests/jobs/{job_id}", response_class=HTMLResponse)
+    def get_backtest_job_details_page(request: Request, job_id: str) -> Response:
+        """
+        Render protected Backtest job details page behind current-user login gate.
+
+        Args:
+            request: HTTP request object.
+            job_id: Target Backtest job identifier string from route path.
+        Returns:
+            Response: HTML job details page or login redirect response.
+        Assumptions:
+            Identity API determines current user via forwarded cookies.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/backtests/jobs",
+            page_title="Backtest Job Details",
+            template_name="backtest_job_details.html",
+            template_context={"job_id": job_id},
         )
 
     @app.get("/_partial/user_badge", response_class=HTMLResponse)

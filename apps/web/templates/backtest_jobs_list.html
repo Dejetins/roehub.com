@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="panel"
+    data-backtest-jobs-page="list"
+    data-api-jobs-path="/api/backtests/jobs"
+    data-details-path-template="/backtests/jobs/{job_id}"
+    data-default-limit="50"
+  >
+    <div class="panel-heading">
+      <h1>Backtest jobs</h1>
+      <a class="button-link" href="/backtests?run_type=job">Create job</a>
+    </div>
+
+    <p>
+      Browser loads jobs from <code>/api/*</code> with credentials and keeps cursor as opaque
+      <code>base64url(json)</code> text. The UI stores <code>next_cursor</code> exactly as returned.
+    </p>
+
+    <div id="jobs-list-error-banner" class="error-banner hidden" role="alert"></div>
+    <div id="jobs-list-validation-errors" class="validation-list hidden"></div>
+
+    <section class="panel panel--soft">
+      <h2>Filters</h2>
+      <div class="filters-grid">
+        <label for="jobs-list-state">State</label>
+        <select id="jobs-list-state">
+          <option value="">All</option>
+          <option value="queued">queued</option>
+          <option value="running">running</option>
+          <option value="succeeded">succeeded</option>
+          <option value="failed">failed</option>
+          <option value="cancelled">cancelled</option>
+        </select>
+
+        <label for="jobs-list-limit">Limit</label>
+        <select id="jobs-list-limit">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+        </select>
+
+        <label for="jobs-list-cursor-value">Current cursor</label>
+        <input id="jobs-list-cursor-value" type="text" readonly placeholder="" value="">
+      </div>
+
+      <div class="inline-actions">
+        <button id="jobs-list-refresh" class="button-link" type="button">Refresh</button>
+        <button id="jobs-list-prev" class="button-link button-link--secondary" type="button">
+          Previous page
+        </button>
+        <button id="jobs-list-next" class="button-link button-link--secondary" type="button">
+          Next page
+        </button>
+      </div>
+
+      <p id="jobs-list-disabled-banner" class="muted-text hidden">Jobs disabled by config</p>
+      <p id="jobs-list-cursor-note" class="muted-text">next_cursor: none</p>
+    </section>
+
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">job_id</th>
+            <th scope="col">mode</th>
+            <th scope="col">state</th>
+            <th scope="col">stage</th>
+            <th scope="col">created_at</th>
+            <th scope="col">updated_at</th>
+            <th scope="col">processed_units/total_units</th>
+          </tr>
+        </thead>
+        <tbody id="jobs-list-table-body">
+          <tr>
+            <td colspan="7">Loading jobs...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/backtest_jobs_ui.js"></script>
+{% endblock %}

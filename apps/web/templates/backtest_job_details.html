@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="panel"
+    data-backtest-jobs-page="details"
+    data-job-id="{{ job_id }}"
+    data-api-jobs-path-prefix="/api/backtests/jobs/"
+    data-api-top-path-template="/api/backtests/jobs/{job_id}/top"
+    data-api-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"
+    data-list-path="/backtests/jobs"
+    data-strategy-builder-path="/strategies/new"
+    data-prefill-query-param="prefill"
+    data-prefill-storage="sessionStorage"
+    data-default-top-limit="50"
+  >
+    <div class="panel-heading">
+      <h1>Backtest job details</h1>
+      <a class="button-link button-link--secondary" href="/backtests/jobs">Back to jobs</a>
+    </div>
+
+    <p>
+      Status endpoint: <code>/api/backtests/jobs/{job_id}</code>. Top endpoint default request is
+      <code>limit=50</code>. Polling runs only while state is active.
+    </p>
+
+    <div id="job-details-error-banner" class="error-banner hidden" role="alert"></div>
+    <div id="job-details-validation-errors" class="validation-list hidden"></div>
+    <p id="job-details-disabled-banner" class="muted-text hidden">Jobs disabled by config</p>
+
+    <section class="panel panel--soft">
+      <div class="panel-heading">
+        <h2>Status</h2>
+        <div class="inline-actions">
+          <button id="job-copy-id" class="button-link button-link--secondary" type="button">
+            Copy job_id
+          </button>
+          <button id="job-refresh-status" class="button-link button-link--secondary" type="button">
+            Refresh status
+          </button>
+          <button id="job-cancel" class="button-link button-link--danger" type="button">
+            Cancel job
+          </button>
+        </div>
+      </div>
+
+      <dl class="key-value-grid">
+        <dt>job_id</dt>
+        <dd id="job-field-id">{{ job_id }}</dd>
+
+        <dt>mode</dt>
+        <dd id="job-field-mode"></dd>
+
+        <dt>state</dt>
+        <dd id="job-field-state"></dd>
+
+        <dt>stage</dt>
+        <dd id="job-field-stage"></dd>
+
+        <dt>created_at</dt>
+        <dd id="job-field-created-at"></dd>
+
+        <dt>updated_at</dt>
+        <dd id="job-field-updated-at"></dd>
+
+        <dt>started_at</dt>
+        <dd id="job-field-started-at"></dd>
+
+        <dt>finished_at</dt>
+        <dd id="job-field-finished-at"></dd>
+
+        <dt>cancel_requested_at</dt>
+        <dd id="job-field-cancel-requested-at"></dd>
+
+        <dt>progress_updated_at</dt>
+        <dd id="job-field-progress-updated-at"></dd>
+
+        <dt>processed_units / total_units</dt>
+        <dd id="job-field-progress"></dd>
+
+        <dt>request_hash</dt>
+        <dd id="job-field-request-hash"></dd>
+
+        <dt>engine_params_hash</dt>
+        <dd id="job-field-engine-params-hash"></dd>
+
+        <dt>backtest_runtime_config_hash</dt>
+        <dd id="job-field-runtime-config-hash"></dd>
+
+        <dt>spec_hash</dt>
+        <dd id="job-field-spec-hash"></dd>
+      </dl>
+
+      <div class="job-progress-track" role="progressbar" aria-label="Job progress">
+        <div id="job-progress-bar" class="job-progress-bar"></div>
+      </div>
+      <p id="job-progress-caption" class="muted-text">Progress: 0%</p>
+
+      <details id="job-failed-block" class="panel panel--soft hidden">
+        <summary>Failure details</summary>
+        <p><strong id="job-failed-error"></strong></p>
+        <pre id="job-failed-error-json" class="json-pre"></pre>
+      </details>
+    </section>
+
+    <section class="panel panel--soft">
+      <div class="panel-heading">
+        <h2>Best-so-far top</h2>
+        <div class="inline-actions">
+          <label for="job-top-limit">Limit</label>
+          <select id="job-top-limit">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+          </select>
+          <button id="job-refresh-top" class="button-link button-link--secondary" type="button">
+            Refresh top
+          </button>
+        </div>
+      </div>
+
+      <p id="job-top-note" class="muted-text">
+        report_table_md and trades are shown only for state <code>succeeded</code>.
+      </p>
+
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">rank</th>
+              <th scope="col">total_return_pct</th>
+              <th scope="col">variant_key</th>
+              <th scope="col">indicator_variant_key</th>
+              <th scope="col">report_table_md</th>
+              <th scope="col">trades</th>
+              <th scope="col">actions</th>
+            </tr>
+          </thead>
+          <tbody id="job-top-table-body">
+            <tr>
+              <td colspan="7">Loading top...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/lib/marked.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script type="module" src="/assets/backtest_jobs_ui.js"></script>
+{% endblock %}

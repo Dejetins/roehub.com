@@ -64,6 +64,10 @@ def test_create_app_fails_fast_when_web_api_base_url_is_missing() -> None:
     [
         ("/backtests", "/login?next=%2Fbacktests"),
         ("/backtests/jobs", "/login?next=%2Fbacktests%2Fjobs"),
+        (
+            "/backtests/jobs/00000000-0000-0000-0000-000000000777",
+            "/login?next=%2Fbacktests%2Fjobs%2F00000000-0000-0000-0000-000000000777",
+        ),
         ("/strategies", "/login?next=%2Fstrategies"),
         ("/strategies/new", "/login?next=%2Fstrategies%2Fnew"),
         (
@@ -209,6 +213,67 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     assert "/api/market-data/instruments" in response.text
     assert "/api/indicators" in response.text
     assert "/strategies/new" in response.text
+    assert "sessionStorage" in response.text
+    assert "prefill" in response.text
+
+
+def test_backtest_jobs_list_page_renders_required_jobs_ui_hooks() -> None:
+    """
+    Verify `/backtests/jobs` renders list-page hooks and required jobs API literals.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Jobs list page is SSR shell and browser performs JSON requests to `/api/backtests/jobs`.
+    Raises:
+        AssertionError: If required list hooks or literals are missing in rendered HTML.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+
+    response = client.get("/backtests/jobs")
+
+    assert response.status_code == 200
+    assert 'data-backtest-jobs-page="list"' in response.text
+    assert "/assets/backtest_jobs_ui.js" in response.text
+    assert "/api/backtests/jobs" in response.text
+    assert "base64url(json)" in response.text
+    assert "next_cursor" in response.text
+    assert "Jobs disabled by config" in response.text
+    assert "/backtests?run_type=job" in response.text
+
+
+def test_backtest_job_details_page_renders_job_id_and_required_jobs_literals() -> None:
+    """
+    Verify `/backtests/jobs/{job_id}` renders details hooks and route job identifier.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Details page route is SSR-only and job payload is fetched browser-side.
+    Raises:
+        AssertionError: If route job id or required jobs API path literals are missing.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+    job_id = "00000000-0000-0000-0000-000000000456"
+
+    response = client.get(f"/backtests/jobs/{job_id}")
+
+    assert response.status_code == 200
+    assert 'data-backtest-jobs-page="details"' in response.text
+    assert f'data-job-id="{job_id}"' in response.text
+    assert "/api/backtests/jobs/" in response.text
+    assert "/api/backtests/jobs/{job_id}/top" in response.text
+    assert "/api/backtests/jobs/{job_id}/cancel" in response.text
+    assert "limit=50" in response.text
+    assert "Jobs disabled by config" in response.text
     assert "sessionStorage" in response.text
     assert "prefill" in response.text
 

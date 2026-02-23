@@ -5,18 +5,24 @@
     class="panel"
     data-backtest-page="sync"
     data-api-backtests-path="/api/backtests"
+    data-api-backtest-jobs-path="/api/backtests/jobs"
     data-api-estimate-path="/api/indicators/estimate"
     data-api-strategies-path="/api/strategies"
     data-api-markets-path="/api/market-data/markets"
     data-api-instruments-path="/api/market-data/instruments"
     data-api-indicators-path="/api/indicators"
     data-strategy-builder-path="/strategies/new"
+    data-jobs-list-path="/backtests/jobs"
     data-prefill-query-param="prefill"
     data-prefill-storage="sessionStorage"
+    data-job-context-storage-prefix="backtest-job-context:"
   >
     <div class="panel-heading">
       <h1>Backtests</h1>
-      <a class="button-link button-link--secondary" href="/strategies">Open strategies</a>
+      <div class="inline-actions">
+        <a class="button-link button-link--secondary" href="/strategies">Open strategies</a>
+        <a class="button-link button-link--secondary" href="/backtests/jobs">Open jobs</a>
+      </div>
     </div>
 
     <p>
@@ -54,7 +60,10 @@
             Run as job
           </label>
         </div>
-        <p id="backtest-job-notice" class="muted-text hidden">Jobs UI is in WEB-EPIC-06.</p>
+        <p id="backtest-job-notice" class="muted-text hidden">
+          Job mode sends request to <code>/api/backtests/jobs</code> and redirects to details page.
+        </p>
+        <p id="backtest-job-disabled-banner" class="muted-text hidden">Jobs disabled by config</p>
       </fieldset>
 
       <fieldset class="panel panel--soft">
