@@ -251,7 +251,7 @@ def _register_routes(
     @app.get("/backtests", response_class=HTMLResponse)
     def get_backtests_page(request: Request) -> Response:
         """
-        Render protected backtests skeleton page behind current-user login gate.
+        Render protected sync backtests page behind current-user login gate.
 
         Args:
             request: HTTP request object.
@@ -269,9 +269,7 @@ def _register_routes(
             templates=templates,
             page_path="/backtests",
             page_title="Backtests",
-            page_description=(
-                "Backtest UI arrives in WEB-EPIC-05. This page is a protected skeleton."
-            ),
+            template_name="backtests.html",
         )
 
     @app.get("/backtests/jobs", response_class=HTMLResponse)

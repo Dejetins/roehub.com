@@ -341,6 +341,8 @@ function initBuilderPage(pageRoot) {
   const instrumentsPath = requireDataAttr(pageRoot, "apiInstrumentsPath");
   const indicatorsPath = requireDataAttr(pageRoot, "apiIndicatorsPath");
   const detailsPathPrefix = requireDataAttr(pageRoot, "detailsPathPrefix");
+  const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
+  const prefillStorage = requireDataAttr(pageRoot, "prefillStorage");
 
   const form = pageRoot.querySelector("#strategy-builder-form");
   const marketSelect = pageRoot.querySelector("#builder-market-id");
@@ -833,6 +835,118 @@ function initBuilderPage(pageRoot) {
     };
   };
 
+  const readPrefillPayload = () => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const prefillId = String(searchParams.get(prefillQueryParam) || "").trim();
+    if (prefillId.length === 0) {
+      return null;
+    }
+    if (prefillStorage !== "sessionStorage" || typeof window.sessionStorage === "undefined") {
+      throw new Error("sessionStorage is unavailable for strategy prefill.");
+    }
+
+    const rawPayload = window.sessionStorage.getItem(prefillId);
+    if (rawPayload === null || rawPayload.trim().length === 0) {
+      throw new Error(`Prefill payload is missing for key '${prefillId}'.`);
+    }
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(rawPayload);
+    } catch (_error) {
+      throw new Error("Prefill payload is not valid JSON.");
+    } finally {
+      window.sessionStorage.removeItem(prefillId);
+    }
+    return asRecord(parsed);
+  };
+
+  const buildBlocksFromPrefill = (prefillIndicators) => {
+    const blocks = [];
+    prefillIndicators.forEach((rawIndicator) => {
+      const indicator = asRecord(rawIndicator);
+      const indicatorId = String(indicator.id || "").trim();
+      if (indicatorId.length === 0) {
+        return;
+      }
+      const descriptor = state.indicatorsById.get(indicatorId);
+      if (!descriptor) {
+        return;
+      }
+
+      const block = {
+        uid: `indicator-block-${state.nextBlockNumber}`,
+        indicatorId,
+        inputs: {},
+        params: {},
+      };
+      state.nextBlockNumber += 1;
+
+      const inputValues = asRecord(indicator.inputs);
+      descriptor.inputs.forEach((inputSpec) => {
+        const inputName = String(inputSpec.name || "");
+        if (!inputName) {
+          return;
+        }
+        const rawValue = inputValues[inputName];
+        if (typeof rawValue !== "undefined" && rawValue !== "") {
+          block.inputs[inputName] = String(rawValue);
+        }
+      });
+
+      const paramValues = asRecord(indicator.params);
+      descriptor.params.forEach((paramSpec) => {
+        const paramName = String(paramSpec.name || "");
+        if (!paramName) {
+          return;
+        }
+        const rawValue = paramValues[paramName];
+        if (typeof rawValue === "undefined" || rawValue === "") {
+          return;
+        }
+        block.params[paramName] = coerceParamValue(String(paramSpec.kind || ""), rawValue);
+      });
+
+      ensureDefaultsForBlock(block);
+      blocks.push(block);
+    });
+    return blocks;
+  };
+
+  const applyPrefillPayload = (prefillPayload) => {
+    const instrument = asRecord(prefillPayload.instrument_id);
+    const marketId = Number(instrument.market_id || 0);
+    const symbol = String(instrument.symbol || "").trim();
+    const timeframe = String(prefillPayload.timeframe || "").trim();
+
+    if (marketId > 0 && state.marketsById.has(marketId)) {
+      marketSelect.value = String(marketId);
+    }
+    if (symbol.length > 0) {
+      symbolValue.value = symbol;
+      symbolQuery.value = symbol;
+      selectedSymbol.textContent = `Selected symbol: ${symbol}`;
+    }
+    if (SUPPORTED_TIMEFRAMES.includes(timeframe)) {
+      timeframeSelect.value = timeframe;
+    }
+
+    const indicatorItems = Array.isArray(prefillPayload.indicators)
+      ? prefillPayload.indicators
+      : [];
+    const blocks = buildBlocksFromPrefill(indicatorItems);
+    if (blocks.length > 0) {
+      state.blocks = blocks;
+      renderIndicatorBlocks();
+      return;
+    }
+    if (state.blocks.length === 0 && state.indicators.length > 0) {
+      addIndicatorBlock();
+    } else {
+      renderIndicatorBlocks();
+    }
+  };
+
   const initializeBuilder = async () => {
     clearPageError(pageRoot);
     try {
@@ -882,8 +996,24 @@ function initBuilderPage(pageRoot) {
         marketSelect.appendChild(option);
       });
 
-      if (state.indicators.length > 0) {
-        addIndicatorBlock();
+      let prefillApplied = false;
+      try {
+        const prefillPayload = readPrefillPayload();
+        if (prefillPayload !== null) {
+          applyPrefillPayload(prefillPayload);
+          prefillApplied = true;
+        }
+      } catch (error) {
+        const normalized = normalizeError(error);
+        showPageError(pageRoot, normalized.message, normalized.details);
+      }
+
+      if (!prefillApplied) {
+        if (state.indicators.length > 0) {
+          addIndicatorBlock();
+        } else {
+          renderIndicatorBlocks();
+        }
       }
     } catch (error) {
       const normalized = normalizeError(error);

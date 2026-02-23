@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="panel"
+    data-backtest-page="sync"
+    data-api-backtests-path="/api/backtests"
+    data-api-estimate-path="/api/indicators/estimate"
+    data-api-strategies-path="/api/strategies"
+    data-api-markets-path="/api/market-data/markets"
+    data-api-instruments-path="/api/market-data/instruments"
+    data-api-indicators-path="/api/indicators"
+    data-strategy-builder-path="/strategies/new"
+    data-prefill-query-param="prefill"
+    data-prefill-storage="sessionStorage"
+  >
+    <div class="panel-heading">
+      <h1>Backtests</h1>
+      <a class="button-link button-link--secondary" href="/strategies">Open strategies</a>
+    </div>
+
+    <p>
+      Run synchronous backtests in template mode or saved mode. Browser requests are sent to
+      <code>/api/*</code> with credentials.
+    </p>
+
+    <div id="backtest-error-banner" class="error-banner hidden" role="alert"></div>
+    <div id="backtest-validation-errors" class="validation-list hidden"></div>
+
+    <form id="backtest-form" class="stack-form">
+      <fieldset class="panel panel--soft">
+        <legend>Mode</legend>
+        <div class="inline-actions">
+          <label class="inline-radio">
+            <input type="radio" name="backtest-mode" value="template" checked>
+            Template mode
+          </label>
+          <label class="inline-radio">
+            <input type="radio" name="backtest-mode" value="saved">
+            Saved mode
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="panel panel--soft">
+        <legend>Run type</legend>
+        <div class="inline-actions">
+          <label class="inline-radio">
+            <input type="radio" name="backtest-run-type" value="sync" checked>
+            Run sync
+          </label>
+          <label class="inline-radio">
+            <input type="radio" name="backtest-run-type" value="job">
+            Run as job
+          </label>
+        </div>
+        <p id="backtest-job-notice" class="muted-text hidden">Jobs UI is in WEB-EPIC-06.</p>
+      </fieldset>
+
+      <fieldset class="panel panel--soft">
+        <legend>Time range</legend>
+        <div class="filters-grid filters-grid--time-range">
+          <label for="backtest-range-preset">Preset</label>
+          <select id="backtest-range-preset">
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="90d" selected>Last 90 days</option>
+            <option value="custom">Custom</option>
+          </select>
+
+          <label for="backtest-range-start">Start (local)</label>
+          <input id="backtest-range-start" type="datetime-local" required>
+
+          <label for="backtest-range-end">End (local)</label>
+          <input id="backtest-range-end" type="datetime-local" required>
+        </div>
+      </fieldset>
+
+      <fieldset id="backtest-template-mode" class="panel panel--soft">
+        <legend>Template mode</legend>
+        <div class="filters-grid">
+          <label for="backtest-market-id">Market</label>
+          <select id="backtest-market-id">
+            <option value="">Select market</option>
+          </select>
+
+          <label for="backtest-symbol-query">Symbol search</label>
+          <input
+            id="backtest-symbol-query"
+            type="text"
+            placeholder="Type symbol, for example BTCUSDT"
+            autocomplete="off"
+          >
+
+          <label for="backtest-timeframe">Timeframe</label>
+          <select id="backtest-timeframe">
+            <option value="1m">1m</option>
+            <option value="5m">5m</option>
+            <option value="15m">15m</option>
+            <option value="1h">1h</option>
+            <option value="4h">4h</option>
+            <option value="1d">1d</option>
+          </select>
+        </div>
+
+        <p id="backtest-selected-symbol" class="muted-text">Selected symbol: none</p>
+        <input id="backtest-symbol-value" type="hidden">
+        <ul id="backtest-symbol-suggestions" class="suggestions-list"></ul>
+
+        <section class="panel panel--soft">
+          <div class="panel-heading">
+            <h2>Indicator grids</h2>
+            <button id="backtest-add-indicator" class="button-link" type="button">
+              Add indicator
+            </button>
+          </div>
+          <p class="muted-text">
+            Minimal v1 editor sends explicit values grid specs for indicator params.
+          </p>
+          <div id="backtest-indicator-blocks" class="indicator-blocks"></div>
+        </section>
+
+        <div class="inline-actions">
+          <button id="backtest-preflight-button" class="button-link" type="button">
+            Estimate preflight
+          </button>
+          <span id="backtest-preflight-loading" class="muted-text hidden">Estimating...</span>
+        </div>
+        <p id="backtest-preflight-summary" class="muted-text">
+          Template mode requires successful preflight before run.
+        </p>
+      </fieldset>
+
+      <fieldset id="backtest-saved-mode" class="panel panel--soft hidden">
+        <legend>Saved mode</legend>
+        <label for="backtest-strategy-id">Strategy</label>
+        <select id="backtest-strategy-id">
+          <option value="">Select strategy</option>
+        </select>
+        <div class="inline-actions">
+          <button id="backtest-refresh-strategies" class="button-link button-link--secondary" type="button">
+            Refresh strategies
+          </button>
+        </div>
+      </fieldset>
+
+      <details class="panel panel--soft">
+        <summary>Advanced</summary>
+        <div class="filters-grid filters-grid--advanced">
+          <label for="backtest-direction-mode">direction_mode</label>
+          <select id="backtest-direction-mode">
+            <option value="">Use API default</option>
+            <option value="long-short">long-short</option>
+            <option value="long-only">long-only</option>
+            <option value="short-only">short-only</option>
+          </select>
+
+          <label for="backtest-sizing-mode">sizing_mode</label>
+          <select id="backtest-sizing-mode">
+            <option value="">Use API default</option>
+            <option value="all_in">all_in</option>
+            <option value="fixed_quote">fixed_quote</option>
+            <option value="strategy_compound">strategy_compound</option>
+            <option value="strategy_compound_profit_lock">strategy_compound_profit_lock</option>
+          </select>
+
+          <label for="backtest-exec-init-cash">execution.init_cash_quote</label>
+          <input id="backtest-exec-init-cash" type="number" step="any" placeholder="10000">
+
+          <label for="backtest-exec-fee-pct">execution.fee_pct</label>
+          <input id="backtest-exec-fee-pct" type="number" step="any" placeholder="0.075">
+
+          <label for="backtest-exec-slippage-pct">execution.slippage_pct</label>
+          <input id="backtest-exec-slippage-pct" type="number" step="any" placeholder="0.01">
+
+          <label for="backtest-exec-fixed-quote">execution.fixed_quote</label>
+          <input id="backtest-exec-fixed-quote" type="number" step="any">
+
+          <label for="backtest-exec-safe-profit-percent">execution.safe_profit_percent</label>
+          <input id="backtest-exec-safe-profit-percent" type="number" step="any">
+
+          <label for="backtest-risk-sl-enabled">risk_grid.sl_enabled</label>
+          <input id="backtest-risk-sl-enabled" type="checkbox">
+
+          <label for="backtest-risk-sl-mode">risk_grid.sl axis mode</label>
+          <select id="backtest-risk-sl-mode">
+            <option value="explicit" selected>explicit</option>
+            <option value="range">range</option>
+          </select>
+
+          <label for="backtest-risk-sl-values">risk_grid.sl values (csv)</label>
+          <input id="backtest-risk-sl-values" type="text" placeholder="1,2,3">
+
+          <label for="backtest-risk-sl-start">risk_grid.sl.start</label>
+          <input id="backtest-risk-sl-start" type="number" step="any">
+
+          <label for="backtest-risk-sl-stop">risk_grid.sl.stop_incl</label>
+          <input id="backtest-risk-sl-stop" type="number" step="any">
+
+          <label for="backtest-risk-sl-step">risk_grid.sl.step</label>
+          <input id="backtest-risk-sl-step" type="number" step="any">
+
+          <label for="backtest-risk-sl-pct">risk_grid.sl_pct</label>
+          <input id="backtest-risk-sl-pct" type="number" step="any">
+
+          <label for="backtest-risk-tp-enabled">risk_grid.tp_enabled</label>
+          <input id="backtest-risk-tp-enabled" type="checkbox">
+
+          <label for="backtest-risk-tp-mode">risk_grid.tp axis mode</label>
+          <select id="backtest-risk-tp-mode">
+            <option value="explicit" selected>explicit</option>
+            <option value="range">range</option>
+          </select>
+
+          <label for="backtest-risk-tp-values">risk_grid.tp values (csv)</label>
+          <input id="backtest-risk-tp-values" type="text" placeholder="1,2,3">
+
+          <label for="backtest-risk-tp-start">risk_grid.tp.start</label>
+          <input id="backtest-risk-tp-start" type="number" step="any">
+
+          <label for="backtest-risk-tp-stop">risk_grid.tp.stop_incl</label>
+          <input id="backtest-risk-tp-stop" type="number" step="any">
+
+          <label for="backtest-risk-tp-step">risk_grid.tp.step</label>
+          <input id="backtest-risk-tp-step" type="number" step="any">
+
+          <label for="backtest-risk-tp-pct">risk_grid.tp_pct</label>
+          <input id="backtest-risk-tp-pct" type="number" step="any">
+
+          <label for="backtest-top-k">top_k</label>
+          <input id="backtest-top-k" type="number" min="1" step="1">
+
+          <label for="backtest-preselect">preselect</label>
+          <input id="backtest-preselect" type="number" min="1" step="1">
+
+          <label for="backtest-top-trades-n">top_trades_n</label>
+          <input id="backtest-top-trades-n" type="number" min="1" step="1">
+
+          <label for="backtest-warmup-bars">warmup_bars</label>
+          <input id="backtest-warmup-bars" type="number" min="1" step="1">
+        </div>
+      </details>
+
+      <div class="inline-actions">
+        <button id="backtest-run-button" class="button-link" type="submit" disabled>
+          Run sync
+        </button>
+        <span id="backtest-run-loading" class="muted-text hidden">Running...</span>
+      </div>
+    </form>
+  </section>
+
+  <section id="backtest-results-panel" class="panel hidden">
+    <h2>Results</h2>
+    <pre id="backtest-results-meta" class="json-pre"></pre>
+
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Total return %</th>
+            <th scope="col">variant_key</th>
+            <th scope="col">indicator_variant_key</th>
+            <th scope="col">Report</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="backtest-variants-body">
+          <tr>
+            <td colspan="6">Run backtest to see variants.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/lib/marked.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script type="module" src="/assets/backtest_ui.js"></script>
+{% endblock %}

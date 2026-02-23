@@ -62,6 +62,7 @@ def test_create_app_fails_fast_when_web_api_base_url_is_missing() -> None:
 @pytest.mark.parametrize(
     ("path", "expected_location"),
     [
+        ("/backtests", "/login?next=%2Fbacktests"),
         ("/backtests/jobs", "/login?next=%2Fbacktests%2Fjobs"),
         ("/strategies", "/login?next=%2Fstrategies"),
         ("/strategies/new", "/login?next=%2Fstrategies%2Fnew"),
@@ -179,24 +180,57 @@ def test_strategies_list_page_renders_required_strategy_ui_hooks() -> None:
     assert "/api/strategies/clone" in response.text
 
 
-def test_strategy_builder_page_renders_required_reference_api_hooks() -> None:
+def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     """
-    Verify `/strategies/new` renders builder hooks for create and reference API endpoints.
+    Verify `/backtests` renders required hooks and API literals for sync backtest UI module.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Builder page uses browser-side fetch calls and does not expose JSON textarea input.
+        Backtests page is protected SSR that performs browser-side API calls to `/api/*`.
     Raises:
-        AssertionError: If required endpoint literals or hooks are absent from SSR output.
+        AssertionError: If required hooks/literals for preflight/run/prefill flow are missing.
     Side Effects:
         None.
     """
     client = _build_test_client()
 
-    response = client.get("/strategies/new")
+    response = client.get("/backtests")
+
+    assert response.status_code == 200
+    assert 'data-backtest-page="sync"' in response.text
+    assert "/assets/backtest_ui.js" in response.text
+    assert "/api/backtests" in response.text
+    assert "/api/indicators/estimate" in response.text
+    assert "/api/strategies" in response.text
+    assert "/api/market-data/markets" in response.text
+    assert "/api/market-data/instruments" in response.text
+    assert "/api/indicators" in response.text
+    assert "/strategies/new" in response.text
+    assert "sessionStorage" in response.text
+    assert "prefill" in response.text
+
+
+def test_strategy_builder_page_renders_required_reference_api_hooks() -> None:
+    """
+    Verify `/strategies/new` keeps builder hooks and exposes prefill-query integration hooks.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Builder page supports optional `prefill` query parameter without changing base hooks.
+    Raises:
+        AssertionError: If required endpoint literals or prefill hooks are absent from SSR output.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+
+    response = client.get("/strategies/new?prefill=sample-prefill-id")
 
     assert response.status_code == 200
     assert 'data-strategy-page="builder"' in response.text
@@ -204,6 +238,8 @@ def test_strategy_builder_page_renders_required_reference_api_hooks() -> None:
     assert "/api/market-data/markets" in response.text
     assert "/api/market-data/instruments" in response.text
     assert "/api/indicators" in response.text
+    assert 'data-prefill-query-param="prefill"' in response.text
+    assert 'data-prefill-storage="sessionStorage"' in response.text
     assert "<textarea" not in response.text
 
 
