@@ -61,17 +61,25 @@ jobs:
             rsync -a --delete src/ /opt/roehub/market-data-src/src/
             rsync -a --delete apps/ /opt/roehub/market-data-src/apps/
             rsync -a --delete configs/ /opt/roehub/market-data-src/configs/
+            rsync -a --delete alembic/ /opt/roehub/market-data-src/alembic/
+            rsync -a --delete migrations/ /opt/roehub/market-data-src/migrations/
             rsync -a --delete infra/docker/ /opt/roehub/market-data-src/infra/docker/
+            install -m 0644 alembic.ini /opt/roehub/market-data-src/alembic.ini
           else
-            rm -rf /opt/roehub/market-data-src/src /opt/roehub/market-data-src/apps /opt/roehub/market-data-src/configs /opt/roehub/market-data-src/infra/docker
+            rm -rf /opt/roehub/market-data-src/src /opt/roehub/market-data-src/apps /opt/roehub/market-data-src/configs /opt/roehub/market-data-src/alembic /opt/roehub/market-data-src/migrations /opt/roehub/market-data-src/infra/docker /opt/roehub/market-data-src/alembic.ini
             install -d /opt/roehub/market-data-src/src
             install -d /opt/roehub/market-data-src/apps
             install -d /opt/roehub/market-data-src/configs
+            install -d /opt/roehub/market-data-src/alembic
+            install -d /opt/roehub/market-data-src/migrations
             install -d /opt/roehub/market-data-src/infra/docker
             tar -C src -cf - . | tar -C /opt/roehub/market-data-src/src -xf -
             tar -C apps -cf - . | tar -C /opt/roehub/market-data-src/apps -xf -
             tar -C configs -cf - . | tar -C /opt/roehub/market-data-src/configs -xf -
+            tar -C alembic -cf - . | tar -C /opt/roehub/market-data-src/alembic -xf -
+            tar -C migrations -cf - . | tar -C /opt/roehub/market-data-src/migrations -xf -
             tar -C infra/docker -cf - . | tar -C /opt/roehub/market-data-src/infra/docker -xf -
+            install -m 0644 alembic.ini /opt/roehub/market-data-src/alembic.ini
           fi
           install -m 0644 pyproject.toml /opt/roehub/market-data-src/pyproject.toml
 
@@ -87,6 +95,9 @@ jobs:
           test -s /opt/roehub/docker-compose.yml
           test -s /opt/roehub/market-data-src/pyproject.toml
           test -s /opt/roehub/market-data-src/infra/docker/Dockerfile.market_data
+          test -s /opt/roehub/market-data-src/alembic.ini
+          test -s /opt/roehub/market-data-src/alembic/env.py
+          test -s /opt/roehub/market-data-src/migrations/postgres/0001_identity_v1.sql
           test -s /opt/roehub/monitoring/prometheus/prometheus.yml
           test -s /opt/roehub/monitoring/blackbox/blackbox.yml
           ls -la /opt/roehub | head -n 50
