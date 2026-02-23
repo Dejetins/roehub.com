@@ -9,6 +9,10 @@ from trading.contexts.identity.application.ports.current_user import CurrentUser
 from trading.contexts.market_data.application.dto.reference_api import EnabledMarketReference
 from trading.shared_kernel.primitives import InstrumentId, MarketId, PaidLevel, Symbol, UserId
 
+# WEB-EPIC-07 mapping:
+# - Scope 1: unit tests for auth-only access, deterministic payload mapping,
+#   and q/limit semantics for market-data reference endpoints.
+
 
 class _HeaderCurrentUserDependency:
     """
@@ -280,11 +284,12 @@ def test_get_market_data_instruments_returns_empty_for_unknown_market() -> None:
     Side effects:
     - None.
     """
+    search_use_case = _FakeSearchEnabledTradableInstrumentsUseCase(
+        rows_by_market={1: (_instrument(1, "BTCUSDT"),)}
+    )
     client, _ = _build_client(
         list_use_case=_FakeListEnabledMarketsUseCase(rows=()),
-        search_use_case=_FakeSearchEnabledTradableInstrumentsUseCase(
-            rows_by_market={1: (_instrument(1, "BTCUSDT"),)}
-        ),
+        search_use_case=search_use_case,
     )
 
     response = client.get(
@@ -295,6 +300,55 @@ def test_get_market_data_instruments_returns_empty_for_unknown_market() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"items": []}
+    assert search_use_case.calls == [(999, "BTC", 50)]
+
+
+def test_get_market_data_instruments_maps_payload_and_forwards_q_limit() -> None:
+    """
+    Verify instruments endpoint maps payload deterministically and forwards q/limit.
+
+    Parameters:
+    - None.
+
+    Returns:
+    - None.
+
+    Assumptions/Invariants:
+    - Route forwards raw query values to use-case and maps `InstrumentId` rows into API DTO.
+
+    Errors/Exceptions:
+    - None.
+
+    Side effects:
+    - None.
+    """
+    search_use_case = _FakeSearchEnabledTradableInstrumentsUseCase(
+        rows_by_market={
+            1: (
+                _instrument(1, "BTCUSDT"),
+                _instrument(1, "ETHUSDT"),
+            )
+        }
+    )
+    client, _ = _build_client(
+        list_use_case=_FakeListEnabledMarketsUseCase(rows=()),
+        search_use_case=search_use_case,
+    )
+
+    response = client.get(
+        "/market-data/instruments",
+        params={"market_id": 1, "q": "ETH", "limit": 2},
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000105"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "items": [
+            {"market_id": 1, "symbol": "BTCUSDT"},
+            {"market_id": 1, "symbol": "ETHUSDT"},
+        ]
+    }
+    assert search_use_case.calls == [(1, "ETH", 2)]
 
 
 def test_get_market_data_instruments_rejects_limit_above_max_with_422() -> None:

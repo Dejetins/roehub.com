@@ -9,6 +9,10 @@ from fastapi.testclient import TestClient
 from apps.web.main.api_client import CurrentUserApiResult, WebCurrentUser
 from apps.web.main.app import create_app
 
+# WEB-EPIC-07 mapping:
+# - Scope 2: smoke tests for login gate redirects and SSR pages that expose
+#   required data-hooks, assets entrypoints, and /api/* literals without network I/O.
+
 
 def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> TestClient:
     """
