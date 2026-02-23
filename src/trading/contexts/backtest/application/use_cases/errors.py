@@ -106,6 +106,66 @@ def backtest_forbidden(*, strategy_id: UUID) -> RoehubError:
     )
 
 
+def backtest_job_not_found(*, job_id: UUID) -> RoehubError:
+    """
+    Build deterministic not-found API error for Backtest job id lookup failures.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - apps/api/routes/backtest_jobs.py
+      - apps/api/common/errors.py
+
+    Args:
+        job_id: Requested Backtest job identifier.
+    Returns:
+        RoehubError: Canonical `not_found` payload.
+    Assumptions:
+        Missing job id always maps to `404 not_found`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return RoehubError(
+        code="not_found",
+        message="Backtest job was not found",
+        details={"job_id": str(job_id)},
+    )
+
+
+def backtest_job_forbidden(*, job_id: UUID) -> RoehubError:
+    """
+    Build deterministic forbidden API error for foreign Backtest job access attempts.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/roadmap/milestone-5-epics-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - apps/api/routes/backtest_jobs.py
+      - apps/api/common/errors.py
+
+    Args:
+        job_id: Existing Backtest job identifier requested by non-owner.
+    Returns:
+        RoehubError: Canonical `forbidden` payload.
+    Assumptions:
+        Existing foreign jobs must return `403` (not `404`) by EPIC-11 contract.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return RoehubError(
+        code="forbidden",
+        message="Backtest job does not belong to current user",
+        details={"job_id": str(job_id)},
+    )
+
+
 def backtest_conflict(*, message: str, details: Mapping[str, Any]) -> RoehubError:
     """
     Build deterministic conflict API error for request/use-case state conflicts.
@@ -220,4 +280,3 @@ def _sorted_validation_items(*, items: Sequence[Mapping[str, str]]) -> list[dict
         normalized_items,
         key=lambda row: (row["path"], row["code"], row["message"]),
     )
-

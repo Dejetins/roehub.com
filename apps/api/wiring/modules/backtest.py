@@ -13,15 +13,26 @@ from typing import Mapping
 
 from fastapi import APIRouter
 
-from apps.api.routes import build_backtests_router
+from apps.api.routes import build_backtest_jobs_router, build_backtests_router
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest.adapters.outbound import (
+    PostgresBacktestJobRepository,
+    PostgresBacktestJobResultsRepository,
+    PsycopgBacktestPostgresGateway,
     StrategyRepositoryBacktestStrategyReader,
     YamlBacktestGridDefaultsProvider,
+    build_backtest_runtime_config_hash,
     load_backtest_runtime_config,
     resolve_backtest_config_path,
 )
-from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
+from trading.contexts.backtest.application.use_cases import (
+    CancelBacktestJobUseCase,
+    CreateBacktestJobUseCase,
+    GetBacktestJobStatusUseCase,
+    GetBacktestJobTopUseCase,
+    ListBacktestJobsUseCase,
+    RunBacktestUseCase,
+)
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.indicators.adapters.outbound import MarketDataCandleFeed
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
@@ -89,7 +100,7 @@ def build_backtest_router(
     indicator_compute: IndicatorCompute,
 ) -> APIRouter:
     """
-    Build fully wired `POST /backtests` router with fail-fast runtime configuration.
+    Build fully wired Backtest API router (`POST /backtests` + optional jobs endpoints).
 
     Docs:
       - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -104,7 +115,7 @@ def build_backtest_router(
         current_user_dependency: Shared identity dependency resolving authenticated principal.
         indicator_compute: Pre-warmed indicators compute adapter.
     Returns:
-        APIRouter: Backtests router exposing `POST /backtests` endpoint.
+        APIRouter: Backtests router with optional EPIC-11 jobs endpoints.
     Assumptions:
         Defaults/provider/config are validated on startup (fail-fast).
     Raises:
@@ -121,6 +132,12 @@ def build_backtest_router(
     runtime_settings = _resolve_backtest_runtime_settings(environ=environ)
     runtime_config_path = resolve_backtest_config_path(environ=environ)
     runtime_config = load_backtest_runtime_config(runtime_config_path)
+    backtest_runtime_config_hash = build_backtest_runtime_config_hash(config=runtime_config)
+
+    if runtime_config.jobs.enabled and not runtime_settings.strategy_postgres_dsn:
+        raise ValueError(
+            f"{_STRATEGY_PG_DSN_KEY} is required when backtest.jobs.enabled is true"
+        )
 
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     strategy_repository = _build_strategy_repository(settings=runtime_settings)
@@ -142,11 +159,48 @@ def build_backtest_router(
         slippage_pct_default=runtime_config.execution.slippage_pct_default,
         fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
     )
-    return build_backtests_router(
+    backtests_router = build_backtests_router(
         run_use_case=run_use_case,
         strategy_reader=strategy_reader,
         current_user_dependency=current_user_dependency,
     )
+    if not runtime_config.jobs.enabled:
+        return backtests_router
+
+    jobs_gateway = _build_jobs_gateway(settings=runtime_settings)
+    job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)
+    results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
+
+    create_use_case = CreateBacktestJobUseCase(
+        job_repository=job_repository,
+        strategy_reader=strategy_reader,
+        top_k_persisted_default=runtime_config.jobs.top_k_persisted_default,
+        max_active_jobs_per_user=runtime_config.jobs.max_active_jobs_per_user,
+        warmup_bars_default=runtime_config.warmup_bars_default,
+        top_k_default=runtime_config.top_k_default,
+        preselect_default=runtime_config.preselect_default,
+        top_trades_n_default=runtime_config.reporting.top_trades_n_default,
+        init_cash_quote_default=runtime_config.execution.init_cash_quote_default,
+        fixed_quote_default=runtime_config.execution.fixed_quote_default,
+        safe_profit_percent_default=runtime_config.execution.safe_profit_percent_default,
+        slippage_pct_default=runtime_config.execution.slippage_pct_default,
+        fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
+        backtest_runtime_config_hash=backtest_runtime_config_hash,
+    )
+    jobs_router = build_backtest_jobs_router(
+        create_use_case=create_use_case,
+        get_status_use_case=GetBacktestJobStatusUseCase(job_repository=job_repository),
+        get_top_use_case=GetBacktestJobTopUseCase(
+            job_repository=job_repository,
+            results_repository=results_repository,
+            top_k_persisted_default=runtime_config.jobs.top_k_persisted_default,
+        ),
+        list_use_case=ListBacktestJobsUseCase(job_repository=job_repository),
+        cancel_use_case=CancelBacktestJobUseCase(job_repository=job_repository),
+        current_user_dependency=current_user_dependency,
+    )
+    backtests_router.include_router(jobs_router)
+    return backtests_router
 
 
 def _resolve_backtest_runtime_settings(*, environ: Mapping[str, str]) -> BacktestRuntimeSettings:
@@ -279,6 +333,36 @@ def _build_strategy_repository(*, settings: BacktestRuntimeSettings) -> Strategy
         )
 
     return InMemoryStrategyRepository()
+
+
+def _build_jobs_gateway(*, settings: BacktestRuntimeSettings) -> PsycopgBacktestPostgresGateway:
+    """
+    Build fail-fast Postgres gateway for Backtest Jobs API repositories.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - apps/api/wiring/modules/backtest.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/gateway.py
+      - apps/api/routes/backtest_jobs.py
+
+    Args:
+        settings: Resolved runtime settings with strategy Postgres DSN.
+    Returns:
+        PsycopgBacktestPostgresGateway: Configured gateway for jobs repositories.
+    Assumptions:
+        Jobs endpoints are mounted only when runtime toggle is enabled.
+    Raises:
+        ValueError: If Postgres DSN is missing.
+    Side Effects:
+        None.
+    """
+    if not settings.strategy_postgres_dsn:
+        raise ValueError(
+            f"{_STRATEGY_PG_DSN_KEY} is required when backtest.jobs.enabled is true"
+        )
+    return PsycopgBacktestPostgresGateway(dsn=settings.strategy_postgres_dsn)
 
 
 def _build_backtest_candle_feed(*, environ: Mapping[str, str]) -> MarketDataCandleFeed:

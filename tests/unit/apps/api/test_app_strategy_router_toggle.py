@@ -61,6 +61,7 @@ def _load_app_module(*, monkeypatch):
     """
     monkeypatch.setenv("ROEHUB_NUMBA_NUM_THREADS", "1")
     monkeypatch.setenv("NUMBA_NUM_THREADS", "1")
+    monkeypatch.setenv("STRATEGY_PG_DSN", "postgresql://user:pass@localhost:5432/roehub")
     return importlib.import_module("apps.api.main.app")
 
 
