@@ -32,16 +32,20 @@ Milestone 5 добавляет асинхронный (job-based) путь за�
 
 ### Request snapshot + hashes (фикс)
 
-- `request_json` всегда содержит все, что влияет на результат.
-- Saved-mode job дополнительно содержит:
-  - `spec_hash`,
-  - и (желательно) снапшот `spec_payload` на момент создания job.
-- `request_hash` = sha256 от canonical JSON (`sort_keys`, `separators=(",", ":")`, `ensure_ascii=true`).
-- `engine_params_hash` считаем при создании job из effective direction/sizing/execution после применения runtime defaults.
-- `backtest_runtime_config_hash` = хэш только result-affecting секций:
+- Job snapshot хранится так, чтобы воркер мог **воспроизвести результат без чтения актуальной Strategy из storage**.
+- `request_json` — canonical effective request envelope (strict JSON object) с примененными runtime defaults.
+  - template-mode: `request_json.template` содержит полный effective template.
+  - saved-mode: `request_json` может содержать только `strategy_id` + `overrides` (и может **не** содержать `template`).
+- Saved-mode job **обязательно** дополнительно хранит:
+  - `spec_payload_json` — снапшот StrategySpec payload на момент создания job,
+  - `spec_hash` = sha256 от canonical JSON `spec_payload_json`.
+- `request_hash` = sha256 от canonical JSON `request_json` (`sort_keys`, `separators=(",", ":")`, `ensure_ascii=true`).
+- `engine_params_hash` считаем при создании job из effective `direction_mode/sizing_mode/execution` после применения runtime defaults.
+- `backtest_runtime_config_hash` = sha256 от canonical JSON только result-affecting секций:
   - `warmup/top_k/preselect`,
   - `execution`,
-  - `reporting`.
+  - `reporting`,
+  - `jobs.top_k_persisted_default`.
 
 ### Error persistence policy (фикс)
 
@@ -76,7 +80,9 @@ Milestone 5 добавляет асинхронный (job-based) путь за�
 - Lease/heartbeat обязательны.
 - При потере lease воркер обязан fail-fast остановиться.
 - Все write операции (progress/top variants/final state) делаем условно по:
-  `(job_id, locked_by, lease_expires_at > now())`.
+`(job_id, locked_by, lease_expires_at > now())`.
+- Reclaim v1 = **restart attempt**: после истечения lease другой воркер может забрать job и начать заново со `stage_a`.
+  В этом режиме `stage/progress` могут “сброситься”, а `/top` может временно показывать snapshot предыдущей попытки до первой перезаписи.
 
 ### Progress semantics (фикс)
 
@@ -87,8 +93,8 @@ Milestone 5 добавляет асинхронный (job-based) путь за�
 
 ### Parallelism policy (фикс)
 
-- По умолчанию внутренняя параллельность одного job = 1 (масштабируемся репликами воркера).
-- Конфиг для parallel_workers добавляем сразу.
+- В Milestone 5 внутренняя параллельность одного job = 1 (масштабируемся репликами воркера).
+- `backtest.jobs.parallel_workers` добавляем и валидируем сразу, но в v1 `backtest-job-runner` его не использует (knob зарезервирован под будущее).
 
 ### Guards (фикс)
 
@@ -154,8 +160,8 @@ Milestone 5 делится на 4 логических части:
     - `heartbeat_seconds`
     - `snapshot_seconds` и/или `snapshot_variants_step`
     - `parallel_workers` (default 1)
-  - обновить loader/validator `src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py`.
-  - добавить вычисление `backtest_runtime_config_hash` (result-affecting sections only).
+- обновить loader/validator `src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py`.
+- добавить вычисление `backtest_runtime_config_hash` (result-affecting sections only, включая `backtest.jobs.top_k_persisted_default`).
 
 **Non-goals:**
 - retention/cleanup политика для старых job'ов и результатов.
@@ -242,7 +248,7 @@ Milestone 5 делится на 4 логических части:
 **Scope:**
 - Endpoints:
   - `POST /backtests/jobs` (создать job; request envelope как в `POST /backtests`)
-- `GET /backtests/jobs/{job_id}` (status + progress + hashes)
+  - `GET /backtests/jobs/{job_id}` (status + progress + hashes)
   - `GET /backtests/jobs/{job_id}/top?limit=...` (best-so-far; на succeeded включает `report_table_md`)
   - `GET /backtests/jobs?state=&limit=&cursor=` (keyset pagination)
   - `POST /backtests/jobs/{job_id}/cancel` (idempotent)

@@ -29,6 +29,8 @@
   - обработано `snapshot_variants_step` новых Stage-B вариантов.
 - Finalizing: детали (`report_table_md`/trades) считаются только для persisted cap:
   - `persisted_k = min(request.top_k, backtest.jobs.top_k_persisted_default)`.
+- Parallelism v1: один job исполняется последовательно (intra-job parallelism = 1).
+  `backtest.jobs.parallel_workers` существует в runtime config, но в v1 воркер его не использует (зарезервирован под будущее).
 
 ## Scope
 
@@ -181,6 +183,11 @@ Cancel best-effort:
 - Если worker упал и lease истек, другой worker может reclaim job через `claim_next(...)`.
 - v1 политика: restart attempt с начала flow (Stage A -> Stage B -> Finalizing).
 - Цель: простая, надежная консистентность без сложного cursor resume в Stage B.
+
+Наблюдаемое поведение (важно для UI/операций):
+
+- При reclaim attempt `stage/progress` могут сброситься к `stage_a` и `processed_units=0`.
+- Persisted `/top` snapshot от предыдущей попытки может оставаться в БД и быть видимым до первой перезаписи snapshot в новой попытке.
 
 ## Детерминизм и инварианты
 
