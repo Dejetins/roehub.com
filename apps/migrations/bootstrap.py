@@ -10,11 +10,11 @@ from psycopg.rows import dict_row
 
 from apps.migrations.main import main as run_alembic_migrations_main
 
-_IDENTITY_BASELINE_SQL_FILES: tuple[str, ...] = (
+_IDENTITY_CORE_SQL_FILES: tuple[str, ...] = (
     "0001_identity_v1.sql",
     "0002_identity_2fa_totp_v1.sql",
-    "0003_identity_exchange_keys_v1.sql",
 )
+_IDENTITY_EXCHANGE_KEYS_V1_SQL_FILE = "0003_identity_exchange_keys_v1.sql"
 _IDENTITY_EXCHANGE_KEYS_V2_SQL_FILE = "0004_identity_exchange_keys_v2.sql"
 
 
@@ -118,6 +118,74 @@ def decide_identity_exchange_keys_v2_action(
     )
 
 
+def is_identity_exchange_keys_v2_layout(*, columns: set[str]) -> bool:
+    """
+    Check whether exchange-keys table columns match the expected v2 layout.
+
+    Args:
+        columns: Set of discovered `identity_exchange_keys` column names.
+    Returns:
+        bool: True when v2 columns exist and legacy `api_key` column is absent.
+    Assumptions:
+        Caller provides column names from a single deterministic schema snapshot.
+    Raises:
+        None.
+    Side Effects:
+        None.
+
+    Docs:
+      - docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
+    Related:
+      - migrations/postgres/0003_identity_exchange_keys_v1.sql
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
+      - apps/migrations/bootstrap.py
+    """
+    required_v2_columns = {"api_key_enc", "api_key_hash", "api_key_last4"}
+    return required_v2_columns.issubset(columns) and "api_key" not in columns
+
+
+def decide_identity_exchange_keys_baseline_action(
+    *,
+    layout: IdentityExchangeKeysLayout,
+) -> Literal["apply", "skip"]:
+    """
+    Decide whether exchange-keys baseline SQL (`0003`) should be applied or skipped.
+
+    Args:
+        layout: Current schema layout introspected before executing `0003`.
+    Returns:
+        Literal["apply", "skip"]: Deterministic action for baseline exchange-keys SQL.
+    Assumptions:
+        Called after `0001` and `0002` have already been executed.
+    Raises:
+        None.
+    Side Effects:
+        None.
+
+    Docs:
+      - docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
+    Related:
+      - migrations/postgres/0003_identity_exchange_keys_v1.sql
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
+      - apps/migrations/bootstrap.py
+    """
+    columns: set[str] = set()
+    if layout.has_api_key:
+        columns.add("api_key")
+    if layout.has_api_key_enc:
+        columns.add("api_key_enc")
+    if layout.has_api_key_hash:
+        columns.add("api_key_hash")
+    if layout.has_api_key_last4:
+        columns.add("api_key_last4")
+
+    if layout.table_exists and is_identity_exchange_keys_v2_layout(columns=columns):
+        return "skip"
+    return "apply"
+
+
 def run_dev_db_bootstrap(
     *,
     identity_dsn: str,
@@ -152,7 +220,7 @@ def run_dev_db_bootstrap(
 
 def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """
-    Apply identity baseline SQL and guarded `0004` migration in deterministic order.
+    Apply identity baseline SQL with v2 pre-check and guarded `0004` migration.
 
     Args:
         identity_dsn: DSN for identity Postgres schema.
@@ -160,19 +228,31 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
     Returns:
         None.
     Assumptions:
-        `0001..0003` files are idempotent and can be re-executed.
+        `0001` and `0002` are safe to re-execute; `0003` may be skipped for pre-existing v2 layout.
     Raises:
         ValueError: If DSN is unsupported or migration files are missing.
         RuntimeError: If guarded decision for `0004` returns fail.
         psycopg.Error: If DB execution fails.
     Side Effects:
         Executes SQL scripts against identity Postgres schema.
+
+    Docs:
+      - docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
+    Related:
+      - migrations/postgres/0003_identity_exchange_keys_v1.sql
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
+      - apps/migrations/bootstrap.py
     """
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
-    baseline_paths = _collect_sql_paths(
+    core_paths = _collect_sql_paths(
         migrations_dir=migrations_dir,
-        filenames=_IDENTITY_BASELINE_SQL_FILES,
+        filenames=_IDENTITY_CORE_SQL_FILES,
     )
+    exchange_keys_v1_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_IDENTITY_EXCHANGE_KEYS_V1_SQL_FILE,),
+    )[0]
     v2_path = _collect_sql_paths(
         migrations_dir=migrations_dir,
         filenames=(_IDENTITY_EXCHANGE_KEYS_V2_SQL_FILE,),
@@ -183,9 +263,21 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
         autocommit=True,
         row_factory=cast(Any, dict_row),
     ) as connection:
-        for sql_path in baseline_paths:
+        for sql_path in core_paths:
             print(f"Applying identity baseline SQL: {sql_path.name}")
             _execute_sql_script(connection=connection, sql_path=sql_path)
+
+        pre_0003_layout = inspect_identity_exchange_keys_layout(connection=connection)
+        baseline_action = decide_identity_exchange_keys_baseline_action(layout=pre_0003_layout)
+        if baseline_action == "skip":
+            print(
+                "Skipping identity exchange keys baseline SQL: detected v2 layout; "
+                f"skip {exchange_keys_v1_path.name} and {v2_path.name}"
+            )
+            return
+
+        print(f"Applying identity baseline SQL: {exchange_keys_v1_path.name}")
+        _execute_sql_script(connection=connection, sql_path=exchange_keys_v1_path)
 
         layout = inspect_identity_exchange_keys_layout(connection=connection)
         decision = decide_identity_exchange_keys_v2_action(layout=layout)

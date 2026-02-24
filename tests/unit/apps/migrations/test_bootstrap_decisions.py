@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from apps.migrations.bootstrap import (
     IdentityExchangeKeysLayout,
+    decide_identity_exchange_keys_baseline_action,
     decide_identity_exchange_keys_v2_action,
 )
 
@@ -139,3 +140,64 @@ def test_decision_fails_when_table_is_missing() -> None:
 
     assert decision.action == "fail"
     assert "table is missing" in decision.reason
+
+
+def test_baseline_decision_skips_when_v2_layout_is_detected() -> None:
+    """
+    Verify baseline `0003` action is `skip` when table is already in v2 column layout.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        v2 layout has `api_key_enc/api_key_hash/api_key_last4` and no `api_key`.
+    Raises:
+        AssertionError: If baseline decision does not return `skip`.
+    Side Effects:
+        None.
+
+    Docs:
+      - docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md
+    Related:
+      - apps/migrations/bootstrap.py
+      - migrations/postgres/0003_identity_exchange_keys_v1.sql
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
+    """
+    decision = decide_identity_exchange_keys_baseline_action(
+        layout=_layout(
+            has_api_key=False,
+            has_api_key_enc=True,
+            has_api_key_hash=True,
+            has_api_key_last4=True,
+        )
+    )
+
+    assert decision == "skip"
+
+
+def test_baseline_decision_applies_for_v1_layout() -> None:
+    """
+    Verify baseline `0003` action remains `apply` for v1 schema layout.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        v1 layout contains `api_key` and does not contain full v2 column set.
+    Raises:
+        AssertionError: If baseline decision does not return `apply`.
+    Side Effects:
+        None.
+
+    Docs:
+      - docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md
+    Related:
+      - apps/migrations/bootstrap.py
+      - migrations/postgres/0003_identity_exchange_keys_v1.sql
+      - migrations/postgres/0004_identity_exchange_keys_v2.sql
+    """
+    decision = decide_identity_exchange_keys_baseline_action(layout=_layout())
+
+    assert decision == "apply"
