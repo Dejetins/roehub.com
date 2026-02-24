@@ -39,6 +39,7 @@
 ### 2) Browser-side integration pattern (фикс)
 
 - Все backtest запросы выполняются из браузера напрямую в JSON API через `/api/...`:
+  - `GET /api/backtests/runtime-defaults`
   - `POST /api/indicators/estimate`
   - `POST /api/backtests`
   - (в дальнейшем) `POST /api/backtests/jobs` для async режима
@@ -175,6 +176,8 @@ Prefill payload переносится между страницами чере�
 Docs:
 - `docs/architecture/roadmap/milestone-6-epics-v1.md` — WEB-EPIC-05.
 - `docs/architecture/backtest/backtest-api-post-backtests-v1.md` — sync backtest API contract.
+- `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md` — runtime defaults
+  endpoint contract for browser prefill.
 - `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md` — guards semantics.
 - `docs/architecture/apps/web/web-strategy-ui-crud-builder-delete-v1.md` — strategy builder v1.
 

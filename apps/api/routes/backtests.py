@@ -1,5 +1,5 @@
 """
-Backtests API route for synchronous `POST /backtests` runs.
+Backtests API routes for sync `POST /backtests` and `GET /backtests/runtime-defaults`.
 
 Docs:
   - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -13,6 +13,7 @@ from typing import Callable
 from fastapi import APIRouter, Depends, Request
 
 from apps.api.dto import (
+    BacktestRuntimeDefaultsResponse,
     BacktestsPostRequest,
     BacktestsPostResponse,
     build_backtest_run_request,
@@ -33,10 +34,11 @@ def build_backtests_router(
     *,
     run_use_case: RunBacktestUseCase,
     strategy_reader: BacktestStrategyReader,
+    runtime_defaults_response: BacktestRuntimeDefaultsResponse,
     current_user_dependency: CurrentUserDependency,
 ) -> APIRouter:
     """
-    Build `POST /backtests` router for saved/ad-hoc synchronous backtest runs.
+    Build backtests router for sync runs and runtime-defaults browser prefill endpoint.
 
     Docs:
       - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -49,6 +51,7 @@ def build_backtests_router(
     Args:
         run_use_case: Backtest application use-case implementation.
         strategy_reader: Saved-strategy reader ACL port for reproducibility `spec_hash`.
+        runtime_defaults_response: Prebuilt deterministic runtime defaults response payload.
         current_user_dependency: Identity dependency resolving authenticated principal.
     Returns:
         APIRouter: Configured backtests router.
@@ -63,10 +66,44 @@ def build_backtests_router(
         raise ValueError("build_backtests_router requires run_use_case")
     if strategy_reader is None:  # type: ignore[truthy-bool]
         raise ValueError("build_backtests_router requires strategy_reader")
+    if runtime_defaults_response is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_backtests_router requires runtime_defaults_response")
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_backtests_router requires current_user_dependency")
 
     router = APIRouter(tags=["backtest"])
+
+    @router.get(
+        "/backtests/runtime-defaults",
+        response_model=BacktestRuntimeDefaultsResponse,
+    )
+    def get_backtests_runtime_defaults(
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ) -> BacktestRuntimeDefaultsResponse:
+        """
+        Return deterministic non-secret Backtest runtime defaults used by `/backtests` UI.
+
+        Docs:
+          - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - apps/api/dto/backtest_runtime_defaults.py
+          - apps/api/wiring/modules/backtest.py
+          - apps/web/dist/backtest_ui.js
+
+        Args:
+            principal: Authenticated user principal resolved by identity dependency.
+        Returns:
+            BacktestRuntimeDefaultsResponse: Startup-prebuilt deterministic defaults payload.
+        Assumptions:
+            Runtime defaults payload is derived from validated startup config.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = principal
+        return runtime_defaults_response
 
     @router.post("/backtests", response_model=BacktestsPostResponse)
     def post_backtests(

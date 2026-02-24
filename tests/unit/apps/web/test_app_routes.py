@@ -211,6 +211,7 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     assert 'data-backtest-page="sync"' in response.text
     assert "/assets/backtest_ui.js" in response.text
     assert "/api/backtests" in response.text
+    assert "/api/backtests/runtime-defaults" in response.text
     assert "/api/indicators/estimate" in response.text
     assert "/api/strategies" in response.text
     assert "/api/market-data/markets" in response.text

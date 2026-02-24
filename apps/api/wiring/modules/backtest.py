@@ -13,6 +13,7 @@ from typing import Mapping
 
 from fastapi import APIRouter
 
+from apps.api.dto import build_backtest_runtime_defaults_response
 from apps.api.routes import build_backtest_jobs_router, build_backtests_router
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest.adapters.outbound import (
@@ -159,9 +160,13 @@ def build_backtest_router(
         slippage_pct_default=runtime_config.execution.slippage_pct_default,
         fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
     )
+    runtime_defaults_response = build_backtest_runtime_defaults_response(
+        config=runtime_config
+    )
     backtests_router = build_backtests_router(
         run_use_case=run_use_case,
         strategy_reader=strategy_reader,
+        runtime_defaults_response=runtime_defaults_response,
         current_user_dependency=current_user_dependency,
     )
     if not runtime_config.jobs.enabled:

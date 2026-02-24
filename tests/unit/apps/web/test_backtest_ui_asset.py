@@ -66,3 +66,52 @@ def test_backtest_ui_asset_uses_single_select_source_with_explicit_axis_payload(
     assert "const sourceSelect = document.createElement(\"select\");" in source
     assert "source requires one selected value" in source
     assert "values: [selectedSource]" in source
+
+
+def test_backtest_ui_asset_fetches_runtime_defaults_and_tracks_fee_dirty_state() -> None:
+    """
+    Verify UI loads `/api/backtests/runtime-defaults` and avoids fee overwrite after manual edits.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Runtime defaults endpoint path and dirty-tracking literals remain stable in source.
+    Raises:
+        AssertionError: If runtime-defaults fetch or fee dirty logic is missing.
+    Side Effects:
+        None.
+    """
+    source = _read_backtest_ui_asset()
+
+    assert "apiBacktestRuntimeDefaultsPath" in source
+    assert "loadRuntimeDefaults" in source
+    assert "executionFeeDirty" in source
+    assert "applyDefaultFeeForSelectedMarket" in source
+    assert "Runtime defaults:" in source
+    assert "top_k_persisted_default" in source
+
+
+def test_backtest_ui_asset_formats_preflight_memory_and_toggles_risk_visibility() -> None:
+    """
+    Verify UI shows human-readable memory and hides/shows SL/TP controls by enabled/mode.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        PR2 keeps visibility and memory formatting helpers in browser asset.
+    Raises:
+        AssertionError: If memory/risk visibility literals disappear from the script.
+    Side Effects:
+        None.
+    """
+    source = _read_backtest_ui_asset()
+
+    assert "formatEstimatedMemory" in source
+    assert "GiB (base-2)" in source
+    assert "MiB (base-2)" in source
+    assert "updateRiskUiVisibility" in source
+    assert "toggleNodesVisibility" in source

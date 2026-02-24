@@ -6,8 +6,18 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
 from apps.api.common import register_api_error_handlers
-from apps.api.dto import build_sha256_from_payload
+from apps.api.dto import (
+    BacktestRuntimeDefaultsResponse,
+    build_backtest_runtime_defaults_response,
+    build_sha256_from_payload,
+)
 from apps.api.routes import build_backtests_router
+from trading.contexts.backtest.adapters.outbound import (
+    BacktestExecutionRuntimeConfig,
+    BacktestJobsRuntimeConfig,
+    BacktestReportingRuntimeConfig,
+    BacktestRuntimeConfig,
+)
 from trading.contexts.backtest.application.dto import (
     BacktestMetricRowV1,
     BacktestReportV1,
@@ -166,6 +176,7 @@ def _build_client(
     *,
     use_case: _FakeRunBacktestUseCase,
     strategy_reader: _StaticStrategyReader | None = None,
+    runtime_defaults_response: BacktestRuntimeDefaultsResponse | None = None,
 ) -> TestClient:
     """
     Build minimal FastAPI TestClient with backtests router and shared error handlers.
@@ -173,6 +184,7 @@ def _build_client(
     Args:
         use_case: Fake use-case used by endpoint handler.
         strategy_reader: Optional strategy reader fake.
+        runtime_defaults_response: Optional runtime defaults payload for GET endpoint tests.
     Returns:
         TestClient: Configured client instance.
     Assumptions:
@@ -188,10 +200,143 @@ def _build_client(
         build_backtests_router(
             run_use_case=use_case,  # type: ignore[arg-type]
             strategy_reader=strategy_reader or _StaticStrategyReader(),
+            runtime_defaults_response=runtime_defaults_response
+            or _runtime_defaults_response(),
             current_user_dependency=_HeaderCurrentUserDependency(),
         )
     )
     return TestClient(app)
+
+
+def _runtime_defaults_response() -> BacktestRuntimeDefaultsResponse:
+    """
+    Build deterministic runtime defaults fixture matching `/backtests/runtime-defaults` contract.
+
+    Args:
+        None.
+    Returns:
+        BacktestRuntimeDefaultsResponse: Runtime defaults response fixture.
+    Assumptions:
+        Fee defaults input order is intentionally unsorted to verify deterministic ordering.
+    Raises:
+        ValueError: If fixture violates runtime config invariants.
+    Side Effects:
+        None.
+    """
+    return build_backtest_runtime_defaults_response(
+        config=BacktestRuntimeConfig(
+            version=1,
+            warmup_bars_default=200,
+            top_k_default=300,
+            preselect_default=20000,
+            reporting=BacktestReportingRuntimeConfig(top_trades_n_default=3),
+            execution=BacktestExecutionRuntimeConfig(
+                init_cash_quote_default=10000.0,
+                fixed_quote_default=100.0,
+                safe_profit_percent_default=30.0,
+                slippage_pct_default=0.01,
+                fee_pct_default_by_market_id={
+                    4: 0.1,
+                    2: 0.1,
+                    1: 0.075,
+                    3: 0.075,
+                },
+            ),
+            jobs=BacktestJobsRuntimeConfig(
+                enabled=True,
+                top_k_persisted_default=300,
+                max_active_jobs_per_user=3,
+                claim_poll_seconds=1.0,
+                lease_seconds=60,
+                heartbeat_seconds=15,
+                parallel_workers=1,
+                snapshot_seconds=30,
+                snapshot_variants_step=1000,
+            ),
+        )
+    )
+
+
+def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
+    """
+    Verify runtime defaults endpoint returns stable shape and deterministic fee-map ordering.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Response keys should be stable across repeated calls for browser prefill logic.
+    Raises:
+        AssertionError: If shape, values, or ordering deviate from endpoint contract.
+    Side Effects:
+        None.
+    """
+    client = _build_client(use_case=_FakeRunBacktestUseCase(result=_template_mode_response()))
+
+    response_one = client.get(
+        "/backtests/runtime-defaults",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
+    )
+    response_two = client.get(
+        "/backtests/runtime-defaults",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
+    )
+
+    assert response_one.status_code == 200
+    assert response_one.json() == response_two.json()
+    assert response_one.json() == {
+        "warmup_bars_default": 200,
+        "top_k_default": 300,
+        "preselect_default": 20000,
+        "top_trades_n_default": 3,
+        "execution": {
+            "init_cash_quote_default": 10000.0,
+            "fixed_quote_default": 100.0,
+            "safe_profit_percent_default": 30.0,
+            "slippage_pct_default": 0.01,
+            "fee_pct_default_by_market_id": {
+                "1": 0.075,
+                "2": 0.1,
+                "3": 0.075,
+                "4": 0.1,
+            },
+        },
+        "jobs": {
+            "top_k_persisted_default": 300,
+        },
+    }
+    assert list(
+        response_one.json()["execution"]["fee_pct_default_by_market_id"].keys()
+    ) == ["1", "2", "3", "4"]
+
+
+def test_get_backtests_runtime_defaults_returns_401_when_unauthenticated() -> None:
+    """
+    Verify runtime defaults endpoint remains protected by shared current-user dependency.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Backtests API module keeps auth behavior consistent across routes.
+    Raises:
+        AssertionError: If endpoint does not return deterministic unauthorized payload.
+    Side Effects:
+        None.
+    """
+    client = _build_client(use_case=_FakeRunBacktestUseCase(result=_template_mode_response()))
+
+    response = client.get("/backtests/runtime-defaults")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "error": "unauthorized",
+            "message": "Authentication required",
+        }
+    }
 
 
 def test_post_backtests_forbids_extra_fields_with_deterministic_422_payload() -> None:

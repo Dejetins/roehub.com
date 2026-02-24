@@ -5,6 +5,7 @@
     class="panel"
     data-backtest-page="sync"
     data-api-backtests-path="/api/backtests"
+    data-api-backtest-runtime-defaults-path="/api/backtests/runtime-defaults"
     data-api-backtest-jobs-path="/api/backtests/jobs"
     data-api-estimate-path="/api/indicators/estimate"
     data-api-strategies-path="/api/strategies"
@@ -248,6 +249,7 @@
           <label for="backtest-warmup-bars">warmup_bars</label>
           <input id="backtest-warmup-bars" type="number" min="1" step="1">
         </div>
+        <p id="backtest-runtime-defaults-hint" class="muted-text hidden"></p>
       </details>
 
       <div class="inline-actions">

@@ -27,6 +27,7 @@ function initBacktestPage(pageRoot) {
   const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
   const prefillStorage = requireDataAttr(pageRoot, "prefillStorage");
   const jobContextStoragePrefix = requireDataAttr(pageRoot, "jobContextStoragePrefix");
+  const runtimeDefaultsPath = requireDataAttr(pageRoot, "apiBacktestRuntimeDefaultsPath");
 
   const form = pageRoot.querySelector("#backtest-form");
   const modeTemplate = pageRoot.querySelector("input[name=\"backtest-mode\"][value=\"template\"]");
@@ -84,6 +85,7 @@ function initBacktestPage(pageRoot) {
   const preselectInput = pageRoot.querySelector("#backtest-preselect");
   const topTradesInput = pageRoot.querySelector("#backtest-top-trades-n");
   const warmupBarsInput = pageRoot.querySelector("#backtest-warmup-bars");
+  const runtimeDefaultsHint = pageRoot.querySelector("#backtest-runtime-defaults-hint");
 
   const resultsPanel = pageRoot.querySelector("#backtest-results-panel");
   const resultsMeta = pageRoot.querySelector("#backtest-results-meta");
@@ -142,6 +144,7 @@ function initBacktestPage(pageRoot) {
     || preselectInput === null
     || topTradesInput === null
     || warmupBarsInput === null
+    || runtimeDefaultsHint === null
     || resultsPanel === null
     || resultsMeta === null
     || variantsBody === null
@@ -165,6 +168,9 @@ function initBacktestPage(pageRoot) {
     searchDebounceId: 0,
     instrumentsAbortController: null,
     latestRun: null,
+    runtimeDefaults: null,
+    executionFeeDirty: false,
+    applyingFeeDefault: false,
   };
 
   const setPreflightSummary = (message) => {
@@ -226,6 +232,246 @@ function initBacktestPage(pageRoot) {
       runTypeJob.checked = false;
     }
     updateRunAvailability();
+  };
+
+  const selectLabelForInput = (inputId) => (
+    pageRoot.querySelector(`label[for="${inputId}"]`)
+  );
+
+  const toggleNodesVisibility = ({ nodes, visible }) => {
+    nodes.forEach((node) => {
+      if (node !== null) {
+        node.classList.toggle("hidden", !visible);
+      }
+    });
+  };
+
+  const riskUiSections = {
+    sl: {
+      enabledNode: riskSlEnabled,
+      modeNode: riskSlMode,
+      sharedNodes: [
+        selectLabelForInput("backtest-risk-sl-mode"),
+        riskSlMode,
+        selectLabelForInput("backtest-risk-sl-pct"),
+        riskSlPct,
+      ],
+      explicitNodes: [
+        selectLabelForInput("backtest-risk-sl-values"),
+        riskSlValues,
+      ],
+      rangeNodes: [
+        selectLabelForInput("backtest-risk-sl-start"),
+        riskSlStart,
+        selectLabelForInput("backtest-risk-sl-stop"),
+        riskSlStop,
+        selectLabelForInput("backtest-risk-sl-step"),
+        riskSlStep,
+      ],
+    },
+    tp: {
+      enabledNode: riskTpEnabled,
+      modeNode: riskTpMode,
+      sharedNodes: [
+        selectLabelForInput("backtest-risk-tp-mode"),
+        riskTpMode,
+        selectLabelForInput("backtest-risk-tp-pct"),
+        riskTpPct,
+      ],
+      explicitNodes: [
+        selectLabelForInput("backtest-risk-tp-values"),
+        riskTpValues,
+      ],
+      rangeNodes: [
+        selectLabelForInput("backtest-risk-tp-start"),
+        riskTpStart,
+        selectLabelForInput("backtest-risk-tp-stop"),
+        riskTpStop,
+        selectLabelForInput("backtest-risk-tp-step"),
+        riskTpStep,
+      ],
+    },
+  };
+
+  const updateRiskUiSectionVisibility = (sectionKey) => {
+    const section = riskUiSections[sectionKey];
+    if (!section) {
+      return;
+    }
+    const enabled = section.enabledNode.checked;
+    const mode = normalizeAxisMode(section.modeNode.value);
+    const useRange = enabled && mode === "range";
+
+    toggleNodesVisibility({ nodes: section.sharedNodes, visible: enabled });
+    toggleNodesVisibility({ nodes: section.explicitNodes, visible: enabled && !useRange });
+    toggleNodesVisibility({ nodes: section.rangeNodes, visible: useRange });
+  };
+
+  const updateRiskUiVisibility = () => {
+    updateRiskUiSectionVisibility("sl");
+    updateRiskUiSectionVisibility("tp");
+  };
+
+  const readFiniteNumber = (value) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+  };
+
+  const readFiniteInteger = (value) => {
+    const numberValue = readFiniteNumber(value);
+    if (numberValue === null) {
+      return null;
+    }
+    return Math.trunc(numberValue);
+  };
+
+  const readRuntimeDefaultsFeeMap = () => {
+    const defaultsRecord = asRecord(state.runtimeDefaults);
+    const executionRecord = asRecord(defaultsRecord.execution);
+    return asRecord(executionRecord.fee_pct_default_by_market_id);
+  };
+
+  const readRuntimeDefaultFeePct = ({ marketId, allowFallbackToFirst }) => {
+    const feeMap = readRuntimeDefaultsFeeMap();
+    if (marketId > 0) {
+      const marketFee = readFiniteNumber(feeMap[String(marketId)]);
+      if (marketFee !== null) {
+        return marketFee;
+      }
+    }
+    if (!allowFallbackToFirst) {
+      return null;
+    }
+    const sortedKeys = Object.keys(feeMap).sort(compareStableStrings);
+    for (const marketKey of sortedKeys) {
+      const fallbackFee = readFiniteNumber(feeMap[marketKey]);
+      if (fallbackFee !== null) {
+        return fallbackFee;
+      }
+    }
+    return null;
+  };
+
+  const setExecutionFeeDefaultValue = (feePct) => {
+    state.applyingFeeDefault = true;
+    executionFeePct.value = String(feePct);
+    state.applyingFeeDefault = false;
+  };
+
+  const applyDefaultFeeForSelectedMarket = ({ force, allowFallbackToFirst }) => {
+    if (!force && state.executionFeeDirty) {
+      return;
+    }
+    if (state.runtimeDefaults === null) {
+      return;
+    }
+    const marketId = Number(marketSelect.value || "0");
+    const defaultFee = readRuntimeDefaultFeePct({ marketId, allowFallbackToFirst });
+    if (defaultFee === null) {
+      return;
+    }
+    setExecutionFeeDefaultValue(defaultFee);
+  };
+
+  const renderRuntimeDefaultsHint = () => {
+    if (state.runtimeDefaults === null) {
+      runtimeDefaultsHint.textContent = "";
+      runtimeDefaultsHint.classList.add("hidden");
+      return;
+    }
+    const defaultsRecord = asRecord(state.runtimeDefaults);
+    const jobsRecord = asRecord(defaultsRecord.jobs);
+    const topKDefault = readFiniteInteger(defaultsRecord.top_k_default);
+    const preselectDefault = readFiniteInteger(defaultsRecord.preselect_default);
+    const warmupBarsDefault = readFiniteInteger(defaultsRecord.warmup_bars_default);
+    const jobsTopKCap = readFiniteInteger(jobsRecord.top_k_persisted_default);
+    runtimeDefaultsHint.textContent = [
+      "Runtime defaults:",
+      `top_k=${topKDefault ?? "-"}`,
+      `preselect=${preselectDefault ?? "-"}`,
+      `warmup_bars=${warmupBarsDefault ?? "-"}.`,
+      `Jobs cap top_k_persisted_default=${jobsTopKCap ?? "-"}.`,
+    ].join(" ");
+    runtimeDefaultsHint.classList.remove("hidden");
+  };
+
+  const applyRuntimeDefaultsToAdvancedFields = () => {
+    if (state.runtimeDefaults === null) {
+      return;
+    }
+    const defaultsRecord = asRecord(state.runtimeDefaults);
+    const executionRecord = asRecord(defaultsRecord.execution);
+
+    const warmupBarsDefault = readFiniteInteger(defaultsRecord.warmup_bars_default);
+    const topKDefault = readFiniteInteger(defaultsRecord.top_k_default);
+    const preselectDefault = readFiniteInteger(defaultsRecord.preselect_default);
+    const topTradesDefault = readFiniteInteger(defaultsRecord.top_trades_n_default);
+
+    if (warmupBarsDefault !== null) {
+      warmupBarsInput.value = String(warmupBarsDefault);
+    }
+    if (topKDefault !== null) {
+      topKInput.value = String(topKDefault);
+    }
+    if (preselectDefault !== null) {
+      preselectInput.value = String(preselectDefault);
+    }
+    if (topTradesDefault !== null) {
+      topTradesInput.value = String(topTradesDefault);
+    }
+
+    const initCashDefault = readFiniteNumber(executionRecord.init_cash_quote_default);
+    const fixedQuoteDefault = readFiniteNumber(executionRecord.fixed_quote_default);
+    const safeProfitDefault = readFiniteNumber(executionRecord.safe_profit_percent_default);
+    const slippageDefault = readFiniteNumber(executionRecord.slippage_pct_default);
+
+    if (initCashDefault !== null) {
+      executionInitCash.value = String(initCashDefault);
+    }
+    if (fixedQuoteDefault !== null) {
+      executionFixedQuote.value = String(fixedQuoteDefault);
+    }
+    if (safeProfitDefault !== null) {
+      executionSafeProfitPercent.value = String(safeProfitDefault);
+    }
+    if (slippageDefault !== null) {
+      executionSlippagePct.value = String(slippageDefault);
+    }
+
+    applyDefaultFeeForSelectedMarket({ force: true, allowFallbackToFirst: true });
+    renderRuntimeDefaultsHint();
+    if (state.mode === "template") {
+      invalidatePreflight();
+    } else {
+      updateRunAvailability();
+    }
+  };
+
+  const loadRuntimeDefaults = async () => {
+    try {
+      const response = await fetch(runtimeDefaultsPath, { credentials: 'include' });
+      if (!response.ok) {
+        throw await buildHttpError(response);
+      }
+      state.runtimeDefaults = asRecord(await response.json());
+      applyRuntimeDefaultsToAdvancedFields();
+    } catch (error) {
+      const normalized = normalizeError(error);
+      showPageError(pageRoot, normalized.message, normalized.details);
+    }
+  };
+
+  const formatEstimatedMemory = (estimatedMemoryBytes) => {
+    const bytes = readFiniteNumber(estimatedMemoryBytes);
+    if (bytes === null || bytes < 0) {
+      return "n/a";
+    }
+    const gib = 1024 * 1024 * 1024;
+    const mib = 1024 * 1024;
+    if (bytes >= gib) {
+      return `${(bytes / gib).toFixed(2)} GiB (base-2)`;
+    }
+    return `${(bytes / mib).toFixed(2)} MiB (base-2)`;
   };
 
   const renderSuggestionButtons = (symbols) => {
@@ -959,24 +1205,28 @@ function initBacktestPage(pageRoot) {
     const slEnabled = riskSlEnabled.checked;
     const tpEnabled = riskTpEnabled.checked;
 
-    const slAxis = parseRiskAxis({
-      modeNode: riskSlMode,
-      valuesNode: riskSlValues,
-      startNode: riskSlStart,
-      stopNode: riskSlStop,
-      stepNode: riskSlStep,
-      sideName: "sl",
-    });
-    const tpAxis = parseRiskAxis({
-      modeNode: riskTpMode,
-      valuesNode: riskTpValues,
-      startNode: riskTpStart,
-      stopNode: riskTpStop,
-      stepNode: riskTpStep,
-      sideName: "tp",
-    });
-    const slPct = readOptionalNumber(riskSlPct, "risk_grid.sl_pct");
-    const tpPct = readOptionalNumber(riskTpPct, "risk_grid.tp_pct");
+    const slAxis = slEnabled
+      ? parseRiskAxis({
+        modeNode: riskSlMode,
+        valuesNode: riskSlValues,
+        startNode: riskSlStart,
+        stopNode: riskSlStop,
+        stepNode: riskSlStep,
+        sideName: "sl",
+      })
+      : null;
+    const tpAxis = tpEnabled
+      ? parseRiskAxis({
+        modeNode: riskTpMode,
+        valuesNode: riskTpValues,
+        startNode: riskTpStart,
+        stopNode: riskTpStop,
+        stepNode: riskTpStep,
+        sideName: "tp",
+      })
+      : null;
+    const slPct = slEnabled ? readOptionalNumber(riskSlPct, "risk_grid.sl_pct") : null;
+    const tpPct = tpEnabled ? readOptionalNumber(riskTpPct, "risk_grid.tp_pct") : null;
 
     if (
       !slEnabled
@@ -1654,14 +1904,17 @@ function initBacktestPage(pageRoot) {
         throw await buildHttpError(response);
       }
       const payload = await response.json();
-      const totalVariants = Number(payload.total_variants || 0);
-      const estimatedMemoryBytes = Number(payload.estimated_memory_bytes || 0);
+      const totalVariants = Math.max(
+        0,
+        Math.trunc(readFiniteNumber(payload.total_variants) || 0),
+      );
+      const estimatedMemory = formatEstimatedMemory(payload.estimated_memory_bytes);
       state.preflightReady = true;
       setPreflightSummary(
         [
           "Preflight passed.",
           `total_variants=${totalVariants}`,
-          `estimated_memory_bytes=${estimatedMemoryBytes}`,
+          `estimated_memory=${estimatedMemory}`,
         ].join(" "),
       );
       updateRunAvailability();
@@ -1793,6 +2046,7 @@ function initBacktestPage(pageRoot) {
   marketSelect.addEventListener("change", () => {
     clearSelectedSymbol();
     suggestionsList.innerHTML = "";
+    applyDefaultFeeForSelectedMarket({ force: false, allowFallbackToFirst: false });
     invalidatePreflight();
   });
   symbolQuery.addEventListener("input", () => {
@@ -1805,6 +2059,18 @@ function initBacktestPage(pageRoot) {
   preflightButton.addEventListener("click", runPreflight);
   refreshStrategiesButton.addEventListener("click", loadStrategies);
   strategiesSelect.addEventListener("change", updateRunAvailability);
+  [riskSlEnabled, riskSlMode, riskTpEnabled, riskTpMode].forEach((node) => {
+    node.addEventListener("change", updateRiskUiVisibility);
+  });
+
+  const markExecutionFeeDirty = () => {
+    if (state.applyingFeeDefault) {
+      return;
+    }
+    state.executionFeeDirty = true;
+  };
+  executionFeePct.addEventListener("change", markExecutionFeeDirty);
+  executionFeePct.addEventListener("input", markExecutionFeeDirty);
 
   rangePresetSelect.addEventListener("change", () => {
     const preset = String(rangePresetSelect.value || "custom");
@@ -1872,8 +2138,10 @@ function initBacktestPage(pageRoot) {
   }
 
   applyRangePreset("90d");
+  updateRiskUiVisibility();
   updateModeSections();
   updateRunAvailability();
+  loadRuntimeDefaults();
   loadReferences();
   loadStrategies();
 }
