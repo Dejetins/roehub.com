@@ -11,6 +11,7 @@ from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
 )
 from trading.contexts.backtest.application.ports import BacktestJobListQuery
 from trading.contexts.backtest.domain.entities import (
+    BacktestJob,
     BacktestJobErrorPayload,
     BacktestJobStageAShortlist,
     BacktestJobTopVariant,
@@ -57,7 +58,9 @@ class _FakeGateway:
         self._fetch_one_results = list(fetch_one_results or [])
         self._fetch_all_results = list(fetch_all_results or [])
         self.fetch_one_queries: list[str] = []
+        self.fetch_one_parameters: list[Mapping[str, Any]] = []
         self.fetch_all_queries: list[str] = []
+        self.fetch_all_parameters: list[Mapping[str, Any]] = []
         self.execute_queries: list[str] = []
 
     def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -77,7 +80,7 @@ class _FakeGateway:
             Appends SQL query text to in-memory log.
         """
         self.fetch_one_queries.append(query)
-        _ = parameters
+        self.fetch_one_parameters.append(parameters)
         if not self._fetch_one_results:
             return None
         result = self._fetch_one_results.pop(0)
@@ -107,7 +110,7 @@ class _FakeGateway:
             Appends SQL query text to in-memory log.
         """
         self.fetch_all_queries.append(query)
-        _ = parameters
+        self.fetch_all_parameters.append(parameters)
         if not self._fetch_all_results:
             return tuple()
         return self._fetch_all_results.pop(0)
@@ -130,7 +133,6 @@ class _FakeGateway:
         """
         self.execute_queries.append(query)
         _ = parameters
-
 
 
 def test_lease_repository_claim_uses_skip_locked_and_fifo_order() -> None:
@@ -162,7 +164,6 @@ def test_lease_repository_claim_uses_skip_locked_and_fifo_order() -> None:
     assert "FOR UPDATE SKIP LOCKED" in gateway.fetch_one_queries[0]
     assert "ORDER BY created_at ASC, job_id ASC" in gateway.fetch_one_queries[0]
     assert "lease_expires_at <= %(now)s" in gateway.fetch_one_queries[0]
-
 
 
 def test_job_repository_list_for_user_uses_keyset_desc_ordering() -> None:
@@ -197,7 +198,50 @@ def test_job_repository_list_for_user_uses_keyset_desc_ordering() -> None:
     assert "(created_at, job_id) <" in gateway.fetch_all_queries[0]
     assert "%(state)s::text IS NULL" in gateway.fetch_all_queries[0]
     assert "state = %(state)s::text" in gateway.fetch_all_queries[0]
+    assert "%(cursor_created_at)s::timestamptz IS NULL" in gateway.fetch_all_queries[0]
+    assert "%(cursor_created_at)s::timestamptz" in gateway.fetch_all_queries[0]
 
+
+def test_job_repository_create_serializes_mappingproxy_request_payload() -> None:
+    """Ensure create flow can persist MappingProxyType-backed request_json.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Domain job aggregate stores JSON payloads as immutable mappings.
+    Raises:
+        AssertionError: If request_json/spec payload serialization is not a string.
+    Side Effects:
+        None.
+    """
+
+    gateway = _FakeGateway(fetch_one_results=[_build_job_row(state="queued")])
+    repository = PostgresBacktestJobRepository(gateway=gateway)
+    created_at = datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc)
+
+    job = BacktestJob(
+        job_id=UUID("00000000-0000-0000-0000-000000000810"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        mode="template",
+        state="queued",
+        created_at=created_at,
+        updated_at=created_at,
+        request_json={"mode": "template", "template": {"timeframe": "1m"}},
+        request_hash="a" * 64,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        stage="stage_a",
+        processed_units=0,
+        total_units=0,
+    )
+
+    created = repository.create(job=job)
+
+    assert created.job_id == job.job_id
+    assert len(gateway.fetch_one_parameters) == 1
+    assert isinstance(gateway.fetch_one_parameters[0]["request_json"], str)
 
 
 def test_lease_repository_heartbeat_uses_active_lease_owner_predicate() -> None:
@@ -229,7 +273,6 @@ def test_lease_repository_heartbeat_uses_active_lease_owner_predicate() -> None:
     assert "locked_by = %(locked_by)s" in gateway.fetch_one_queries[0]
     assert "lease_expires_at > %(now)s" in gateway.fetch_one_queries[0]
     assert "state = 'running'" in gateway.fetch_one_queries[0]
-
 
 
 def test_lease_repository_finish_uses_active_lease_owner_predicate() -> None:
@@ -268,7 +311,6 @@ def test_lease_repository_finish_uses_active_lease_owner_predicate() -> None:
     assert "state = 'running'" in gateway.fetch_one_queries[0]
     assert "lease_expires_at > %(now)s" in gateway.fetch_one_queries[0]
     assert "last_error_json" in gateway.fetch_one_queries[0]
-
 
 
 def test_results_repository_replace_snapshot_uses_delete_insert_single_statement() -> None:
@@ -318,7 +360,6 @@ def test_results_repository_replace_snapshot_uses_delete_insert_single_statement
     assert "item ->> 'report_table_md' AS report_table_md" in gateway.fetch_one_queries[0]
 
 
-
 def test_results_repository_save_stage_a_shortlist_uses_lease_guarded_upsert() -> None:
     """
     Verify Stage-A shortlist SQL uses lease guard and deterministic ON CONFLICT upsert.
@@ -358,7 +399,6 @@ def test_results_repository_save_stage_a_shortlist_uses_lease_guarded_upsert() -
     assert "state = 'running'" in gateway.fetch_one_queries[0]
 
 
-
 def _build_job_row(*, state: str) -> Mapping[str, Any]:
     """
     Build deterministic Backtest jobs SQL row fixture.
@@ -393,9 +433,7 @@ def _build_job_row(*, state: str) -> Mapping[str, Any]:
         "started_at": datetime(2026, 2, 22, 18, 0, 10, tzinfo=timezone.utc)
         if state != "queued"
         else None,
-        "finished_at": datetime(2026, 2, 22, 18, 5, tzinfo=timezone.utc)
-        if terminal_like
-        else None,
+        "finished_at": datetime(2026, 2, 22, 18, 5, tzinfo=timezone.utc) if terminal_like else None,
         "cancel_requested_at": None,
         "request_json": {"mode": "template"},
         "request_hash": "a" * 64,
@@ -404,11 +442,7 @@ def _build_job_row(*, state: str) -> Mapping[str, Any]:
         "engine_params_hash": "b" * 64,
         "backtest_runtime_config_hash": "c" * 64,
         "stage": (
-            "stage_b"
-            if state == "running"
-            else "finalizing"
-            if state == "succeeded"
-            else "stage_a"
+            "stage_b" if state == "running" else "finalizing" if state == "succeeded" else "stage_a"
         ),
         "processed_units": 10,
         "total_units": 100,
@@ -420,9 +454,7 @@ def _build_job_row(*, state: str) -> Mapping[str, Any]:
         "lease_expires_at": datetime(2026, 2, 22, 18, 2, tzinfo=timezone.utc)
         if running_like
         else None,
-        "heartbeat_at": datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc)
-        if running_like
-        else None,
+        "heartbeat_at": datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc) if running_like else None,
         "attempt": 1,
         "last_error": "Execution failed" if state == "failed" else None,
         "last_error_json": {

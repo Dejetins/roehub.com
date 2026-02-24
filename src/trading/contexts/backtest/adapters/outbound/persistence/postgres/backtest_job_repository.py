@@ -272,8 +272,11 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         WHERE user_id = %(user_id)s
           AND (%(state)s::text IS NULL OR state = %(state)s::text)
           AND (
-            %(cursor_created_at)s IS NULL
-            OR (created_at, job_id) < (%(cursor_created_at)s, %(cursor_job_id)s::uuid)
+            %(cursor_created_at)s::timestamptz IS NULL
+            OR (created_at, job_id) < (
+              %(cursor_created_at)s::timestamptz,
+              %(cursor_job_id)s::uuid
+            )
           )
         ORDER BY created_at DESC, job_id DESC
         LIMIT %(limit)s
@@ -390,7 +393,6 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             ) from error
 
 
-
 def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
     """
     Map SQL row payload into immutable `BacktestJob` aggregate.
@@ -470,7 +472,6 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
         raise BacktestStorageError("PostgresBacktestJobRepository cannot map job row") from error
 
 
-
 def _parse_json_object(
     *,
     value: Any,
@@ -511,9 +512,7 @@ def _parse_json_object(
         try:
             decoded = json.loads(raw_value)
         except json.JSONDecodeError as error:
-            raise BacktestStorageError(
-                f"backtest_jobs.{field_name} has invalid JSON"
-            ) from error
+            raise BacktestStorageError(f"backtest_jobs.{field_name} has invalid JSON") from error
         if not isinstance(decoded, Mapping):
             raise BacktestStorageError(f"backtest_jobs.{field_name} must be JSON object")
         return dict(decoded)
@@ -603,7 +602,9 @@ def _json_dumps(*, payload: Mapping[str, Any] | None) -> str | None:
     """
     if payload is None:
         return None
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    # json.dumps does not support MappingProxyType directly.
+    # Domain aggregates intentionally store JSON payloads as immutable mappings.
+    return json.dumps(dict(payload), sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
 
 __all__ = ["PostgresBacktestJobRepository"]
