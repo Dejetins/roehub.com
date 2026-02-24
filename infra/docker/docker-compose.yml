@@ -89,6 +89,8 @@ services:
         condition: service_completed_successfully
     environment:
       ROEHUB_ENV: ${ROEHUB_ENV:-dev}
+      ROEHUB_NUMBA_NUM_THREADS: ${ROEHUB_NUMBA_NUM_THREADS:-4}
+      NUMBA_NUM_THREADS: ${ROEHUB_NUMBA_NUM_THREADS:-4}
       IDENTITY_FAIL_FAST: ${IDENTITY_FAIL_FAST:-false}
       STRATEGY_FAIL_FAST: ${STRATEGY_FAIL_FAST:-false}
       BACKTEST_FAIL_FAST: ${BACKTEST_FAIL_FAST:-false}
