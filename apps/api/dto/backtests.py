@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime
 from typing import Annotated, Any, Literal, Mapping, Sequence
 from uuid import UUID
@@ -949,13 +950,15 @@ def _build_risk_grid_spec(
     tp = _build_grid_param_spec(name="tp", request=request.tp) if request.tp is not None else None
 
     if request.sl_enabled and sl is None and request.sl_pct is not None:
-        sl = ExplicitValuesSpec(name="sl", values=(
-            _normalize_numeric(value=request.sl_pct, field_path="risk_grid.sl_pct"),
-        ))
+        sl = ExplicitValuesSpec(
+            name="sl",
+            values=(_normalize_numeric(value=request.sl_pct, field_path="risk_grid.sl_pct"),),
+        )
     if request.tp_enabled and tp is None and request.tp_pct is not None:
-        tp = ExplicitValuesSpec(name="tp", values=(
-            _normalize_numeric(value=request.tp_pct, field_path="risk_grid.tp_pct"),
-        ))
+        tp = ExplicitValuesSpec(
+            name="tp",
+            values=(_normalize_numeric(value=request.tp_pct, field_path="risk_grid.tp_pct"),),
+        )
 
     return BacktestRiskGridSpec(
         sl_enabled=request.sl_enabled,
@@ -1115,15 +1118,15 @@ def _build_grid_param_spec(
             raise ValueError(f"axis '{normalized_name}' mode payload mismatch")
         return RangeValuesSpec(
             name=normalized_name,
-            start=_normalize_numeric(
+            start=_normalize_axis_numeric(
                 value=request.start,
                 field_path=f"{normalized_name}.start",
             ),
-            stop_inclusive=_normalize_numeric(
+            stop_inclusive=_normalize_axis_numeric(
                 value=request.stop_incl,
                 field_path=f"{normalized_name}.stop_incl",
             ),
-            step=_normalize_numeric(
+            step=_normalize_axis_numeric(
                 value=request.step,
                 field_path=f"{normalized_name}.step",
             ),
@@ -1396,6 +1399,47 @@ def _normalize_numeric(*, value: int | float, field_path: str) -> float:
     if isinstance(value, bool):
         raise ValueError(f"{field_path} must be numeric")
     return float(value)
+
+
+def _normalize_axis_numeric(*, value: int | float, field_path: str) -> int | float:
+    """Normalize numeric axis scalar while preserving ints when possible.
+
+    Why:
+    - `GridBuilder` validates integer axes strictly (`axis 'window' expects integer values`).
+    - The backtests API accepts `int | float` for range axis fields.
+    - We must not eagerly cast int axis values to float, otherwise integer params materialize as
+      floats (e.g. `5.0`) and fail validation.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md
+    Related:
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/indicators/domain/specifications/grid_param_spec.py
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+
+    Args:
+        value: Raw numeric scalar.
+        field_path: Dot-path used in deterministic error messages.
+    Returns:
+        int | float: Preserved int when possible, otherwise float.
+    Assumptions:
+        Boolean values are rejected at the API boundary.
+    Raises:
+        ValueError: If value is boolean or not finite.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, bool):
+        raise ValueError(f"{field_path} must be numeric")
+    if isinstance(value, int):
+        return value
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError(f"{field_path} must be numeric")
+    if parsed.is_integer():
+        return int(parsed)
+    return parsed
 
 
 def _to_sorted_nested_scalar_mapping(
