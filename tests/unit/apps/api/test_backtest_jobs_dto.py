@@ -5,7 +5,11 @@ from uuid import UUID
 
 import pytest
 
-from apps.api.dto import decode_backtest_jobs_cursor, encode_backtest_jobs_cursor
+from apps.api.dto import (
+    decode_backtest_jobs_cursor,
+    decode_backtest_jobs_state,
+    encode_backtest_jobs_cursor,
+)
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 
@@ -39,6 +43,72 @@ def test_backtest_jobs_cursor_codec_roundtrip_is_deterministic() -> None:
     )
     assert decode_backtest_jobs_cursor(cursor=encoded) == cursor
 
+
+
+def test_backtest_jobs_state_decode_accepts_blank_and_valid_values() -> None:
+    """
+    Verify state decoder accepts blank values as `None` and normalizes valid literals.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Legacy clients may send blank `state` query values.
+    Raises:
+        AssertionError: If blank or valid values are not normalized correctly.
+    Side Effects:
+        None.
+    """
+    assert decode_backtest_jobs_state(state=None) is None
+    assert decode_backtest_jobs_state(state="") is None
+    assert decode_backtest_jobs_state(state="   ") is None
+    assert decode_backtest_jobs_state(state="RUNNING") == "running"
+
+
+def test_backtest_jobs_state_decode_rejects_unknown_values() -> None:
+    """
+    Verify state decoder rejects unknown non-empty values with deterministic error details.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Allowed state literals are fixed by Backtest Jobs API v1 contract.
+    Raises:
+        AssertionError: If unknown state value is accepted.
+    Side Effects:
+        None.
+    """
+    with pytest.raises(BacktestValidationError) as error_info:
+        decode_backtest_jobs_state(state="done")
+
+    assert error_info.value.errors == (
+        {
+            "path": "query.state",
+            "code": "invalid_value",
+            "message": "state must be one of: queued, running, succeeded, failed, cancelled",
+        },
+    )
+
+
+def test_backtest_jobs_cursor_decode_returns_none_for_blank_cursor() -> None:
+    """
+    Verify cursor decoder treats blank query values as missing cursor for compatibility.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Jobs list endpoint accepts `cursor=` from older UI links.
+    Raises:
+        AssertionError: If blank cursor still maps to validation error.
+    Side Effects:
+        None.
+    """
+    assert decode_backtest_jobs_cursor(cursor="   ") is None
 
 
 def test_backtest_jobs_cursor_decode_rejects_non_base64_payload() -> None:

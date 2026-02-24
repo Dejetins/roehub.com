@@ -170,10 +170,11 @@ class _ListUseCaseFake:
     page: BacktestJobListPage
     error: Exception | None = None
     last_cursor: BacktestJobListCursor | None = None
+    last_state: str | None = None
 
     def execute(self, *, current_user, state: str | None, limit: int, cursor):
         """
-        Return configured list page and record decoded cursor argument.
+        Return configured list page and record decoded cursor/state arguments.
 
         Args:
             current_user: Authenticated user payload.
@@ -187,10 +188,11 @@ class _ListUseCaseFake:
         Raises:
             Exception: Configured exception.
         Side Effects:
-            Stores last cursor payload for assertions.
+            Stores last cursor and state payloads for assertions.
         """
         _ = current_user, state, limit
         self.last_cursor = cursor
+        self.last_state = state
         if self.error is not None:
             raise self.error
         return self.page
@@ -532,6 +534,76 @@ def test_list_backtest_jobs_decodes_cursor_and_returns_next_cursor() -> None:
     assert resolved_list_fake.last_cursor == previous_cursor
     assert response.json()["next_cursor"] == encode_backtest_jobs_cursor(cursor=next_cursor)
 
+
+def test_list_backtest_jobs_accepts_blank_state_and_cursor_query_values() -> None:
+    """
+    Verify list endpoint treats blank `state` and blank `cursor` as missing filters.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Backward compatibility requires accepting `state=` and `cursor=` from UI/client links.
+    Raises:
+        AssertionError: If blank query values still fail validation or are passed as non-empty.
+    Side Effects:
+        None.
+    """
+    listed_job = _queued_job(job_id=UUID("00000000-0000-0000-0000-000000000919"))
+    list_fake = _ListUseCaseFake(page=BacktestJobListPage(items=(listed_job,), next_cursor=None))
+    client, resolved_list_fake = _build_client(list_use_case=list_fake)
+
+    response = client.get(
+        "/backtests/jobs?state=&limit=25&cursor=",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    assert resolved_list_fake.last_state is None
+    assert resolved_list_fake.last_cursor is None
+
+
+def test_list_backtest_jobs_rejects_unknown_state_with_deterministic_payload() -> None:
+    """
+    Verify list endpoint rejects unknown non-empty `state` with canonical validation payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Allowed states are fixed by Backtest Jobs API v1 contract.
+    Raises:
+        AssertionError: If status code or payload differs from deterministic validation contract.
+    Side Effects:
+        None.
+    """
+    client, _ = _build_client()
+
+    response = client.get(
+        "/backtests/jobs?state=done",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "validation_error",
+            "message": "Invalid jobs state filter",
+            "details": {
+                "errors": [
+                    {
+                        "path": "query.state",
+                        "code": "invalid_value",
+                        "message": (
+                            "state must be one of: queued, running, succeeded, failed, cancelled"
+                        ),
+                    }
+                ]
+            },
+        }
+    }
 
 
 def test_list_backtest_jobs_rejects_invalid_cursor_with_deterministic_payload() -> None:

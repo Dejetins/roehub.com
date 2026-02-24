@@ -15,7 +15,6 @@ from fastapi import APIRouter, Depends, Request
 
 from apps.api.dto import (
     BacktestJobsListResponse,
-    BacktestJobsStateLiteral,
     BacktestJobStatusResponse,
     BacktestJobTopResponse,
     BacktestsPostRequest,
@@ -24,6 +23,7 @@ from apps.api.dto import (
     build_backtest_jobs_list_response,
     build_backtest_run_request,
     decode_backtest_jobs_cursor,
+    decode_backtest_jobs_state,
 )
 from trading.contexts.backtest.application.ports import CurrentUser
 from trading.contexts.backtest.application.use_cases import (
@@ -219,7 +219,7 @@ def build_backtest_jobs_router(
 
     @router.get("/backtests/jobs", response_model=BacktestJobsListResponse)
     def list_backtest_jobs(
-        state: BacktestJobsStateLiteral | None = None,
+        state: str | None = None,
         limit: int = 50,
         cursor: str | None = None,
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
@@ -236,7 +236,7 @@ def build_backtest_jobs_router(
           - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
 
         Args:
-            state: Optional state filter.
+            state: Optional state filter query value.
             limit: Page size (validated in use-case/query object).
             cursor: Opaque `base64url(json)` keyset cursor.
             principal: Authenticated user principal resolved by identity dependency.
@@ -250,10 +250,11 @@ def build_backtest_jobs_router(
             Reads jobs page from storage.
         """
         try:
+            state_value = decode_backtest_jobs_state(state=state)
             cursor_value = decode_backtest_jobs_cursor(cursor=cursor)
             page = list_use_case.execute(
                 current_user=CurrentUser(user_id=principal.user_id),
-                state=state,
+                state=state_value,
                 limit=limit,
                 cursor=cursor_value,
             )

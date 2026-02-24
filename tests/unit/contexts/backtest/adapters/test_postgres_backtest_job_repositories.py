@@ -195,6 +195,8 @@ def test_job_repository_list_for_user_uses_keyset_desc_ordering() -> None:
     assert len(page.items) == 1
     assert "ORDER BY created_at DESC, job_id DESC" in gateway.fetch_all_queries[0]
     assert "(created_at, job_id) <" in gateway.fetch_all_queries[0]
+    assert "%(state)s::text IS NULL" in gateway.fetch_all_queries[0]
+    assert "state = %(state)s::text" in gateway.fetch_all_queries[0]
 
 
 

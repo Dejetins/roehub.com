@@ -12,7 +12,7 @@ import base64
 import binascii
 import json
 from datetime import datetime
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
@@ -24,6 +24,13 @@ from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 
 BacktestJobsStateLiteral = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 BacktestJobsStageLiteral = Literal["stage_a", "stage_b", "finalizing"]
+_BACKTEST_JOBS_STATE_VALUES: tuple[BacktestJobsStateLiteral, ...] = (
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "cancelled",
+)
 
 
 class BacktestJobErrorResponse(BaseModel):
@@ -360,6 +367,51 @@ def encode_backtest_jobs_cursor(*, cursor: BacktestJobListCursor | None) -> str 
     return base64.urlsafe_b64encode(canonical_json.encode("utf-8")).decode("ascii").rstrip("=")
 
 
+def decode_backtest_jobs_state(*, state: str | None) -> BacktestJobsStateLiteral | None:
+    """
+    Decode optional jobs list `state` query value with blank-to-none compatibility behavior.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/api/api-errors-and-422-payload-v1.md
+    Related:
+      - apps/api/routes/backtest_jobs.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+
+    Args:
+        state: Optional raw `state` query value.
+    Returns:
+        BacktestJobsStateLiteral | None: Normalized state literal or `None`.
+    Assumptions:
+        Empty `state` query value from legacy clients should be treated as missing filter.
+    Raises:
+        BacktestValidationError: If non-empty state value is not one of allowed literals.
+    Side Effects:
+        None.
+    """
+    if state is None:
+        return None
+
+    normalized_state = state.strip().lower()
+    if not normalized_state:
+        return None
+
+    if normalized_state not in _BACKTEST_JOBS_STATE_VALUES:
+        allowed_values = ", ".join(_BACKTEST_JOBS_STATE_VALUES)
+        raise BacktestValidationError(
+            "Invalid jobs state filter",
+            errors=(
+                {
+                    "path": "query.state",
+                    "code": "invalid_value",
+                    "message": f"state must be one of: {allowed_values}",
+                },
+            ),
+        )
+
+    return cast(BacktestJobsStateLiteral, normalized_state)
+
 
 def decode_backtest_jobs_cursor(*, cursor: str | None) -> BacktestJobListCursor | None:
     """
@@ -378,7 +430,7 @@ def decode_backtest_jobs_cursor(*, cursor: str | None) -> BacktestJobListCursor 
     Returns:
         BacktestJobListCursor | None: Decoded cursor or `None` when not provided.
     Assumptions:
-        Payload is produced by `encode_backtest_jobs_cursor`.
+        Payload is produced by `encode_backtest_jobs_cursor`; blank cursor is treated as missing.
     Raises:
         BacktestValidationError: If cursor payload is malformed or cannot be parsed.
     Side Effects:
@@ -389,7 +441,7 @@ def decode_backtest_jobs_cursor(*, cursor: str | None) -> BacktestJobListCursor 
 
     normalized_cursor = cursor.strip()
     if not normalized_cursor:
-        raise _invalid_cursor_error()
+        return None
 
     try:
         padding = "=" * (-len(normalized_cursor) % 4)
@@ -498,6 +550,7 @@ __all__ = [
     "build_backtest_job_status_response",
     "build_backtest_job_top_response",
     "build_backtest_jobs_list_response",
+    "decode_backtest_jobs_state",
     "decode_backtest_jobs_cursor",
     "encode_backtest_jobs_cursor",
 ]

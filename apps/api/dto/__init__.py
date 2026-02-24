@@ -10,6 +10,7 @@ from .backtest_jobs import (
     build_backtest_job_top_response,
     build_backtest_jobs_list_response,
     decode_backtest_jobs_cursor,
+    decode_backtest_jobs_state,
     encode_backtest_jobs_cursor,
 )
 from .backtest_runtime_defaults import (
@@ -135,6 +136,7 @@ __all__ = [
     "build_backtest_job_status_response",
     "build_backtest_job_top_response",
     "build_backtest_jobs_list_response",
+    "decode_backtest_jobs_state",
     "decode_backtest_jobs_cursor",
     "encode_backtest_jobs_cursor",
     "BacktestRuntimeDefaultsResponse",

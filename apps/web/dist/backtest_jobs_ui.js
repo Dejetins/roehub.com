@@ -156,12 +156,18 @@ function initJobsListPage(pageRoot) {
 
     try {
       const requestUrl = new URL(jobsPath, window.location.origin);
-      requestUrl.searchParams.set("state", String(stateFilter.value || ""));
+      const stateValue = String(stateFilter.value || "").trim();
+      if (stateValue.length > 0) {
+        requestUrl.searchParams.set("state", stateValue);
+      }
       requestUrl.searchParams.set(
         "limit",
         String(parsePositiveInt(String(limitSelect.value || ""), defaultLimit)),
       );
-      requestUrl.searchParams.set("cursor", currentCursor());
+      const cursor = currentCursor().trim();
+      if (cursor.length > 0) {
+        requestUrl.searchParams.set("cursor", cursor);
+      }
 
       const response = await fetch(requestUrl.toString(), {
         credentials: 'include',
@@ -924,6 +930,11 @@ async function parseApiError(response) {
   }
 
   if (payload !== null) {
+    const roehubError = parseRoehubErrorPayload(payload);
+    if (roehubError !== null) {
+      return roehubError;
+    }
+
     const detail = payload.detail;
     if (typeof detail === "string" && detail.length > 0) {
       message = detail;
@@ -935,7 +946,7 @@ async function parseApiError(response) {
           if (typeof itemRecord.msg === "string" && itemRecord.msg.length > 0) {
             return itemRecord.msg;
           }
-          return JSON.stringify(item);
+          return buildStableDetailString(item);
         })
         .filter((item) => item.length > 0);
     } else if (detail !== null && typeof detail === "object") {
@@ -955,7 +966,7 @@ async function parseApiError(response) {
             if (typeof itemRecord.message === "string" && itemRecord.message.length > 0) {
               return itemRecord.message;
             }
-            return JSON.stringify(item);
+            return buildStableDetailString(item);
           })
           .filter((item) => item.length > 0);
       } else if (response.status === 422) {
@@ -963,11 +974,11 @@ async function parseApiError(response) {
         if (typeof detailRecord.error === "string") {
           fallbackDetails.push(`error: ${detailRecord.error}`);
         }
-        Object.keys(detailRecord).forEach((key) => {
+        Object.keys(detailRecord).sort(compareStableStrings).forEach((key) => {
           if (key === "error" || key === "message") {
             return;
           }
-          fallbackDetails.push(`${key}: ${JSON.stringify(detailRecord[key])}`);
+          fallbackDetails.push(`${key}: ${buildStableDetailString(detailRecord[key])}`);
         });
         details = fallbackDetails;
       }
@@ -975,6 +986,86 @@ async function parseApiError(response) {
   }
 
   return { message, details };
+}
+
+function parseRoehubErrorPayload(payload) {
+  const payloadRecord = asRecord(payload);
+  const errorRecord = asRecord(payloadRecord.error);
+  if (Object.keys(errorRecord).length === 0) {
+    return null;
+  }
+
+  const errorMessage = String(errorRecord.message || "").trim();
+  return {
+    message: errorMessage.length > 0 ? errorMessage : "Unexpected backtest operation error.",
+    details: parseRoehubErrorDetails(errorRecord.details),
+  };
+}
+
+function parseRoehubErrorDetails(rawDetails) {
+  const detailsRecord = asRecord(rawDetails);
+  if (Object.keys(detailsRecord).length === 0) {
+    return [];
+  }
+
+  if (Array.isArray(detailsRecord.errors)) {
+    return detailsRecord.errors
+      .map((item) => formatValidationDetailItem(item))
+      .filter((item) => item.length > 0)
+      .sort(compareStableStrings);
+  }
+
+  if (typeof detailsRecord.reason === "string" && detailsRecord.reason.trim().length > 0) {
+    return [detailsRecord.reason.trim()];
+  }
+
+  return [buildStableDetailString(detailsRecord)];
+}
+
+function formatValidationDetailItem(item) {
+  if (typeof item === "string") {
+    return item.trim();
+  }
+
+  const itemRecord = asRecord(item);
+  const path = typeof itemRecord.path === "string" ? itemRecord.path.trim() : "";
+  const message = typeof itemRecord.message === "string" ? itemRecord.message.trim() : "";
+  if (path.length > 0 && message.length > 0) {
+    return `${path}: ${message}`;
+  }
+  if (message.length > 0) {
+    return message;
+  }
+  if (path.length > 0) {
+    return path;
+  }
+  return buildStableDetailString(item);
+}
+
+function buildStableDetailString(value) {
+  try {
+    return JSON.stringify(normalizeJsonLikeValue(value));
+  } catch (_error) {
+    return String(value);
+  }
+}
+
+function normalizeJsonLikeValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeJsonLikeValue(item));
+  }
+  if (typeof value === "bigint") {
+    return String(value);
+  }
+  if (value !== null && typeof value === "object") {
+    const record = asRecord(value);
+    const normalized = {};
+    Object.keys(record).sort(compareStableStrings).forEach((key) => {
+      normalized[key] = normalizeJsonLikeValue(record[key]);
+    });
+    return normalized;
+  }
+  return value;
 }
 
 function showPageError(pageRoot, message, details) {
@@ -1022,9 +1113,13 @@ function clearPageError(pageRoot) {
 function normalizeError(error) {
   if (error instanceof Error) {
     const details = Array.isArray(error.details) ? error.details : [];
-    return { message: error.message, details };
+    const message = String(error.message || "").trim();
+    return {
+      message: message.length > 0 ? message : "Unexpected backtest operation error.",
+      details,
+    };
   }
-  return { message: "Unexpected error.", details: [] };
+  return { message: "Unexpected backtest operation error.", details: [] };
 }
 
 function requireDataAttr(node, camelCaseName) {

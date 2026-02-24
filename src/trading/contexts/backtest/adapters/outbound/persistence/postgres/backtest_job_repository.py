@@ -270,7 +270,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             {_BACKTEST_JOB_SELECT_COLUMNS}
         FROM {self._jobs_table}
         WHERE user_id = %(user_id)s
-          AND (%(state)s IS NULL OR state = %(state)s)
+          AND (%(state)s::text IS NULL OR state = %(state)s::text)
           AND (
             %(cursor_created_at)s IS NULL
             OR (created_at, job_id) < (%(cursor_created_at)s, %(cursor_job_id)s::uuid)
