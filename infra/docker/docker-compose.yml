@@ -68,8 +68,8 @@ services:
         condition: service_healthy
     restart: "no"
     environment:
-      IDENTITY_PG_DSN: ${IDENTITY_PG_DSN:-postgresql://roehub:roehub@postgres:5432/roehub}
-      POSTGRES_DSN: ${POSTGRES_DSN:-postgresql://roehub:roehub@postgres:5432/roehub}
+      IDENTITY_PG_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
+      POSTGRES_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
     command:
       - python
       - -m
@@ -92,8 +92,8 @@ services:
       IDENTITY_FAIL_FAST: ${IDENTITY_FAIL_FAST:-false}
       STRATEGY_FAIL_FAST: ${STRATEGY_FAIL_FAST:-false}
       BACKTEST_FAIL_FAST: ${BACKTEST_FAIL_FAST:-false}
-      IDENTITY_PG_DSN: ${IDENTITY_PG_DSN:-postgresql://roehub:roehub@postgres:5432/roehub}
-      STRATEGY_PG_DSN: ${STRATEGY_PG_DSN:-postgresql://roehub:roehub@postgres:5432/roehub}
+      IDENTITY_PG_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
+      STRATEGY_PG_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
       CH_HOST: ${CH_HOST:-clickhouse}
       CH_PORT: ${CH_PORT:-8123}
       CH_DATABASE: ${CH_DATABASE:-market_data}

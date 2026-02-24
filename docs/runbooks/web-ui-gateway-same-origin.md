@@ -12,11 +12,12 @@
 Минимальные ключи для UI-профиля:
 
 - `POSTGRES_PASSWORD`
-- `IDENTITY_PG_DSN`
-- `POSTGRES_DSN`
-- `STRATEGY_PG_DSN`
 - `WEB_API_BASE_URL`
 - `TELEGRAM_BOT_TOKEN`
+
+DSN-ключи `IDENTITY_PG_DSN`, `POSTGRES_DSN`, `STRATEGY_PG_DSN` можно не задавать:
+`docker-compose.yml` в UI-профиле собирает их в формате conninfo автоматически
+из `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`.
 
 Референс с плейсхолдерами:
 
@@ -50,6 +51,8 @@ curl -i http://127.0.0.1:8080/assets/site.css
 `db-bootstrap` запускается перед `api` в UI-профиле и выполняет:
 
 1. `python -m apps.migrations.bootstrap_main`
+   - `IDENTITY_PG_DSN`/`POSTGRES_DSN` по умолчанию передаются как conninfo:
+     `host=postgres port=5432 dbname=<POSTGRES_DB> user=<POSTGRES_USER> password=<POSTGRES_PASSWORD>`
 2. Базовую SQL-миграцию Identity в `IDENTITY_PG_DSN`:
    - применяет `0001_identity_v1.sql`
    - применяет `0002_identity_2fa_totp_v1.sql`

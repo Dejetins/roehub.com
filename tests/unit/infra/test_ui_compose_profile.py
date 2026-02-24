@@ -80,3 +80,34 @@ def test_ui_profile_publishes_only_gateway_to_host() -> None:
     assert "ports" not in services["api"]
     assert "ports" not in services["web"]
     assert "ports" not in services["db-bootstrap"]
+
+
+def test_ui_profile_uses_conninfo_dsn_defaults_from_postgres_env() -> None:
+    """
+    Verify UI profile services derive DSNs from POSTGRES_* values in conninfo format.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        UI profile should not require explicit DSN lines in env file.
+    Raises:
+        AssertionError: If DSN defaults drift from required conninfo template.
+    Side Effects:
+        None.
+    """
+    compose_payload = _load_main_compose()
+    services = compose_payload["services"]
+    expected_conninfo = (
+        "host=postgres port=5432 dbname=${POSTGRES_DB:-roehub} "
+        "user=${POSTGRES_USER:-roehub} password=${POSTGRES_PASSWORD}"
+    )
+
+    db_bootstrap_env = services["db-bootstrap"]["environment"]
+    api_env = services["api"]["environment"]
+
+    assert db_bootstrap_env["IDENTITY_PG_DSN"] == expected_conninfo
+    assert db_bootstrap_env["POSTGRES_DSN"] == expected_conninfo
+    assert api_env["IDENTITY_PG_DSN"] == expected_conninfo
+    assert api_env["STRATEGY_PG_DSN"] == expected_conninfo

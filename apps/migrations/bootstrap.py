@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, Literal, cast
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
 from apps.migrations.main import main as run_alembic_migrations_main
@@ -313,18 +314,24 @@ def inspect_identity_exchange_keys_layout(
 
 def normalize_psycopg_dsn(*, dsn: str) -> str:
     """
-    Normalize DSN for direct psycopg connections.
+    Normalize DSN for direct psycopg connections from URL or conninfo input.
 
     Args:
         dsn: Raw DSN string.
     Returns:
-        str: DSN accepted by psycopg3 (`postgresql://` or `postgres://`).
+        str: DSN accepted by psycopg3 (`postgresql://`, `postgres://`, or conninfo).
     Assumptions:
-        Input DSN may use SQLAlchemy `postgresql+psycopg://` scheme.
+        Input DSN may use SQLAlchemy `postgresql+psycopg://` scheme or conninfo format.
     Raises:
-        ValueError: If DSN is empty or has unsupported scheme.
+        ValueError: If DSN is empty or has unsupported format.
     Side Effects:
         None.
+
+    Docs:
+      - docs/runbooks/web-ui-gateway-same-origin.md
+    Related:
+      - apps/migrations/main.py
+      - infra/docker/docker-compose.yml
     """
     normalized = dsn.strip()
     if not normalized:
@@ -335,7 +342,11 @@ def normalize_psycopg_dsn(*, dsn: str) -> str:
         return normalized
     if normalized.startswith("postgres://"):
         return normalized
-    raise ValueError("Postgres DSN must start with postgresql:// or postgres://")
+    try:
+        conninfo_to_dict(normalized)
+    except Exception as error:  # noqa: BLE001
+        raise ValueError("Postgres DSN must be URL or libpq conninfo format") from error
+    return normalized
 
 
 def _collect_sql_paths(*, migrations_dir: Path, filenames: tuple[str, ...]) -> tuple[Path, ...]:

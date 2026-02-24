@@ -37,12 +37,18 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--identity-dsn",
         default="",
-        help=f"Identity Postgres DSN. Falls back to ${_IDENTITY_DSN_ENV}.",
+        help=(
+            "Identity Postgres DSN (URL or conninfo). "
+            f"Falls back to ${_IDENTITY_DSN_ENV}."
+        ),
     )
     parser.add_argument(
         "--postgres-dsn",
         default="",
-        help=f"Alembic Postgres DSN. Falls back to ${_POSTGRES_DSN_ENV}.",
+        help=(
+            "Alembic Postgres DSN (URL or conninfo). "
+            f"Falls back to ${_POSTGRES_DSN_ENV}."
+        ),
     )
     parser.add_argument(
         "--identity-migrations-dir",
