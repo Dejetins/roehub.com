@@ -219,6 +219,8 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     assert "/strategies/new" in response.text
     assert "sessionStorage" in response.text
     assert "prefill" in response.text
+    assert "Indicator params support both explicit values and range axes." in response.text
+    assert "Source is selected from allowed values." in response.text
 
 
 def test_backtest_jobs_list_page_renders_required_jobs_ui_hooks() -> None:

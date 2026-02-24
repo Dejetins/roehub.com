@@ -299,6 +299,11 @@ function initBacktestPage(pageRoot) {
     }, 220);
   };
 
+  const normalizeAxisMode = (rawMode) => {
+    const mode = String(rawMode || "explicit").trim().toLowerCase();
+    return mode === "range" ? "range" : "explicit";
+  };
+
   const readDefaultFieldValue = (defaultSpec) => {
     const spec = asRecord(defaultSpec);
     if (spec.mode === "explicit" && Array.isArray(spec.values) && spec.values.length > 0) {
@@ -308,6 +313,103 @@ function initBacktestPage(pageRoot) {
       return String(spec.start);
     }
     return "";
+  };
+
+  const readDefaultExplicitValuesCsv = (defaultSpec) => {
+    const spec = asRecord(defaultSpec);
+    if (spec.mode !== "explicit" || !Array.isArray(spec.values) || spec.values.length === 0) {
+      return "";
+    }
+    return spec.values.map((item) => String(item)).join(",");
+  };
+
+  const readDefaultRangeFields = (defaultSpec) => {
+    const spec = asRecord(defaultSpec);
+    if (spec.mode !== "range") {
+      return {
+        start: "",
+        stopIncl: "",
+        step: "",
+      };
+    }
+    return {
+      start: typeof spec.start === "undefined" ? "" : String(spec.start),
+      stopIncl: typeof spec.stop_incl === "undefined" ? "" : String(spec.stop_incl),
+      step: typeof spec.step === "undefined" ? "" : String(spec.step),
+    };
+  };
+
+  const getSourceAllowedValues = (sourceRecord) => (
+    Array.isArray(sourceRecord.allowed_values)
+      ? sourceRecord.allowed_values.map((item) => String(item))
+      : []
+  );
+
+  const readSourceDefaultValue = (sourceRecord, allowedValues) => {
+    const defaultValue = readDefaultFieldValue(sourceRecord.default).trim();
+    if (defaultValue.length > 0 && (allowedValues.length === 0 || allowedValues.includes(defaultValue))) {
+      return defaultValue;
+    }
+    if (allowedValues.length > 0) {
+      return allowedValues[0];
+    }
+    return defaultValue;
+  };
+
+  const ensureParamAxisState = ({ block, paramRecord }) => {
+    const paramName = String(paramRecord.name || "");
+    if (paramName.length === 0) {
+      return null;
+    }
+    if (!block.paramAxes || typeof block.paramAxes !== "object" || Array.isArray(block.paramAxes)) {
+      block.paramAxes = {};
+    }
+
+    const defaultSpec = asRecord(paramRecord.default);
+    const defaultMode = normalizeAxisMode(defaultSpec.mode);
+    const defaultRange = readDefaultRangeFields(defaultSpec);
+    const enumDefault = Array.isArray(paramRecord.enum_values) && paramRecord.enum_values.length > 0
+      ? String(paramRecord.enum_values[0])
+      : "";
+    const explicitDefault = readDefaultExplicitValuesCsv(defaultSpec);
+    const fallbackExplicit = explicitDefault.length > 0 ? explicitDefault : enumDefault;
+    const existing = asRecord(block.paramAxes[paramName]);
+    const hasExistingMode = typeof existing.mode === "string" && existing.mode.trim().length > 0;
+
+    const axisState = {
+      mode: hasExistingMode ? normalizeAxisMode(existing.mode) : defaultMode,
+      explicitValues: String(existing.explicitValues || ""),
+      rangeStart: String(existing.rangeStart || ""),
+      rangeStopIncl: String(existing.rangeStopIncl || ""),
+      rangeStep: String(existing.rangeStep || ""),
+    };
+    if (axisState.explicitValues.trim().length === 0 && fallbackExplicit.length > 0) {
+      axisState.explicitValues = fallbackExplicit;
+    }
+    if (axisState.rangeStart.trim().length === 0 && defaultRange.start.length > 0) {
+      axisState.rangeStart = defaultRange.start;
+    }
+    if (axisState.rangeStopIncl.trim().length === 0 && defaultRange.stopIncl.length > 0) {
+      axisState.rangeStopIncl = defaultRange.stopIncl;
+    }
+    if (axisState.rangeStep.trim().length === 0 && defaultRange.step.length > 0) {
+      axisState.rangeStep = defaultRange.step;
+    }
+    block.paramAxes[paramName] = axisState;
+    return axisState;
+  };
+
+  const readParamLabels = ({ indicatorId, paramName }) => {
+    if (paramName === "window" && indicatorId.startsWith("ma.")) {
+      return {
+        axisLabel: "window period",
+        stepLabel: "window grid step",
+      };
+    }
+    return {
+      axisLabel: paramName,
+      stepLabel: `${paramName} step`,
+    };
   };
 
   const ensureDefaultsForBlock = (block) => {
@@ -321,39 +423,37 @@ function initBacktestPage(pageRoot) {
       : null;
     if (sourceSpec !== null) {
       const sourceRecord = asRecord(sourceSpec);
-      if (typeof block.sourceValues !== "string" || block.sourceValues.trim().length === 0) {
-        if (
-          Array.isArray(sourceRecord.allowed_values)
-          && sourceRecord.allowed_values.length > 0
-        ) {
-          block.sourceValues = String(sourceRecord.allowed_values[0]);
-        } else {
-          block.sourceValues = readDefaultFieldValue(sourceRecord.default);
-        }
+      const allowedValues = getSourceAllowedValues(sourceRecord);
+      const selectedSource = String(block.sourceSelection || "").trim();
+      if (
+        selectedSource.length === 0
+        || (allowedValues.length > 0 && !allowedValues.includes(selectedSource))
+      ) {
+        block.sourceSelection = readSourceDefaultValue(sourceRecord, allowedValues);
       }
     } else {
-      block.sourceValues = "";
+      block.sourceSelection = "";
     }
 
     const params = Array.isArray(descriptor.params) ? descriptor.params : [];
+    const descriptorParamNames = new Set();
     params.forEach((paramSpec) => {
       const record = asRecord(paramSpec);
       const paramName = String(record.name || "");
-      if (!paramName) {
+      if (paramName.length === 0) {
         return;
       }
-      if (
-        typeof block.paramValues[paramName] === "string"
-        && block.paramValues[paramName].trim().length > 0
-      ) {
-        return;
-      }
-      if (Array.isArray(record.enum_values) && record.enum_values.length > 0) {
-        block.paramValues[paramName] = String(record.enum_values[0]);
-        return;
-      }
-      block.paramValues[paramName] = readDefaultFieldValue(record.default);
+      descriptorParamNames.add(paramName);
+      ensureParamAxisState({ block, paramRecord: record });
     });
+
+    if (block.paramAxes && typeof block.paramAxes === "object" && !Array.isArray(block.paramAxes)) {
+      Object.keys(block.paramAxes).forEach((paramName) => {
+        if (!descriptorParamNames.has(paramName)) {
+          delete block.paramAxes[paramName];
+        }
+      });
+    }
   };
 
   const addIndicatorBlock = () => {
@@ -364,8 +464,8 @@ function initBacktestPage(pageRoot) {
     const block = {
       uid: `backtest-indicator-${state.nextBlockNumber}`,
       indicatorId: String(firstIndicator.indicator_id),
-      sourceValues: "",
-      paramValues: {},
+      sourceSelection: "",
+      paramAxes: {},
     };
     state.nextBlockNumber += 1;
     ensureDefaultsForBlock(block);
@@ -456,8 +556,8 @@ function initBacktestPage(pageRoot) {
       });
       indicatorSelect.addEventListener("change", () => {
         block.indicatorId = indicatorSelect.value;
-        block.paramValues = {};
-        block.sourceValues = "";
+        block.paramAxes = {};
+        block.sourceSelection = "";
         ensureDefaultsForBlock(block);
         renderIndicatorBlocks();
         invalidatePreflight();
@@ -470,30 +570,36 @@ function initBacktestPage(pageRoot) {
       );
       if (sourceSpec) {
         const sourceRecord = asRecord(sourceSpec);
+        const sourceOptions = getSourceAllowedValues(sourceRecord);
         const sourceLabel = document.createElement("label");
-        sourceLabel.setAttribute("for", `${block.uid}-source-values`);
-        sourceLabel.textContent = "source values (csv)";
+        sourceLabel.setAttribute("for", `${block.uid}-source-select`);
+        sourceLabel.textContent = "source";
         card.appendChild(sourceLabel);
 
-        const sourceInput = document.createElement("input");
-        sourceInput.id = `${block.uid}-source-values`;
-        sourceInput.type = "text";
-        sourceInput.value = String(block.sourceValues || "");
-        if (
-          Array.isArray(sourceRecord.allowed_values)
-          && sourceRecord.allowed_values.length > 0
-        ) {
-          sourceInput.placeholder = sourceRecord.allowed_values.join(",");
+        const sourceSelect = document.createElement("select");
+        sourceSelect.id = `${block.uid}-source-select`;
+        sourceOptions.forEach((sourceValue) => {
+          const option = document.createElement("option");
+          option.value = sourceValue;
+          option.textContent = sourceValue;
+          sourceSelect.appendChild(option);
+        });
+        if (sourceOptions.length === 0) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "No source options";
+          sourceSelect.appendChild(option);
         }
-        sourceInput.addEventListener("change", () => {
-          block.sourceValues = sourceInput.value.trim();
+        sourceSelect.value = String(block.sourceSelection || "");
+        sourceSelect.addEventListener("change", () => {
+          block.sourceSelection = String(sourceSelect.value || "").trim();
           invalidatePreflight();
         });
-        card.appendChild(sourceInput);
+        card.appendChild(sourceSelect);
       }
 
       const paramsTitle = document.createElement("h4");
-      paramsTitle.textContent = "params (explicit values)";
+      paramsTitle.textContent = "params";
       card.appendChild(paramsTitle);
 
       const descriptorParams = Array.isArray(descriptor.params) ? descriptor.params : [];
@@ -510,24 +616,115 @@ function initBacktestPage(pageRoot) {
           if (!paramName) {
             return;
           }
-
-          const fieldLabel = document.createElement("label");
-          fieldLabel.setAttribute("for", `${block.uid}-param-${paramName}`);
-          fieldLabel.textContent = `${paramName} (${paramKind}) values`;
-          card.appendChild(fieldLabel);
-
-          const inputField = document.createElement("input");
-          inputField.id = `${block.uid}-param-${paramName}`;
-          inputField.type = "text";
-          inputField.value = String(block.paramValues[paramName] || "");
-          if (Array.isArray(paramRecord.enum_values) && paramRecord.enum_values.length > 0) {
-            inputField.placeholder = paramRecord.enum_values.join(",");
+          const axisState = ensureParamAxisState({ block, paramRecord });
+          if (axisState === null) {
+            return;
           }
-          inputField.addEventListener("change", () => {
-            block.paramValues[paramName] = inputField.value.trim();
+          const labels = readParamLabels({
+            indicatorId: block.indicatorId,
+            paramName,
+          });
+
+          const modeLabel = document.createElement("label");
+          modeLabel.setAttribute("for", `${block.uid}-param-${paramName}-mode`);
+          modeLabel.textContent = `${labels.axisLabel} axis mode`;
+          card.appendChild(modeLabel);
+
+          const modeSelect = document.createElement("select");
+          modeSelect.id = `${block.uid}-param-${paramName}-mode`;
+          ["explicit", "range"].forEach((modeOption) => {
+            const option = document.createElement("option");
+            option.value = modeOption;
+            option.textContent = modeOption;
+            option.selected = axisState.mode === modeOption;
+            modeSelect.appendChild(option);
+          });
+          card.appendChild(modeSelect);
+
+          const explicitLabel = document.createElement("label");
+          explicitLabel.setAttribute("for", `${block.uid}-param-${paramName}-values`);
+          explicitLabel.textContent = `${labels.axisLabel} (${paramKind}) values (csv)`;
+          card.appendChild(explicitLabel);
+
+          const explicitInput = document.createElement("input");
+          explicitInput.id = `${block.uid}-param-${paramName}-values`;
+          explicitInput.type = "text";
+          explicitInput.value = String(axisState.explicitValues || "");
+          if (Array.isArray(paramRecord.enum_values) && paramRecord.enum_values.length > 0) {
+            explicitInput.placeholder = paramRecord.enum_values.join(",");
+          }
+          explicitInput.addEventListener("change", () => {
+            axisState.explicitValues = explicitInput.value.trim();
             invalidatePreflight();
           });
-          card.appendChild(inputField);
+          card.appendChild(explicitInput);
+
+          const rangeStartLabel = document.createElement("label");
+          rangeStartLabel.setAttribute("for", `${block.uid}-param-${paramName}-start`);
+          rangeStartLabel.textContent = `${labels.axisLabel} start`;
+          card.appendChild(rangeStartLabel);
+
+          const rangeStartInput = document.createElement("input");
+          rangeStartInput.id = `${block.uid}-param-${paramName}-start`;
+          rangeStartInput.type = "number";
+          rangeStartInput.step = "any";
+          rangeStartInput.value = String(axisState.rangeStart || "");
+          rangeStartInput.addEventListener("change", () => {
+            axisState.rangeStart = rangeStartInput.value.trim();
+            invalidatePreflight();
+          });
+          card.appendChild(rangeStartInput);
+
+          const rangeStopLabel = document.createElement("label");
+          rangeStopLabel.setAttribute("for", `${block.uid}-param-${paramName}-stop`);
+          rangeStopLabel.textContent = `${labels.axisLabel} stop_incl`;
+          card.appendChild(rangeStopLabel);
+
+          const rangeStopInput = document.createElement("input");
+          rangeStopInput.id = `${block.uid}-param-${paramName}-stop`;
+          rangeStopInput.type = "number";
+          rangeStopInput.step = "any";
+          rangeStopInput.value = String(axisState.rangeStopIncl || "");
+          rangeStopInput.addEventListener("change", () => {
+            axisState.rangeStopIncl = rangeStopInput.value.trim();
+            invalidatePreflight();
+          });
+          card.appendChild(rangeStopInput);
+
+          const rangeStepLabel = document.createElement("label");
+          rangeStepLabel.setAttribute("for", `${block.uid}-param-${paramName}-step`);
+          rangeStepLabel.textContent = labels.stepLabel;
+          card.appendChild(rangeStepLabel);
+
+          const rangeStepInput = document.createElement("input");
+          rangeStepInput.id = `${block.uid}-param-${paramName}-step`;
+          rangeStepInput.type = "number";
+          rangeStepInput.step = "any";
+          rangeStepInput.value = String(axisState.rangeStep || "");
+          rangeStepInput.addEventListener("change", () => {
+            axisState.rangeStep = rangeStepInput.value.trim();
+            invalidatePreflight();
+          });
+          card.appendChild(rangeStepInput);
+
+          const toggleParamMode = () => {
+            const isRangeMode = axisState.mode === "range";
+            explicitLabel.classList.toggle("hidden", isRangeMode);
+            explicitInput.classList.toggle("hidden", isRangeMode);
+            rangeStartLabel.classList.toggle("hidden", !isRangeMode);
+            rangeStartInput.classList.toggle("hidden", !isRangeMode);
+            rangeStopLabel.classList.toggle("hidden", !isRangeMode);
+            rangeStopInput.classList.toggle("hidden", !isRangeMode);
+            rangeStepLabel.classList.toggle("hidden", !isRangeMode);
+            rangeStepInput.classList.toggle("hidden", !isRangeMode);
+          };
+
+          modeSelect.addEventListener("change", () => {
+            axisState.mode = normalizeAxisMode(modeSelect.value);
+            toggleParamMode();
+            invalidatePreflight();
+          });
+          toggleParamMode();
         });
       }
 
@@ -621,6 +818,50 @@ function initBacktestPage(pageRoot) {
     return {
       mode: "explicit",
       values: parsed,
+    };
+  };
+
+  const parseRangeAxisSpec = ({ kind, startRaw, stopRaw, stepRaw, fieldLabel }) => {
+    if (kind !== "int" && kind !== "float") {
+      throw new Error(`${fieldLabel} range mode requires numeric param kind.`);
+    }
+
+    const rawStart = String(startRaw || "").trim();
+    const rawStop = String(stopRaw || "").trim();
+    const rawStep = String(stepRaw || "").trim();
+    if (rawStart.length === 0 || rawStop.length === 0 || rawStep.length === 0) {
+      throw new Error(`${fieldLabel} range requires start, stop_incl, and step.`);
+    }
+
+    const parseField = (rawValue, axisField) => {
+      if (kind === "int") {
+        if (!/^-?\d+$/.test(rawValue)) {
+          throw new Error(`${fieldLabel} range ${axisField} must be an int.`);
+        }
+        return Number.parseInt(rawValue, 10);
+      }
+      const parsedFloat = Number(rawValue);
+      if (!Number.isFinite(parsedFloat)) {
+        throw new Error(`${fieldLabel} range ${axisField} must be a float.`);
+      }
+      return parsedFloat;
+    };
+
+    const startValue = parseField(rawStart, "start");
+    const stopValue = parseField(rawStop, "stop_incl");
+    const stepValue = parseField(rawStep, "step");
+    if (stepValue <= 0) {
+      throw new Error(`${fieldLabel} range step must be greater than 0.`);
+    }
+    if (startValue > stopValue) {
+      throw new Error(`${fieldLabel} range start must be less than or equal to stop_incl.`);
+    }
+
+    return {
+      mode: "range",
+      start: startValue,
+      stop_incl: stopValue,
+      step: stepValue,
     };
   };
 
@@ -787,6 +1028,7 @@ function initBacktestPage(pageRoot) {
       throw new Error("Template mode requires at least one indicator grid.");
     }
     return state.blocks.map((block, index) => {
+      ensureDefaultsForBlock(block);
       const descriptor = state.indicatorsById.get(block.indicatorId);
       if (!descriptor) {
         throw new Error(`Indicator descriptor is unavailable for block #${index + 1}.`);
@@ -800,15 +1042,28 @@ function initBacktestPage(pageRoot) {
         if (!paramName) {
           return;
         }
-        const rawValue = String(block.paramValues[paramName] || "").trim();
+        const axisState = ensureParamAxisState({ block, paramRecord });
+        if (axisState === null) {
+          return;
+        }
+        const paramKind = String(paramRecord.kind || "string");
+        const fieldLabel = `indicator ${block.indicatorId} param ${paramName}`;
+        if (axisState.mode === "range") {
+          params[paramName] = parseRangeAxisSpec({
+            kind: paramKind,
+            startRaw: axisState.rangeStart,
+            stopRaw: axisState.rangeStopIncl,
+            stepRaw: axisState.rangeStep,
+            fieldLabel,
+          });
+          return;
+        }
+
+        const rawValue = String(axisState.explicitValues || "").trim();
         if (rawValue.length === 0) {
           return;
         }
-        params[paramName] = parseAxisValuesCsv(
-          rawValue,
-          String(paramRecord.kind || "string"),
-          `indicator ${block.indicatorId} param ${paramName}`,
-        );
+        params[paramName] = parseAxisValuesCsv(rawValue, paramKind, fieldLabel);
       });
 
       const grid = {
@@ -821,14 +1076,19 @@ function initBacktestPage(pageRoot) {
         (item) => String(asRecord(item).name || "") === "source",
       );
       if (sourceSpec) {
-        const rawSource = String(block.sourceValues || "").trim();
-        if (rawSource.length > 0) {
-          grid.source = parseAxisValuesCsv(
-            rawSource,
-            "string",
-            `indicator ${block.indicatorId} source`,
-          );
+        const sourceRecord = asRecord(sourceSpec);
+        const sourceOptions = getSourceAllowedValues(sourceRecord);
+        const selectedSource = String(block.sourceSelection || "").trim();
+        if (selectedSource.length === 0) {
+          throw new Error(`indicator ${block.indicatorId} source requires one selected value.`);
         }
+        if (sourceOptions.length > 0 && !sourceOptions.includes(selectedSource)) {
+          throw new Error(`indicator ${block.indicatorId} source must be one of allowed values.`);
+        }
+        grid.source = {
+          mode: "explicit",
+          values: [selectedSource],
+        };
       }
       return grid;
     });
