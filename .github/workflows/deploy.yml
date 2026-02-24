@@ -113,7 +113,7 @@ jobs:
           MARKET_DATA_DOCKERFILE: infra/docker/Dockerfile.market_data
         run: |
           set -euxo pipefail
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env config >/dev/null
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui config >/dev/null
 
       - name: Cleanup legacy market-data stack
         run: |
@@ -140,5 +140,5 @@ jobs:
             fi
             sleep "$((attempt * 15))"
           done
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
-          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui up -d --build --remove-orphans
+          docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui ps

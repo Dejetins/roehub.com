@@ -99,8 +99,9 @@ services:
       CH_HOST: ${CH_HOST:-clickhouse}
       CH_PORT: ${CH_PORT:-8123}
       CH_DATABASE: ${CH_DATABASE:-market_data}
-      CH_USER: ${CH_USER:-default}
-      CH_PASSWORD: ${CH_PASSWORD:-}
+      # Use the same credentials as clickhouse container init.
+      CH_USER: ${CLICKHOUSE_USER:-default}
+      CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CH_SECURE: ${CH_SECURE:-0}
       CH_VERIFY: ${CH_VERIFY:-1}
       ROEHUB_REDIS_PASSWORD: ${ROEHUB_REDIS_PASSWORD:-}
