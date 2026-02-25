@@ -57,6 +57,7 @@ class _FixedSeriesIndicatorCompute:
         """
         self._outputs = outputs
         self.compute_calls = 0
+        self.requested_layout_preferences: list[Layout | None] = []
 
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
@@ -84,12 +85,12 @@ class _FixedSeriesIndicatorCompute:
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:
         """
-        Return deterministic tensor with one variant and fixed output series.
+        Return deterministic tensor with one variant honoring requested layout.
 
         Args:
             req: Compute request payload.
         Returns:
-            IndicatorTensor: Deterministic time-major tensor.
+            IndicatorTensor: Deterministic tensor with one variant.
         Assumptions:
             Requested indicator id exists in outputs mapping.
         Raises:
@@ -98,12 +99,17 @@ class _FixedSeriesIndicatorCompute:
             Increments in-memory compute call counter.
         """
         self.compute_calls += 1
+        self.requested_layout_preferences.append(req.grid.layout_preference)
         indicator_id = req.grid.indicator_id.value
         output = self._outputs[indicator_id]
-        values = np.ascontiguousarray(output.reshape(output.shape[0], 1), dtype=np.float32)
+        requested_layout = req.grid.layout_preference or Layout.TIME_MAJOR
+        if requested_layout is Layout.VARIANT_MAJOR:
+            values = np.ascontiguousarray(output.reshape(1, output.shape[0]), dtype=np.float32)
+        else:
+            values = np.ascontiguousarray(output.reshape(output.shape[0], 1), dtype=np.float32)
         return IndicatorTensor(
             indicator_id=IndicatorId(indicator_id),
-            layout=Layout.TIME_MAJOR,
+            layout=requested_layout,
             axes=(AxisDef(name="variant", values_int=(0,)),),
             values=values,
             meta=TensorMeta(t=output.shape[0], variants=1, nan_policy="propagate", compute_ms=0),

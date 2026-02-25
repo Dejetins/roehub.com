@@ -19,6 +19,7 @@ from trading.contexts.backtest.application.services import (
     evaluate_indicator_signal_encoded_v1,
     evaluate_indicator_signal_v1,
     expand_indicator_grids_with_signal_dependencies_v1,
+    indicator_primary_output_series_from_tensor_v1,
     list_signal_rule_registry_v1,
     supported_indicator_ids_for_signals_v1,
 )
@@ -648,6 +649,44 @@ def test_build_inputs_from_tensors_uses_primary_output_and_registry_listing_is_s
     assert inputs[0].primary_output.tolist() == [10.0, 20.0, 30.0]
     assert inputs[0].indicator_inputs["source"] == "close"
     assert registry_pairs == tuple(sorted(registry_pairs, key=lambda item: item[0]))
+
+
+def test_indicator_primary_output_series_variant_major_can_share_memory() -> None:
+    """
+    Verify VARIANT_MAJOR extraction can reuse tensor memory without an extra copy.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Variant-major tensor stores variants on axis 0 and bars on axis 1.
+    Raises:
+        AssertionError: If extracted series is incorrect or does not share memory.
+    Side Effects:
+        None.
+    """
+    tensor = IndicatorTensor(
+        indicator_id=IndicatorId("ma.sma"),
+        layout=Layout.VARIANT_MAJOR,
+        axes=(AxisDef(name="window", values_int=(10, 20)),),
+        values=np.asarray(
+            (
+                (1.0, 2.0, 3.0),
+                (10.0, 20.0, 30.0),
+            ),
+            dtype=np.float32,
+        ),
+        meta=TensorMeta(t=3, variants=2),
+    )
+
+    series = indicator_primary_output_series_from_tensor_v1(
+        tensor=tensor,
+        variant_index=1,
+    )
+
+    assert series.tolist() == [10.0, 20.0, 30.0]
+    assert np.shares_memory(series, tensor.values)
 
 
 def test_compact_signal_encoding_matches_legacy_for_multiple_rule_families() -> None:

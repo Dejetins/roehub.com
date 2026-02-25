@@ -126,7 +126,10 @@ Request v1 может override `top_trades_n` (валидируется, нап�
 
 - периодически проверяет `request.is_disconnected()`;
 - при disconnect помечает `BacktestRunControlV1` как cancelled (`reason=client_disconnected`);
-- дополнительно использует hard deadline (`BacktestRunControlV1(deadline_seconds=...)`).
+- дополнительно использует hard deadline (`BacktestRunControlV1(deadline_seconds=...)`),
+  где значение берётся из runtime config `backtest.sync.sync_deadline_seconds`
+  (`configs/<env>/backtest.yaml`) и прокидывается через
+  `apps/api/wiring/modules/backtest.py -> build_backtests_router(...)`.
 
 Отмена реализована кооперативно: staged loops проверяют token/checkpoint и прекращают вычисление без принудительного завершения thread/process.
 

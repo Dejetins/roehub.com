@@ -177,6 +177,7 @@ def build_backtest_router(
         strategy_reader=strategy_reader,
         runtime_defaults_response=runtime_defaults_response,
         current_user_dependency=current_user_dependency,
+        sync_deadline_seconds=runtime_config.sync.sync_deadline_seconds,
     )
     if not runtime_config.jobs.enabled:
         return backtests_router

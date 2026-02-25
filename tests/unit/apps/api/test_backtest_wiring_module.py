@@ -15,6 +15,7 @@ from trading.contexts.backtest.adapters.outbound import (
     BacktestJobsRuntimeConfig,
     BacktestReportingRuntimeConfig,
     BacktestRuntimeConfig,
+    BacktestSyncRuntimeConfig,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
@@ -161,12 +162,17 @@ def _runtime_config(
     max_variants_per_compute: int = 600000,
     max_compute_bytes_total: int = 5 * 1024**3,
     max_numba_threads: int = 4,
+    sync_deadline_seconds: float = 55.0,
 ) -> BacktestRuntimeConfig:
     """
     Build minimal runtime config fixture for backtest wiring router-toggle tests.
 
     Args:
         jobs_enabled: Jobs toggle value.
+        max_variants_per_compute: Variants guard limit.
+        max_compute_bytes_total: Memory guard limit.
+        max_numba_threads: Runtime Numba threads cap.
+        sync_deadline_seconds: Sync route cooperative hard deadline in seconds.
     Returns:
         BacktestRuntimeConfig: Valid runtime config fixture.
     Assumptions:
@@ -194,6 +200,7 @@ def _runtime_config(
             max_compute_bytes_total=max_compute_bytes_total,
         ),
         cpu=BacktestCpuRuntimeConfig(max_numba_threads=max_numba_threads),
+        sync=BacktestSyncRuntimeConfig(sync_deadline_seconds=sync_deadline_seconds),
         jobs=BacktestJobsRuntimeConfig(
             enabled=jobs_enabled,
             top_k_persisted_default=300,
@@ -274,7 +281,7 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
 
 def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypatch) -> None:
     """
-    Verify sync `RunBacktestUseCase` receives half of configured guard budgets.
+    Verify wiring passes sync half-guards and sync deadline into composed dependencies.
 
     Args:
         monkeypatch: pytest monkeypatch fixture.
@@ -288,11 +295,13 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         None.
     """
     captured_kwargs: dict[str, object] = {}
+    captured_backtests_router_kwargs: dict[str, object] = {}
     runtime_config = _runtime_config(
         jobs_enabled=False,
         max_variants_per_compute=101,
         max_compute_bytes_total=1001,
         max_numba_threads=7,
+        sync_deadline_seconds=42.5,
     )
 
     monkeypatch.setattr(
@@ -345,7 +354,8 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     monkeypatch.setattr(
         backtest_module,
         "build_backtests_router",
-        lambda **kwargs: _build_ping_router(path="/backtests/ping"),
+        lambda **kwargs: captured_backtests_router_kwargs.update(kwargs)
+        or _build_ping_router(path="/backtests/ping"),
     )
 
     router = backtest_module.build_backtest_router(
@@ -360,6 +370,7 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     assert captured_kwargs["max_variants_per_compute"] == 50
     assert captured_kwargs["max_compute_bytes_total"] == 500
     assert captured_kwargs["max_numba_threads"] == 7
+    assert captured_backtests_router_kwargs["sync_deadline_seconds"] == 42.5
 
 
 

@@ -493,7 +493,11 @@ def indicator_primary_output_series_from_tensor_v1(
 
     if tensor.layout is Layout.VARIANT_MAJOR:
         flattened = tensor.values.reshape(tensor.meta.variants, tensor.meta.t)
-        return np.ascontiguousarray(flattened[variant_index, :], dtype=np.float32)
+        # HOT PATH: variant-major row extraction stays a view when dtype/layout already match.
+        variant_view = flattened[variant_index, :]
+        if variant_view.dtype == np.float32 and variant_view.flags.c_contiguous:
+            return variant_view
+        return np.ascontiguousarray(variant_view, dtype=np.float32)
 
     raise ValueError(f"Unsupported tensor layout: {tensor.layout}")
 

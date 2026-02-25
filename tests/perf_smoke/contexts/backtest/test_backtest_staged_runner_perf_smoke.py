@@ -60,6 +60,7 @@ class _PerfSmokeIndicatorCompute:
             None.
         """
         self.compute_calls = 0
+        self.requested_layout_preferences: list[Layout | None] = []
 
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
@@ -102,12 +103,12 @@ class _PerfSmokeIndicatorCompute:
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:
         """
-        Return deterministic multi-variant tensor with neutral bars between sign transitions.
+        Return deterministic multi-variant tensor honoring requested layout preference.
 
         Args:
             req: Compute request payload.
         Returns:
-            IndicatorTensor: Deterministic time-major tensor used by scorer.
+            IndicatorTensor: Deterministic tensor used by scorer.
         Assumptions:
             Prepared scorer path may request full indicator axis grid in one compute call.
         Raises:
@@ -120,6 +121,7 @@ class _PerfSmokeIndicatorCompute:
             raise ValueError("bars must be > 0")
 
         self.compute_calls += 1
+        self.requested_layout_preferences.append(req.grid.layout_preference)
         pattern = np.asarray((1.0, 0.0, -1.0, 0.0), dtype=np.float32)
         window_spec = req.grid.params.get(
             "window",
@@ -128,18 +130,23 @@ class _PerfSmokeIndicatorCompute:
         windows = tuple(window_spec.materialize())
         if len(windows) == 0:
             windows = (1,)
-        values = np.empty((bars, len(windows)), dtype=np.float32)
+        values_time_major = np.empty((bars, len(windows)), dtype=np.float32)
         for index, raw_window in enumerate(windows):
             series = np.resize(pattern, bars).astype(np.float32)
             shift = int(int(raw_window) % 4)
             if shift > 0:
                 series = np.roll(series, shift=shift)
-            values[:, index] = series
+            values_time_major[:, index] = series
+        requested_layout = req.grid.layout_preference or Layout.TIME_MAJOR
+        if requested_layout is Layout.VARIANT_MAJOR:
+            values = np.ascontiguousarray(values_time_major.T, dtype=np.float32)
+        else:
+            values = np.ascontiguousarray(values_time_major, dtype=np.float32)
         return IndicatorTensor(
             indicator_id=req.grid.indicator_id,
-            layout=Layout.TIME_MAJOR,
+            layout=requested_layout,
             axes=(AxisDef(name="variant", values_int=tuple(range(len(windows)))),),
-            values=np.ascontiguousarray(values, dtype=np.float32),
+            values=values,
             meta=TensorMeta(
                 t=bars,
                 variants=len(windows),
@@ -221,6 +228,7 @@ def test_backtest_staged_runner_perf_smoke_small_sync_grid() -> None:
     assert result.stage_b_variants_total == 16
     assert len(result.variants) == 5
     assert indicator_compute.compute_calls == 1
+    assert indicator_compute.requested_layout_preferences == [Layout.VARIANT_MAJOR]
     assert len({item.variant_key for item in result.variants}) == len(result.variants)
     assert all(len(item.variant_key) == 64 for item in result.variants)
 

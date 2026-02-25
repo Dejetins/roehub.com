@@ -8,6 +8,8 @@ backtest:
     max_compute_bytes_total: 5368709120
   cpu:
     max_numba_threads: 4
+  sync:
+    sync_deadline_seconds: 55.0
   jobs:
     enabled: true
     top_k_persisted_default: 300

@@ -17,6 +17,7 @@ from trading.contexts.backtest.adapters.outbound import (
     BacktestJobsRuntimeConfig,
     BacktestReportingRuntimeConfig,
     BacktestRuntimeConfig,
+    BacktestSyncRuntimeConfig,
 )
 from trading.contexts.backtest.application.dto import (
     BacktestMetricRowV1,
@@ -204,6 +205,7 @@ def _build_client(
             runtime_defaults_response=runtime_defaults_response
             or _runtime_defaults_response(),
             current_user_dependency=_HeaderCurrentUserDependency(),
+            sync_deadline_seconds=55.0,
         )
     )
     return TestClient(app)
@@ -230,6 +232,7 @@ def _runtime_defaults_response() -> BacktestRuntimeDefaultsResponse:
             warmup_bars_default=200,
             top_k_default=300,
             preselect_default=20000,
+            sync=BacktestSyncRuntimeConfig(sync_deadline_seconds=55.0),
             reporting=BacktestReportingRuntimeConfig(top_trades_n_default=3),
             execution=BacktestExecutionRuntimeConfig(
                 init_cash_quote_default=10000.0,

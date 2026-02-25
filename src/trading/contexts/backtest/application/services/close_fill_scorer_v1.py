@@ -28,7 +28,7 @@ from trading.contexts.indicators.application.ports.compute import IndicatorCompu
 from trading.contexts.indicators.application.services.grid_builder import (
     MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
 )
-from trading.contexts.indicators.domain.entities import IndicatorId
+from trading.contexts.indicators.domain.entities import IndicatorId, Layout
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
 from trading.platform.errors import RoehubError
 
@@ -40,6 +40,7 @@ from .grid_builder_v1 import (
 )
 from .run_control_v1 import BacktestRunControlV1
 from .signals_from_indicators_v1 import (
+    IndicatorSignalEvaluationInputV1,
     build_indicator_signal_inputs_from_tensors_v1,
     evaluate_and_aggregate_signals_encoded_v1,
     indicator_primary_output_series_from_tensor_v1,
@@ -56,6 +57,7 @@ _DEFAULT_FEE_PCT_BY_MARKET_ID = {
 
 _DEFAULT_SIGNALS_CACHE_MAX_ENTRIES = 2048
 _DEFAULT_SIGNALS_CACHE_MAX_BYTES = 32 * 1024 * 1024
+_EMPTY_SCALAR_MAPPING: Mapping[str, BacktestVariantScalar] = MappingProxyType({})
 
 
 @dataclass(frozen=True, slots=True)
@@ -403,6 +405,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             _PreparedTensorPlan: Prepared tensor with axis metadata and lookup maps.
         Assumptions:
             `plan.axes` is deterministic and compatible with indicator compute contract.
+            Prepared tensor requests prefer `Layout.VARIANT_MAJOR` for scoring hot path.
         Raises:
             ValueError: If axis payload cannot be normalized into deterministic plan.
         Side Effects:
@@ -436,6 +439,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             indicator_id=IndicatorId(indicator_id),
             params=params_axes,
             source=source_axis,
+            layout_preference=Layout.VARIANT_MAJOR,
         )
         tensor = self._indicator_compute.compute(
             ComputeRequest(
@@ -658,34 +662,27 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             Calls indicator compute port for base and dependency indicators.
         """
         prepared_context = self._prepared_grid_context
+        if prepared_context is not None:
+            return self._build_final_signal_prepared_fast_path(
+                candles=candles,
+                indicator_selections=indicator_selections,
+                signal_params=signal_params,
+                prepared_context=prepared_context,
+            )
+
         ordered_selections = tuple(
             sorted(indicator_selections, key=lambda item: item.indicator_id)
         )
         tensors_by_indicator: dict[str, IndicatorTensor] = {}
         indicator_inputs: dict[str, Mapping[str, BacktestVariantScalar]] = {}
         dependency_outputs: dict[str, Mapping[str, np.ndarray]] = {}
-        variant_index_by_indicator: dict[str, int] = {}
 
-        # HOT PATH: per-variant signal assembly using precomputed indicator tensors.
         for selection in ordered_selections:
             indicator_id = selection.indicator_id
-            prepared_plan = None
-            if prepared_context is not None:
-                prepared_plan = prepared_context.indicator_plans.get(indicator_id)
-
-            if prepared_plan is None:
-                tensor = self._compute_tensor_for_selection(
-                    candles=candles,
-                    selection=selection,
-                )
-                variant_index_by_indicator[indicator_id] = 0
-            else:
-                tensor = prepared_plan.tensor
-                variant_index = prepared_plan.variant_index_for_selection(
-                    selection=selection,
-                )
-                variant_index_by_indicator[indicator_id] = variant_index
-
+            tensor = self._compute_tensor_for_selection(
+                candles=candles,
+                selection=selection,
+            )
             tensors_by_indicator[indicator_id] = tensor
             indicator_inputs[indicator_id] = _normalize_scalar_mapping(values=selection.inputs)
 
@@ -695,51 +692,140 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
 
             selection_dependency_outputs: dict[str, np.ndarray] = {}
             for dependency_id in rule_spec.required_dependency_ids:
-                dependency_tensor: IndicatorTensor
-                dependency_variant_index: int
-                prepared_dependency = None
-                if prepared_context is not None:
-                    prepared_by_dependency = prepared_context.dependency_plans.get(indicator_id, {})
-                    prepared_dependency = prepared_by_dependency.get(dependency_id)
-
-                if prepared_dependency is None:
-                    dependency_selection = IndicatorVariantSelection(
-                        indicator_id=dependency_id,
-                        inputs=selection.inputs,
-                        params=selection.params,
-                    )
-                    dependency_tensor = self._compute_tensor_for_selection(
-                        candles=candles,
-                        selection=dependency_selection,
-                    )
-                    dependency_variant_index = 0
-                else:
-                    dependency_tensor = prepared_dependency.tensor
-                    dependency_variant_index = prepared_dependency.variant_index_for_selection(
-                        selection=selection
-                    )
+                dependency_selection = IndicatorVariantSelection(
+                    indicator_id=dependency_id,
+                    inputs=selection.inputs,
+                    params=selection.params,
+                )
+                dependency_tensor = self._compute_tensor_for_selection(
+                    candles=candles,
+                    selection=dependency_selection,
+                )
                 selection_dependency_outputs[dependency_id] = (
                     indicator_primary_output_series_from_tensor_v1(
                         tensor=dependency_tensor,
-                        variant_index=dependency_variant_index,
+                        variant_index=0,
                     )
                 )
-            dependency_outputs[indicator_id] = MappingProxyType(
-                dict(sorted(selection_dependency_outputs.items(), key=lambda item: item[0]))
-            )
+            dependency_outputs[indicator_id] = MappingProxyType(selection_dependency_outputs)
 
         signal_inputs = build_indicator_signal_inputs_from_tensors_v1(
             tensors=tensors_by_indicator,
             indicator_inputs=indicator_inputs,
             signal_params=signal_params,
             dependency_outputs=dependency_outputs,
-            variant_index_by_indicator=variant_index_by_indicator,
         )
         final_signal = evaluate_and_aggregate_signals_encoded_v1(
             candles=candles,
             indicator_inputs=signal_inputs,
         )
         return final_signal
+
+    def _build_final_signal_prepared_fast_path(
+        self,
+        *,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]],
+        prepared_context: _PreparedGridContext,
+    ) -> np.ndarray:
+        """
+        Build final signal using prepared tensors without large intermediate dict allocations.
+
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+          - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+
+        Args:
+            candles: Warmup-inclusive candles.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Normalized signal parameter mapping.
+            prepared_context: Prepared tensor plans for current staged run.
+        Returns:
+            np.ndarray: Compact `np.int8` final signal array.
+        Assumptions:
+            Indicator selections are unique by indicator id and sorted deterministically.
+        Raises:
+            ValueError: If one dependency series cannot be resolved deterministically.
+        Side Effects:
+            May call compute port only when prepared plan for selected id is absent.
+        """
+        ordered_selections = tuple(
+            sorted(indicator_selections, key=lambda item: item.indicator_id)
+        )
+        signal_inputs: list[IndicatorSignalEvaluationInputV1] = []
+
+        # HOT PATH: avoid large intermediate mappings for prepared-tensor scoring.
+        for selection in ordered_selections:
+            indicator_id = selection.indicator_id
+            prepared_plan = prepared_context.indicator_plans.get(indicator_id)
+            if prepared_plan is None:
+                tensor = self._compute_tensor_for_selection(
+                    candles=candles,
+                    selection=selection,
+                )
+                variant_index = 0
+            else:
+                tensor = prepared_plan.tensor
+                variant_index = prepared_plan.variant_index_for_selection(
+                    selection=selection,
+                )
+            primary_output = indicator_primary_output_series_from_tensor_v1(
+                tensor=tensor,
+                variant_index=variant_index,
+            )
+
+            dependency_outputs: dict[str, np.ndarray] = {}
+            rule_spec = signal_rule_spec_v1(indicator_id=indicator_id)
+            if len(rule_spec.required_dependency_ids) > 0:
+                prepared_by_dependency: Mapping[str, _PreparedTensorPlan] = (
+                    prepared_context.dependency_plans.get(indicator_id, {})
+                )
+                for dependency_id in rule_spec.required_dependency_ids:
+                    prepared_dependency = prepared_by_dependency.get(dependency_id)
+                    if prepared_dependency is None:
+                        dependency_selection = IndicatorVariantSelection(
+                            indicator_id=dependency_id,
+                            inputs=selection.inputs,
+                            params=selection.params,
+                        )
+                        dependency_tensor = self._compute_tensor_for_selection(
+                            candles=candles,
+                            selection=dependency_selection,
+                        )
+                        dependency_variant_index = 0
+                    else:
+                        dependency_tensor = prepared_dependency.tensor
+                        dependency_variant_index = (
+                            prepared_dependency.variant_index_for_selection(
+                                selection=selection
+                            )
+                        )
+                    dependency_outputs[dependency_id] = (
+                        indicator_primary_output_series_from_tensor_v1(
+                            tensor=dependency_tensor,
+                            variant_index=dependency_variant_index,
+                        )
+                    )
+
+            signal_inputs.append(
+                IndicatorSignalEvaluationInputV1(
+                    indicator_id=indicator_id,
+                    primary_output=primary_output,
+                    indicator_inputs=_normalize_scalar_mapping(values=selection.inputs),
+                    signal_params=signal_params.get(indicator_id, _EMPTY_SCALAR_MAPPING),
+                    dependency_outputs=dependency_outputs,
+                )
+            )
+
+        return evaluate_and_aggregate_signals_encoded_v1(
+            candles=candles,
+            indicator_inputs=signal_inputs,
+        )
 
     def _compute_tensor_for_selection(
         self,

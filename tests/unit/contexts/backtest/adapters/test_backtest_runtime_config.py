@@ -23,6 +23,11 @@ _DEFAULT_JOBS_BLOCK = """
     parallel_workers: 1
 """.rstrip()
 
+_DEFAULT_SYNC_BLOCK = """
+  sync:
+    sync_deadline_seconds: 55.0
+""".rstrip()
+
 
 
 def _write_backtest_config(tmp_path: Path, *, body: str, filename: str = "backtest.yaml") -> Path:
@@ -71,6 +76,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5368709120
     assert config.cpu.max_numba_threads == 4
+    assert config.sync.sync_deadline_seconds == 55.0
     assert config.reporting.top_trades_n_default == 3
     assert config.execution.init_cash_quote_default == 10000.0
     assert config.execution.fixed_quote_default == 100.0
@@ -98,14 +104,14 @@ def test_load_backtest_runtime_config_uses_defaults_when_optional_keys_absent(
     tmp_path: Path,
 ) -> None:
     """
-    Verify optional non-jobs scalar keys fallback to documented defaults.
+    Verify optional non-jobs/non-sync scalar keys fallback to documented defaults.
 
     Args:
         tmp_path: pytest temporary path fixture.
     Returns:
         None.
     Assumptions:
-        `backtest.jobs.*` keys are strict-required and provided in fixture.
+        `backtest.jobs.*` and `backtest.sync.*` keys are strict-required and provided.
     Raises:
         AssertionError: If fallback defaults are not applied.
     Side Effects:
@@ -118,6 +124,8 @@ def test_load_backtest_runtime_config_uses_defaults_when_optional_keys_absent(
 version: 1
 backtest:
 """
+            + _DEFAULT_SYNC_BLOCK
+            + "\n"
             + _DEFAULT_JOBS_BLOCK
         ).strip(),
     )
@@ -130,6 +138,7 @@ backtest:
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5 * 1024**3
     assert config.cpu.max_numba_threads > 0
+    assert config.sync.sync_deadline_seconds == 55.0
     assert config.reporting.top_trades_n_default == 3
     assert config.execution.init_cash_quote_default == 10000.0
     assert config.execution.fixed_quote_default == 100.0
@@ -192,6 +201,8 @@ def test_load_backtest_runtime_config_requires_jobs_required_keys(tmp_path: Path
         body="""
 version: 1
 backtest:
+  sync:
+    sync_deadline_seconds: 55
   jobs:
     enabled: true
     max_active_jobs_per_user: 3
@@ -205,6 +216,41 @@ backtest:
     with pytest.raises(ValueError, match="top_k_persisted_default"):
         load_backtest_runtime_config(config_path)
 
+
+
+def test_load_backtest_runtime_config_requires_sync_section(tmp_path: Path) -> None:
+    """
+    Verify runtime loader fails fast when `backtest.sync` section is absent.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Sync deadline is a strict-required runtime knob for sync API route.
+    Raises:
+        AssertionError: If missing sync section does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1.0
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="sync"):
+        load_backtest_runtime_config(config_path)
 
 
 def test_resolve_backtest_config_path_precedence() -> None:
@@ -289,6 +335,8 @@ backtest:
     max_compute_bytes_total: 1234567
   cpu:
     max_numba_threads: 6
+  sync:
+    sync_deadline_seconds: 42.5
   execution:
     init_cash_quote_default: 5000
     fixed_quote_default: 250
@@ -318,6 +366,7 @@ backtest:
     assert config.guards.max_variants_per_compute == 1200
     assert config.guards.max_compute_bytes_total == 1234567
     assert config.cpu.max_numba_threads == 6
+    assert config.sync.sync_deadline_seconds == 42.5
     assert config.reporting.top_trades_n_default == 5
     assert config.execution.init_cash_quote_default == 5000.0
     assert config.execution.fixed_quote_default == 250.0
@@ -356,6 +405,8 @@ def test_load_backtest_runtime_config_rejects_invalid_jobs_defaults(tmp_path: Pa
         body="""
 version: 1
 backtest:
+  sync:
+    sync_deadline_seconds: 55
   jobs:
     enabled: true
     top_k_persisted_default: 0
@@ -368,6 +419,43 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="top_k_persisted_default"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_invalid_sync_defaults(tmp_path: Path) -> None:
+    """
+    Verify loader fails fast when `backtest.sync.sync_deadline_seconds` is non-positive.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Sync deadline is strict-positive to keep cooperative cancellation deterministic.
+    Raises:
+        AssertionError: If invalid sync payload does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 0
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="sync_deadline_seconds"):
         load_backtest_runtime_config(config_path)
 
 
@@ -393,6 +481,8 @@ version: 1
 backtest:
   cpu:
     max_numba_threads: 0
+  sync:
+    sync_deadline_seconds: 55
   jobs:
     enabled: true
     top_k_persisted_default: 300
@@ -457,6 +547,8 @@ backtest:
   top_k_default: 300
   warmup_bars_default: 200
   preselect_default: 20000
+  sync:
+    sync_deadline_seconds: 55
   reporting:
     top_trades_n_default: 3
   execution:
@@ -488,6 +580,8 @@ backtest:
   top_k_default: 300
   warmup_bars_default: 200
   preselect_default: 20000
+  sync:
+    sync_deadline_seconds: 40
   reporting:
     top_trades_n_default: 3
   execution:
@@ -541,6 +635,8 @@ def test_build_backtest_runtime_config_hash_ignores_operational_jobs_fields(
         body="""
 version: 1
 backtest:
+  sync:
+    sync_deadline_seconds: 30
   jobs:
     enabled: true
     top_k_persisted_default: 300
@@ -563,6 +659,8 @@ backtest:
         body="""
 version: 1
 backtest:
+  sync:
+    sync_deadline_seconds: 55
   jobs:
     enabled: false
     top_k_persisted_default: 300

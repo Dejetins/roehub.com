@@ -220,6 +220,41 @@ class BacktestCpuRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestSyncRuntimeConfig:
+    """
+    Runtime sync settings loaded from strict required `backtest.sync.*` YAML section.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+    Related:
+      - configs/dev/backtest.yaml
+      - apps/api/routes/backtests.py
+      - apps/api/wiring/modules/backtest.py
+    """
+
+    sync_deadline_seconds: float
+
+    def __post_init__(self) -> None:
+        """
+        Validate sync-route deadline settings with fail-fast startup semantics.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Sync deadline is configured in seconds and must be strictly positive.
+        Raises:
+            ValueError: If `sync_deadline_seconds` is non-positive.
+        Side Effects:
+            None.
+        """
+        if self.sync_deadline_seconds <= 0.0:
+            raise ValueError("backtest.sync.sync_deadline_seconds must be > 0")
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestJobsRuntimeConfig:
     """
     Runtime jobs settings loaded from strict required `backtest.jobs.*` YAML section.
@@ -295,6 +330,7 @@ class BacktestRuntimeConfig:
 
     version: int
     jobs: BacktestJobsRuntimeConfig
+    sync: BacktestSyncRuntimeConfig
     warmup_bars_default: int = _WARMUP_BARS_DEFAULT
     top_k_default: int = _TOP_K_DEFAULT
     preselect_default: int = _PRESELECT_DEFAULT
@@ -340,6 +376,8 @@ class BacktestRuntimeConfig:
             raise ValueError("backtest.cpu section must be configured")
         if self.jobs is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest.jobs section must be configured")
+        if self.sync is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.sync section must be configured")
 
 
 
@@ -394,7 +432,8 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     Returns:
         BacktestRuntimeConfig: Parsed validated config object.
     Assumptions:
-        Missing non-jobs scalar keys fallback to documented defaults.
+        Missing non-required scalar keys fallback to documented defaults.
+        `backtest.jobs.*` and `backtest.sync.sync_deadline_seconds` are strict-required.
     Raises:
         FileNotFoundError: If path does not exist.
         ValueError: If YAML shape or values are invalid.
@@ -416,6 +455,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     guards_map = _get_mapping(backtest_map, "guards", required=False)
     cpu_map = _get_mapping(backtest_map, "cpu", required=False)
     jobs_map = _get_mapping(backtest_map, "jobs", required=True)
+    sync_map = _get_mapping(backtest_map, "sync", required=True)
 
     warmup_bars_default = _get_int_with_default(
         backtest_map,
@@ -495,10 +535,14 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         snapshot_seconds=_get_optional_int(jobs_map, "snapshot_seconds"),
         snapshot_variants_step=_get_optional_int(jobs_map, "snapshot_variants_step"),
     )
+    sync = BacktestSyncRuntimeConfig(
+        sync_deadline_seconds=_get_float(sync_map, "sync_deadline_seconds", required=True)
+    )
 
     return BacktestRuntimeConfig(
         version=version,
         jobs=jobs,
+        sync=sync,
         warmup_bars_default=warmup_bars_default,
         top_k_default=top_k_default,
         preselect_default=preselect_default,

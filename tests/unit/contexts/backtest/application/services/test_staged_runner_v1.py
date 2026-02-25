@@ -154,6 +154,7 @@ class _InstrumentedSignalIndicatorCompute:
             None.
         """
         self.compute_calls = 0
+        self.requested_layout_preferences: list[Layout | None] = []
 
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
@@ -196,12 +197,12 @@ class _InstrumentedSignalIndicatorCompute:
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:
         """
-        Return deterministic multi-variant tensor with neutral bars between sign flips.
+        Return deterministic multi-variant tensor honoring requested layout preference.
 
         Args:
             req: Compute request payload with explicit single-value axes.
         Returns:
-            IndicatorTensor: Deterministic time-major tensor for scorer signal evaluation.
+            IndicatorTensor: Deterministic tensor for scorer signal evaluation.
         Assumptions:
             Prepared scorer path may request full indicator axis grid in one compute call.
         Raises:
@@ -214,6 +215,7 @@ class _InstrumentedSignalIndicatorCompute:
             raise ValueError("bars must be > 0")
 
         self.compute_calls += 1
+        self.requested_layout_preferences.append(req.grid.layout_preference)
         pattern = np.asarray((1.0, 0.0, -1.0, 0.0), dtype=np.float32)
         window_spec = req.grid.params.get(
             "window",
@@ -222,18 +224,25 @@ class _InstrumentedSignalIndicatorCompute:
         windows = tuple(window_spec.materialize())
         if len(windows) == 0:
             windows = (1,)
-        values = np.empty((bars, len(windows)), dtype=np.float32)
+        values_time_major = np.empty((bars, len(windows)), dtype=np.float32)
         for index, raw_window in enumerate(windows):
             series = np.resize(pattern, bars).astype(np.float32)
             shift = int(int(raw_window) % 4)
             if shift > 0:
                 series = np.roll(series, shift=shift)
-            values[:, index] = series
+            values_time_major[:, index] = series
+
+        requested_layout = req.grid.layout_preference or Layout.TIME_MAJOR
+        if requested_layout is Layout.VARIANT_MAJOR:
+            values = np.ascontiguousarray(values_time_major.T, dtype=np.float32)
+        else:
+            values = np.ascontiguousarray(values_time_major, dtype=np.float32)
+
         return IndicatorTensor(
             indicator_id=req.grid.indicator_id,
-            layout=Layout.TIME_MAJOR,
+            layout=requested_layout,
             axes=(AxisDef(name="variant", values_int=tuple(range(len(windows)))),),
-            values=np.ascontiguousarray(values, dtype=np.float32),
+            values=values,
             meta=TensorMeta(
                 t=bars,
                 variants=len(windows),
@@ -511,6 +520,7 @@ def test_staged_runner_v1_stage_b_risk_expansion_reuses_signal_cache() -> None:
     assert result.stage_a_variants_total == 2
     assert result.stage_b_variants_total == 6
     assert indicator_compute.compute_calls == 1
+    assert indicator_compute.requested_layout_preferences == [Layout.VARIANT_MAJOR]
 
 
 class _CancellingScorer:

@@ -39,7 +39,7 @@ def build_backtests_router(
     strategy_reader: BacktestStrategyReader,
     runtime_defaults_response: BacktestRuntimeDefaultsResponse,
     current_user_dependency: CurrentUserDependency,
-    sync_deadline_seconds: float = 55.0,
+    sync_deadline_seconds: float,
 ) -> APIRouter:
     """
     Build backtests router for sync runs and runtime-defaults browser prefill endpoint.

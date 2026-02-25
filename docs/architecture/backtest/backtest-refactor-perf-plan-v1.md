@@ -24,9 +24,13 @@ owner: backtest
 
 - Stage A/Stage B используют общий `BacktestStagedCoreRunnerV1` для sync и jobs.
 - `CloseFillBacktestStagedScorerV1` готовит batched/scoped indicator tensors на run (`prepare_for_grid_context(...)`) и избегает per-variant `IndicatorCompute.compute(...)` в hot path.
+- Подготовленные indicator tensors запрашиваются с `GridSpec.layout_preference = Layout.VARIANT_MAJOR`,
+  чтобы извлечение series по варианту могло идти view-based в scoring hot path.
 - Sync `POST /backtests` работает через async route + `asyncio.to_thread(...)` и кооперативную отмену:
   - по `request.is_disconnected()`;
   - по hard deadline (`BacktestRunControlV1`).
+- Hard deadline sync route вынесен в runtime config: `backtest.sync.sync_deadline_seconds`
+  (`configs/<env>/backtest.yaml`) и пробрасывается wiring-слоем в router builder.
 - Job runner использует тот же shared core scoring path и проверяет cancel/lease на checkpoint-границах стадий.
 - Sync guards применяются как half-budget от runtime config:
   - `max_variants_per_compute = floor(full / 2)`;
