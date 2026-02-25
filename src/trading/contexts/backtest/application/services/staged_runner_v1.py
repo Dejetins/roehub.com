@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Mapping, cast
+from functools import partial
+from heapq import heappush, heapreplace
+from typing import Iterator, Mapping, cast
 
 from trading.contexts.backtest.application.dto import (
     BacktestReportV1,
@@ -267,22 +269,21 @@ class BacktestStagedRunnerV1:
             max_compute_bytes_total=max_compute_bytes_total,
         )
 
-        stage_a_rows = self._score_stage_a(
+        shortlist = self._score_stage_a(
             grid_context=grid_context,
             candles=candles,
             scorer=scorer,
+            shortlist_limit=preselect,
         )
-        shortlist_len = min(preselect, len(stage_a_rows))
-        shortlist = stage_a_rows[:shortlist_len]
 
-        stage_b_rows, stage_b_tasks = self._score_stage_b(
+        top_rows, stage_b_tasks = self._score_stage_b(
             template=template,
             grid_context=grid_context,
             shortlist=shortlist,
             candles=candles,
             scorer=scorer,
+            top_k_limit=top_k,
         )
-        top_rows = stage_b_rows[: min(top_k, len(stage_b_rows))]
         top_payload_context = self._build_top_reports(
             requested_time_range=requested_time_range,
             top_rows=top_rows,
@@ -337,35 +338,63 @@ class BacktestStagedRunnerV1:
         grid_context: BacktestGridBuildContextV1,
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
+        shortlist_limit: int,
     ) -> list[_StageAScoredVariant]:
         """
-        Score Stage A base variants and return deterministic sorted shortlist candidates.
+        Score Stage A base variants and keep only bounded deterministic shortlist by heap.
 
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
         Args:
             grid_context: Built staged grid context.
             candles: Dense candles forwarded to scorer.
             scorer: Stage scorer port.
+            shortlist_limit: Maximum number of Stage A rows retained in memory.
         Returns:
-            list[_StageAScoredVariant]: Sorted Stage A rows by ranking and tie-break key.
+            list[_StageAScoredVariant]:
+                Sorted Stage A shortlist rows by ranking and tie-break key.
         Assumptions:
             Stage A uses base key tie-break with risk disabled.
         Raises:
-            ValueError: If scorer payload lacks required ranking metric.
+            ValueError: If scorer payload lacks required ranking metric or limit is invalid.
         Side Effects:
             None.
         """
-        base_variants = tuple(grid_context.iter_stage_a_variants())
-        workers = self._resolve_parallel_workers(total_tasks=len(base_variants))
-
-        rows: list[_StageAScoredVariant] = []
+        if shortlist_limit <= 0:
+            raise ValueError("BacktestStagedRunnerV1 shortlist_limit must be > 0")
+        workers = self._resolve_parallel_workers(total_tasks=grid_context.stage_a_variants_total)
+        shortlist_heap: list[tuple[float, tuple[int, ...], _StageAScoredVariant]] = []
         if workers <= 1:
-            for base_variant in base_variants:
-                rows.append(
-                    self._score_stage_a_variant(
-                        base_variant=base_variant,
-                        candles=candles,
-                        scorer=scorer,
+            for base_variant in grid_context.iter_stage_a_variants():
+                row = self._score_stage_a_variant(
+                    base_variant=base_variant,
+                    candles=candles,
+                    scorer=scorer,
+                )
+                # HOT PATH: streaming heap update prevents full Stage A row materialization.
+                if len(shortlist_heap) < shortlist_limit:
+                    heappush(
+                        shortlist_heap,
+                        (
+                            row.total_return_pct,
+                            _descending_text_key(value=row.base_variant.base_variant_key),
+                            row,
+                        ),
                     )
+                    continue
+                if not _stage_a_outranks(candidate=row, baseline=shortlist_heap[0][2]):
+                    continue
+                heapreplace(
+                    shortlist_heap,
+                    (
+                        row.total_return_pct,
+                        _descending_text_key(value=row.base_variant.base_variant_key),
+                        row,
+                    ),
                 )
         else:
             with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -375,13 +404,30 @@ class BacktestStagedRunnerV1:
                         candles=candles,
                         scorer=scorer,
                     ),
-                    base_variants,
+                    grid_context.iter_stage_a_variants(),
                 ):
-                    rows.append(row)
-        return sorted(
-            rows,
-            key=lambda row: (-row.total_return_pct, row.base_variant.base_variant_key),
-        )
+                    # HOT PATH: streaming heap update prevents full Stage A row materialization.
+                    if len(shortlist_heap) < shortlist_limit:
+                        heappush(
+                            shortlist_heap,
+                            (
+                                row.total_return_pct,
+                                _descending_text_key(value=row.base_variant.base_variant_key),
+                                row,
+                            ),
+                        )
+                        continue
+                    if not _stage_a_outranks(candidate=row, baseline=shortlist_heap[0][2]):
+                        continue
+                    heapreplace(
+                        shortlist_heap,
+                        (
+                            row.total_return_pct,
+                            _descending_text_key(value=row.base_variant.base_variant_key),
+                            row,
+                        ),
+                    )
+        return sorted((entry[2] for entry in shortlist_heap), key=_stage_a_rank_key)
 
     def _score_stage_b(
         self,
@@ -391,56 +437,107 @@ class BacktestStagedRunnerV1:
         shortlist: list[_StageAScoredVariant],
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
+        top_k_limit: int,
     ) -> tuple[list[_StageBScoredVariant], Mapping[str, _StageBTask]]:
         """
-        Score Stage B expanded variants from Stage A shortlist and risk cartesian axes.
+        Score Stage B expanded variants and keep only bounded deterministic top-K by heap.
 
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
         Args:
             template: Resolved backtest template payload.
             grid_context: Built staged grid context.
             shortlist: Sorted Stage A shortlist rows.
             candles: Dense candles forwarded to scorer.
             scorer: Stage scorer port.
+            top_k_limit: Maximum number of Stage B rows retained in memory.
         Returns:
             tuple[list[_StageBScoredVariant], Mapping[str, _StageBTask]]:
-                Sorted Stage B rows and variant-key lookup for top-k reporting phase.
+                Sorted Stage B top rows and task lookup required for report/payload building.
         Assumptions:
             Stage B tie-break key is full `variant_key`.
         Raises:
-            ValueError: If scorer payload lacks required ranking metric.
+            ValueError: If scorer payload lacks required ranking metric or limit is invalid.
         Side Effects:
             None.
         """
-        tasks = self._stage_b_tasks(
+        if top_k_limit <= 0:
+            raise ValueError("BacktestStagedRunnerV1 top_k_limit must be > 0")
+        tasks = self._iter_stage_b_tasks(
             template=template,
             grid_context=grid_context,
             shortlist=shortlist,
         )
-        task_by_variant_key: dict[str, _StageBTask] = {}
-        for task in tasks:
-            if task.variant_key in task_by_variant_key:
-                raise ValueError("duplicate Stage B variant_key is not allowed")
-            task_by_variant_key[task.variant_key] = task
-        workers = self._resolve_parallel_workers(total_tasks=len(tasks))
-        rows: list[_StageBScoredVariant] = []
+        workers = self._resolve_parallel_workers(total_tasks=grid_context.stage_b_variants_total)
+        top_heap: list[tuple[float, tuple[int, ...], _StageBScoredVariant, _StageBTask]] = []
         if workers <= 1:
             for task in tasks:
-                rows.append(self._score_stage_b_task(task=task, candles=candles, scorer=scorer))
-        else:
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                for row in executor.map(
-                    lambda item: self._score_stage_b_task(
-                        task=item,
-                        candles=candles,
-                        scorer=scorer,
+                row = self._score_stage_b_task(task=task, candles=candles, scorer=scorer)
+                # HOT PATH: streaming heap update keeps only Stage B top-K rows and tasks.
+                if len(top_heap) < top_k_limit:
+                    heappush(
+                        top_heap,
+                        (
+                            row.total_return_pct,
+                            _descending_text_key(value=row.variant_key),
+                            row,
+                            task,
+                        ),
+                    )
+                    continue
+                if not _stage_b_outranks(candidate=row, baseline=top_heap[0][2]):
+                    continue
+                heapreplace(
+                    top_heap,
+                    (
+                        row.total_return_pct,
+                        _descending_text_key(value=row.variant_key),
+                        row,
+                        task,
                     ),
-                    tasks,
-                ):
-                    rows.append(row)
-        return (
-            sorted(rows, key=lambda row: (-row.total_return_pct, row.variant_key)),
-            task_by_variant_key,
-        )
+                )
+        else:
+            task_row_mapper = partial(
+                self._score_stage_b_task_with_task,
+                candles=candles,
+                scorer=scorer,
+            )
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                for row, task in executor.map(task_row_mapper, tasks):
+                    # HOT PATH: streaming heap update keeps only Stage B top-K rows and tasks.
+                    if len(top_heap) < top_k_limit:
+                        heappush(
+                            top_heap,
+                            (
+                                row.total_return_pct,
+                                _descending_text_key(value=row.variant_key),
+                                row,
+                                task,
+                            ),
+                        )
+                        continue
+                    if not _stage_b_outranks(candidate=row, baseline=top_heap[0][2]):
+                        continue
+                    heapreplace(
+                        top_heap,
+                        (
+                            row.total_return_pct,
+                            _descending_text_key(value=row.variant_key),
+                            row,
+                            task,
+                        ),
+                    )
+        top_rows = sorted((entry[2] for entry in top_heap), key=_stage_b_rank_key)
+        top_tasks_by_variant_key: dict[str, _StageBTask] = {}
+        for _, _, row, task in top_heap:
+            if row.variant_key in top_tasks_by_variant_key:
+                raise ValueError("duplicate Stage B variant_key is not allowed")
+            top_tasks_by_variant_key[row.variant_key] = task
+        return top_rows, top_tasks_by_variant_key
 
     def _score_stage_a_variant(
         self,
@@ -484,22 +581,28 @@ class BacktestStagedRunnerV1:
             total_return_pct=_extract_total_return_pct(metrics=metrics),
         )
 
-    def _stage_b_tasks(
+    def _iter_stage_b_tasks(
         self,
         *,
         template: RunBacktestTemplate,
         grid_context: BacktestGridBuildContextV1,
         shortlist: list[_StageAScoredVariant],
-    ) -> tuple[_StageBTask, ...]:
+    ) -> Iterator[_StageBTask]:
         """
-        Build deterministic Stage B scoring task list from shortlist and risk variants.
+        Iterate deterministic Stage B scoring tasks from shortlist and risk variants.
 
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
         Args:
             template: Resolved backtest template payload.
             grid_context: Built staged grid context.
             shortlist: Stage A shortlist rows.
         Returns:
-            tuple[_StageBTask, ...]: Deterministic Stage B task payloads.
+            Iterator[_StageBTask]: Deterministic Stage B task payload stream.
         Assumptions:
             Variant index follows `(shortlist_index * risk_total) + risk_index` contract.
         Raises:
@@ -507,7 +610,6 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
-        tasks: list[_StageBTask] = []
         risk_variants = grid_context.risk_variants
         risk_total = len(risk_variants)
         for shortlist_index, stage_a_row in enumerate(shortlist):
@@ -522,17 +624,14 @@ class BacktestStagedRunnerV1:
                     risk_params=risk_variant.risk_params,
                     execution_params=template.execution_params,
                 )
-                tasks.append(
-                    _StageBTask(
-                        variant_index=variant_index,
-                        indicator_variant_key=base_variant.indicator_variant_key,
-                        variant_key=variant_key,
-                        indicator_selections=base_variant.indicator_selections,
-                        signal_params=base_variant.signal_params,
-                        risk_params=risk_variant.risk_params,
-                    )
+                yield _StageBTask(
+                    variant_index=variant_index,
+                    indicator_variant_key=base_variant.indicator_variant_key,
+                    variant_key=variant_key,
+                    indicator_selections=base_variant.indicator_selections,
+                    signal_params=base_variant.signal_params,
+                    risk_params=risk_variant.risk_params,
                 )
-        return tuple(tasks)
 
     def _score_stage_b_task(
         self,
@@ -571,6 +670,41 @@ class BacktestStagedRunnerV1:
             indicator_variant_key=task.indicator_variant_key,
             variant_key=task.variant_key,
             total_return_pct=_extract_total_return_pct(metrics=metrics),
+        )
+
+    def _score_stage_b_task_with_task(
+        self,
+        task: _StageBTask,
+        *,
+        candles: CandleArrays,
+        scorer: BacktestStagedVariantScorer,
+    ) -> tuple[_StageBScoredVariant, _StageBTask]:
+        """
+        Score one Stage-B task and return both ranked row and original task payload.
+
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+        Args:
+            task: Stage B scoring task.
+            candles: Dense candles forwarded to scorer.
+            scorer: Stage scorer port.
+        Returns:
+            tuple[_StageBScoredVariant, _StageBTask]:
+                Ranked row coupled with source task for top-row payload reconstruction.
+        Assumptions:
+            Task identity must remain unchanged after scoring for deterministic mapping.
+        Raises:
+            ValueError: If scorer payload lacks required ranking metric.
+        Side Effects:
+            None.
+        """
+        return (
+            self._score_stage_b_task(task=task, candles=candles, scorer=scorer),
+            task,
         )
 
     def _build_top_reports(
@@ -679,6 +813,137 @@ class BacktestStagedRunnerV1:
             return min(self._parallel_workers, total_tasks)
         detected = os.cpu_count() or 1
         return min(max(detected, 1), total_tasks)
+
+
+def _stage_a_rank_key(row: _StageAScoredVariant) -> tuple[float, str]:
+    """
+    Build deterministic Stage-A ranking key for sorted shortlist output.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    Args:
+        row: Stage A scored row.
+    Returns:
+        tuple[float, str]: Ranking key (`total_return_pct DESC`, `base_variant_key ASC`).
+    Assumptions:
+        Smaller tuple value means higher deterministic rank.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return (-row.total_return_pct, row.base_variant.base_variant_key)
+
+
+def _stage_b_rank_key(row: _StageBScoredVariant) -> tuple[float, str]:
+    """
+    Build deterministic Stage-B ranking key for sorted top-K output.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    Args:
+        row: Stage B scored row.
+    Returns:
+        tuple[float, str]: Ranking key (`total_return_pct DESC`, `variant_key ASC`).
+    Assumptions:
+        Smaller tuple value means higher deterministic rank.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return (-row.total_return_pct, row.variant_key)
+
+
+def _stage_a_outranks(
+    *,
+    candidate: _StageAScoredVariant,
+    baseline: _StageAScoredVariant,
+) -> bool:
+    """
+    Check whether Stage-A candidate is strictly better than current shortlist baseline.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    Args:
+        candidate: New Stage A candidate.
+        baseline: Current worst retained Stage A row.
+    Returns:
+        bool: `True` when candidate must replace baseline in bounded heap.
+    Assumptions:
+        Stage A ranking key is `total_return_pct DESC, base_variant_key ASC`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _stage_a_rank_key(candidate) < _stage_a_rank_key(baseline)
+
+
+def _stage_b_outranks(
+    *,
+    candidate: _StageBScoredVariant,
+    baseline: _StageBScoredVariant,
+) -> bool:
+    """
+    Check whether Stage-B candidate is strictly better than current top-K baseline.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    Args:
+        candidate: New Stage B candidate.
+        baseline: Current worst retained Stage B row.
+    Returns:
+        bool: `True` when candidate must replace baseline in bounded heap.
+    Assumptions:
+        Stage B ranking key is `total_return_pct DESC, variant_key ASC`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _stage_b_rank_key(candidate) < _stage_b_rank_key(baseline)
+
+
+def _descending_text_key(*, value: str) -> tuple[int, ...]:
+    """
+    Encode text into a tuple comparable in reverse lexicographical order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    Args:
+        value: Source deterministic tie-break key.
+    Returns:
+        tuple[int, ...]:
+            Comparable tuple where lexicographically larger source strings become smaller values.
+    Assumptions:
+        Sentinel `0` is greater than any negated code point and handles prefix ordering.
+    Raises:
+        None.
+    Side Effects:
+        Allocates one tuple for each retained heap entry.
+    """
+    return (*(-ord(char) for char in value), 0)
 
 
 def _details_scorer(

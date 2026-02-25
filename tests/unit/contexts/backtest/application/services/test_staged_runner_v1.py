@@ -8,6 +8,7 @@ import numpy as np
 from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunBacktestTemplate
 from trading.contexts.backtest.application.services import (
     TOTAL_RETURN_METRIC_LITERAL,
+    BacktestGridBuilderV1,
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
 )
@@ -550,6 +551,124 @@ def test_staged_runner_v1_ordering_is_independent_from_mapping_insertion_order()
     assert tuple(item.variant_index for item in first.variants) == tuple(
         item.variant_index for item in second.variants
     )
+
+
+def test_stage_a_heap_shortlist_matches_full_sort_reference() -> None:
+    """
+    Verify Stage-A streaming heap shortlist is equivalent to full sort+slice reference.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Stage-A ranking key is `total_return_pct DESC, base_variant_key ASC`.
+    Raises:
+        AssertionError: If heap shortlist differs from deterministic full-sort reference.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1(parallel_workers=1)
+    template = _template_for_tie_breaks()
+    candles = _build_candles(bars=60)
+    scorer = _ConstantTieScorer()
+    preselect = 3
+    grid_context = BacktestGridBuilderV1().build(
+        template=template,
+        candles=candles,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        preselect=preselect,
+    )
+
+    all_rows = [
+        runner._score_stage_a_variant(
+            base_variant=base_variant,
+            candles=candles,
+            scorer=scorer,
+        )
+        for base_variant in grid_context.iter_stage_a_variants()
+    ]
+    expected_rows = sorted(
+        all_rows,
+        key=lambda row: (-row.total_return_pct, row.base_variant.base_variant_key),
+    )[:preselect]
+
+    heap_rows = runner._score_stage_a(
+        grid_context=grid_context,
+        candles=candles,
+        scorer=scorer,
+        shortlist_limit=preselect,
+    )
+
+    assert tuple(
+        (row.base_variant.base_variant_key, row.total_return_pct) for row in heap_rows
+    ) == tuple((row.base_variant.base_variant_key, row.total_return_pct) for row in expected_rows)
+
+
+def test_stage_b_heap_top_k_matches_full_sort_reference() -> None:
+    """
+    Verify Stage-B streaming heap top-K is equivalent to full sort+slice reference.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Stage-B ranking key is `total_return_pct DESC, variant_key ASC`.
+    Raises:
+        AssertionError: If heap top-K differs from deterministic full-sort reference.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1(parallel_workers=1)
+    template = _template_for_tie_breaks()
+    candles = _build_candles(bars=60)
+    scorer = _ConstantTieScorer()
+    preselect = 3
+    top_k = 4
+    grid_context = BacktestGridBuilderV1().build(
+        template=template,
+        candles=candles,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        preselect=preselect,
+    )
+
+    shortlist = runner._score_stage_a(
+        grid_context=grid_context,
+        candles=candles,
+        scorer=scorer,
+        shortlist_limit=preselect,
+    )
+    stage_b_tasks = tuple(
+        runner._iter_stage_b_tasks(
+            template=template,
+            grid_context=grid_context,
+            shortlist=shortlist,
+        )
+    )
+    expected_rows = sorted(
+        (
+            runner._score_stage_b_task(task=task, candles=candles, scorer=scorer)
+            for task in stage_b_tasks
+        ),
+        key=lambda row: (-row.total_return_pct, row.variant_key),
+    )[:top_k]
+
+    heap_rows, heap_tasks = runner._score_stage_b(
+        template=template,
+        grid_context=grid_context,
+        shortlist=shortlist,
+        candles=candles,
+        scorer=scorer,
+        top_k_limit=top_k,
+    )
+
+    assert tuple(
+        (row.variant_key, row.total_return_pct, row.variant_index) for row in heap_rows
+    ) == tuple((row.variant_key, row.total_return_pct, row.variant_index) for row in expected_rows)
+    assert set(heap_tasks.keys()) == {row.variant_key for row in heap_rows}
+    for row in heap_rows:
+        assert heap_tasks[row.variant_key].variant_key == row.variant_key
 
 
 def _template_for_tie_breaks() -> RunBacktestTemplate:

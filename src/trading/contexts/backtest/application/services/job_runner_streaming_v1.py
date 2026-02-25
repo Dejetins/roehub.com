@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from heapq import heappush, heapreplace
 from types import MappingProxyType
 from typing import Any, Mapping
 from uuid import UUID
@@ -170,6 +171,12 @@ class BacktestJobTopKBufferV1:
         """
         Initialize bounded top-K buffer with positive capacity.
 
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+          - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
         Args:
             limit: Maximum number of retained candidates.
         Returns:
@@ -184,12 +191,20 @@ class BacktestJobTopKBufferV1:
         if limit <= 0:
             raise ValueError("BacktestJobTopKBufferV1.limit must be > 0")
         self._limit = limit
-        self._items: list[BacktestJobTopVariantCandidateV1] = []
+        self._heap: list[
+            tuple[float, tuple[int, ...], BacktestJobTopVariantCandidateV1]
+        ] = []
 
     def include(self, *, candidate: BacktestJobTopVariantCandidateV1) -> None:
         """
         Add one candidate if it belongs to current deterministic top-K frontier.
 
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+          - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
         Args:
             candidate: Scored Stage-B candidate.
         Returns:
@@ -201,40 +216,51 @@ class BacktestJobTopKBufferV1:
         Side Effects:
             Mutates in-memory bounded buffer.
         """
-        if len(self._items) < self._limit:
-            self._items.append(candidate)
-            self._items.sort(key=_candidate_rank_key)
+        if len(self._heap) < self._limit:
+            # HOT PATH: bounded heap keeps only current top-K frontier in memory.
+            heappush(self._heap, _candidate_heap_entry(candidate=candidate))
             return
 
-        worst = self._items[-1]
+        worst = self._heap[0][2]
         if not _candidate_outranks(candidate=candidate, baseline=worst):
             return
 
-        self._items.append(candidate)
-        self._items.sort(key=_candidate_rank_key)
-        del self._items[self._limit :]
+        # HOT PATH: replace current worst retained candidate in O(log K).
+        heapreplace(self._heap, _candidate_heap_entry(candidate=candidate))
 
     def ranked(self) -> tuple[BacktestJobTopVariantCandidateV1, ...]:
         """
         Return deterministic ranked candidates snapshot from buffer.
 
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+          - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
         Args:
             None.
         Returns:
             tuple[BacktestJobTopVariantCandidateV1, ...]: Ranked candidates.
         Assumptions:
-            Internal buffer is maintained in sorted deterministic ranking order.
+            Internal heap keeps only bounded frontier; ranking is materialized on read.
         Raises:
             None.
         Side Effects:
             None.
         """
-        return tuple(self._items)
+        return tuple(sorted((entry[2] for entry in self._heap), key=_candidate_rank_key))
 
     def __len__(self) -> int:
         """
         Return number of currently retained candidates.
 
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+          - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
         Args:
             None.
         Returns:
@@ -246,7 +272,7 @@ class BacktestJobTopKBufferV1:
         Side Effects:
             None.
         """
-        return len(self._items)
+        return len(self._heap)
 
 
 def build_running_snapshot_rows(
@@ -473,6 +499,38 @@ def _candidate_rank_key(
     return (-candidate.total_return_pct, candidate.variant_key)
 
 
+def _candidate_heap_entry(
+    *,
+    candidate: BacktestJobTopVariantCandidateV1,
+) -> tuple[float, tuple[int, ...], BacktestJobTopVariantCandidateV1]:
+    """
+    Build heap entry where root is always the worst retained candidate.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
+    Args:
+        candidate: Stage-B scored candidate.
+    Returns:
+        tuple[float, tuple[int, ...], BacktestJobTopVariantCandidateV1]:
+            Heap entry ordered by `total_return_pct ASC, variant_key DESC`.
+    Assumptions:
+        Root entry represents current deterministic worst candidate inside bounded top-K set.
+    Raises:
+        None.
+    Side Effects:
+        Allocates one tuple for each retained heap insertion/replacement.
+    """
+    return (
+        candidate.total_return_pct,
+        _descending_text_key(value=candidate.variant_key),
+        candidate,
+    )
+
+
 def _candidate_outranks(
     *,
     candidate: BacktestJobTopVariantCandidateV1,
@@ -494,6 +552,31 @@ def _candidate_outranks(
         None.
     """
     return _candidate_rank_key(candidate) < _candidate_rank_key(baseline)
+
+
+def _descending_text_key(*, value: str) -> tuple[int, ...]:
+    """
+    Encode text into tuple comparable in reverse lexicographical order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
+    Args:
+        value: Deterministic tie-break key.
+    Returns:
+        tuple[int, ...]:
+            Comparable tuple where lexicographically larger strings become smaller values.
+    Assumptions:
+        Sentinel `0` handles prefix ordering and is greater than any negated code point.
+    Raises:
+        None.
+    Side Effects:
+        Allocates tuple used only for retained heap entries.
+    """
+    return (*(-ord(char) for char in value), 0)
 
 
 def _sorted_scalar_mapping(

@@ -48,6 +48,26 @@ def _candidate(*, variant_key: str, total_return_pct: float) -> BacktestJobTopVa
     )
 
 
+def _variant_key_from_int(*, value: int) -> str:
+    """
+    Build deterministic fixed-length lowercase hex variant key from integer fixture value.
+
+    Args:
+        value: Non-negative integer used as key fixture source.
+    Returns:
+        str: Deterministic 64-char lowercase hex key.
+    Assumptions:
+        Fixed key width keeps lexical order aligned with numeric order.
+    Raises:
+        ValueError: If value is negative.
+    Side Effects:
+        None.
+    """
+    if value < 0:
+        raise ValueError("value must be >= 0")
+    return f"{value:064x}"
+
+
 def test_snapshot_cadence_should_persist_uses_or_semantics() -> None:
     """
     Verify snapshot cadence persists when either time or processed-step condition is met.
@@ -122,3 +142,52 @@ def test_top_k_buffer_keeps_deterministic_rank_order() -> None:
     assert len(ranked) == 2
     assert ranked[0].variant_key == "c" * 64
     assert ranked[1].variant_key == "a" * 64
+
+
+def test_top_k_buffer_matches_reference_full_sort_policy_per_insert() -> None:
+    """
+    Verify heap-based top-k buffer matches full-sort reference policy after each insert.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Reference policy sorts all seen candidates by `total_return_pct DESC, variant_key ASC`.
+    Raises:
+        AssertionError: If heap buffer differs from deterministic full-sort policy.
+    Side Effects:
+        None.
+    """
+    limit = 5
+    buffer = BacktestJobTopKBufferV1(limit=limit)
+    seen: list[BacktestJobTopVariantCandidateV1] = []
+    stream = (
+        (7, 11.0),
+        (2, 11.0),
+        (5, 9.5),
+        (1, 11.0),
+        (8, 12.0),
+        (3, 12.0),
+        (0, 11.0),
+        (9, 8.0),
+        (4, 12.0),
+        (6, 11.0),
+        (10, 12.0),
+    )
+
+    for value, total_return_pct in stream:
+        candidate = _candidate(
+            variant_key=_variant_key_from_int(value=value),
+            total_return_pct=total_return_pct,
+        )
+        buffer.include(candidate=candidate)
+        seen.append(candidate)
+
+        expected = tuple(
+            sorted(
+                seen,
+                key=lambda item: (-item.total_return_pct, item.variant_key),
+            )[:limit]
+        )
+        assert buffer.ranked() == expected
