@@ -32,6 +32,17 @@
 - Parallelism v1: один job исполняется последовательно (intra-job parallelism = 1).
   `backtest.jobs.parallel_workers` существует в runtime config, но в v1 воркер его не использует (зарезервирован под будущее).
 
+## Update 2026-02-25 (Perf Phase 3)
+
+С 2026-02-25 worker использует тот же scoring core, что и sync path:
+
+- Stage A/Stage B исполняются через `BacktestStagedCoreRunnerV1`.
+- Ranking/tie-break semantics между sync и jobs унифицированы в одном коде:
+  - Stage A: `total_return_pct DESC`, `base_variant_key ASC`;
+  - Stage B: `total_return_pct DESC`, `variant_key ASC`.
+- Перед стадиями scorer подготавливает batched indicator tensors (`prepare_for_grid_context(...)`), что убирает per-variant compute из hot path.
+- CPU лимит из runtime config (`backtest.cpu.max_numba_threads`) применяется в worker attempt через `numba.set_num_threads(...)`.
+
 ## Scope
 
 ### 1) Новый worker процесс и wiring

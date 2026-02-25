@@ -3,6 +3,11 @@ backtest:
   warmup_bars_default: 200
   top_k_default: 300
   preselect_default: 20000
+  guards:
+    max_variants_per_compute: 600000
+    max_compute_bytes_total: 5368709120
+  cpu:
+    max_numba_threads: 4
   jobs:
     enabled: true
     top_k_persisted_default: 300

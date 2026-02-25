@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -10,6 +11,11 @@ from typing import Any, Mapping, Sequence
 from uuid import UUID
 
 import yaml
+
+from trading.contexts.indicators.application.services.grid_builder import (
+    MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+    MAX_VARIANTS_PER_COMPUTE_DEFAULT,
+)
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _BACKTEST_CONFIG_PATH_KEY = "ROEHUB_BACKTEST_CONFIG"
@@ -24,6 +30,7 @@ _INIT_CASH_QUOTE_DEFAULT = 10000.0
 _FIXED_QUOTE_DEFAULT = 100.0
 _SAFE_PROFIT_PERCENT_DEFAULT = 30.0
 _SLIPPAGE_PCT_DEFAULT = 0.01
+_MAX_NUMBA_THREADS_DEFAULT = max(1, os.cpu_count() or 1)
 _FEE_PCT_DEFAULT_BY_MARKET_ID = {
     1: 0.075,
     2: 0.1,
@@ -140,6 +147,79 @@ class BacktestReportingRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestGuardsRuntimeConfig:
+    """
+    Runtime guard limits for staged backtest compute loaded from `backtest.guards`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+    Related:
+      - configs/dev/backtest.yaml
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+      - apps/api/wiring/modules/backtest.py
+    """
+
+    max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT
+    max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT
+
+    def __post_init__(self) -> None:
+        """
+        Validate deterministic staged compute guard values.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Guard values are strict-positive integers in variants/bytes units.
+        Raises:
+            ValueError: If one guard value is non-positive.
+        Side Effects:
+            None.
+        """
+        if self.max_variants_per_compute <= 0:
+            raise ValueError("backtest.guards.max_variants_per_compute must be > 0")
+        if self.max_compute_bytes_total <= 0:
+            raise ValueError("backtest.guards.max_compute_bytes_total must be > 0")
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestCpuRuntimeConfig:
+    """
+    Runtime CPU settings for backtest compute loaded from `backtest.cpu`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/runbooks/indicators-numba-cache-and-threads.md
+    Related:
+      - configs/dev/backtest.yaml
+      - src/trading/contexts/backtest/application/services/numba_runtime_v1.py
+      - apps/api/wiring/modules/backtest.py
+    """
+
+    max_numba_threads: int = _MAX_NUMBA_THREADS_DEFAULT
+
+    def __post_init__(self) -> None:
+        """
+        Validate backtest CPU settings with fail-fast startup semantics.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Numba thread cap must stay strictly positive.
+        Raises:
+            ValueError: If `max_numba_threads` is non-positive.
+        Side Effects:
+            None.
+        """
+        if self.max_numba_threads <= 0:
+            raise ValueError("backtest.cpu.max_numba_threads must be > 0")
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestJobsRuntimeConfig:
     """
     Runtime jobs settings loaded from strict required `backtest.jobs.*` YAML section.
@@ -224,6 +304,8 @@ class BacktestRuntimeConfig:
     reporting: BacktestReportingRuntimeConfig = field(
         default_factory=BacktestReportingRuntimeConfig
     )
+    guards: BacktestGuardsRuntimeConfig = field(default_factory=BacktestGuardsRuntimeConfig)
+    cpu: BacktestCpuRuntimeConfig = field(default_factory=BacktestCpuRuntimeConfig)
 
     def __post_init__(self) -> None:
         """
@@ -252,6 +334,10 @@ class BacktestRuntimeConfig:
             raise ValueError("backtest.execution section must be configured")
         if self.reporting is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest.reporting section must be configured")
+        if self.guards is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.guards section must be configured")
+        if self.cpu is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.cpu section must be configured")
         if self.jobs is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest.jobs section must be configured")
 
@@ -327,6 +413,8 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     backtest_map = _get_mapping(payload, "backtest", required=False)
     execution_map = _get_mapping(backtest_map, "execution", required=False)
     reporting_map = _get_mapping(backtest_map, "reporting", required=False)
+    guards_map = _get_mapping(backtest_map, "guards", required=False)
+    cpu_map = _get_mapping(backtest_map, "cpu", required=False)
     jobs_map = _get_mapping(backtest_map, "jobs", required=True)
 
     warmup_bars_default = _get_int_with_default(
@@ -377,6 +465,25 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
             default=_TOP_TRADES_N_DEFAULT,
         ),
     )
+    guards = BacktestGuardsRuntimeConfig(
+        max_variants_per_compute=_get_int_with_default(
+            guards_map,
+            "max_variants_per_compute",
+            default=MAX_VARIANTS_PER_COMPUTE_DEFAULT,
+        ),
+        max_compute_bytes_total=_get_int_with_default(
+            guards_map,
+            "max_compute_bytes_total",
+            default=MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+        ),
+    )
+    cpu = BacktestCpuRuntimeConfig(
+        max_numba_threads=_get_int_with_default(
+            cpu_map,
+            "max_numba_threads",
+            default=_MAX_NUMBA_THREADS_DEFAULT,
+        )
+    )
     jobs = BacktestJobsRuntimeConfig(
         enabled=_get_bool(jobs_map, "enabled", required=True),
         top_k_persisted_default=_get_int(jobs_map, "top_k_persisted_default", required=True),
@@ -397,6 +504,8 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         preselect_default=preselect_default,
         execution=execution,
         reporting=reporting,
+        guards=guards,
+        cpu=cpu,
     )
 
 
@@ -733,7 +842,9 @@ def _normalize_json_value(*, value: Any) -> Any:
 
 
 __all__ = [
+    "BacktestCpuRuntimeConfig",
     "BacktestExecutionRuntimeConfig",
+    "BacktestGuardsRuntimeConfig",
     "BacktestJobsRuntimeConfig",
     "BacktestReportingRuntimeConfig",
     "BacktestRuntimeConfig",

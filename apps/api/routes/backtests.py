@@ -8,6 +8,7 @@ Docs:
 
 from __future__ import annotations
 
+import asyncio
 from typing import Callable
 
 from fastapi import APIRouter, Depends, Request
@@ -20,6 +21,7 @@ from apps.api.dto import (
     build_backtests_post_response,
 )
 from trading.contexts.backtest.application.ports import BacktestStrategyReader, CurrentUser
+from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.application.use_cases import (
     RunBacktestUseCase,
     map_backtest_exception,
@@ -28,6 +30,7 @@ from trading.contexts.identity.application.ports.current_user import CurrentUser
 from trading.platform.errors import RoehubError
 
 CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
+_SYNC_DISCONNECT_POLL_SECONDS = 0.2
 
 
 def build_backtests_router(
@@ -36,6 +39,7 @@ def build_backtests_router(
     strategy_reader: BacktestStrategyReader,
     runtime_defaults_response: BacktestRuntimeDefaultsResponse,
     current_user_dependency: CurrentUserDependency,
+    sync_deadline_seconds: float = 55.0,
 ) -> APIRouter:
     """
     Build backtests router for sync runs and runtime-defaults browser prefill endpoint.
@@ -53,6 +57,7 @@ def build_backtests_router(
         strategy_reader: Saved-strategy reader ACL port for reproducibility `spec_hash`.
         runtime_defaults_response: Prebuilt deterministic runtime defaults response payload.
         current_user_dependency: Identity dependency resolving authenticated principal.
+        sync_deadline_seconds: Hard wall-time deadline for cooperative sync cancellation.
     Returns:
         APIRouter: Configured backtests router.
     Assumptions:
@@ -70,6 +75,8 @@ def build_backtests_router(
         raise ValueError("build_backtests_router requires runtime_defaults_response")
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_backtests_router requires current_user_dependency")
+    if sync_deadline_seconds <= 0.0:
+        raise ValueError("build_backtests_router requires sync_deadline_seconds > 0")
 
     router = APIRouter(tags=["backtest"])
 
@@ -106,8 +113,9 @@ def build_backtests_router(
         return runtime_defaults_response
 
     @router.post("/backtests", response_model=BacktestsPostResponse)
-    def post_backtests(
+    async def post_backtests(
         request: BacktestsPostRequest,
+        http_request: Request,
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> BacktestsPostResponse:
         """
@@ -139,10 +147,20 @@ def build_backtests_router(
                 strategy_snapshot = strategy_reader.load_any(strategy_id=request.strategy_id)
 
             use_case_request = build_backtest_run_request(request=request)
-            use_case_response = run_use_case.execute(
-                request=use_case_request,
-                current_user=CurrentUser(user_id=principal.user_id),
+            run_control = BacktestRunControlV1(deadline_seconds=sync_deadline_seconds)
+            run_task = asyncio.create_task(
+                asyncio.to_thread(
+                    run_use_case.execute,
+                    request=use_case_request,
+                    current_user=CurrentUser(user_id=principal.user_id),
+                    run_control=run_control,
+                )
             )
+            while not run_task.done():
+                if await http_request.is_disconnected():
+                    run_control.cancel(reason="client_disconnected")
+                await asyncio.sleep(_SYNC_DISCONNECT_POLL_SECONDS)
+            use_case_response = await run_task
             return build_backtests_post_response(
                 request=request,
                 response=use_case_response,

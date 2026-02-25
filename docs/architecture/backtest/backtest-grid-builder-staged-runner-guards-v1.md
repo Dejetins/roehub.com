@@ -49,6 +49,22 @@
   - `preselect_default=20_000` (Stage A shortlist),
   - ranking key: `Total Return [%]` (desc), tie-break: stable `variant_key`.
 
+## Update 2026-02-25 (Perf Phase 3)
+
+С 2026-02-25 staged scoring path реализован через shared core и batched tensor prepare:
+
+- Sync и jobs используют общий `BacktestStagedCoreRunnerV1` для Stage A/Stage B ranking.
+- `CloseFillBacktestStagedScorerV1.prepare_for_grid_context(...)` заранее вычисляет indicator tensors по natural Stage-A grid и переиспользует их в Stage A и Stage B.
+- `IndicatorCompute.compute(...)` больше не вызывается per-variant в Stage A/Stage B hot path при доступном prepared context.
+- Кооперативная отмена добавлена на границах длинных циклов (Stage A/Stage B checkpoints) через `BacktestRunControlV1` (sync) и lease/cancel checks (jobs).
+
+Guard budgets разделены по режимам:
+
+- Sync wiring (`apps/api/wiring/modules/backtest.py`) использует half-budget:
+  - `max_variants_per_compute = floor(backtest.guards.max_variants_per_compute / 2)`;
+  - `max_compute_bytes_total = floor(backtest.guards.max_compute_bytes_total / 2)`.
+- Jobs wiring (`apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py`) использует full budget из `backtest.guards.*`.
+
 ## Non-goals
 
 - Перебор подмножеств индикаторов (subsets).

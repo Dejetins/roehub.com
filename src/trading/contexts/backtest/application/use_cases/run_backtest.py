@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
@@ -23,6 +24,10 @@ from trading.contexts.backtest.application.services import (
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
 )
+from trading.contexts.backtest.application.services.numba_runtime_v1 import (
+    apply_backtest_numba_threads,
+)
+from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.application.use_cases.errors import map_backtest_exception
 from trading.contexts.backtest.domain.errors import (
     BacktestForbiddenError,
@@ -44,6 +49,7 @@ _DEFAULT_FEE_PCT_BY_MARKET_ID = {
     3: 0.075,
     4: 0.1,
 }
+_DEFAULT_MAX_NUMBA_THREADS = max(1, os.cpu_count() or 1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +109,7 @@ class RunBacktestUseCase:
         fee_pct_default_by_market_id: Mapping[int, float] | None = None,
         max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+        max_numba_threads: int = _DEFAULT_MAX_NUMBA_THREADS,
     ) -> None:
         """
         Initialize staged backtest use-case dependencies and runtime defaults.
@@ -135,6 +142,8 @@ class RunBacktestUseCase:
             fee_pct_default_by_market_id: Runtime default fee mapping by market id.
             max_variants_per_compute: Stage variants guard limit.
             max_compute_bytes_total: Stage memory guard limit.
+            max_numba_threads:
+                Runtime CPU knob for backtest runs mapped to maximum Numba threads.
         Returns:
             None.
         Assumptions:
@@ -172,6 +181,8 @@ class RunBacktestUseCase:
             raise ValueError("RunBacktestUseCase.max_variants_per_compute must be > 0")
         if max_compute_bytes_total <= 0:
             raise ValueError("RunBacktestUseCase.max_compute_bytes_total must be > 0")
+        if max_numba_threads <= 0:
+            raise ValueError("RunBacktestUseCase.max_numba_threads must be > 0")
 
         resolved_timeline_builder = candle_timeline_builder
         if resolved_timeline_builder is None:
@@ -196,12 +207,14 @@ class RunBacktestUseCase:
         )
         self._max_variants_per_compute = max_variants_per_compute
         self._max_compute_bytes_total = max_compute_bytes_total
+        self._max_numba_threads = max_numba_threads
 
     def execute(
         self,
         *,
         request: RunBacktestRequest,
         current_user: CurrentUser,
+        run_control: BacktestRunControlV1 | None = None,
     ) -> RunBacktestResponse:
         """
         Execute staged sync flow and return deterministic top-k variant preview response.
@@ -217,6 +230,7 @@ class RunBacktestUseCase:
         Args:
             request: Saved/ad-hoc backtest request.
             current_user: Authenticated user for ownership checks in saved mode.
+            run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             RunBacktestResponse: Deterministic staged response with ranked top-k variants.
         Assumptions:
@@ -233,6 +247,9 @@ class RunBacktestUseCase:
             if current_user is None:  # type: ignore[truthy-bool]
                 raise BacktestValidationError("RunBacktestUseCase.execute requires current_user")
 
+            apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
+            if run_control is not None:
+                run_control.raise_if_cancelled(stage="stage_a")
             resolved = self._resolve_run_context(request=request, current_user=current_user)
             timeline = self._candle_timeline_builder.build(
                 market_id=resolved.template.instrument_id.market_id,
@@ -241,6 +258,8 @@ class RunBacktestUseCase:
                 requested_time_range=request.time_range,
                 warmup_bars=resolved.warmup_bars,
             )
+            if run_control is not None:
+                run_control.raise_if_cancelled(stage="stage_a")
             resolved_scorer = self._resolve_staged_scorer(
                 template=resolved.template,
                 target_slice=timeline.target_slice,
@@ -257,6 +276,7 @@ class RunBacktestUseCase:
                 max_compute_bytes_total=self._max_compute_bytes_total,
                 requested_time_range=request.time_range,
                 top_trades_n=resolved.top_trades_n,
+                run_control=run_control,
             )
 
             return RunBacktestResponse(
@@ -522,6 +542,7 @@ class RunBacktestUseCase:
             slippage_pct_default=self._slippage_pct_default,
             fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
             max_variants_guard=self._max_variants_per_compute,
+            max_compute_bytes_total=self._max_compute_bytes_total,
         )
 
 

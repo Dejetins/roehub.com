@@ -5,7 +5,7 @@ from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
 from types import MappingProxyType
-from typing import Mapping
+from typing import Any, Mapping
 
 import numpy as np
 
@@ -25,11 +25,20 @@ from trading.contexts.indicators.application.dto import (
     IndicatorVariantSelection,
 )
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
+from trading.contexts.indicators.application.services.grid_builder import (
+    MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+)
 from trading.contexts.indicators.domain.entities import IndicatorId
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
+from trading.platform.errors import RoehubError
 
 from .execution_engine_v1 import BacktestExecutionEngineV1
-from .grid_builder_v1 import STAGE_A_LITERAL, STAGE_B_LITERAL
+from .grid_builder_v1 import (
+    STAGE_A_LITERAL,
+    STAGE_B_LITERAL,
+    BacktestGridBuildContextV1,
+)
+from .run_control_v1 import BacktestRunControlV1
 from .signals_from_indicators_v1 import (
     build_indicator_signal_inputs_from_tensors_v1,
     evaluate_and_aggregate_signals_encoded_v1,
@@ -89,6 +98,89 @@ class _SignalCacheValue:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedTensorPlan:
+    """
+    Prepared batched indicator tensor with deterministic axis lookup metadata.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+    """
+
+    tensor: IndicatorTensor
+    axis_names: tuple[str, ...]
+    axis_values: tuple[tuple[int | float | str, ...], ...]
+    axis_positions: Mapping[str, Mapping[int | float | str, int]]
+
+    def variant_index_for_selection(
+        self,
+        *,
+        selection: IndicatorVariantSelection,
+    ) -> int:
+        """
+        Resolve flattened tensor variant index for explicit indicator selection payload.
+
+        Args:
+            selection: Indicator selection with explicit `inputs` and `params` values.
+        Returns:
+            int: Flattened variant index in this prepared tensor.
+        Assumptions:
+            Selection values originate from deterministic Stage-A grid materialization.
+        Raises:
+            ValueError: If one axis value is missing from prepared plan axes.
+        Side Effects:
+            None.
+        """
+        coordinates: list[int] = []
+        for axis_name in self.axis_names:
+            if axis_name == "source":
+                raw_value = selection.inputs.get("source")
+            elif axis_name in selection.params:
+                raw_value = selection.params[axis_name]
+            else:
+                raw_value = selection.inputs.get(axis_name)
+            if raw_value is None:
+                raise ValueError(
+                    f"selection is missing axis value '{axis_name}' for prepared tensor"
+                )
+            value = _normalize_variant_scalar(value=raw_value)
+            axis_map = self.axis_positions.get(axis_name)
+            if axis_map is None or value not in axis_map:
+                raise ValueError(
+                    f"selection axis value is not present in prepared tensor: "
+                    f"{axis_name}={value!r}"
+                )
+            coordinates.append(int(axis_map[value]))
+        return _encode_mixed_radix(
+            coordinates=tuple(coordinates),
+            radices=tuple(len(values) for values in self.axis_values),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedGridContext:
+    """
+    Prepared scorer context with batched indicator tensors for current staged run.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+    """
+
+    indicator_plans: Mapping[str, _PreparedTensorPlan]
+    dependency_plans: Mapping[str, Mapping[str, _PreparedTensorPlan]]
+    total_tensor_bytes: int
+
+
 class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
     """
     Concrete staged scorer using close-fill engine v1 and indicator signal aggregation.
@@ -117,6 +209,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         slippage_pct_default: float,
         fee_pct_default_by_market_id: Mapping[int, float] | None = None,
         max_variants_guard: int = 600_000,
+        max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
         signals_cache_max_entries: int = _DEFAULT_SIGNALS_CACHE_MAX_ENTRIES,
         signals_cache_max_bytes: int = _DEFAULT_SIGNALS_CACHE_MAX_BYTES,
         execution_engine: BacktestExecutionEngineV1 | None = None,
@@ -137,6 +230,8 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             slippage_pct_default: Runtime default slippage percent.
             fee_pct_default_by_market_id: Runtime fee defaults per market id.
             max_variants_guard: Guard forwarded to indicator compute requests.
+            max_compute_bytes_total:
+                Memory budget guard for prepared batched indicator tensors.
             signals_cache_max_entries: Maximum cached signal vectors retained in memory
                 (default: `2048`).
             signals_cache_max_bytes: Maximum total bytes retained by cached signal vectors
@@ -165,6 +260,8 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             raise ValueError("slippage_pct_default must be >= 0")
         if max_variants_guard <= 0:
             raise ValueError("max_variants_guard must be > 0")
+        if max_compute_bytes_total <= 0:
+            raise ValueError("max_compute_bytes_total must be > 0")
         if signals_cache_max_entries <= 0:
             raise ValueError("signals_cache_max_entries must be > 0")
         if signals_cache_max_bytes <= 0:
@@ -192,6 +289,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             values=fee_pct_default_by_market_id
         )
         self._max_variants_guard = max_variants_guard
+        self._max_compute_bytes_total = max_compute_bytes_total
         self._signals_cache_max_entries = signals_cache_max_entries
         self._signals_cache_max_bytes = signals_cache_max_bytes
         self._execution_engine = execution_engine or BacktestExecutionEngineV1()
@@ -199,6 +297,160 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         self._signals_cache: OrderedDict[str, _SignalCacheValue] = OrderedDict()
         self._signals_cache_total_bytes = 0
         self._signals_cache_lock = Lock()
+        self._prepared_grid_context: _PreparedGridContext | None = None
+
+    def prepare_for_grid_context(
+        self,
+        *,
+        grid_context: BacktestGridBuildContextV1,
+        candles: CandleArrays,
+        max_compute_bytes_total: int,
+        run_control: BacktestRunControlV1 | None = None,
+    ) -> None:
+        """
+        Prepare batched indicator tensors for staged run to avoid per-variant compute calls.
+
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+          - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+
+        Args:
+            grid_context: Deterministic staged grid context for current run.
+            candles: Dense warmup-inclusive candle arrays.
+            max_compute_bytes_total: Effective memory budget limit from staged runner.
+            run_control: Optional cooperative cancellation/deadline control object.
+        Returns:
+            None.
+        Assumptions:
+            Prepared context is local to one scorer instance/run and can be replaced.
+        Raises:
+            RoehubError: If prepared tensors exceed memory budget guard.
+            ValueError: If one plan cannot be materialized deterministically.
+        Side Effects:
+            Performs batched `IndicatorCompute.compute(...)` calls and stores in-memory tensors.
+        """
+        effective_budget = min(self._max_compute_bytes_total, max_compute_bytes_total)
+        if effective_budget <= 0:
+            raise ValueError("effective max_compute_bytes_total must be > 0")
+
+        indicator_plans: dict[str, _PreparedTensorPlan] = {}
+        dependency_plans: dict[str, Mapping[str, _PreparedTensorPlan]] = {}
+        total_tensor_bytes = 0
+
+        for indicator_plan in grid_context.indicator_plans:
+            if run_control is not None:
+                run_control.raise_if_cancelled(stage=STAGE_A_LITERAL)
+            prepared_plan = self._prepare_tensor_plan_for_indicator(
+                indicator_id=indicator_plan.indicator_id,
+                plan=indicator_plan,
+                candles=candles,
+            )
+            indicator_plans[indicator_plan.indicator_id] = prepared_plan
+            total_tensor_bytes += int(prepared_plan.tensor.values.nbytes)
+            _raise_if_prepared_tensors_exceed_budget(
+                total_tensor_bytes=total_tensor_bytes,
+                max_compute_bytes_total=effective_budget,
+            )
+
+            rule_spec = signal_rule_spec_v1(indicator_id=indicator_plan.indicator_id)
+            if len(rule_spec.required_dependency_ids) == 0:
+                continue
+
+            dependency_payload: dict[str, _PreparedTensorPlan] = {}
+            for dependency_id in rule_spec.required_dependency_ids:
+                if run_control is not None:
+                    run_control.raise_if_cancelled(stage=STAGE_A_LITERAL)
+                dependency_plan = self._prepare_tensor_plan_for_indicator(
+                    indicator_id=dependency_id,
+                    plan=indicator_plan,
+                    candles=candles,
+                )
+                dependency_payload[dependency_id] = dependency_plan
+                total_tensor_bytes += int(dependency_plan.tensor.values.nbytes)
+                _raise_if_prepared_tensors_exceed_budget(
+                    total_tensor_bytes=total_tensor_bytes,
+                    max_compute_bytes_total=effective_budget,
+                )
+            dependency_plans[indicator_plan.indicator_id] = MappingProxyType(
+                dict(sorted(dependency_payload.items(), key=lambda item: item[0]))
+            )
+
+        self._prepared_grid_context = _PreparedGridContext(
+            indicator_plans=MappingProxyType(dict(indicator_plans)),
+            dependency_plans=MappingProxyType(dict(dependency_plans)),
+            total_tensor_bytes=total_tensor_bytes,
+        )
+
+    def _prepare_tensor_plan_for_indicator(
+        self,
+        *,
+        indicator_id: str,
+        plan: Any,
+        candles: CandleArrays,
+    ) -> _PreparedTensorPlan:
+        """
+        Compute one batched tensor plan for indicator id using Stage-A natural grid axes.
+
+        Args:
+            indicator_id: Indicator id for compute request.
+            plan: Stage-A indicator plan object with deterministic axes.
+            candles: Dense warmup-inclusive candles.
+        Returns:
+            _PreparedTensorPlan: Prepared tensor with axis metadata and lookup maps.
+        Assumptions:
+            `plan.axes` is deterministic and compatible with indicator compute contract.
+        Raises:
+            ValueError: If axis payload cannot be normalized into deterministic plan.
+        Side Effects:
+            Calls indicator compute port.
+        """
+        source_axis: ExplicitValuesSpec | None = None
+        params_axes: dict[str, ExplicitValuesSpec] = {}
+        axis_names: list[str] = []
+        axis_values: list[tuple[int | float | str, ...]] = []
+        axis_positions: dict[str, Mapping[int | float | str, int]] = {}
+
+        for axis in plan.axes:
+            axis_name = str(axis.name).strip().lower()
+            values = tuple(_normalize_variant_scalar(value=value) for value in axis.values)
+            if len(values) == 0:
+                raise ValueError("prepared tensor axis values must be non-empty")
+            axis_names.append(axis_name)
+            axis_values.append(values)
+            axis_positions[axis_name] = MappingProxyType(
+                {value: index for index, value in enumerate(values)}
+            )
+            if axis_name == "source":
+                source_axis = ExplicitValuesSpec(
+                    name="source",
+                    values=tuple(str(value) for value in values),
+                )
+                continue
+            params_axes[axis_name] = ExplicitValuesSpec(name=axis_name, values=values)
+
+        grid = GridSpec(
+            indicator_id=IndicatorId(indicator_id),
+            params=params_axes,
+            source=source_axis,
+        )
+        tensor = self._indicator_compute.compute(
+            ComputeRequest(
+                candles=candles,
+                grid=grid,
+                max_variants_guard=self._max_variants_guard,
+                dtype="float32",
+            )
+        )
+        return _PreparedTensorPlan(
+            tensor=tensor,
+            axis_names=tuple(axis_names),
+            axis_values=tuple(axis_values),
+            axis_positions=MappingProxyType(axis_positions),
+        )
 
     def score_variant(
         self,
@@ -405,19 +657,35 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         Side Effects:
             Calls indicator compute port for base and dependency indicators.
         """
+        prepared_context = self._prepared_grid_context
         ordered_selections = tuple(
             sorted(indicator_selections, key=lambda item: item.indicator_id)
         )
         tensors_by_indicator: dict[str, IndicatorTensor] = {}
         indicator_inputs: dict[str, Mapping[str, BacktestVariantScalar]] = {}
         dependency_outputs: dict[str, Mapping[str, np.ndarray]] = {}
+        variant_index_by_indicator: dict[str, int] = {}
 
+        # HOT PATH: per-variant signal assembly using precomputed indicator tensors.
         for selection in ordered_selections:
-            tensor = self._compute_tensor_for_selection(
-                candles=candles,
-                selection=selection,
-            )
             indicator_id = selection.indicator_id
+            prepared_plan = None
+            if prepared_context is not None:
+                prepared_plan = prepared_context.indicator_plans.get(indicator_id)
+
+            if prepared_plan is None:
+                tensor = self._compute_tensor_for_selection(
+                    candles=candles,
+                    selection=selection,
+                )
+                variant_index_by_indicator[indicator_id] = 0
+            else:
+                tensor = prepared_plan.tensor
+                variant_index = prepared_plan.variant_index_for_selection(
+                    selection=selection,
+                )
+                variant_index_by_indicator[indicator_id] = variant_index
+
             tensors_by_indicator[indicator_id] = tensor
             indicator_inputs[indicator_id] = _normalize_scalar_mapping(values=selection.inputs)
 
@@ -427,17 +695,34 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
 
             selection_dependency_outputs: dict[str, np.ndarray] = {}
             for dependency_id in rule_spec.required_dependency_ids:
-                dependency_selection = IndicatorVariantSelection(
-                    indicator_id=dependency_id,
-                    inputs=selection.inputs,
-                    params=selection.params,
-                )
-                dependency_tensor = self._compute_tensor_for_selection(
-                    candles=candles,
-                    selection=dependency_selection,
-                )
+                dependency_tensor: IndicatorTensor
+                dependency_variant_index: int
+                prepared_dependency = None
+                if prepared_context is not None:
+                    prepared_by_dependency = prepared_context.dependency_plans.get(indicator_id, {})
+                    prepared_dependency = prepared_by_dependency.get(dependency_id)
+
+                if prepared_dependency is None:
+                    dependency_selection = IndicatorVariantSelection(
+                        indicator_id=dependency_id,
+                        inputs=selection.inputs,
+                        params=selection.params,
+                    )
+                    dependency_tensor = self._compute_tensor_for_selection(
+                        candles=candles,
+                        selection=dependency_selection,
+                    )
+                    dependency_variant_index = 0
+                else:
+                    dependency_tensor = prepared_dependency.tensor
+                    dependency_variant_index = prepared_dependency.variant_index_for_selection(
+                        selection=selection
+                    )
                 selection_dependency_outputs[dependency_id] = (
-                    indicator_primary_output_series_from_tensor_v1(tensor=dependency_tensor)
+                    indicator_primary_output_series_from_tensor_v1(
+                        tensor=dependency_tensor,
+                        variant_index=dependency_variant_index,
+                    )
                 )
             dependency_outputs[indicator_id] = MappingProxyType(
                 dict(sorted(selection_dependency_outputs.items(), key=lambda item: item[0]))
@@ -448,6 +733,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             indicator_inputs=indicator_inputs,
             signal_params=signal_params,
             dependency_outputs=dependency_outputs,
+            variant_index_by_indicator=variant_index_by_indicator,
         )
         final_signal = evaluate_and_aggregate_signals_encoded_v1(
             candles=candles,
@@ -880,6 +1166,76 @@ def _normalize_fee_defaults(
     if len(normalized) == 0:
         raise ValueError("fee defaults mapping must be non-empty")
     return MappingProxyType(normalized)
+
+
+def _encode_mixed_radix(
+    *,
+    coordinates: tuple[int, ...],
+    radices: tuple[int, ...],
+) -> int:
+    """
+    Encode mixed-radix coordinates into flattened variant index.
+
+    Args:
+        coordinates: Zero-based coordinate tuple.
+        radices: Positive radix tuple for each coordinate.
+    Returns:
+        int: Flattened variant index.
+    Assumptions:
+        Coordinates and radices lengths are equal and each coordinate is in bounds.
+    Raises:
+        ValueError: If one coordinate/radix is invalid.
+    Side Effects:
+        None.
+    """
+    if len(coordinates) != len(radices):
+        raise ValueError("coordinates and radices must have the same length")
+    index = 0
+    for position, coordinate in enumerate(coordinates):
+        radix = radices[position]
+        if radix <= 0:
+            raise ValueError("radices must be > 0")
+        if coordinate < 0 or coordinate >= radix:
+            raise ValueError("coordinates must be in [0, radix)")
+        multiplier = 1
+        for next_radix in radices[position + 1 :]:
+            multiplier = multiplier * next_radix
+        index = index + (coordinate * multiplier)
+    return index
+
+
+def _raise_if_prepared_tensors_exceed_budget(
+    *,
+    total_tensor_bytes: int,
+    max_compute_bytes_total: int,
+) -> None:
+    """
+    Raise deterministic validation error when prepared tensor bytes exceed budget guard.
+
+    Args:
+        total_tensor_bytes: Current accumulated prepared tensor bytes.
+        max_compute_bytes_total: Effective memory guard limit.
+    Returns:
+        None.
+    Assumptions:
+        Both values are positive integers in bytes.
+    Raises:
+        RoehubError: With deterministic `validation_error` details payload.
+    Side Effects:
+        None.
+    """
+    if total_tensor_bytes <= max_compute_bytes_total:
+        return
+    raise RoehubError(
+        code="validation_error",
+        message="Prepared indicator tensors exceed max_compute_bytes_total budget",
+        details={
+            "error": "max_compute_bytes_total_exceeded",
+            "stage": STAGE_A_LITERAL,
+            "estimated_memory_bytes": int(total_tensor_bytes),
+            "max_compute_bytes_total": int(max_compute_bytes_total),
+        },
+    )
 
 
 __all__ = [

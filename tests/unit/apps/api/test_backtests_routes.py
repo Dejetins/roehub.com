@@ -150,13 +150,14 @@ class _FakeRunBacktestUseCase:
         self._result = result
         self._error = error
 
-    def execute(self, *, request, current_user):
+    def execute(self, *, request, current_user, run_control=None):
         """
         Return configured result or raise configured error.
 
         Args:
             request: Application request DTO.
             current_user: Current user port object.
+            run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             Any: Configured result payload.
         Assumptions:
@@ -166,7 +167,7 @@ class _FakeRunBacktestUseCase:
         Side Effects:
             None.
         """
-        _ = request, current_user
+        _ = request, current_user, run_control
         if self._error is not None:
             raise self._error
         return self._result

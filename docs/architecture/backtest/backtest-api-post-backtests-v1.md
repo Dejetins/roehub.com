@@ -118,6 +118,37 @@ Response v1 включает:
 
 Request v1 может override `top_trades_n` (валидируется, например: `1 <= top_trades_n <= top_k`).
 
+### 7) Sync cancellation: disconnect + hard deadline (кооперативно, без kill)
+
+С 2026-02-25 sync route реализован как `async` и запускает compute в thread через `asyncio.to_thread(...)`.
+
+Пока thread выполняет use-case, route:
+
+- периодически проверяет `request.is_disconnected()`;
+- при disconnect помечает `BacktestRunControlV1` как cancelled (`reason=client_disconnected`);
+- дополнительно использует hard deadline (`BacktestRunControlV1(deadline_seconds=...)`).
+
+Отмена реализована кооперативно: staged loops проверяют token/checkpoint и прекращают вычисление без принудительного завершения thread/process.
+
+### 8) Sync half-budgets, jobs full-budgets
+
+С 2026-02-25 wiring применяет разные guard budgets:
+
+- Sync (`RunBacktestUseCase`) получает половинные лимиты:
+  - `floor(backtest.guards.max_variants_per_compute / 2)`;
+  - `floor(backtest.guards.max_compute_bytes_total / 2)`.
+- Jobs path сохраняет полные лимиты из `backtest.guards.*`.
+
+HTTP response schema при этом не меняется.
+
+### 9) CPU knob через Numba threads
+
+С 2026-02-25 в `backtest.yaml` добавлен `backtest.cpu.max_numba_threads`.
+
+- Значение валидируется fail-fast на старте.
+- В sync и jobs перед run attempt вызывается `numba.set_num_threads(...)`.
+- Это текущий runtime CPU knob v1 (без новых native dependencies).
+
 ## Endpoint v1: `POST /backtests`
 
 ### Request (v1)

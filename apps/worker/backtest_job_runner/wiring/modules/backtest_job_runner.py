@@ -45,10 +45,6 @@ from trading.contexts.backtest.application.use_cases import (
     BacktestJobRunReportV1,
     RunBacktestJobRunnerV1,
 )
-from trading.contexts.indicators.application.services.grid_builder import (
-    MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
-    MAX_VARIANTS_PER_COMPUTE_DEFAULT,
-)
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleReader,
     ThreadLocalClickHouseConnectGateway,
@@ -407,12 +403,13 @@ def build_backtest_job_runner_app(
         safe_profit_percent_default=runtime_config.execution.safe_profit_percent_default,
         slippage_pct_default=runtime_config.execution.slippage_pct_default,
         fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
-        max_variants_per_compute=MAX_VARIANTS_PER_COMPUTE_DEFAULT,
-        max_compute_bytes_total=MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+        max_variants_per_compute=runtime_config.guards.max_variants_per_compute,
+        max_compute_bytes_total=runtime_config.guards.max_compute_bytes_total,
         lease_seconds=runtime_config.jobs.lease_seconds,
         heartbeat_seconds=runtime_config.jobs.heartbeat_seconds,
         snapshot_seconds=runtime_config.jobs.snapshot_seconds,
         snapshot_variants_step=runtime_config.jobs.snapshot_variants_step,
+        max_numba_threads=runtime_config.cpu.max_numba_threads,
     )
     return BacktestJobRunnerApp(
         claim_poll_seconds=runtime_config.jobs.claim_poll_seconds,

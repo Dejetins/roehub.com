@@ -4,11 +4,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Mapping, cast
 
 import numpy as np
+import pytest
 
 from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunBacktestTemplate
 from trading.contexts.backtest.application.services import (
     TOTAL_RETURN_METRIC_LITERAL,
     BacktestGridBuilderV1,
+    BacktestRunCancelledV1,
+    BacktestRunControlV1,
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
 )
@@ -193,14 +196,14 @@ class _InstrumentedSignalIndicatorCompute:
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:
         """
-        Return deterministic one-variant tensor with neutral bars between sign flips.
+        Return deterministic multi-variant tensor with neutral bars between sign flips.
 
         Args:
             req: Compute request payload with explicit single-value axes.
         Returns:
             IndicatorTensor: Deterministic time-major tensor for scorer signal evaluation.
         Assumptions:
-            Staged scorer requests one explicit selection variant at a time.
+            Prepared scorer path may request full indicator axis grid in one compute call.
         Raises:
             ValueError: If bars count is non-positive.
         Side Effects:
@@ -212,26 +215,28 @@ class _InstrumentedSignalIndicatorCompute:
 
         self.compute_calls += 1
         pattern = np.asarray((1.0, 0.0, -1.0, 0.0), dtype=np.float32)
-        series = np.resize(pattern, bars).astype(np.float32)
-
-        window_spec = req.grid.params.get("window")
-        if window_spec is not None:
-            materialized = tuple(window_spec.materialize())
-            if len(materialized) > 0:
-                window = int(materialized[0])
-                shift = int(window % 4)
-                if shift > 0:
-                    series = np.roll(series, shift=shift)
-
-        values = np.ascontiguousarray(series.reshape(bars, 1), dtype=np.float32)
+        window_spec = req.grid.params.get(
+            "window",
+            ExplicitValuesSpec(name="window", values=(1,)),
+        )
+        windows = tuple(window_spec.materialize())
+        if len(windows) == 0:
+            windows = (1,)
+        values = np.empty((bars, len(windows)), dtype=np.float32)
+        for index, raw_window in enumerate(windows):
+            series = np.resize(pattern, bars).astype(np.float32)
+            shift = int(int(raw_window) % 4)
+            if shift > 0:
+                series = np.roll(series, shift=shift)
+            values[:, index] = series
         return IndicatorTensor(
             indicator_id=req.grid.indicator_id,
             layout=Layout.TIME_MAJOR,
-            axes=(AxisDef(name="variant", values_int=(0,)),),
-            values=values,
+            axes=(AxisDef(name="variant", values_int=tuple(range(len(windows)))),),
+            values=np.ascontiguousarray(values, dtype=np.float32),
             meta=TensorMeta(
                 t=bars,
-                variants=1,
+                variants=len(windows),
                 nan_policy="propagate",
                 compute_ms=0,
             ),
@@ -505,7 +510,119 @@ def test_staged_runner_v1_stage_b_risk_expansion_reuses_signal_cache() -> None:
 
     assert result.stage_a_variants_total == 2
     assert result.stage_b_variants_total == 6
-    assert indicator_compute.compute_calls == result.stage_a_variants_total
+    assert indicator_compute.compute_calls == 1
+
+
+class _CancellingScorer:
+    """
+    Deterministic scorer fake that triggers cooperative cancellation after N calls.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/run_control_v1.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    """
+
+    def __init__(self, *, run_control: BacktestRunControlV1, cancel_after_calls: int) -> None:
+        """
+        Initialize deterministic scorer cancellation behavior.
+
+        Args:
+            run_control: Cooperative run control object.
+            cancel_after_calls: Calls threshold after which scorer triggers cancellation.
+        Returns:
+            None.
+        Assumptions:
+            Call counter increments once per `score_variant` invocation.
+        Raises:
+            ValueError: If threshold is non-positive.
+        Side Effects:
+            None.
+        """
+        if cancel_after_calls <= 0:
+            raise ValueError("cancel_after_calls must be > 0")
+        self._run_control = run_control
+        self._cancel_after_calls = cancel_after_calls
+        self.calls = 0
+
+    def score_variant(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return deterministic metric and trigger cooperative cancellation after threshold.
+
+        Args:
+            stage: Stage literal.
+            candles: Dense candles payload.
+            indicator_selections: Indicator selections payload.
+            signal_params: Signal parameters payload.
+            risk_params: Risk payload.
+            indicator_variant_key: Indicators-only key.
+            variant_key: Full variant key.
+        Returns:
+            Mapping[str, float]: Deterministic ranking payload.
+        Assumptions:
+            Cancellation request is checked by staged core before next loop iteration.
+        Raises:
+            None.
+        Side Effects:
+            Triggers cooperative cancellation on run control when threshold is reached.
+        """
+        _ = (
+            stage,
+            candles,
+            indicator_selections,
+            signal_params,
+            risk_params,
+            indicator_variant_key,
+            variant_key,
+        )
+        self.calls += 1
+        if self.calls >= self._cancel_after_calls:
+            self._run_control.cancel(reason="unit_test_cancelled")
+        return {TOTAL_RETURN_METRIC_LITERAL: 1.0}
+
+
+def test_staged_runner_v1_cooperative_cancellation_stops_stage_loop() -> None:
+    """
+    Verify cooperative cancellation token interrupts Stage-A loop before full completion.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Shared staged core checks cancellation between scored variants.
+    Raises:
+        AssertionError: If cancellation does not interrupt staged execution.
+    Side Effects:
+        None.
+    """
+    run_control = BacktestRunControlV1(deadline_seconds=10.0)
+    scorer = _CancellingScorer(run_control=run_control, cancel_after_calls=1)
+    runner = BacktestStagedRunnerV1()
+
+    with pytest.raises(BacktestRunCancelledV1):
+        runner.run(
+            template=_template_for_tie_breaks(),
+            candles=_build_candles(bars=40),
+            preselect=3,
+            top_k=2,
+            indicator_compute=_EstimateOnlyIndicatorCompute(),
+            scorer=scorer,
+            run_control=run_control,
+        )
+    assert scorer.calls == 1
 
 
 def test_staged_runner_v1_ordering_is_independent_from_mapping_insertion_order() -> None:

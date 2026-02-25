@@ -1,6 +1,8 @@
 from .acl import StrategyRepositoryBacktestStrategyReader
 from .config import (
+    BacktestCpuRuntimeConfig,
     BacktestExecutionRuntimeConfig,
+    BacktestGuardsRuntimeConfig,
     BacktestJobsRuntimeConfig,
     BacktestReportingRuntimeConfig,
     BacktestRuntimeConfig,
@@ -20,7 +22,9 @@ from .persistence import (
 __all__ = [
     "BacktestPostgresGateway",
     "StrategyRepositoryBacktestStrategyReader",
+    "BacktestCpuRuntimeConfig",
     "BacktestExecutionRuntimeConfig",
+    "BacktestGuardsRuntimeConfig",
     "BacktestJobsRuntimeConfig",
     "BacktestReportingRuntimeConfig",
     "BacktestRuntimeConfig",

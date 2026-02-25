@@ -68,6 +68,9 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.warmup_bars_default == 200
     assert config.top_k_default == 300
     assert config.preselect_default == 20000
+    assert config.guards.max_variants_per_compute == 600000
+    assert config.guards.max_compute_bytes_total == 5368709120
+    assert config.cpu.max_numba_threads == 4
     assert config.reporting.top_trades_n_default == 3
     assert config.execution.init_cash_quote_default == 10000.0
     assert config.execution.fixed_quote_default == 100.0
@@ -124,6 +127,9 @@ backtest:
     assert config.warmup_bars_default == 200
     assert config.top_k_default == 300
     assert config.preselect_default == 20000
+    assert config.guards.max_variants_per_compute == 600000
+    assert config.guards.max_compute_bytes_total == 5 * 1024**3
+    assert config.cpu.max_numba_threads > 0
     assert config.reporting.top_trades_n_default == 3
     assert config.execution.init_cash_quote_default == 10000.0
     assert config.execution.fixed_quote_default == 100.0
@@ -278,6 +284,11 @@ backtest:
   preselect_default: 30
   reporting:
     top_trades_n_default: 5
+  guards:
+    max_variants_per_compute: 1200
+    max_compute_bytes_total: 1234567
+  cpu:
+    max_numba_threads: 6
   execution:
     init_cash_quote_default: 5000
     fixed_quote_default: 250
@@ -304,6 +315,9 @@ backtest:
     assert config.warmup_bars_default == 10
     assert config.top_k_default == 20
     assert config.preselect_default == 30
+    assert config.guards.max_variants_per_compute == 1200
+    assert config.guards.max_compute_bytes_total == 1234567
+    assert config.cpu.max_numba_threads == 6
     assert config.reporting.top_trades_n_default == 5
     assert config.execution.init_cash_quote_default == 5000.0
     assert config.execution.fixed_quote_default == 250.0
@@ -354,6 +368,43 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="top_k_persisted_default"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_invalid_cpu_defaults(tmp_path: Path) -> None:
+    """
+    Verify loader fails fast when `backtest.cpu.max_numba_threads` is non-positive.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        CPU knob is validated at startup to keep runtime configuration fail-fast.
+    Raises:
+        AssertionError: If invalid CPU payload does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  cpu:
+    max_numba_threads: 0
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="max_numba_threads"):
         load_backtest_runtime_config(config_path)
 
 

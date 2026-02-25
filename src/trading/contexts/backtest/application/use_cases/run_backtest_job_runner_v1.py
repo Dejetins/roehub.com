@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from time import perf_counter
@@ -29,14 +30,23 @@ from trading.contexts.backtest.application.services import (
     BacktestCandleTimelineBuilder,
     BacktestGridBuilderV1,
     BacktestReportingServiceV1,
+    BacktestStageABaseVariant,
     CloseFillBacktestStagedScorerV1,
 )
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobSnapshotCadenceV1,
-    BacktestJobTopKBufferV1,
     BacktestJobTopVariantCandidateV1,
     build_finalized_snapshot_rows,
     build_running_snapshot_rows,
+)
+from trading.contexts.backtest.application.services.numba_runtime_v1 import (
+    apply_backtest_numba_threads,
+)
+from trading.contexts.backtest.application.services.staged_core_runner_v1 import (
+    BacktestStageAScoredVariantV1,
+    BacktestStageBScoredVariantV1,
+    BacktestStageBTaskV1,
+    BacktestStagedCoreRunnerV1,
 )
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
@@ -60,6 +70,7 @@ _LOG = logging.getLogger(__name__)
 _TOTAL_RETURN_METRIC = "Total Return [%]"
 
 BacktestJobRunStatus = Literal["succeeded", "failed", "cancelled", "lease_lost"]
+_DEFAULT_MAX_NUMBA_THREADS = max(1, os.cpu_count() or 1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,6 +188,7 @@ class RunBacktestJobRunnerV1:
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         grid_builder: BacktestGridBuilderV1 | None = None,
         reporting_service: BacktestReportingServiceV1 | None = None,
+        core_runner: BacktestStagedCoreRunnerV1 | None = None,
         staged_scorer: BacktestStagedVariantScorer | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
@@ -195,6 +207,7 @@ class RunBacktestJobRunnerV1:
         snapshot_seconds: int | None = None,
         snapshot_variants_step: int | None = None,
         stage_batch_size: int = 256,
+        max_numba_threads: int = _DEFAULT_MAX_NUMBA_THREADS,
         now_provider: Callable[[], datetime] | None = None,
     ) -> None:
         """
@@ -210,6 +223,7 @@ class RunBacktestJobRunnerV1:
             defaults_provider: Optional grid defaults provider.
             grid_builder: Optional custom staged grid builder.
             reporting_service: Optional report assembly service for finalizing step.
+            core_runner: Shared staged scoring core used by sync and job-runner paths.
             staged_scorer: Optional custom staged scorer.
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k request fallback.
@@ -228,6 +242,8 @@ class RunBacktestJobRunnerV1:
             snapshot_seconds: Optional time-based Stage-B snapshot trigger.
             snapshot_variants_step: Optional processed-count snapshot trigger.
             stage_batch_size: Batch boundary size for cancel/progress checks.
+            max_numba_threads:
+                Runtime CPU knob for jobs mapped to maximum Numba threads.
             now_provider: Optional UTC-aware current time provider for deterministic tests.
         Returns:
             None.
@@ -278,6 +294,8 @@ class RunBacktestJobRunnerV1:
             raise ValueError("heartbeat_seconds must be > 0")
         if stage_batch_size <= 0:
             raise ValueError("stage_batch_size must be > 0")
+        if max_numba_threads <= 0:
+            raise ValueError("max_numba_threads must be > 0")
 
         self._job_repository = job_repository
         self._lease_repository = lease_repository
@@ -288,6 +306,9 @@ class RunBacktestJobRunnerV1:
         self._defaults_provider = defaults_provider
         self._grid_builder = grid_builder or BacktestGridBuilderV1()
         self._reporting_service = reporting_service or BacktestReportingServiceV1()
+        self._core_runner = core_runner or BacktestStagedCoreRunnerV1(
+            batch_size_default=stage_batch_size
+        )
         self._staged_scorer = staged_scorer
         self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
@@ -310,6 +331,7 @@ class RunBacktestJobRunnerV1:
             snapshot_variants_step=snapshot_variants_step,
         )
         self._stage_batch_size = stage_batch_size
+        self._max_numba_threads = max_numba_threads
         self._now = now_provider or _utc_now
 
     def process_claimed_job(
@@ -348,6 +370,7 @@ class RunBacktestJobRunnerV1:
         current_stage = STAGE_A_LITERAL
 
         try:
+            apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
             context = self._resolve_request_context(job=job)
             timeline = self._candle_timeline_builder.build(
                 market_id=context.template.instrument_id.market_id,
@@ -368,6 +391,11 @@ class RunBacktestJobRunnerV1:
                 defaults_provider=self._defaults_provider,
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
+            )
+            self._prepare_scorer_for_grid_context(
+                scorer=scorer,
+                grid_context=grid_context,
+                candles=timeline.candles,
             )
 
             shortlist, heartbeat_at = self._run_stage_a(
@@ -573,6 +601,39 @@ class RunBacktestJobRunnerV1:
             raise ValueError("request override must be > 0")
         return value
 
+    def _prepare_scorer_for_grid_context(
+        self,
+        *,
+        scorer: BacktestStagedVariantScorer,
+        grid_context: Any,
+        candles: Any,
+    ) -> None:
+        """
+        Prepare scorer run context (batched indicator tensors) when extension is available.
+
+        Args:
+            scorer: Staged scorer implementation.
+            grid_context: Prepared staged grid context.
+            candles: Warmup-inclusive candle arrays.
+        Returns:
+            None.
+        Assumptions:
+            Optional scorer extension is discovered by method presence.
+        Raises:
+            Exception: Propagates scorer preparation errors.
+        Side Effects:
+            May materialize batched indicator tensors in scorer local cache.
+        """
+        prepare_method = getattr(scorer, "prepare_for_grid_context", None)
+        if prepare_method is None:
+            return
+        prepare_method(
+            grid_context=grid_context,
+            candles=candles,
+            max_compute_bytes_total=self._max_compute_bytes_total,
+            run_control=None,
+        )
+
     def _run_stage_a(
         self,
         *,
@@ -607,7 +668,6 @@ class RunBacktestJobRunnerV1:
         """
         stage_total = int(grid_context.stage_a_variants_total)
         stage_limit = min(context.preselect, stage_total)
-        shortlist_buffer = BacktestJobTopKBufferV1(limit=stage_limit)
         now = self._now()
         self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_A_LITERAL)
         self._update_progress(
@@ -619,43 +679,9 @@ class RunBacktestJobRunnerV1:
             now=now,
         )
         heartbeat_at = now
-        processed = 0
-        for base_variant in grid_context.iter_stage_a_variants():
-            metrics = scorer.score_variant(
-                stage=STAGE_A_LITERAL,
-                candles=timeline.candles,
-                indicator_selections=base_variant.indicator_selections,
-                signal_params=base_variant.signal_params,
-                risk_params={
-                    "sl_enabled": False,
-                    "sl_pct": None,
-                    "tp_enabled": False,
-                    "tp_pct": None,
-                },
-                indicator_variant_key=base_variant.indicator_variant_key,
-                variant_key=base_variant.base_variant_key,
-            )
-            shortlist_buffer.include(
-                candidate=BacktestJobTopVariantCandidateV1(
-                    variant_index=base_variant.stage_a_index,
-                    variant_key=base_variant.base_variant_key,
-                    indicator_variant_key=base_variant.indicator_variant_key,
-                    total_return_pct=_extract_total_return_pct(metrics=metrics),
-                    indicator_selections=base_variant.indicator_selections,
-                    signal_params=base_variant.signal_params,
-                    risk_params={
-                        "sl_enabled": False,
-                        "sl_pct": None,
-                        "tp_enabled": False,
-                        "tp_pct": None,
-                    },
-                )
-            )
-            processed += 1
 
-            if processed % self._stage_batch_size != 0 and processed != stage_total:
-                continue
-
+        def _on_stage_a_checkpoint(processed: int, total: int) -> None:
+            nonlocal heartbeat_at
             now = self._now()
             self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_A_LITERAL)
             heartbeat_at = self._heartbeat_if_due(
@@ -669,11 +695,35 @@ class RunBacktestJobRunnerV1:
                 locked_by=locked_by,
                 stage=STAGE_A_LITERAL,
                 processed_units=processed,
-                total_units=stage_total,
+                total_units=total,
                 now=now,
             )
 
-        shortlist = shortlist_buffer.ranked()
+        shortlist_rows = self._core_runner.run_stage_a(
+            grid_context=grid_context,
+            candles=timeline.candles,
+            scorer=scorer,
+            shortlist_limit=stage_limit,
+            batch_size=self._stage_batch_size,
+            on_checkpoint=_on_stage_a_checkpoint,
+        )
+        shortlist = tuple(
+            BacktestJobTopVariantCandidateV1(
+                variant_index=row.base_variant.stage_a_index,
+                variant_key=row.base_variant.base_variant_key,
+                indicator_variant_key=row.base_variant.indicator_variant_key,
+                total_return_pct=row.total_return_pct,
+                indicator_selections=row.base_variant.indicator_selections,
+                signal_params=row.base_variant.signal_params,
+                risk_params={
+                    "sl_enabled": False,
+                    "sl_pct": None,
+                    "tp_enabled": False,
+                    "tp_pct": None,
+                },
+            )
+            for row in shortlist_rows
+        )
 
         now = self._now()
         self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_A_LITERAL)
@@ -733,7 +783,6 @@ class RunBacktestJobRunnerV1:
             Writes progress and top-variants snapshots under active lease guard.
         """
         stage_total = int(grid_context.stage_b_variants_total)
-        top_k_buffer = BacktestJobTopKBufferV1(limit=context.persisted_k)
         now = self._now()
         self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_B_LITERAL)
         self._update_progress(
@@ -748,88 +797,95 @@ class RunBacktestJobRunnerV1:
         processed = 0
         last_snapshot_at = now
         last_snapshot_processed = 0
-        risk_total = len(grid_context.risk_variants)
+        stage_a_shortlist = tuple(
+            BacktestStageAScoredVariantV1(
+                base_variant=BacktestStageABaseVariant(
+                    stage_a_index=item.variant_index,
+                    indicator_selections=item.indicator_selections,
+                    signal_params=item.signal_params,
+                    indicator_variant_key=item.indicator_variant_key,
+                    base_variant_key=item.variant_key,
+                ),
+                total_return_pct=item.total_return_pct,
+            )
+            for item in shortlist
+        )
 
-        for shortlist_index, base_candidate in enumerate(shortlist):
-            for risk_variant in grid_context.risk_variants:
-                variant_index = (shortlist_index * risk_total) + risk_variant.risk_index
-                variant_key = _build_variant_key_for_stage_b(
-                    indicator_variant_key=base_candidate.indicator_variant_key,
-                    direction_mode=context.template.direction_mode,
-                    sizing_mode=context.template.sizing_mode,
-                    signal_params=base_candidate.signal_params,
-                    risk_params=risk_variant.risk_params,
-                    execution_params=context.template.execution_params or {},
-                )
-                metrics = scorer.score_variant(
-                    stage=STAGE_B_LITERAL,
-                    candles=timeline.candles,
-                    indicator_selections=base_candidate.indicator_selections,
-                    signal_params=base_candidate.signal_params,
-                    risk_params=risk_variant.risk_params,
-                    indicator_variant_key=base_candidate.indicator_variant_key,
-                    variant_key=variant_key,
-                )
-                top_k_buffer.include(
-                    candidate=BacktestJobTopVariantCandidateV1(
-                        variant_index=variant_index,
-                        variant_key=variant_key,
-                        indicator_variant_key=base_candidate.indicator_variant_key,
-                        total_return_pct=_extract_total_return_pct(metrics=metrics),
-                        indicator_selections=base_candidate.indicator_selections,
-                        signal_params=base_candidate.signal_params,
-                        risk_params=risk_variant.risk_params,
-                    )
-                )
-                processed += 1
+        def _on_stage_b_checkpoint(
+            checkpoint_processed: int,
+            checkpoint_total: int,
+            ranked_rows: tuple[BacktestStageBScoredVariantV1, ...],
+            stage_b_tasks: Mapping[str, BacktestStageBTaskV1],
+        ) -> None:
+            nonlocal heartbeat_at
+            nonlocal processed
+            nonlocal last_snapshot_at
+            nonlocal last_snapshot_processed
+            processed = checkpoint_processed
+            now_local = self._now()
+            self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_B_LITERAL)
+            heartbeat_at = self._heartbeat_if_due(
+                job=job,
+                locked_by=locked_by,
+                now=now_local,
+                last_heartbeat_at=heartbeat_at,
+            )
+            self._update_progress(
+                job=job,
+                locked_by=locked_by,
+                stage=STAGE_B_LITERAL,
+                processed_units=checkpoint_processed,
+                total_units=checkpoint_total,
+                now=now_local,
+            )
+            if not self._snapshot_cadence.should_persist(
+                now=now_local,
+                last_persist_at=last_snapshot_at,
+                processed_variants=checkpoint_processed,
+                last_persist_processed_variants=last_snapshot_processed,
+            ):
+                return
+            ranked_candidates = _ranked_candidates_from_core_rows(
+                ranked_rows=ranked_rows,
+                tasks_by_variant_key=stage_b_tasks,
+            )
+            self._persist_running_snapshot(
+                job=job,
+                locked_by=locked_by,
+                context=context,
+                ranked_candidates=ranked_candidates,
+                now=now_local,
+            )
+            last_snapshot_at = now_local
+            last_snapshot_processed = checkpoint_processed
 
-                if processed % self._stage_batch_size != 0 and processed != stage_total:
-                    continue
-
-                now = self._now()
-                self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_B_LITERAL)
-                heartbeat_at = self._heartbeat_if_due(
-                    job=job,
-                    locked_by=locked_by,
-                    now=now,
-                    last_heartbeat_at=heartbeat_at,
-                )
-                self._update_progress(
-                    job=job,
-                    locked_by=locked_by,
-                    stage=STAGE_B_LITERAL,
-                    processed_units=processed,
-                    total_units=stage_total,
-                    now=now,
-                )
-                if self._snapshot_cadence.should_persist(
-                    now=now,
-                    last_persist_at=last_snapshot_at,
-                    processed_variants=processed,
-                    last_persist_processed_variants=last_snapshot_processed,
-                ):
-                    self._persist_running_snapshot(
-                        job=job,
-                        locked_by=locked_by,
-                        context=context,
-                        ranked_candidates=top_k_buffer.ranked(),
-                        now=now,
-                    )
-                    last_snapshot_at = now
-                    last_snapshot_processed = processed
+        ranked_rows, ranked_tasks = self._core_runner.run_stage_b(
+            template=context.template,
+            grid_context=grid_context,
+            shortlist=stage_a_shortlist,
+            candles=timeline.candles,
+            scorer=scorer,
+            top_k_limit=context.persisted_k,
+            batch_size=self._stage_batch_size,
+            on_checkpoint=_on_stage_b_checkpoint,
+        )
 
         now = self._now()
         self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_B_LITERAL)
+        ranked_candidates = _ranked_candidates_from_core_rows(
+            ranked_rows=ranked_rows,
+            tasks_by_variant_key=ranked_tasks,
+        )
         if processed != last_snapshot_processed:
             self._persist_running_snapshot(
                 job=job,
                 locked_by=locked_by,
                 context=context,
-                ranked_candidates=top_k_buffer.ranked(),
+                ranked_candidates=ranked_candidates,
                 now=now,
             )
 
-        return (top_k_buffer.ranked(), heartbeat_at)
+        return (ranked_candidates, heartbeat_at)
 
     def _run_finalizing(
         self,
@@ -1252,6 +1308,7 @@ class RunBacktestJobRunnerV1:
             slippage_pct_default=self._slippage_pct_default,
             fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
             max_variants_guard=self._max_variants_per_compute,
+            max_compute_bytes_total=self._max_compute_bytes_total,
         )
 
 
@@ -1312,6 +1369,46 @@ def _extract_total_return_pct(*, metrics: Mapping[str, float]) -> float:
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueError(f"'{_TOTAL_RETURN_METRIC}' metric must be numeric")
     return float(value)
+
+
+def _ranked_candidates_from_core_rows(
+    *,
+    ranked_rows: tuple[BacktestStageBScoredVariantV1, ...],
+    tasks_by_variant_key: Mapping[str, BacktestStageBTaskV1],
+) -> tuple[BacktestJobTopVariantCandidateV1, ...]:
+    """
+    Convert shared core Stage-B rows/tasks into persisted job-runner candidate payloads.
+
+    Args:
+        ranked_rows: Ranked Stage-B rows from shared staged core.
+        tasks_by_variant_key: Stage-B task mapping by deterministic `variant_key`.
+    Returns:
+        tuple[BacktestJobTopVariantCandidateV1, ...]:
+            Deterministic ranked candidates for persistence and finalizing flow.
+    Assumptions:
+        Every ranked row has matching task payload in mapping.
+    Raises:
+        ValueError: If one ranked row has no corresponding task payload.
+    Side Effects:
+        None.
+    """
+    candidates: list[BacktestJobTopVariantCandidateV1] = []
+    for row in ranked_rows:
+        task = tasks_by_variant_key.get(row.variant_key)
+        if task is None:
+            raise ValueError("missing Stage-B task payload for ranked variant_key")
+        candidates.append(
+            BacktestJobTopVariantCandidateV1(
+                variant_index=row.variant_index,
+                variant_key=row.variant_key,
+                indicator_variant_key=row.indicator_variant_key,
+                total_return_pct=row.total_return_pct,
+                indicator_selections=task.indicator_selections,
+                signal_params=task.signal_params,
+                risk_params=task.risk_params,
+            )
+        )
+    return tuple(candidates)
 
 
 def _normalize_fee_defaults(*, values: Mapping[int, float] | None) -> Mapping[int, float]:

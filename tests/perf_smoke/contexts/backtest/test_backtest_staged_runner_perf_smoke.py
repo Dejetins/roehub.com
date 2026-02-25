@@ -102,14 +102,14 @@ class _PerfSmokeIndicatorCompute:
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:
         """
-        Return deterministic one-variant tensor with neutral bars between sign transitions.
+        Return deterministic multi-variant tensor with neutral bars between sign transitions.
 
         Args:
             req: Compute request payload.
         Returns:
             IndicatorTensor: Deterministic time-major tensor used by scorer.
         Assumptions:
-            `close_fill_scorer_v1` requests one explicit selection per compute call.
+            Prepared scorer path may request full indicator axis grid in one compute call.
         Raises:
             ValueError: If bars count is non-positive.
         Side Effects:
@@ -121,20 +121,28 @@ class _PerfSmokeIndicatorCompute:
 
         self.compute_calls += 1
         pattern = np.asarray((1.0, 0.0, -1.0, 0.0), dtype=np.float32)
-        series = np.resize(pattern, bars).astype(np.float32)
-        shift = int(_window_value(req=req) % 4)
-        if shift > 0:
-            series = np.roll(series, shift=shift)
-
-        values = np.ascontiguousarray(series.reshape(bars, 1), dtype=np.float32)
+        window_spec = req.grid.params.get(
+            "window",
+            ExplicitValuesSpec(name="window", values=(1,)),
+        )
+        windows = tuple(window_spec.materialize())
+        if len(windows) == 0:
+            windows = (1,)
+        values = np.empty((bars, len(windows)), dtype=np.float32)
+        for index, raw_window in enumerate(windows):
+            series = np.resize(pattern, bars).astype(np.float32)
+            shift = int(int(raw_window) % 4)
+            if shift > 0:
+                series = np.roll(series, shift=shift)
+            values[:, index] = series
         return IndicatorTensor(
             indicator_id=req.grid.indicator_id,
             layout=Layout.TIME_MAJOR,
-            axes=(AxisDef(name="variant", values_int=(0,)),),
-            values=values,
+            axes=(AxisDef(name="variant", values_int=tuple(range(len(windows)))),),
+            values=np.ascontiguousarray(values, dtype=np.float32),
             meta=TensorMeta(
                 t=bars,
-                variants=1,
+                variants=len(windows),
                 nan_policy="propagate",
                 compute_ms=0,
             ),
@@ -212,7 +220,7 @@ def test_backtest_staged_runner_perf_smoke_small_sync_grid() -> None:
     assert result.stage_a_variants_total == 6
     assert result.stage_b_variants_total == 16
     assert len(result.variants) == 5
-    assert indicator_compute.compute_calls == result.stage_a_variants_total
+    assert indicator_compute.compute_calls == 1
     assert len({item.variant_key for item in result.variants}) == len(result.variants)
     assert all(len(item.variant_key) == 64 for item in result.variants)
 
@@ -310,31 +318,6 @@ def _build_hourly_candles(*, bars: int) -> CandleArrays:
         close=close,
         volume=volume,
     )
-
-
-def _window_value(*, req: ComputeRequest) -> int:
-    """
-    Extract explicit integer `window` parameter from compute request grid.
-
-    Args:
-        req: Compute request payload.
-    Returns:
-        int: Integer window parameter value (default `1` when absent).
-    Assumptions:
-        Perf-smoke grid uses explicit scalar value per compute call.
-    Raises:
-        ValueError: If explicit window value cannot be converted to integer.
-    Side Effects:
-        None.
-    """
-    window_spec = req.grid.params.get("window")
-    if window_spec is None:
-        return 1
-    materialized = tuple(window_spec.materialize())
-    if len(materialized) == 0:
-        return 1
-    return int(materialized[0])
-
 
 def _axis_def(name: str, values: tuple[int | float | str, ...]) -> AxisDef:
     """

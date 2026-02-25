@@ -1,11 +1,8 @@
 from __future__ import annotations
 
 import os
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from functools import partial
-from heapq import heappush, heapreplace
-from typing import Iterator, Mapping, cast
+from typing import Callable, Iterator, Mapping, cast
 
 from trading.contexts.backtest.application.dto import (
     BacktestReportV1,
@@ -19,7 +16,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestStagedVariantScorerWithDetails,
 )
 from trading.contexts.backtest.application.services.grid_builder_v1 import (
-    STAGE_A_LITERAL,
     STAGE_B_LITERAL,
     BacktestGridBuildContextV1,
     BacktestGridBuilderV1,
@@ -29,7 +25,6 @@ from trading.contexts.backtest.domain.value_objects import (
     BacktestVariantScalar,
     ExecutionParamsV1,
     RiskParamsV1,
-    build_backtest_variant_key_v1,
 )
 from trading.contexts.indicators.application.dto import CandleArrays, IndicatorVariantSelection
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
@@ -40,6 +35,13 @@ from trading.contexts.indicators.application.services.grid_builder import (
 from trading.shared_kernel.primitives import TimeRange
 
 from .reporting_service_v1 import BacktestReportingServiceV1
+from .run_control_v1 import BacktestRunControlV1
+from .staged_core_runner_v1 import (
+    BacktestStageAScoredVariantV1,
+    BacktestStageBScoredVariantV1,
+    BacktestStageBTaskV1,
+    BacktestStagedCoreRunnerV1,
+)
 
 TOTAL_RETURN_METRIC_LITERAL = "Total Return [%]"
 
@@ -187,6 +189,7 @@ class BacktestStagedRunnerV1:
         grid_builder: BacktestGridBuilderV1 | None = None,
         parallel_workers: int | None = None,
         reporting_service: BacktestReportingServiceV1 | None = None,
+        core_runner: BacktestStagedCoreRunnerV1 | None = None,
     ) -> None:
         """
         Initialize staged runner with optional custom grid-builder implementation.
@@ -195,6 +198,7 @@ class BacktestStagedRunnerV1:
             grid_builder: Optional custom grid builder for Stage A/Stage B context.
             parallel_workers: Optional number of worker threads for variant scoring.
             reporting_service: Optional reporting service used for Stage-B top-k payloads.
+            core_runner: Shared staged scoring core used by sync and jobs paths.
         Returns:
             None.
         Assumptions:
@@ -209,6 +213,7 @@ class BacktestStagedRunnerV1:
         self._grid_builder = grid_builder or BacktestGridBuilderV1()
         self._parallel_workers = parallel_workers
         self._reporting_service = reporting_service or BacktestReportingServiceV1()
+        self._core_runner = core_runner or BacktestStagedCoreRunnerV1()
 
     def run(
         self,
@@ -224,6 +229,7 @@ class BacktestStagedRunnerV1:
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
         requested_time_range: TimeRange | None = None,
         top_trades_n: int = 3,
+        run_control: BacktestRunControlV1 | None = None,
     ) -> BacktestStagedRunResultV1:
         """
         Execute staged ranking flow and return deterministic top-K variant previews.
@@ -242,6 +248,9 @@ class BacktestStagedRunnerV1:
                 Optional request range for reporting rows (`Start/End/Duration`).
             top_trades_n:
                 Number of best variants for which full trades payload is included.
+            run_control:
+                Optional cooperative cancellation/deadline control shared with request/job
+                lifecycle.
         Returns:
             BacktestStagedRunResultV1: Deterministic staged-run output summary.
         Assumptions:
@@ -268,12 +277,21 @@ class BacktestStagedRunnerV1:
             max_variants_per_compute=max_variants_per_compute,
             max_compute_bytes_total=max_compute_bytes_total,
         )
+        self._prepare_scorer_for_grid_context(
+            scorer=scorer,
+            grid_context=grid_context,
+            candles=candles,
+            max_compute_bytes_total=max_compute_bytes_total,
+            run_control=run_control,
+        )
+        cancel_checker = _cancel_checker_from_run_control(run_control=run_control)
 
         shortlist = self._score_stage_a(
             grid_context=grid_context,
             candles=candles,
             scorer=scorer,
             shortlist_limit=preselect,
+            cancel_checker=cancel_checker,
         )
 
         top_rows, stage_b_tasks = self._score_stage_b(
@@ -283,6 +301,7 @@ class BacktestStagedRunnerV1:
             candles=candles,
             scorer=scorer,
             top_k_limit=top_k,
+            cancel_checker=cancel_checker,
         )
         top_payload_context = self._build_top_reports(
             requested_time_range=requested_time_range,
@@ -332,6 +351,43 @@ class BacktestStagedRunnerV1:
             indicator_estimate_calls=grid_context.indicator_estimate_calls,
         )
 
+    def _prepare_scorer_for_grid_context(
+        self,
+        *,
+        scorer: BacktestStagedVariantScorer,
+        grid_context: BacktestGridBuildContextV1,
+        candles: CandleArrays,
+        max_compute_bytes_total: int,
+        run_control: BacktestRunControlV1 | None,
+    ) -> None:
+        """
+        Prepare scorer hot-path context (batched indicator tensors) when scorer supports it.
+
+        Args:
+            scorer: Stage scorer port implementation.
+            grid_context: Deterministic staged grid context.
+            candles: Dense warmup-inclusive candles for tensor compute.
+            max_compute_bytes_total: Stage memory guard budget.
+            run_control: Optional cooperative cancellation/deadline control.
+        Returns:
+            None.
+        Assumptions:
+            Optional scorer extension is discovered via method presence.
+        Raises:
+            Exception: Propagates scorer preparation errors.
+        Side Effects:
+            May trigger indicator tensor precompute and in-memory cache priming.
+        """
+        prepare_method = getattr(scorer, "prepare_for_grid_context", None)
+        if prepare_method is None:
+            return
+        prepare_method(
+            grid_context=grid_context,
+            candles=candles,
+            max_compute_bytes_total=max_compute_bytes_total,
+            run_control=run_control,
+        )
+
     def _score_stage_a(
         self,
         *,
@@ -339,14 +395,17 @@ class BacktestStagedRunnerV1:
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
         shortlist_limit: int,
-    ) -> list[_StageAScoredVariant]:
+        cancel_checker: Callable[[str], None] | None = None,
+    ) -> list[BacktestStageAScoredVariantV1]:
         """
-        Score Stage A base variants and keep only bounded deterministic shortlist by heap.
+        Score Stage-A variants through shared staged core runner.
 
         Docs:
           - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
           - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
         Related:
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
           - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
         Args:
@@ -354,8 +413,9 @@ class BacktestStagedRunnerV1:
             candles: Dense candles forwarded to scorer.
             scorer: Stage scorer port.
             shortlist_limit: Maximum number of Stage A rows retained in memory.
+            cancel_checker: Optional cooperative cancellation callback by stage.
         Returns:
-            list[_StageAScoredVariant]:
+            list[BacktestStageAScoredVariantV1]:
                 Sorted Stage A shortlist rows by ranking and tie-break key.
         Assumptions:
             Stage A uses base key tie-break with risk disabled.
@@ -364,88 +424,35 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
-        if shortlist_limit <= 0:
-            raise ValueError("BacktestStagedRunnerV1 shortlist_limit must be > 0")
-        workers = self._resolve_parallel_workers(total_tasks=grid_context.stage_a_variants_total)
-        shortlist_heap: list[tuple[float, tuple[int, ...], _StageAScoredVariant]] = []
-        if workers <= 1:
-            for base_variant in grid_context.iter_stage_a_variants():
-                row = self._score_stage_a_variant(
-                    base_variant=base_variant,
-                    candles=candles,
-                    scorer=scorer,
-                )
-                # HOT PATH: streaming heap update prevents full Stage A row materialization.
-                if len(shortlist_heap) < shortlist_limit:
-                    heappush(
-                        shortlist_heap,
-                        (
-                            row.total_return_pct,
-                            _descending_text_key(value=row.base_variant.base_variant_key),
-                            row,
-                        ),
-                    )
-                    continue
-                if not _stage_a_outranks(candidate=row, baseline=shortlist_heap[0][2]):
-                    continue
-                heapreplace(
-                    shortlist_heap,
-                    (
-                        row.total_return_pct,
-                        _descending_text_key(value=row.base_variant.base_variant_key),
-                        row,
-                    ),
-                )
-        else:
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                for row in executor.map(
-                    lambda item: self._score_stage_a_variant(
-                        base_variant=item,
-                        candles=candles,
-                        scorer=scorer,
-                    ),
-                    grid_context.iter_stage_a_variants(),
-                ):
-                    # HOT PATH: streaming heap update prevents full Stage A row materialization.
-                    if len(shortlist_heap) < shortlist_limit:
-                        heappush(
-                            shortlist_heap,
-                            (
-                                row.total_return_pct,
-                                _descending_text_key(value=row.base_variant.base_variant_key),
-                                row,
-                            ),
-                        )
-                        continue
-                    if not _stage_a_outranks(candidate=row, baseline=shortlist_heap[0][2]):
-                        continue
-                    heapreplace(
-                        shortlist_heap,
-                        (
-                            row.total_return_pct,
-                            _descending_text_key(value=row.base_variant.base_variant_key),
-                            row,
-                        ),
-                    )
-        return sorted((entry[2] for entry in shortlist_heap), key=_stage_a_rank_key)
+        rows = self._core_runner.run_stage_a(
+            grid_context=grid_context,
+            candles=candles,
+            scorer=scorer,
+            shortlist_limit=shortlist_limit,
+            cancel_checker=cancel_checker,
+        )
+        return list(rows)
 
     def _score_stage_b(
         self,
         *,
         template: RunBacktestTemplate,
         grid_context: BacktestGridBuildContextV1,
-        shortlist: list[_StageAScoredVariant],
+        shortlist: list[BacktestStageAScoredVariantV1],
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
         top_k_limit: int,
-    ) -> tuple[list[_StageBScoredVariant], Mapping[str, _StageBTask]]:
+        cancel_checker: Callable[[str], None] | None = None,
+    ) -> tuple[list[BacktestStageBScoredVariantV1], Mapping[str, BacktestStageBTaskV1]]:
         """
-        Score Stage B expanded variants and keep only bounded deterministic top-K by heap.
+        Score Stage-B variants through shared staged core runner.
 
         Docs:
           - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
           - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
         Related:
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
           - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
         Args:
@@ -455,8 +462,9 @@ class BacktestStagedRunnerV1:
             candles: Dense candles forwarded to scorer.
             scorer: Stage scorer port.
             top_k_limit: Maximum number of Stage B rows retained in memory.
+            cancel_checker: Optional cooperative cancellation callback by stage.
         Returns:
-            tuple[list[_StageBScoredVariant], Mapping[str, _StageBTask]]:
+            tuple[list[BacktestStageBScoredVariantV1], Mapping[str, BacktestStageBTaskV1]]:
                 Sorted Stage B top rows and task lookup required for report/payload building.
         Assumptions:
             Stage B tie-break key is full `variant_key`.
@@ -465,79 +473,16 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
-        if top_k_limit <= 0:
-            raise ValueError("BacktestStagedRunnerV1 top_k_limit must be > 0")
-        tasks = self._iter_stage_b_tasks(
+        top_rows, top_tasks_by_variant_key = self._core_runner.run_stage_b(
             template=template,
             grid_context=grid_context,
-            shortlist=shortlist,
+            shortlist=tuple(shortlist),
+            candles=candles,
+            scorer=scorer,
+            top_k_limit=top_k_limit,
+            cancel_checker=cancel_checker,
         )
-        workers = self._resolve_parallel_workers(total_tasks=grid_context.stage_b_variants_total)
-        top_heap: list[tuple[float, tuple[int, ...], _StageBScoredVariant, _StageBTask]] = []
-        if workers <= 1:
-            for task in tasks:
-                row = self._score_stage_b_task(task=task, candles=candles, scorer=scorer)
-                # HOT PATH: streaming heap update keeps only Stage B top-K rows and tasks.
-                if len(top_heap) < top_k_limit:
-                    heappush(
-                        top_heap,
-                        (
-                            row.total_return_pct,
-                            _descending_text_key(value=row.variant_key),
-                            row,
-                            task,
-                        ),
-                    )
-                    continue
-                if not _stage_b_outranks(candidate=row, baseline=top_heap[0][2]):
-                    continue
-                heapreplace(
-                    top_heap,
-                    (
-                        row.total_return_pct,
-                        _descending_text_key(value=row.variant_key),
-                        row,
-                        task,
-                    ),
-                )
-        else:
-            task_row_mapper = partial(
-                self._score_stage_b_task_with_task,
-                candles=candles,
-                scorer=scorer,
-            )
-            with ThreadPoolExecutor(max_workers=workers) as executor:
-                for row, task in executor.map(task_row_mapper, tasks):
-                    # HOT PATH: streaming heap update keeps only Stage B top-K rows and tasks.
-                    if len(top_heap) < top_k_limit:
-                        heappush(
-                            top_heap,
-                            (
-                                row.total_return_pct,
-                                _descending_text_key(value=row.variant_key),
-                                row,
-                                task,
-                            ),
-                        )
-                        continue
-                    if not _stage_b_outranks(candidate=row, baseline=top_heap[0][2]):
-                        continue
-                    heapreplace(
-                        top_heap,
-                        (
-                            row.total_return_pct,
-                            _descending_text_key(value=row.variant_key),
-                            row,
-                            task,
-                        ),
-                    )
-        top_rows = sorted((entry[2] for entry in top_heap), key=_stage_b_rank_key)
-        top_tasks_by_variant_key: dict[str, _StageBTask] = {}
-        for _, _, row, task in top_heap:
-            if row.variant_key in top_tasks_by_variant_key:
-                raise ValueError("duplicate Stage B variant_key is not allowed")
-            top_tasks_by_variant_key[row.variant_key] = task
-        return top_rows, top_tasks_by_variant_key
+        return (list(top_rows), top_tasks_by_variant_key)
 
     def _score_stage_a_variant(
         self,
@@ -545,9 +490,9 @@ class BacktestStagedRunnerV1:
         base_variant: BacktestStageABaseVariant,
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
-    ) -> _StageAScoredVariant:
+    ) -> BacktestStageAScoredVariantV1:
         """
-        Score one Stage A base variant and return deterministic ranking row.
+        Score one Stage-A base variant through shared staged core helper.
 
         Args:
             base_variant: Stage A base variant.
@@ -562,23 +507,10 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
-        metrics = scorer.score_variant(
-            stage=STAGE_A_LITERAL,
-            candles=candles,
-            indicator_selections=base_variant.indicator_selections,
-            signal_params=base_variant.signal_params,
-            risk_params={
-                "sl_enabled": False,
-                "sl_pct": None,
-                "tp_enabled": False,
-                "tp_pct": None,
-            },
-            indicator_variant_key=base_variant.indicator_variant_key,
-            variant_key=base_variant.base_variant_key,
-        )
-        return _StageAScoredVariant(
+        return self._core_runner._score_stage_a_variant(  # noqa: SLF001
             base_variant=base_variant,
-            total_return_pct=_extract_total_return_pct(metrics=metrics),
+            candles=candles,
+            scorer=scorer,
         )
 
     def _iter_stage_b_tasks(
@@ -586,10 +518,10 @@ class BacktestStagedRunnerV1:
         *,
         template: RunBacktestTemplate,
         grid_context: BacktestGridBuildContextV1,
-        shortlist: list[_StageAScoredVariant],
-    ) -> Iterator[_StageBTask]:
+        shortlist: list[BacktestStageAScoredVariantV1],
+    ) -> Iterator[BacktestStageBTaskV1]:
         """
-        Iterate deterministic Stage B scoring tasks from shortlist and risk variants.
+        Iterate deterministic Stage-B scoring tasks through shared staged core helper.
 
         Docs:
           - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
@@ -610,38 +542,21 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
-        risk_variants = grid_context.risk_variants
-        risk_total = len(risk_variants)
-        for shortlist_index, stage_a_row in enumerate(shortlist):
-            base_variant = stage_a_row.base_variant
-            for risk_variant in risk_variants:
-                variant_index = (shortlist_index * risk_total) + risk_variant.risk_index
-                variant_key = build_backtest_variant_key_v1(
-                    indicator_variant_key=base_variant.indicator_variant_key,
-                    direction_mode=template.direction_mode,
-                    sizing_mode=template.sizing_mode,
-                    signals=base_variant.signal_params,
-                    risk_params=risk_variant.risk_params,
-                    execution_params=template.execution_params,
-                )
-                yield _StageBTask(
-                    variant_index=variant_index,
-                    indicator_variant_key=base_variant.indicator_variant_key,
-                    variant_key=variant_key,
-                    indicator_selections=base_variant.indicator_selections,
-                    signal_params=base_variant.signal_params,
-                    risk_params=risk_variant.risk_params,
-                )
+        yield from self._core_runner._iter_stage_b_tasks(  # noqa: SLF001
+            template=template,
+            grid_context=grid_context,
+            shortlist=tuple(shortlist),
+        )
 
     def _score_stage_b_task(
         self,
         *,
-        task: _StageBTask,
+        task: BacktestStageBTaskV1,
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
-    ) -> _StageBScoredVariant:
+    ) -> BacktestStageBScoredVariantV1:
         """
-        Score one Stage B task payload and return deterministic ranking row.
+        Score one Stage-B task payload through shared staged core helper.
 
         Args:
             task: Stage B scoring task.
@@ -656,29 +571,19 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
-        metrics = scorer.score_variant(
-            stage=STAGE_B_LITERAL,
+        return self._core_runner._score_stage_b_task(  # noqa: SLF001
+            task=task,
             candles=candles,
-            indicator_selections=task.indicator_selections,
-            signal_params=task.signal_params,
-            risk_params=task.risk_params,
-            indicator_variant_key=task.indicator_variant_key,
-            variant_key=task.variant_key,
-        )
-        return _StageBScoredVariant(
-            variant_index=task.variant_index,
-            indicator_variant_key=task.indicator_variant_key,
-            variant_key=task.variant_key,
-            total_return_pct=_extract_total_return_pct(metrics=metrics),
+            scorer=scorer,
         )
 
     def _score_stage_b_task_with_task(
         self,
-        task: _StageBTask,
+        task: BacktestStageBTaskV1,
         *,
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
-    ) -> tuple[_StageBScoredVariant, _StageBTask]:
+    ) -> tuple[BacktestStageBScoredVariantV1, BacktestStageBTaskV1]:
         """
         Score one Stage-B task and return both ranked row and original task payload.
 
@@ -711,8 +616,8 @@ class BacktestStagedRunnerV1:
         self,
         *,
         requested_time_range: TimeRange | None,
-        top_rows: list[_StageBScoredVariant],
-        stage_b_tasks: Mapping[str, _StageBTask],
+        top_rows: list[BacktestStageBScoredVariantV1],
+        stage_b_tasks: Mapping[str, BacktestStageBTaskV1],
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
         top_trades_n: int,
@@ -1043,6 +948,48 @@ def _risk_params_to_mapping(*, params: RiskParamsV1) -> Mapping[str, BacktestVar
         "tp_enabled": bool(params.tp_enabled),
         "tp_pct": float(params.tp_pct) if params.tp_pct is not None else None,
     }
+
+
+def _cancel_checker_from_run_control(
+    *,
+    run_control: BacktestRunControlV1 | None,
+) -> Callable[[str], None] | None:
+    """
+    Build stage-aware cancellation checker callback from optional run-control object.
+
+    Args:
+        run_control: Optional cooperative run-control object.
+    Returns:
+        Callable[[str], None] | None:
+            Stage checker callback or `None` when run-control is not configured.
+    Assumptions:
+        Callback is invoked from hot loops and must stay allocation-light.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if run_control is None:
+        return None
+
+    def _check(stage: str) -> None:
+        """
+        Check cancellation/deadline for one stage.
+
+        Args:
+            stage: Stage literal where check is executed.
+        Returns:
+            None.
+        Assumptions:
+            Stage name is a non-empty deterministic literal.
+        Raises:
+            BacktestRunCancelledV1: If run-control reports cancellation/deadline.
+        Side Effects:
+            None.
+        """
+        run_control.raise_if_cancelled(stage=stage)
+
+    return _check
 
 
 __all__ = [

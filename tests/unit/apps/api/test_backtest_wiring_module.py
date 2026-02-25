@@ -9,7 +9,9 @@ from fastapi import APIRouter
 
 from apps.api.wiring.modules import backtest as backtest_module
 from trading.contexts.backtest.adapters.outbound import (
+    BacktestCpuRuntimeConfig,
     BacktestExecutionRuntimeConfig,
+    BacktestGuardsRuntimeConfig,
     BacktestJobsRuntimeConfig,
     BacktestReportingRuntimeConfig,
     BacktestRuntimeConfig,
@@ -153,7 +155,13 @@ def _build_ping_router(*, path: str) -> APIRouter:
 
 
 
-def _runtime_config(*, jobs_enabled: bool) -> BacktestRuntimeConfig:
+def _runtime_config(
+    *,
+    jobs_enabled: bool,
+    max_variants_per_compute: int = 600000,
+    max_compute_bytes_total: int = 5 * 1024**3,
+    max_numba_threads: int = 4,
+) -> BacktestRuntimeConfig:
     """
     Build minimal runtime config fixture for backtest wiring router-toggle tests.
 
@@ -181,6 +189,11 @@ def _runtime_config(*, jobs_enabled: bool) -> BacktestRuntimeConfig:
             slippage_pct_default=0.01,
             fee_pct_default_by_market_id={1: 0.075},
         ),
+        guards=BacktestGuardsRuntimeConfig(
+            max_variants_per_compute=max_variants_per_compute,
+            max_compute_bytes_total=max_compute_bytes_total,
+        ),
+        cpu=BacktestCpuRuntimeConfig(max_numba_threads=max_numba_threads),
         jobs=BacktestJobsRuntimeConfig(
             enabled=jobs_enabled,
             top_k_persisted_default=300,
@@ -257,6 +270,96 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
         "build_backtest_jobs_router",
         lambda **kwargs: _build_ping_router(path="/backtests/jobs/ping"),
     )
+
+
+def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypatch) -> None:
+    """
+    Verify sync `RunBacktestUseCase` receives half of configured guard budgets.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Jobs mode keeps full guard values; only sync route uses half budgets.
+    Raises:
+        AssertionError: If run use-case kwargs do not contain expected halved guard values.
+    Side Effects:
+        None.
+    """
+    captured_kwargs: dict[str, object] = {}
+    runtime_config = _runtime_config(
+        jobs_enabled=False,
+        max_variants_per_compute=101,
+        max_compute_bytes_total=1001,
+        max_numba_threads=7,
+    )
+
+    monkeypatch.setattr(
+        backtest_module,
+        "resolve_backtest_config_path",
+        lambda *, environ: Path("configs/test/backtest.yaml"),
+    )
+    monkeypatch.setattr(
+        backtest_module,
+        "load_backtest_runtime_config",
+        lambda _path: runtime_config,
+    )
+    monkeypatch.setattr(
+        backtest_module,
+        "build_backtest_runtime_config_hash",
+        lambda *, config: "f" * 64,
+    )
+    monkeypatch.setattr(backtest_module, "YamlBacktestGridDefaultsProvider", _DummyDefaultsProvider)
+    monkeypatch.setattr(backtest_module, "_build_strategy_repository", lambda *, settings: object())
+    monkeypatch.setattr(
+        backtest_module,
+        "StrategyRepositoryBacktestStrategyReader",
+        _DummyStrategyReader,
+    )
+    monkeypatch.setattr(backtest_module, "_build_backtest_candle_feed", lambda *, environ: object())
+
+    class _CaptureRunBacktestUseCase:
+        """
+        Capture run use-case constructor kwargs for guard/CPU assertions.
+        """
+
+        def __init__(self, **kwargs) -> None:
+            """
+            Store kwargs for deterministic assertions.
+
+            Args:
+                **kwargs: Constructor kwargs from wiring module.
+            Returns:
+                None.
+            Assumptions:
+                Captured kwargs are not mutated by router builder.
+            Raises:
+                None.
+            Side Effects:
+                Stores kwargs in enclosing test scope.
+            """
+            captured_kwargs.update(kwargs)
+
+    monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _CaptureRunBacktestUseCase)
+    monkeypatch.setattr(
+        backtest_module,
+        "build_backtests_router",
+        lambda **kwargs: _build_ping_router(path="/backtests/ping"),
+    )
+
+    router = backtest_module.build_backtest_router(
+        environ={},
+        current_user_dependency=cast(
+            RequireCurrentUserDependency,
+            lambda _request: None,
+        ),
+        indicator_compute=cast(IndicatorCompute, SimpleNamespace()),
+    )
+    assert "/backtests/ping" in _paths_from_router(router=router)
+    assert captured_kwargs["max_variants_per_compute"] == 50
+    assert captured_kwargs["max_compute_bytes_total"] == 500
+    assert captured_kwargs["max_numba_threads"] == 7
 
 
 

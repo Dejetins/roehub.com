@@ -18,6 +18,30 @@ owner: backtest
 - Без миграций БД.
 - Стратегия оптимизации Numba-first (в первой фазе без новых native-зависимостей).
 
+## Статус реализации (обновлено 2026-02-25)
+
+Фазы 1-3 и ключевые элементы фазы 4/7 из этого плана реализованы в рабочем коде:
+
+- Stage A/Stage B используют общий `BacktestStagedCoreRunnerV1` для sync и jobs.
+- `CloseFillBacktestStagedScorerV1` готовит batched/scoped indicator tensors на run (`prepare_for_grid_context(...)`) и избегает per-variant `IndicatorCompute.compute(...)` в hot path.
+- Sync `POST /backtests` работает через async route + `asyncio.to_thread(...)` и кооперативную отмену:
+  - по `request.is_disconnected()`;
+  - по hard deadline (`BacktestRunControlV1`).
+- Job runner использует тот же shared core scoring path и проверяет cancel/lease на checkpoint-границах стадий.
+- Sync guards применяются как half-budget от runtime config:
+  - `max_variants_per_compute = floor(full / 2)`;
+  - `max_compute_bytes_total = floor(full / 2)`.
+- Добавлен runtime CPU knob `backtest.cpu.max_numba_threads`, применяемый через `numba.set_num_threads(...)` в sync и jobs.
+
+Актуальные implementation точки:
+
+- `src/trading/contexts/backtest/application/services/staged_core_runner_v1.py`
+- `src/trading/contexts/backtest/application/services/run_control_v1.py`
+- `src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py`
+- `apps/api/routes/backtests.py`
+- `apps/api/wiring/modules/backtest.py`
+- `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py`
+
 ## Зачем этот рефакторинг
 
 Наблюдаемые проблемы текущего пайплайна:

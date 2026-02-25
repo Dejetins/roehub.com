@@ -159,6 +159,15 @@ def build_backtest_router(
         safe_profit_percent_default=runtime_config.execution.safe_profit_percent_default,
         slippage_pct_default=runtime_config.execution.slippage_pct_default,
         fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
+        max_variants_per_compute=max(
+            1,
+            runtime_config.guards.max_variants_per_compute // 2,
+        ),
+        max_compute_bytes_total=max(
+            1,
+            runtime_config.guards.max_compute_bytes_total // 2,
+        ),
+        max_numba_threads=runtime_config.cpu.max_numba_threads,
     )
     runtime_defaults_response = build_backtest_runtime_defaults_response(
         config=runtime_config

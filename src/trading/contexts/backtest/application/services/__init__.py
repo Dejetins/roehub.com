@@ -26,7 +26,9 @@ from .job_runner_streaming_v1 import (
     build_variant_payload_json,
 )
 from .metrics_calculator_v1 import BACKTEST_METRIC_ORDER_V1, BacktestMetricsCalculatorV1
+from .numba_runtime_v1 import apply_backtest_numba_threads
 from .reporting_service_v1 import BacktestReportingServiceV1
+from .run_control_v1 import BacktestRunCancelledV1, BacktestRunControlV1
 from .signals_from_indicators_v1 import (
     SIGNAL_CODE_LONG_V1,
     SIGNAL_CODE_NEUTRAL_V1,
@@ -48,6 +50,12 @@ from .signals_from_indicators_v1 import (
     signal_rule_spec_v1,
     supported_indicator_ids_for_signals_v1,
 )
+from .staged_core_runner_v1 import (
+    BacktestStageAScoredVariantV1,
+    BacktestStageBScoredVariantV1,
+    BacktestStageBTaskV1,
+    BacktestStagedCoreRunnerV1,
+)
 from .staged_runner_v1 import (
     TOTAL_RETURN_METRIC_LITERAL,
     BacktestStagedRunnerV1,
@@ -62,7 +70,13 @@ __all__ = [
     "BacktestJobSnapshotCadenceV1",
     "BacktestJobTopKBufferV1",
     "BacktestJobTopVariantCandidateV1",
+    "BacktestRunCancelledV1",
+    "BacktestRunControlV1",
     "BacktestRiskVariantV1",
+    "BacktestStageAScoredVariantV1",
+    "BacktestStageBScoredVariantV1",
+    "BacktestStageBTaskV1",
+    "BacktestStagedCoreRunnerV1",
     "BacktestStagedRunResultV1",
     "BacktestStagedRunnerV1",
     "BacktestStageABaseVariant",
@@ -104,4 +118,5 @@ __all__ = [
     "rollup_1m_candles_best_effort",
     "signal_rule_spec_v1",
     "supported_indicator_ids_for_signals_v1",
+    "apply_backtest_numba_threads",
 ]
