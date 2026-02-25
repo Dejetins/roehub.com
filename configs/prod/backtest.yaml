@@ -9,7 +9,7 @@ backtest:
   cpu:
     max_numba_threads: 4
   sync:
-    sync_deadline_seconds: 55.0
+    sync_deadline_seconds: 9999.0
   jobs:
     enabled: true
     top_k_persisted_default: 300
