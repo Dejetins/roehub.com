@@ -151,8 +151,6 @@ class BacktestEquityCurveBuilderV1:
             exits_by_bar[trade.exit_bar_index] = trade
             local_start = trade.entry_bar_index - start_index
             local_stop = trade.exit_bar_index - start_index + 1
-            if np.any(have_position[local_start:local_stop] > 0.0):
-                raise ValueError("overlapping trades are not supported")
             have_position[local_start:local_stop] = 1.0
             entry_quote_by_bar[local_start:local_stop] = float(trade.entry_quote_amount)
 
@@ -160,9 +158,18 @@ class BacktestEquityCurveBuilderV1:
         safe_quote = 0.0
         active_trade: TradeV1 | None = None
 
+        # HOT PATH: bar loop must match engine event ordering.
+        # Engine ordering (v1): risk exit -> signal exit -> signal entry on the same close.
         for local_index, bar_index in enumerate(range(start_index, stop_index)):
             entry_trade = entries_by_bar.get(bar_index)
-            if entry_trade is not None:
+            exit_trade = exits_by_bar.get(bar_index)
+
+            if (
+                entry_trade is not None
+                and exit_trade is not None
+                and entry_trade.trade_id == exit_trade.trade_id
+            ):
+                # One-bar trade: open then close on the same bar.
                 if active_trade is not None:
                     raise ValueError("cannot open a new trade while another trade is active")
                 available_quote = (
@@ -170,10 +177,6 @@ class BacktestEquityCurveBuilderV1:
                 )
                 active_trade = entry_trade
 
-            exit_trade = exits_by_bar.get(bar_index)
-            if exit_trade is not None:
-                if active_trade is None or active_trade.trade_id != exit_trade.trade_id:
-                    raise ValueError("exit trade does not match active trade")
                 available_quote = (
                     available_quote
                     + exit_trade.entry_quote_amount
@@ -184,6 +187,32 @@ class BacktestEquityCurveBuilderV1:
                     available_quote = available_quote - exit_trade.locked_profit_quote
                     safe_quote = safe_quote + exit_trade.locked_profit_quote
                 active_trade = None
+
+            else:
+                # Reversal-compatible ordering: close first, then open.
+                if exit_trade is not None:
+                    if active_trade is None or active_trade.trade_id != exit_trade.trade_id:
+                        raise ValueError("exit trade does not match active trade")
+                    available_quote = (
+                        available_quote
+                        + exit_trade.entry_quote_amount
+                        + exit_trade.gross_pnl_quote
+                        - exit_trade.exit_fee_quote
+                    )
+                    if exit_trade.locked_profit_quote > 0.0:
+                        available_quote = available_quote - exit_trade.locked_profit_quote
+                        safe_quote = safe_quote + exit_trade.locked_profit_quote
+                    active_trade = None
+
+                if entry_trade is not None:
+                    if active_trade is not None:
+                        raise ValueError("cannot open a new trade while another trade is active")
+                    available_quote = (
+                        available_quote
+                        - entry_trade.entry_quote_amount
+                        - entry_trade.entry_fee_quote
+                    )
+                    active_trade = entry_trade
 
             if active_trade is None:
                 equity_close_quote[local_index] = available_quote + safe_quote

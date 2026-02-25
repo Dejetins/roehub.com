@@ -131,7 +131,7 @@ Check bound ports:
 sudo ss -ltnp | egrep ':(8080|80|443)\s'
 ```
 
-Rebuild after code update (manual):
+Rebuild after code update (manual, with bootstrap):
 
 ```bash
 cd /opt/roehub/market-data-src && git pull --ff-only
@@ -139,7 +139,70 @@ cd /opt/roehub/market-data-src && git pull --ff-only
 COMPOSE_PROJECT_NAME=roehub \
 MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src \
 MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data \
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui build --pull api web db-bootstrap gateway
+
+# Re-run bootstrap explicitly (recommended when bootstrap/migrations code changed).
+COMPOSE_PROJECT_NAME=roehub \
+MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src \
+MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data \
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui run --rm db-bootstrap
+
+# Start UI stack (api depends_on db-bootstrap: service_completed_successfully).
+COMPOSE_PROJECT_NAME=roehub \
+MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src \
+MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data \
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui up -d --remove-orphans api web gateway
+```
+
+Note:
+
+- The commands above rebuild only the services that have a `build:` section (`api`, `web`, `gateway`, `db-bootstrap`).
+- Dependencies like `postgres`, `clickhouse`, `redis` are pulled images and are not "rebuilt" in the same sense.
+
+Full UI stack recreate (non-destructive; keeps volumes/data):
+
+```bash
+# Stop all containers managed by this compose project.
+COMPOSE_PROJECT_NAME=roehub \
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui down --remove-orphans
+
+# Pull base images (optional; updates postgres/clickhouse/redis versions if tags changed).
+COMPOSE_PROJECT_NAME=roehub \
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui pull postgres clickhouse redis
+
+# Rebuild app images and start UI stack again.
+COMPOSE_PROJECT_NAME=roehub \
+MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src \
+MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data \
 docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui up -d --build --remove-orphans api web gateway
+```
+
+Full reset (destructive; wipes Postgres/ClickHouse/Redis data volumes):
+
+```bash
+# WARNING: this deletes volumes and all stored data.
+COMPOSE_PROJECT_NAME=roehub \
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui down --remove-orphans --volumes
+
+COMPOSE_PROJECT_NAME=roehub \
+MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src \
+MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data \
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui up -d --build --remove-orphans api web gateway
+```
+
+If you prefer systemd for the final start step:
+
+```bash
+sudo systemctl restart roehub-ui.service
+```
+
+Bootstrap only (rerun `db-bootstrap`):
+
+```bash
+COMPOSE_PROJECT_NAME=roehub \
+MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src \
+MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data \
+docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui run --rm db-bootstrap
 ```
 
 Stop UI stack:
