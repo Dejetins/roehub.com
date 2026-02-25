@@ -140,6 +140,20 @@ Backtest/Signals слой вводит свой loader для `defaults.<indicat
 
 Это означает, что pipeline backtest должен уметь добавить “внутренний” compute dependency на wrapper индикатор при необходимости.
 
+### 8) Internal compact encoding для perf path
+
+Для производительного scorer/execution path v1 вводится внутреннее компактное кодирование:
+
+- `NEUTRAL = 0`
+- `LONG = 1`
+- `SHORT = -1`
+
+Требования:
+
+- Hot path работает на `np.int8` и не материализует unicode-массивы сигналов (`dtype='U7'`).
+- Legacy-представление `LONG|SHORT|NEUTRAL` остаётся поддержанным для совместимости и boundary/API случаев.
+- Конвертация в строки выполняется только на границах, где это реально нужно (например, debug/report/top variants).
+
 ## Контракты и инварианты
 
 - Signal evaluation выполняется на закрытии бара `t` и использует значения series на этом баре.

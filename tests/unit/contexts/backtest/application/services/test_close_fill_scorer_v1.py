@@ -5,7 +5,13 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.services import CloseFillBacktestStagedScorerV1
+from trading.contexts.backtest.application.services import (
+    BacktestExecutionEngineV1,
+    CloseFillBacktestStagedScorerV1,
+    IndicatorSignalEvaluationInputV1,
+    evaluate_and_aggregate_signals_v1,
+)
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
     ComputeRequest,
@@ -234,6 +240,200 @@ def test_close_fill_scorer_v1_reuses_signal_cache_for_same_base_variant() -> Non
     )
 
     assert compute.compute_calls == 1
+
+
+def test_close_fill_scorer_v1_cache_is_bounded_and_stores_compact_signals() -> None:
+    """
+    Verify scorer signal cache is bounded by entry count and stores compact int8 vectors.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Different `signal_params` payloads create different cache keys.
+    Raises:
+        AssertionError: If cache exceeds configured capacity or stores non-int8 arrays.
+    Side Effects:
+        None.
+    """
+    candles = _candles_from_closes((100.0, 102.0, 101.0, 103.0))
+    compute = _FixedSeriesIndicatorCompute(
+        outputs={
+            "momentum.roc": np.asarray((1.0, 1.0, 1.0, 1.0), dtype=np.float32),
+        }
+    )
+    scorer = CloseFillBacktestStagedScorerV1(
+        indicator_compute=compute,
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={"init_cash_quote": 1000.0, "fee_pct": 0.0, "slippage_pct": 0.0},
+        market_id=1,
+        target_slice=slice(0, 4),
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+        signals_cache_max_entries=1,
+        signals_cache_max_bytes=1024,
+    )
+    selection = _selection(indicator_id="momentum.roc")
+
+    scorer.score_variant(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="b" * 64,
+    )
+    scorer.score_variant(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={"momentum.roc": {"debug_toggle": 1}},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="c" * 64,
+    )
+
+    assert len(scorer._signals_cache) == 1
+    assert all(value.final_signal.dtype == np.int8 for value in scorer._signals_cache.values())
+
+
+def test_close_fill_scorer_v1_cache_respects_byte_limit() -> None:
+    """
+    Verify cache byte limit evicts oversized signal vectors and prevents unbounded growth.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        One compact signal vector for 3 bars occupies 3 bytes (`np.int8`).
+    Raises:
+        AssertionError: If oversized entries are retained despite byte budget.
+    Side Effects:
+        None.
+    """
+    candles = _candles_from_closes((100.0, 101.0, 102.0))
+    compute = _FixedSeriesIndicatorCompute(
+        outputs={
+            "momentum.roc": np.asarray((1.0, 1.0, 1.0), dtype=np.float32),
+        }
+    )
+    scorer = CloseFillBacktestStagedScorerV1(
+        indicator_compute=compute,
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={"init_cash_quote": 1000.0, "fee_pct": 0.0, "slippage_pct": 0.0},
+        market_id=1,
+        target_slice=slice(0, 3),
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+        signals_cache_max_entries=8,
+        signals_cache_max_bytes=2,
+    )
+    selection = _selection(indicator_id="momentum.roc")
+
+    scorer.score_variant(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="b" * 64,
+    )
+    scorer.score_variant(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="c" * 64,
+    )
+
+    assert compute.compute_calls == 2
+    assert len(scorer._signals_cache) == 0
+
+
+def test_close_fill_scorer_v1_matches_legacy_total_return_pct() -> None:
+    """
+    Verify scorer compact path keeps `Total Return [%]` equal to legacy signal execution.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Legacy path builds string signals through `evaluate_and_aggregate_signals_v1`.
+    Raises:
+        AssertionError: If scorer metric diverges from legacy execution outcome.
+    Side Effects:
+        None.
+    """
+    candles = _candles_from_closes((100.0, 105.0, 98.0, 106.0))
+    indicator_series = np.asarray((1.0, 1.0, -1.0, -1.0), dtype=np.float32)
+    compute = _FixedSeriesIndicatorCompute(outputs={"momentum.roc": indicator_series})
+    scorer = CloseFillBacktestStagedScorerV1(
+        indicator_compute=compute,
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={"init_cash_quote": 1000.0, "fee_pct": 0.0, "slippage_pct": 0.0},
+        market_id=1,
+        target_slice=slice(0, 4),
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+    )
+    selection = _selection(indicator_id="momentum.roc")
+
+    scorer_metric = scorer.score_variant(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="b" * 64,
+    )["Total Return [%]"]
+
+    legacy_input = IndicatorSignalEvaluationInputV1(
+        indicator_id="momentum.roc",
+        primary_output=indicator_series,
+    )
+    legacy_signals = evaluate_and_aggregate_signals_v1(
+        candles=candles,
+        indicator_inputs=(legacy_input,),
+    ).final_signal
+    legacy_outcome = BacktestExecutionEngineV1().run(
+        candles=candles,
+        target_slice=slice(0, 4),
+        final_signal=legacy_signals,
+        execution_params=ExecutionParamsV1(
+            direction_mode="long-short",
+            sizing_mode="all_in",
+            init_cash_quote=1000.0,
+            fixed_quote=100.0,
+            safe_profit_percent=30.0,
+            fee_pct=0.0,
+            slippage_pct=0.0,
+        ),
+        risk_params=RiskParamsV1(
+            sl_enabled=False,
+            sl_pct=None,
+            tp_enabled=False,
+            tp_pct=None,
+        ),
+    )
+
+    assert scorer_metric == pytest.approx(legacy_outcome.total_return_pct)
 
 
 def _selection(*, indicator_id: str) -> IndicatorVariantSelection:

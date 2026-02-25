@@ -5,7 +5,12 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.services import BacktestExecutionEngineV1
+from trading.contexts.backtest.application.services import (
+    SIGNAL_CODE_LONG_V1,
+    SIGNAL_CODE_NEUTRAL_V1,
+    SIGNAL_CODE_SHORT_V1,
+    BacktestExecutionEngineV1,
+)
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
 from trading.contexts.indicators.application.dto import CandleArrays
 from trading.shared_kernel.primitives import (
@@ -322,6 +327,55 @@ def test_execution_engine_v1_is_deterministic_across_repeated_runs(
     assert first.total_return_pct == second.total_return_pct
 
 
+def test_execution_engine_v1_compact_and_legacy_signals_have_equivalent_outcome(
+    engine: BacktestExecutionEngineV1,
+) -> None:
+    """
+    Verify compact int8 and legacy string signals yield identical execution metrics.
+
+    Args:
+        engine: Execution engine fixture.
+    Returns:
+        None.
+    Assumptions:
+        Execution loop normalizes legacy inputs once and then uses compact codes internally.
+    Raises:
+        AssertionError: If compact and legacy paths diverge on deterministic payloads.
+    Side Effects:
+        None.
+    """
+    candles = _candles_from_closes((100.0, 102.0, 98.0, 104.0, 101.0))
+    legacy_signals = _signal_array(("LONG", "LONG", "SHORT", "SHORT", "NEUTRAL"))
+    compact_signals = _signal_code_array((1, 1, -1, -1, 0))
+    execution_params = _execution_params(
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        fee_pct=0.05,
+        slippage_pct=0.01,
+    )
+    risk_params = RiskParamsV1(sl_enabled=True, sl_pct=2.0, tp_enabled=True, tp_pct=5.0)
+
+    legacy_outcome = engine.run(
+        candles=candles,
+        target_slice=slice(0, 5),
+        final_signal=legacy_signals,
+        execution_params=execution_params,
+        risk_params=risk_params,
+    )
+    compact_outcome = engine.run(
+        candles=candles,
+        target_slice=slice(0, 5),
+        final_signal=compact_signals,
+        execution_params=execution_params,
+        risk_params=risk_params,
+    )
+
+    assert compact_signals.dtype == np.int8
+    assert legacy_outcome.trades == compact_outcome.trades
+    assert legacy_outcome.equity_end_quote == compact_outcome.equity_end_quote
+    assert legacy_outcome.total_return_pct == compact_outcome.total_return_pct
+
+
 def _execution_params(
     *,
     direction_mode: str,
@@ -379,6 +433,30 @@ def _signal_array(values: tuple[str, ...]) -> np.ndarray:
         None.
     """
     return np.asarray(values, dtype="U7")
+
+
+def _signal_code_array(values: tuple[int, ...]) -> np.ndarray:
+    """
+    Convert tuple of compact signal codes into deterministic int8 numpy vector.
+
+    Args:
+        values: Compact signal codes (`-1`, `0`, `1`).
+    Returns:
+        np.ndarray: Compact int8 signal array.
+    Assumptions:
+        Codes are canonical and follow backtest compact-signal contract.
+    Raises:
+        ValueError: If one value is outside canonical compact code set.
+    Side Effects:
+        None.
+    """
+    signal_codes = np.asarray(values, dtype=np.int8)
+    if not np.isin(
+        signal_codes,
+        (SIGNAL_CODE_SHORT_V1, SIGNAL_CODE_NEUTRAL_V1, SIGNAL_CODE_LONG_V1),
+    ).all():
+        raise ValueError("values must contain only compact signal codes -1, 0, 1")
+    return signal_codes
 
 
 def _candles_from_closes(closes: tuple[float, ...]) -> CandleArrays:

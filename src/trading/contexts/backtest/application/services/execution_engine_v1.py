@@ -10,8 +10,15 @@ from trading.contexts.backtest.domain.entities import (
     PositionV1,
     TradeV1,
 )
-from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1, SignalV1
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
 from trading.contexts.indicators.application.dto import CandleArrays
+
+from .signals_from_indicators_v1 import (
+    SIGNAL_CODE_LONG_V1,
+    SIGNAL_CODE_NEUTRAL_V1,
+    SIGNAL_CODE_SHORT_V1,
+    encode_signal_array_v1,
+)
 
 _SIGNAL_EXIT_REASON = "signal_exit"
 _FORCED_CLOSE_REASON = "forced_close"
@@ -61,10 +68,18 @@ class BacktestExecutionEngineV1:
         """
         Execute deterministic close-fill simulation on target slice and return outcome.
 
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/execution_engine_v1.py
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+          - tests/unit/contexts/backtest/application/services/test_execution_engine_v1.py
+
         Args:
             candles: Warmup-inclusive candles used for close-price execution.
             target_slice: Half-open slice of bars included in trading/reporting window.
-            final_signal: Aggregated signal vector (`LONG|SHORT|NEUTRAL`) for all bars.
+            final_signal: Aggregated signal vector for all bars (`LONG|SHORT|NEUTRAL` or int8).
             execution_params: Runtime execution and sizing settings.
             risk_params: Close-based SL/TP settings for current stage.
         Returns:
@@ -80,6 +95,7 @@ class BacktestExecutionEngineV1:
             raise ValueError("final_signal must be a 1D array")
         if final_signal.shape[0] != candles.close.shape[0]:
             raise ValueError("final_signal length must match candles.close length")
+        signal_codes = _normalize_final_signal_codes(final_signal=final_signal)
 
         start_index = 0 if target_slice.start is None else target_slice.start
         stop_index = candles.close.shape[0] if target_slice.stop is None else target_slice.stop
@@ -94,11 +110,12 @@ class BacktestExecutionEngineV1:
         position: PositionV1 | None = None
         trades: list[TradeV1] = []
         next_trade_id = 1
-        prev_signal = SignalV1.NEUTRAL.value
+        prev_signal_code = SIGNAL_CODE_NEUTRAL_V1
 
+        # HOT PATH: per-bar execution loop consumes pre-normalized int8 signals.
         for bar_index in range(start_index, stop_index):
             close_price = float(candles.close[bar_index])
-            signal_value = _normalize_signal_value(raw_value=final_signal[bar_index])
+            signal_code = signal_codes[bar_index]
             is_last_target_bar = bar_index == (stop_index - 1)
 
             if position is not None:
@@ -122,7 +139,7 @@ class BacktestExecutionEngineV1:
             if position is not None:
                 should_exit_by_signal = _should_exit_by_signal(
                     position=position,
-                    signal_value=signal_value,
+                    signal_code=signal_code,
                 )
                 if should_exit_by_signal:
                     account, closed_trade = self._close_position(
@@ -136,10 +153,10 @@ class BacktestExecutionEngineV1:
                     trades.append(closed_trade)
                     position = None
 
-            signal_changed = signal_value != prev_signal
+            signal_changed = signal_code != prev_signal_code
             if position is None and signal_changed:
                 entry_decision = _entry_decision_from_signal(
-                    signal_value=signal_value,
+                    signal_code=signal_code,
                     execution_params=execution_params,
                     account=account,
                 )
@@ -167,7 +184,7 @@ class BacktestExecutionEngineV1:
                 trades.append(closed_trade)
                 position = None
 
-            prev_signal = signal_value
+            prev_signal_code = signal_code
 
         equity_end_quote = account.available_quote + account.safe_quote
         total_return_pct = (
@@ -321,29 +338,30 @@ class BacktestExecutionEngineV1:
         return updated_account, trade
 
 
-def _normalize_signal_value(*, raw_value: object) -> str:
+def _normalize_final_signal_codes(*, final_signal: np.ndarray) -> np.ndarray:
     """
-    Normalize one signal value to canonical `LONG|SHORT|NEUTRAL` literal.
+    Normalize final signal vector to contiguous compact int8 codes.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/execution_engine_v1.py
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - tests/unit/contexts/backtest/application/services/test_execution_engine_v1.py
 
     Args:
-        raw_value: Raw signal value from aggregated signal array.
+        final_signal: Raw final-signal array (legacy labels or compact int8 values).
     Returns:
-        str: Canonical signal literal.
+        np.ndarray: Compact `np.int8` signal vector with canonical codes.
     Assumptions:
-        Signal array may contain `SignalV1` enum or uppercase string literal.
+        Signal array may contain `SignalV1`/string literals or compact integer codes.
     Raises:
-        ValueError: If signal literal is unsupported.
+        ValueError: If one value is unsupported.
     Side Effects:
         None.
     """
-    normalized = str(raw_value).strip().upper()
-    if normalized not in {
-        SignalV1.LONG.value,
-        SignalV1.SHORT.value,
-        SignalV1.NEUTRAL.value,
-    }:
-        raise ValueError("final_signal values must be LONG, SHORT, or NEUTRAL")
-    return normalized
+    return encode_signal_array_v1(signals=final_signal)
 
 
 def _fill_price_from_close(*, close_price: float, slippage_rate: float, is_buy: bool) -> float:
@@ -372,15 +390,23 @@ def _fill_price_from_close(*, close_price: float, slippage_rate: float, is_buy: 
 
 def _entry_decision_from_signal(
     *,
-    signal_value: str,
+    signal_code: np.int8,
     execution_params: ExecutionParamsV1,
     account: AccountStateV1,
 ) -> _EntryDecision | None:
     """
     Resolve deterministic entry decision from current signal and direction/sizing settings.
 
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/execution_engine_v1.py
+      - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
+      - tests/unit/contexts/backtest/application/services/test_execution_engine_v1.py
+
     Args:
-        signal_value: Canonical current signal literal.
+        signal_code: Canonical current compact signal code.
         execution_params: Execution settings with mode literals and sizing params.
         account: Current strategy-account state.
     Returns:
@@ -393,10 +419,10 @@ def _entry_decision_from_signal(
         None.
     """
     direction: str | None = None
-    if signal_value == SignalV1.LONG.value:
+    if signal_code == SIGNAL_CODE_LONG_V1:
         if execution_params.direction_mode in {"long-only", "long-short"}:
             direction = "long"
-    elif signal_value == SignalV1.SHORT.value:
+    elif signal_code == SIGNAL_CODE_SHORT_V1:
         if execution_params.direction_mode in {"short-only", "long-short"}:
             direction = "short"
 
@@ -489,13 +515,21 @@ def _risk_exit_reason(
     return None
 
 
-def _should_exit_by_signal(*, position: PositionV1, signal_value: str) -> bool:
+def _should_exit_by_signal(*, position: PositionV1, signal_code: np.int8) -> bool:
     """
     Decide whether current open position must be closed by signal semantics.
 
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/execution_engine_v1.py
+      - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
+      - tests/unit/contexts/backtest/application/services/test_execution_engine_v1.py
+
     Args:
         position: Current open position.
-        signal_value: Canonical current signal literal.
+        signal_code: Canonical current compact signal code.
     Returns:
         bool: True when signal requires immediate close of current position.
     Assumptions:
@@ -506,8 +540,8 @@ def _should_exit_by_signal(*, position: PositionV1, signal_value: str) -> bool:
         None.
     """
     if position.direction == "long":
-        return signal_value in {SignalV1.NEUTRAL.value, SignalV1.SHORT.value}
-    return signal_value in {SignalV1.NEUTRAL.value, SignalV1.LONG.value}
+        return signal_code in {SIGNAL_CODE_NEUTRAL_V1, SIGNAL_CODE_SHORT_V1}
+    return signal_code in {SIGNAL_CODE_NEUTRAL_V1, SIGNAL_CODE_LONG_V1}
 
 
 __all__ = [

@@ -222,6 +222,22 @@ Staged-пайплайн не должен аллоцировать больше,
 - `src/trading/contexts/backtest/application/services/staged_runner_v1.py`
 - `src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py`
 
+### Фаза 2.1: Compact signals в текущем single-variant scorer (perf milestone)
+
+Уточнение к плану: до полного batch scorer вводим компактное кодирование сигналов уже в текущем v1 pipeline.
+
+- Каноническое кодирование сигналов: `NEUTRAL = 0`, `LONG = 1`, `SHORT = -1` (`np.int8`).
+- `signals_from_indicators_v1` вычисляет compact-сигналы для hot path без materialize `dtype='U7'`.
+- `CloseFillBacktestStagedScorerV1` кэширует только compact-сигналы и использует bounded LRU (лимиты по entries и bytes).
+- `BacktestExecutionEngineV1` принимает compact-сигналы напрямую; legacy `LONG|SHORT|NEUTRAL` остаются совместимыми через pre-normalization.
+- Тесты обязаны проверять эквивалентность `Total Return [%]` между legacy и compact path.
+
+Затронутые файлы:
+
+- `src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py`
+- `src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py`
+- `src/trading/contexts/backtest/application/services/execution_engine_v1.py`
+
 ### Фаза 3: Пакетный расчёт индикаторов + компактные сигналы
 
 - Вычислять тензоры индикаторов батчами, используя естественную форму грида.

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
 from types import MappingProxyType
@@ -31,7 +32,7 @@ from .execution_engine_v1 import BacktestExecutionEngineV1
 from .grid_builder_v1 import STAGE_A_LITERAL, STAGE_B_LITERAL
 from .signals_from_indicators_v1 import (
     build_indicator_signal_inputs_from_tensors_v1,
-    evaluate_and_aggregate_signals_v1,
+    evaluate_and_aggregate_signals_encoded_v1,
     indicator_primary_output_series_from_tensor_v1,
     signal_rule_spec_v1,
 )
@@ -43,6 +44,9 @@ _DEFAULT_FEE_PCT_BY_MARKET_ID = {
     3: 0.075,
     4: 0.1,
 }
+
+_DEFAULT_SIGNALS_CACHE_MAX_ENTRIES = 2048
+_DEFAULT_SIGNALS_CACHE_MAX_BYTES = 32 * 1024 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +64,29 @@ class _SignalCacheValue:
     """
 
     final_signal: np.ndarray
+
+    def __post_init__(self) -> None:
+        """
+        Normalize cached signal payload to compact contiguous `np.int8` representation.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Cache stores only aggregated final-signal vectors.
+        Raises:
+            ValueError: If provided signal array is not one-dimensional.
+        Side Effects:
+            Replaces stored array with contiguous compact copy.
+        """
+        if self.final_signal.ndim != 1:
+            raise ValueError("_SignalCacheValue.final_signal must be a 1D array")
+        object.__setattr__(
+            self,
+            "final_signal",
+            np.ascontiguousarray(self.final_signal, dtype=np.int8),
+        )
 
 
 class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
@@ -90,6 +117,8 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         slippage_pct_default: float,
         fee_pct_default_by_market_id: Mapping[int, float] | None = None,
         max_variants_guard: int = 600_000,
+        signals_cache_max_entries: int = _DEFAULT_SIGNALS_CACHE_MAX_ENTRIES,
+        signals_cache_max_bytes: int = _DEFAULT_SIGNALS_CACHE_MAX_BYTES,
         execution_engine: BacktestExecutionEngineV1 | None = None,
     ) -> None:
         """
@@ -108,6 +137,10 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             slippage_pct_default: Runtime default slippage percent.
             fee_pct_default_by_market_id: Runtime fee defaults per market id.
             max_variants_guard: Guard forwarded to indicator compute requests.
+            signals_cache_max_entries: Maximum cached signal vectors retained in memory
+                (default: `2048`).
+            signals_cache_max_bytes: Maximum total bytes retained by cached signal vectors
+                (default: `32 * 1024 * 1024`).
             execution_engine: Optional custom close-fill engine implementation.
         Returns:
             None.
@@ -132,6 +165,10 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             raise ValueError("slippage_pct_default must be >= 0")
         if max_variants_guard <= 0:
             raise ValueError("max_variants_guard must be > 0")
+        if signals_cache_max_entries <= 0:
+            raise ValueError("signals_cache_max_entries must be > 0")
+        if signals_cache_max_bytes <= 0:
+            raise ValueError("signals_cache_max_bytes must be > 0")
         if target_slice.start is None or target_slice.stop is None:
             raise ValueError("target_slice must define explicit start and stop")
         if target_slice.start < 0:
@@ -155,9 +192,12 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             values=fee_pct_default_by_market_id
         )
         self._max_variants_guard = max_variants_guard
+        self._signals_cache_max_entries = signals_cache_max_entries
+        self._signals_cache_max_bytes = signals_cache_max_bytes
         self._execution_engine = execution_engine or BacktestExecutionEngineV1()
 
-        self._signals_cache: dict[str, _SignalCacheValue] = {}
+        self._signals_cache: OrderedDict[str, _SignalCacheValue] = OrderedDict()
+        self._signals_cache_total_bytes = 0
         self._signals_cache_lock = Lock()
 
     def score_variant(
@@ -250,8 +290,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
                 indicator_selections=indicator_selections,
                 signal_params=normalized_signal_params,
             )
-            with self._signals_cache_lock:
-                self._signals_cache[cache_key] = _SignalCacheValue(final_signal=final_signal)
+            self._insert_cached_signal(cache_key=cache_key, final_signal=final_signal)
         else:
             final_signal = cached_signal.final_signal
 
@@ -292,7 +331,56 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             Reads shared in-memory cache under lock.
         """
         with self._signals_cache_lock:
-            return self._signals_cache.get(cache_key)
+            cached = self._signals_cache.get(cache_key)
+            if cached is None:
+                return None
+            self._signals_cache.move_to_end(cache_key)
+            return cached
+
+    def _insert_cached_signal(self, *, cache_key: str, final_signal: np.ndarray) -> None:
+        """
+        Insert compact signal vector into bounded in-memory cache with LRU eviction.
+
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+          - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+          - tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
+
+        Args:
+            cache_key: Deterministic cache key.
+            final_signal: Compact aggregated signal vector (`np.int8`).
+        Returns:
+            None.
+        Assumptions:
+            Cache stores compact vectors only; value size is derived from `nbytes`.
+        Raises:
+            None.
+        Side Effects:
+            Mutates shared cache map and may evict older entries.
+        """
+        cache_value = _SignalCacheValue(
+            final_signal=np.ascontiguousarray(final_signal, dtype=np.int8),
+        )
+        cache_value_bytes = int(cache_value.final_signal.nbytes)
+        with self._signals_cache_lock:
+            existing = self._signals_cache.pop(cache_key, None)
+            if existing is not None:
+                self._signals_cache_total_bytes -= int(existing.final_signal.nbytes)
+
+            # HOT PATH: bounded cache insert keeps memory stable for large variant spaces.
+            self._signals_cache[cache_key] = cache_value
+            self._signals_cache_total_bytes += cache_value_bytes
+            self._signals_cache.move_to_end(cache_key)
+
+            while (
+                len(self._signals_cache) > self._signals_cache_max_entries
+                or self._signals_cache_total_bytes > self._signals_cache_max_bytes
+            ):
+                _, evicted_value = self._signals_cache.popitem(last=False)
+                self._signals_cache_total_bytes -= int(evicted_value.final_signal.nbytes)
 
     def _build_final_signal(
         self,
@@ -309,7 +397,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             indicator_selections: Explicit indicator selections.
             signal_params: Normalized signal-parameter mapping.
         Returns:
-            object: Numpy array with normalized `LONG|SHORT|NEUTRAL` values.
+            object: Compact `np.int8` final signal array.
         Assumptions:
             Indicator selections are unique by indicator id.
         Raises:
@@ -361,11 +449,11 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             signal_params=signal_params,
             dependency_outputs=dependency_outputs,
         )
-        aggregated = evaluate_and_aggregate_signals_v1(
+        final_signal = evaluate_and_aggregate_signals_encoded_v1(
             candles=candles,
             indicator_inputs=signal_inputs,
         )
-        return aggregated.final_signal
+        return final_signal
 
     def _compute_tensor_for_selection(
         self,
@@ -527,6 +615,14 @@ def _signal_cache_key(
     """
     Build deterministic cache key for computed aggregated signal vector.
 
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
+
     Args:
         indicator_variant_key: Deterministic indicators-only key.
         signal_params: Normalized signal-parameter mapping.
@@ -541,9 +637,44 @@ def _signal_cache_key(
     """
     payload = {
         "indicator_variant_key": indicator_variant_key.strip().lower(),
-        "signal_params": signal_params,
+        "signal_params": _signal_params_json_payload(signal_params=signal_params),
     }
     return json.dumps(payload, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+
+
+def _signal_params_json_payload(
+    *,
+    signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]],
+) -> dict[str, dict[str, BacktestVariantScalar]]:
+    """
+    Convert normalized nested signal params mapping into JSON-serializable structure.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
+
+    Args:
+        signal_params: Normalized signal-params mapping.
+    Returns:
+        dict[str, dict[str, BacktestVariantScalar]]: Deterministic plain-dict payload.
+    Assumptions:
+        Nested parameter mappings are key-addressable by strings.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    payload: dict[str, dict[str, BacktestVariantScalar]] = {}
+    for indicator_id in sorted(signal_params.keys()):
+        params = signal_params[indicator_id]
+        payload[indicator_id] = {
+            param_name: params[param_name] for param_name in sorted(params.keys())
+        }
+    return payload
 
 
 def _resolve_number(

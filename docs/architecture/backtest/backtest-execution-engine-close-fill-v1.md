@@ -42,6 +42,9 @@
   - допускается `exit -> entry` на одном `close[t]`.
 - Entry gating v1 (фикс):
   - новый вход разрешён только по **новому сигналу** (edge), старый “persisted” сигнал не должен открывать сделки повторно.
+- Формат входного сигнала:
+  - engine принимает legacy `LONG|SHORT|NEUTRAL` и compact `np.int8` (`0/1/-1`);
+  - в hot loop используется compact-представление без per-bar `str(...)` нормализации.
 - Sizing v1 (4 режима):
   - `all_in`
   - `fixed_quote` (в v1: capped by available: `min(available, fixed_quote)`)
@@ -228,6 +231,15 @@ backtest:
 
 Причина:
 - backtest не должен зависеть от “market_type” как модели другого контекста; market_id уже является стабильным идентификатором.
+
+### 10) Compact signal contract в execution hot path
+
+Для perf-пайплайна фиксируем:
+
+- канонические коды: `NEUTRAL=0`, `LONG=1`, `SHORT=-1`;
+- нормализация legacy сигналов делается один раз до цикла исполнения;
+- внутри per-bar цикла используется только `np.int8` код, чтобы убрать строковые преобразования из hot path;
+- `Total Return [%]` и trade ordering должны оставаться эквивалентными legacy path.
 
 ## Контракты и инварианты
 

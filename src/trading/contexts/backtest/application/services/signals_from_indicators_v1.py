@@ -26,6 +26,10 @@ _RULE_CANDLE_BODY_DIRECTION = "candle_body_direction"
 _RULE_PIVOT_EVENTS = "pivot_events"
 _RULE_THRESHOLD_CENTERED = "threshold_centered"
 
+SIGNAL_CODE_NEUTRAL_V1 = np.int8(0)
+SIGNAL_CODE_LONG_V1 = np.int8(1)
+SIGNAL_CODE_SHORT_V1 = np.int8(-1)
+
 
 def _normalize_string_tuple(values: tuple[str, ...]) -> tuple[str, ...]:
     """
@@ -556,6 +560,167 @@ def build_indicator_signal_inputs_from_tensors_v1(
     return tuple(items)
 
 
+def encode_signal_array_v1(*, signals: np.ndarray) -> np.ndarray:
+    """
+    Encode legacy signal labels into compact `np.int8` representation.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/execution_engine_v1.py
+      - tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py
+
+    Args:
+        signals: One-dimensional signal array containing legacy labels or compact codes.
+    Returns:
+        np.ndarray: Contiguous `np.int8` array with values `{-1, 0, 1}`.
+    Assumptions:
+        Input can contain `SignalV1`, string literals, or integer codes.
+    Raises:
+        ValueError: If array shape is invalid or one value is not recognized.
+    Side Effects:
+        None.
+    """
+    raw = np.asarray(signals)
+    if raw.ndim != 1:
+        raise ValueError("signals must be a 1D array")
+    if np.issubdtype(raw.dtype, np.integer):
+        encoded = np.ascontiguousarray(raw, dtype=np.int8)
+        _ensure_supported_signal_codes_v1(signal_codes=encoded, field_name="signals")
+        return encoded
+
+    encoded = np.full(raw.shape[0], SIGNAL_CODE_NEUTRAL_V1, dtype=np.int8)
+    for index, value in enumerate(raw.tolist()):
+        encoded[index] = _signal_value_to_code_v1(value=value, field_name="signals")
+    return encoded
+
+
+def decode_signal_codes_v1(*, signal_codes: np.ndarray) -> np.ndarray:
+    """
+    Decode compact `np.int8` signal codes into canonical `LONG|SHORT|NEUTRAL` labels.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
+      - tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py
+
+    Args:
+        signal_codes: One-dimensional compact signal-code array.
+    Returns:
+        np.ndarray: Unicode label array with canonical `LONG|SHORT|NEUTRAL` values.
+    Assumptions:
+        Valid compact values are `NEUTRAL=0`, `LONG=1`, `SHORT=-1`.
+    Raises:
+        ValueError: If shape is invalid or contains unsupported codes.
+    Side Effects:
+        None.
+    """
+    encoded = encode_signal_array_v1(signals=signal_codes)
+    decoded = _neutral_signal_array(length=int(encoded.shape[0]))
+    decoded[encoded == SIGNAL_CODE_LONG_V1] = SignalV1.LONG.value
+    decoded[encoded == SIGNAL_CODE_SHORT_V1] = SignalV1.SHORT.value
+    return decoded
+
+
+def evaluate_indicator_signal_encoded_v1(
+    *,
+    candles: CandleArrays,
+    indicator_input: IndicatorSignalEvaluationInputV1,
+) -> np.ndarray:
+    """
+    Evaluate one indicator signal series into compact `np.int8` codes.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py
+
+    Args:
+        candles: Candle arrays aligned to target backtest timeline.
+        indicator_input: Rule-evaluation input payload for one indicator.
+    Returns:
+        np.ndarray: Compact `np.int8` signal codes for one indicator.
+    Assumptions:
+        `indicator_input.primary_output` length equals candle timeline length.
+    Raises:
+        ValueError: If array lengths mismatch or rule parameters/dependencies are missing.
+    Side Effects:
+        None.
+    """
+    bar_count = int(candles.close.shape[0])
+    if indicator_input.primary_output.shape[0] != bar_count:
+        raise ValueError(
+            f"{indicator_input.indicator_id}: primary_output length must equal candles length"
+        )
+
+    spec = signal_rule_spec_v1(indicator_id=indicator_input.indicator_id)
+    _ensure_required_signal_params(
+        indicator_id=indicator_input.indicator_id,
+        spec=spec,
+        signal_params=indicator_input.signal_params,
+    )
+    _ensure_required_dependencies(
+        indicator_id=indicator_input.indicator_id,
+        spec=spec,
+        dependency_outputs=indicator_input.dependency_outputs,
+        expected_length=bar_count,
+    )
+
+    if spec.rule_family == _RULE_COMPARE_PRICE_TO_OUTPUT:
+        signal_codes = _rule_compare_price_to_output(
+            candles=candles,
+            primary_output=indicator_input.primary_output,
+            indicator_inputs=indicator_input.indicator_inputs,
+            invert=spec.invert_price_comparison,
+        )
+    elif spec.rule_family == _RULE_THRESHOLD_BAND:
+        signal_codes = _rule_threshold_band(
+            primary_output=indicator_input.primary_output,
+            signal_params=indicator_input.signal_params,
+        )
+    elif spec.rule_family == _RULE_SIGN:
+        signal_codes = _rule_sign(primary_output=indicator_input.primary_output)
+    elif spec.rule_family == _RULE_DELTA_SIGN:
+        signal_codes = _rule_delta_sign(
+            primary_output=indicator_input.primary_output,
+            signal_params=indicator_input.signal_params,
+        )
+    elif spec.rule_family == _RULE_COMPARE_VOLUME_TO_OUTPUT:
+        signal_codes = _rule_compare_volume_to_output(
+            candles=candles,
+            primary_output=indicator_input.primary_output,
+        )
+    elif spec.rule_family == _RULE_CANDLE_BODY_DIRECTION:
+        signal_codes = _rule_candle_body_direction(
+            candles=candles,
+            primary_output=indicator_input.primary_output,
+            signal_params=indicator_input.signal_params,
+            min_param_name=spec.candle_body_min_param_name,
+        )
+    elif spec.rule_family == _RULE_PIVOT_EVENTS:
+        signal_codes = _rule_pivot_events(
+            dependency_outputs=indicator_input.dependency_outputs,
+            expected_length=bar_count,
+        )
+    elif spec.rule_family == _RULE_THRESHOLD_CENTERED:
+        signal_codes = _rule_threshold_centered(
+            primary_output=indicator_input.primary_output,
+            signal_params=indicator_input.signal_params,
+            center=spec.threshold_center,
+        )
+    else:
+        raise ValueError(f"Unsupported rule family: {spec.rule_family}")
+    return signal_codes
+
+
 def evaluate_indicator_signal_v1(
     *,
     candles: CandleArrays,
@@ -584,71 +749,58 @@ def evaluate_indicator_signal_v1(
     Side Effects:
         None.
     """
-    bar_count = int(candles.close.shape[0])
-    if indicator_input.primary_output.shape[0] != bar_count:
-        raise ValueError(
-            f"{indicator_input.indicator_id}: primary_output length must equal candles length"
-        )
-
-    spec = signal_rule_spec_v1(indicator_id=indicator_input.indicator_id)
-    _ensure_required_signal_params(
-        indicator_id=indicator_input.indicator_id,
-        spec=spec,
-        signal_params=indicator_input.signal_params,
+    signal_codes = evaluate_indicator_signal_encoded_v1(
+        candles=candles,
+        indicator_input=indicator_input,
     )
-    _ensure_required_dependencies(
-        indicator_id=indicator_input.indicator_id,
-        spec=spec,
-        dependency_outputs=indicator_input.dependency_outputs,
-        expected_length=bar_count,
-    )
-
-    if spec.rule_family == _RULE_COMPARE_PRICE_TO_OUTPUT:
-        signal_values = _rule_compare_price_to_output(
-            candles=candles,
-            primary_output=indicator_input.primary_output,
-            indicator_inputs=indicator_input.indicator_inputs,
-            invert=spec.invert_price_comparison,
-        )
-    elif spec.rule_family == _RULE_THRESHOLD_BAND:
-        signal_values = _rule_threshold_band(
-            primary_output=indicator_input.primary_output,
-            signal_params=indicator_input.signal_params,
-        )
-    elif spec.rule_family == _RULE_SIGN:
-        signal_values = _rule_sign(primary_output=indicator_input.primary_output)
-    elif spec.rule_family == _RULE_DELTA_SIGN:
-        signal_values = _rule_delta_sign(
-            primary_output=indicator_input.primary_output,
-            signal_params=indicator_input.signal_params,
-        )
-    elif spec.rule_family == _RULE_COMPARE_VOLUME_TO_OUTPUT:
-        signal_values = _rule_compare_volume_to_output(
-            candles=candles,
-            primary_output=indicator_input.primary_output,
-        )
-    elif spec.rule_family == _RULE_CANDLE_BODY_DIRECTION:
-        signal_values = _rule_candle_body_direction(
-            candles=candles,
-            primary_output=indicator_input.primary_output,
-            signal_params=indicator_input.signal_params,
-            min_param_name=spec.candle_body_min_param_name,
-        )
-    elif spec.rule_family == _RULE_PIVOT_EVENTS:
-        signal_values = _rule_pivot_events(
-            dependency_outputs=indicator_input.dependency_outputs,
-            expected_length=bar_count,
-        )
-    elif spec.rule_family == _RULE_THRESHOLD_CENTERED:
-        signal_values = _rule_threshold_centered(
-            primary_output=indicator_input.primary_output,
-            signal_params=indicator_input.signal_params,
-            center=spec.threshold_center,
-        )
-    else:
-        raise ValueError(f"Unsupported rule family: {spec.rule_family}")
-
+    signal_values = decode_signal_codes_v1(signal_codes=signal_codes)
     return IndicatorSignalsV1(indicator_id=indicator_input.indicator_id, signals=signal_values)
+
+
+def evaluate_and_aggregate_signals_encoded_v1(
+    *,
+    candles: CandleArrays,
+    indicator_inputs: Sequence[IndicatorSignalEvaluationInputV1],
+) -> np.ndarray:
+    """
+    Evaluate indicator rules and return aggregated compact `np.int8` final signal series.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py
+
+    Args:
+        candles: Candle arrays aligned to target backtest timeline.
+        indicator_inputs: Inputs for indicator-level rule evaluation.
+    Returns:
+        np.ndarray: Compact aggregated final signal array (`np.int8`).
+    Assumptions:
+        Aggregation order is deterministic by normalized `indicator_id`.
+    Raises:
+        ValueError: If one indicator payload is invalid or has mismatched timeline length.
+    Side Effects:
+        None.
+    """
+    per_indicator_codes: list[tuple[str, np.ndarray]] = []
+    for indicator_input in sorted(indicator_inputs, key=lambda item: item.indicator_id):
+        # HOT PATH: keep per-indicator signals in compact int8 form without unicode arrays.
+        per_indicator_codes.append(
+            (
+                indicator_input.indicator_id,
+                evaluate_indicator_signal_encoded_v1(
+                    candles=candles,
+                    indicator_input=indicator_input,
+                ),
+            )
+        )
+    return aggregate_indicator_signal_codes_v1(
+        candles=candles,
+        indicator_signal_codes=per_indicator_codes,
+    )
 
 
 def evaluate_and_aggregate_signals_v1(
@@ -688,6 +840,57 @@ def evaluate_and_aggregate_signals_v1(
             )
         )
     return aggregate_indicator_signals_v1(candles=candles, indicator_signals=evaluated)
+
+
+def aggregate_indicator_signal_codes_v1(
+    *,
+    candles: CandleArrays,
+    indicator_signal_codes: Sequence[tuple[str, np.ndarray]],
+) -> np.ndarray:
+    """
+    Aggregate compact per-indicator signal codes with v1 AND policy.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py
+
+    Args:
+        candles: Candle arrays defining timeline length for output vectors.
+        indicator_signal_codes: Per-indicator compact signal codes.
+    Returns:
+        np.ndarray: Aggregated compact final signal codes (`np.int8`).
+    Assumptions:
+        Empty indicator set resolves to all-neutral final signal with conflict neutralization.
+    Raises:
+        ValueError: If one signal series length mismatches the candle timeline.
+    Side Effects:
+        None.
+    """
+    bar_count = int(candles.close.shape[0])
+    ordered_signal_codes = tuple(sorted(indicator_signal_codes, key=lambda item: item[0]))
+    final_long = np.ones(bar_count, dtype=np.bool_)
+    final_short = np.ones(bar_count, dtype=np.bool_)
+
+    for indicator_id, signal_codes in ordered_signal_codes:
+        normalized_codes = encode_signal_array_v1(signals=signal_codes)
+        if normalized_codes.shape[0] != bar_count:
+            raise ValueError(
+                f"{indicator_id}: signal length must equal candles length"
+            )
+        final_long &= normalized_codes == SIGNAL_CODE_LONG_V1
+        final_short &= normalized_codes == SIGNAL_CODE_SHORT_V1
+
+    conflict_mask = final_long & final_short
+    resolved_final_long = final_long & ~conflict_mask
+    resolved_final_short = final_short & ~conflict_mask
+    final_signal = _neutral_signal_code_array(length=bar_count)
+    final_signal[resolved_final_long] = SIGNAL_CODE_LONG_V1
+    final_signal[resolved_final_short] = SIGNAL_CODE_SHORT_V1
+    return final_signal
 
 
 def aggregate_indicator_signals_v1(
@@ -774,7 +977,7 @@ def _rule_compare_price_to_output(
         indicator_inputs: Optional indicator inputs (e.g., `source`).
         invert: Invert comparison polarity for mean-reversion variants.
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar.
     Assumptions:
         NaN at source/output produces `NEUTRAL` on the same bar.
     Raises:
@@ -814,7 +1017,7 @@ def _rule_threshold_band(
         primary_output: Indicator primary output.
         signal_params: Rule params with `long_threshold` and `short_threshold`.
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar.
     Assumptions:
         When `long_threshold <= short_threshold`, lower values are LONG and higher values
             are SHORT (mean-reversion orientation). Otherwise orientation is inverted
@@ -852,7 +1055,7 @@ def _rule_sign(*, primary_output: np.ndarray) -> np.ndarray:
     Args:
         primary_output: Indicator primary output.
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar.
     Assumptions:
         NaN values are converted to `NEUTRAL`.
     Raises:
@@ -886,7 +1089,7 @@ def _rule_delta_sign(
         primary_output: Indicator primary output.
         signal_params: Rule params with `long_delta_periods` and `short_delta_periods`.
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar.
     Assumptions:
         Input periods can be negative in UI/config; evaluator uses `abs(value)` lookback.
     Raises:
@@ -939,7 +1142,7 @@ def _rule_compare_volume_to_output(
         candles: Candle arrays with volume series.
         primary_output: Indicator primary output.
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar.
     Assumptions:
         NaN volume or output values are converted to `NEUTRAL`.
     Raises:
@@ -977,7 +1180,7 @@ def _rule_candle_body_direction(
         signal_params: Rule params with minimal body magnitude threshold.
         min_param_name: Name of threshold param (`min_body_pct` or `min_body_atr`).
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar.
     Assumptions:
         Candle direction is derived from same-bar `close` vs `open`.
     Raises:
@@ -1018,7 +1221,7 @@ def _rule_pivot_events(
         dependency_outputs: Dependency output map by wrapper indicator id.
         expected_length: Expected bars count for dependency vectors.
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar.
     Assumptions:
         Finite value in `pivot_low` means LONG event, finite value in `pivot_high` means SHORT.
     Raises:
@@ -1063,7 +1266,7 @@ def _rule_threshold_centered(
         signal_params: Rule params with `abs_threshold`.
         center: Center value around which the threshold band is built.
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar.
     Assumptions:
         NaN values are mapped to `NEUTRAL`.
     Raises:
@@ -1140,9 +1343,10 @@ def _resolve_price_series_from_inputs(
 
 def _compose_signal_from_masks(*, long_mask: np.ndarray, short_mask: np.ndarray) -> np.ndarray:
     """
-    Compose signal label series from long/short boolean masks with conflict-neutralization.
+    Compose compact signal-code series from long/short masks with conflict-neutralization.
 
     Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
       - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
@@ -1154,7 +1358,7 @@ def _compose_signal_from_masks(*, long_mask: np.ndarray, short_mask: np.ndarray)
         long_mask: Boolean mask of candidate LONG bars.
         short_mask: Boolean mask of candidate SHORT bars.
     Returns:
-        np.ndarray: Signal labels by bar.
+        np.ndarray: Compact signal codes by bar (`NEUTRAL=0`, `LONG=1`, `SHORT=-1`).
     Assumptions:
         Both masks are one-dimensional and bar-aligned.
     Raises:
@@ -1167,10 +1371,11 @@ def _compose_signal_from_masks(*, long_mask: np.ndarray, short_mask: np.ndarray)
     conflict_mask = long_mask & short_mask
     resolved_long = long_mask & ~conflict_mask
     resolved_short = short_mask & ~conflict_mask
-    signal = _neutral_signal_array(length=int(long_mask.shape[0]))
-    signal[resolved_long] = SignalV1.LONG.value
-    signal[resolved_short] = SignalV1.SHORT.value
-    return signal
+    # HOT PATH: use int8 composition to avoid unicode allocations in scorer path.
+    signal_codes = _neutral_signal_code_array(length=int(long_mask.shape[0]))
+    signal_codes[resolved_long] = SIGNAL_CODE_LONG_V1
+    signal_codes[resolved_short] = SIGNAL_CODE_SHORT_V1
+    return signal_codes
 
 
 def _neutral_signal_array(*, length: int) -> np.ndarray:
@@ -1198,6 +1403,117 @@ def _neutral_signal_array(*, length: int) -> np.ndarray:
     if length < 0:
         raise ValueError("length must be >= 0")
     return np.full(length, SignalV1.NEUTRAL.value, dtype="U7")
+
+
+def _neutral_signal_code_array(*, length: int) -> np.ndarray:
+    """
+    Build deterministic compact neutral-filled signal-code array.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py
+
+    Args:
+        length: Number of bars.
+    Returns:
+        np.ndarray: Compact `np.int8` neutral signal array.
+    Assumptions:
+        Length is non-negative.
+    Raises:
+        ValueError: If length is negative.
+    Side Effects:
+        None.
+    """
+    if length < 0:
+        raise ValueError("length must be >= 0")
+    return np.full(length, SIGNAL_CODE_NEUTRAL_V1, dtype=np.int8)
+
+
+def _signal_value_to_code_v1(*, value: object, field_name: str) -> np.int8:
+    """
+    Normalize one raw signal value into canonical compact code.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/execution_engine_v1.py
+      - tests/unit/contexts/backtest/application/services/test_execution_engine_v1.py
+
+    Args:
+        value: Raw signal value.
+        field_name: Field label used in validation errors.
+    Returns:
+        np.int8: Canonical compact code.
+    Assumptions:
+        Supported values are integer codes or `SignalV1`/string literals.
+    Raises:
+        ValueError: If value cannot be mapped to one of canonical codes.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, (int, np.integer)) and not isinstance(value, bool):
+        code_value = int(value)
+        if code_value == int(SIGNAL_CODE_NEUTRAL_V1):
+            return SIGNAL_CODE_NEUTRAL_V1
+        if code_value == int(SIGNAL_CODE_LONG_V1):
+            return SIGNAL_CODE_LONG_V1
+        if code_value == int(SIGNAL_CODE_SHORT_V1):
+            return SIGNAL_CODE_SHORT_V1
+        raise ValueError(
+            f"{field_name} values must be LONG, SHORT, NEUTRAL or compact codes -1, 0, 1"
+        )
+
+    normalized = str(value).strip().upper()
+    if normalized == SignalV1.NEUTRAL.value:
+        return SIGNAL_CODE_NEUTRAL_V1
+    if normalized == SignalV1.LONG.value:
+        return SIGNAL_CODE_LONG_V1
+    if normalized == SignalV1.SHORT.value:
+        return SIGNAL_CODE_SHORT_V1
+    raise ValueError(
+        f"{field_name} values must be LONG, SHORT, NEUTRAL or compact codes -1, 0, 1"
+    )
+
+
+def _ensure_supported_signal_codes_v1(*, signal_codes: np.ndarray, field_name: str) -> None:
+    """
+    Validate that compact signal array contains only canonical code values.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/execution_engine_v1.py
+      - tests/unit/contexts/backtest/application/services/test_execution_engine_v1.py
+
+    Args:
+        signal_codes: Compact signal-code array.
+        field_name: Field label used in deterministic validation errors.
+    Returns:
+        None.
+    Assumptions:
+        Signal array is one-dimensional and already converted to `np.int8`.
+    Raises:
+        ValueError: If one element is outside canonical `{-1, 0, 1}` set.
+    Side Effects:
+        None.
+    """
+    invalid_mask = (
+        (signal_codes != SIGNAL_CODE_NEUTRAL_V1)
+        & (signal_codes != SIGNAL_CODE_LONG_V1)
+        & (signal_codes != SIGNAL_CODE_SHORT_V1)
+    )
+    if np.any(invalid_mask):
+        raise ValueError(
+            f"{field_name} values must be LONG, SHORT, NEUTRAL or compact codes -1, 0, 1"
+        )
 
 
 def _ensure_required_signal_params(

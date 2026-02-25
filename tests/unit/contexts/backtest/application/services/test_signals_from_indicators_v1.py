@@ -7,10 +7,16 @@ import numpy as np
 import yaml
 
 from trading.contexts.backtest.application.services import (
+    SIGNAL_CODE_LONG_V1,
+    SIGNAL_CODE_NEUTRAL_V1,
+    SIGNAL_CODE_SHORT_V1,
     IndicatorSignalEvaluationInputV1,
     aggregate_indicator_signals_v1,
     build_indicator_signal_inputs_from_tensors_v1,
+    decode_signal_codes_v1,
+    evaluate_and_aggregate_signals_encoded_v1,
     evaluate_and_aggregate_signals_v1,
+    evaluate_indicator_signal_encoded_v1,
     evaluate_indicator_signal_v1,
     expand_indicator_grids_with_signal_dependencies_v1,
     list_signal_rule_registry_v1,
@@ -642,3 +648,125 @@ def test_build_inputs_from_tensors_uses_primary_output_and_registry_listing_is_s
     assert inputs[0].primary_output.tolist() == [10.0, 20.0, 30.0]
     assert inputs[0].indicator_inputs["source"] == "close"
     assert registry_pairs == tuple(sorted(registry_pairs, key=lambda item: item[0]))
+
+
+def test_compact_signal_encoding_matches_legacy_for_multiple_rule_families() -> None:
+    """
+    Verify compact indicator signals decode back to legacy labels for key rule families.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Compact encoding uses canonical codes `NEUTRAL=0`, `LONG=1`, `SHORT=-1`.
+    Raises:
+        AssertionError: If encoded path diverges from legacy label semantics.
+    Side Effects:
+        None.
+    """
+    candles = _build_candles(
+        open_values=(10.0, 11.0, 12.0, 13.0, 14.0),
+        high_values=(11.0, 12.0, 13.0, 14.0, 15.0),
+        low_values=(9.0, 10.0, 11.0, 12.0, 13.0),
+        close_values=(10.5, 10.0, 13.5, 12.0, 14.5),
+        volume_values=(100.0, 95.0, 110.0, 90.0, 105.0),
+    )
+    indicator_inputs = (
+        IndicatorSignalEvaluationInputV1(
+            indicator_id="ma.ema",
+            primary_output=np.asarray((10.0, 10.0, 13.0, 13.0, np.nan), dtype=np.float32),
+            indicator_inputs={"source": "close"},
+        ),
+        IndicatorSignalEvaluationInputV1(
+            indicator_id="trend.aroon",
+            primary_output=np.asarray((15.0, 50.0, 85.0, 45.0, np.nan), dtype=np.float32),
+            signal_params={"long_threshold": 30.0, "short_threshold": 70.0},
+        ),
+        IndicatorSignalEvaluationInputV1(
+            indicator_id="trend.adx",
+            primary_output=np.asarray((1.0, 3.0, 2.0, 5.0, 4.0), dtype=np.float32),
+            signal_params={"long_delta_periods": -1, "short_delta_periods": -2},
+        ),
+        IndicatorSignalEvaluationInputV1(
+            indicator_id="volume.volume_sma",
+            primary_output=np.asarray((99.0, 95.0, 105.0, 100.0, 105.0), dtype=np.float32),
+        ),
+        IndicatorSignalEvaluationInputV1(
+            indicator_id="structure.pivots",
+            primary_output=np.asarray((np.nan, np.nan, np.nan, np.nan, np.nan), dtype=np.float32),
+            dependency_outputs={
+                "structure.pivot_low": np.asarray(
+                    (np.nan, 1.0, np.nan, np.nan, np.nan),
+                    dtype=np.float32,
+                ),
+                "structure.pivot_high": np.asarray(
+                    (np.nan, np.nan, 2.0, np.nan, np.nan),
+                    dtype=np.float32,
+                ),
+            },
+        ),
+    )
+
+    for indicator_input in indicator_inputs:
+        legacy = evaluate_indicator_signal_v1(
+            candles=candles,
+            indicator_input=indicator_input,
+        )
+        encoded = evaluate_indicator_signal_encoded_v1(
+            candles=candles,
+            indicator_input=indicator_input,
+        )
+        decoded = decode_signal_codes_v1(signal_codes=encoded)
+
+        assert encoded.dtype == np.int8
+        assert decoded.tolist() == legacy.signals.tolist()
+        assert set(encoded.tolist()).issubset(
+            {SIGNAL_CODE_SHORT_V1, SIGNAL_CODE_NEUTRAL_V1, SIGNAL_CODE_LONG_V1}
+        )
+
+
+def test_compact_aggregation_matches_legacy_final_signal_and_uses_int8() -> None:
+    """
+    Verify compact aggregated final signal matches legacy path and stays `np.int8`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Legacy aggregation output remains canonical source for external label payloads.
+    Raises:
+        AssertionError: If compact and legacy final signals diverge.
+    Side Effects:
+        None.
+    """
+    candles = _build_candles(
+        open_values=(10.0, 10.0, 10.0, 10.0),
+        high_values=(11.0, 11.0, 11.0, 11.0),
+        low_values=(9.0, 9.0, 9.0, 9.0),
+        close_values=(10.0, 11.0, 9.0, 10.0),
+        volume_values=(100.0, 90.0, 110.0, 100.0),
+    )
+    indicator_inputs = (
+        IndicatorSignalEvaluationInputV1(
+            indicator_id="trend.linreg_slope",
+            primary_output=np.asarray((1.0, 1.0, -1.0, 0.0), dtype=np.float32),
+        ),
+        IndicatorSignalEvaluationInputV1(
+            indicator_id="ma.ema",
+            primary_output=np.asarray((9.0, 11.0, 10.0, 10.0), dtype=np.float32),
+            indicator_inputs={"source": "close"},
+        ),
+    )
+
+    legacy = evaluate_and_aggregate_signals_v1(candles=candles, indicator_inputs=indicator_inputs)
+    compact = evaluate_and_aggregate_signals_encoded_v1(
+        candles=candles,
+        indicator_inputs=indicator_inputs,
+    )
+    decoded_compact = decode_signal_codes_v1(signal_codes=compact)
+
+    assert compact.dtype == np.int8
+    assert compact.dtype.kind != "U"
+    assert decoded_compact.tolist() == legacy.final_signal.tolist()
