@@ -5,7 +5,11 @@ from heapq import heappush, heapreplace
 from typing import Callable, Iterator, Mapping
 
 from trading.contexts.backtest.application.dto import RunBacktestTemplate
-from trading.contexts.backtest.application.ports import BacktestStagedVariantScorer
+from trading.contexts.backtest.application.ports import (
+    BacktestStagedVariantScorer,
+    BacktestStagedVariantScorerWithDetails,
+    BacktestVariantScoreDetailsV1,
+)
 from trading.contexts.backtest.application.services.grid_builder_v1 import (
     STAGE_A_LITERAL,
     STAGE_B_LITERAL,
@@ -243,6 +247,76 @@ class BacktestStagedCoreRunnerV1:
         Side Effects:
             None.
         """
+        rows, tasks, _ = self.run_stage_b_with_details(
+            template=template,
+            grid_context=grid_context,
+            shortlist=shortlist,
+            candles=candles,
+            scorer=scorer,
+            top_k_limit=top_k_limit,
+            details_scorer=None,
+            batch_size=batch_size,
+            cancel_checker=cancel_checker,
+            on_checkpoint=on_checkpoint,
+        )
+        return (rows, tasks)
+
+    def run_stage_b_with_details(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        grid_context: BacktestGridBuildContextV1,
+        shortlist: tuple[BacktestStageAScoredVariantV1, ...],
+        candles: CandleArrays,
+        scorer: BacktestStagedVariantScorer,
+        top_k_limit: int,
+        details_scorer: BacktestStagedVariantScorerWithDetails | None,
+        batch_size: int | None = None,
+        cancel_checker: CancelCheckerV1 | None = None,
+        on_checkpoint: StageBCheckpointCallbackV1 | None = None,
+    ) -> tuple[
+        tuple[BacktestStageBScoredVariantV1, ...],
+        Mapping[str, BacktestStageBTaskV1],
+        Mapping[str, BacktestVariantScoreDetailsV1],
+    ]:
+        """
+        Score Stage-B variants and optionally retain details for variants currently in top-k heap.
+
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+        Args:
+            template: Effective run template used for deterministic variant key build.
+            grid_context: Deterministic staged grid context.
+            shortlist: Deterministically sorted Stage-A shortlist rows.
+            candles: Dense warmup-inclusive candle arrays.
+            scorer: Stage scorer contract implementation.
+            top_k_limit: Maximum number of Stage-B rows retained in memory.
+            details_scorer:
+                Optional scorer extension used to retain detailed execution payloads in heap.
+            batch_size: Optional checkpoint boundary override.
+            cancel_checker: Optional cooperative cancellation callback by stage.
+            on_checkpoint:
+                Optional checkpoint callback with current ranked frontier snapshot.
+        Returns:
+            tuple[
+                tuple[BacktestStageBScoredVariantV1, ...],
+                Mapping[str, BacktestStageBTaskV1],
+                Mapping[str, BacktestVariantScoreDetailsV1],
+            ]:
+                Ranked rows, tasks mapping, and retained details for current top-k variants.
+        Assumptions:
+            Stage-B ranking key is `Total Return [%] DESC, variant_key ASC`.
+        Raises:
+            ValueError: If limits/batch-size are invalid or scorer payload is malformed.
+        Side Effects:
+            Retained details are bounded by heap capacity and dropped on heap evictions.
+        """
         if top_k_limit <= 0:
             raise ValueError("BacktestStagedCoreRunnerV1 top_k_limit must be > 0")
         effective_batch = self._resolve_batch_size(batch_size=batch_size)
@@ -251,7 +325,13 @@ class BacktestStagedCoreRunnerV1:
             cancel_checker(STAGE_B_LITERAL)
 
         top_heap: list[
-            tuple[float, tuple[int, ...], BacktestStageBScoredVariantV1, BacktestStageBTaskV1]
+            tuple[
+                float,
+                tuple[int, ...],
+                BacktestStageBScoredVariantV1,
+                BacktestStageBTaskV1,
+                BacktestVariantScoreDetailsV1 | None,
+            ]
         ] = []
         processed = 0
         # HOT PATH: Stage-B scoring loop for shortlist x risk expansion tasks.
@@ -262,7 +342,12 @@ class BacktestStagedCoreRunnerV1:
         ):
             if cancel_checker is not None:
                 cancel_checker(STAGE_B_LITERAL)
-            row = self._score_stage_b_task(task=task, candles=candles, scorer=scorer)
+            row, details = self._score_stage_b_task_with_optional_details(
+                task=task,
+                candles=candles,
+                scorer=scorer,
+                details_scorer=details_scorer,
+            )
             if len(top_heap) < top_k_limit:
                 heappush(
                     top_heap,
@@ -271,6 +356,7 @@ class BacktestStagedCoreRunnerV1:
                         _descending_text_key(value=row.variant_key),
                         row,
                         task,
+                        details,
                     ),
                 )
             elif _stage_b_outranks(candidate=row, baseline=top_heap[0][2]):
@@ -281,6 +367,7 @@ class BacktestStagedCoreRunnerV1:
                         _descending_text_key(value=row.variant_key),
                         row,
                         task,
+                        details,
                     ),
                 )
 
@@ -300,6 +387,7 @@ class BacktestStagedCoreRunnerV1:
         return (
             _stage_b_rows_from_heap(heap=top_heap),
             _stage_b_tasks_from_heap(heap=top_heap),
+            _stage_b_details_from_heap(heap=top_heap),
         )
 
     def _iter_stage_b_tasks(
@@ -427,6 +515,64 @@ class BacktestStagedCoreRunnerV1:
             indicator_variant_key=task.indicator_variant_key,
             variant_key=task.variant_key,
             total_return_pct=_extract_total_return_pct(metrics=metrics),
+        )
+
+    def _score_stage_b_task_with_optional_details(
+        self,
+        *,
+        task: BacktestStageBTaskV1,
+        candles: CandleArrays,
+        scorer: BacktestStagedVariantScorer,
+        details_scorer: BacktestStagedVariantScorerWithDetails | None,
+    ) -> tuple[BacktestStageBScoredVariantV1, BacktestVariantScoreDetailsV1 | None]:
+        """
+        Score Stage-B task and optionally return detailed execution payload for retained top-k rows.
+
+        Docs:
+          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+        Args:
+            task: Stage-B task payload.
+            candles: Dense warmup-inclusive candles.
+            scorer: Base Stage-B scorer contract implementation.
+            details_scorer: Optional details scorer extension.
+        Returns:
+            tuple[BacktestStageBScoredVariantV1, BacktestVariantScoreDetailsV1 | None]:
+                Ranked row and optional details payload.
+        Assumptions:
+            Detailed payload metrics are deterministic and equivalent to ranking metric.
+        Raises:
+            ValueError: If scorer payload lacks required ranking metric.
+        Side Effects:
+            None.
+        """
+        if details_scorer is None:
+            return (
+                self._score_stage_b_task(task=task, candles=candles, scorer=scorer),
+                None,
+            )
+
+        details = details_scorer.score_variant_with_details(
+            stage=STAGE_B_LITERAL,
+            candles=candles,
+            indicator_selections=task.indicator_selections,
+            signal_params=task.signal_params,
+            risk_params=task.risk_params,
+            indicator_variant_key=task.indicator_variant_key,
+            variant_key=task.variant_key,
+        )
+        return (
+            BacktestStageBScoredVariantV1(
+                variant_index=task.variant_index,
+                indicator_variant_key=task.indicator_variant_key,
+                variant_key=task.variant_key,
+                total_return_pct=_extract_total_return_pct(metrics=details.metrics),
+            ),
+            details,
         )
 
     def _resolve_batch_size(self, *, batch_size: int | None) -> int:
@@ -576,7 +722,15 @@ def _extract_total_return_pct(*, metrics: Mapping[str, float]) -> float:
 
 def _stage_b_rows_from_heap(
     *,
-    heap: list[tuple[float, tuple[int, ...], BacktestStageBScoredVariantV1, BacktestStageBTaskV1]],
+    heap: list[
+        tuple[
+            float,
+            tuple[int, ...],
+            BacktestStageBScoredVariantV1,
+            BacktestStageBTaskV1,
+            BacktestVariantScoreDetailsV1 | None,
+        ]
+    ],
 ) -> tuple[BacktestStageBScoredVariantV1, ...]:
     """
     Materialize deterministic ranked Stage-B rows from bounded heap entries.
@@ -597,7 +751,15 @@ def _stage_b_rows_from_heap(
 
 def _stage_b_tasks_from_heap(
     *,
-    heap: list[tuple[float, tuple[int, ...], BacktestStageBScoredVariantV1, BacktestStageBTaskV1]],
+    heap: list[
+        tuple[
+            float,
+            tuple[int, ...],
+            BacktestStageBScoredVariantV1,
+            BacktestStageBTaskV1,
+            BacktestVariantScoreDetailsV1 | None,
+        ]
+    ],
 ) -> Mapping[str, BacktestStageBTaskV1]:
     """
     Build deterministic `variant_key -> task` mapping from bounded Stage-B heap.
@@ -614,10 +776,54 @@ def _stage_b_tasks_from_heap(
         None.
     """
     mapping: dict[str, BacktestStageBTaskV1] = {}
-    for _, _, row, task in heap:
+    for _, _, row, task, _ in heap:
         if row.variant_key in mapping:
             raise ValueError("duplicate Stage-B variant_key is not allowed")
         mapping[row.variant_key] = task
+    return mapping
+
+
+def _stage_b_details_from_heap(
+    *,
+    heap: list[
+        tuple[
+            float,
+            tuple[int, ...],
+            BacktestStageBScoredVariantV1,
+            BacktestStageBTaskV1,
+            BacktestVariantScoreDetailsV1 | None,
+        ]
+    ],
+) -> Mapping[str, BacktestVariantScoreDetailsV1]:
+    """
+    Build deterministic `variant_key -> details` mapping from bounded Stage-B heap entries.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    Args:
+        heap: Internal bounded heap entries.
+    Returns:
+        Mapping[str, BacktestVariantScoreDetailsV1]:
+            Retained details payload by deterministic `variant_key`.
+    Assumptions:
+        Retained details are present only when details scorer extension is enabled.
+    Raises:
+        ValueError: If duplicate `variant_key` is detected in heap.
+    Side Effects:
+        None.
+    """
+    mapping: dict[str, BacktestVariantScoreDetailsV1] = {}
+    for _, _, row, _, details in heap:
+        if details is None:
+            continue
+        if row.variant_key in mapping:
+            raise ValueError("duplicate Stage-B variant_key is not allowed")
+        mapping[row.variant_key] = details
     return mapping
 
 

@@ -7,13 +7,16 @@ import numpy as np
 import pytest
 
 from trading.contexts.indicators.adapters.outbound.compute_numba import NumbaIndicatorCompute
+from trading.contexts.indicators.adapters.outbound.compute_numba.engine import (
+    _build_series_map,
+)
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
     ComputeRequest,
     ExplicitValuesSpec,
 )
 from trading.contexts.indicators.domain.definitions import all_defs
-from trading.contexts.indicators.domain.entities import IndicatorId, Layout
+from trading.contexts.indicators.domain.entities import IndicatorId, InputSeries, Layout
 from trading.contexts.indicators.domain.errors import ComputeBudgetExceeded
 from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.platform.config import IndicatorsComputeNumbaConfig
@@ -230,3 +233,60 @@ def test_compute_raises_budget_exceeded_for_total_memory_guard(tmp_path: Path) -
     assert details["T"] == 300
     assert details["V"] == 4
     assert details["max_compute_bytes_total"] == 8_192
+
+
+def test_build_series_map_allocates_only_requested_close_series() -> None:
+    """
+    Verify lazy series-map path allocates only `close` when request requires only close source.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Source set is resolved before matrix kernels and can exclude derived OHLC aggregates.
+    Raises:
+        AssertionError: If unnecessary series are materialized.
+    Side Effects:
+        None.
+    """
+    candles = _candles(t_size=32)
+
+    series_map = _build_series_map(
+        candles=candles,
+        required_sources=(InputSeries.CLOSE.value,),
+    )
+
+    assert tuple(series_map.keys()) == (InputSeries.CLOSE.value,)
+    assert series_map[InputSeries.CLOSE.value].dtype == np.float32
+    assert series_map[InputSeries.CLOSE.value].flags.c_contiguous
+
+
+def test_build_series_map_lazily_allocates_derived_source_only_when_requested() -> None:
+    """
+    Verify lazy series-map computes derived `ohlc4` only when request explicitly asks for it.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Derived source values are computed from float32 contiguous OHLC arrays.
+    Raises:
+        AssertionError: If derived series is missing or incorrectly computed.
+    Side Effects:
+        None.
+    """
+    candles = _candles(t_size=24)
+
+    series_map = _build_series_map(
+        candles=candles,
+        required_sources=(InputSeries.OHLC4.value,),
+    )
+    expected = np.ascontiguousarray(
+        (candles.open + candles.high + candles.low + candles.close) / np.float32(4.0),
+        dtype=np.float32,
+    )
+
+    assert tuple(series_map.keys()) == (InputSeries.OHLC4.value,)
+    np.testing.assert_allclose(series_map[InputSeries.OHLC4.value], expected)

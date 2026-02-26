@@ -1,7 +1,7 @@
 schema_version: 1
 compute:
   numba:
-    numba_num_threads: 8
+    numba_num_threads: 4
     numba_cache_dir: ".cache/numba/prod"
     max_compute_bytes_total: 5368709120
 defaults:

@@ -69,6 +69,30 @@ from trading.contexts.indicators.domain.errors import (
 from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.platform.config import IndicatorsComputeNumbaConfig
 
+_STRUCTURE_IDS_REQUIRING_OHLC = {
+    "structure.candle_body",
+    "structure.candle_body_atr",
+    "structure.candle_body_pct",
+    "structure.candle_lower_wick",
+    "structure.candle_lower_wick_atr",
+    "structure.candle_lower_wick_pct",
+    "structure.candle_range",
+    "structure.candle_range_atr",
+    "structure.candle_stats",
+    "structure.candle_stats_atr_norm",
+    "structure.candle_upper_wick",
+    "structure.candle_upper_wick_atr",
+    "structure.candle_upper_wick_pct",
+}
+_STRUCTURE_IDS_REQUIRING_HL = {
+    "structure.pivot_high",
+    "structure.pivot_low",
+    "structure.pivots",
+}
+_STRUCTURE_IDS_REQUIRING_HLC = {
+    "structure.distance_to_ma_norm",
+}
+
 
 class NumbaIndicatorCompute(IndicatorCompute):
     """
@@ -251,7 +275,11 @@ class NumbaIndicatorCompute(IndicatorCompute):
             max_compute_bytes_total=self._config.max_compute_bytes_total,
         )
 
-        series_map = _build_series_map(candles=req.candles)
+        required_sources = _required_sources_for_request(definition=definition, axes=axes)
+        series_map = _build_series_map(
+            candles=req.candles,
+            required_sources=required_sources,
+        )
         if is_supported_ma_indicator(indicator_id=definition.indicator_id.value):
             variant_series_matrix = _compute_ma_variant_source_matrix(
                 definition=definition,
@@ -573,9 +601,165 @@ def _axis_def_from_materialized_axis(*, axis: MaterializedAxis) -> AxisDef:
     )
 
 
-def _build_series_map(*, candles: CandleArrays) -> Mapping[str, np.ndarray]:
+def _required_sources_for_request(
+    *,
+    definition: IndicatorDef,
+    axes: tuple[AxisDef, ...],
+) -> tuple[str, ...]:
     """
-    Build deterministic source-series map including derived OHLC aggregates.
+    Resolve minimal source set required for one compute request.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/domain/entities/indicator_def.py,
+      src/trading/contexts/indicators/domain/entities/input_series.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        definition: Hard indicator definition for the request.
+        axes: Materialized axes preserving request value order.
+    Returns:
+        tuple[str, ...]: Sorted unique source names required by this request.
+    Assumptions:
+        Source axis values define dynamic source requirements when axis exists.
+    Raises:
+        GridValidationError: If source axis exists but is not enum-based.
+    Side Effects:
+        None.
+    """
+    axis_names = [axis.name for axis in axes]
+    required: set[str] = set()
+    dynamic_price_sources = {
+        InputSeries.OPEN.value,
+        InputSeries.HIGH.value,
+        InputSeries.LOW.value,
+        InputSeries.CLOSE.value,
+        InputSeries.HL2.value,
+        InputSeries.HLC3.value,
+        InputSeries.OHLC4.value,
+    }
+
+    if "source" in axis_names:
+        source_axis = axes[axis_names.index("source")]
+        source_values = source_axis.values_enum
+        if source_values is None:
+            raise GridValidationError("source axis must have values_enum")
+        for value in source_values:
+            normalized_value = str(value).strip().lower()
+            if not normalized_value:
+                raise GridValidationError("source axis values must be non-empty")
+            required.add(normalized_value)
+        for input_series in definition.inputs:
+            source_name = input_series.value
+            if source_name not in dynamic_price_sources:
+                required.add(source_name)
+        required.update(
+            _required_fixed_series_for_indicator_id(
+                indicator_id=definition.indicator_id.value
+            )
+        )
+    else:
+        required.update(series.value for series in definition.inputs)
+        if len(required) == 0:
+            required.add(_fallback_source(definition=definition))
+
+    return tuple(sorted(required))
+
+
+def _expanded_required_sources_for_derivatives(
+    *,
+    required_sources: set[str],
+) -> set[str]:
+    """
+    Expand required source set with base OHLC dependencies for derived source requests.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/domain/entities/input_series.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      docs/architecture/indicators/indicators_formula.yaml
+
+    Args:
+        required_sources: Request-level required sources.
+    Returns:
+        set[str]: Expanded source set including derived-series dependencies.
+    Assumptions:
+        Derived series are `hl2`, `hlc3`, and `ohlc4`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    expanded = set(required_sources)
+    if InputSeries.HL2.value in required_sources:
+        expanded.update((InputSeries.HIGH.value, InputSeries.LOW.value))
+    if InputSeries.HLC3.value in required_sources:
+        expanded.update(
+            (
+                InputSeries.HIGH.value,
+                InputSeries.LOW.value,
+                InputSeries.CLOSE.value,
+            )
+        )
+    if InputSeries.OHLC4.value in required_sources:
+        expanded.update(
+            (
+                InputSeries.OPEN.value,
+                InputSeries.HIGH.value,
+                InputSeries.LOW.value,
+                InputSeries.CLOSE.value,
+            )
+        )
+    return expanded
+
+
+def _required_fixed_series_for_indicator_id(*, indicator_id: str) -> tuple[str, ...]:
+    """
+    Resolve fixed OHLC requirements that remain mandatory even when source axis is present.
+
+    Docs: docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/structure.py,
+      src/trading/contexts/indicators/domain/definitions/structure.py
+
+    Args:
+        indicator_id: Normalized indicator identifier.
+    Returns:
+        tuple[str, ...]: Fixed mandatory source names for the indicator.
+    Assumptions:
+        Only structure wrappers currently require fixed OHLC in addition to source axis.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    normalized_id = indicator_id.strip().lower()
+    if normalized_id in _STRUCTURE_IDS_REQUIRING_OHLC:
+        return (
+            InputSeries.OPEN.value,
+            InputSeries.HIGH.value,
+            InputSeries.LOW.value,
+            InputSeries.CLOSE.value,
+        )
+    if normalized_id in _STRUCTURE_IDS_REQUIRING_HLC:
+        return (
+            InputSeries.HIGH.value,
+            InputSeries.LOW.value,
+            InputSeries.CLOSE.value,
+        )
+    if normalized_id in _STRUCTURE_IDS_REQUIRING_HL:
+        return (InputSeries.HIGH.value, InputSeries.LOW.value)
+    return ()
+
+
+def _build_series_map(
+    *,
+    candles: CandleArrays,
+    required_sources: tuple[str, ...],
+) -> Mapping[str, np.ndarray]:
+    """
+    Build deterministic source-series map and lazily allocate only request-required series.
 
     Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
     Related:
@@ -584,39 +768,72 @@ def _build_series_map(*, candles: CandleArrays) -> Mapping[str, np.ndarray]:
 
     Args:
         candles: Dense candle arrays payload.
+        required_sources: Source labels required for current compute request.
     Returns:
         Mapping[str, np.ndarray]: Source name to contiguous float32 array.
     Assumptions:
-        Candle arrays are aligned and share the same length.
+        `required_sources` already reflects request-level source axis and fixed indicator inputs.
     Raises:
         None.
     Side Effects:
-        Allocates derived arrays (`hl2`, `hlc3`, `ohlc4`).
+        Allocates only required base/derived arrays for current request.
     """
-    open_series = np.ascontiguousarray(candles.open, dtype=np.float32)
-    high_series = np.ascontiguousarray(candles.high, dtype=np.float32)
-    low_series = np.ascontiguousarray(candles.low, dtype=np.float32)
-    close_series = np.ascontiguousarray(candles.close, dtype=np.float32)
-    volume_series = np.ascontiguousarray(candles.volume, dtype=np.float32)
+    required = set(required_sources)
+    expanded_required = _expanded_required_sources_for_derivatives(required_sources=required)
 
-    hl2_series = np.ascontiguousarray((high_series + low_series) / np.float32(2.0))
-    hlc3_series = np.ascontiguousarray(
-        (high_series + low_series + close_series) / np.float32(3.0)
-    )
-    ohlc4_series = np.ascontiguousarray(
-        (open_series + high_series + low_series + close_series) / np.float32(4.0)
-    )
+    open_series: np.ndarray | None = None
+    high_series: np.ndarray | None = None
+    low_series: np.ndarray | None = None
+    close_series: np.ndarray | None = None
+    volume_series: np.ndarray | None = None
 
-    return {
-        InputSeries.CLOSE.value: close_series,
-        InputSeries.HIGH.value: high_series,
-        InputSeries.HL2.value: hl2_series,
-        InputSeries.HLC3.value: hlc3_series,
-        InputSeries.LOW.value: low_series,
-        InputSeries.OHLC4.value: ohlc4_series,
-        InputSeries.OPEN.value: open_series,
-        InputSeries.VOLUME.value: volume_series,
-    }
+    if InputSeries.OPEN.value in expanded_required:
+        open_series = np.ascontiguousarray(candles.open, dtype=np.float32)
+    if InputSeries.HIGH.value in expanded_required:
+        high_series = np.ascontiguousarray(candles.high, dtype=np.float32)
+    if InputSeries.LOW.value in expanded_required:
+        low_series = np.ascontiguousarray(candles.low, dtype=np.float32)
+    if InputSeries.CLOSE.value in expanded_required:
+        close_series = np.ascontiguousarray(candles.close, dtype=np.float32)
+    if InputSeries.VOLUME.value in expanded_required:
+        volume_series = np.ascontiguousarray(candles.volume, dtype=np.float32)
+
+    series_map: dict[str, np.ndarray] = {}
+    if InputSeries.OPEN.value in required and open_series is not None:
+        series_map[InputSeries.OPEN.value] = open_series
+    if InputSeries.HIGH.value in required and high_series is not None:
+        series_map[InputSeries.HIGH.value] = high_series
+    if InputSeries.LOW.value in required and low_series is not None:
+        series_map[InputSeries.LOW.value] = low_series
+    if InputSeries.CLOSE.value in required and close_series is not None:
+        series_map[InputSeries.CLOSE.value] = close_series
+    if InputSeries.VOLUME.value in required and volume_series is not None:
+        series_map[InputSeries.VOLUME.value] = volume_series
+
+    if InputSeries.HL2.value in required and high_series is not None and low_series is not None:
+        series_map[InputSeries.HL2.value] = np.ascontiguousarray(
+            (high_series + low_series) / np.float32(2.0)
+        )
+    if (
+        InputSeries.HLC3.value in required
+        and high_series is not None
+        and low_series is not None
+        and close_series is not None
+    ):
+        series_map[InputSeries.HLC3.value] = np.ascontiguousarray(
+            (high_series + low_series + close_series) / np.float32(3.0)
+        )
+    if (
+        InputSeries.OHLC4.value in required
+        and open_series is not None
+        and high_series is not None
+        and low_series is not None
+        and close_series is not None
+    ):
+        series_map[InputSeries.OHLC4.value] = np.ascontiguousarray(
+            (open_series + high_series + low_series + close_series) / np.float32(4.0)
+        )
+    return series_map
 
 
 def _compute_ma_variant_source_matrix(
@@ -660,7 +877,7 @@ def _compute_ma_variant_source_matrix(
     )
 
     volume_series = available_series.get(InputSeries.VOLUME.value)
-    if volume_series is None:
+    if definition.indicator_id.value == "ma.vwma" and volume_series is None:
         raise MissingRequiredSeries(
             "MissingRequiredSeries: missing=('volume',); "
             f"required={tuple(sorted(set(variant_source_labels)))}"
@@ -1432,22 +1649,26 @@ def _compute_structure_variant_matrix(
                 np.asarray(_variant_int_values(axes=axes, axis_name="right"), dtype=np.int64)
             )
 
-        if InputSeries.OPEN in definition.inputs:
+        requires_ohlc = indicator_id in _STRUCTURE_IDS_REQUIRING_OHLC
+        requires_hlc = indicator_id in _STRUCTURE_IDS_REQUIRING_HLC
+        requires_hl = indicator_id in _STRUCTURE_IDS_REQUIRING_HL
+
+        if requires_ohlc:
             kernel_kwargs["open"] = _require_series(
                 available_series=available_series,
                 name=InputSeries.OPEN.value,
             )
-        if InputSeries.HIGH in definition.inputs:
+        if requires_ohlc or requires_hlc or requires_hl:
             kernel_kwargs["high"] = _require_series(
                 available_series=available_series,
                 name=InputSeries.HIGH.value,
             )
-        if InputSeries.LOW in definition.inputs:
+        if requires_ohlc or requires_hlc or requires_hl:
             kernel_kwargs["low"] = _require_series(
                 available_series=available_series,
                 name=InputSeries.LOW.value,
             )
-        if InputSeries.CLOSE in definition.inputs:
+        if requires_ohlc or requires_hlc:
             kernel_kwargs["close"] = _require_series(
                 available_series=available_series,
                 name=InputSeries.CLOSE.value,

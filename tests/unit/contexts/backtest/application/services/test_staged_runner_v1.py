@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunBacktestTemplate
+from trading.contexts.backtest.application.ports import BacktestVariantScoreDetailsV1
 from trading.contexts.backtest.application.services import (
     TOTAL_RETURN_METRIC_LITERAL,
     BacktestGridBuilderV1,
@@ -15,6 +16,8 @@ from trading.contexts.backtest.application.services import (
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
 )
+from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
     ComputeRequest,
@@ -372,6 +375,162 @@ class _WindowScorer:
         return {TOTAL_RETURN_METRIC_LITERAL: float(window)}
 
 
+class _DetailsCountingScorer:
+    """
+    Staged scorer fake exposing details extension and call counters for Stage-B reuse checks.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize deterministic call counters for stage-level scorer methods.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Counter increments once per corresponding scorer method invocation.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        self.stage_a_score_variant_calls = 0
+        self.stage_b_score_variant_calls = 0
+        self.stage_b_score_variant_with_details_calls = 0
+
+    def score_variant(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return deterministic ranking metric while counting Stage-A and Stage-B invocations.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters payload.
+            risk_params: Risk payload.
+            indicator_variant_key: Indicators-only key.
+            variant_key: Full variant key.
+        Returns:
+            Mapping[str, float]: Deterministic payload with `Total Return [%]`.
+        Assumptions:
+            Ranking metric must exactly match details payload metric for determinism checks.
+        Raises:
+            None.
+        Side Effects:
+            Updates in-memory stage counters.
+        """
+        _ = candles, signal_params, indicator_variant_key, variant_key
+        total_return_pct = _details_scorer_total_return_pct(
+            indicator_selections=indicator_selections,
+            risk_params=risk_params,
+        )
+        if stage == "stage_a":
+            self.stage_a_score_variant_calls += 1
+        elif stage == "stage_b":
+            self.stage_b_score_variant_calls += 1
+        return {TOTAL_RETURN_METRIC_LITERAL: total_return_pct}
+
+    def score_variant_with_details(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> BacktestVariantScoreDetailsV1:
+        """
+        Return deterministic details payload and count Stage-B details scorer invocations.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters payload.
+            risk_params: Risk payload.
+            indicator_variant_key: Indicators-only key.
+            variant_key: Full variant key.
+        Returns:
+            BacktestVariantScoreDetailsV1: Deterministic details payload for report builder.
+        Assumptions:
+            This fake scorer is used only for Stage-B details flow in tests.
+        Raises:
+            ValueError: If stage literal is unsupported.
+        Side Effects:
+            Updates in-memory details call counter.
+        """
+        _ = signal_params, indicator_variant_key, variant_key
+        if stage != "stage_b":
+            raise ValueError("details scorer supports only stage_b in this test fixture")
+        self.stage_b_score_variant_with_details_calls += 1
+        total_return_pct = _details_scorer_total_return_pct(
+            indicator_selections=indicator_selections,
+            risk_params=risk_params,
+        )
+        execution_params = ExecutionParamsV1(
+            direction_mode="long-short",
+            sizing_mode="all_in",
+            init_cash_quote=1000.0,
+            fixed_quote=100.0,
+            safe_profit_percent=30.0,
+            fee_pct=0.0,
+            slippage_pct=0.0,
+        )
+        sl_enabled_raw = risk_params.get("sl_enabled", False)
+        tp_enabled_raw = risk_params.get("tp_enabled", False)
+        sl_pct_raw = risk_params.get("sl_pct")
+        tp_pct_raw = risk_params.get("tp_pct")
+        resolved_risk_params = RiskParamsV1(
+            sl_enabled=sl_enabled_raw if isinstance(sl_enabled_raw, bool) else False,
+            sl_pct=(
+                float(sl_pct_raw)
+                if isinstance(sl_pct_raw, int | float) and not isinstance(sl_pct_raw, bool)
+                else None
+            ),
+            tp_enabled=tp_enabled_raw if isinstance(tp_enabled_raw, bool) else False,
+            tp_pct=(
+                float(tp_pct_raw)
+                if isinstance(tp_pct_raw, int | float) and not isinstance(tp_pct_raw, bool)
+                else None
+            ),
+        )
+        equity_end_quote = execution_params.init_cash_quote * (1.0 + (total_return_pct / 100.0))
+        return BacktestVariantScoreDetailsV1(
+            metrics={TOTAL_RETURN_METRIC_LITERAL: total_return_pct},
+            target_slice=slice(0, int(candles.close.shape[0])),
+            execution_params=execution_params,
+            risk_params=resolved_risk_params,
+            execution_outcome=ExecutionOutcomeV1(
+                trades=(),
+                equity_end_quote=equity_end_quote,
+                available_quote=equity_end_quote,
+                safe_quote=0.0,
+                total_return_pct=total_return_pct,
+            ),
+        )
+
+
 def test_staged_runner_v1_applies_deterministic_tie_break_keys() -> None:
     """
     Verify tie-break ordering is deterministic for equal Stage A/Stage B metric values.
@@ -521,6 +680,44 @@ def test_staged_runner_v1_stage_b_risk_expansion_reuses_signal_cache() -> None:
     assert result.stage_b_variants_total == 6
     assert indicator_compute.compute_calls == 1
     assert indicator_compute.requested_layout_preferences == [Layout.VARIANT_MAJOR]
+
+
+def test_staged_runner_v1_top_reports_use_retained_stage_b_details_without_rescore() -> None:
+    """
+    Verify report-building path reuses Stage-B retained details and avoids top-k re-score pass.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Requested time range enables report generation for ranked top variants.
+    Raises:
+        AssertionError: If Stage-B details are re-scored for top rows.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1()
+    scorer = _DetailsCountingScorer()
+    candles = _build_candles(bars=60)
+
+    result = runner.run(
+        template=_template_for_top_k(),
+        candles=candles,
+        preselect=4,
+        top_k=2,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=scorer,
+        requested_time_range=candles.time_range,
+        top_trades_n=1,
+    )
+
+    assert len(result.variants) == 2
+    assert tuple(item.total_return_pct for item in result.variants) == (4.0, 3.0)
+    assert all(item.report is not None for item in result.variants)
+    assert scorer.stage_a_score_variant_calls == result.stage_a_variants_total
+    assert scorer.stage_b_score_variant_calls == 0
+    assert scorer.stage_b_score_variant_with_details_calls == result.stage_b_variants_total
 
 
 class _CancellingScorer:
@@ -796,6 +993,36 @@ def test_stage_b_heap_top_k_matches_full_sort_reference() -> None:
     assert set(heap_tasks.keys()) == {row.variant_key for row in heap_rows}
     for row in heap_rows:
         assert heap_tasks[row.variant_key].variant_key == row.variant_key
+
+
+def _details_scorer_total_return_pct(
+    *,
+    indicator_selections: tuple[IndicatorVariantSelection, ...],
+    risk_params: Mapping[str, float | int | str | bool | None],
+) -> float:
+    """
+    Build deterministic fake ranking metric used by details scorer fixture methods.
+
+    Args:
+        indicator_selections: Explicit indicator selections payload.
+        risk_params: Risk payload mapping.
+    Returns:
+        float: Deterministic total return percentage for staged ranking.
+    Assumptions:
+        Fixture template has one indicator and optional numeric `sl_pct` risk scalar.
+    Raises:
+        KeyError: If `window` parameter is missing in fixture selection.
+    Side Effects:
+        None.
+    """
+    window = int(indicator_selections[0].params["window"])
+    sl_pct_raw = risk_params.get("sl_pct")
+    sl_penalty = (
+        float(sl_pct_raw)
+        if isinstance(sl_pct_raw, int | float) and not isinstance(sl_pct_raw, bool)
+        else 0.0
+    )
+    return float(window) - sl_penalty
 
 
 def _template_for_tie_breaks() -> RunBacktestTemplate:

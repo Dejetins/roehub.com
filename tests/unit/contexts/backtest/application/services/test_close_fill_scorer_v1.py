@@ -11,6 +11,10 @@ from trading.contexts.backtest.application.services import (
     IndicatorSignalEvaluationInputV1,
     evaluate_and_aggregate_signals_v1,
 )
+from trading.contexts.backtest.application.services.close_fill_scorer_v1 import (
+    _signal_cache_key,
+    _SignalCacheValue,
+)
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
@@ -366,6 +370,125 @@ def test_close_fill_scorer_v1_cache_respects_byte_limit() -> None:
 
     assert compute.compute_calls == 2
     assert len(scorer._signals_cache) == 0
+
+
+def test_signal_cache_value_keeps_canonical_int8_signal_without_copy() -> None:
+    """
+    Verify canonical compact signal vectors are cached without allocating a second buffer.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical final-signal vector is one-dimensional, `np.int8`, C-contiguous.
+    Raises:
+        AssertionError: If cache value normalization allocates another array.
+    Side Effects:
+        None.
+    """
+    final_signal = np.asarray((1, 0, -1, 1), dtype=np.int8)
+
+    cache_value = _SignalCacheValue(final_signal=final_signal)
+
+    assert cache_value.final_signal is final_signal
+
+
+def test_signal_cache_key_is_hash_stable_and_separates_distinct_signal_params() -> None:
+    """
+    Verify hashed cache key is deterministic and collision-safe for distinct signal params.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical payload semantics stay identical after switching to SHA-256 key format.
+    Raises:
+        AssertionError: If deterministic key equivalence or separation is violated.
+    Side Effects:
+        None.
+    """
+    key_a = _signal_cache_key(
+        indicator_variant_key="A" * 64,
+        signal_params={
+            "momentum.rsi": {"long_threshold": 30, "short_threshold": 70},
+        },
+    )
+    key_b = _signal_cache_key(
+        indicator_variant_key="a" * 64,
+        signal_params={
+            "momentum.rsi": {"short_threshold": 70, "long_threshold": 30},
+        },
+    )
+    key_c = _signal_cache_key(
+        indicator_variant_key="a" * 64,
+        signal_params={
+            "momentum.rsi": {"long_threshold": 70, "short_threshold": 30},
+        },
+    )
+
+    assert len(key_a) == 64
+    assert key_a == key_b
+    assert key_a != key_c
+
+
+def test_close_fill_scorer_v1_cache_does_not_cross_talk_between_signal_params() -> None:
+    """
+    Verify cache key isolates variants with same indicator key but different signal params.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `momentum.rsi` threshold params deterministically alter LONG/SHORT decision.
+    Raises:
+        AssertionError: If cached signals leak between different params payloads.
+    Side Effects:
+        None.
+    """
+    candles = _candles_from_closes((100.0, 105.0, 95.0))
+    compute = _FixedSeriesIndicatorCompute(
+        outputs={
+            "momentum.rsi": np.asarray((20.0, 20.0, 20.0), dtype=np.float32),
+        }
+    )
+    scorer = CloseFillBacktestStagedScorerV1(
+        indicator_compute=compute,
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={"init_cash_quote": 1000.0, "fee_pct": 0.0, "slippage_pct": 0.0},
+        market_id=1,
+        target_slice=slice(0, 3),
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+    )
+    selection = _selection(indicator_id="momentum.rsi")
+
+    long_metric = scorer.score_variant(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={"momentum.rsi": {"long_threshold": 30, "short_threshold": 70}},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="b" * 64,
+    )["Total Return [%]"]
+    short_metric = scorer.score_variant(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={"momentum.rsi": {"long_threshold": 70, "short_threshold": 30}},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="c" * 64,
+    )["Total Return [%]"]
+
+    assert compute.compute_calls == 2
+    assert long_metric != short_metric
 
 
 def test_close_fill_scorer_v1_matches_legacy_total_return_pct() -> None:

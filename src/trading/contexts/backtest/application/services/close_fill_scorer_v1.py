@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
 from types import MappingProxyType
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
 import numpy as np
 
@@ -42,8 +43,10 @@ from .run_control_v1 import BacktestRunControlV1
 from .signals_from_indicators_v1 import (
     IndicatorSignalEvaluationInputV1,
     build_indicator_signal_inputs_from_tensors_v1,
+    encode_signal_array_v1,
     evaluate_and_aggregate_signals_encoded_v1,
     indicator_primary_output_series_from_tensor_v1,
+    is_int8_c_contiguous_signal_array_v1,
     signal_rule_spec_v1,
 )
 from .staged_runner_v1 import TOTAL_RETURN_METRIC_LITERAL
@@ -89,15 +92,14 @@ class _SignalCacheValue:
         Raises:
             ValueError: If provided signal array is not one-dimensional.
         Side Effects:
-            Replaces stored array with contiguous compact copy.
+            Replaces stored array with canonical compact payload when normalization is required.
         """
         if self.final_signal.ndim != 1:
             raise ValueError("_SignalCacheValue.final_signal must be a 1D array")
-        object.__setattr__(
-            self,
-            "final_signal",
-            np.ascontiguousarray(self.final_signal, dtype=np.int8),
-        )
+        if is_int8_c_contiguous_signal_array_v1(signals=self.final_signal):
+            object.__setattr__(self, "final_signal", self.final_signal)
+            return
+        object.__setattr__(self, "final_signal", encode_signal_array_v1(signals=self.final_signal))
 
 
 @dataclass(frozen=True, slots=True)
@@ -534,7 +536,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         if resolved_stage not in {STAGE_A_LITERAL, STAGE_B_LITERAL}:
             raise ValueError("stage must be stage_a or stage_b")
 
-        normalized_signal_params = _normalize_nested_scalar_mapping(values=signal_params)
+        normalized_signal_params = _normalized_signal_params_for_scoring(values=signal_params)
         cache_key = _signal_cache_key(
             indicator_variant_key=indicator_variant_key,
             signal_params=normalized_signal_params,
@@ -617,9 +619,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         Side Effects:
             Mutates shared cache map and may evict older entries.
         """
-        cache_value = _SignalCacheValue(
-            final_signal=np.ascontiguousarray(final_signal, dtype=np.int8),
-        )
+        cache_value = _SignalCacheValue(final_signal=final_signal)
         cache_value_bytes = int(cache_value.final_signal.nbytes)
         with self._signals_cache_lock:
             existing = self._signals_cache.pop(cache_key, None)
@@ -999,19 +999,52 @@ def _signal_cache_key(
         indicator_variant_key: Deterministic indicators-only key.
         signal_params: Normalized signal-parameter mapping.
     Returns:
-        str: Deterministic cache key string.
+        str: Deterministic SHA-256 cache key string.
     Assumptions:
-        Key serialization uses key-sorted canonical JSON.
+        Key serialization uses key-sorted canonical JSON payload hashed via SHA-256.
     Raises:
         None.
     Side Effects:
         None.
     """
     payload = {
-        "indicator_variant_key": indicator_variant_key.strip().lower(),
+        "indicator_variant_key": _normalize_indicator_variant_key_for_cache(
+            indicator_variant_key=indicator_variant_key
+        ),
         "signal_params": _signal_params_json_payload(signal_params=signal_params),
     }
-    return json.dumps(payload, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    payload_json = json.dumps(payload, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    return hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+
+
+def _normalize_indicator_variant_key_for_cache(*, indicator_variant_key: str) -> str:
+    """
+    Normalize indicator variant key with a cheap fast-path for canonical lowercase hashes.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
+      - src/trading/contexts/indicators/application/dto/variant_key.py
+
+    Args:
+        indicator_variant_key: Raw indicator-variant key candidate.
+    Returns:
+        str: Lowercase normalized key.
+    Assumptions:
+        Canonical v1 keys are 64-char lowercase hex SHA-256 strings.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if len(indicator_variant_key) == 64 and all(
+        char in "0123456789abcdef" for char in indicator_variant_key
+    ):
+        return indicator_variant_key
+    return indicator_variant_key.strip().lower()
 
 
 def _signal_params_json_payload(
@@ -1218,6 +1251,83 @@ def _normalize_nested_scalar_mapping(
         params = values[raw_indicator_id]
         normalized[indicator_id] = MappingProxyType(_normalize_scalar_mapping(values=params))
     return normalized
+
+
+def _normalized_signal_params_for_scoring(
+    *,
+    values: Mapping[str, Mapping[str, BacktestVariantScalar]],
+) -> Mapping[str, Mapping[str, BacktestVariantScalar]]:
+    """
+    Normalize `signal_params` with a zero-allocation fast-path for pre-normalized mappings.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+      - tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
+
+    Args:
+        values: Signal parameters mapping from staged runner payload.
+    Returns:
+        Mapping[str, Mapping[str, BacktestVariantScalar]]:
+            Normalized mapping ready for deterministic cache-key serialization.
+    Assumptions:
+        Grid-builder payloads are already normalized/lowercased mapping proxies.
+    Raises:
+        ValueError: If one key is invalid and normalization is required.
+    Side Effects:
+        None.
+    """
+    if _is_pre_normalized_signal_params(values=values):
+        return cast(Mapping[str, Mapping[str, BacktestVariantScalar]], values)
+    return _normalize_nested_scalar_mapping(values=values)
+
+
+def _is_pre_normalized_signal_params(
+    *,
+    values: Mapping[str, Mapping[str, BacktestVariantScalar]],
+) -> bool:
+    """
+    Check whether `signal_params` already match normalized lowercase mapping-proxy shape.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+      - tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
+
+    Args:
+        values: Candidate signal params mapping.
+    Returns:
+        bool: `True` when payload can be reused without re-normalization.
+    Assumptions:
+        Fast-path must be conservative and reject unknown mutable/key shapes.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if not isinstance(values, MappingProxyType):
+        return False
+    for indicator_id, params in values.items():
+        if not isinstance(indicator_id, str):
+            return False
+        normalized_indicator_id = indicator_id.strip().lower()
+        if not normalized_indicator_id or normalized_indicator_id != indicator_id:
+            return False
+        if not isinstance(params, MappingProxyType):
+            return False
+        for param_name in params.keys():
+            if not isinstance(param_name, str):
+                return False
+            normalized_param_name = param_name.strip().lower()
+            if not normalized_param_name or normalized_param_name != param_name:
+                return False
+    return True
 
 
 def _normalize_fee_defaults(

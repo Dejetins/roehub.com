@@ -590,6 +590,9 @@ def encode_signal_array_v1(*, signals: np.ndarray) -> np.ndarray:
     raw = np.asarray(signals)
     if raw.ndim != 1:
         raise ValueError("signals must be a 1D array")
+    if is_int8_c_contiguous_signal_array_v1(signals=raw):
+        _ensure_supported_signal_codes_v1(signal_codes=raw, field_name="signals")
+        return raw
     if np.issubdtype(raw.dtype, np.integer):
         encoded = np.ascontiguousarray(raw, dtype=np.int8)
         _ensure_supported_signal_codes_v1(signal_codes=encoded, field_name="signals")
@@ -599,6 +602,36 @@ def encode_signal_array_v1(*, signals: np.ndarray) -> np.ndarray:
     for index, value in enumerate(raw.tolist()):
         encoded[index] = _signal_value_to_code_v1(value=value, field_name="signals")
     return encoded
+
+
+def is_int8_c_contiguous_signal_array_v1(*, signals: np.ndarray) -> bool:
+    """
+    Check whether signal array already matches canonical compact hot-path representation.
+
+    Docs:
+      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/execution_engine_v1.py
+
+    Args:
+        signals: Candidate signal array.
+    Returns:
+        bool: `True` when array is 1D, `np.int8`, and C-contiguous.
+    Assumptions:
+        Canonical shape/dtype/layout check is enough for fast-path copy avoidance.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return (
+        signals.ndim == 1
+        and signals.dtype == np.int8
+        and bool(signals.flags.c_contiguous)
+    )
 
 
 def decode_signal_codes_v1(*, signal_codes: np.ndarray) -> np.ndarray:

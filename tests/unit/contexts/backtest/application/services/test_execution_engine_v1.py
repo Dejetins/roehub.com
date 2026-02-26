@@ -10,6 +10,7 @@ from trading.contexts.backtest.application.services import (
     SIGNAL_CODE_NEUTRAL_V1,
     SIGNAL_CODE_SHORT_V1,
     BacktestExecutionEngineV1,
+    encode_signal_array_v1,
 )
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
 from trading.contexts.indicators.application.dto import CandleArrays
@@ -374,6 +375,139 @@ def test_execution_engine_v1_compact_and_legacy_signals_have_equivalent_outcome(
     assert legacy_outcome.trades == compact_outcome.trades
     assert legacy_outcome.equity_end_quote == compact_outcome.equity_end_quote
     assert legacy_outcome.total_return_pct == compact_outcome.total_return_pct
+
+
+def test_encode_signal_array_v1_returns_same_buffer_for_canonical_int8_codes() -> None:
+    """
+    Verify canonical compact signal vectors use zero-copy fast path in signal encoding.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical vector is one-dimensional, `np.int8`, C-contiguous, and code-valid.
+    Raises:
+        AssertionError: If fast path allocates a new buffer.
+    Side Effects:
+        None.
+    """
+    signal_codes = _signal_code_array((1, 0, -1, 1, 0))
+
+    encoded = encode_signal_array_v1(signals=signal_codes)
+
+    assert encoded is signal_codes
+
+
+def test_encode_signal_array_v1_legacy_labels_map_to_canonical_codes() -> None:
+    """
+    Verify legacy `LONG|SHORT|NEUTRAL` vectors normalize to canonical compact int8 codes.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Legacy labels are case-sensitive canonical literals in this fixture.
+    Raises:
+        AssertionError: If label-to-code mapping diverges from v1 contract.
+    Side Effects:
+        None.
+    """
+    encoded = encode_signal_array_v1(
+        signals=np.asarray(("LONG", "NEUTRAL", "SHORT", "LONG"), dtype="U7")
+    )
+
+    assert encoded.dtype == np.int8
+    assert encoded.tolist() == [
+        int(SIGNAL_CODE_LONG_V1),
+        int(SIGNAL_CODE_NEUTRAL_V1),
+        int(SIGNAL_CODE_SHORT_V1),
+        int(SIGNAL_CODE_LONG_V1),
+    ]
+
+
+def test_execution_engine_v1_skips_risk_evaluation_when_risk_is_disabled(
+    engine: BacktestExecutionEngineV1,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify engine loop does not call risk-exit resolver when both SL and TP are disabled.
+
+    Args:
+        engine: Execution engine fixture.
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Stage-A risk policy disables both SL and TP for every variant.
+    Raises:
+        AssertionError: If risk resolver is called or deterministic outcome changes.
+    Side Effects:
+        Monkeypatches module-level `_risk_exit_reason` during the test.
+    """
+    candles = _candles_from_closes((100.0, 102.0, 101.0, 103.0))
+    signals = _signal_array(("LONG", "LONG", "LONG", "NEUTRAL"))
+    execution_params = _execution_params(direction_mode="long-short", sizing_mode="all_in")
+    risk_params = RiskParamsV1(
+        sl_enabled=False,
+        sl_pct=None,
+        tp_enabled=False,
+        tp_pct=None,
+    )
+    reference = engine.run(
+        candles=candles,
+        target_slice=slice(0, 4),
+        final_signal=signals,
+        execution_params=execution_params,
+        risk_params=risk_params,
+    )
+
+    calls = 0
+
+    def _counting_risk_exit_reason(
+        *,
+        position: object,
+        close_price: float,
+        risk_params: RiskParamsV1,
+    ) -> str | None:
+        """
+        Count risk resolver calls while preserving deterministic resolver semantics.
+
+        Args:
+            position: Open-position payload (ignored by this test helper).
+            close_price: Current close price (ignored by this test helper).
+            risk_params: Risk settings payload.
+        Returns:
+            str | None: Always `None` in this instrumentation helper.
+        Assumptions:
+            Disabled risk policy should prevent this helper from being called.
+        Raises:
+            None.
+        Side Effects:
+            Increments local call counter.
+        """
+        nonlocal calls
+        _ = position, close_price, risk_params
+        calls += 1
+        return None
+
+    monkeypatch.setattr(
+        "trading.contexts.backtest.application.services.execution_engine_v1._risk_exit_reason",
+        _counting_risk_exit_reason,
+    )
+    outcome = engine.run(
+        candles=candles,
+        target_slice=slice(0, 4),
+        final_signal=signals,
+        execution_params=execution_params,
+        risk_params=risk_params,
+    )
+
+    assert calls == 0
+    assert outcome.trades == reference.trades
+    assert outcome.equity_end_quote == reference.equity_end_quote
+    assert outcome.total_return_pct == reference.total_return_pct
 
 
 def _execution_params(

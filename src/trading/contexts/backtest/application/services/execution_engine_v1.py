@@ -111,6 +111,7 @@ class BacktestExecutionEngineV1:
         trades: list[TradeV1] = []
         next_trade_id = 1
         prev_signal_code = SIGNAL_CODE_NEUTRAL_V1
+        risk_enabled = bool(risk_params.sl_enabled or risk_params.tp_enabled)
 
         # HOT PATH: per-bar execution loop consumes pre-normalized int8 signals.
         for bar_index in range(start_index, stop_index):
@@ -118,7 +119,7 @@ class BacktestExecutionEngineV1:
             signal_code = signal_codes[bar_index]
             is_last_target_bar = bar_index == (stop_index - 1)
 
-            if position is not None:
+            if risk_enabled and position is not None:
                 risk_exit_reason = _risk_exit_reason(
                     position=position,
                     close_price=close_price,

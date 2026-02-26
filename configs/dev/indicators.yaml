@@ -1,7 +1,7 @@
 schema_version: 1
 compute:
   numba:
-    numba_num_threads: 8
+    numba_num_threads: 4
     numba_cache_dir: ".cache/numba/dev"
     max_compute_bytes_total: 5368709120
 defaults:
@@ -14,7 +14,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.ema:
@@ -26,7 +26,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.hma:
@@ -38,7 +38,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.lwma:
@@ -50,7 +50,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.rma:
@@ -62,7 +62,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.sma:
@@ -74,7 +74,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.tema:
@@ -86,7 +86,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.vwma:
@@ -94,7 +94,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.wma:
@@ -106,7 +106,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   ma.zlema:
@@ -118,7 +118,7 @@ defaults:
       window:
         mode: range
         start: 5
-        stop_incl: 400
+        stop_incl: 200
         step: 1
 
   trend.adx:
