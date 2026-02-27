@@ -108,6 +108,12 @@
 
 Wrappers должны быть доступны через registry + compute так же, как обычные индикаторы.
 
+Для source-parameterized structure-path (`zscore`, `percent_rank`, `distance_to_ma_norm`) используется grouped-source pipeline в compute engine:
+
+- `variant_source_labels` преобразуются в deterministic source-группы;
+- kernel считается по subset-вариантам внутри каждой source-группы;
+- результаты scatter’ятся обратно в общий `(V, T)` в исходном variant ordering.
+
 **Wrappers для `structure.candle_stats`:**
 - `structure.candle_body` → `body`
 - `structure.candle_range` → `range`
@@ -471,4 +477,3 @@ EPIC-09 считается выполненным, если:
    - `docs/architecture/indicators/README.md` содержит ссылку,
    - публичные экспорты через `__init__.py` стабильны,
    - docstrings в новых/изменённых классах/протоколах ссылаются на этот документ и связанные файлы.
-

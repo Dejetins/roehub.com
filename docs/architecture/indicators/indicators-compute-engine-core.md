@@ -41,6 +41,27 @@
 - если вычисленная матрица уже `float32`, C-contiguous и имеет shape `(V, T)`, она возвращается без дополнительной full-copy;
 - иначе выполняется однократная нормализация до `float32` C-contiguous с сохранением shape-контракта `(V, T)`.
 
+### Variant axis expansion
+
+Экспансия параметрических осей в:
+
+- `_variant_int_values(...)`
+- `_variant_float_values(...)`
+- `_variant_window_values(...)`
+- `_variant_source_labels(...)`
+
+выполняется векторным путём через `np.repeat` + `np.tile` с сохранением прежнего deterministic cartesian order вариантов (ось справа меняется быстрее).
+
+### Grouped source pipeline (phase 3)
+
+Для source-parameterized веток в `volatility` / `momentum` / `trend` / `structure` используется grouped compute по `variant_source_labels`:
+
+- сначала строятся deterministic группы `source -> variant_indexes` в порядке первого появления source;
+- затем kernel вызывается по каждой source-группе на подмножестве вариантов;
+- результат каждого group-калькулятора scatter’ится обратно в глобальный `(V, T)` по исходным `variant_indexes`.
+
+Это убирает необходимость строить один общий full `source_variants` `(V, T)` для всех source сразу и сохраняет исходный порядок вариантов в финальном тензоре.
+
 ## Total memory guard
 
 Единственный публичный budget-параметр:

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 from types import MappingProxyType
-from typing import Mapping
+from typing import Mapping, TypeVar, cast
 
 import numpy as np
 
@@ -91,6 +91,8 @@ _STRUCTURE_IDS_REQUIRING_HL = {
 _STRUCTURE_IDS_REQUIRING_HLC = {
     "structure.distance_to_ma_norm",
 }
+
+_AxisValue = TypeVar("_AxisValue", int, float, str)
 
 
 class NumbaIndicatorCompute(IndicatorCompute):
@@ -1036,21 +1038,40 @@ def _compute_volatility_variant_matrix(
             variant_source_labels=variant_source_labels,
             available_series=available_series,
         )
-        source_variants = _build_variant_source_matrix(
-            variant_source_labels=variant_source_labels,
-            available_series=available_series,
-            t_size=t_size,
+        source_groups = _group_variant_indexes_by_source(
+            variant_source_labels=variant_source_labels
         )
+        variants = len(variant_source_labels)
+        out = np.empty((variants, t_size), dtype=np.float32, order="C")
 
         if indicator_id in {"volatility.stddev", "volatility.variance"}:
             windows_i64 = np.ascontiguousarray(
                 np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
             )
-            return compute_volatility_grid_f32(
-                indicator_id=indicator_id,
-                source_variants=source_variants,
-                windows=windows_i64,
-            )
+            for source_name, variant_indexes in source_groups:
+                source_variants = _build_group_source_matrix(
+                    source=_require_series(
+                        available_series=available_series,
+                        name=source_name,
+                    ),
+                    variants=int(variant_indexes.shape[0]),
+                    t_size=t_size,
+                )
+                group_values = compute_volatility_grid_f32(
+                    indicator_id=indicator_id,
+                    source_variants=source_variants,
+                    windows=_slice_variant_vector(
+                        values=windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                )
+                _scatter_group_values(
+                    destination=out,
+                    variant_indexes=variant_indexes,
+                    group_values=group_values,
+                    t_size=t_size,
+                )
+            return out
 
         if indicator_id == "volatility.hv":
             windows_i64 = np.ascontiguousarray(
@@ -1062,12 +1083,34 @@ def _compute_volatility_variant_matrix(
                     dtype=np.int64,
                 )
             )
-            return compute_volatility_grid_f32(
-                indicator_id=indicator_id,
-                source_variants=source_variants,
-                windows=windows_i64,
-                annualizations=annualizations_i64,
-            )
+            for source_name, variant_indexes in source_groups:
+                source_variants = _build_group_source_matrix(
+                    source=_require_series(
+                        available_series=available_series,
+                        name=source_name,
+                    ),
+                    variants=int(variant_indexes.shape[0]),
+                    t_size=t_size,
+                )
+                group_values = compute_volatility_grid_f32(
+                    indicator_id=indicator_id,
+                    source_variants=source_variants,
+                    windows=_slice_variant_vector(
+                        values=windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                    annualizations=_slice_variant_vector(
+                        values=annualizations_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                )
+                _scatter_group_values(
+                    destination=out,
+                    variant_indexes=variant_indexes,
+                    group_values=group_values,
+                    t_size=t_size,
+                )
+            return out
 
         if indicator_id in {
             "volatility.bbands",
@@ -1080,12 +1123,34 @@ def _compute_volatility_variant_matrix(
             mults_f64 = np.ascontiguousarray(
                 np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
             )
-            return compute_volatility_grid_f32(
-                indicator_id=indicator_id,
-                source_variants=source_variants,
-                windows=windows_i64,
-                mults=mults_f64,
-            )
+            for source_name, variant_indexes in source_groups:
+                source_variants = _build_group_source_matrix(
+                    source=_require_series(
+                        available_series=available_series,
+                        name=source_name,
+                    ),
+                    variants=int(variant_indexes.shape[0]),
+                    t_size=t_size,
+                )
+                group_values = compute_volatility_grid_f32(
+                    indicator_id=indicator_id,
+                    source_variants=source_variants,
+                    windows=_slice_variant_vector(
+                        values=windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                    mults=_slice_variant_vector(
+                        values=mults_f64,
+                        variant_indexes=variant_indexes,
+                    ),
+                )
+                _scatter_group_values(
+                    destination=out,
+                    variant_indexes=variant_indexes,
+                    group_values=group_values,
+                    t_size=t_size,
+                )
+            return out
     except ValueError as error:
         raise GridValidationError(str(error)) from error
 
@@ -1127,24 +1192,43 @@ def _compute_momentum_variant_matrix(
 
     try:
         if indicator_id in {"momentum.rsi", "momentum.roc"}:
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
             variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
             _validate_required_series_available(
                 variant_source_labels=variant_source_labels,
                 available_series=available_series,
             )
-            source_variants = _build_variant_source_matrix(
-                variant_source_labels=variant_source_labels,
-                available_series=available_series,
-                t_size=t_size,
+            source_groups = _group_variant_indexes_by_source(
+                variant_source_labels=variant_source_labels
             )
-            windows_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
-            )
-            return compute_momentum_grid_f32(
-                indicator_id=indicator_id,
-                source_variants=source_variants,
-                windows=windows_i64,
-            )
+            variants = len(variant_source_labels)
+            out = np.empty((variants, t_size), dtype=np.float32, order="C")
+            for source_name, variant_indexes in source_groups:
+                source_variants = _build_group_source_matrix(
+                    source=_require_series(
+                        available_series=available_series,
+                        name=source_name,
+                    ),
+                    variants=int(variant_indexes.shape[0]),
+                    t_size=t_size,
+                )
+                group_values = compute_momentum_grid_f32(
+                    indicator_id=indicator_id,
+                    source_variants=source_variants,
+                    windows=_slice_variant_vector(
+                        values=windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                )
+                _scatter_group_values(
+                    destination=out,
+                    variant_indexes=variant_indexes,
+                    group_values=group_values,
+                    t_size=t_size,
+                )
+            return out
 
         if indicator_id in {"momentum.cci", "momentum.williams_r"}:
             windows_i64 = np.ascontiguousarray(
@@ -1218,11 +1302,11 @@ def _compute_momentum_variant_matrix(
             variant_source_labels=variant_source_labels,
             available_series=available_series,
         )
-        source_variants = _build_variant_source_matrix(
-            variant_source_labels=variant_source_labels,
-            available_series=available_series,
-            t_size=t_size,
+        source_groups = _group_variant_indexes_by_source(
+            variant_source_labels=variant_source_labels
         )
+        variants = len(variant_source_labels)
+        out = np.empty((variants, t_size), dtype=np.float32, order="C")
 
         if indicator_id == "momentum.stoch_rsi":
             rsi_windows_i64 = np.ascontiguousarray(
@@ -1237,14 +1321,42 @@ def _compute_momentum_variant_matrix(
             d_windows_i64 = np.ascontiguousarray(
                 np.asarray(_variant_int_values(axes=axes, axis_name="d_window"), dtype=np.int64)
             )
-            return compute_momentum_grid_f32(
-                indicator_id=indicator_id,
-                source_variants=source_variants,
-                rsi_windows=rsi_windows_i64,
-                k_windows=k_windows_i64,
-                smoothings=smoothings_i64,
-                d_windows=d_windows_i64,
-            )
+            for source_name, variant_indexes in source_groups:
+                source_variants = _build_group_source_matrix(
+                    source=_require_series(
+                        available_series=available_series,
+                        name=source_name,
+                    ),
+                    variants=int(variant_indexes.shape[0]),
+                    t_size=t_size,
+                )
+                group_values = compute_momentum_grid_f32(
+                    indicator_id=indicator_id,
+                    source_variants=source_variants,
+                    rsi_windows=_slice_variant_vector(
+                        values=rsi_windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                    k_windows=_slice_variant_vector(
+                        values=k_windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                    smoothings=_slice_variant_vector(
+                        values=smoothings_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                    d_windows=_slice_variant_vector(
+                        values=d_windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                )
+                _scatter_group_values(
+                    destination=out,
+                    variant_indexes=variant_indexes,
+                    group_values=group_values,
+                    t_size=t_size,
+                )
+            return out
 
         if indicator_id == "momentum.trix":
             windows_i64 = np.ascontiguousarray(
@@ -1256,12 +1368,34 @@ def _compute_momentum_variant_matrix(
                     dtype=np.int64,
                 )
             )
-            return compute_momentum_grid_f32(
-                indicator_id=indicator_id,
-                source_variants=source_variants,
-                windows=windows_i64,
-                signal_windows=signal_windows_i64,
-            )
+            for source_name, variant_indexes in source_groups:
+                source_variants = _build_group_source_matrix(
+                    source=_require_series(
+                        available_series=available_series,
+                        name=source_name,
+                    ),
+                    variants=int(variant_indexes.shape[0]),
+                    t_size=t_size,
+                )
+                group_values = compute_momentum_grid_f32(
+                    indicator_id=indicator_id,
+                    source_variants=source_variants,
+                    windows=_slice_variant_vector(
+                        values=windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                    signal_windows=_slice_variant_vector(
+                        values=signal_windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                )
+                _scatter_group_values(
+                    destination=out,
+                    variant_indexes=variant_indexes,
+                    group_values=group_values,
+                    t_size=t_size,
+                )
+            return out
 
         if indicator_id in {"momentum.ppo", "momentum.macd"}:
             fast_windows_i64 = np.ascontiguousarray(
@@ -1282,13 +1416,38 @@ def _compute_momentum_variant_matrix(
                     dtype=np.int64,
                 )
             )
-            return compute_momentum_grid_f32(
-                indicator_id=indicator_id,
-                source_variants=source_variants,
-                fast_windows=fast_windows_i64,
-                slow_windows=slow_windows_i64,
-                signal_windows=signal_windows_i64,
-            )
+            for source_name, variant_indexes in source_groups:
+                source_variants = _build_group_source_matrix(
+                    source=_require_series(
+                        available_series=available_series,
+                        name=source_name,
+                    ),
+                    variants=int(variant_indexes.shape[0]),
+                    t_size=t_size,
+                )
+                group_values = compute_momentum_grid_f32(
+                    indicator_id=indicator_id,
+                    source_variants=source_variants,
+                    fast_windows=_slice_variant_vector(
+                        values=fast_windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                    slow_windows=_slice_variant_vector(
+                        values=slow_windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                    signal_windows=_slice_variant_vector(
+                        values=signal_windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                )
+                _scatter_group_values(
+                    destination=out,
+                    variant_indexes=variant_indexes,
+                    group_values=group_values,
+                    t_size=t_size,
+                )
+            return out
     except ValueError as error:
         raise GridValidationError(str(error)) from error
 
@@ -1331,24 +1490,43 @@ def _compute_trend_variant_matrix(
 
     try:
         if indicator_id == "trend.linreg_slope":
+            windows_i64 = np.ascontiguousarray(
+                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
+            )
             variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
             _validate_required_series_available(
                 variant_source_labels=variant_source_labels,
                 available_series=available_series,
             )
-            source_variants = _build_variant_source_matrix(
-                variant_source_labels=variant_source_labels,
-                available_series=available_series,
-                t_size=t_size,
+            source_groups = _group_variant_indexes_by_source(
+                variant_source_labels=variant_source_labels
             )
-            windows_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
-            )
-            return compute_trend_grid_f32(
-                indicator_id=indicator_id,
-                source_variants=source_variants,
-                windows=windows_i64,
-            )
+            variants = len(variant_source_labels)
+            out = np.empty((variants, t_size), dtype=np.float32, order="C")
+            for source_name, variant_indexes in source_groups:
+                source_variants = _build_group_source_matrix(
+                    source=_require_series(
+                        available_series=available_series,
+                        name=source_name,
+                    ),
+                    variants=int(variant_indexes.shape[0]),
+                    t_size=t_size,
+                )
+                group_values = compute_trend_grid_f32(
+                    indicator_id=indicator_id,
+                    source_variants=source_variants,
+                    windows=_slice_variant_vector(
+                        values=windows_i64,
+                        variant_indexes=variant_indexes,
+                    ),
+                )
+                _scatter_group_values(
+                    destination=out,
+                    variant_indexes=variant_indexes,
+                    group_values=group_values,
+                    t_size=t_size,
+                )
+            return out
 
         high = _require_series(available_series=available_series, name=InputSeries.HIGH.value)
         low = _require_series(available_series=available_series, name=InputSeries.LOW.value)
@@ -1663,16 +1841,12 @@ def _compute_structure_variant_matrix(
         axis_names = [axis.name for axis in axes]
         kernel_kwargs: dict[str, np.ndarray] = {}
 
+        variant_source_labels: tuple[str, ...] | None = None
         if "source" in axis_names:
             variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
             _validate_required_series_available(
                 variant_source_labels=variant_source_labels,
                 available_series=available_series,
-            )
-            kernel_kwargs["source_variants"] = _build_variant_source_matrix(
-                variant_source_labels=variant_source_labels,
-                available_series=available_series,
-                t_size=t_size,
             )
 
         if "window" in axis_names:
@@ -1720,12 +1894,94 @@ def _compute_structure_variant_matrix(
                 name=InputSeries.CLOSE.value,
             )
 
-        return compute_structure_grid_f32(
-            indicator_id=indicator_id,
-            **kernel_kwargs,
+        if variant_source_labels is None:
+            return compute_structure_grid_f32(
+                indicator_id=indicator_id,
+                **kernel_kwargs,
+            )
+
+        source_groups = _group_variant_indexes_by_source(
+            variant_source_labels=variant_source_labels
         )
+        variants = len(variant_source_labels)
+        out = np.empty((variants, t_size), dtype=np.float32, order="C")
+        group_slice_keys = frozenset(("windows", "atr_windows", "lefts", "rights"))
+
+        for source_name, variant_indexes in source_groups:
+            group_kwargs: dict[str, np.ndarray] = {}
+            for key, values in kernel_kwargs.items():
+                if key in group_slice_keys:
+                    group_kwargs[key] = _slice_variant_vector(
+                        values=values,
+                        variant_indexes=variant_indexes,
+                    )
+                else:
+                    group_kwargs[key] = values
+
+            group_kwargs["source_variants"] = _build_group_source_matrix(
+                source=_require_series(
+                    available_series=available_series,
+                    name=source_name,
+                ),
+                variants=int(variant_indexes.shape[0]),
+                t_size=t_size,
+            )
+            group_values = compute_structure_grid_f32(
+                indicator_id=indicator_id,
+                **group_kwargs,
+            )
+            _scatter_group_values(
+                destination=out,
+                variant_indexes=variant_indexes,
+                group_values=group_values,
+                t_size=t_size,
+            )
+
+        return out
     except ValueError as error:
         raise GridValidationError(str(error)) from error
+
+
+def _expand_axis_values_repeat_tile(
+    *,
+    axis_values: tuple[_AxisValue, ...],
+    axis_lengths: tuple[int, ...],
+    axis_index: int,
+) -> tuple[_AxisValue, ...]:
+    """
+    Expand one materialized axis into per-variant values using repeat/tile cartesian layout.
+
+    Docs: docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/application/services/grid_builder.py,
+      src/trading/contexts/indicators/domain/entities/axis_def.py
+
+    Args:
+        axis_values: Materialized values of one axis preserving request order.
+        axis_lengths: Length of each axis in definition order.
+        axis_index: Index of axis being expanded.
+    Returns:
+        tuple[_AxisValue, ...]: Expanded values aligned with variant index order.
+    Assumptions:
+        Cartesian variant order follows axis definition order with the last axis changing fastest.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    repeat_factor = 1
+    for length in axis_lengths[axis_index + 1 :]:
+        repeat_factor = repeat_factor * length
+
+    tile_factor = 1
+    for length in axis_lengths[:axis_index]:
+        tile_factor = tile_factor * length
+
+    expanded = np.tile(
+        np.repeat(np.asarray(axis_values), repeat_factor),
+        tile_factor,
+    )
+    return cast(tuple[_AxisValue, ...], tuple(expanded))
 
 
 def _variant_int_values(*, axes: tuple[AxisDef, ...], axis_name: str) -> tuple[int, ...]:
@@ -1754,10 +2010,13 @@ def _variant_int_values(*, axes: tuple[AxisDef, ...], axis_name: str) -> tuple[i
     if axis.values_int is None:
         raise GridValidationError(f"axis '{axis_name}' must have values_int")
     axis_lengths = tuple(axis_item.length() for axis_item in axes)
-    items: list[int] = []
-    for coordinate in np.ndindex(axis_lengths):
-        items.append(axis.values_int[coordinate[axis_index]])
-    return tuple(items)
+    return tuple(
+        _expand_axis_values_repeat_tile(
+            axis_values=axis.values_int,
+            axis_lengths=axis_lengths,
+            axis_index=axis_index,
+        )
+    )
 
 
 def _variant_float_values(*, axes: tuple[AxisDef, ...], axis_name: str) -> tuple[float, ...]:
@@ -1786,10 +2045,13 @@ def _variant_float_values(*, axes: tuple[AxisDef, ...], axis_name: str) -> tuple
     if axis.values_float is None:
         raise GridValidationError(f"axis '{axis_name}' must have values_float")
     axis_lengths = tuple(axis_item.length() for axis_item in axes)
-    items: list[float] = []
-    for coordinate in np.ndindex(axis_lengths):
-        items.append(axis.values_float[coordinate[axis_index]])
-    return tuple(items)
+    return tuple(
+        _expand_axis_values_repeat_tile(
+            axis_values=axis.values_float,
+            axis_lengths=axis_lengths,
+            axis_index=axis_index,
+        )
+    )
 
 
 def _axis_index(*, axes: tuple[AxisDef, ...], axis_name: str) -> int:
@@ -1895,10 +2157,13 @@ def _variant_window_values(*, axes: tuple[AxisDef, ...]) -> tuple[int, ...]:
         raise GridValidationError("window axis must have values_int")
 
     axis_lengths = tuple(axis.length() for axis in axes)
-    labels: list[int] = []
-    for coordinate in np.ndindex(axis_lengths):
-        labels.append(window_axis.values_int[coordinate[window_axis_index]])
-    return tuple(labels)
+    return tuple(
+        _expand_axis_values_repeat_tile(
+            axis_values=window_axis.values_int,
+            axis_lengths=axis_lengths,
+            axis_index=window_axis_index,
+        )
+    )
 
 
 def _variant_source_labels(
@@ -1939,10 +2204,13 @@ def _variant_source_labels(
         raise GridValidationError("source axis must have values_enum")
 
     axis_lengths = tuple(axis.length() for axis in axes)
-    labels: list[str] = []
-    for coordinate in np.ndindex(axis_lengths):
-        labels.append(source_values[coordinate[source_axis_index]])
-    return tuple(labels)
+    return tuple(
+        _expand_axis_values_repeat_tile(
+            axis_values=source_values,
+            axis_lengths=axis_lengths,
+            axis_index=source_axis_index,
+        )
+    )
 
 
 def _fallback_source(*, definition: IndicatorDef) -> str:
@@ -2043,6 +2311,148 @@ def _build_variant_source_matrix(
             raise MissingRequiredSeries(f"MissingRequiredSeries: missing={source_name!r}")
         matrix[variant_index, :] = source
     return matrix
+
+
+def _group_variant_indexes_by_source(
+    *,
+    variant_source_labels: tuple[str, ...],
+) -> tuple[tuple[str, np.ndarray], ...]:
+    """
+    Build deterministic source groups with global variant indexes.
+
+    Docs: docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/volatility.py
+
+    Args:
+        variant_source_labels: Source label assigned to each global variant index.
+    Returns:
+        tuple[tuple[str, np.ndarray], ...]: Source groups preserving first-seen source order.
+    Assumptions:
+        Variant labels already reflect deterministic cartesian axis ordering.
+    Raises:
+        None.
+    Side Effects:
+        Allocates per-source int64 index vectors.
+    """
+    grouped: dict[str, list[int]] = {}
+    for variant_index, source_name in enumerate(variant_source_labels):
+        grouped.setdefault(source_name, []).append(variant_index)
+
+    groups: list[tuple[str, np.ndarray]] = []
+    for source_name, indexes in grouped.items():
+        groups.append(
+            (
+                source_name,
+                np.ascontiguousarray(np.asarray(indexes, dtype=np.int64)),
+            )
+        )
+    return tuple(groups)
+
+
+def _build_group_source_matrix(
+    *,
+    source: np.ndarray,
+    variants: int,
+    t_size: int,
+) -> np.ndarray:
+    """
+    Build contiguous `(group_variants, T)` matrix from one source series for grouped compute.
+
+    Docs: docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/trend.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/structure.py
+
+    Args:
+        source: Source series for one source label.
+        variants: Number of variants in the current source group.
+        t_size: Expected time dimension.
+    Returns:
+        np.ndarray: Float32 C-contiguous matrix `(group_variants, T)`.
+    Assumptions:
+        Source series is aligned to request candles timeline.
+    Raises:
+        ValueError: If source length does not match `t_size`.
+    Side Effects:
+        Allocates one grouped source matrix.
+    """
+    source_row = np.ascontiguousarray(source, dtype=np.float32).reshape(1, t_size)
+    return np.ascontiguousarray(
+        np.repeat(source_row, repeats=variants, axis=0),
+        dtype=np.float32,
+    )
+
+
+def _slice_variant_vector(
+    *,
+    values: np.ndarray,
+    variant_indexes: np.ndarray,
+) -> np.ndarray:
+    """
+    Slice one per-variant parameter vector by grouped global indexes.
+
+    Docs: docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/volatility.py
+
+    Args:
+        values: Per-variant parameter vector in global deterministic order.
+        variant_indexes: Group-local selection of global variant indexes.
+    Returns:
+        np.ndarray: Contiguous parameter vector aligned with grouped source matrix rows.
+    Assumptions:
+        Index vector is int64 and deterministic for the source group.
+    Raises:
+        IndexError: If group indexes are outside vector bounds.
+    Side Effects:
+        Allocates one contiguous slice vector.
+    """
+    return np.ascontiguousarray(values[variant_indexes])
+
+
+def _scatter_group_values(
+    *,
+    destination: np.ndarray,
+    variant_indexes: np.ndarray,
+    group_values: np.ndarray,
+    t_size: int,
+) -> None:
+    """
+    Scatter grouped output rows back into global variant-major output matrix.
+
+    Docs: docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      src/trading/contexts/indicators/application/dto/indicator_tensor.py,
+      docs/architecture/indicators/indicators-compute-engine-core.md
+
+    Args:
+        destination: Global output matrix `(V, T)` to fill.
+        variant_indexes: Global variant indexes for grouped rows.
+        group_values: Group output matrix `(group_variants, T)`.
+        t_size: Expected time dimension.
+    Returns:
+        None.
+    Assumptions:
+        `variant_indexes` and grouped compute inputs are aligned by source group.
+    Raises:
+        GridValidationError: If grouped result shape is incompatible with target scatter.
+    Side Effects:
+        Mutates destination matrix in-place.
+    """
+    expected_shape = (int(variant_indexes.shape[0]), t_size)
+    if group_values.shape != expected_shape:
+        raise GridValidationError(
+            "grouped matrix shape mismatch: "
+            f"expected={expected_shape}, got={group_values.shape}"
+        )
+    destination[variant_indexes, :] = group_values
 
 
 def _variants_from_axes(*, axes: tuple[AxisDef, ...]) -> int:

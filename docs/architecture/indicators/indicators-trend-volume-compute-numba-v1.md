@@ -120,6 +120,12 @@ Batch — отдельная orchestration задача (не в EPIC-08).
 
 **Примечание:** остальные outputs допускается считать внутри kernels (для будущего расширения), но наружу в v1 не экспортируются.
 
+Для source-parameterized trend-path (`trend.linreg_slope`) compute engine использует grouped-source pipeline:
+
+- глобальные `variant_source_labels` группируются по unique source;
+- kernel вызывается отдельно по каждой source-группе и subset параметров;
+- group-результаты scatter’ятся в исходные global variant indexes без изменения порядка.
+
 ### 3) Int outputs (direction flags) не возвращаются в v1
 
 `trend.psar` и `trend.supertrend` в формуле имеют `*_dir: series<int>`.

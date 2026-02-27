@@ -125,6 +125,12 @@
 * Порядок `explicit.values` сохраняется как в request (без сортировки).
 * Допустимые значения `source` должны совпадать с доменной моделью (см. `domain/definitions/*` и `domain/entities/input_series.py`).
 
+Для source-parameterized volatility/momentum индикаторов в compute engine используется grouped-source pipeline:
+
+* `variant_source_labels` группируются по уникальному `source` в deterministic порядке;
+* kernel рассчитывается по source-группам на subset-вариантах;
+* результаты scatter’ятся обратно в глобальный `(V, T)` без изменения variant ordering.
+
 ### 3) NaN policy (фикс v1, единая для EPIC-07)
 
 Compute **не делает импутацию**. NaN holes из CandleFeed должны корректно “просачиваться” в outputs.
