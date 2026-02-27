@@ -920,6 +920,51 @@ def _psar_series_f64(
     """
     t_size = high.shape[0]
     out = np.empty(t_size, dtype=np.float64)
+    _psar_series_into_f64(
+        out,
+        high,
+        low,
+        accel_start,
+        accel_step,
+        accel_max,
+    )
+    return out
+
+
+@nb.njit(cache=True)
+def _psar_series_into_f64(
+    out: np.ndarray,
+    high: np.ndarray,
+    low: np.ndarray,
+    accel_start: float,
+    accel_step: float,
+    accel_max: float,
+) -> None:
+    """
+    Compute Parabolic SAR primary output (`psar`) into a preallocated output buffer.
+
+    Docs: docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/trend.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/trend.py
+
+    Args:
+        out: Preallocated float64 output vector.
+        high: High-price series.
+        low: Low-price series.
+        accel_start: Initial acceleration factor.
+        accel_step: Step for acceleration increase.
+        accel_max: Maximum acceleration factor.
+    Returns:
+        None.
+    Assumptions:
+        NaN on inputs emits NaN output and fully resets trend direction/state.
+    Raises:
+        None.
+    Side Effects:
+        Writes PSAR values into `out` in-place.
+    """
+    t_size = high.shape[0]
 
     direction = 0
     sar = np.nan
@@ -984,8 +1029,6 @@ def _psar_series_f64(
         out[time_index] = sar
         prev_high = high_value
         prev_low = low_value
-
-    return out
 
 
 @nb.njit(cache=True)
@@ -1424,7 +1467,8 @@ def _psar_variants_f64(
     out = np.empty((variants, t_size), dtype=np.float64)
 
     for variant_index in nb.prange(variants):
-        out[variant_index, :] = _psar_series_f64(
+        _psar_series_into_f64(
+            out[variant_index, :],
             high,
             low,
             float(accel_starts[variant_index]),

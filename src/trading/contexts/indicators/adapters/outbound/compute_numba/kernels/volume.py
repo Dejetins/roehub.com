@@ -630,21 +630,71 @@ def _vwap_deviation_upper_series_f64(
     Side Effects:
         Allocates intermediate vectors.
     """
-    vwap = _vwap_series_f64(high, low, close, volume, window)
-    typical_price = _typical_price_series_f64(high, low, close)
     t_size = high.shape[0]
+    out = np.empty(t_size, dtype=np.float64)
+    _vwap_deviation_upper_series_into_f64(
+        out,
+        high,
+        low,
+        close,
+        volume,
+        window,
+        mult,
+    )
+    return out
 
+
+@nb.njit(cache=True)
+def _vwap_deviation_upper_series_into_f64(
+    out: np.ndarray,
+    high: np.ndarray,
+    low: np.ndarray,
+    close: np.ndarray,
+    volume: np.ndarray,
+    window: int,
+    mult: float,
+) -> None:
+    """
+    Compute VWAP deviation primary output (`vwap_upper`) into preallocated buffer.
+
+    Docs: docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/volume.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/volume.py
+
+    Args:
+        out: Preallocated float64 output vector.
+        high: High-price series.
+        low: Low-price series.
+        close: Close-price series.
+        volume: Volume series.
+        window: Rolling window.
+        mult: Band multiplier.
+    Returns:
+        None.
+    Assumptions:
+        Primary output in v1 is `vwap_upper`, which depends on both `window` and `mult`.
+    Raises:
+        None.
+    Side Effects:
+        Writes VWAP deviation upper-band values into `out` in-place.
+    """
+    t_size = high.shape[0]
+    vwap = _vwap_series_f64(high, low, close, volume, window)
     diff = np.empty(t_size, dtype=np.float64)
+
     for time_index in range(t_size):
-        typical_price_value = float(typical_price[time_index])
+        high_value = float(high[time_index])
+        low_value = float(low[time_index])
+        close_value = float(close[time_index])
         vwap_value = float(vwap[time_index])
-        if is_nan(typical_price_value) or is_nan(vwap_value):
+        if is_nan(high_value) or is_nan(low_value) or is_nan(close_value) or is_nan(vwap_value):
             diff[time_index] = np.nan
-        else:
-            diff[time_index] = typical_price_value - vwap_value
+            continue
+        typical_price_value = (high_value + low_value + close_value) / 3.0
+        diff[time_index] = typical_price_value - vwap_value
 
     stdev = _rolling_std_series_f64(diff, window)
-    out = np.empty(t_size, dtype=np.float64)
 
     for time_index in range(t_size):
         vwap_value = float(vwap[time_index])
@@ -653,8 +703,6 @@ def _vwap_deviation_upper_series_f64(
             out[time_index] = np.nan
         else:
             out[time_index] = vwap_value + (mult * stdev_value)
-
-    return out
 
 
 @nb.njit(parallel=True, cache=True)
@@ -846,7 +894,8 @@ def _vwap_deviation_variants_f64(
     out = np.empty((variants, t_size), dtype=np.float64)
 
     for variant_index in nb.prange(variants):
-        out[variant_index, :] = _vwap_deviation_upper_series_f64(
+        _vwap_deviation_upper_series_into_f64(
+            out[variant_index, :],
             high,
             low,
             close,

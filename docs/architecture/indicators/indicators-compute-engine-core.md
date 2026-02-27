@@ -62,6 +62,25 @@
 
 Это убирает необходимость строить один общий full `source_variants` `(V, T)` для всех source сразу и сохраняет исходный порядок вариантов в финальном тензоре.
 
+### In-place heavy kernels (phase 4)
+
+Для наиболее тяжёлых по аллокациям variant-paths включён in-place write pattern:
+
+- kernel-циклы по вариантам пишут в заранее выделенную строку `out[variant_index, :]`;
+- для hot-кейсов используются `*_into` helper-ы вместо возврата отдельного временного ряда;
+- публичные kernel entrypoints и сигнатуры `compute_*_grid_f32(...)` не меняются.
+
+Целевые индикаторы phase 4:
+
+- `trend.psar`
+- `volatility.bbands`
+- `volatility.bbands_bandwidth`
+- `volatility.bbands_percent_b`
+- `momentum.stoch_rsi`
+- `momentum.macd`
+- `momentum.ppo`
+- `volume.vwap_deviation`
+
 ## Total memory guard
 
 Единственный публичный budget-параметр:

@@ -131,7 +131,25 @@
 * kernel рассчитывается по source-группам на subset-вариантах;
 * результаты scatter’ятся обратно в глобальный `(V, T)` без изменения variant ordering.
 
-### 3) NaN policy (фикс v1, единая для EPIC-07)
+### 3) In-place heavy kernels (phase 4)
+
+Для наиболее тяжёлых volatility/momentum kernels в variant-циклах используется in-place write path:
+
+* запись результата идёт сразу в `out[variant_index, :]`;
+* внутренние helper-ы `*_into_*` используются там, где это снижает число временных векторов;
+* публичные entrypoints `compute_momentum_grid_f32(...)` и `compute_volatility_grid_f32(...)`
+  сохраняют прежние сигнатуры и поведение.
+
+Phase 4 покрывает следующие индикаторы:
+
+* `volatility.bbands`
+* `volatility.bbands_bandwidth`
+* `volatility.bbands_percent_b`
+* `momentum.stoch_rsi`
+* `momentum.macd`
+* `momentum.ppo`
+
+### 4) NaN policy (фикс v1, единая для EPIC-07)
 
 Compute **не делает импутацию**. NaN holes из CandleFeed должны корректно “просачиваться” в outputs.
 
@@ -152,17 +170,17 @@ Compute **не делает импутацию**. NaN holes из CandleFeed до
 
 Эта политика гарантирует, что состояние не “перетягивается” через пропуски.
 
-### 4) `volatility.tr` и `volatility.atr` используют OHLC, а не `source`
+### 5) `volatility.tr` и `volatility.atr` используют OHLC, а не `source`
 
 * `TR` использует `high/low/close` (prev_close нужен для max-ветки).
 * `ATR` = сглаживание TR (v1 фикс: RMA alpha=1/window, с reset-on-NaN).
 
-### 5) Float32 output (фикс)
+### 6) Float32 output (фикс)
 
 `IndicatorTensor.values` — `float32`.
 Внутри kernels допускаются float64 accumulator’ы (implementation detail), но выход фиксирован как `float32`.
 
-### 6) Guards применяются до больших аллокаций тензора
+### 7) Guards применяются до больших аллокаций тензора
 
 До расчёта:
 

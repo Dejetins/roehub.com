@@ -73,6 +73,129 @@ def _rolling_mean_series_f64(source: np.ndarray, window: int) -> np.ndarray:
 
 
 @nb.njit(cache=True)
+def _rolling_mean_series_into_f64(out: np.ndarray, source: np.ndarray, window: int) -> None:
+    """
+    Compute one rolling-mean series into a preallocated output buffer.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/momentum.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py
+
+    Args:
+        out: Preallocated float64 output vector.
+        source: Float64 source series.
+        window: Positive integer window.
+    Returns:
+        None.
+    Assumptions:
+        `out` and `source` have identical length.
+    Raises:
+        None.
+    Side Effects:
+        Writes rolling mean values into `out` in-place.
+    """
+    t_size = source.shape[0]
+    running_sum = 0.0
+    nan_count = 0
+    for time_index in range(t_size):
+        incoming = float(source[time_index])
+        if is_nan(incoming):
+            nan_count += 1
+        else:
+            running_sum += incoming
+
+        if time_index >= window:
+            outgoing = float(source[time_index - window])
+            if is_nan(outgoing):
+                nan_count -= 1
+            else:
+                running_sum -= outgoing
+
+        if time_index + 1 < window or nan_count > 0:
+            out[time_index] = np.nan
+        else:
+            out[time_index] = running_sum / float(window)
+
+
+@nb.njit(cache=True)
+def _rolling_mean_series_discard_f64(source: np.ndarray, window: int) -> None:
+    """
+    Execute rolling-mean pass with NaN policy while discarding outputs.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/momentum.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py
+
+    Args:
+        source: Float64 source series.
+        window: Positive integer window.
+    Returns:
+        None.
+    Assumptions:
+        Helper is used to preserve indicator pipeline semantics when an auxiliary
+        output is intentionally not materialized.
+    Raises:
+        None.
+    Side Effects:
+        Performs compute pass without allocating an output vector.
+    """
+    t_size = source.shape[0]
+    running_sum = 0.0
+    nan_count = 0
+    for time_index in range(t_size):
+        incoming = float(source[time_index])
+        if is_nan(incoming):
+            nan_count += 1
+        else:
+            running_sum += incoming
+
+        if time_index >= window:
+            outgoing = float(source[time_index - window])
+            if is_nan(outgoing):
+                nan_count -= 1
+            else:
+                running_sum -= outgoing
+
+
+@nb.njit(cache=True)
+def _ema_series_discard_f64(source: np.ndarray, window: int) -> None:
+    """
+    Execute EMA pass with reset-on-NaN policy while discarding outputs.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/momentum.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py
+
+    Args:
+        source: Float64 source series.
+        window: Positive integer smoothing window.
+    Returns:
+        None.
+    Assumptions:
+        First valid source value is used as seed after each reset.
+    Raises:
+        None.
+    Side Effects:
+        Performs compute pass without allocating an output vector.
+    """
+    alpha = 2.0 / (float(window) + 1.0)
+    t_size = source.shape[0]
+    previous = np.nan
+    for time_index in range(t_size):
+        value = float(source[time_index])
+        if is_nan(value):
+            previous = np.nan
+            continue
+        if is_nan(previous):
+            previous = value
+        else:
+            previous = (alpha * value) + ((1.0 - alpha) * previous)
+
+
+@nb.njit(cache=True)
 def _rolling_min_series_f64(source: np.ndarray, window: int) -> np.ndarray:
     """
     Compute one rolling-minimum series with NaN-window propagation policy.
@@ -597,26 +720,67 @@ def _stoch_rsi_variants_f64(
     t_size = source_variants.shape[1]
     out = np.empty((variants, t_size), dtype=np.float64)
     for variant_index in nb.prange(variants):
-        rsi_series = _rsi_series_f64(
+        _stoch_rsi_series_into_f64(
+            out[variant_index, :],
             source_variants[variant_index, :],
             int(rsi_windows[variant_index]),
+            int(k_windows[variant_index]),
+            int(smoothings[variant_index]),
+            int(d_windows[variant_index]),
         )
-        hh = _rolling_max_series_f64(rsi_series, int(k_windows[variant_index]))
-        ll = _rolling_min_series_f64(rsi_series, int(k_windows[variant_index]))
-        k_raw = np.empty(t_size, dtype=np.float64)
-        for time_index in range(t_size):
-            rsi_value = float(rsi_series[time_index])
-            hh_value = float(hh[time_index])
-            ll_value = float(ll[time_index])
-            denominator = hh_value - ll_value
-            if is_nan(rsi_value) or is_nan(hh_value) or is_nan(ll_value) or denominator == 0.0:
-                k_raw[time_index] = np.nan
-            else:
-                k_raw[time_index] = 100.0 * ((rsi_value - ll_value) / denominator)
-        k = _rolling_mean_series_f64(k_raw, int(smoothings[variant_index]))
-        _ = _rolling_mean_series_f64(k, int(d_windows[variant_index]))
-        out[variant_index, :] = k
     return out
+
+
+@nb.njit(cache=True)
+def _stoch_rsi_series_into_f64(
+    out: np.ndarray,
+    source: np.ndarray,
+    rsi_window: int,
+    k_window: int,
+    smoothing: int,
+    d_window: int,
+) -> None:
+    """
+    Compute stochastic-RSI `k` series into a preallocated output buffer.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/momentum.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py
+
+    Args:
+        out: Preallocated float64 output vector.
+        source: Float64 source series.
+        rsi_window: RSI smoothing window.
+        k_window: Stochastic window on RSI.
+        smoothing: Rolling smoothing window for `k`.
+        d_window: Rolling window for auxiliary `d` line.
+    Returns:
+        None.
+    Assumptions:
+        All window values are positive integers validated by the Python wrapper.
+    Raises:
+        None.
+    Side Effects:
+        Writes primary stochastic-RSI output into `out` in-place.
+    """
+    t_size = source.shape[0]
+    rsi_series = _rsi_series_f64(source, rsi_window)
+    hh = _rolling_max_series_f64(rsi_series, k_window)
+    ll = _rolling_min_series_f64(rsi_series, k_window)
+    k_raw = np.empty(t_size, dtype=np.float64)
+    for time_index in range(t_size):
+        rsi_value = float(rsi_series[time_index])
+        hh_value = float(hh[time_index])
+        ll_value = float(ll[time_index])
+        denominator = hh_value - ll_value
+        if is_nan(rsi_value) or is_nan(hh_value) or is_nan(ll_value) or denominator == 0.0:
+            k_raw[time_index] = np.nan
+        else:
+            k_raw[time_index] = 100.0 * ((rsi_value - ll_value) / denominator)
+
+    _rolling_mean_series_into_f64(out, k_raw, smoothing)
+    _rolling_mean_series_discard_f64(out, d_window)
 
 
 @nb.njit(parallel=True, cache=True)
@@ -695,26 +859,82 @@ def _macd_or_ppo_variants_f64(
     t_size = source_variants.shape[1]
     out = np.empty((variants, t_size), dtype=np.float64)
     for variant_index in nb.prange(variants):
-        source = source_variants[variant_index, :]
-        fast = _ema_series_f64(source, int(fast_windows[variant_index]))
-        slow = _ema_series_f64(source, int(slow_windows[variant_index]))
-        main = np.empty(t_size, dtype=np.float64)
-        for time_index in range(t_size):
-            fast_value = float(fast[time_index])
-            slow_value = float(slow[time_index])
-            if is_nan(fast_value) or is_nan(slow_value):
-                main[time_index] = np.nan
-                continue
-            if compute_ppo:
-                if slow_value == 0.0:
-                    main[time_index] = np.nan
-                else:
-                    main[time_index] = 100.0 * ((fast_value - slow_value) / slow_value)
-            else:
-                main[time_index] = fast_value - slow_value
-        _ = _ema_series_f64(main, int(signal_windows[variant_index]))
-        out[variant_index, :] = main
+        _macd_or_ppo_series_into_f64(
+            out[variant_index, :],
+            source_variants[variant_index, :],
+            int(fast_windows[variant_index]),
+            int(slow_windows[variant_index]),
+            int(signal_windows[variant_index]),
+            compute_ppo,
+        )
     return out
+
+
+@nb.njit(cache=True)
+def _macd_or_ppo_series_into_f64(
+    out: np.ndarray,
+    source: np.ndarray,
+    fast_window: int,
+    slow_window: int,
+    signal_window: int,
+    compute_ppo: bool,
+) -> None:
+    """
+    Compute MACD/PPO main line into a preallocated output buffer.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/momentum.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py
+
+    Args:
+        out: Preallocated float64 output vector.
+        source: Float64 source series.
+        fast_window: Fast EMA window.
+        slow_window: Slow EMA window.
+        signal_window: Signal EMA window.
+        compute_ppo: Whether to compute PPO (`True`) or MACD (`False`).
+    Returns:
+        None.
+    Assumptions:
+        All window values are positive integers validated by the Python wrapper.
+    Raises:
+        None.
+    Side Effects:
+        Writes primary main-line output into `out` in-place.
+    """
+    t_size = source.shape[0]
+    fast_alpha = 2.0 / (float(fast_window) + 1.0)
+    slow_alpha = 2.0 / (float(slow_window) + 1.0)
+    fast_previous = np.nan
+    slow_previous = np.nan
+    for time_index in range(t_size):
+        source_value = float(source[time_index])
+        if is_nan(source_value):
+            fast_previous = np.nan
+            slow_previous = np.nan
+            out[time_index] = np.nan
+            continue
+
+        if is_nan(fast_previous):
+            fast_previous = source_value
+        else:
+            fast_previous = (fast_alpha * source_value) + ((1.0 - fast_alpha) * fast_previous)
+
+        if is_nan(slow_previous):
+            slow_previous = source_value
+        else:
+            slow_previous = (slow_alpha * source_value) + ((1.0 - slow_alpha) * slow_previous)
+
+        if compute_ppo:
+            if slow_previous == 0.0:
+                out[time_index] = np.nan
+            else:
+                out[time_index] = 100.0 * ((fast_previous - slow_previous) / slow_previous)
+        else:
+            out[time_index] = fast_previous - slow_previous
+
+    _ema_series_discard_f64(out, signal_window)
 
 
 def is_supported_momentum_indicator(*, indicator_id: str) -> bool:

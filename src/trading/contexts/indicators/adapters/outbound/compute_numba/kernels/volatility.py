@@ -350,61 +350,81 @@ def _bbands_variants_f64(
     out = np.empty((variants, t_size), dtype=np.float64)
 
     for variant_index in nb.prange(variants):
-        series = source_variants[variant_index, :]
-        window = int(windows[variant_index])
-        mult = float(mults[variant_index])
+        _bbands_series_into_f64(
+            out[variant_index, :],
+            source_variants[variant_index, :],
+            int(windows[variant_index]),
+            float(mults[variant_index]),
+            mode,
+        )
+    return out
 
-        middle = _rolling_mean_series_f64(series, window)
-        variance = _rolling_variance_series_f64(series, window)
-        upper = np.empty(t_size, dtype=np.float64)
-        lower = np.empty(t_size, dtype=np.float64)
 
+@nb.njit(cache=True)
+def _bbands_series_into_f64(
+    out: np.ndarray,
+    source: np.ndarray,
+    window: int,
+    mult: float,
+    mode: int,
+) -> None:
+    """
+    Compute Bollinger-derived series into a preallocated output buffer.
+
+    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/volatility.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/volatility.py
+
+    Args:
+        out: Preallocated float64 output vector.
+        source: Float64 source series.
+        window: Rolling window.
+        mult: Bollinger multiplier.
+        mode: `0=middle`, `1=bandwidth`, `2=percent_b`.
+    Returns:
+        None.
+    Assumptions:
+        Parameters are pre-validated and `mode` is one of supported values.
+    Raises:
+        None.
+    Side Effects:
+        Writes selected Bollinger output into `out` in-place.
+    """
+    t_size = source.shape[0]
+    middle = _rolling_mean_series_f64(source, window)
+    variance = _rolling_variance_series_f64(source, window)
+
+    if mode == 0:
         for time_index in range(t_size):
-            variance_value = float(variance[time_index])
+            out[time_index] = float(middle[time_index])
+        return
+
+    if mode == 1:
+        for time_index in range(t_size):
             middle_value = float(middle[time_index])
-            if is_nan(variance_value) or is_nan(middle_value):
-                upper[time_index] = np.nan
-                lower[time_index] = np.nan
+            variance_value = float(variance[time_index])
+            if is_nan(middle_value) or is_nan(variance_value) or middle_value == 0.0:
+                out[time_index] = np.nan
                 continue
             sigma = math.sqrt(variance_value)
-            upper[time_index] = middle_value + (mult * sigma)
-            lower[time_index] = middle_value - (mult * sigma)
+            out[time_index] = (2.0 * mult * sigma) / middle_value
+        return
 
-        if mode == 0:
-            out[variant_index, :] = middle
+    for time_index in range(t_size):
+        source_value = float(source[time_index])
+        middle_value = float(middle[time_index])
+        variance_value = float(variance[time_index])
+        if is_nan(source_value) or is_nan(middle_value) or is_nan(variance_value):
+            out[time_index] = np.nan
             continue
-
-        if mode == 1:
-            for time_index in range(t_size):
-                middle_value = float(middle[time_index])
-                upper_value = float(upper[time_index])
-                lower_value = float(lower[time_index])
-                if (
-                    is_nan(middle_value)
-                    or is_nan(upper_value)
-                    or is_nan(lower_value)
-                    or middle_value == 0.0
-                ):
-                    out[variant_index, time_index] = np.nan
-                else:
-                    out[variant_index, time_index] = (upper_value - lower_value) / middle_value
+        sigma = math.sqrt(variance_value)
+        denominator = 2.0 * mult * sigma
+        if denominator == 0.0:
+            out[time_index] = np.nan
             continue
-
-        for time_index in range(t_size):
-            source_value = float(series[time_index])
-            upper_value = float(upper[time_index])
-            lower_value = float(lower[time_index])
-            denominator = upper_value - lower_value
-            if (
-                is_nan(source_value)
-                or is_nan(upper_value)
-                or is_nan(lower_value)
-                or denominator == 0.0
-            ):
-                out[variant_index, time_index] = np.nan
-            else:
-                out[variant_index, time_index] = (source_value - lower_value) / denominator
-    return out
+        lower = middle_value - (mult * sigma)
+        out[time_index] = (source_value - lower) / denominator
 
 
 def is_supported_volatility_indicator(*, indicator_id: str) -> bool:
