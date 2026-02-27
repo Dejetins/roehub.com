@@ -20,6 +20,100 @@ _ALLOWED_SIZING_MODES = {
     "strategy_compound",
     "strategy_compound_profit_lock",
 }
+BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1 = "total_return_pct"
+BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1: str | None = None
+BACKTEST_RANKING_METRIC_LITERALS_V1: tuple[str, ...] = (
+    "max_drawdown_pct",
+    "profit_factor",
+    "return_over_max_drawdown",
+    "total_return_pct",
+)
+_BACKTEST_ALLOWED_RANKING_METRICS_V1 = frozenset(BACKTEST_RANKING_METRIC_LITERALS_V1)
+
+
+def normalize_backtest_ranking_metric_literal(*, metric: str, field_path: str) -> str:
+    """
+    Normalize and validate one ranking metric literal against v1 allowed contract.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+
+    Args:
+        metric: Raw ranking metric literal.
+        field_path: Field path used in deterministic validation error messages.
+    Returns:
+        str: Lowercase normalized metric literal.
+    Assumptions:
+        Ranking identifiers are lowercase snake_case literals from fixed v1 list.
+    Raises:
+        ValueError: If value is not a supported metric literal.
+    Side Effects:
+        None.
+    """
+    normalized_metric = metric.strip().lower()
+    if not normalized_metric:
+        raise ValueError(f"{field_path} must be non-empty")
+    if normalized_metric not in _BACKTEST_ALLOWED_RANKING_METRICS_V1:
+        allowed_values = ", ".join(sorted(_BACKTEST_ALLOWED_RANKING_METRICS_V1))
+        raise ValueError(f"{field_path} must be one of: {allowed_values}")
+    return normalized_metric
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestRankingConfig:
+    """
+    Ranking override payload for request/runtime contracts with deterministic normalization.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    primary_metric: str = BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1
+    secondary_metric: str | None = BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
+
+    def __post_init__(self) -> None:
+        """
+        Validate ranking metric literals and enforce deterministic tie-break contract.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Secondary metric is optional and cannot duplicate primary metric.
+        Raises:
+            ValueError: If one metric literal is invalid or duplicates primary metric.
+        Side Effects:
+            Normalizes ranking literals to lowercase snake_case.
+        """
+        normalized_primary_metric = normalize_backtest_ranking_metric_literal(
+            metric=self.primary_metric,
+            field_path="ranking.primary_metric",
+        )
+        object.__setattr__(self, "primary_metric", normalized_primary_metric)
+
+        if self.secondary_metric is None:
+            return
+
+        normalized_secondary_metric = normalize_backtest_ranking_metric_literal(
+            metric=self.secondary_metric,
+            field_path="ranking.secondary_metric",
+        )
+        if normalized_secondary_metric == normalized_primary_metric:
+            raise ValueError(
+                "ranking.secondary_metric must be different from ranking.primary_metric"
+            )
+        object.__setattr__(self, "secondary_metric", normalized_secondary_metric)
 
 
 @dataclass(frozen=True, slots=True)
@@ -243,6 +337,7 @@ class RunBacktestRequest:
     top_k: int | None = None
     preselect: int | None = None
     top_trades_n: int | None = None
+    ranking: BacktestRankingConfig | None = None
 
     def __post_init__(self) -> None:
         """

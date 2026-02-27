@@ -6,6 +6,8 @@ from uuid import UUID
 import pytest
 
 from apps.api.dto import (
+    BacktestsPostRequest,
+    build_backtest_run_request,
     decode_backtest_jobs_cursor,
     decode_backtest_jobs_state,
     encode_backtest_jobs_cursor,
@@ -185,3 +187,49 @@ def test_backtest_jobs_cursor_encode_returns_none_for_empty_cursor() -> None:
         None.
     """
     assert encode_backtest_jobs_cursor(cursor=None) is None
+
+
+def test_backtest_jobs_create_request_accepts_ranking_block() -> None:
+    """
+    Verify shared jobs-create envelope accepts ranking block and normalizes metric literals.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Jobs create endpoint reuses `BacktestsPostRequest` contract from sync endpoint.
+    Raises:
+        AssertionError: If ranking override is dropped or not normalized.
+    Side Effects:
+        None.
+    """
+    request = BacktestsPostRequest.model_validate(
+        {
+            "time_range": {
+                "start": datetime(2026, 2, 23, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2026, 2, 23, 1, 0, tzinfo=timezone.utc),
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1m",
+                "indicator_grids": [
+                    {
+                        "indicator_id": "ma.sma",
+                        "params": {
+                            "window": {"mode": "explicit", "values": [20]},
+                        },
+                    }
+                ],
+            },
+            "ranking": {
+                "primary_metric": "TOTAL_RETURN_PCT",
+                "secondary_metric": "MAX_DRAWDOWN_PCT",
+            },
+        }
+    )
+
+    run_request = build_backtest_run_request(request=request)
+    assert run_request.ranking is not None
+    assert run_request.ranking.primary_metric == "total_return_pct"
+    assert run_request.ranking.secondary_metric == "max_drawdown_pct"

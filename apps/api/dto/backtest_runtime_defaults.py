@@ -57,6 +57,26 @@ class BacktestRuntimeJobsDefaultsResponse(BaseModel):
     top_k_persisted_default: int
 
 
+class BacktestRuntimeRankingDefaultsResponse(BaseModel):
+    """
+    API response model for ranking defaults used by browser-side ranking controls.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+      - apps/web/dist/backtest_ui.js
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    primary_metric_default: str
+    secondary_metric_default: str | None = None
+
+
 class BacktestRuntimeDefaultsResponse(BaseModel):
     """
     API response model for deterministic runtime defaults contract.
@@ -78,6 +98,7 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
     top_k_default: int
     preselect_default: int
     top_trades_n_default: int
+    ranking: BacktestRuntimeRankingDefaultsResponse
     execution: BacktestRuntimeExecutionDefaultsResponse
     jobs: BacktestRuntimeJobsDefaultsResponse
 
@@ -120,6 +141,10 @@ def build_backtest_runtime_defaults_response(
         top_k_default=config.top_k_default,
         preselect_default=config.preselect_default,
         top_trades_n_default=config.reporting.top_trades_n_default,
+        ranking=BacktestRuntimeRankingDefaultsResponse(
+            primary_metric_default=config.ranking.primary_metric_default,
+            secondary_metric_default=config.ranking.secondary_metric_default,
+        ),
         execution=BacktestRuntimeExecutionDefaultsResponse(
             init_cash_quote_default=config.execution.init_cash_quote_default,
             fixed_quote_default=config.execution.fixed_quote_default,
@@ -137,5 +162,6 @@ __all__ = [
     "BacktestRuntimeDefaultsResponse",
     "BacktestRuntimeExecutionDefaultsResponse",
     "BacktestRuntimeJobsDefaultsResponse",
+    "BacktestRuntimeRankingDefaultsResponse",
     "build_backtest_runtime_defaults_response",
 ]

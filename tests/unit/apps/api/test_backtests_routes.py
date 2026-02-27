@@ -15,6 +15,7 @@ from apps.api.routes import build_backtests_router
 from trading.contexts.backtest.adapters.outbound import (
     BacktestExecutionRuntimeConfig,
     BacktestJobsRuntimeConfig,
+    BacktestRankingRuntimeConfig,
     BacktestReportingRuntimeConfig,
     BacktestRuntimeConfig,
     BacktestSyncRuntimeConfig,
@@ -232,6 +233,10 @@ def _runtime_defaults_response() -> BacktestRuntimeDefaultsResponse:
             warmup_bars_default=200,
             top_k_default=300,
             preselect_default=20000,
+            ranking=BacktestRankingRuntimeConfig(
+                primary_metric_default="total_return_pct",
+                secondary_metric_default=None,
+            ),
             sync=BacktestSyncRuntimeConfig(sync_deadline_seconds=55.0),
             reporting=BacktestReportingRuntimeConfig(top_trades_n_default=3),
             execution=BacktestExecutionRuntimeConfig(
@@ -294,6 +299,10 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
         "top_k_default": 300,
         "preselect_default": 20000,
         "top_trades_n_default": 3,
+        "ranking": {
+            "primary_metric_default": "total_return_pct",
+            "secondary_metric_default": None,
+        },
         "execution": {
             "init_cash_quote_default": 10000.0,
             "fixed_quote_default": 100.0,

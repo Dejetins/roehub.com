@@ -1,5 +1,9 @@
 from .dto import (
+    BACKTEST_RANKING_METRIC_LITERALS_V1,
+    BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
+    BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
     BacktestMetricRowV1,
+    BacktestRankingConfig,
     BacktestReportV1,
     BacktestRequestScalar,
     BacktestRiskGridSpec,
@@ -9,6 +13,7 @@ from .dto import (
     RunBacktestResponse,
     RunBacktestSavedOverrides,
     RunBacktestTemplate,
+    normalize_backtest_ranking_metric_literal,
 )
 from .ports import (
     BacktestGridDefaultsProvider,
@@ -99,6 +104,9 @@ from .use_cases import (
 
 __all__ = [
     "BACKTEST_METRIC_ORDER_V1",
+    "BACKTEST_RANKING_METRIC_LITERALS_V1",
+    "BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1",
+    "BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1",
     "BacktestJobLeaseRepository",
     "BacktestJobListPage",
     "BacktestJobListQuery",
@@ -125,6 +133,7 @@ __all__ = [
     "BacktestMetricsTableFormatterV1",
     "BacktestReportingServiceV1",
     "BacktestReportV1",
+    "BacktestRankingConfig",
     "BacktestRiskGridSpec",
     "BacktestRiskVariantV1",
     "BacktestRequestScalar",
@@ -187,5 +196,6 @@ __all__ = [
     "rollup_1m_candles_best_effort",
     "signal_rule_spec_v1",
     "supported_indicator_ids_for_signals_v1",
+    "normalize_backtest_ranking_metric_literal",
     "validation_error",
 ]

@@ -3,6 +3,7 @@ Pydantic models and deterministic cursor/mapper helpers for Backtest Jobs API v1
 
 Docs:
   - docs/architecture/backtest/backtest-jobs-api-v1.md
+  - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
   - docs/architecture/api/api-errors-and-422-payload-v1.md
 """
 

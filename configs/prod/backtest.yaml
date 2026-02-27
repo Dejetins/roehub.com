@@ -3,6 +3,9 @@ backtest:
   warmup_bars_default: 200
   top_k_default: 300
   preselect_default: 20000
+  ranking:
+    primary_metric_default: total_return_pct
+    secondary_metric_default: null
   guards:
     max_variants_per_compute: 600000
     max_compute_bytes_total: 5368709120

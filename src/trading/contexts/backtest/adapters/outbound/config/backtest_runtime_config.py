@@ -12,6 +12,11 @@ from uuid import UUID
 
 import yaml
 
+from trading.contexts.backtest.application.dto import (
+    BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
+    BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
+    normalize_backtest_ranking_metric_literal,
+)
 from trading.contexts.indicators.application.services.grid_builder import (
     MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     MAX_VARIANTS_PER_COMPUTE_DEFAULT,
@@ -25,6 +30,8 @@ _WARMUP_BARS_DEFAULT = 200
 _TOP_K_DEFAULT = 300
 _PRESELECT_DEFAULT = 20000
 _TOP_TRADES_N_DEFAULT = 3
+_PRIMARY_METRIC_DEFAULT = BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1
+_SECONDARY_METRIC_DEFAULT = BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
 
 _INIT_CASH_QUOTE_DEFAULT = 10000.0
 _FIXED_QUOTE_DEFAULT = 100.0
@@ -144,6 +151,59 @@ class BacktestReportingRuntimeConfig:
         """
         if self.top_trades_n_default <= 0:
             raise ValueError("backtest.reporting.top_trades_n_default must be > 0")
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestRankingRuntimeConfig:
+    """
+    Runtime defaults for ranking contract loaded from `backtest.ranking` section.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - configs/dev/backtest.yaml
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/dto/backtest_runtime_defaults.py
+    """
+
+    primary_metric_default: str = _PRIMARY_METRIC_DEFAULT
+    secondary_metric_default: str | None = _SECONDARY_METRIC_DEFAULT
+
+    def __post_init__(self) -> None:
+        """
+        Validate ranking defaults and normalize metric identifiers.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Metric identifiers follow lowercase snake_case literals from fixed v1 list.
+        Raises:
+            ValueError: If one ranking metric literal is invalid or duplicated.
+        Side Effects:
+            Normalizes metric literals to lowercase snake_case.
+        """
+        normalized_primary_metric = normalize_backtest_ranking_metric_literal(
+            metric=self.primary_metric_default,
+            field_path="backtest.ranking.primary_metric_default",
+        )
+        object.__setattr__(self, "primary_metric_default", normalized_primary_metric)
+
+        if self.secondary_metric_default is None:
+            return
+
+        normalized_secondary_metric = normalize_backtest_ranking_metric_literal(
+            metric=self.secondary_metric_default,
+            field_path="backtest.ranking.secondary_metric_default",
+        )
+        if normalized_secondary_metric == normalized_primary_metric:
+            raise ValueError(
+                "backtest.ranking.secondary_metric_default must be different from "
+                "backtest.ranking.primary_metric_default"
+            )
+        object.__setattr__(self, "secondary_metric_default", normalized_secondary_metric)
 
 
 @dataclass(frozen=True, slots=True)
@@ -334,6 +394,9 @@ class BacktestRuntimeConfig:
     warmup_bars_default: int = _WARMUP_BARS_DEFAULT
     top_k_default: int = _TOP_K_DEFAULT
     preselect_default: int = _PRESELECT_DEFAULT
+    ranking: BacktestRankingRuntimeConfig = field(
+        default_factory=BacktestRankingRuntimeConfig
+    )
     execution: BacktestExecutionRuntimeConfig = field(
         default_factory=BacktestExecutionRuntimeConfig
     )
@@ -366,6 +429,8 @@ class BacktestRuntimeConfig:
             raise ValueError("backtest.top_k_default must be > 0")
         if self.preselect_default <= 0:
             raise ValueError("backtest.preselect_default must be > 0")
+        if self.ranking is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.ranking section must be configured")
         if self.execution is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest.execution section must be configured")
         if self.reporting is None:  # type: ignore[truthy-bool]
@@ -450,6 +515,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
 
     version = _get_int(payload, "version", required=True)
     backtest_map = _get_mapping(payload, "backtest", required=False)
+    ranking_map = _get_mapping(backtest_map, "ranking", required=False)
     execution_map = _get_mapping(backtest_map, "execution", required=False)
     reporting_map = _get_mapping(backtest_map, "reporting", required=False)
     guards_map = _get_mapping(backtest_map, "guards", required=False)
@@ -471,6 +537,18 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         backtest_map,
         "preselect_default",
         default=_PRESELECT_DEFAULT,
+    )
+    ranking = BacktestRankingRuntimeConfig(
+        primary_metric_default=_get_str_with_default(
+            ranking_map,
+            "primary_metric_default",
+            default=_PRIMARY_METRIC_DEFAULT,
+        ),
+        secondary_metric_default=_get_optional_str_with_default(
+            ranking_map,
+            "secondary_metric_default",
+            default=_SECONDARY_METRIC_DEFAULT,
+        ),
     )
 
     execution = BacktestExecutionRuntimeConfig(
@@ -546,6 +624,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         warmup_bars_default=warmup_bars_default,
         top_k_default=top_k_default,
         preselect_default=preselect_default,
+        ranking=ranking,
         execution=execution,
         reporting=reporting,
         guards=guards,
@@ -571,7 +650,8 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
     Returns:
         str: Canonical SHA-256 hash string.
     Assumptions:
-        Hash must include `backtest.jobs.top_k_persisted_default` and exclude operational knobs.
+        Hash includes result-affecting defaults (ranking/execution/reporting/persisted top-k)
+        and excludes operational-only knobs.
     Raises:
         TypeError: If payload normalization fails for unsupported node type.
     Side Effects:
@@ -582,6 +662,10 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
             "warmup_bars_default": config.warmup_bars_default,
             "top_k_default": config.top_k_default,
             "preselect_default": config.preselect_default,
+            "ranking": {
+                "primary_metric_default": config.ranking.primary_metric_default,
+                "secondary_metric_default": config.ranking.secondary_metric_default,
+            },
             "execution": {
                 "init_cash_quote_default": config.execution.init_cash_quote_default,
                 "fixed_quote_default": config.execution.fixed_quote_default,
@@ -763,6 +847,87 @@ def _get_int_with_default(data: Mapping[str, Any], key: str, *, default: int) ->
 
 
 
+def _get_str(data: Mapping[str, Any], key: str, *, required: bool) -> str:
+    """
+    Read string literal value from payload.
+
+    Args:
+        data: Source mapping.
+        key: String key name.
+        required: Whether key is mandatory.
+    Returns:
+        str: Parsed string value.
+    Assumptions:
+        Value is used as metric identifier literal and stripped by downstream validators.
+    Raises:
+        ValueError: If required key is missing or value type is invalid.
+    Side Effects:
+        None.
+    """
+    value = data.get(key)
+    if value is None:
+        if required:
+            raise ValueError(f"missing required key: {key}")
+        return ""
+    if not isinstance(value, str):
+        raise ValueError(f"expected str at key '{key}', got {type(value).__name__}")
+    return value
+
+
+def _get_str_with_default(data: Mapping[str, Any], key: str, *, default: str) -> str:
+    """
+    Read optional string literal with explicit fallback default.
+
+    Args:
+        data: Source mapping.
+        key: String key name.
+        default: Fallback value for absent key.
+    Returns:
+        str: Parsed string literal.
+    Assumptions:
+        Fallback default is validated by downstream ranking runtime config object.
+    Raises:
+        ValueError: If provided value type is invalid.
+    Side Effects:
+        None.
+    """
+    if key not in data:
+        return default
+    return _get_str(data, key, required=True)
+
+
+def _get_optional_str_with_default(
+    data: Mapping[str, Any],
+    key: str,
+    *,
+    default: str | None,
+) -> str | None:
+    """
+    Read optional string literal with explicit fallback and `null` support.
+
+    Args:
+        data: Source mapping.
+        key: String key name.
+        default: Fallback value when key is absent.
+    Returns:
+        str | None: Parsed string or `None`.
+    Assumptions:
+        YAML `null` value maps to Python `None` and means disabled secondary metric.
+    Raises:
+        ValueError: If provided non-null value type is invalid.
+    Side Effects:
+        None.
+    """
+    if key not in data:
+        return default
+    value = data.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError(f"expected str at key '{key}', got {type(value).__name__}")
+    return value
+
+
 def _get_float(data: Mapping[str, Any], key: str, *, required: bool) -> float:
     """
     Read float-compatible numeric value from payload while rejecting bools.
@@ -890,8 +1055,10 @@ __all__ = [
     "BacktestExecutionRuntimeConfig",
     "BacktestGuardsRuntimeConfig",
     "BacktestJobsRuntimeConfig",
+    "BacktestRankingRuntimeConfig",
     "BacktestReportingRuntimeConfig",
     "BacktestRuntimeConfig",
+    "BacktestSyncRuntimeConfig",
     "build_backtest_runtime_config_hash",
     "load_backtest_runtime_config",
     "resolve_backtest_config_path",

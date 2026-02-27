@@ -15,10 +15,11 @@ from datetime import datetime
 from typing import Annotated, Any, Literal, Mapping, Sequence
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from trading.contexts.backtest.application.dto import (
     BacktestMetricRowV1,
+    BacktestRankingConfig,
     BacktestReportV1,
     BacktestRequestScalar,
     BacktestRiskGridSpec,
@@ -28,6 +29,7 @@ from trading.contexts.backtest.application.dto import (
     RunBacktestResponse,
     RunBacktestSavedOverrides,
     RunBacktestTemplate,
+    normalize_backtest_ranking_metric_literal,
 )
 from trading.contexts.backtest.application.ports import BacktestStrategySnapshot
 from trading.contexts.backtest.domain.entities import TradeV1
@@ -242,6 +244,71 @@ class BacktestSavedOverridesRequest(BaseModel):
     signal_grids: dict[str, dict[str, BacktestAxisSpecRequest]] = Field(default_factory=dict)
 
 
+class BacktestRankingRequest(BaseModel):
+    """
+    API payload for optional ranking override block in sync/jobs request envelope.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/routes/backtests.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    primary_metric: str
+    secondary_metric: str | None = None
+
+    @field_validator("primary_metric", "secondary_metric")
+    @classmethod
+    def _normalize_metric_literal(cls, metric: str | None) -> str | None:
+        """
+        Normalize ranking metric literal into canonical lowercase snake_case identifier.
+
+        Args:
+            metric: Raw metric literal from API request.
+        Returns:
+            str | None: Canonical metric literal or `None`.
+        Assumptions:
+            Allowed literals are fixed by ranking contract and validated centrally.
+        Raises:
+            ValueError: If metric literal is unsupported.
+        Side Effects:
+            None.
+        """
+        if metric is None:
+            return None
+        return normalize_backtest_ranking_metric_literal(
+            metric=metric,
+            field_path="ranking.metric",
+        )
+
+    @model_validator(mode="after")
+    def _validate_secondary_metric(self) -> BacktestRankingRequest:
+        """
+        Validate secondary metric invariant for deterministic multi-key ranking behavior.
+
+        Args:
+            None.
+        Returns:
+            BacktestRankingRequest: Validated request model instance.
+        Assumptions:
+            Secondary metric is optional and cannot duplicate primary metric.
+        Raises:
+            ValueError: If `secondary_metric` duplicates `primary_metric`.
+        Side Effects:
+            None.
+        """
+        if self.secondary_metric is None:
+            return self
+        if self.secondary_metric == self.primary_metric:
+            raise ValueError("secondary_metric must be different from primary_metric")
+        return self
+
+
 class BacktestsPostRequest(BaseModel):
     """
     API request envelope for `POST /backtests` saved/ad-hoc modes.
@@ -265,6 +332,7 @@ class BacktestsPostRequest(BaseModel):
     top_k: int | None = Field(default=None, gt=0)
     preselect: int | None = Field(default=None, gt=0)
     top_trades_n: int | None = Field(default=None, gt=0)
+    ranking: BacktestRankingRequest | None = None
 
 
 class BacktestInstrumentIdResponse(BaseModel):
@@ -511,6 +579,7 @@ def build_backtest_run_request(*, request: BacktestsPostRequest) -> RunBacktestR
         top_k=request.top_k,
         preselect=request.preselect,
         top_trades_n=request.top_trades_n,
+        ranking=_build_ranking_config(request=request.ranking),
     )
 
 
@@ -620,6 +689,8 @@ def build_grid_request_hash(*, request: BacktestsPostRequest) -> str:
         "preselect": request.preselect,
         "top_trades_n": request.top_trades_n,
     }
+    if request.ranking is not None:
+        payload["ranking"] = request.ranking.model_dump(mode="json", exclude_none=True)
     return build_sha256_from_payload(payload=payload)
 
 
@@ -819,6 +890,40 @@ def _build_saved_overrides(
         risk_grid=_build_risk_grid_spec(request=request.risk_grid),
         risk_params=_build_risk_params(request=request.risk_grid),
         execution_params=_build_execution_params(request=request.execution),
+    )
+
+
+def _build_ranking_config(
+    *,
+    request: BacktestRankingRequest | None,
+) -> BacktestRankingConfig | None:
+    """
+    Convert optional API ranking block into deterministic application ranking config DTO.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/routes/backtests.py
+
+    Args:
+        request: Optional ranking override payload.
+    Returns:
+        BacktestRankingConfig | None: Application ranking DTO or `None` when omitted.
+    Assumptions:
+        Missing block keeps runtime-config defaults and preserves backward compatibility.
+    Raises:
+        ValueError: If ranking metric literals violate DTO invariants.
+    Side Effects:
+        None.
+    """
+    if request is None:
+        return None
+    return BacktestRankingConfig(
+        primary_metric=request.primary_metric,
+        secondary_metric=request.secondary_metric,
     )
 
 
@@ -1556,6 +1661,7 @@ __all__ = [
     "BacktestInstrumentIdRequest",
     "BacktestInstrumentIdResponse",
     "BacktestMetricRowResponse",
+    "BacktestRankingRequest",
     "BacktestRangeAxisSpecRequest",
     "BacktestReportResponse",
     "BacktestRiskGridRequest",

@@ -73,6 +73,8 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.warmup_bars_default == 200
     assert config.top_k_default == 300
     assert config.preselect_default == 20000
+    assert config.ranking.primary_metric_default == "total_return_pct"
+    assert config.ranking.secondary_metric_default is None
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5368709120
     assert config.cpu.max_numba_threads == 4
@@ -135,6 +137,8 @@ backtest:
     assert config.warmup_bars_default == 200
     assert config.top_k_default == 300
     assert config.preselect_default == 20000
+    assert config.ranking.primary_metric_default == "total_return_pct"
+    assert config.ranking.secondary_metric_default is None
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5 * 1024**3
     assert config.cpu.max_numba_threads > 0
@@ -328,6 +332,9 @@ backtest:
   warmup_bars_default: 10
   top_k_default: 20
   preselect_default: 30
+  ranking:
+    primary_metric_default: RETURN_OVER_MAX_DRAWDOWN
+    secondary_metric_default: profit_factor
   reporting:
     top_trades_n_default: 5
   guards:
@@ -363,6 +370,8 @@ backtest:
     assert config.warmup_bars_default == 10
     assert config.top_k_default == 20
     assert config.preselect_default == 30
+    assert config.ranking.primary_metric_default == "return_over_max_drawdown"
+    assert config.ranking.secondary_metric_default == "profit_factor"
     assert config.guards.max_variants_per_compute == 1200
     assert config.guards.max_compute_bytes_total == 1234567
     assert config.cpu.max_numba_threads == 6
@@ -419,6 +428,89 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="top_k_persisted_default"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_invalid_ranking_defaults(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when ranking metric defaults violate supported literals contract.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `backtest.ranking.primary_metric_default` must be one of v1 allowed literals.
+    Raises:
+        AssertionError: If invalid ranking payload does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  ranking:
+    primary_metric_default: total_return
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="primary_metric_default"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_duplicate_ranking_defaults(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when ranking secondary metric duplicates primary metric.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Runtime ranking contract forbids duplicate primary/secondary metric identifiers.
+    Raises:
+        AssertionError: If duplicated ranking defaults do not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  ranking:
+    primary_metric_default: total_return_pct
+    secondary_metric_default: total_return_pct
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="secondary_metric_default"):
         load_backtest_runtime_config(config_path)
 
 
@@ -611,6 +703,71 @@ backtest:
 
     assert hash_a != hash_b
 
+
+def test_build_backtest_runtime_config_hash_changes_on_ranking_defaults(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify runtime hash changes when result-affecting ranking defaults are modified.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Ranking defaults participate in runtime hash payload.
+    Raises:
+        AssertionError: If hash value does not change.
+    Side Effects:
+        None.
+    """
+    config_a = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  ranking:
+    primary_metric_default: total_return_pct
+    secondary_metric_default: null
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+        filename="backtest_ranking_a.yaml",
+    )
+    config_b = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  ranking:
+    primary_metric_default: return_over_max_drawdown
+    secondary_metric_default: profit_factor
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+        filename="backtest_ranking_b.yaml",
+    )
+
+    hash_a = build_backtest_runtime_config_hash(config=load_backtest_runtime_config(config_a))
+    hash_b = build_backtest_runtime_config_hash(config=load_backtest_runtime_config(config_b))
+
+    assert hash_a != hash_b
 
 
 def test_build_backtest_runtime_config_hash_ignores_operational_jobs_fields(
