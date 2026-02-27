@@ -14,7 +14,21 @@ import math
 import numba as nb
 import numpy as np
 
-from ._common import ewma_grid_f64, is_nan, rolling_mean_grid_f64, rolling_sum_grid_f64
+from ._common import (
+    PRECISION_MODE_FLOAT32,
+    PRECISION_MODE_FLOAT64,
+    PRECISION_MODE_MIXED,
+    SUPPORTED_PRECISION_MODES,
+    ewma_grid_f32,
+    ewma_grid_f64,
+    ewma_grid_mixed_f32,
+    is_nan,
+    rolling_mean_grid_f32,
+    rolling_mean_grid_f64,
+    rolling_mean_grid_mixed_f32,
+    rolling_sum_grid_f64,
+    rolling_sum_grid_mixed_f32,
+)
 
 _SUPPORTED_MA_IDS = {
     "ma.sma",
@@ -67,6 +81,48 @@ def _ewma_series_f64(source: np.ndarray, alpha: float) -> np.ndarray:
             previous = value
         else:
             previous = (alpha * value) + ((1.0 - alpha) * previous)
+        out[time_index] = previous
+
+    return out
+
+
+@nb.njit(cache=True)
+def _ewma_series_f32(source: np.ndarray, alpha: np.float32) -> np.ndarray:
+    """
+    Compute one EWMA-like series with NaN reset policy using float32 core.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py
+
+    Args:
+        source: One-dimensional float32 source series.
+        alpha: Float32 smoothing factor in `(0, 1]`.
+    Returns:
+        np.ndarray: One-dimensional float32 result with NaN reset behavior.
+    Assumptions:
+        `source` is contiguous and `alpha` is validated by the caller.
+    Raises:
+        None.
+    Side Effects:
+        Allocates one output array.
+    """
+    t_size = source.shape[0]
+    out = np.empty(t_size, dtype=np.float32)
+    previous = np.float32(np.nan)
+    one = np.float32(1.0)
+
+    for time_index in range(t_size):
+        value = source[time_index]
+        if np.isnan(value):
+            previous = np.float32(np.nan)
+            out[time_index] = np.float32(np.nan)
+            continue
+        if np.isnan(previous):
+            previous = value
+        else:
+            previous = np.float32((alpha * value) + ((one - alpha) * previous))
         out[time_index] = previous
 
     return out
@@ -149,6 +205,85 @@ def _wma_series_f64(source: np.ndarray, window: int) -> np.ndarray:
     return out
 
 
+@nb.njit(cache=True)
+def _wma_series_f32(source: np.ndarray, window: int) -> np.ndarray:
+    """
+    Compute one linear-WMA series with rolling-window NaN policy in float32 core.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py
+
+    Args:
+        source: One-dimensional float32 source series.
+        window: Positive integer window size.
+    Returns:
+        np.ndarray: One-dimensional float32 linear-WMA result.
+    Assumptions:
+        `window` is positive and `source` is contiguous.
+    Raises:
+        None.
+    Side Effects:
+        Allocates one output array.
+    """
+    t_size = source.shape[0]
+    out = np.empty(t_size, dtype=np.float32)
+    nan32 = np.float32(np.nan)
+    for time_index in range(t_size):
+        out[time_index] = nan32
+
+    if t_size == 0:
+        return out
+    if window > t_size:
+        return out
+
+    window_f32 = np.float32(window)
+    denominator = np.float32((window_f32 * (window_f32 + np.float32(1.0))) / np.float32(2.0))
+    sum_x = np.float32(0.0)
+    weighted = np.float32(0.0)
+    nan_count = 0
+
+    for offset in range(window):
+        raw_value = source[offset]
+        weight = np.float32(offset + 1)
+        if np.isnan(raw_value):
+            nan_count += 1
+            continue
+        sum_x = np.float32(sum_x + raw_value)
+        weighted = np.float32(weighted + (weight * raw_value))
+
+    if nan_count == 0:
+        out[window - 1] = np.float32(weighted / denominator)
+
+    for time_index in range(window, t_size):
+        incoming = source[time_index]
+        outgoing = source[time_index - window]
+
+        incoming_value = np.float32(0.0)
+        outgoing_value = np.float32(0.0)
+
+        if np.isnan(incoming):
+            nan_count += 1
+        else:
+            incoming_value = incoming
+
+        if np.isnan(outgoing):
+            nan_count -= 1
+        else:
+            outgoing_value = outgoing
+
+        weighted = np.float32(weighted - sum_x + (window_f32 * incoming_value))
+        sum_x = np.float32(sum_x - outgoing_value + incoming_value)
+
+        if nan_count == 0:
+            out[time_index] = np.float32(weighted / denominator)
+        else:
+            out[time_index] = nan32
+
+    return out
+
+
 @nb.njit(parallel=True, cache=True)
 def _wma_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     """
@@ -178,6 +313,41 @@ def _wma_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     for window_index in nb.prange(w_size):
         window = int(windows[window_index])
         series = _wma_series_f64(source, window)
+        for time_index in range(t_size):
+            out[time_index, window_index] = series[time_index]
+
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
+def _wma_grid_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute linear-WMA matrix for multiple windows using float32 core.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py
+
+    Args:
+        source: One-dimensional float32 source series.
+        windows: One-dimensional positive integer windows.
+    Returns:
+        np.ndarray: Float32 matrix with shape `(T, W)`.
+    Assumptions:
+        Window values are pre-validated by wrapper.
+    Raises:
+        None.
+    Side Effects:
+        Allocates one output matrix and temporary vectors per window worker.
+    """
+    t_size = source.shape[0]
+    w_size = windows.shape[0]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+
+    for window_index in nb.prange(w_size):
+        window = int(windows[window_index])
+        series = _wma_series_f32(source, window)
         for time_index in range(t_size):
             out[time_index, window_index] = series[time_index]
 
@@ -237,6 +407,59 @@ def _vwma_grid_f64(source: np.ndarray, volume: np.ndarray, windows: np.ndarray) 
 
 
 @nb.njit(parallel=True, cache=True)
+def _vwma_grid_mixed_f32(source: np.ndarray, volume: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute VWMA matrix with float64 rolling accumulators and float32 output.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py
+
+    Args:
+        source: One-dimensional float32 price/source series.
+        volume: One-dimensional float32 volume series.
+        windows: One-dimensional positive integer windows.
+    Returns:
+        np.ndarray: Float32 matrix with shape `(T, W)`.
+    Assumptions:
+        `source` and `volume` have identical length and aligned indices.
+    Raises:
+        None.
+    Side Effects:
+        Allocates intermediate `pv`, rolling sums, and one output matrix.
+    """
+    t_size = source.shape[0]
+    pv = np.empty(t_size, dtype=np.float32)
+    nan32 = np.float32(np.nan)
+
+    for time_index in range(t_size):
+        price = source[time_index]
+        vol = volume[time_index]
+        if np.isnan(price) or np.isnan(vol):
+            pv[time_index] = nan32
+        else:
+            pv[time_index] = np.float32(price * vol)
+
+    numerator = rolling_sum_grid_mixed_f32(pv, windows)
+    denominator = rolling_sum_grid_mixed_f32(volume, windows)
+
+    w_size = windows.shape[0]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+
+    for window_index in nb.prange(w_size):
+        for time_index in range(t_size):
+            num = numerator[time_index, window_index]
+            den = denominator[time_index, window_index]
+            if np.isnan(num) or np.isnan(den) or den == np.float32(0.0):
+                out[time_index, window_index] = nan32
+            else:
+                out[time_index, window_index] = np.float32(num / den)
+
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
 def _dema_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     """
     Compute DEMA matrix for multiple windows.
@@ -274,6 +497,51 @@ def _dema_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
                 out[time_index, window_index] = np.nan
             else:
                 out[time_index, window_index] = (2.0 * value_ema1) - value_ema2
+
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
+def _dema_grid_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute DEMA matrix for multiple windows using float32 core.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py
+
+    Args:
+        source: One-dimensional float32 source series.
+        windows: One-dimensional positive integer windows.
+    Returns:
+        np.ndarray: Float32 matrix with shape `(T, W)`.
+    Assumptions:
+        EWMA primitive follows NaN-reset semantics.
+    Raises:
+        None.
+    Side Effects:
+        Allocates intermediate EMA matrices and output matrix.
+    """
+    ema1 = ewma_grid_f32(source, windows, False)
+    t_size = ema1.shape[0]
+    w_size = ema1.shape[1]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+    nan32 = np.float32(np.nan)
+
+    for window_index in nb.prange(w_size):
+        window = int(windows[window_index])
+        alpha = np.float32(2.0 / (float(window) + 1.0))
+        ema2 = _ewma_series_f32(ema1[:, window_index], alpha)
+        for time_index in range(t_size):
+            value_ema1 = ema1[time_index, window_index]
+            value_ema2 = ema2[time_index]
+            if np.isnan(value_ema1) or np.isnan(value_ema2):
+                out[time_index, window_index] = nan32
+            else:
+                out[time_index, window_index] = np.float32(
+                    (np.float32(2.0) * value_ema1) - value_ema2
+                )
 
     return out
 
@@ -320,6 +588,56 @@ def _tema_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
             else:
                 out[time_index, window_index] = (
                     (3.0 * value_ema1) - (3.0 * value_ema2) + value_ema3
+                )
+
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
+def _tema_grid_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute TEMA matrix for multiple windows using float32 core.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py
+
+    Args:
+        source: One-dimensional float32 source series.
+        windows: One-dimensional positive integer windows.
+    Returns:
+        np.ndarray: Float32 matrix with shape `(T, W)`.
+    Assumptions:
+        EWMA primitive follows NaN-reset semantics.
+    Raises:
+        None.
+    Side Effects:
+        Allocates intermediate EMA matrices and output matrix.
+    """
+    ema1 = ewma_grid_f32(source, windows, False)
+    t_size = ema1.shape[0]
+    w_size = ema1.shape[1]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+    nan32 = np.float32(np.nan)
+
+    for window_index in nb.prange(w_size):
+        window = int(windows[window_index])
+        alpha = np.float32(2.0 / (float(window) + 1.0))
+        ema2 = _ewma_series_f32(ema1[:, window_index], alpha)
+        ema3 = _ewma_series_f32(ema2, alpha)
+
+        for time_index in range(t_size):
+            value_ema1 = ema1[time_index, window_index]
+            value_ema2 = ema2[time_index]
+            value_ema3 = ema3[time_index]
+            if np.isnan(value_ema1) or np.isnan(value_ema2) or np.isnan(value_ema3):
+                out[time_index, window_index] = nan32
+            else:
+                out[time_index, window_index] = np.float32(
+                    (np.float32(3.0) * value_ema1)
+                    - (np.float32(3.0) * value_ema2)
+                    + value_ema3
                 )
 
     return out
@@ -382,6 +700,63 @@ def _zlema_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
 
 
 @nb.njit(parallel=True, cache=True)
+def _zlema_grid_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute ZLEMA matrix for multiple windows using float32 core.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py
+
+    Args:
+        source: One-dimensional float32 source series.
+        windows: One-dimensional positive integer windows.
+    Returns:
+        np.ndarray: Float32 matrix with shape `(T, W)`.
+    Assumptions:
+        Lag is `floor((window - 1) / 2)` for each window.
+    Raises:
+        None.
+    Side Effects:
+        Allocates per-window adjusted series and one output matrix.
+    """
+    t_size = source.shape[0]
+    w_size = windows.shape[0]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+    nan32 = np.float32(np.nan)
+
+    for window_index in nb.prange(w_size):
+        window = int(windows[window_index])
+        lag = int((window - 1) // 2)
+        alpha = np.float32(2.0 / (float(window) + 1.0))
+
+        adjusted = np.empty(t_size, dtype=np.float32)
+        for time_index in range(t_size):
+            current = source[time_index]
+            if lag == 0:
+                adjusted[time_index] = current
+                continue
+
+            lagged_index = time_index - lag
+            if lagged_index < 0:
+                adjusted[time_index] = nan32
+                continue
+
+            lagged = source[lagged_index]
+            if np.isnan(current) or np.isnan(lagged):
+                adjusted[time_index] = nan32
+            else:
+                adjusted[time_index] = np.float32(current + (current - lagged))
+
+        zlema = _ewma_series_f32(adjusted, alpha)
+        for time_index in range(t_size):
+            out[time_index, window_index] = zlema[time_index]
+
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
 def _hma_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     """
     Compute HMA matrix for multiple windows.
@@ -436,6 +811,62 @@ def _hma_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     return out
 
 
+@nb.njit(parallel=True, cache=True)
+def _hma_grid_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute HMA matrix for multiple windows using float32 core.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py
+
+    Args:
+        source: One-dimensional float32 source series.
+        windows: One-dimensional positive integer windows.
+    Returns:
+        np.ndarray: Float32 matrix with shape `(T, W)`.
+    Assumptions:
+        `w2=floor(window/2)` and `sqrt_w=floor(sqrt(window))` with lower bound `1`.
+    Raises:
+        None.
+    Side Effects:
+        Allocates intermediate WMA series and output matrix.
+    """
+    t_size = source.shape[0]
+    w_size = windows.shape[0]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+    nan32 = np.float32(np.nan)
+
+    for window_index in nb.prange(w_size):
+        window = int(windows[window_index])
+        window_half = int(window // 2)
+        if window_half < 1:
+            window_half = 1
+
+        window_sqrt = int(math.sqrt(float(window)))
+        if window_sqrt < 1:
+            window_sqrt = 1
+
+        wma_half = _wma_series_f32(source, window_half)
+        wma_full = _wma_series_f32(source, window)
+
+        diff = np.empty(t_size, dtype=np.float32)
+        for time_index in range(t_size):
+            value_half = wma_half[time_index]
+            value_full = wma_full[time_index]
+            if np.isnan(value_half) or np.isnan(value_full):
+                diff[time_index] = nan32
+            else:
+                diff[time_index] = np.float32((np.float32(2.0) * value_half) - value_full)
+
+        hma = _wma_series_f32(diff, window_sqrt)
+        for time_index in range(t_size):
+            out[time_index, window_index] = hma[time_index]
+
+    return out
+
+
 def is_supported_ma_indicator(*, indicator_id: str) -> bool:
     """
     Return whether indicator id is supported by MA kernels.
@@ -466,6 +897,7 @@ def compute_ma_grid_f32(
     source: np.ndarray,
     windows: np.ndarray,
     volume: np.ndarray | None = None,
+    precision: str = PRECISION_MODE_FLOAT64,
 ) -> np.ndarray:
     """
     Compute MA indicator matrix `(T, W)` as float32 contiguous array.
@@ -481,47 +913,197 @@ def compute_ma_grid_f32(
         source: Source series vector.
         windows: Window values vector.
         volume: Optional volume vector required by `ma.vwma`.
+        precision: Precision mode (`float32`, `mixed`, `float64`) for kernel core dispatch.
     Returns:
         np.ndarray: Float32 C-contiguous matrix `(T, W)`.
     Assumptions:
         Caller provides aligned vectors for `source` and optional `volume`.
     Raises:
-        ValueError: If indicator id is unsupported, windows are invalid, or volume is missing.
+        ValueError: If indicator id is unsupported, precision mode is invalid, windows are invalid,
+            or volume is missing.
     Side Effects:
-        Allocates intermediate float64 matrices before casting to float32.
+        Allocates intermediate matrices depending on selected precision path.
     """
     normalized_id = _normalize_ma_indicator_id(indicator_id=indicator_id)
     if normalized_id not in _SUPPORTED_MA_IDS:
         raise ValueError(f"unsupported MA indicator_id: {indicator_id!r}")
+    _validate_precision_mode(precision=precision)
+
+    if precision == PRECISION_MODE_FLOAT32:
+        source_f32, windows_i64 = _prepare_source_and_windows_f32(source=source, windows=windows)
+        if normalized_id == "ma.sma":
+            return np.ascontiguousarray(rolling_mean_grid_f32(source_f32, windows_i64))
+        if normalized_id == "ma.ema":
+            return np.ascontiguousarray(ewma_grid_f32(source_f32, windows_i64, False))
+        if normalized_id in {"ma.rma", "ma.smma"}:
+            return np.ascontiguousarray(ewma_grid_f32(source_f32, windows_i64, True))
+        if normalized_id in {"ma.wma", "ma.lwma"}:
+            return np.ascontiguousarray(_wma_grid_f32(source_f32, windows_i64))
+        if normalized_id == "ma.dema":
+            return np.ascontiguousarray(_dema_grid_f32(source_f32, windows_i64))
+        if normalized_id == "ma.tema":
+            return np.ascontiguousarray(_tema_grid_f32(source_f32, windows_i64))
+        if normalized_id == "ma.zlema":
+            return np.ascontiguousarray(_zlema_grid_f32(source_f32, windows_i64))
+        if normalized_id == "ma.hma":
+            return np.ascontiguousarray(_hma_grid_f32(source_f32, windows_i64))
+        if normalized_id == "ma.vwma":
+            if volume is None:
+                raise ValueError("ma.vwma requires volume series")
+            volume_f32 = _prepare_volume_f32(volume=volume, expected_length=source_f32.shape[0])
+            return np.ascontiguousarray(_vwma_grid_mixed_f32(source_f32, volume_f32, windows_i64))
+        raise ValueError(f"unsupported MA indicator_id: {indicator_id!r}")
+
+    if precision == PRECISION_MODE_MIXED:
+        source_f32, windows_i64 = _prepare_source_and_windows_f32(source=source, windows=windows)
+        if normalized_id == "ma.sma":
+            return np.ascontiguousarray(rolling_mean_grid_mixed_f32(source_f32, windows_i64))
+        if normalized_id == "ma.ema":
+            return np.ascontiguousarray(ewma_grid_mixed_f32(source_f32, windows_i64, False))
+        if normalized_id in {"ma.rma", "ma.smma"}:
+            return np.ascontiguousarray(ewma_grid_mixed_f32(source_f32, windows_i64, True))
+        if normalized_id == "ma.vwma":
+            if volume is None:
+                raise ValueError("ma.vwma requires volume series")
+            volume_f32 = _prepare_volume_f32(volume=volume, expected_length=source_f32.shape[0])
+            return np.ascontiguousarray(_vwma_grid_mixed_f32(source_f32, volume_f32, windows_i64))
+        source_f64 = np.ascontiguousarray(source_f32, dtype=np.float64)
+        out_f64 = _compute_ma_grid_f64_by_id(
+            normalized_id=normalized_id,
+            source_f64=source_f64,
+            windows_i64=windows_i64,
+            volume=volume,
+        )
+        return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
     source_f64, windows_i64 = _prepare_source_and_windows(source=source, windows=windows)
+    out_f64 = _compute_ma_grid_f64_by_id(
+        normalized_id=normalized_id,
+        source_f64=source_f64,
+        windows_i64=windows_i64,
+        volume=volume,
+    )
+    return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
+
+def _validate_precision_mode(*, precision: str) -> None:
+    """
+    Validate MA kernel precision mode against shared precision policy constants.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        precision: Precision mode candidate.
+    Returns:
+        None.
+    Assumptions:
+        Engine-level dispatch passes normalized lowercase mode values.
+    Raises:
+        ValueError: If precision mode is unsupported.
+    Side Effects:
+        None.
+    """
+    if precision not in SUPPORTED_PRECISION_MODES:
+        raise ValueError(
+            "unsupported precision mode: "
+            f"{precision!r}; expected one of {SUPPORTED_PRECISION_MODES!r}"
+        )
+
+
+def _compute_ma_grid_f64_by_id(
+    *,
+    normalized_id: str,
+    source_f64: np.ndarray,
+    windows_i64: np.ndarray,
+    volume: np.ndarray | None,
+) -> np.ndarray:
+    """
+    Compute MA matrix via legacy float64 core dispatch by normalized indicator id.
+
+    Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numpy/ma.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        normalized_id: Normalized MA indicator identifier.
+        source_f64: Source vector normalized to float64.
+        windows_i64: Window vector normalized to int64.
+        volume: Optional volume vector required by `ma.vwma`.
+    Returns:
+        np.ndarray: Float64 matrix `(T, W)` with legacy core semantics.
+    Assumptions:
+        `normalized_id` already validated against `_SUPPORTED_MA_IDS`.
+    Raises:
+        ValueError: If required volume input is missing.
+    Side Effects:
+        Allocates intermediate arrays depending on selected indicator.
+    """
     if normalized_id == "ma.sma":
-        out_f64 = rolling_mean_grid_f64(source_f64, windows_i64)
-    elif normalized_id == "ma.ema":
-        out_f64 = ewma_grid_f64(source_f64, windows_i64, False)
-    elif normalized_id in {"ma.rma", "ma.smma"}:
-        out_f64 = ewma_grid_f64(source_f64, windows_i64, True)
-    elif normalized_id in {"ma.wma", "ma.lwma"}:
-        out_f64 = _wma_grid_f64(source_f64, windows_i64)
-    elif normalized_id == "ma.vwma":
+        return rolling_mean_grid_f64(source_f64, windows_i64)
+    if normalized_id == "ma.ema":
+        return ewma_grid_f64(source_f64, windows_i64, False)
+    if normalized_id in {"ma.rma", "ma.smma"}:
+        return ewma_grid_f64(source_f64, windows_i64, True)
+    if normalized_id in {"ma.wma", "ma.lwma"}:
+        return _wma_grid_f64(source_f64, windows_i64)
+    if normalized_id == "ma.vwma":
         if volume is None:
             raise ValueError("ma.vwma requires volume series")
         volume_f64 = _prepare_volume(volume=volume, expected_length=source_f64.shape[0])
-        out_f64 = _vwma_grid_f64(source_f64, volume_f64, windows_i64)
-    elif normalized_id == "ma.dema":
-        out_f64 = _dema_grid_f64(source_f64, windows_i64)
-    elif normalized_id == "ma.tema":
-        out_f64 = _tema_grid_f64(source_f64, windows_i64)
-    elif normalized_id == "ma.zlema":
-        out_f64 = _zlema_grid_f64(source_f64, windows_i64)
-    elif normalized_id == "ma.hma":
-        out_f64 = _hma_grid_f64(source_f64, windows_i64)
-    else:  # pragma: no cover
-        raise ValueError(f"unsupported MA indicator_id: {indicator_id!r}")
+        return _vwma_grid_f64(source_f64, volume_f64, windows_i64)
+    if normalized_id == "ma.dema":
+        return _dema_grid_f64(source_f64, windows_i64)
+    if normalized_id == "ma.tema":
+        return _tema_grid_f64(source_f64, windows_i64)
+    if normalized_id == "ma.zlema":
+        return _zlema_grid_f64(source_f64, windows_i64)
+    if normalized_id == "ma.hma":
+        return _hma_grid_f64(source_f64, windows_i64)
+    raise ValueError(f"unsupported MA indicator_id: {normalized_id!r}")
 
-    out_f32 = np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-    return out_f32
+
+def _prepare_source_and_windows_f32(
+    *,
+    source: np.ndarray,
+    windows: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Normalize source/windows inputs for float32 and mixed MA precision paths.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py
+
+    Args:
+        source: Source series vector.
+        windows: Window values vector.
+    Returns:
+        tuple[np.ndarray, np.ndarray]: `(source_f32, windows_i64)` contiguous arrays.
+    Assumptions:
+        Source can contain NaNs and windows must be positive integers.
+    Raises:
+        ValueError: If array shapes are invalid or window values are non-positive.
+    Side Effects:
+        Allocates normalized contiguous arrays.
+    """
+    source_f32 = np.ascontiguousarray(source, dtype=np.float32)
+    if source_f32.ndim != 1:
+        raise ValueError("source must be a 1D array")
+
+    windows_i64 = np.ascontiguousarray(windows, dtype=np.int64)
+    if windows_i64.ndim != 1:
+        raise ValueError("windows must be a 1D array")
+    if windows_i64.shape[0] == 0:
+        raise ValueError("windows must contain at least one value")
+    if np.any(windows_i64 <= 0):
+        raise ValueError("windows must contain only positive integers")
+
+    return source_f32, windows_i64
 
 
 def _prepare_source_and_windows(
@@ -562,6 +1144,38 @@ def _prepare_source_and_windows(
         raise ValueError("windows must contain only positive integers")
 
     return source_f64, windows_i64
+
+
+def _prepare_volume_f32(*, volume: np.ndarray, expected_length: int) -> np.ndarray:
+    """
+    Normalize volume vector for float32/mixed VWMA paths.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py
+
+    Args:
+        volume: Volume vector.
+        expected_length: Required length matching source series length.
+    Returns:
+        np.ndarray: Float32 C-contiguous volume vector.
+    Assumptions:
+        Volume can contain NaN values per CandleFeed policy.
+    Raises:
+        ValueError: If volume shape or length is invalid.
+    Side Effects:
+        Allocates one normalized array.
+    """
+    volume_f32 = np.ascontiguousarray(volume, dtype=np.float32)
+    if volume_f32.ndim != 1:
+        raise ValueError("volume must be a 1D array")
+    if volume_f32.shape[0] != expected_length:
+        raise ValueError(
+            "volume length must match source length: "
+            f"expected={expected_length}, got={volume_f32.shape[0]}"
+        )
+    return volume_f32
 
 
 def _prepare_volume(*, volume: np.ndarray, expected_length: int) -> np.ndarray:

@@ -181,6 +181,18 @@ Candles содержат NaN дырки. Compute **не делает импут�
 `IndicatorTensor.values` — `float32`.
 Внутри kernels допустимы `float64` accumulator’ы (implementation detail), но выход фиксирован как `float32`.
 
+### 7.1) Phase-5 precision policy (f32/mixed)
+
+Для trend/volume phase-5 policy фиксируется так:
+
+- `Tier A` (`float32`): `trend.aroon`, `trend.donchian`.
+- `Tier B` (`mixed precision`): `trend.adx`, `trend.vortex`, `trend.supertrend`,
+  `trend.psar`, `trend.keltner`, `volume.vwap`, `volume.vwap_deviation`.
+- `Tier C` (`float64` core): `trend.linreg_slope`, `volume.obv`, `volume.ad_line`,
+  `volume.cmf`, `volume.mfi`.
+
+Policy не меняет внешние API/DTO: `IndicatorTensor.values` по-прежнему `float32`.
+
 ### 8) Guards применяются до аллокаций тензора
 
 До расчёта:

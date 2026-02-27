@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -188,7 +189,7 @@ def test_numba_structure_kernels_match_numpy_oracle_with_nan_holes() -> None:
     )
     windows_i64 = np.asarray([5, 10, 20, 30], dtype=np.int64)
 
-    cases: tuple[tuple[str, dict[str, np.ndarray]], ...] = (
+    cases: tuple[tuple[str, dict[str, Any]], ...] = (
         (
             "structure.zscore",
             {

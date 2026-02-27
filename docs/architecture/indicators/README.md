@@ -38,6 +38,8 @@
 ### Performance plans
 
 - `docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md` — план оптимизаций grid compute path (пункты 1-4).
+- `docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md` — план phase-5 миграции kernels на float32/mixed precision.
+- Реализация phase-5 использует явный precision policy dispatch (`Tier A`/`Tier B`/`Tier C`) и сохраняет контракт `IndicatorTensor.values=float32`.
 
 ### Specs and config
 

@@ -15,6 +15,9 @@ from trading.contexts.indicators.adapters.outbound.compute_numba.engine import (
     _build_series_map,
 )
 from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import (
+    PRECISION_MODE_FLOAT32,
+    PRECISION_MODE_FLOAT64,
+    PRECISION_MODE_MIXED,
     compute_momentum_grid_f32,
     compute_structure_grid_f32,
     compute_trend_grid_f32,
@@ -859,3 +862,65 @@ def test_grouped_source_paths_do_not_use_full_variant_source_matrix(
         assert tensor.layout is Layout.VARIANT_MAJOR
         assert tensor.values.dtype == np.float32
         assert tensor.values.flags.c_contiguous
+
+
+def test_precision_policy_dispatch_maps_tier_a_b_c_and_fallback() -> None:
+    """
+    Verify deterministic precision policy dispatch for Tier A/B/C and unknown fallback ids.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Indicator ids are normalized to lowercase in policy helper.
+    Raises:
+        AssertionError: If policy mapping returns unexpected precision mode.
+    Side Effects:
+        None.
+    """
+    assert (
+        numba_engine._precision_mode_for_indicator(indicator_id="ma.sma")
+        == PRECISION_MODE_FLOAT32
+    )
+    assert (
+        numba_engine._precision_mode_for_indicator(indicator_id="momentum.macd")
+        == PRECISION_MODE_MIXED
+    )
+    assert (
+        numba_engine._precision_mode_for_indicator(indicator_id="volatility.stddev")
+        == PRECISION_MODE_FLOAT64
+    )
+    assert (
+        numba_engine._precision_mode_for_indicator(indicator_id="custom.unknown")
+        == PRECISION_MODE_FLOAT64
+    )
+
+
+def test_precision_tier_label_matches_policy_constants() -> None:
+    """
+    Verify precision mode to tier label mapping is explicit and deterministic.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Mapping function covers all shared precision constants.
+    Raises:
+        AssertionError: If tier labels drift from migration-plan semantics.
+    Side Effects:
+        None.
+    """
+    assert (
+        numba_engine._precision_tier_label(precision=PRECISION_MODE_FLOAT32)
+        == "Tier A"
+    )
+    assert (
+        numba_engine._precision_tier_label(precision=PRECISION_MODE_MIXED)
+        == "Tier B"
+    )
+    assert (
+        numba_engine._precision_tier_label(precision=PRECISION_MODE_FLOAT64)
+        == "Tier C"
+    )

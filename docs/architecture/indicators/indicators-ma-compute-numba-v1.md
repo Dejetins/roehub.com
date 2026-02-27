@@ -133,6 +133,21 @@ Candles содержат NaN дырки. Compute **не делает импут�
 `IndicatorTensor.values` — `float32`.
 Внутри kernels допустимы `float64` accumulator’ы (implementation detail), но выход фиксирован как `float32`.
 
+### 5.1) Phase-5 precision policy (f32/mixed)
+
+В MA kernels введён явный аргумент `precision` в `compute_ma_grid_f32(...)` c режимами:
+
+- `float32`
+- `mixed precision`
+- `float64`
+
+Policy для MA в v1:
+
+- `Tier A` (`float32`): `ma.sma`, `ma.ema`, `ma.rma`/`ma.smma`, `ma.wma`/`ma.lwma`,
+  `ma.dema`, `ma.tema`, `ma.zlema`, `ma.hma`.
+- `Tier B` (`mixed precision`): `ma.vwma` (float32 output + float64 rolling accumulators).
+- `Tier C`: для MA группы не используется как отдельная целевая миграция в phase-5.
+
 ### 6) Guards применяются до аллокаций тензора
 
 До расчёта:

@@ -159,6 +159,18 @@ Candles содержат NaN дырки. Compute **не делает импут�
 `IndicatorTensor.values` — `float32`.
 Внутри kernels допустимы `float64` accumulator’ы (implementation detail), но выход фиксирован как `float32`.
 
+### 5.1) Phase-5 precision policy (f32/mixed)
+
+Для structure phase-5 policy фиксируется так:
+
+- `Tier A` (`float32`): candle wrappers (`structure.candle_*`) и pivot wrappers
+  (`structure.pivots`, `structure.pivot_high`, `structure.pivot_low`).
+- `Tier B` (`mixed precision`): `structure.zscore`, `structure.percent_rank`,
+  `structure.distance_to_ma_norm`.
+- `Tier C`: отдельные structure индикаторы в phase-5 не добавлялись.
+
+Контракт слоя application сохраняется: `IndicatorTensor.values` остаётся `float32`.
+
 ### 6) Guards применяются до аллокаций тензора
 
 До расчёта:

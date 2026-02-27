@@ -20,6 +20,10 @@ from typing import Mapping, TypeVar, cast
 import numpy as np
 
 from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import (
+    PRECISION_MODE_FLOAT32,
+    PRECISION_MODE_FLOAT64,
+    PRECISION_MODE_MIXED,
+    SUPPORTED_PRECISION_MODES,
     WORKSPACE_FACTOR_DEFAULT,
     WORKSPACE_FIXED_BYTES_DEFAULT,
     check_total_budget_or_raise,
@@ -93,6 +97,80 @@ _STRUCTURE_IDS_REQUIRING_HLC = {
 }
 
 _AxisValue = TypeVar("_AxisValue", int, float, str)
+_TIER_A_LABEL = "Tier A"
+_TIER_B_LABEL = "Tier B"
+_TIER_C_LABEL = "Tier C"
+_TIER_A_FLOAT32_IDS = frozenset(
+    (
+        "ma.dema",
+        "ma.ema",
+        "ma.hma",
+        "ma.lwma",
+        "ma.rma",
+        "ma.sma",
+        "ma.smma",
+        "ma.tema",
+        "ma.wma",
+        "ma.zlema",
+        "structure.candle_body",
+        "structure.candle_body_atr",
+        "structure.candle_body_pct",
+        "structure.candle_lower_wick",
+        "structure.candle_lower_wick_atr",
+        "structure.candle_lower_wick_pct",
+        "structure.candle_range",
+        "structure.candle_range_atr",
+        "structure.candle_stats",
+        "structure.candle_stats_atr_norm",
+        "structure.candle_upper_wick",
+        "structure.candle_upper_wick_atr",
+        "structure.candle_upper_wick_pct",
+        "structure.pivot_high",
+        "structure.pivot_low",
+        "structure.pivots",
+        "trend.aroon",
+        "trend.donchian",
+    )
+)
+_TIER_B_MIXED_IDS = frozenset(
+    (
+        "ma.vwma",
+        "momentum.cci",
+        "momentum.macd",
+        "momentum.ppo",
+        "momentum.roc",
+        "momentum.rsi",
+        "momentum.stoch",
+        "momentum.stoch_rsi",
+        "momentum.trix",
+        "momentum.williams_r",
+        "structure.distance_to_ma_norm",
+        "structure.percent_rank",
+        "structure.zscore",
+        "trend.adx",
+        "trend.keltner",
+        "trend.psar",
+        "trend.supertrend",
+        "trend.vortex",
+        "volume.vwap",
+        "volume.vwap_deviation",
+    )
+)
+_TIER_C_FLOAT64_IDS = frozenset(
+    (
+        "trend.linreg_slope",
+        "volatility.bbands",
+        "volatility.bbands_bandwidth",
+        "volatility.bbands_percent_b",
+        "volatility.hv",
+        "volatility.stddev",
+        "volatility.variance",
+        "volume.ad_line",
+        "volume.cmf",
+        "volume.mfi",
+        "volume.obv",
+    )
+)
 
 
 class NumbaIndicatorCompute(IndicatorCompute):
@@ -281,11 +359,13 @@ class NumbaIndicatorCompute(IndicatorCompute):
             candles=req.candles,
             required_sources=required_sources,
         )
+        precision = _precision_mode_for_indicator(indicator_id=definition.indicator_id.value)
         if is_supported_ma_indicator(indicator_id=definition.indicator_id.value):
             variant_series_matrix = _compute_ma_variant_source_matrix(
                 definition=definition,
                 axes=axes,
                 available_series=series_map,
+                precision=precision,
             )
         elif is_supported_volatility_indicator(indicator_id=definition.indicator_id.value):
             variant_series_matrix = _compute_volatility_variant_matrix(
@@ -293,6 +373,7 @@ class NumbaIndicatorCompute(IndicatorCompute):
                 axes=axes,
                 available_series=series_map,
                 t_size=t_size,
+                precision=precision,
             )
         elif is_supported_momentum_indicator(indicator_id=definition.indicator_id.value):
             variant_series_matrix = _compute_momentum_variant_matrix(
@@ -300,6 +381,7 @@ class NumbaIndicatorCompute(IndicatorCompute):
                 axes=axes,
                 available_series=series_map,
                 t_size=t_size,
+                precision=precision,
             )
         elif is_supported_trend_indicator(indicator_id=definition.indicator_id.value):
             variant_series_matrix = _compute_trend_variant_matrix(
@@ -307,12 +389,14 @@ class NumbaIndicatorCompute(IndicatorCompute):
                 axes=axes,
                 available_series=series_map,
                 t_size=t_size,
+                precision=precision,
             )
         elif is_supported_volume_indicator(indicator_id=definition.indicator_id.value):
             variant_series_matrix = _compute_volume_variant_matrix(
                 definition=definition,
                 axes=axes,
                 available_series=series_map,
+                precision=precision,
             )
         elif is_supported_structure_indicator(indicator_id=definition.indicator_id.value):
             variant_series_matrix = _compute_structure_variant_matrix(
@@ -320,6 +404,7 @@ class NumbaIndicatorCompute(IndicatorCompute):
                 axes=axes,
                 available_series=series_map,
                 t_size=t_size,
+                precision=precision,
             )
         else:
             variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
@@ -583,6 +668,73 @@ def _prepare_variant_major_values(
         return variant_series_matrix
 
     return np.ascontiguousarray(variant_series_matrix, dtype=np.float32)
+
+
+def _precision_mode_for_indicator(*, indicator_id: str) -> str:
+    """
+    Resolve deterministic kernel precision mode by indicator id.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        indicator_id: Normalized indicator identifier.
+    Returns:
+        str: Precision mode (`float32`, `mixed`, or `float64`).
+    Assumptions:
+        Unknown ids must deterministically fallback to `float64` core path.
+    Raises:
+        GridValidationError: If computed mode is outside supported precision constants.
+    Side Effects:
+        None.
+    """
+    normalized_id = indicator_id.strip().lower()
+    if normalized_id in _TIER_A_FLOAT32_IDS:
+        precision = PRECISION_MODE_FLOAT32
+    elif normalized_id in _TIER_B_MIXED_IDS:
+        precision = PRECISION_MODE_MIXED
+    elif normalized_id in _TIER_C_FLOAT64_IDS:
+        precision = PRECISION_MODE_FLOAT64
+    else:
+        precision = PRECISION_MODE_FLOAT64
+    if precision not in SUPPORTED_PRECISION_MODES:
+        raise GridValidationError(
+            "unsupported precision mode: "
+            f"indicator_id={normalized_id!r}, precision={precision!r}"
+        )
+    return precision
+
+
+def _precision_tier_label(*, precision: str) -> str:
+    """
+    Convert precision mode into explicit migration tier label.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py,
+      docs/architecture/indicators/indicators-compute-engine-core.md
+
+    Args:
+        precision: Kernel precision mode (`float32`, `mixed`, `float64`).
+    Returns:
+        str: Human-readable tier label (`Tier A`, `Tier B`, `Tier C`).
+    Assumptions:
+        Mode comes from `_precision_mode_for_indicator`.
+    Raises:
+        GridValidationError: If precision mode is unknown.
+    Side Effects:
+        None.
+    """
+    if precision == PRECISION_MODE_FLOAT32:
+        return _TIER_A_LABEL
+    if precision == PRECISION_MODE_MIXED:
+        return _TIER_B_LABEL
+    if precision == PRECISION_MODE_FLOAT64:
+        return _TIER_C_LABEL
+    raise GridValidationError(f"unsupported precision mode: {precision!r}")
 
 
 def _axis_defs_from_materialized_axes(*, axes: tuple[MaterializedAxis, ...]) -> tuple[AxisDef, ...]:
@@ -889,6 +1041,7 @@ def _compute_ma_variant_source_matrix(
     definition: IndicatorDef,
     axes: tuple[AxisDef, ...],
     available_series: Mapping[str, np.ndarray],
+    precision: str,
 ) -> np.ndarray:
     """
     Compute variant-major MA matrix `(V, T)` via Numba MA kernels.
@@ -903,6 +1056,7 @@ def _compute_ma_variant_source_matrix(
         definition: Hard indicator definition for the request.
         axes: Materialized domain axes preserving request order.
         available_series: Mapping of available source arrays.
+        precision: Precision mode resolved by engine dispatch policy.
     Returns:
         np.ndarray: Float32 C-contiguous matrix `(V, T)`.
     Assumptions:
@@ -943,6 +1097,7 @@ def _compute_ma_variant_source_matrix(
                 source=source_series,
                 windows=windows_i64,
                 volume=volume_series,
+                precision=precision,
             )
         except ValueError as error:
             raise GridValidationError(str(error)) from error
@@ -967,6 +1122,7 @@ def _compute_volatility_variant_matrix(
     axes: tuple[AxisDef, ...],
     available_series: Mapping[str, np.ndarray],
     t_size: int,
+    precision: str,
 ) -> np.ndarray:
     """
     Compute variant-major matrix `(V, T)` for volatility-family indicators.
@@ -982,6 +1138,7 @@ def _compute_volatility_variant_matrix(
         axes: Materialized domain axes preserving request order.
         available_series: Mapping of available source arrays.
         t_size: Time dimension length.
+        precision: Precision mode resolved by engine dispatch policy.
     Returns:
         np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
     Assumptions:
@@ -1010,6 +1167,7 @@ def _compute_volatility_variant_matrix(
                     available_series=available_series,
                     name=InputSeries.CLOSE.value,
                 ),
+                precision=precision,
             )
 
         if indicator_id == "volatility.atr":
@@ -1031,6 +1189,7 @@ def _compute_volatility_variant_matrix(
                     name=InputSeries.CLOSE.value,
                 ),
                 windows=windows_i64,
+                precision=precision,
             )
 
         variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
@@ -1064,6 +1223,7 @@ def _compute_volatility_variant_matrix(
                         values=windows_i64,
                         variant_indexes=variant_indexes,
                     ),
+                    precision=precision,
                 )
                 _scatter_group_values(
                     destination=out,
@@ -1103,6 +1263,7 @@ def _compute_volatility_variant_matrix(
                         values=annualizations_i64,
                         variant_indexes=variant_indexes,
                     ),
+                    precision=precision,
                 )
                 _scatter_group_values(
                     destination=out,
@@ -1143,6 +1304,7 @@ def _compute_volatility_variant_matrix(
                         values=mults_f64,
                         variant_indexes=variant_indexes,
                     ),
+                    precision=precision,
                 )
                 _scatter_group_values(
                     destination=out,
@@ -1163,6 +1325,7 @@ def _compute_momentum_variant_matrix(
     axes: tuple[AxisDef, ...],
     available_series: Mapping[str, np.ndarray],
     t_size: int,
+    precision: str,
 ) -> np.ndarray:
     """
     Compute variant-major matrix `(V, T)` for momentum-family indicators.
@@ -1178,6 +1341,7 @@ def _compute_momentum_variant_matrix(
         axes: Materialized domain axes preserving request order.
         available_series: Mapping of available source arrays.
         t_size: Time dimension length.
+        precision: Precision mode resolved by engine dispatch policy.
     Returns:
         np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
     Assumptions:
@@ -1221,6 +1385,7 @@ def _compute_momentum_variant_matrix(
                         values=windows_i64,
                         variant_indexes=variant_indexes,
                     ),
+                    precision=precision,
                 )
                 _scatter_group_values(
                     destination=out,
@@ -1249,6 +1414,7 @@ def _compute_momentum_variant_matrix(
                     name=InputSeries.CLOSE.value,
                 ),
                 windows=windows_i64,
+                precision=precision,
             )
 
         if indicator_id == "momentum.fisher":
@@ -1266,6 +1432,7 @@ def _compute_momentum_variant_matrix(
                     name=InputSeries.LOW.value,
                 ),
                 windows=windows_i64,
+                precision=precision,
             )
 
         if indicator_id == "momentum.stoch":
@@ -1295,6 +1462,7 @@ def _compute_momentum_variant_matrix(
                 k_windows=k_windows_i64,
                 smoothings=smoothings_i64,
                 d_windows=d_windows_i64,
+                precision=precision,
             )
 
         variant_source_labels = _variant_source_labels(definition=definition, axes=axes)
@@ -1349,6 +1517,7 @@ def _compute_momentum_variant_matrix(
                         values=d_windows_i64,
                         variant_indexes=variant_indexes,
                     ),
+                    precision=precision,
                 )
                 _scatter_group_values(
                     destination=out,
@@ -1388,6 +1557,7 @@ def _compute_momentum_variant_matrix(
                         values=signal_windows_i64,
                         variant_indexes=variant_indexes,
                     ),
+                    precision=precision,
                 )
                 _scatter_group_values(
                     destination=out,
@@ -1440,6 +1610,7 @@ def _compute_momentum_variant_matrix(
                         values=signal_windows_i64,
                         variant_indexes=variant_indexes,
                     ),
+                    precision=precision,
                 )
                 _scatter_group_values(
                     destination=out,
@@ -1460,6 +1631,7 @@ def _compute_trend_variant_matrix(
     axes: tuple[AxisDef, ...],
     available_series: Mapping[str, np.ndarray],
     t_size: int,
+    precision: str,
 ) -> np.ndarray:
     """
     Compute variant-major matrix `(V, T)` for trend-family indicators.
@@ -1476,6 +1648,7 @@ def _compute_trend_variant_matrix(
         axes: Materialized domain axes preserving request order.
         available_series: Mapping of available source arrays.
         t_size: Time dimension length.
+        precision: Precision mode resolved by engine dispatch policy.
     Returns:
         np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
     Assumptions:
@@ -1519,6 +1692,7 @@ def _compute_trend_variant_matrix(
                         values=windows_i64,
                         variant_indexes=variant_indexes,
                     ),
+                    precision=precision,
                 )
                 _scatter_group_values(
                     destination=out,
@@ -1557,6 +1731,7 @@ def _compute_trend_variant_matrix(
                 accel_starts=accel_starts_f64,
                 accel_steps=accel_steps_f64,
                 accel_maxes=accel_maxes_f64,
+                precision=precision,
             )
 
         close = _require_series(
@@ -1578,6 +1753,7 @@ def _compute_trend_variant_matrix(
                 close=close,
                 windows=windows_i64,
                 smoothings=smoothings_i64,
+                precision=precision,
             )
 
         if indicator_id == "trend.aroon":
@@ -1590,6 +1766,7 @@ def _compute_trend_variant_matrix(
                 low=low,
                 close=close,
                 windows=windows_i64,
+                precision=precision,
             )
 
         if indicator_id == "trend.chandelier_exit":
@@ -1606,6 +1783,7 @@ def _compute_trend_variant_matrix(
                 close=close,
                 windows=windows_i64,
                 mults=mults_f64,
+                precision=precision,
             )
 
         if indicator_id == "trend.donchian":
@@ -1618,6 +1796,7 @@ def _compute_trend_variant_matrix(
                 low=low,
                 close=close,
                 windows=windows_i64,
+                precision=precision,
             )
 
         if indicator_id == "trend.ichimoku":
@@ -1654,6 +1833,7 @@ def _compute_trend_variant_matrix(
                 base_windows=base_windows_i64,
                 span_b_windows=span_b_windows_i64,
                 displacements=displacements_i64,
+                precision=precision,
             )
 
         if indicator_id in {"trend.keltner", "trend.supertrend"}:
@@ -1670,6 +1850,7 @@ def _compute_trend_variant_matrix(
                 close=close,
                 windows=windows_i64,
                 mults=mults_f64,
+                precision=precision,
             )
 
         if indicator_id == "trend.vortex":
@@ -1682,6 +1863,7 @@ def _compute_trend_variant_matrix(
                 low=low,
                 close=close,
                 windows=windows_i64,
+                precision=precision,
             )
     except ValueError as error:
         raise GridValidationError(str(error)) from error
@@ -1694,6 +1876,7 @@ def _compute_volume_variant_matrix(
     definition: IndicatorDef,
     axes: tuple[AxisDef, ...],
     available_series: Mapping[str, np.ndarray],
+    precision: str,
 ) -> np.ndarray:
     """
     Compute variant-major matrix `(V, T)` for volume-family indicators.
@@ -1709,6 +1892,7 @@ def _compute_volume_variant_matrix(
         definition: Hard indicator definition for the request.
         axes: Materialized domain axes preserving request order.
         available_series: Mapping of available source arrays.
+        precision: Precision mode resolved by engine dispatch policy.
     Returns:
         np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
     Assumptions:
@@ -1736,6 +1920,7 @@ def _compute_volume_variant_matrix(
                 indicator_id=indicator_id,
                 close=close,
                 volume=volume,
+                precision=precision,
             )
 
         if indicator_id == "volume.volume_sma":
@@ -1746,6 +1931,7 @@ def _compute_volume_variant_matrix(
                 indicator_id=indicator_id,
                 volume=volume,
                 windows=windows_i64,
+                precision=precision,
             )
 
         high = _require_series(
@@ -1768,6 +1954,7 @@ def _compute_volume_variant_matrix(
                 low=low,
                 close=close,
                 volume=volume,
+                precision=precision,
             )
 
         windows_i64 = np.ascontiguousarray(
@@ -1782,6 +1969,7 @@ def _compute_volume_variant_matrix(
                 close=close,
                 volume=volume,
                 windows=windows_i64,
+                precision=precision,
             )
 
         if indicator_id == "volume.vwap_deviation":
@@ -1796,6 +1984,7 @@ def _compute_volume_variant_matrix(
                 volume=volume,
                 windows=windows_i64,
                 mults=mults_f64,
+                precision=precision,
             )
     except ValueError as error:
         raise GridValidationError(str(error)) from error
@@ -1809,6 +1998,7 @@ def _compute_structure_variant_matrix(
     axes: tuple[AxisDef, ...],
     available_series: Mapping[str, np.ndarray],
     t_size: int,
+    precision: str,
 ) -> np.ndarray:
     """
     Compute variant-major matrix `(V, T)` for structure-family indicators.
@@ -1825,6 +2015,7 @@ def _compute_structure_variant_matrix(
         axes: Materialized domain axes preserving request order.
         available_series: Mapping of available source arrays.
         t_size: Time dimension length.
+        precision: Precision mode resolved by engine dispatch policy.
     Returns:
         np.ndarray: Float32 C-contiguous variant-major matrix `(V, T)`.
     Assumptions:
@@ -1897,6 +2088,7 @@ def _compute_structure_variant_matrix(
         if variant_source_labels is None:
             return compute_structure_grid_f32(
                 indicator_id=indicator_id,
+                precision=precision,
                 **kernel_kwargs,
             )
 
@@ -1928,6 +2120,7 @@ def _compute_structure_variant_matrix(
             )
             group_values = compute_structure_grid_f32(
                 indicator_id=indicator_id,
+                precision=precision,
                 **group_kwargs,
             )
             _scatter_group_values(

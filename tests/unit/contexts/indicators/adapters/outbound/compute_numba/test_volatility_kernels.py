@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -189,7 +190,7 @@ def test_numba_volatility_kernels_match_numpy_oracle_with_nan_holes() -> None:
     mults_f64 = np.asarray([1.5, 2.0, 2.5, 3.0], dtype=np.float64)
     annualizations_i64 = np.asarray([252, 365, 252, 365], dtype=np.int64)
 
-    cases: tuple[tuple[str, dict[str, np.ndarray]], ...] = (
+    cases: tuple[tuple[str, dict[str, Any]], ...] = (
         (
             "volatility.tr",
             {

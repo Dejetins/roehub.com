@@ -5,6 +5,7 @@
 ## Ключевые документы
 
 - [Indicators Architecture](docs/architecture/indicators/README.md)
+- [План миграции kernels на float32/mixed precision (v1)](docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md)
 - [Backtest v1 — Grid Builder + Staged Runner + Sync Guards (BKT-EPIC-04)](docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md)
 - [Market Data — Application Ports (Walking Skeleton v1)](docs/architecture/market_data/market-data-application-ports.md)
 - [Strategy — Milestone 3 Epics](docs/architecture/strategy/strategy-milestone-3-epics-v1.md)
@@ -54,6 +55,7 @@
 - [Indicators — Compute Engine Core (Numba) v1](docs/architecture/indicators/indicators-compute-engine-core.md) — `docs/architecture/indicators/indicators-compute-engine-core.md` — Документ фиксирует фактическую реализацию `IND-EPIC-05` в `indicators`: CPU/Numba skeleton, warmup, runtime config, total memory guard.
 - [Indicators — Grid Builder + Batch Estimator + Guards (v1)](docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md) — `docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md` — **Документ:** `docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md`
 - [План оптимизации производительности расчета сеток индикаторов (v1)](docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md) — `docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md` — Документ фиксирует пошаговый план изменений по 4 направлениям оптимизации (пункты 1-2-3-4) для `indicators` compute path без изменения бизнес-семантики индикаторов и порядка вариантов.
+- [План миграции kernels на float32/mixed precision (v1)](docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md) — `docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md` — Документ описывает phase-5 план оптимизации после `docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md`.
 - [Indicators — MA compute (Numba/Numpy) + sources v1](docs/architecture/indicators/indicators-ma-compute-numba-v1.md) — `docs/architecture/indicators/indicators-ma-compute-numba-v1.md` — Этот документ является source of truth для **IND-EPIC-06 — Реализация группы MA + базовые “строительные блоки”** в bounded context `indicators`.
 - [Indicators — MA](docs/architecture/indicators/indicators-ma.md) — `docs/architecture/indicators/indicators-ma.md` — Документ фиксирует поддерживаемые `ma.*` идентификаторы, ссылки на реализацию и практические ограничения для сопровождения группы MA.
 - [Indicators — Momentum](docs/architecture/indicators/indicators-momentum.md) — `docs/architecture/indicators/indicators-momentum.md` — Документ фиксирует поддерживаемые `momentum.*` идентификаторы, ключевые ссылки на реализацию и типовые ошибки сопровождения для группы Momentum.

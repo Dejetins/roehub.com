@@ -15,7 +15,7 @@ import math
 import numba as nb
 import numpy as np
 
-from ._common import is_nan
+from ._common import PRECISION_MODE_FLOAT64, SUPPORTED_PRECISION_MODES, is_nan
 
 _SUPPORTED_VOLUME_IDS = {
     "volume.ad_line",
@@ -941,6 +941,7 @@ def compute_volume_grid_f32(
     volume: np.ndarray | None = None,
     windows: np.ndarray | None = None,
     mults: np.ndarray | None = None,
+    precision: str = PRECISION_MODE_FLOAT64,
 ) -> np.ndarray:
     """
     Compute volume indicator matrix `(V, T)` as float32 contiguous array.
@@ -960,6 +961,7 @@ def compute_volume_grid_f32(
         volume: Optional volume series.
         windows: Optional per-variant window values.
         mults: Optional per-variant multiplier values.
+        precision: Precision mode (`float32`, `mixed`, `float64`) from engine policy dispatch.
     Returns:
         np.ndarray: Float32 C-contiguous matrix `(V, T)` in deterministic variant order.
     Assumptions:
@@ -972,11 +974,13 @@ def compute_volume_grid_f32(
     normalized_id = _normalize_volume_indicator_id(indicator_id=indicator_id)
     if normalized_id not in _SUPPORTED_VOLUME_IDS:
         raise ValueError(f"unsupported volume indicator_id: {indicator_id!r}")
+    _validate_precision_mode(precision=precision)
+    core_dtype = np.float64 if precision == PRECISION_MODE_FLOAT64 else np.float32
 
-    volume_f64 = _prepare_series(name="volume", values=volume)
+    volume_f64 = _prepare_series(name="volume", values=volume, dtype=core_dtype)
 
     if normalized_id == "volume.obv":
-        close_f64 = _prepare_series(name="close", values=close)
+        close_f64 = _prepare_series(name="close", values=close, dtype=core_dtype)
         _ensure_same_length_cv(close=close_f64, volume=volume_f64)
         out_f64 = np.ascontiguousarray(_obv_series_f64(close_f64, volume_f64).reshape(1, -1))
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
@@ -986,9 +990,9 @@ def compute_volume_grid_f32(
         out_f64 = _volume_sma_variants_f64(volume_f64, windows_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    high_f64 = _prepare_series(name="high", values=high)
-    low_f64 = _prepare_series(name="low", values=low)
-    close_f64 = _prepare_series(name="close", values=close)
+    high_f64 = _prepare_series(name="high", values=high, dtype=core_dtype)
+    low_f64 = _prepare_series(name="low", values=low, dtype=core_dtype)
+    close_f64 = _prepare_series(name="close", values=close, dtype=core_dtype)
     _ensure_same_length(high=high_f64, low=low_f64, close=close_f64, volume=volume_f64)
 
     if normalized_id == "volume.ad_line":
@@ -1030,13 +1034,46 @@ def compute_volume_grid_f32(
     return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
 
-def _prepare_series(*, name: str, values: np.ndarray | None) -> np.ndarray:
+def _validate_precision_mode(*, precision: str) -> None:
+    """
+    Validate volume kernel precision mode against shared precision policy constants.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        precision: Precision mode candidate.
+    Returns:
+        None.
+    Assumptions:
+        Engine-level dispatch passes normalized lowercase mode values.
+    Raises:
+        ValueError: If precision mode is unsupported.
+    Side Effects:
+        None.
+    """
+    if precision not in SUPPORTED_PRECISION_MODES:
+        raise ValueError(
+            "unsupported precision mode: "
+            f"{precision!r}; expected one of {SUPPORTED_PRECISION_MODES!r}"
+        )
+
+
+def _prepare_series(
+    *,
+    name: str,
+    values: np.ndarray | None,
+    dtype: np.dtype | type = np.float64,
+) -> np.ndarray:
     """
     Normalize mandatory one-dimensional series input.
 
     Args:
         name: Logical input name for deterministic error messages.
         values: Series input.
+        dtype: Target floating dtype for normalized output.
     Returns:
         np.ndarray: Float64 C-contiguous one-dimensional array.
     Assumptions:
@@ -1048,7 +1085,7 @@ def _prepare_series(*, name: str, values: np.ndarray | None) -> np.ndarray:
     """
     if values is None:
         raise ValueError(f"{name} series is required")
-    out = np.ascontiguousarray(values, dtype=np.float64)
+    out = np.ascontiguousarray(values, dtype=dtype)
     if out.ndim != 1:
         raise ValueError(f"{name} must be a 1D array")
     return out

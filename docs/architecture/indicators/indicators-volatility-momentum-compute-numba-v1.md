@@ -180,6 +180,20 @@ Compute **не делает импутацию**. NaN holes из CandleFeed до
 `IndicatorTensor.values` — `float32`.
 Внутри kernels допускаются float64 accumulator’ы (implementation detail), но выход фиксирован как `float32`.
 
+### 6.1) Phase-5 precision policy (f32/mixed)
+
+Для этой группы phase-5 фиксирует явную tier-политику:
+
+- `Tier B` (`mixed precision`) для momentum:
+  `momentum.rsi`, `momentum.roc`, `momentum.cci`, `momentum.williams_r`,
+  `momentum.stoch`, `momentum.trix`, `momentum.stoch_rsi`, `momentum.macd`, `momentum.ppo`.
+- `Tier C` (`float64` core) для volatility:
+  `volatility.variance`, `volatility.stddev`, `volatility.hv`,
+  `volatility.bbands`, `volatility.bbands_bandwidth`, `volatility.bbands_percent_b`.
+
+Даже при mixed/internal float64 путях внешний контракт остаётся неизменным:
+`IndicatorTensor.values` всегда `float32`.
+
 ### 7) Guards применяются до больших аллокаций тензора
 
 До расчёта:

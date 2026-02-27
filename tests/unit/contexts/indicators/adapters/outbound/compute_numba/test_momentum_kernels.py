@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -195,7 +196,7 @@ def test_numba_momentum_kernels_match_numpy_oracle_with_nan_holes() -> None:
     smoothings_i64 = np.asarray([3, 3, 4, 4], dtype=np.int64)
     d_windows_i64 = np.asarray([3, 4, 4, 5], dtype=np.int64)
 
-    cases: tuple[tuple[str, dict[str, np.ndarray]], ...] = (
+    cases: tuple[tuple[str, dict[str, Any]], ...] = (
         (
             "momentum.rsi",
             {
@@ -417,3 +418,66 @@ def test_numba_engine_supports_all_momentum_indicators(tmp_path: Path) -> None:
         assert tensor.values.flags["C_CONTIGUOUS"]
         assert tensor.values.shape[0] == candles.ts_open.shape[0]
         assert tensor.values.shape[1] == tensor.meta.variants
+
+
+def test_momentum_macd_mixed_precision_keeps_near_zero_signal_stability() -> None:
+    """
+    Verify mixed precision MACD path preserves sign stability versus float64 baseline.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py,
+      tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_momentum_kernels.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Sign flips may appear only in near-zero zone for signal-sensitive outputs.
+    Raises:
+        AssertionError: If mixed precision diverges materially from float64 baseline.
+    Side Effects:
+        None.
+    """
+    t_size = 1800
+    timeline = np.arange(t_size, dtype=np.float32)
+    base_close = np.ascontiguousarray(
+        np.float32(200.0)
+        + (np.float32(0.01) * timeline)
+        + (np.float32(0.8) * np.sin(timeline / np.float32(21.0)))
+    )
+    alt_close = np.ascontiguousarray(base_close + (np.float32(0.15) * np.cos(timeline / 17.0)))
+    source_variants = np.ascontiguousarray(np.stack((base_close, alt_close), axis=0))
+    source_variants[:, np.asarray([37, 511, 1207], dtype=np.int64)] = np.nan
+
+    fast_windows = np.asarray([8, 12], dtype=np.int64)
+    slow_windows = np.asarray([21, 26], dtype=np.int64)
+    signal_windows = np.asarray([5, 9], dtype=np.int64)
+
+    baseline = compute_momentum_grid_numba_f32(
+        indicator_id="momentum.macd",
+        source_variants=source_variants,
+        fast_windows=fast_windows,
+        slow_windows=slow_windows,
+        signal_windows=signal_windows,
+        precision="float64",
+    )
+    mixed = compute_momentum_grid_numba_f32(
+        indicator_id="momentum.macd",
+        source_variants=source_variants,
+        fast_windows=fast_windows,
+        slow_windows=slow_windows,
+        signal_windows=signal_windows,
+        precision="mixed",
+    )
+
+    assert mixed.dtype == np.float32
+    assert mixed.flags["C_CONTIGUOUS"]
+    np.testing.assert_allclose(mixed, baseline, rtol=5e-4, atol=5e-4, equal_nan=True)
+
+    finite_mask = np.isfinite(baseline) & np.isfinite(mixed)
+    sign_flip_mask = np.signbit(baseline) != np.signbit(mixed)
+    away_from_zero = np.abs(baseline) > 5e-4
+
+    assert not np.any(sign_flip_mask & finite_mask & away_from_zero)

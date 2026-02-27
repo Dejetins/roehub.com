@@ -286,3 +286,139 @@ def test_numba_engine_matches_numpy_oracle_for_all_derived_sources(tmp_path: Pat
         atol=2e-5,
         equal_nan=True,
     )
+
+
+def test_ma_tier_a_float32_path_matches_float64_baseline_accuracy_harness() -> None:
+    """
+    Verify Tier A MA float32 path stays numerically close to legacy float64 baseline.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_ma_kernels.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Tier A covers MA ids except `ma.vwma`, which is migrated as mixed precision Tier B.
+    Raises:
+        AssertionError: If float32 path diverges from float64 baseline beyond migration tolerances.
+    Side Effects:
+        None.
+    """
+    rng = np.random.default_rng(20260227)
+    t_size = 1024
+    source = np.ascontiguousarray(rng.normal(100.0, 2.0, t_size).astype(np.float32))
+    windows = np.ascontiguousarray(np.asarray([3, 7, 13, 29], dtype=np.int64))
+
+    source[np.asarray([5, 77, 201, 509], dtype=np.int64)] = np.nan
+    tier_a_ids = (
+        "ma.sma",
+        "ma.ema",
+        "ma.wma",
+        "ma.lwma",
+        "ma.rma",
+        "ma.smma",
+        "ma.dema",
+        "ma.tema",
+        "ma.zlema",
+        "ma.hma",
+    )
+
+    for indicator_id in tier_a_ids:
+        baseline = compute_ma_grid_numba_f32(
+            indicator_id=indicator_id,
+            source=source,
+            windows=windows,
+            precision="float64",
+        )
+        migrated = compute_ma_grid_numba_f32(
+            indicator_id=indicator_id,
+            source=source,
+            windows=windows,
+            precision="float32",
+        )
+
+        assert migrated.dtype == np.float32
+        assert migrated.flags["C_CONTIGUOUS"]
+        rtol = 5e-4
+        atol = 5e-4
+        if indicator_id == "ma.hma":
+            rtol = 1e-3
+            atol = 1e-1
+        np.testing.assert_allclose(
+            migrated,
+            baseline,
+            rtol=rtol,
+            atol=atol,
+            equal_nan=True,
+            err_msg=f"indicator_id={indicator_id}",
+        )
+
+
+def test_ma_vwma_mixed_precision_keeps_signal_stability_vs_float64_baseline() -> None:
+    """
+    Verify Tier B mixed precision VWMA is close to float64 baseline and stable near-zero signals.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_ma_kernels.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Mixed precision keeps float32 output and preserves stable sign behavior
+        away from near-zero zone.
+    Raises:
+        AssertionError: If mixed path diverges materially from float64 baseline.
+    Side Effects:
+        None.
+    """
+    t_size = 1400
+    timeline = np.arange(t_size, dtype=np.float32)
+    source = np.ascontiguousarray(
+        np.float32(100.0)
+        + (np.float32(0.015) * timeline)
+        + (np.float32(0.1) * np.sin(timeline / np.float32(13.0)))
+    )
+    volume = np.ascontiguousarray(
+        np.float32(250.0)
+        + (np.float32(5.0) * np.sin(timeline / np.float32(7.0)))
+    )
+    windows = np.ascontiguousarray(np.asarray([5, 13, 34], dtype=np.int64))
+
+    source[np.asarray([31, 111, 907], dtype=np.int64)] = np.nan
+    volume[np.asarray([17, 181, 701], dtype=np.int64)] = np.nan
+
+    baseline = compute_ma_grid_numba_f32(
+        indicator_id="ma.vwma",
+        source=source,
+        windows=windows,
+        volume=volume,
+        precision="float64",
+    )
+    mixed = compute_ma_grid_numba_f32(
+        indicator_id="ma.vwma",
+        source=source,
+        windows=windows,
+        volume=volume,
+        precision="mixed",
+    )
+
+    assert mixed.dtype == np.float32
+    assert mixed.flags["C_CONTIGUOUS"]
+    np.testing.assert_allclose(mixed, baseline, rtol=5e-4, atol=5e-4, equal_nan=True)
+
+    source_matrix = np.repeat(source.reshape(-1, 1), windows.shape[0], axis=1)
+    baseline_delta = source_matrix - baseline
+    mixed_delta = source_matrix - mixed
+    finite_mask = np.isfinite(baseline_delta) & np.isfinite(mixed_delta)
+    sign_flip_mask = np.signbit(baseline_delta) != np.signbit(mixed_delta)
+    away_from_zero = np.abs(baseline_delta) > 1e-3
+
+    assert not np.any(sign_flip_mask & finite_mask & away_from_zero)

@@ -14,7 +14,7 @@ import math
 import numba as nb
 import numpy as np
 
-from ._common import is_nan
+from ._common import PRECISION_MODE_FLOAT64, SUPPORTED_PRECISION_MODES, is_nan
 
 _SUPPORTED_MOMENTUM_IDS = {
     "momentum.rsi",
@@ -976,6 +976,7 @@ def compute_momentum_grid_f32(
     k_windows: np.ndarray | None = None,
     smoothings: np.ndarray | None = None,
     d_windows: np.ndarray | None = None,
+    precision: str = PRECISION_MODE_FLOAT64,
 ) -> np.ndarray:
     """
     Compute momentum indicator matrix `(V, T)` as float32 contiguous array.
@@ -1000,6 +1001,7 @@ def compute_momentum_grid_f32(
         k_windows: Optional per-variant stochastic K window values.
         smoothings: Optional per-variant smoothing window values.
         d_windows: Optional per-variant D window values.
+        precision: Precision mode (`float32`, `mixed`, `float64`) from engine policy dispatch.
     Returns:
         np.ndarray: Float32 C-contiguous matrix `(V, T)`.
     Assumptions:
@@ -1012,9 +1014,13 @@ def compute_momentum_grid_f32(
     normalized_id = _normalize_momentum_indicator_id(indicator_id=indicator_id)
     if normalized_id not in _SUPPORTED_MOMENTUM_IDS:
         raise ValueError(f"unsupported momentum indicator_id: {indicator_id!r}")
+    _validate_precision_mode(precision=precision)
+    core_dtype = (
+        np.float64 if precision == PRECISION_MODE_FLOAT64 else np.float32
+    )
 
     if normalized_id in {"momentum.rsi", "momentum.roc"}:
-        source_f64 = _prepare_source_variants(values=source_variants)
+        source_f64 = _prepare_source_variants(values=source_variants, dtype=core_dtype)
         windows_i64 = _prepare_int_variants(
             name="windows",
             values=windows,
@@ -1028,9 +1034,9 @@ def compute_momentum_grid_f32(
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
     if normalized_id in {"momentum.cci", "momentum.williams_r"}:
-        high_f64 = _prepare_series(name="high", values=high)
-        low_f64 = _prepare_series(name="low", values=low)
-        close_f64 = _prepare_series(name="close", values=close)
+        high_f64 = _prepare_series(name="high", values=high, dtype=core_dtype)
+        low_f64 = _prepare_series(name="low", values=low, dtype=core_dtype)
+        close_f64 = _prepare_series(name="close", values=close, dtype=core_dtype)
         _ensure_same_length(high=high_f64, low=low_f64, close=close_f64)
         windows_i64 = _prepare_int_variants(name="windows", values=windows)
         out_f64 = _williams_or_cci_variants_f64(
@@ -1043,17 +1049,17 @@ def compute_momentum_grid_f32(
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
     if normalized_id == "momentum.fisher":
-        high_f64 = _prepare_series(name="high", values=high)
-        low_f64 = _prepare_series(name="low", values=low)
+        high_f64 = _prepare_series(name="high", values=high, dtype=core_dtype)
+        low_f64 = _prepare_series(name="low", values=low, dtype=core_dtype)
         _ensure_same_length_hl(high=high_f64, low=low_f64)
         windows_i64 = _prepare_int_variants(name="windows", values=windows)
         out_f64 = _fisher_variants_f64(high_f64, low_f64, windows_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
     if normalized_id == "momentum.stoch":
-        high_f64 = _prepare_series(name="high", values=high)
-        low_f64 = _prepare_series(name="low", values=low)
-        close_f64 = _prepare_series(name="close", values=close)
+        high_f64 = _prepare_series(name="high", values=high, dtype=core_dtype)
+        low_f64 = _prepare_series(name="low", values=low, dtype=core_dtype)
+        close_f64 = _prepare_series(name="close", values=close, dtype=core_dtype)
         _ensure_same_length(high=high_f64, low=low_f64, close=close_f64)
 
         k_windows_i64 = _prepare_int_variants(name="k_windows", values=k_windows)
@@ -1079,7 +1085,7 @@ def compute_momentum_grid_f32(
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
     if normalized_id == "momentum.stoch_rsi":
-        source_f64 = _prepare_source_variants(values=source_variants)
+        source_f64 = _prepare_source_variants(values=source_variants, dtype=core_dtype)
         variants = source_f64.shape[0]
         rsi_windows_i64 = _prepare_int_variants(
             name="rsi_windows",
@@ -1111,7 +1117,7 @@ def compute_momentum_grid_f32(
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
     if normalized_id == "momentum.trix":
-        source_f64 = _prepare_source_variants(values=source_variants)
+        source_f64 = _prepare_source_variants(values=source_variants, dtype=core_dtype)
         variants = source_f64.shape[0]
         windows_i64 = _prepare_int_variants(
             name="windows",
@@ -1126,7 +1132,7 @@ def compute_momentum_grid_f32(
         out_f64 = _trix_variants_f64(source_f64, windows_i64, signal_windows_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    source_f64 = _prepare_source_variants(values=source_variants)
+    source_f64 = _prepare_source_variants(values=source_variants, dtype=core_dtype)
     variants = source_f64.shape[0]
     fast_windows_i64 = _prepare_int_variants(
         name="fast_windows",
@@ -1153,13 +1159,46 @@ def compute_momentum_grid_f32(
     return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
 
-def _prepare_series(*, name: str, values: np.ndarray | None) -> np.ndarray:
+def _validate_precision_mode(*, precision: str) -> None:
+    """
+    Validate momentum kernel precision mode against shared precision policy constants.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        precision: Precision mode candidate.
+    Returns:
+        None.
+    Assumptions:
+        Engine-level dispatch passes normalized lowercase mode values.
+    Raises:
+        ValueError: If precision mode is unsupported.
+    Side Effects:
+        None.
+    """
+    if precision not in SUPPORTED_PRECISION_MODES:
+        raise ValueError(
+            "unsupported precision mode: "
+            f"{precision!r}; expected one of {SUPPORTED_PRECISION_MODES!r}"
+        )
+
+
+def _prepare_series(
+    *,
+    name: str,
+    values: np.ndarray | None,
+    dtype: np.dtype | type = np.float64,
+) -> np.ndarray:
     """
     Normalize mandatory one-dimensional series input.
 
     Args:
         name: Logical input name for deterministic error messages.
         values: Series input.
+        dtype: Target floating dtype for normalized output.
     Returns:
         np.ndarray: Float64 C-contiguous one-dimensional array.
     Assumptions:
@@ -1171,18 +1210,23 @@ def _prepare_series(*, name: str, values: np.ndarray | None) -> np.ndarray:
     """
     if values is None:
         raise ValueError(f"{name} series is required")
-    out = np.ascontiguousarray(values, dtype=np.float64)
+    out = np.ascontiguousarray(values, dtype=dtype)
     if out.ndim != 1:
         raise ValueError(f"{name} must be a 1D array")
     return out
 
 
-def _prepare_source_variants(*, values: np.ndarray | None) -> np.ndarray:
+def _prepare_source_variants(
+    *,
+    values: np.ndarray | None,
+    dtype: np.dtype | type = np.float64,
+) -> np.ndarray:
     """
     Normalize source variants matrix for source-parameterized indicators.
 
     Args:
         values: Variant-major source matrix.
+        dtype: Target floating dtype for normalized output.
     Returns:
         np.ndarray: Float64 C-contiguous two-dimensional array `(V, T)`.
     Assumptions:
@@ -1194,7 +1238,7 @@ def _prepare_source_variants(*, values: np.ndarray | None) -> np.ndarray:
     """
     if values is None:
         raise ValueError("source_variants matrix is required")
-    out = np.ascontiguousarray(values, dtype=np.float64)
+    out = np.ascontiguousarray(values, dtype=dtype)
     if out.ndim != 2:
         raise ValueError("source_variants must be a 2D array")
     if out.shape[0] == 0 or out.shape[1] == 0:

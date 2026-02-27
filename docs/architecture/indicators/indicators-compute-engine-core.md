@@ -81,6 +81,24 @@
 - `momentum.ppo`
 - `volume.vwap_deviation`
 
+### Precision policy (phase 5)
+
+В `engine.py` реализован явный и детерминированный dispatch precision policy по `indicator_id`:
+
+- `Tier A` -> `float32` path.
+- `Tier B` -> `mixed precision` path.
+- `Tier C` -> `float64` core path.
+
+Технически это зафиксировано через `_precision_mode_for_indicator(...)` и константы
+`PRECISION_MODE_FLOAT32`, `PRECISION_MODE_MIXED`, `PRECISION_MODE_FLOAT64` из
+`kernels/_common.py`.
+
+Инварианты:
+
+- неизвестные/непокрытые `indicator_id` детерминированно fallback'ятся в `float64` core;
+- внешний контракт не меняется: `IndicatorTensor.values` всегда `float32`;
+- variant ordering и layout контракты остаются неизменными.
+
 ## Total memory guard
 
 Единственный публичный budget-параметр:

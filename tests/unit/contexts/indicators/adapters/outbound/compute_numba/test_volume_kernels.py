@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 
@@ -144,7 +145,7 @@ def test_numba_volume_kernels_match_numpy_oracle_with_nan_holes() -> None:
     windows_i64 = np.asarray([5, 14, 28, 42], dtype=np.int64)
     mults_f64 = np.asarray([1.5, 2.0, 2.5, 3.0], dtype=np.float64)
 
-    cases: tuple[tuple[str, dict[str, np.ndarray]], ...] = (
+    cases: tuple[tuple[str, dict[str, Any]], ...] = (
         (
             "volume.ad_line",
             {

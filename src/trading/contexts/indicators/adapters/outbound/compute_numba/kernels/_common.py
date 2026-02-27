@@ -18,6 +18,14 @@ from trading.contexts.indicators.domain.errors import ComputeBudgetExceeded
 WORKSPACE_FACTOR_DEFAULT = 0.20
 WORKSPACE_FIXED_BYTES_DEFAULT = 67_108_864
 FLOAT32_DTYPE_BYTES = 4
+PRECISION_MODE_FLOAT32 = "float32"
+PRECISION_MODE_MIXED = "mixed"
+PRECISION_MODE_FLOAT64 = "float64"
+SUPPORTED_PRECISION_MODES = (
+    PRECISION_MODE_FLOAT32,
+    PRECISION_MODE_MIXED,
+    PRECISION_MODE_FLOAT64,
+)
 
 
 @nb.njit(cache=True)
@@ -150,6 +158,108 @@ def rolling_sum_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
 
 
 @nb.njit(parallel=True, cache=True)
+def rolling_sum_grid_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute rolling sums for multiple integer windows with float32 core.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        source: One-dimensional source series (`float32` preferred).
+        windows: One-dimensional integer windows.
+    Returns:
+        np.ndarray: Matrix of shape `(T, W)` in float32.
+    Assumptions:
+        `windows` contains strictly positive integers.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    t_size = source.shape[0]
+    w_size = windows.shape[0]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+
+    for window_index in nb.prange(w_size):
+        window = windows[window_index]
+        running_sum = np.float32(0.0)
+        nan_count = 0
+        for time_index in range(t_size):
+            incoming = source[time_index]
+            if np.isnan(incoming):
+                nan_count += 1
+            else:
+                running_sum = np.float32(running_sum + incoming)
+
+            if time_index >= window:
+                outgoing = source[time_index - window]
+                if np.isnan(outgoing):
+                    nan_count -= 1
+                else:
+                    running_sum = np.float32(running_sum - outgoing)
+
+            if time_index + 1 < window or nan_count > 0:
+                out[time_index, window_index] = np.float32(np.nan)
+            else:
+                out[time_index, window_index] = running_sum
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
+def rolling_sum_grid_mixed_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute rolling sums with float64 accumulator and float32 output.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        source: One-dimensional source series (`float32` preferred).
+        windows: One-dimensional integer windows.
+    Returns:
+        np.ndarray: Matrix of shape `(T, W)` in float32.
+    Assumptions:
+        `windows` contains strictly positive integers.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    t_size = source.shape[0]
+    w_size = windows.shape[0]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+
+    for window_index in nb.prange(w_size):
+        window = windows[window_index]
+        running_sum = 0.0
+        nan_count = 0
+        for time_index in range(t_size):
+            incoming = float(source[time_index])
+            if is_nan(incoming):
+                nan_count += 1
+            else:
+                running_sum += incoming
+
+            if time_index >= window:
+                outgoing = float(source[time_index - window])
+                if is_nan(outgoing):
+                    nan_count -= 1
+                else:
+                    running_sum -= outgoing
+
+            if time_index + 1 < window or nan_count > 0:
+                out[time_index, window_index] = np.float32(np.nan)
+            else:
+                out[time_index, window_index] = np.float32(running_sum)
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
 def rolling_mean_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     """
     Compute rolling means for multiple integer windows.
@@ -178,6 +288,80 @@ def rolling_mean_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray
                 out[time_index, window_index] = np.nan
             else:
                 out[time_index, window_index] = value / window
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
+def rolling_mean_grid_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute rolling means for multiple integer windows with float32 core.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        source: One-dimensional source series (`float32` preferred).
+        windows: One-dimensional integer windows.
+    Returns:
+        np.ndarray: Matrix of shape `(T, W)` in float32.
+    Assumptions:
+        `windows` contains strictly positive integers.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    rolling_sum = rolling_sum_grid_f32(source, windows)
+    t_size = rolling_sum.shape[0]
+    w_size = rolling_sum.shape[1]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+    for window_index in nb.prange(w_size):
+        window = np.float32(windows[window_index])
+        for time_index in range(t_size):
+            value = rolling_sum[time_index, window_index]
+            if np.isnan(value):
+                out[time_index, window_index] = np.float32(np.nan)
+            else:
+                out[time_index, window_index] = np.float32(value / window)
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
+def rolling_mean_grid_mixed_f32(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
+    """
+    Compute rolling means with float64 accumulator and float32 output.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        source: One-dimensional source series (`float32` preferred).
+        windows: One-dimensional integer windows.
+    Returns:
+        np.ndarray: Matrix of shape `(T, W)` in float32.
+    Assumptions:
+        `windows` contains strictly positive integers.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    rolling_sum = rolling_sum_grid_mixed_f32(source, windows)
+    t_size = rolling_sum.shape[0]
+    w_size = rolling_sum.shape[1]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+    for window_index in nb.prange(w_size):
+        window = np.float32(windows[window_index])
+        for time_index in range(t_size):
+            value = rolling_sum[time_index, window_index]
+            if np.isnan(value):
+                out[time_index, window_index] = np.float32(np.nan)
+            else:
+                out[time_index, window_index] = np.float32(value / window)
     return out
 
 
@@ -217,6 +401,101 @@ def ewma_grid_f64(source: np.ndarray, windows: np.ndarray, use_rma_alpha: bool) 
             else:
                 previous = alpha * value + (1.0 - alpha) * previous
             out[time_index, window_index] = previous
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
+def ewma_grid_f32(source: np.ndarray, windows: np.ndarray, use_rma_alpha: bool) -> np.ndarray:
+    """
+    Compute EWMA/RMA matrix for multiple windows in float32 core precision.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        source: One-dimensional source series (`float32` preferred).
+        windows: One-dimensional integer windows.
+        use_rma_alpha: When True uses `1 / w`, otherwise `2 / (w + 1)`.
+    Returns:
+        np.ndarray: Matrix of shape `(T, W)` in float32.
+    Assumptions:
+        `windows` contains strictly positive integers.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    t_size = source.shape[0]
+    w_size = windows.shape[0]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+    for window_index in nb.prange(w_size):
+        window = windows[window_index]
+        if use_rma_alpha:
+            alpha = np.float32(1.0 / window)
+        else:
+            alpha = np.float32(2.0 / (window + 1.0))
+        previous = np.float32(np.nan)
+        for time_index in range(t_size):
+            value = source[time_index]
+            if np.isnan(value):
+                previous = np.float32(np.nan)
+                out[time_index, window_index] = np.float32(np.nan)
+                continue
+            if np.isnan(previous):
+                previous = value
+            else:
+                previous = np.float32((alpha * value) + ((np.float32(1.0) - alpha) * previous))
+            out[time_index, window_index] = previous
+    return out
+
+
+@nb.njit(parallel=True, cache=True)
+def ewma_grid_mixed_f32(
+    source: np.ndarray,
+    windows: np.ndarray,
+    use_rma_alpha: bool,
+) -> np.ndarray:
+    """
+    Compute EWMA/RMA matrix with float64 state accumulator and float32 output.
+
+    Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
+    Related:
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/ma.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+
+    Args:
+        source: One-dimensional source series (`float32` preferred).
+        windows: One-dimensional integer windows.
+        use_rma_alpha: When True uses `1 / w`, otherwise `2 / (w + 1)`.
+    Returns:
+        np.ndarray: Matrix of shape `(T, W)` in float32.
+    Assumptions:
+        `windows` contains strictly positive integers.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    t_size = source.shape[0]
+    w_size = windows.shape[0]
+    out = np.empty((t_size, w_size), dtype=np.float32)
+    for window_index in nb.prange(w_size):
+        window = windows[window_index]
+        alpha = 1.0 / window if use_rma_alpha else 2.0 / (window + 1.0)
+        previous: float = math.nan
+        for time_index in range(t_size):
+            value = float(source[time_index])
+            if is_nan(value):
+                previous = math.nan
+                out[time_index, window_index] = np.float32(np.nan)
+                continue
+            if is_nan(previous):
+                previous = value
+            else:
+                previous = alpha * value + (1.0 - alpha) * previous
+            out[time_index, window_index] = np.float32(previous)
     return out
 
 
@@ -370,17 +649,27 @@ def check_total_budget_or_raise(
 
 __all__ = [
     "FLOAT32_DTYPE_BYTES",
+    "PRECISION_MODE_FLOAT32",
+    "PRECISION_MODE_MIXED",
+    "PRECISION_MODE_FLOAT64",
+    "SUPPORTED_PRECISION_MODES",
     "WORKSPACE_FACTOR_DEFAULT",
     "WORKSPACE_FIXED_BYTES_DEFAULT",
     "check_total_budget_or_raise",
+    "ewma_grid_f32",
     "estimate_tensor_bytes",
     "estimate_total_bytes",
     "ewma_grid_f64",
+    "ewma_grid_mixed_f32",
     "first_valid_index",
     "is_nan",
     "nan_to_zero",
+    "rolling_mean_grid_f32",
     "rolling_mean_grid_f64",
+    "rolling_mean_grid_mixed_f32",
+    "rolling_sum_grid_f32",
     "rolling_sum_grid_f64",
+    "rolling_sum_grid_mixed_f32",
     "write_series_grid_time_major",
     "write_series_grid_variant_major",
     "zero_to_nan",
