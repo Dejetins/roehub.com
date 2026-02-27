@@ -6,7 +6,11 @@ from types import SimpleNamespace
 from typing import Any, Mapping, cast
 from uuid import UUID
 
-from trading.contexts.backtest.application.dto import RunBacktestRequest, RunBacktestTemplate
+from trading.contexts.backtest.application.dto import (
+    BacktestRankingConfig,
+    RunBacktestRequest,
+    RunBacktestTemplate,
+)
 from trading.contexts.backtest.application.services import (
     BacktestRiskVariantV1,
     BacktestStageABaseVariant,
@@ -383,6 +387,112 @@ class _DeterministicScorerWithDetails:
         )
         return SimpleNamespace(
             metrics={"Total Return [%]": self._stage_b_score},
+            target_slice=slice(0, 1),
+            execution_params={},
+            risk_params={},
+            execution_outcome={},
+        )
+
+
+class _RankingAwareScorerWithDetails:
+    """
+    Deterministic scorer fake exposing configurable ranking metrics for jobs ordering tests.
+    """
+
+    def score_variant(
+        self,
+        *,
+        stage: str,
+        candles: Any,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, Any]],
+        risk_params: Mapping[str, Any],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return deterministic multi-metric payload for Stage-A/Stage-B ranking checks.
+
+        Args:
+            stage: Stage literal.
+            candles: Candle arrays payload.
+            indicator_selections: Indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicators-only variant key.
+            variant_key: Backtest variant key.
+        Returns:
+            Mapping[str, float]: Payload including primary/secondary metric literals.
+        Assumptions:
+            Stage-A fixtures use `ema.threshold` signal parameter to derive primary ranking value.
+        Raises:
+            ValueError: If fixture payload shape is invalid.
+        Side Effects:
+            None.
+        """
+        _ = stage, candles, indicator_selections, indicator_variant_key, variant_key
+        ema_signal = signal_params.get("ema", {})
+        threshold_raw = ema_signal.get("threshold", 0)
+        primary = float(threshold_raw) if isinstance(threshold_raw, int | float) else 0.0
+        sl_pct_raw = risk_params.get("sl_pct")
+        secondary = (
+            float(sl_pct_raw)
+            if isinstance(sl_pct_raw, int | float) and not isinstance(sl_pct_raw, bool)
+            else 0.0
+        )
+        total_return = 100.0 - primary
+        return {
+            "Total Return [%]": total_return,
+            "total_return_pct": total_return,
+            "max_drawdown_pct": primary,
+            "profit_factor": secondary,
+            "return_over_max_drawdown": (
+                total_return / primary if primary != 0.0 else float("inf")
+            ),
+        }
+
+    def score_variant_with_details(
+        self,
+        *,
+        stage: str,
+        candles: Any,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, Any]],
+        risk_params: Mapping[str, Any],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Any:
+        """
+        Return minimal details payload for finalizing path while preserving total-return checks.
+
+        Args:
+            stage: Stage literal.
+            candles: Candle arrays payload.
+            indicator_selections: Indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicators-only variant key.
+            variant_key: Backtest variant key.
+        Returns:
+            Any: Details-like object with deterministic metrics payload.
+        Assumptions:
+            Finalizing consistency check uses `Total Return [%]` only.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        metrics = self.score_variant(
+            stage=stage,
+            candles=candles,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
+        )
+        return SimpleNamespace(
+            metrics=metrics,
             target_slice=slice(0, 1),
             execution_params={},
             risk_params={},
@@ -887,6 +997,66 @@ def test_process_claimed_job_persists_stage_progress_and_finalizing_policy() -> 
     assert final_rows[1].trades_json is None
 
 
+def test_process_claimed_job_applies_configured_primary_and_secondary_ranking() -> None:
+    """
+    Verify worker Stage-B ordering follows configured primary/secondary ranking semantics.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Primary metric comes from signal threshold; secondary metric comes from `sl_pct`.
+    Raises:
+        AssertionError: If running snapshot order violates configured ranking contract.
+    Side Effects:
+        None.
+    """
+    job = _build_running_job()
+    request = _build_request(
+        top_k=4,
+        preselect=2,
+        top_trades_n=1,
+        ranking=BacktestRankingConfig(
+            primary_metric="max_drawdown_pct",
+            secondary_metric="profit_factor",
+        ),
+    )
+    base_variants = _build_stage_a_variants()
+    risk_variants = _build_risk_variants()
+    job_repository = _FakeJobRepository(default_job=job)
+    lease_repository = _FakeLeaseRepository()
+    results_repository = _FakeResultsRepository()
+    use_case = _build_use_case(
+        request=request,
+        job_repository=job_repository,
+        lease_repository=lease_repository,
+        results_repository=results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=risk_variants,
+        ),
+        scorer=_RankingAwareScorerWithDetails(),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=4,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 5, 0)),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    running_rows = results_repository.replace_calls[0]["rows"]
+    assert tuple(
+        int(row.payload_json["signal_params"]["ema"]["threshold"]) for row in running_rows
+    ) == (1, 1, 2, 2)
+    assert tuple(
+        float(row.payload_json["risk_params"]["sl_pct"] or 0.0) for row in running_rows
+    ) == (1.0, 0.0, 1.0, 0.0)
+
+
 def test_process_claimed_job_cancels_on_batch_boundary() -> None:
     """
     Verify cancel detection on batch boundary transitions job to `cancelled` and stops writes.
@@ -1123,7 +1293,7 @@ def _build_use_case(
     lease_repository: _FakeLeaseRepository,
     results_repository: _FakeResultsRepository,
     grid_context: _FakeGridContext,
-    scorer: _DeterministicScorerWithDetails,
+    scorer: Any,
     reporting_service: _FakeReportingService,
     top_k_persisted_default: int,
     snapshot_seconds: int | None,
@@ -1140,7 +1310,7 @@ def _build_use_case(
         lease_repository: Fake lease repository.
         results_repository: Fake results repository.
         grid_context: Fake staged grid context.
-        scorer: Fake scorer with details.
+        scorer: Fake scorer with deterministic Stage-A/Stage-B metrics.
         reporting_service: Fake reporting service.
         top_k_persisted_default: Persisted cap for top rows.
         snapshot_seconds: Optional time trigger threshold.
@@ -1180,7 +1350,13 @@ def _build_use_case(
     )
 
 
-def _build_request(*, top_k: int, preselect: int, top_trades_n: int) -> RunBacktestRequest:
+def _build_request(
+    *,
+    top_k: int,
+    preselect: int,
+    top_trades_n: int,
+    ranking: BacktestRankingConfig | None = None,
+) -> RunBacktestRequest:
     """
     Build deterministic template-mode request fixture for worker use-case tests.
 
@@ -1188,6 +1364,7 @@ def _build_request(*, top_k: int, preselect: int, top_trades_n: int) -> RunBackt
         top_k: Requested top-k value.
         preselect: Requested Stage-A preselect value.
         top_trades_n: Requested trades payload cap.
+        ranking: Optional ranking override payload.
     Returns:
         RunBacktestRequest: Template-mode request fixture.
     Assumptions:
@@ -1228,6 +1405,7 @@ def _build_request(*, top_k: int, preselect: int, top_trades_n: int) -> RunBackt
         top_k=top_k,
         preselect=preselect,
         top_trades_n=top_trades_n,
+        ranking=ranking,
     )
 
 

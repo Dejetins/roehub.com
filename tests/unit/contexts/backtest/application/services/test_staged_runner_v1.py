@@ -6,7 +6,11 @@ from typing import Mapping, cast
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunBacktestTemplate
+from trading.contexts.backtest.application.dto import (
+    BacktestRankingConfig,
+    BacktestRiskGridSpec,
+    RunBacktestTemplate,
+)
 from trading.contexts.backtest.application.ports import BacktestVariantScoreDetailsV1
 from trading.contexts.backtest.application.services import (
     TOTAL_RETURN_METRIC_LITERAL,
@@ -375,6 +379,70 @@ class _WindowScorer:
         return {TOTAL_RETURN_METRIC_LITERAL: float(window)}
 
 
+class _MultiMetricScorer:
+    """
+    Staged scorer fake exposing v1 configurable ranking metrics for ordering tests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    """
+
+    def score_variant(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> dict[str, float]:
+        """
+        Return deterministic multi-metric payload used by ranking-ordering tests.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Deterministic indicator key.
+            variant_key: Deterministic backtest key.
+        Returns:
+            dict[str, float]: Payload with required ranking literals and total-return alias.
+        Assumptions:
+            Fixture has one indicator with integer `window` parameter and optional `sl_pct`.
+        Raises:
+            KeyError: If `window` parameter is missing.
+        Side Effects:
+            None.
+        """
+        _ = stage, candles, signal_params, indicator_variant_key, variant_key
+        window = int(indicator_selections[0].params["window"])
+        sl_pct_raw = risk_params.get("sl_pct")
+        sl_pct = (
+            float(sl_pct_raw)
+            if isinstance(sl_pct_raw, int | float) and not isinstance(sl_pct_raw, bool)
+            else 0.0
+        )
+        max_drawdown_pct = float(window)
+        profit_factor = sl_pct
+        return {
+            TOTAL_RETURN_METRIC_LITERAL: float(window),
+            "total_return_pct": float(window),
+            "max_drawdown_pct": max_drawdown_pct,
+            "profit_factor": profit_factor,
+            "return_over_max_drawdown": (
+                float(window) / max_drawdown_pct if max_drawdown_pct != 0.0 else float("inf")
+            ),
+        }
+
+
 class _DetailsCountingScorer:
     """
     Staged scorer fake exposing details extension and call counters for Stage-B reuse checks.
@@ -592,6 +660,83 @@ def test_staged_runner_v1_applies_preselect_and_top_k_limits() -> None:
     assert result.variants[0].total_return_pct == 4.0
     assert result.stage_a_variants_total == 4
     assert result.stage_b_variants_total == 2
+
+
+def test_staged_runner_v1_applies_primary_ranking_metric_from_config() -> None:
+    """
+    Verify Stage ordering follows configured primary metric instead of legacy total-return default.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Primary metric `max_drawdown_pct ASC` is intentionally anti-correlated with total return.
+    Raises:
+        AssertionError: If configurable ranking is ignored by staged core runner path.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1()
+    result = runner.run(
+        template=_template_for_top_k(),
+        candles=_build_candles(bars=60),
+        preselect=4,
+        top_k=4,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=_MultiMetricScorer(),
+        ranking=BacktestRankingConfig(primary_metric="max_drawdown_pct"),
+    )
+
+    assert tuple(item.total_return_pct for item in result.variants) == (1.0, 2.0, 3.0, 4.0)
+
+
+def test_staged_runner_v1_applies_secondary_metric_and_variant_key_tie_break() -> None:
+    """
+    Verify Stage-B ordering applies secondary metric and final `variant_key ASC` tie-break.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `profit_factor` is derived from `sl_pct` in fixture scorer (`2.0` outranks `1.0`).
+    Raises:
+        AssertionError: If secondary metric or final deterministic tie-break is violated.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1()
+    result = runner.run(
+        template=_template_for_tie_breaks(),
+        candles=_build_candles(bars=60),
+        preselect=4,
+        top_k=6,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=_MultiMetricScorer(),
+        ranking=BacktestRankingConfig(
+            primary_metric="max_drawdown_pct",
+            secondary_metric="profit_factor",
+        ),
+    )
+
+    payloads = []
+    for item in result.variants:
+        assert item.payload is not None
+        payloads.append(item.payload)
+
+    windows = tuple(int(payload.indicator_selections[0].params["window"]) for payload in payloads)
+    sl_values = tuple(float(payload.risk_params["sl_pct"] or 0.0) for payload in payloads)
+    assert windows[:4] == (10, 10, 10, 10)
+    assert sl_values[:4] == (2.0, 2.0, 1.0, 1.0)
+    assert windows[4:] == (20, 20)
+    assert sl_values[4:] == (2.0, 2.0)
+    assert tuple(item.variant_key for item in result.variants[:2]) == tuple(
+        sorted(item.variant_key for item in result.variants[:2])
+    )
+    assert tuple(item.variant_key for item in result.variants[4:]) == tuple(
+        sorted(item.variant_key for item in result.variants[4:])
+    )
 
 
 def test_staged_runner_v1_is_deterministic_with_parallel_scoring() -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Mapping, Protocol
 
 from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1
@@ -16,6 +17,22 @@ from trading.contexts.indicators.application.dto import (
 from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 
 BacktestSignalParamsMap = Mapping[str, Mapping[str, BacktestVariantScalar]]
+BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1 = MappingProxyType(
+    {
+        "total_return_pct": "DESC",
+        "max_drawdown_pct": "ASC",
+        "return_over_max_drawdown": "DESC",
+        "profit_factor": "DESC",
+    }
+)
+BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1 = MappingProxyType(
+    {
+        "total_return_pct": ("total_return_pct", "Total Return [%]"),
+        "max_drawdown_pct": ("max_drawdown_pct", "Max. Drawdown [%]"),
+        "return_over_max_drawdown": ("return_over_max_drawdown",),
+        "profit_factor": ("profit_factor",),
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,7 +130,7 @@ class BacktestGridDefaultsProvider(Protocol):
 
 class BacktestStagedVariantScorer(Protocol):
     """
-    Port for Stage A / Stage B variant scoring using `Total Return [%]` ranking metric.
+    Port for Stage A / Stage B variant scoring with configurable ranking metrics support.
 
     Docs:
       - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
@@ -147,9 +164,11 @@ class BacktestStagedVariantScorer(Protocol):
             indicator_variant_key: Deterministic compute-only indicators key.
             variant_key: Deterministic backtest variant key.
         Returns:
-            Mapping[str, float]: Metric mapping containing `Total Return [%]`.
+            Mapping[str, float]:
+                Metric mapping containing `total_return_pct` aliases and optional
+                ranking literals from `BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1`.
         Assumptions:
-            Returned value for `Total Return [%]` is deterministic for identical inputs.
+            Returned values are deterministic for identical inputs.
         Raises:
             ValueError: If scorer cannot produce required ranking metric.
         Side Effects:
@@ -206,6 +225,8 @@ class BacktestStagedVariantScorerWithDetails(Protocol):
 
 
 __all__ = [
+    "BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1",
+    "BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1",
     "BacktestGridDefaultsProvider",
     "BacktestSignalParamsMap",
     "BacktestStagedVariantScorerWithDetails",

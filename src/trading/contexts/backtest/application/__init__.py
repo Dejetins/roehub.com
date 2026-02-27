@@ -16,6 +16,8 @@ from .dto import (
     normalize_backtest_ranking_metric_literal,
 )
 from .ports import (
+    BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1,
+    BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1,
     BacktestGridDefaultsProvider,
     BacktestJobLeaseRepository,
     BacktestJobListPage,
@@ -104,9 +106,11 @@ from .use_cases import (
 
 __all__ = [
     "BACKTEST_METRIC_ORDER_V1",
+    "BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1",
     "BACKTEST_RANKING_METRIC_LITERALS_V1",
     "BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1",
     "BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1",
+    "BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1",
     "BacktestJobLeaseRepository",
     "BacktestJobListPage",
     "BacktestJobListQuery",

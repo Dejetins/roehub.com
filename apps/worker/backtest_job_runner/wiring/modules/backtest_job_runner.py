@@ -397,6 +397,8 @@ def build_backtest_job_runner_app(
         top_k_default=runtime_config.top_k_default,
         preselect_default=runtime_config.preselect_default,
         top_trades_n_default=runtime_config.reporting.top_trades_n_default,
+        ranking_primary_metric_default=runtime_config.ranking.primary_metric_default,
+        ranking_secondary_metric_default=runtime_config.ranking.secondary_metric_default,
         top_k_persisted_default=runtime_config.jobs.top_k_persisted_default,
         init_cash_quote_default=runtime_config.execution.init_cash_quote_default,
         fixed_quote_default=runtime_config.execution.fixed_quote_default,

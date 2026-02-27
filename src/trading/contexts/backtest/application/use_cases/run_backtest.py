@@ -7,6 +7,9 @@ from typing import Mapping
 from uuid import UUID
 
 from trading.contexts.backtest.application.dto import (
+    BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
+    BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
+    BacktestRankingConfig,
     RunBacktestRequest,
     RunBacktestResponse,
     RunBacktestSavedOverrides,
@@ -72,6 +75,7 @@ class _ResolvedRunContext:
     top_k: int
     preselect: int
     top_trades_n: int
+    ranking: BacktestRankingConfig
 
 
 class RunBacktestUseCase:
@@ -102,6 +106,11 @@ class RunBacktestUseCase:
         top_k_default: int = 300,
         preselect_default: int = 20000,
         top_trades_n_default: int = 3,
+        ranking_primary_metric_default: str = BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
+        ranking_secondary_metric_default: str | None = (
+            BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
+        ),
+        configurable_ranking_enabled: bool = True,
         init_cash_quote_default: float = 10000.0,
         fixed_quote_default: float = 100.0,
         safe_profit_percent_default: float = 30.0,
@@ -135,6 +144,12 @@ class RunBacktestUseCase:
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
             top_trades_n_default: Runtime default number of variants with full trades payload.
+            ranking_primary_metric_default:
+                Runtime default for ranking primary metric literal.
+            ranking_secondary_metric_default:
+                Runtime default for ranking secondary metric literal.
+            configurable_ranking_enabled:
+                Feature-flag guard for configurable ranking behavior rollout.
             init_cash_quote_default: Runtime default initial strategy quote balance.
             fixed_quote_default: Runtime default fixed quote notional for `fixed_quote`.
             safe_profit_percent_default: Runtime default profit-lock percent.
@@ -183,6 +198,13 @@ class RunBacktestUseCase:
             raise ValueError("RunBacktestUseCase.max_compute_bytes_total must be > 0")
         if max_numba_threads <= 0:
             raise ValueError("RunBacktestUseCase.max_numba_threads must be > 0")
+        if not isinstance(configurable_ranking_enabled, bool):
+            raise ValueError("RunBacktestUseCase.configurable_ranking_enabled must be bool")
+
+        ranking_defaults = BacktestRankingConfig(
+            primary_metric=ranking_primary_metric_default,
+            secondary_metric=ranking_secondary_metric_default,
+        )
 
         resolved_timeline_builder = candle_timeline_builder
         if resolved_timeline_builder is None:
@@ -198,6 +220,8 @@ class RunBacktestUseCase:
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
         self._top_trades_n_default = top_trades_n_default
+        self._ranking_defaults = ranking_defaults
+        self._configurable_ranking_enabled = configurable_ranking_enabled
         self._init_cash_quote_default = init_cash_quote_default
         self._fixed_quote_default = fixed_quote_default
         self._safe_profit_percent_default = safe_profit_percent_default
@@ -271,6 +295,7 @@ class RunBacktestUseCase:
                 top_k=resolved.top_k,
                 indicator_compute=self._indicator_compute,
                 scorer=resolved_scorer,
+                ranking=resolved.ranking,
                 defaults_provider=self._defaults_provider,
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
@@ -335,6 +360,7 @@ class RunBacktestUseCase:
             value=request.top_trades_n,
             default=self._top_trades_n_default,
         )
+        ranking = self._resolve_ranking_config(request=request)
         if request.top_trades_n is not None and top_trades_n > top_k:
             raise BacktestValidationError("Backtest request top_trades_n must be <= top_k")
         if top_trades_n > top_k:
@@ -359,6 +385,7 @@ class RunBacktestUseCase:
                 top_k=top_k,
                 preselect=preselect,
                 top_trades_n=top_trades_n,
+                ranking=ranking,
             )
 
         if request.template is None:  # pragma: no cover - guarded by request DTO invariant
@@ -374,6 +401,7 @@ class RunBacktestUseCase:
             top_k=top_k,
             preselect=preselect,
             top_trades_n=top_trades_n,
+            ranking=ranking,
         )
 
     def _template_from_snapshot(
@@ -504,6 +532,27 @@ class RunBacktestUseCase:
         if value <= 0:
             raise BacktestValidationError("Backtest request override values must be > 0")
         return value
+
+    def _resolve_ranking_config(self, *, request: RunBacktestRequest) -> BacktestRankingConfig:
+        """
+        Resolve effective ranking config from request override, runtime defaults, and feature flag.
+
+        Args:
+            request: Backtest request payload.
+        Returns:
+            BacktestRankingConfig: Effective deterministic ranking config.
+        Assumptions:
+            DTO validation already normalized metric literals and duplicate checks.
+        Raises:
+            ValueError: If runtime ranking defaults are invalid.
+        Side Effects:
+            None.
+        """
+        if not self._configurable_ranking_enabled:
+            return BacktestRankingConfig()
+        if request.ranking is not None:
+            return request.ranking
+        return self._ranking_defaults
 
     def _resolve_staged_scorer(
         self,

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterator, Mapping, cast
 
 from trading.contexts.backtest.application.dto import (
+    BacktestRankingConfig,
     BacktestReportV1,
     BacktestVariantPayloadV1,
     BacktestVariantPreview,
@@ -225,6 +226,7 @@ class BacktestStagedRunnerV1:
         top_k: int,
         indicator_compute: IndicatorCompute,
         scorer: BacktestStagedVariantScorer,
+        ranking: BacktestRankingConfig | None = None,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
@@ -242,6 +244,9 @@ class BacktestStagedRunnerV1:
             top_k: Stage B top-k output size.
             indicator_compute: Indicator estimate port for staged grid materialization.
             scorer: Scoring port returning `Total Return [%]` for every variant.
+            ranking:
+                Optional ranking config (`primary_metric`, optional `secondary_metric`)
+                from request/runtime defaults.
             defaults_provider: Optional defaults provider for compute/signal fallback.
             max_variants_per_compute: Stage variants guard limit.
             max_compute_bytes_total: Stage memory guard limit.
@@ -292,6 +297,7 @@ class BacktestStagedRunnerV1:
             candles=candles,
             scorer=scorer,
             shortlist_limit=preselect,
+            ranking=ranking,
             cancel_checker=cancel_checker,
         )
 
@@ -307,6 +313,7 @@ class BacktestStagedRunnerV1:
                 candles=candles,
                 scorer=scorer,
                 top_k_limit=top_k,
+                ranking=ranking,
                 cancel_checker=cancel_checker,
             )
         else:
@@ -322,6 +329,7 @@ class BacktestStagedRunnerV1:
                 scorer=scorer,
                 details_scorer=details_scorer,
                 top_k_limit=top_k,
+                ranking=ranking,
                 cancel_checker=cancel_checker,
             )
         top_payload_context = self._build_top_reports(
@@ -417,6 +425,7 @@ class BacktestStagedRunnerV1:
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
         shortlist_limit: int,
+        ranking: BacktestRankingConfig | None = None,
         cancel_checker: Callable[[str], None] | None = None,
     ) -> list[BacktestStageAScoredVariantV1]:
         """
@@ -435,6 +444,8 @@ class BacktestStagedRunnerV1:
             candles: Dense candles forwarded to scorer.
             scorer: Stage scorer port.
             shortlist_limit: Maximum number of Stage A rows retained in memory.
+            ranking:
+                Optional ranking config (`primary_metric`, optional `secondary_metric`).
             cancel_checker: Optional cooperative cancellation callback by stage.
         Returns:
             list[BacktestStageAScoredVariantV1]:
@@ -451,6 +462,7 @@ class BacktestStagedRunnerV1:
             candles=candles,
             scorer=scorer,
             shortlist_limit=shortlist_limit,
+            ranking=ranking,
             cancel_checker=cancel_checker,
         )
         return list(rows)
@@ -464,6 +476,7 @@ class BacktestStagedRunnerV1:
         candles: CandleArrays,
         scorer: BacktestStagedVariantScorer,
         top_k_limit: int,
+        ranking: BacktestRankingConfig | None = None,
         cancel_checker: Callable[[str], None] | None = None,
     ) -> tuple[list[BacktestStageBScoredVariantV1], Mapping[str, BacktestStageBTaskV1]]:
         """
@@ -484,6 +497,8 @@ class BacktestStagedRunnerV1:
             candles: Dense candles forwarded to scorer.
             scorer: Stage scorer port.
             top_k_limit: Maximum number of Stage B rows retained in memory.
+            ranking:
+                Optional ranking config (`primary_metric`, optional `secondary_metric`).
             cancel_checker: Optional cooperative cancellation callback by stage.
         Returns:
             tuple[list[BacktestStageBScoredVariantV1], Mapping[str, BacktestStageBTaskV1]]:
@@ -502,6 +517,7 @@ class BacktestStagedRunnerV1:
             candles=candles,
             scorer=scorer,
             top_k_limit=top_k_limit,
+            ranking=ranking,
             cancel_checker=cancel_checker,
         )
         return (list(top_rows), top_tasks_by_variant_key)
@@ -516,6 +532,7 @@ class BacktestStagedRunnerV1:
         scorer: BacktestStagedVariantScorer,
         details_scorer: BacktestStagedVariantScorerWithDetails,
         top_k_limit: int,
+        ranking: BacktestRankingConfig | None = None,
         cancel_checker: Callable[[str], None] | None = None,
     ) -> tuple[
         list[BacktestStageBScoredVariantV1],
@@ -541,6 +558,8 @@ class BacktestStagedRunnerV1:
             scorer: Stage scorer port.
             details_scorer: Details extension used for report payload reuse.
             top_k_limit: Maximum number of Stage B rows retained in memory.
+            ranking:
+                Optional ranking config (`primary_metric`, optional `secondary_metric`).
             cancel_checker: Optional cooperative cancellation callback by stage.
         Returns:
             tuple[
@@ -565,6 +584,7 @@ class BacktestStagedRunnerV1:
                 scorer=scorer,
                 details_scorer=details_scorer,
                 top_k_limit=top_k_limit,
+                ranking=ranking,
                 cancel_checker=cancel_checker,
             )
         )

@@ -9,6 +9,9 @@ from typing import Any, Callable, Literal, Mapping, cast
 from uuid import UUID
 
 from trading.contexts.backtest.application.dto import (
+    BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
+    BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
+    BacktestRankingConfig,
     BacktestRequestScalar,
     BacktestRiskGridSpec,
     RunBacktestRequest,
@@ -142,6 +145,7 @@ class _ResolvedJobRequestContext:
     preselect: int
     top_trades_n: int
     persisted_k: int
+    ranking: BacktestRankingConfig
 
 
 @dataclass(frozen=True, slots=True)
@@ -194,6 +198,11 @@ class RunBacktestJobRunnerV1:
         top_k_default: int = 300,
         preselect_default: int = 20000,
         top_trades_n_default: int = 3,
+        ranking_primary_metric_default: str = BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
+        ranking_secondary_metric_default: str | None = (
+            BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
+        ),
+        configurable_ranking_enabled: bool = True,
         top_k_persisted_default: int = 300,
         init_cash_quote_default: float = 10000.0,
         fixed_quote_default: float = 100.0,
@@ -229,6 +238,12 @@ class RunBacktestJobRunnerV1:
             top_k_default: Runtime default top-k request fallback.
             preselect_default: Runtime default Stage-A shortlist size.
             top_trades_n_default: Runtime default trades payload cap in finalizing.
+            ranking_primary_metric_default:
+                Runtime default for ranking primary metric literal.
+            ranking_secondary_metric_default:
+                Runtime default for ranking secondary metric literal.
+            configurable_ranking_enabled:
+                Feature-flag guard for configurable ranking behavior rollout.
             top_k_persisted_default: Persisted rows cap for worker snapshots/finalizing.
             init_cash_quote_default: Runtime execution default.
             fixed_quote_default: Runtime execution default.
@@ -296,6 +311,13 @@ class RunBacktestJobRunnerV1:
             raise ValueError("stage_batch_size must be > 0")
         if max_numba_threads <= 0:
             raise ValueError("max_numba_threads must be > 0")
+        if not isinstance(configurable_ranking_enabled, bool):
+            raise ValueError("configurable_ranking_enabled must be bool")
+
+        ranking_defaults = BacktestRankingConfig(
+            primary_metric=ranking_primary_metric_default,
+            secondary_metric=ranking_secondary_metric_default,
+        )
 
         self._job_repository = job_repository
         self._lease_repository = lease_repository
@@ -307,13 +329,16 @@ class RunBacktestJobRunnerV1:
         self._grid_builder = grid_builder or BacktestGridBuilderV1()
         self._reporting_service = reporting_service or BacktestReportingServiceV1()
         self._core_runner = core_runner or BacktestStagedCoreRunnerV1(
-            batch_size_default=stage_batch_size
+            batch_size_default=stage_batch_size,
+            configurable_ranking_enabled=configurable_ranking_enabled,
         )
         self._staged_scorer = staged_scorer
         self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
         self._top_trades_n_default = top_trades_n_default
+        self._ranking_defaults = ranking_defaults
+        self._configurable_ranking_enabled = configurable_ranking_enabled
         self._top_k_persisted_default = top_k_persisted_default
         self._init_cash_quote_default = init_cash_quote_default
         self._fixed_quote_default = fixed_quote_default
@@ -532,6 +557,7 @@ class RunBacktestJobRunnerV1:
             value=request.top_trades_n,
             default=self._top_trades_n_default,
         )
+        ranking = self._resolve_ranking_config(request=request)
         if top_trades_n > top_k:
             top_trades_n = top_k
 
@@ -543,6 +569,7 @@ class RunBacktestJobRunnerV1:
             preselect=preselect,
             top_trades_n=top_trades_n,
             persisted_k=min(top_k, self._top_k_persisted_default),
+            ranking=ranking,
         )
 
     def _resolve_template(
@@ -601,6 +628,27 @@ class RunBacktestJobRunnerV1:
             raise ValueError("request override must be > 0")
         return value
 
+    def _resolve_ranking_config(self, *, request: RunBacktestRequest) -> BacktestRankingConfig:
+        """
+        Resolve effective ranking config from request override, runtime defaults, and feature flag.
+
+        Args:
+            request: Decoded job run request payload.
+        Returns:
+            BacktestRankingConfig: Effective deterministic ranking config.
+        Assumptions:
+            Request DTO already validates ranking metric literals and duplicate checks.
+        Raises:
+            ValueError: If runtime ranking defaults are invalid.
+        Side Effects:
+            None.
+        """
+        if not self._configurable_ranking_enabled:
+            return BacktestRankingConfig()
+        if request.ranking is not None:
+            return request.ranking
+        return self._ranking_defaults
+
     def _prepare_scorer_for_grid_context(
         self,
         *,
@@ -658,7 +706,7 @@ class RunBacktestJobRunnerV1:
             tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
                 Ranked Stage-A shortlist candidates and last heartbeat timestamp.
         Assumptions:
-            Stage-A ranking key is `total_return_pct DESC, base_variant_key ASC`.
+            Stage-A final deterministic tie-break remains `base_variant_key ASC`.
         Raises:
             _BacktestJobCancelled: If cancel was requested before stage completion.
             _BacktestJobLeaseLost: If one lease-guarded write fails.
@@ -704,6 +752,7 @@ class RunBacktestJobRunnerV1:
             candles=timeline.candles,
             scorer=scorer,
             shortlist_limit=stage_limit,
+            ranking=context.ranking,
             batch_size=self._stage_batch_size,
             on_checkpoint=_on_stage_a_checkpoint,
         )
@@ -774,7 +823,7 @@ class RunBacktestJobRunnerV1:
             tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
                 Final ranked persisted candidates and updated heartbeat timestamp.
         Assumptions:
-            Stage-B ranking key is `total_return_pct DESC, variant_key ASC`.
+            Stage-B final deterministic tie-break remains `variant_key ASC`.
         Raises:
             _BacktestJobCancelled: If cancel was requested during stage execution.
             _BacktestJobLeaseLost: If one lease-guarded write fails.
@@ -866,6 +915,7 @@ class RunBacktestJobRunnerV1:
             candles=timeline.candles,
             scorer=scorer,
             top_k_limit=context.persisted_k,
+            ranking=context.ranking,
             batch_size=self._stage_batch_size,
             on_checkpoint=_on_stage_b_checkpoint,
         )
