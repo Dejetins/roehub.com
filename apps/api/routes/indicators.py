@@ -222,19 +222,6 @@ def build_indicators_router(
             time_range = build_compute_time_range(request=request)
 
             grid = build_compute_grid_spec(request=request)
-
-            estimate = effective_compute.estimate(grid=grid, max_variants_guard=2_147_483_647)
-            if estimate.variants > max_variants_per_compute:
-                raise EstimateVariantsGuardExceeded(
-                    total_variants=estimate.variants,
-                    max_variants_per_compute=max_variants_per_compute,
-                )
-            if estimate.variants > effective_variants_guard:
-                raise EstimateVariantsGuardExceeded(
-                    total_variants=estimate.variants,
-                    max_variants_per_compute=effective_variants_guard,
-                )
-
             preflight = estimator.estimate_batch(
                 indicator_grids=(grid,),
                 sl_spec=ExplicitValuesSpec(name="sl", values=(1.0,)),
@@ -242,11 +229,22 @@ def build_indicators_router(
                 time_range=time_range,
                 timeframe=timeframe,
             )
-            enforce_batch_guards(
-                estimate=preflight,
-                max_variants_per_compute=effective_variants_guard,
-                max_compute_bytes_total=max_compute_bytes_total,
-            )
+
+            if preflight.total_variants > max_variants_per_compute:
+                raise EstimateVariantsGuardExceeded(
+                    total_variants=preflight.total_variants,
+                    max_variants_per_compute=max_variants_per_compute,
+                )
+            if preflight.total_variants > effective_variants_guard:
+                raise EstimateVariantsGuardExceeded(
+                    total_variants=preflight.total_variants,
+                    max_variants_per_compute=effective_variants_guard,
+                )
+            if preflight.estimated_memory_bytes > max_compute_bytes_total:
+                raise EstimateMemoryGuardExceeded(
+                    estimated_memory_bytes=preflight.estimated_memory_bytes,
+                    max_compute_bytes_total=max_compute_bytes_total,
+                )
 
             candles = effective_candle_feed.load_1m_dense(
                 market_id=build_compute_market_id(request=request),

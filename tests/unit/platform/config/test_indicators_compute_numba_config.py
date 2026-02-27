@@ -139,3 +139,30 @@ defaults: {}
 
     with pytest.raises(ValueError):
         load_indicators_compute_numba_config(environ=environ)
+
+
+def test_load_indicators_compute_numba_config_reads_prod_memory_budget_from_repo_file() -> None:
+    """
+    Verify prod indicators config keeps realistic `max_compute_bytes_total` budget.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Test runs from repository with `configs/prod/indicators.yaml` present.
+    Raises:
+        AssertionError: If loaded prod budget differs from 5 GiB contract.
+    Side Effects:
+        Reads repository prod indicators YAML.
+    """
+    repo_root = Path(__file__).resolve().parents[4]
+    prod_config = repo_root / "configs" / "prod" / "indicators.yaml"
+    environ = {
+        "ROEHUB_ENV": "prod",
+        "ROEHUB_INDICATORS_CONFIG": str(prod_config),
+    }
+
+    config = load_indicators_compute_numba_config(environ=environ)
+
+    assert config.max_compute_bytes_total == 5 * 1024**3

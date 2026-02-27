@@ -10,13 +10,20 @@ from fastapi.testclient import TestClient
 
 from apps.api.routes import build_indicators_router
 from trading.contexts.indicators.adapters.outbound.compute_numba import NumbaIndicatorCompute
-from trading.contexts.indicators.application.dto import CandleArrays
+from trading.contexts.indicators.application.dto import (
+    CandleArrays,
+    ComputeRequest,
+    EstimateResult,
+    IndicatorTensor,
+)
 from trading.contexts.indicators.application.dto.registry_view import MergedIndicatorView
+from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.ports.feeds import CandleFeed
 from trading.contexts.indicators.application.ports.registry import IndicatorRegistry
 from trading.contexts.indicators.domain.definitions import all_defs
 from trading.contexts.indicators.domain.entities import IndicatorDef, IndicatorId
 from trading.contexts.indicators.domain.errors import UnknownIndicatorError
+from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.platform.config import IndicatorsComputeNumbaConfig
 from trading.shared_kernel.primitives import (
     MarketId,
@@ -177,6 +184,86 @@ class _CandleFeedStub(CandleFeed):
         return self._candles
 
 
+class _ComputeSpy(IndicatorCompute):
+    """
+    Compute port spy ensuring `POST /indicators/compute` avoids adapter `estimate`.
+    """
+
+    def __init__(self, *, delegate: IndicatorCompute) -> None:
+        """
+        Store delegated compute adapter and initialize call counters.
+
+        Args:
+            delegate: Real compute adapter used for `compute` and `warmup`.
+        Returns:
+            None.
+        Assumptions:
+            Delegate satisfies `IndicatorCompute` contract.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        self._delegate = delegate
+        self.estimate_calls = 0
+        self.compute_calls = 0
+
+    def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
+        """
+        Fail test if router calls compute adapter estimate preflight.
+
+        Args:
+            grid: Requested compute grid.
+            max_variants_guard: Variants guard value.
+        Returns:
+            EstimateResult: Never returns.
+        Assumptions:
+            Single-preflight router flow should not call this method.
+        Raises:
+            AssertionError: Always, because estimate path must stay unused in route.
+        Side Effects:
+            Increments `estimate_calls` counter.
+        """
+        _ = (grid, max_variants_guard)
+        self.estimate_calls += 1
+        raise AssertionError("route must not call IndicatorCompute.estimate preflight")
+
+    def compute(self, req: ComputeRequest) -> IndicatorTensor:
+        """
+        Delegate actual compute call and record invocation count.
+
+        Args:
+            req: Compute request DTO.
+        Returns:
+            IndicatorTensor: Delegate compute result.
+        Assumptions:
+            Delegate compute behavior is already covered by dedicated engine tests.
+        Raises:
+            Any exception raised by delegated compute adapter.
+        Side Effects:
+            Increments `compute_calls` counter.
+        """
+        self.compute_calls += 1
+        return self._delegate.compute(req)
+
+    def warmup(self) -> None:
+        """
+        Delegate warmup for protocol completeness.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Warmup behavior is delegated unchanged.
+        Raises:
+            Any exception raised by delegated warmup implementation.
+        Side Effects:
+            Triggers delegate warmup when called.
+        """
+        self._delegate.warmup()
+
+
 def _time_range() -> TimeRange:
     """
     Build deterministic UTC half-open time range for API tests.
@@ -252,12 +339,12 @@ def _compute_adapter(*, cache_dir: Path) -> NumbaIndicatorCompute:
     return NumbaIndicatorCompute(defs=all_defs(), config=config)
 
 
-def _client(*, compute: NumbaIndicatorCompute, candle_feed: CandleFeed) -> TestClient:
+def _client(*, compute: IndicatorCompute, candle_feed: CandleFeed) -> TestClient:
     """
     Build TestClient with compute dependencies wired.
 
     Args:
-        compute: Real compute adapter.
+        compute: Compute adapter implementation.
         candle_feed: CandleFeed stub.
     Returns:
         TestClient: Ready API client.
@@ -383,3 +470,31 @@ def test_post_indicators_compute_returns_422_when_request_guard_exceeded(tmp_pat
         }
     }
     assert len(feed.calls) == 0
+
+
+def test_post_indicators_compute_uses_single_preflight_path_without_compute_estimate(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify compute route does not call `IndicatorCompute.estimate` preflight chain.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Router preflight is fully handled by `BatchEstimator.estimate_batch`.
+    Raises:
+        AssertionError: If route still calls compute adapter estimate path.
+    Side Effects:
+        Executes one in-memory API request.
+    """
+    feed = _CandleFeedStub(candles=_candles())
+    spy = _ComputeSpy(delegate=_compute_adapter(cache_dir=tmp_path / "numba-cache"))
+    client = _client(compute=spy, candle_feed=feed)
+
+    response = client.post("/indicators/compute", json=_valid_compute_payload())
+
+    assert response.status_code == 200
+    assert spy.estimate_calls == 0
+    assert spy.compute_calls == 1

@@ -35,6 +35,10 @@
 - `docs/architecture/indicators/indicators-trend-volume-compute-numba-v1.md` — Trend + Volume kernels (Numba) + NumPy oracle.
 - `docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md` — Structure/Normalization kernels (Numba) + NumPy oracle.
 
+### Performance plans
+
+- `docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md` — план оптимизаций grid compute path (пункты 1-4).
+
 ### Specs and config
 
 - `docs/architecture/indicators/indicators_formula.yaml` — source of truth для формул и output mapping.

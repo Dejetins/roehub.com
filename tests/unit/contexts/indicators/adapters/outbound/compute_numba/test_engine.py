@@ -7,6 +7,9 @@ import numpy as np
 import pytest
 
 from trading.contexts.indicators.adapters.outbound.compute_numba import NumbaIndicatorCompute
+from trading.contexts.indicators.adapters.outbound.compute_numba import (
+    engine as numba_engine,
+)
 from trading.contexts.indicators.adapters.outbound.compute_numba.engine import (
     _build_series_map,
 )
@@ -193,8 +196,63 @@ def test_compute_supports_variant_major_layout(tmp_path: Path) -> None:
     assert tensor.layout is Layout.VARIANT_MAJOR
     assert tensor.values.dtype == np.float32
     assert tensor.values.shape == (4, 96)
+    assert tensor.values.flags.c_contiguous
     assert tensor.meta.t == 96
     assert tensor.meta.variants == 4
+
+
+def test_compute_variant_major_reuses_valid_matrix_without_extra_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify VARIANT_MAJOR path reuses valid `(V, T)` matrix without extra allocation.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        If variant-major matrix is already float32 and C-contiguous, adapter returns it as-is.
+    Raises:
+        AssertionError: If compute path allocates an unnecessary copy.
+    Side Effects:
+        Temporarily overrides MA matrix builder in compute engine module.
+    """
+    engine = _compute_engine(cache_dir=tmp_path / "numba-cache")
+    candles = _candles(t_size=64)
+    req = _compute_request(candles=candles, layout=Layout.VARIANT_MAJOR)
+    expected = np.arange(4 * 64, dtype=np.float32).reshape(4, 64)
+
+    def _matrix_builder_stub(**_: object) -> np.ndarray:
+        """
+        Return prepared contiguous float32 matrix for fast-path test.
+
+        Args:
+            **_: Ignored keyword arguments from compute adapter call site.
+        Returns:
+            np.ndarray: Prepared contiguous `(V, T)` matrix.
+        Assumptions:
+            Test controls matrix shape to match request variants and timeline size.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return expected
+
+    monkeypatch.setattr(
+        numba_engine,
+        "_compute_ma_variant_source_matrix",
+        _matrix_builder_stub,
+    )
+
+    tensor = engine.compute(req)
+
+    assert tensor.layout is Layout.VARIANT_MAJOR
+    assert tensor.values is expected
+    assert tensor.values.flags.c_contiguous
 
 
 def test_compute_raises_budget_exceeded_for_total_memory_guard(tmp_path: Path) -> None:

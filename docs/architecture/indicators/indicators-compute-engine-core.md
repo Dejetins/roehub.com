@@ -36,6 +36,11 @@
 
 По умолчанию используется `TIME_MAJOR`, если `layout_preference` не задан.
 
+Для `VARIANT_MAJOR` в `NumbaIndicatorCompute.compute(...)` действует fast-path:
+
+- если вычисленная матрица уже `float32`, C-contiguous и имеет shape `(V, T)`, она возвращается без дополнительной full-copy;
+- иначе выполняется однократная нормализация до `float32` C-contiguous с сохранением shape-контракта `(V, T)`.
+
 ## Total memory guard
 
 Единственный публичный budget-параметр:
@@ -54,6 +59,19 @@
 - `bytes_out`
 - `bytes_total_est`
 - `max_compute_bytes_total`
+
+## Preflight в API
+
+`POST /indicators/compute` использует одну preflight-цепочку через
+`BatchEstimator.estimate_batch(...)` для построения deterministic `total_variants` и
+`estimated_memory_bytes`, после чего guards применяются в прежнем порядке:
+
+1. variants против router-level `max_variants_per_compute`;
+2. variants против request-level effective guard;
+3. memory против `max_compute_bytes_total`.
+
+Контракт 422 payload и типы ошибок (`Estimate*Exceeded`, `ComputeBudgetExceeded`,
+`GridValidationError`) сохраняются без изменения публичной схемы.
 
 ## Common kernels
 

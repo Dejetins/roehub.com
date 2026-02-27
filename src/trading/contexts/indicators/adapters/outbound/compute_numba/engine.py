@@ -38,7 +38,6 @@ from trading.contexts.indicators.adapters.outbound.compute_numba.kernels import 
     is_supported_volatility_indicator,
     is_supported_volume_indicator,
     write_series_grid_time_major,
-    write_series_grid_variant_major,
 )
 from trading.contexts.indicators.adapters.outbound.compute_numba.warmup import (
     ComputeNumbaWarmupRunner,
@@ -336,8 +335,11 @@ class NumbaIndicatorCompute(IndicatorCompute):
             values = np.empty((t_size, variants), dtype=np.float32, order="C")
             write_series_grid_time_major(values, variant_series_matrix)
         else:
-            values = np.empty((variants, t_size), dtype=np.float32, order="C")
-            write_series_grid_variant_major(values, variant_series_matrix)
+            values = _prepare_variant_major_values(
+                variant_series_matrix=variant_series_matrix,
+                variants=variants,
+                t_size=t_size,
+            )
 
         elapsed_ms = int(round((time.perf_counter() - started) * 1000))
         meta = TensorMeta(
@@ -535,6 +537,50 @@ class _DefinitionsRegistry(IndicatorRegistry):
             None.
         """
         raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
+
+
+def _prepare_variant_major_values(
+    *,
+    variant_series_matrix: np.ndarray,
+    variants: int,
+    t_size: int,
+) -> np.ndarray:
+    """
+    Validate and normalize variant-major output matrix for tensor contract.
+
+    Docs: docs/architecture/indicators/indicators-compute-engine-core.md
+    Related:
+      src/trading/contexts/indicators/application/dto/indicator_tensor.py,
+      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/_common.py,
+      apps/api/routes/indicators.py
+
+    Args:
+        variant_series_matrix: Candidate variant-major matrix from compute path.
+        variants: Expected variant count `V`.
+        t_size: Expected timeline size `T`.
+    Returns:
+        np.ndarray: Float32 C-contiguous matrix with shape `(V, T)`.
+    Assumptions:
+        Matrix shape is deterministic after grid materialization.
+    Raises:
+        GridValidationError: If matrix shape is incompatible with `(V, T)`.
+    Side Effects:
+        May allocate one normalized copy when dtype/order contract is not met.
+    """
+    expected_shape = (variants, t_size)
+    if variant_series_matrix.shape != expected_shape:
+        raise GridValidationError(
+            "variant-major matrix shape mismatch: "
+            f"expected={expected_shape}, got={variant_series_matrix.shape}"
+        )
+
+    if (
+        variant_series_matrix.dtype == np.float32
+        and variant_series_matrix.flags.c_contiguous
+    ):
+        return variant_series_matrix
+
+    return np.ascontiguousarray(variant_series_matrix, dtype=np.float32)
 
 
 def _axis_defs_from_materialized_axes(*, axes: tuple[MaterializedAxis, ...]) -> tuple[AxisDef, ...]:
