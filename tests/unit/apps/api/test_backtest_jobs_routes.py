@@ -458,7 +458,13 @@ def test_get_backtest_job_top_hides_details_for_non_succeeded_jobs() -> None:
     )
 
     assert response.status_code == 200
-    item = response.json()["items"][0]
+    payload = response.json()
+    context = payload["report_context"]
+    assert context["strategy_id"] is None
+    assert context["template"]["timeframe"] == "1m"
+    assert context["warmup_bars"] == 200
+    assert context["include_trades"] is True
+    item = payload["items"][0]
     assert "report_table_md" not in item
     assert "trades" not in item
 
@@ -492,7 +498,9 @@ def test_get_backtest_job_top_omits_details_even_for_succeeded_jobs() -> None:
     )
 
     assert response.status_code == 200
-    item = response.json()["items"][0]
+    payload = response.json()
+    assert payload["report_context"] is not None
+    item = payload["items"][0]
     assert "report_table_md" not in item
     assert "trades" not in item
 
@@ -729,7 +737,28 @@ def _queued_job(*, job_id: UUID) -> BacktestJob:
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
         mode="template",
         created_at=datetime(2026, 2, 23, 11, 30, tzinfo=timezone.utc),
-        request_json={"mode": "template", "top_k": 5},
+        request_json={
+            "time_range": {
+                "start": "2026-02-21T00:00:00+00:00",
+                "end": "2026-02-21T01:00:00+00:00",
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1m",
+                "indicator_grids": [
+                    {
+                        "indicator_id": "ma.sma",
+                        "params": {
+                            "window": {"mode": "explicit", "values": [20]},
+                        },
+                    }
+                ],
+            },
+            "warmup_bars": 200,
+            "top_k": 5,
+            "preselect": 20000,
+            "top_trades_n": 2,
+        },
         request_hash="a" * 64,
         spec_hash=None,
         spec_payload_json=None,

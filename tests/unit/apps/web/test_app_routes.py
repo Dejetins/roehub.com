@@ -278,8 +278,10 @@ def test_backtest_job_details_page_renders_job_id_and_required_jobs_literals() -
     assert f'data-job-id="{job_id}"' in response.text
     assert "/api/backtests/jobs/" in response.text
     assert "/api/backtests/jobs/{job_id}/top" in response.text
+    assert "/api/backtests/variant-report" in response.text
     assert "/api/backtests/jobs/{job_id}/cancel" in response.text
     assert "limit=50" in response.text
+    assert "Load report" in response.text
     assert "Jobs disabled by config" in response.text
     assert "sessionStorage" in response.text
     assert "prefill" in response.text

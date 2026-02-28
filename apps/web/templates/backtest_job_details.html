@@ -7,6 +7,7 @@
     data-job-id="{{ job_id }}"
     data-api-jobs-path-prefix="/api/backtests/jobs/"
     data-api-top-path-template="/api/backtests/jobs/{job_id}/top"
+    data-api-variant-report-path="/api/backtests/variant-report"
     data-api-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"
     data-list-path="/backtests/jobs"
     data-strategy-builder-path="/strategies/new"
@@ -20,8 +21,10 @@
     </div>
 
     <p>
-      Status endpoint: <code>/api/backtests/jobs/{job_id}</code>. Top endpoint default request is
-      <code>limit=50</code>. Polling runs only while state is active.
+      Status endpoint: <code>/api/backtests/jobs/{job_id}</code>. Top endpoint:
+      <code>/api/backtests/jobs/{job_id}/top</code> (default <code>limit=50</code>) returns summary
+      rows. Use <code>Load report</code> to request report details from
+      <code>/api/backtests/variant-report</code>. Polling runs only while state is active.
     </p>
 
     <div id="job-details-error-banner" class="error-banner hidden" role="alert"></div>
@@ -121,7 +124,7 @@
       </div>
 
       <p id="job-top-note" class="muted-text">
-        report_table_md and trades are shown only for state <code>succeeded</code>.
+        Reports are loaded on demand per row using <code>Load report</code>.
       </p>
 
       <div class="table-scroll">
@@ -132,14 +135,13 @@
               <th scope="col">total_return_pct</th>
               <th scope="col">variant_key</th>
               <th scope="col">indicator_variant_key</th>
-              <th scope="col">report_table_md</th>
-              <th scope="col">trades</th>
+              <th scope="col">report</th>
               <th scope="col">actions</th>
             </tr>
           </thead>
           <tbody id="job-top-table-body">
             <tr>
-              <td colspan="7">Loading top...</td>
+              <td colspan="6">Loading top...</td>
             </tr>
           </tbody>
         </table>

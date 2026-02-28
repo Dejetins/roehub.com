@@ -279,6 +279,7 @@ function initJobDetailsPage(pageRoot) {
   const jobId = requireDataAttr(pageRoot, "jobId");
   const jobsPathPrefix = requireDataAttr(pageRoot, "apiJobsPathPrefix");
   const topPathTemplate = requireDataAttr(pageRoot, "apiTopPathTemplate");
+  const variantReportPath = requireDataAttr(pageRoot, "apiVariantReportPath");
   const cancelPathTemplate = requireDataAttr(pageRoot, "apiCancelPathTemplate");
   const strategyBuilderPath = requireDataAttr(pageRoot, "strategyBuilderPath");
   const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
@@ -339,6 +340,7 @@ function initJobDetailsPage(pageRoot) {
   const state = {
     status: null,
     topRows: [],
+    topReportContext: null,
     topLimit: defaultTopLimit,
     jobsDisabled: false,
     finalRefreshDone: false,
@@ -346,6 +348,10 @@ function initJobDetailsPage(pageRoot) {
     topTimerId: 0,
     statusRequestToken: 0,
     topRequestToken: 0,
+    reportCacheByVariantKey: new Map(),
+    reportLoadingKeys: new Set(),
+    reportErrorsByVariantKey: new Map(),
+    reportCacheHitKeys: new Set(),
   };
 
   const statusPath = `${jobsPathPrefix}${encodeURIComponent(jobId)}`;
@@ -461,64 +467,232 @@ function initJobDetailsPage(pageRoot) {
     updateButtonsForState();
   };
 
-  const renderTopRows = () => {
-    const statusState = String(asRecord(state.status).state || "").trim().toLowerCase();
-    const showDetails = statusState === "succeeded";
+  const renderVariantReport = (report) => {
+    const reportNode = document.createElement("div");
+    if (!report || typeof report !== "object") {
+      reportNode.textContent = "No report.";
+      return reportNode;
+    }
 
+    const rows = Array.isArray(report.rows) ? report.rows : [];
+    if (rows.length > 0) {
+      const list = document.createElement("ul");
+      list.className = "compact-list";
+      rows.forEach((row) => {
+        const item = document.createElement("li");
+        const rowRecord = asRecord(row);
+        item.textContent = `${String(rowRecord.metric || "")}: ${String(rowRecord.value || "")}`;
+        list.appendChild(item);
+      });
+      reportNode.appendChild(list);
+    }
+
+    const tableMarkdown = String(report.table_md || "").trim();
+    if (tableMarkdown.length > 0) {
+      const tableDetails = document.createElement("details");
+      tableDetails.className = "panel panel--soft";
+      const summary = document.createElement("summary");
+      summary.textContent = "table_md";
+      tableDetails.appendChild(summary);
+      const content = document.createElement("div");
+      content.className = "markdown-report";
+      content.innerHTML = renderMarkdownToSafeHtml(tableMarkdown);
+      tableDetails.appendChild(content);
+      reportNode.appendChild(tableDetails);
+    }
+
+    const trades = Array.isArray(report.trades) ? report.trades : [];
+    if (trades.length > 0) {
+      const tradesDetails = document.createElement("details");
+      tradesDetails.className = "panel panel--soft";
+      const summary = document.createElement("summary");
+      summary.textContent = `trades (${trades.length})`;
+      tradesDetails.appendChild(summary);
+      const pre = document.createElement("pre");
+      pre.className = "json-pre";
+      pre.textContent = JSON.stringify(trades, null, 2);
+      tradesDetails.appendChild(pre);
+      reportNode.appendChild(tradesDetails);
+    }
+
+    if (reportNode.childElementCount === 0) {
+      reportNode.textContent = "Report is empty.";
+    }
+    return reportNode;
+  };
+
+  const readVariantReportStateByKey = (variantKey) => ({
+    isLoading: state.reportLoadingKeys.has(variantKey),
+    report: state.reportCacheByVariantKey.get(variantKey) || null,
+    error: state.reportErrorsByVariantKey.get(variantKey) || null,
+    cacheHit: state.reportCacheHitKeys.has(variantKey),
+  });
+
+  const hasVariantReportContext = () => (
+    state.topReportContext !== null
+    && typeof state.topReportContext === "object"
+    && Object.keys(asRecord(state.topReportContext)).length > 0
+  );
+
+  const buildVariantReportRequestPayload = ({ variantRecord }) => {
+    const context = asRecord(state.topReportContext);
+    if (Object.keys(context).length === 0) {
+      throw new Error("Variant report context is unavailable for this job.");
+    }
+
+    const variantPayload = asRecord(variantRecord.payload);
+    if (Object.keys(variantPayload).length === 0) {
+      throw new Error("Variant payload is unavailable.");
+    }
+
+    const payload = {
+      time_range: normalizeJsonLikeValue(asRecord(context.time_range)),
+      variant: normalizeJsonLikeValue(variantPayload),
+      include_trades: Boolean(context.include_trades),
+    };
+
+    const strategyId = String(context.strategy_id || "").trim();
+    const templatePayload = asRecord(context.template);
+    const hasTemplatePayload = Object.keys(templatePayload).length > 0;
+    if (strategyId.length > 0 && hasTemplatePayload) {
+      throw new Error("Report request mode conflict: both strategy_id and template are set.");
+    }
+    if (strategyId.length === 0 && !hasTemplatePayload) {
+      throw new Error("Report request mode is missing: strategy_id or template is required.");
+    }
+    if (strategyId.length > 0) {
+      payload.strategy_id = strategyId;
+    }
+    if (hasTemplatePayload) {
+      payload.template = normalizeJsonLikeValue(templatePayload);
+    }
+
+    const overridesPayload = asRecord(context.overrides);
+    if (Object.keys(overridesPayload).length > 0) {
+      payload.overrides = normalizeJsonLikeValue(overridesPayload);
+    }
+
+    const warmupBars = parsePositiveInt(String(context.warmup_bars || ""), 0);
+    if (warmupBars > 0) {
+      payload.warmup_bars = warmupBars;
+    }
+    return payload;
+  };
+
+  const loadVariantReport = async (rawRow) => {
+    const rowData = asRecord(rawRow);
+    const variantKey = String(rowData.variant_key || "").trim();
+    if (variantKey.length === 0) {
+      showPageError(pageRoot, "variant_key is required for report loading.", []);
+      return;
+    }
+
+    if (!hasVariantReportContext()) {
+      state.reportErrorsByVariantKey.set(variantKey, {
+        message: "Variant report context is unavailable for this job.",
+        details: [],
+      });
+      renderTopRows();
+      return;
+    }
+
+    if (state.reportLoadingKeys.has(variantKey)) {
+      return;
+    }
+    if (state.reportCacheByVariantKey.has(variantKey)) {
+      state.reportErrorsByVariantKey.delete(variantKey);
+      state.reportCacheHitKeys.add(variantKey);
+      renderTopRows();
+      return;
+    }
+
+    state.reportLoadingKeys.add(variantKey);
+    state.reportErrorsByVariantKey.delete(variantKey);
+    state.reportCacheHitKeys.delete(variantKey);
+    renderTopRows();
+
+    try {
+      const reportRequestPayload = buildVariantReportRequestPayload({ variantRecord: rowData });
+      const reportResponse = await fetch(variantReportPath, {
+        method: "POST",
+        credentials: 'include',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reportRequestPayload),
+      });
+      if (!reportResponse.ok) {
+        throw await buildHttpError(reportResponse);
+      }
+      const reportPayload = asRecord(await reportResponse.json());
+      state.reportCacheByVariantKey.set(variantKey, reportPayload);
+    } catch (error) {
+      const normalized = normalizeError(error);
+      state.reportErrorsByVariantKey.set(variantKey, normalized);
+    } finally {
+      state.reportLoadingKeys.delete(variantKey);
+      renderTopRows();
+    }
+  };
+
+  const renderTopRows = () => {
     topTableBody.innerHTML = "";
     if (state.topRows.length === 0) {
-      topTableBody.innerHTML = "<tr><td colspan=\"7\">No top rows yet.</td></tr>";
+      topTableBody.innerHTML = "<tr><td colspan=\"6\">No top rows yet.</td></tr>";
       return;
     }
 
     state.topRows.forEach((rawRow) => {
       const rowData = asRecord(rawRow);
+      const variantKey = String(rowData.variant_key || "").trim();
+      const reportState = readVariantReportStateByKey(variantKey);
       const row = document.createElement("tr");
 
       row.appendChild(buildCell(String(rowData.rank ?? "")));
       row.appendChild(buildCell(String(rowData.total_return_pct ?? "")));
-      row.appendChild(buildCell(String(rowData.variant_key || "")));
+      row.appendChild(buildCell(variantKey));
       row.appendChild(buildCell(String(rowData.indicator_variant_key || "")));
 
       const reportCell = document.createElement("td");
-      if (showDetails) {
-        const tableMarkdown = String(rowData.report_table_md || "").trim();
-        if (tableMarkdown.length > 0) {
-          const reportNode = document.createElement("div");
-          reportNode.className = "markdown-report";
-          reportNode.innerHTML = renderMarkdownToSafeHtml(tableMarkdown);
-          reportCell.appendChild(reportNode);
-        } else {
-          reportCell.textContent = "No report.";
+      if (variantKey.length === 0) {
+        reportCell.textContent = "variant_key is required for report loading.";
+      } else if (!hasVariantReportContext()) {
+        reportCell.textContent = "Report context is unavailable for this job.";
+      } else if (reportState.isLoading) {
+        reportCell.textContent = "Loading report...";
+      } else if (reportState.error !== null) {
+        reportCell.textContent = String(reportState.error.message || "Report load failed.");
+        const errorDetails = Array.isArray(reportState.error.details) ? reportState.error.details : [];
+        if (errorDetails.length > 0) {
+          const detailsList = document.createElement("ul");
+          detailsList.className = "compact-list";
+          errorDetails.forEach((detail) => {
+            const item = document.createElement("li");
+            item.textContent = String(detail);
+            detailsList.appendChild(item);
+          });
+          reportCell.appendChild(detailsList);
         }
+      } else if (reportState.report !== null) {
+        const cacheLabel = document.createElement("p");
+        cacheLabel.className = "muted-text";
+        cacheLabel.textContent = reportState.cacheHit
+          ? "Loaded from cache by variant_key."
+          : "Cached by variant_key.";
+        reportCell.appendChild(cacheLabel);
+        reportCell.appendChild(renderVariantReport(reportState.report));
       } else {
-        reportCell.textContent = "Hidden until succeeded.";
+        reportCell.textContent = "Not loaded. Use Load report action.";
       }
       row.appendChild(reportCell);
 
-      const tradesCell = document.createElement("td");
-      if (showDetails) {
-        const trades = Array.isArray(rowData.trades) ? rowData.trades : [];
-        if (trades.length > 0) {
-          const details = document.createElement("details");
-          details.className = "panel panel--soft";
-          const summary = document.createElement("summary");
-          summary.textContent = `trades (${trades.length})`;
-          details.appendChild(summary);
-          const pre = document.createElement("pre");
-          pre.className = "json-pre";
-          pre.textContent = JSON.stringify(trades, null, 2);
-          details.appendChild(pre);
-          tradesCell.appendChild(details);
-        } else {
-          tradesCell.textContent = "-";
-        }
-      } else {
-        tradesCell.textContent = "Hidden until succeeded.";
-      }
-      row.appendChild(tradesCell);
-
       const actionsCell = document.createElement("td");
+      const loadReportButton = buildActionButton({
+        label: "Load report",
+        disabled: variantKey.length === 0 || reportState.isLoading || !hasVariantReportContext(),
+        onClick: async () => {
+          await loadVariantReport(rowData);
+        },
+      });
+      actionsCell.appendChild(loadReportButton);
       const saveButton = buildActionButton({
         label: "Save as Strategy",
         className: "button-link--secondary",
@@ -712,7 +886,9 @@ function initJobDetailsPage(pageRoot) {
       }
 
       const items = Array.isArray(payload.items) ? payload.items : [];
+      const reportContext = asRecord(payload.report_context);
       state.topRows = items.slice();
+      state.topReportContext = Object.keys(reportContext).length > 0 ? reportContext : null;
       renderTopRows();
       return payload;
     } catch (error) {

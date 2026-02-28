@@ -107,16 +107,13 @@
 - UI не зависит от внутренних полей keyset cursor,
 - можно безопасно эволюционировать payload (versioning) без ломки клиента.
 
-### 6) `/top` output policy строго зависит от job state
+### 6) `/top` output policy: summary-only + context for lazy report
 
 `GET /backtests/jobs/{job_id}/top` возвращает rows из `backtest_job_top_variants` (`rank ASC, variant_key ASC`) с полями ranking + payload всегда.
 
-Дополнительные поля:
-
-- `report_table_md` присутствует только для `succeeded`.
-- `trades` присутствует только для `succeeded` и только для row, где worker сохранил trades (rank `<= top_trades_n`).
-
-Для `running`/`failed`/`cancelled` эти поля не возвращаются как содержимое отчета.
+Дополнительно endpoint возвращает `report_context` (run-context для
+`POST /api/backtests/variant-report`), чтобы UI мог загрузить report/trades
+по явному действию `Load report` для выбранного `variant_key`.
 
 ### 7) Cancel endpoint idempotent и возвращает status payload (подтверждено)
 
@@ -186,11 +183,11 @@ Request params:
 
 Response (`200 OK`):
 
-- `job_id`, `state`, `items[]`.
+- `job_id`, `state`, `report_context`, `items[]`.
 - `items[]` rows ordered by rank:
   - `rank`, `variant_key`, `indicator_variant_key`, `variant_index`, `total_return_pct`, `payload`.
-  - optional `report_table_md` (only `succeeded`).
-  - optional `trades` (only rows where trades сохранены).
+- `report_context` содержит поля run-context (`time_range`, `strategy_id xor template`,
+  `overrides?`, `warmup_bars?`, `include_trades`) для on-demand report endpoint.
 
 ### 4) `GET /backtests/jobs?state=&limit=&cursor=`
 
@@ -225,7 +222,7 @@ Response (`200 OK`):
 - `/top` ordering фиксирован: `rank ASC, variant_key ASC`.
 - `request_hash/engine_params_hash/backtest_runtime_config_hash` всегда возвращаются в status payload.
 - `failed` status всегда включает `last_error + last_error_json`.
-- `report_table_md`/`trades` в `/top` следуют state-dependent policy из EPIC-10.
+- `/top` не содержит eager `report_table_md`/`trades`; report details читаются через `variant-report`.
 
 ## Wiring и целевые implementation paths
 

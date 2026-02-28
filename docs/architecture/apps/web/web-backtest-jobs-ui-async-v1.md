@@ -1,8 +1,8 @@
 # Web UI -- Backtest Jobs UI v1 (async) (WEB-EPIC-06)
 
 Документ фиксирует архитектуру WEB-EPIC-06: UI для async backtest jobs (create/status/top/list/cancel)
-в `apps/web` с polling (без SSE/WebSocket), deterministic pagination cursor и state-dependent policy
-для `/top` (details доступны только для `succeeded`).
+в `apps/web` с polling (без SSE/WebSocket), deterministic pagination cursor и lazy report policy
+для `/top` (summary-only rows + `Load report` on-demand через `variant-report`).
 
 ## Цель
 
@@ -79,9 +79,11 @@ Job creation происходит на `/backtests` (reuse формы WEB-EPIC-0
 
 - polling `GET /api/backtests/jobs/{job_id}/top?limit=...`
 - default limit: `50` (UI всегда передает limit явно)
-- state-dependent policy:
-  - для `succeeded`: показываем `report_table_md` и trades (если row содержит trades)
-  - для `queued|running|failed|cancelled`: `report_table_md`/trades не показываем
+- `/top` возвращает только ranking summary rows (`rank`, `variant_key`, `indicator_variant_key`,
+  `variant_index`, `total_return_pct`, `payload`) и `report_context`.
+- Для выбранной строки UI показывает действие `Load report` и запрашивает
+  `POST /api/backtests/variant-report`.
+- Загруженный report (`rows/table_md/trades`) кэшируется в браузере по `variant_key`.
 
 Секция Cancel:
 
@@ -134,7 +136,7 @@ UI policy:
 ## DoD
 
 - Пользователь запускает job из `/backtests`, видит progress/top во время `running`.
-- После `succeeded` видит `report_table_md` и trades (где доступны).
+- На details можно загрузить report по кнопке `Load report` для конкретной строки.
 - Cancel работает и отражается в UI.
 - Можно сохранить вариант как Strategy (через builder prefill).
 
@@ -159,9 +161,9 @@ UI policy:
 
 Polling фиксирован как v1 механизм, т.к. SSE/WebSocket не входят в scope.
 
-### 4) UI уважает state-dependent policy `/top`
+### 4) UI использует lazy report policy `/top`
 
-UI никогда не пытается показывать report/trades для не-succeeded state.
+UI всегда работает с summary `/top` и загружает report/trades только по explicit `Load report`.
 
 ### 5) Jobs toggle маппится на UX "disabled"
 
@@ -207,8 +209,8 @@ Manual smoke (через gateway):
 
 1) `/backtests` -> выбрать "Run as job" -> создать job -> redirect в `/backtests/jobs/{job_id}`.
 2) На details: проверить polling status/top, прогресс и best-so-far.
-3) Отменить job и проверить state transition.
-4) Дождаться `succeeded` и проверить `report_table_md`/trades.
+3) Для выбранной строки нажать `Load report` и проверить `rows/table_md/trades`.
+4) Отменить job и проверить state transition.
 5) Нажать `Save as Strategy` и убедиться в prefill `/strategies/new`.
 
 ## Риски и открытые вопросы

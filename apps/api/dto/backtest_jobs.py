@@ -159,6 +159,29 @@ class BacktestJobTopItemResponse(BaseModel):
     payload: dict[str, Any]
 
 
+class BacktestJobVariantReportContextResponse(BaseModel):
+    """
+    API payload with run-context required by jobs UI lazy `variant-report` calls.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - apps/api/dto/backtest_jobs.py
+      - apps/api/routes/backtest_jobs.py
+      - apps/web/dist/backtest_jobs_ui.js
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    time_range: dict[str, Any]
+    strategy_id: str | None = None
+    template: dict[str, Any] | None = None
+    overrides: dict[str, Any] | None = None
+    warmup_bars: int | None = None
+    include_trades: bool = False
+
+
 class BacktestJobTopResponse(BaseModel):
     """
     API response model for Backtest jobs `/top` payload.
@@ -176,6 +199,7 @@ class BacktestJobTopResponse(BaseModel):
 
     job_id: UUID
     state: BacktestJobsStateLiteral
+    report_context: BacktestJobVariantReportContextResponse | None = None
     items: list[BacktestJobTopItemResponse]
 
 
@@ -311,6 +335,7 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
     return BacktestJobTopResponse(
         job_id=result.job.job_id,
         state=result.job.state,
+        report_context=_build_backtest_job_variant_report_context(job=result.job),
         items=[
             BacktestJobTopItemResponse(
                 rank=row.rank,
@@ -324,6 +349,90 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
         ],
     )
 
+
+
+def _build_backtest_job_variant_report_context(
+    *,
+    job: BacktestJob,
+) -> BacktestJobVariantReportContextResponse | None:
+    """
+    Build optional jobs `/top` run-context payload for lazy `variant-report` requests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - apps/api/dto/backtest_jobs.py
+      - apps/api/routes/backtest_jobs.py
+      - apps/web/dist/backtest_jobs_ui.js
+
+    Args:
+        job: Domain job snapshot carrying canonical `request_json`.
+    Returns:
+        BacktestJobVariantReportContextResponse | None:
+            Parsed run-context payload, or `None` when required fields are unavailable.
+    Assumptions:
+        `request_json` shape follows deterministic create-job snapshot contract.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    request_payload = _normalize_json_value(value=job.request_json)
+    if not isinstance(request_payload, Mapping):
+        return None
+
+    time_range_payload = request_payload.get("time_range")
+    if not isinstance(time_range_payload, Mapping):
+        return None
+
+    strategy_id_value: str | None = None
+    raw_strategy_id = request_payload.get("strategy_id")
+    if raw_strategy_id is not None:
+        strategy_id = str(raw_strategy_id).strip()
+        if strategy_id:
+            strategy_id_value = strategy_id
+
+    template_payload: dict[str, Any] | None = None
+    raw_template = request_payload.get("template")
+    if isinstance(raw_template, Mapping):
+        normalized_template = _normalize_json_value(value=raw_template)
+        if isinstance(normalized_template, Mapping):
+            template_payload = dict(normalized_template)
+
+    if strategy_id_value is None and template_payload is None:
+        return None
+    if strategy_id_value is not None and template_payload is not None:
+        return None
+
+    overrides_payload: dict[str, Any] | None = None
+    raw_overrides = request_payload.get("overrides")
+    if isinstance(raw_overrides, Mapping):
+        normalized_overrides = _normalize_json_value(value=raw_overrides)
+        if isinstance(normalized_overrides, Mapping):
+            overrides_payload = dict(normalized_overrides)
+
+    warmup_bars_value: int | None = None
+    raw_warmup_bars = request_payload.get("warmup_bars")
+    if isinstance(raw_warmup_bars, int) and raw_warmup_bars > 0:
+        warmup_bars_value = raw_warmup_bars
+
+    include_trades = False
+    raw_top_trades_n = request_payload.get("top_trades_n")
+    if isinstance(raw_top_trades_n, int):
+        include_trades = raw_top_trades_n > 0
+
+    try:
+        return BacktestJobVariantReportContextResponse(
+            time_range=dict(_normalize_json_value(value=time_range_payload)),
+            strategy_id=strategy_id_value,
+            template=template_payload,
+            overrides=overrides_payload,
+            warmup_bars=warmup_bars_value,
+            include_trades=include_trades,
+        )
+    except ValueError:
+        return None
 
 
 def encode_backtest_jobs_cursor(*, cursor: BacktestJobListCursor | None) -> str | None:
@@ -541,6 +650,7 @@ __all__ = [
     "BacktestJobsListResponse",
     "BacktestJobsStateLiteral",
     "BacktestJobTopItemResponse",
+    "BacktestJobVariantReportContextResponse",
     "BacktestJobTopResponse",
     "build_backtest_job_status_response",
     "build_backtest_job_top_response",
