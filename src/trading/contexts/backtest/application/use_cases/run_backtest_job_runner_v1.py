@@ -26,7 +26,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobResultsRepository,
     BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
-    BacktestStagedVariantScorerWithDetails,
 )
 from trading.contexts.backtest.application.services import (
     STAGE_A_LITERAL,
@@ -40,7 +39,7 @@ from trading.contexts.backtest.application.services import (
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobSnapshotCadenceV1,
     BacktestJobTopVariantCandidateV1,
-    build_finalized_snapshot_rows,
+    FrontierSignatureV1,
     build_running_snapshot_rows,
 )
 from trading.contexts.backtest.application.services.numba_runtime_v1 import (
@@ -56,7 +55,6 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobErrorPayload,
     BacktestJobStageAShortlist,
-    TradeV1,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestVariantScalar
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
@@ -71,7 +69,6 @@ from trading.contexts.indicators.domain.specifications import (
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe
 
 _LOG = logging.getLogger(__name__)
-_TOTAL_RETURN_METRIC = "Total Return [%]"
 
 BacktestJobRunStatus = Literal["succeeded", "failed", "cancelled", "lease_lost"]
 _DEFAULT_MAX_NUMBA_THREADS = max(1, os.cpu_count() or 1)
@@ -148,24 +145,6 @@ class _ResolvedJobRequestContext:
     top_trades_n: int
     persisted_k: int
     ranking: BacktestRankingConfig
-
-
-@dataclass(frozen=True, slots=True)
-class _StageBDerivedPayload:
-    """
-    Internal payload used by finalizing step for persisted Stage-B candidates.
-
-    Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-    Related:
-      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
-      - src/trading/contexts/backtest/application/services/reporting_service_v1.py
-      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
-    """
-
-    reports_by_variant_key: Mapping[str, str]
-    trades_by_variant_key: Mapping[str, tuple[TradeV1, ...] | None]
 
 
 class RunBacktestJobRunnerV1:
@@ -437,7 +416,7 @@ class RunBacktestJobRunnerV1:
 
             current_stage = STAGE_B_LITERAL
             stage_started_at = perf_counter()
-            ranked_candidates, heartbeat_at = self._run_stage_b(
+            heartbeat_at = self._run_stage_b(
                 job=job,
                 locked_by=normalized_locked_by,
                 context=context,
@@ -454,10 +433,6 @@ class RunBacktestJobRunnerV1:
             self._run_finalizing(
                 job=job,
                 locked_by=normalized_locked_by,
-                context=context,
-                timeline=timeline,
-                scorer=scorer,
-                ranked_candidates=ranked_candidates,
                 last_heartbeat_at=heartbeat_at,
             )
             stage_durations["finalizing"] = max(perf_counter() - stage_started_at, 0.0)
@@ -808,9 +783,18 @@ class RunBacktestJobRunnerV1:
         grid_context: Any,
         shortlist: tuple[BacktestJobTopVariantCandidateV1, ...],
         last_heartbeat_at: datetime,
-    ) -> tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
+    ) -> datetime:
         """
-        Execute streaming Stage-B scoring with bounded top-K and OR-cadence snapshots.
+        Execute streaming Stage-B scoring with frontier-signature-gated snapshot persistence.
+
+        Docs:
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+          - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+          - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py
 
         Args:
             job: Claimed running job snapshot.
@@ -822,8 +806,7 @@ class RunBacktestJobRunnerV1:
             shortlist: Stage-A shortlisted base variants.
             last_heartbeat_at: Last successful heartbeat timestamp.
         Returns:
-            tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
-                Final ranked persisted candidates and updated heartbeat timestamp.
+            datetime: Updated heartbeat timestamp.
         Assumptions:
             Stage-B final deterministic tie-break remains `variant_key ASC`.
         Raises:
@@ -848,6 +831,8 @@ class RunBacktestJobRunnerV1:
         processed = 0
         last_snapshot_at = now
         last_snapshot_processed = 0
+        last_persisted_frontier_signature: FrontierSignatureV1 | None = None
+        skipped_snapshot_writes = 0
         stage_a_shortlist = tuple(
             BacktestStageAScoredVariantV1(
                 base_variant=BacktestStageABaseVariant(
@@ -865,13 +850,21 @@ class RunBacktestJobRunnerV1:
         def _on_stage_b_checkpoint(
             checkpoint_processed: int,
             checkpoint_total: int,
-            ranked_rows: tuple[BacktestStageBScoredVariantV1, ...],
-            stage_b_tasks: Mapping[str, BacktestStageBTaskV1],
+            materialize_ranked_rows: Callable[
+                [],
+                tuple[BacktestStageBScoredVariantV1, ...],
+            ],
+            materialize_stage_b_tasks: Callable[
+                [],
+                Mapping[str, BacktestStageBTaskV1],
+            ],
         ) -> None:
             nonlocal heartbeat_at
             nonlocal processed
             nonlocal last_snapshot_at
             nonlocal last_snapshot_processed
+            nonlocal last_persisted_frontier_signature
+            nonlocal skipped_snapshot_writes
             processed = checkpoint_processed
             now_local = self._now()
             self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_B_LITERAL)
@@ -896,9 +889,16 @@ class RunBacktestJobRunnerV1:
                 last_persist_processed_variants=last_snapshot_processed,
             ):
                 return
+            ranked_rows = materialize_ranked_rows()
+            frontier_signature = _frontier_signature_from_ranked_rows(ranked_rows=ranked_rows)
+            if frontier_signature == last_persisted_frontier_signature:
+                skipped_snapshot_writes += 1
+                last_snapshot_at = now_local
+                last_snapshot_processed = checkpoint_processed
+                return
             ranked_candidates = _ranked_candidates_from_core_rows(
                 ranked_rows=ranked_rows,
-                tasks_by_variant_key=stage_b_tasks,
+                tasks_by_variant_key=materialize_stage_b_tasks(),
             )
             self._persist_running_snapshot(
                 job=job,
@@ -907,6 +907,7 @@ class RunBacktestJobRunnerV1:
                 ranked_candidates=ranked_candidates,
                 now=now_local,
             )
+            last_persisted_frontier_signature = frontier_signature
             last_snapshot_at = now_local
             last_snapshot_processed = checkpoint_processed
 
@@ -924,11 +925,12 @@ class RunBacktestJobRunnerV1:
 
         now = self._now()
         self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_B_LITERAL)
-        ranked_candidates = _ranked_candidates_from_core_rows(
-            ranked_rows=ranked_rows,
-            tasks_by_variant_key=ranked_tasks,
-        )
-        if processed != last_snapshot_processed:
+        final_frontier_signature = _frontier_signature_from_ranked_rows(ranked_rows=ranked_rows)
+        if final_frontier_signature != last_persisted_frontier_signature:
+            ranked_candidates = _ranked_candidates_from_core_rows(
+                ranked_rows=ranked_rows,
+                tasks_by_variant_key=ranked_tasks,
+            )
             self._persist_running_snapshot(
                 job=job,
                 locked_by=locked_by,
@@ -936,30 +938,41 @@ class RunBacktestJobRunnerV1:
                 ranked_candidates=ranked_candidates,
                 now=now,
             )
+        elif processed != last_snapshot_processed:
+            skipped_snapshot_writes += 1
 
-        return (ranked_candidates, heartbeat_at)
+        if skipped_snapshot_writes > 0:
+            _LOG.debug(
+                "event=job_snapshot_skipped_frontier_unchanged "
+                "job_id=%s attempt=%s skipped_writes=%s",
+                job.job_id,
+                job.attempt,
+                skipped_snapshot_writes,
+            )
+        return heartbeat_at
 
     def _run_finalizing(
         self,
         *,
         job: BacktestJob,
         locked_by: str,
-        context: _ResolvedJobRequestContext,
-        timeline: Any,
-        scorer: MetricScorerV1,
-        ranked_candidates: tuple[BacktestJobTopVariantCandidateV1, ...],
         last_heartbeat_at: datetime,
     ) -> None:
         """
-        Execute succeeded finalizing step (details/report/trades) for persisted top rows only.
+        Execute finalizing stage without eager report/trades generation.
+
+        Docs:
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+          - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+          - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py
 
         Args:
             job: Claimed running job snapshot.
             locked_by: Active lease owner.
-            context: Resolved request context.
-            timeline: Built candle timeline payload.
-            scorer: Deterministic staged scorer.
-            ranked_candidates: Final persisted candidates from Stage-B.
             last_heartbeat_at: Last successful heartbeat timestamp.
         Returns:
             None.
@@ -968,12 +981,17 @@ class RunBacktestJobRunnerV1:
         Raises:
             _BacktestJobCancelled: If cancel was requested before or during finalizing.
             _BacktestJobLeaseLost: If one lease-guarded write fails.
-            ValueError: If scorer details contract is unavailable/invalid.
         Side Effects:
-            Writes final snapshot with report markdown/trades and terminal `succeeded` state.
+            Writes final stage progress and terminal `succeeded` state.
         """
         now = self._now()
         self._ensure_not_cancelled(job=job, locked_by=locked_by, stage="finalizing")
+        self._heartbeat_if_due(
+            job=job,
+            locked_by=locked_by,
+            now=now,
+            last_heartbeat_at=last_heartbeat_at,
+        )
         self._update_progress(
             job=job,
             locked_by=locked_by,
@@ -983,129 +1001,14 @@ class RunBacktestJobRunnerV1:
             now=now,
         )
 
-        details_scorer = _details_scorer(scorer=scorer)
-        if details_scorer is None:
-            raise ValueError(
-                "finalizing requires BacktestStagedVariantScorerWithDetails capability"
-            )
-
-        derived_payload = self._derive_finalizing_payload(
-            context=context,
-            timeline=timeline,
-            details_scorer=details_scorer,
-            ranked_candidates=ranked_candidates,
-            job=job,
-            locked_by=locked_by,
-            last_heartbeat_at=last_heartbeat_at,
-        )
-        now = self._now()
-        rows = build_finalized_snapshot_rows(
-            job_id=job.job_id,
-            now=now,
-            ranked_candidates=ranked_candidates,
-            direction_mode=context.template.direction_mode,
-            sizing_mode=context.template.sizing_mode,
-            execution_params=context.template.execution_params or {},
-            reports_by_variant_key=derived_payload.reports_by_variant_key,
-            trades_by_variant_key=derived_payload.trades_by_variant_key,
-        )
-        replaced = self._results_repository.replace_top_variants_snapshot(
-            job_id=job.job_id,
-            now=now,
-            locked_by=locked_by,
-            rows=rows,
-        )
-        if not replaced:
-            raise _BacktestJobLeaseLost()
-
         finished = self._lease_repository.finish(
             job_id=job.job_id,
-            now=now,
+            now=self._now(),
             locked_by=locked_by,
             next_state="succeeded",
         )
         if finished is None:
             raise _BacktestJobLeaseLost()
-
-    def _derive_finalizing_payload(
-        self,
-        *,
-        context: _ResolvedJobRequestContext,
-        timeline: Any,
-        details_scorer: BacktestStagedVariantScorerWithDetails,
-        ranked_candidates: tuple[BacktestJobTopVariantCandidateV1, ...],
-        job: BacktestJob,
-        locked_by: str,
-        last_heartbeat_at: datetime,
-    ) -> _StageBDerivedPayload:
-        """
-        Recompute persisted rows details and reports for succeeded finalizing contract.
-
-        Args:
-            context: Resolved request context.
-            timeline: Built candle timeline payload.
-            details_scorer: Details-capable staged scorer.
-            ranked_candidates: Ranked persisted candidates from Stage-B.
-            job: Claimed job snapshot.
-            locked_by: Active lease owner.
-            last_heartbeat_at: Last heartbeat timestamp.
-        Returns:
-            _StageBDerivedPayload: Report markdown and trades payload maps.
-        Assumptions:
-            Recomputed details preserve deterministic total-return ranking values.
-        Raises:
-            _BacktestJobCancelled: If cancel was requested during finalizing loop.
-            _BacktestJobLeaseLost: If heartbeat lease extension fails.
-            ValueError: If detailed score mismatches ranked Stage-B score.
-        Side Effects:
-            Performs additional scorer calls for persisted rows only.
-        """
-        reports_by_variant_key: dict[str, str] = {}
-        trades_by_variant_key: dict[str, tuple[TradeV1, ...] | None] = {}
-        heartbeat_at = last_heartbeat_at
-
-        for rank, candidate in enumerate(ranked_candidates, start=1):
-            now = self._now()
-            self._ensure_not_cancelled(job=job, locked_by=locked_by, stage="finalizing")
-            heartbeat_at = self._heartbeat_if_due(
-                job=job,
-                locked_by=locked_by,
-                now=now,
-                last_heartbeat_at=heartbeat_at,
-            )
-            details = details_scorer.score_variant_with_details(
-                stage=STAGE_B_LITERAL,
-                candles=timeline.candles,
-                indicator_selections=candidate.indicator_selections,
-                signal_params=candidate.signal_params,
-                risk_params=candidate.risk_params,
-                indicator_variant_key=candidate.indicator_variant_key,
-                variant_key=candidate.variant_key,
-            )
-            detailed_total_return = _extract_total_return_pct(metrics=details.metrics)
-            if abs(detailed_total_return - candidate.total_return_pct) > 1e-12:
-                raise ValueError(
-                    "finalizing detailed total_return_pct does not match Stage-B ranked value"
-                )
-
-            report = self._reporting_service.build_report(
-                requested_time_range=context.request.time_range,
-                candles=timeline.candles,
-                target_slice=details.target_slice,
-                execution_params=details.execution_params,
-                execution_outcome=details.execution_outcome,
-                include_table_md=True,
-                include_trades=rank <= context.top_trades_n,
-            )
-            if report.table_md is None:
-                raise ValueError("finalizing requires non-empty report table markdown")
-            reports_by_variant_key[candidate.variant_key] = report.table_md
-            trades_by_variant_key[candidate.variant_key] = report.trades
-
-        return _StageBDerivedPayload(
-            reports_by_variant_key=reports_by_variant_key,
-            trades_by_variant_key=trades_by_variant_key,
-        )
 
     def _persist_running_snapshot(
         self,
@@ -1375,52 +1278,32 @@ class _BacktestJobLeaseLost(Exception):
     Internal control-flow exception signaling lease-owner guarded write mismatch.
     """
 
-
-def _details_scorer(
+def _frontier_signature_from_ranked_rows(
     *,
-    scorer: MetricScorerV1,
-) -> BacktestStagedVariantScorerWithDetails | None:
+    ranked_rows: tuple[BacktestStageBScoredVariantV1, ...],
+) -> FrontierSignatureV1:
     """
-    Resolve optional details extension from base scorer contract.
+    Build deterministic frontier signature from ranked rows for snapshot write gating.
 
+    Docs:
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py
     Args:
-        scorer: Base staged scorer.
+        ranked_rows: Deterministically ranked Stage-B rows.
     Returns:
-        BacktestStagedVariantScorerWithDetails | None:
-            Details-capable scorer when extension is available.
+        FrontierSignatureV1: Ordered `(variant_key, total_return_pct)` signature tuple.
     Assumptions:
-        Extension availability is detected by method presence.
+        Row order matches final deterministic persistence ranking.
     Raises:
         None.
     Side Effects:
         None.
     """
-    if getattr(scorer, "score_variant_with_details", None) is None:
-        return None
-    return cast(BacktestStagedVariantScorerWithDetails, scorer)
-
-
-def _extract_total_return_pct(*, metrics: Mapping[str, float]) -> float:
-    """
-    Extract deterministic Stage ranking value from scorer metrics payload.
-
-    Args:
-        metrics: Scorer metrics mapping.
-    Returns:
-        float: `Total Return [%]` metric.
-    Assumptions:
-        Scorer always publishes `Total Return [%]` metric for ranking.
-    Raises:
-        ValueError: If metric key is missing or value is not numeric.
-    Side Effects:
-        None.
-    """
-    value = metrics.get(_TOTAL_RETURN_METRIC)
-    if value is None:
-        raise ValueError(f"scorer payload must contain '{_TOTAL_RETURN_METRIC}'")
-    if isinstance(value, bool) or not isinstance(value, int | float):
-        raise ValueError(f"'{_TOTAL_RETURN_METRIC}' metric must be numeric")
-    return float(value)
+    return tuple((row.variant_key, row.total_return_pct) for row in ranked_rows)
 
 
 def _ranked_candidates_from_core_rows(

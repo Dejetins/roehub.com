@@ -23,6 +23,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
     Docs:
       - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
       - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
@@ -95,7 +96,8 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         Returns:
             bool: `True` when lease-guarded replace is applied; `False` when lease is lost.
         Assumptions:
-            Snapshot persistence keeps `report_table_md` null for best-so-far running writes.
+            Caller uses frontier_signature gating and keeps `report_table_md` null for
+            running writes.
         Raises:
             BacktestStorageError: If SQL execution fails or row payload is invalid.
         Side Effects:

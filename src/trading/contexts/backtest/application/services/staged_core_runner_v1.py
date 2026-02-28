@@ -39,12 +39,20 @@ _DIRECTION_DESC_LITERAL = "DESC"
 _SECONDARY_METRIC_COMPONENT_DEFAULT = 0.0
 
 StageACheckpointCallbackV1 = Callable[[int, int], None]
+StageBCheckpointRowsMaterializerV1 = Callable[
+    [],
+    tuple["BacktestStageBScoredVariantV1", ...],
+]
+StageBCheckpointTasksMaterializerV1 = Callable[
+    [],
+    Mapping[str, "BacktestStageBTaskV1"],
+]
 StageBCheckpointCallbackV1 = Callable[
     [
         int,
         int,
-        tuple["BacktestStageBScoredVariantV1", ...],
-        Mapping[str, "BacktestStageBTaskV1"],
+        StageBCheckpointRowsMaterializerV1,
+        StageBCheckpointTasksMaterializerV1,
     ],
     None,
 ]
@@ -341,6 +349,15 @@ class BacktestStagedCoreRunnerV1:
         """
         Score Stage-B variants with bounded top-K heap and optional checkpoint hooks.
 
+        Docs:
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+
         Args:
             template: Effective run template used for deterministic variant key build.
             grid_context: Deterministic staged grid context.
@@ -354,7 +371,7 @@ class BacktestStagedCoreRunnerV1:
             batch_size: Optional checkpoint boundary override.
             cancel_checker: Optional cooperative cancellation callback by stage.
             on_checkpoint:
-                Optional checkpoint callback with current ranked frontier snapshot.
+                Optional checkpoint callback with lazy ranked-rows/tasks materializers.
         Returns:
             tuple[tuple[BacktestStageBScoredVariantV1, ...], Mapping[str, BacktestStageBTaskV1]]:
                 Deterministically ranked Stage-B rows and tasks mapping by `variant_key`.
@@ -425,7 +442,7 @@ class BacktestStagedCoreRunnerV1:
             batch_size: Optional checkpoint boundary override.
             cancel_checker: Optional cooperative cancellation callback by stage.
             on_checkpoint:
-                Optional checkpoint callback with current ranked frontier snapshot.
+                Optional checkpoint callback with lazy frontier materializers.
         Returns:
             tuple[
                 tuple[BacktestStageBScoredVariantV1, ...],
@@ -487,11 +504,35 @@ class BacktestStagedCoreRunnerV1:
             if cancel_checker is not None:
                 cancel_checker(STAGE_B_LITERAL)
             if on_checkpoint is not None:
+                sorted_entries_cache: tuple[StageBHeapEntryV1, ...] | None = None
+                rows_cache: tuple[BacktestStageBScoredVariantV1, ...] | None = None
+                tasks_cache: Mapping[str, BacktestStageBTaskV1] | None = None
+
+                def _sorted_entries() -> tuple[StageBHeapEntryV1, ...]:
+                    nonlocal sorted_entries_cache
+                    if sorted_entries_cache is None:
+                        sorted_entries_cache = _sorted_stage_b_heap_entries(heap=top_heap)
+                    return sorted_entries_cache
+
+                def _materialize_ranked_rows() -> tuple[BacktestStageBScoredVariantV1, ...]:
+                    nonlocal rows_cache
+                    if rows_cache is None:
+                        rows_cache = tuple(entry[3] for entry in _sorted_entries())
+                    return rows_cache
+
+                def _materialize_tasks() -> Mapping[str, BacktestStageBTaskV1]:
+                    nonlocal tasks_cache
+                    if tasks_cache is None:
+                        tasks_cache = _stage_b_tasks_from_sorted_entries(
+                            entries=_sorted_entries()
+                        )
+                    return tasks_cache
+
                 on_checkpoint(
                     processed,
                     total,
-                    _stage_b_rows_from_heap(heap=top_heap),
-                    _stage_b_tasks_from_heap(heap=top_heap),
+                    _materialize_ranked_rows,
+                    _materialize_tasks,
                 )
 
         ranked_rows = _stage_b_rows_from_heap(heap=top_heap)
@@ -1137,7 +1178,35 @@ def _stage_b_rows_from_heap(
     Side Effects:
         None.
     """
-    return tuple(entry[3] for entry in sorted(heap, key=lambda item: item[:3], reverse=True))
+    return tuple(entry[3] for entry in _sorted_stage_b_heap_entries(heap=heap))
+
+
+def _sorted_stage_b_heap_entries(
+    *,
+    heap: list[StageBHeapEntryV1],
+) -> tuple[StageBHeapEntryV1, ...]:
+    """
+    Materialize deterministic sorted Stage-B heap entries once for rows/tasks projections.
+
+    Docs:
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py
+    Args:
+        heap: Internal bounded Stage-B heap entries.
+    Returns:
+        tuple[StageBHeapEntryV1, ...]: Deterministically sorted Stage-B heap entries.
+    Assumptions:
+        Sorting key is fixed to ranking components and `variant_key` tie-break transform.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return tuple(sorted(heap, key=lambda item: item[:3], reverse=True))
 
 
 def _stage_b_tasks_from_heap(
@@ -1158,8 +1227,36 @@ def _stage_b_tasks_from_heap(
     Side Effects:
         None.
     """
+    return _stage_b_tasks_from_sorted_entries(entries=_sorted_stage_b_heap_entries(heap=heap))
+
+
+def _stage_b_tasks_from_sorted_entries(
+    *,
+    entries: tuple[StageBHeapEntryV1, ...],
+) -> Mapping[str, BacktestStageBTaskV1]:
+    """
+    Build deterministic `variant_key -> task` mapping from sorted Stage-B entries.
+
+    Docs:
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py
+    Args:
+        entries: Sorted Stage-B heap entries.
+    Returns:
+        Mapping[str, BacktestStageBTaskV1]: Deterministic task mapping.
+    Assumptions:
+        `variant_key` uniqueness is guaranteed by Stage-B identity builder.
+    Raises:
+        ValueError: If duplicate `variant_key` is detected in entries.
+    Side Effects:
+        None.
+    """
     mapping: dict[str, BacktestStageBTaskV1] = {}
-    for _, _, _, row, task in heap:
+    for _, _, _, row, task in entries:
         if row.variant_key in mapping:
             raise ValueError("duplicate Stage-B variant_key is not allowed")
         mapping[row.variant_key] = task

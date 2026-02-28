@@ -138,7 +138,7 @@ class BacktestJobsListResponse(BaseModel):
 
 class BacktestJobTopItemResponse(BaseModel):
     """
-    API response model for one persisted top-variant row in jobs `/top` endpoint.
+    API response model for one ranking-only top row in jobs `/top` endpoint.
 
     Docs:
       - docs/architecture/backtest/backtest-jobs-api-v1.md
@@ -157,8 +157,6 @@ class BacktestJobTopItemResponse(BaseModel):
     variant_index: int
     total_return_pct: float
     payload: dict[str, Any]
-    report_table_md: str | None = None
-    trades: list[dict[str, Any]] | None = None
 
 
 class BacktestJobTopResponse(BaseModel):
@@ -288,11 +286,12 @@ def build_backtest_jobs_list_response(
 
 def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> BacktestJobTopResponse:
     """
-    Build `/top` response payload with EPIC-11 state-dependent details visibility policy.
+    Build ranking-only `/top` response payload with lazy-details policy.
 
     Docs:
       - docs/architecture/backtest/backtest-jobs-api-v1.md
       - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -303,13 +302,12 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
     Returns:
         BacktestJobTopResponse: Strict `/top` response.
     Assumptions:
-        `report_table_md` and `trades` are returned only for `succeeded` jobs.
+        `report_table_md` and `trades` are loaded via variant-report endpoint, not `/top`.
     Raises:
         None.
     Side Effects:
         None.
     """
-    include_details = result.job.state == "succeeded"
     return BacktestJobTopResponse(
         job_id=result.job.job_id,
         state=result.job.state,
@@ -321,10 +319,6 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
                 variant_index=row.variant_index,
                 total_return_pct=row.total_return_pct,
                 payload=dict(row.payload_json),
-                report_table_md=row.report_table_md if include_details else None,
-                trades=[dict(item) for item in row.trades_json]
-                if include_details and row.trades_json is not None
-                else None,
             )
             for row in result.rows
         ],

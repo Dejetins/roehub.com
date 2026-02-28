@@ -11,6 +11,8 @@ from trading.contexts.backtest.domain.entities import BacktestJobTopVariant, Tra
 from trading.contexts.backtest.domain.value_objects import BacktestVariantScalar
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 
+FrontierSignatureV1 = tuple[tuple[str, float], ...]
+
 
 @dataclass(frozen=True, slots=True)
 class BacktestJobSnapshotCadenceV1:
@@ -325,6 +327,38 @@ def build_running_snapshot_rows(
             )
         )
     return tuple(rows)
+
+
+def build_frontier_signature(
+    *,
+    ranked_candidates: tuple[BacktestJobTopVariantCandidateV1, ...],
+) -> FrontierSignatureV1:
+    """
+    Build deterministic Stage-B frontier signature from ranked candidates for snapshot gating.
+
+    Docs:
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py
+    Args:
+        ranked_candidates: Deterministically ranked persisted Stage-B candidates.
+    Returns:
+        FrontierSignatureV1:
+            Frontier signature built from ordered `(variant_key, total_return_pct)` entries.
+    Assumptions:
+        Candidate order is final deterministic ranking order used for persistence writes.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return tuple(
+        (candidate.variant_key, candidate.total_return_pct)
+        for candidate in ranked_candidates
+    )
 
 
 def build_finalized_snapshot_rows(
@@ -684,9 +718,11 @@ def _to_plain_nested_scalar_mapping(
 
 
 __all__ = [
+    "FrontierSignatureV1",
     "BacktestJobSnapshotCadenceV1",
     "BacktestJobTopKBufferV1",
     "BacktestJobTopVariantCandidateV1",
+    "build_frontier_signature",
     "build_finalized_snapshot_rows",
     "build_running_snapshot_rows",
     "build_trades_json_payload",

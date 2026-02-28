@@ -182,11 +182,13 @@ def build_backtest_jobs_router(
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> BacktestJobTopResponse:
         """
-        Read owner persisted best-so-far top rows with state-dependent details policy.
+        Read owner persisted ranking summary top rows with lazy-details policy.
 
         Docs:
           - docs/architecture/backtest/backtest-jobs-api-v1.md
           - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
         Related:
           - apps/api/dto/backtest_jobs.py
           - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -199,7 +201,7 @@ def build_backtest_jobs_router(
         Returns:
             BacktestJobTopResponse: Owner top rows payload.
         Assumptions:
-            Rows are always sorted by `rank ASC, variant_key ASC`.
+            Rows are always sorted by `rank ASC, variant_key ASC` and exclude report/trades details.
         Raises:
             RoehubError: Canonical mapped errors.
         Side Effects:

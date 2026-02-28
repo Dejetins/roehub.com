@@ -393,6 +393,47 @@ class _DeterministicScorerWithDetails:
             execution_outcome={},
         )
 
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: Any,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, Any]],
+        risk_params: Mapping[str, Any],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return metric-only payload used by staged-core ranking loops.
+
+        Args:
+            stage: Stage literal.
+            candles: Candle arrays payload.
+            indicator_selections: Indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicators-only variant key.
+            variant_key: Backtest variant key.
+        Returns:
+            Mapping[str, float]: Deterministic ranking metrics payload.
+        Assumptions:
+            Metric-only path reuses deterministic values from `score_variant`.
+        Raises:
+            ValueError: Propagates Stage-A missing score mapping errors.
+        Side Effects:
+            None.
+        """
+        return self.score_variant(
+            stage=stage,
+            candles=candles,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
+        )
+
 
 class _RankingAwareScorerWithDetails:
     """
@@ -498,6 +539,95 @@ class _RankingAwareScorerWithDetails:
             risk_params={},
             execution_outcome={},
         )
+
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: Any,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, Any]],
+        risk_params: Mapping[str, Any],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return metric-only payload for configurable ranking tests in staged-core loops.
+
+        Args:
+            stage: Stage literal.
+            candles: Candle arrays payload.
+            indicator_selections: Indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicators-only variant key.
+            variant_key: Backtest variant key.
+        Returns:
+            Mapping[str, float]: Deterministic multi-metric payload.
+        Assumptions:
+            Metric-only path is equivalent to `score_variant` for this fake.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self.score_variant(
+            stage=stage,
+            candles=candles,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
+        )
+
+
+class _FrontierStableScorer:
+    """
+    Deterministic scorer fake that stabilizes top-1 Stage-B frontier after first checkpoint.
+    """
+
+    def score_variant(
+        self,
+        *,
+        stage: str,
+        candles: Any,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, Any]],
+        risk_params: Mapping[str, Any],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return deterministic ranking metrics where first Stage-B candidate remains best.
+
+        Args:
+            stage: Stage literal.
+            candles: Candle arrays payload.
+            indicator_selections: Indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicators-only variant key.
+            variant_key: Backtest variant key.
+        Returns:
+            Mapping[str, float]: Ranking payload with deterministic `Total Return [%]`.
+        Assumptions:
+            Stage-B task order follows shortlist order and risk-variant order.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = candles, indicator_selections, indicator_variant_key, variant_key
+        threshold_raw = signal_params.get("ema", {}).get("threshold", 0)
+        threshold = int(threshold_raw) if isinstance(threshold_raw, int | float) else 0
+        if stage == "stage_a":
+            return {"Total Return [%]": float(100 - threshold)}
+
+        sl_enabled = risk_params.get("sl_enabled") is True
+        if threshold == 1 and not sl_enabled:
+            return {"Total Return [%]": 50.0}
+        return {"Total Return [%]": 1.0}
 
 
 class _FakeReportingService:
@@ -912,14 +1042,14 @@ class _NowProvider:
 
 def test_process_claimed_job_persists_stage_progress_and_finalizing_policy() -> None:
     """
-    Verify succeeded flow writes stage progress semantics and finalizing trades/report policy.
+    Verify succeeded flow writes stage progress semantics without eager finalizing details.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Persisted cap is `min(top_k, top_k_persisted_default)` and finalizing uses top-trades cap.
+        Persisted cap is `min(top_k, top_k_persisted_default)` and finalizing avoids report/trades.
     Raises:
         AssertionError: If stage progress or finalizing snapshot policy is violated.
     Side Effects:
@@ -990,11 +1120,8 @@ def test_process_claimed_job_persists_stage_progress_and_finalizing_policy() -> 
     assert all(row.report_table_md is None for row in running_rows)
     assert all(row.trades_json is None for row in running_rows)
 
-    final_rows = results_repository.replace_calls[-1]["rows"]
-    assert len(final_rows) == 2
-    assert all(row.report_table_md is not None for row in final_rows)
-    assert final_rows[0].trades_json is not None
-    assert final_rows[1].trades_json is None
+    assert len(results_repository.replace_calls) == 1
+    assert reporting_service.calls == []
 
 
 def test_process_claimed_job_applies_configured_primary_and_secondary_ranking() -> None:
@@ -1284,6 +1411,54 @@ def test_process_claimed_job_persists_running_snapshots_by_variants_step() -> No
     ]
     assert report.status == "succeeded"
     assert len(running_snapshots) >= 2
+
+
+def test_process_claimed_job_skips_snapshot_replace_when_frontier_signature_unchanged() -> None:
+    """
+    Verify cadence checkpoints skip `replace_top_variants_snapshot`
+    when frontier signature is stable.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Top-1 frontier becomes stable after first Stage-B task with configured scorer fixture.
+    Raises:
+        AssertionError: If unchanged frontier still triggers redundant snapshot replaces.
+    Side Effects:
+        None.
+    """
+    job = _build_running_job()
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    results_repository = _FakeResultsRepository()
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_FrontierStableScorer(),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=1,
+        snapshot_seconds=10_000,
+        snapshot_variants_step=1,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 40, 0)),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    running_snapshots = [
+        call
+        for call in results_repository.replace_calls
+        if all(row.report_table_md is None for row in call["rows"])
+    ]
+    assert report.status == "succeeded"
+    assert len(running_snapshots) == 1
 
 
 def _build_use_case(

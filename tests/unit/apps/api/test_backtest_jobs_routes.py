@@ -432,14 +432,14 @@ def test_get_backtest_job_status_maps_not_found_to_404_payload() -> None:
 
 def test_get_backtest_job_top_hides_details_for_non_succeeded_jobs() -> None:
     """
-    Verify `/top` hides `report_table_md` and `trades` when job state is not `succeeded`.
+    Verify `/top` omits `report_table_md` and `trades` fields for non-succeeded jobs.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        EPIC-11 state policy applies at DTO mapping layer.
+        EPIC-11 lazy-details policy is enforced by DTO mapping layer.
     Raises:
         AssertionError: If response leaks report/trades in non-succeeded state.
     Side Effects:
@@ -459,23 +459,23 @@ def test_get_backtest_job_top_hides_details_for_non_succeeded_jobs() -> None:
 
     assert response.status_code == 200
     item = response.json()["items"][0]
-    assert item["report_table_md"] is None
-    assert item["trades"] is None
+    assert "report_table_md" not in item
+    assert "trades" not in item
 
 
 
-def test_get_backtest_job_top_includes_details_for_succeeded_jobs() -> None:
+def test_get_backtest_job_top_omits_details_even_for_succeeded_jobs() -> None:
     """
-    Verify `/top` returns report/trades details for `succeeded` jobs.
+    Verify `/top` omits `report_table_md` and `trades` even for `succeeded` jobs.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Persisted succeeded rows include markdown table and optional trades payload.
+        Detailed report data is loaded through variant-report endpoint, not `/top`.
     Raises:
-        AssertionError: If succeeded response omits report/trades details.
+        AssertionError: If succeeded response still includes report/trades details.
     Side Effects:
         None.
     """
@@ -493,8 +493,8 @@ def test_get_backtest_job_top_includes_details_for_succeeded_jobs() -> None:
 
     assert response.status_code == 200
     item = response.json()["items"][0]
-    assert item["report_table_md"] == "|Metric|Value|"
-    assert item["trades"] == [{"trade_id": 1, "net_pnl_quote": 12.34}]
+    assert "report_table_md" not in item
+    assert "trades" not in item
 
 
 
