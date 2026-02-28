@@ -473,7 +473,50 @@ class _DetailsCountingScorer:
         """
         self.stage_a_score_variant_calls = 0
         self.stage_b_score_variant_calls = 0
+        self.legacy_score_variant_calls = 0
         self.stage_b_score_variant_with_details_calls = 0
+
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return deterministic ranking metric while counting Stage-A and Stage-B metric calls.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters payload.
+            risk_params: Risk payload.
+            indicator_variant_key: Indicators-only key.
+            variant_key: Full variant key.
+        Returns:
+            Mapping[str, float]: Deterministic payload with `Total Return [%]`.
+        Assumptions:
+            Ranking metric must exactly match details payload metric for determinism checks.
+        Raises:
+            None.
+        Side Effects:
+            Updates in-memory stage counters.
+        """
+        _ = candles, signal_params, indicator_variant_key, variant_key
+        total_return_pct = _details_scorer_total_return_pct(
+            indicator_selections=indicator_selections,
+            risk_params=risk_params,
+        )
+        if stage == "stage_a":
+            self.stage_a_score_variant_calls += 1
+        elif stage == "stage_b":
+            self.stage_b_score_variant_calls += 1
+        return {TOTAL_RETURN_METRIC_LITERAL: total_return_pct}
 
     def score_variant(
         self,
@@ -506,16 +549,16 @@ class _DetailsCountingScorer:
         Side Effects:
             Updates in-memory stage counters.
         """
-        _ = candles, signal_params, indicator_variant_key, variant_key
-        total_return_pct = _details_scorer_total_return_pct(
+        self.legacy_score_variant_calls += 1
+        return self.score_variant_metric(
+            stage=stage,
+            candles=candles,
             indicator_selections=indicator_selections,
+            signal_params=signal_params,
             risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
         )
-        if stage == "stage_a":
-            self.stage_a_score_variant_calls += 1
-        elif stage == "stage_b":
-            self.stage_b_score_variant_calls += 1
-        return {TOTAL_RETURN_METRIC_LITERAL: total_return_pct}
 
     def score_variant_with_details(
         self,
@@ -829,7 +872,7 @@ def test_staged_runner_v1_stage_b_risk_expansion_reuses_signal_cache() -> None:
 
 def test_staged_runner_v1_top_reports_use_retained_stage_b_details_without_rescore() -> None:
     """
-    Verify report-building path reuses Stage-B retained details and avoids top-k re-score pass.
+    Verify Stage-B ranking stays metric-only and details are scored only for retained top rows.
 
     Args:
         None.
@@ -838,7 +881,7 @@ def test_staged_runner_v1_top_reports_use_retained_stage_b_details_without_resco
     Assumptions:
         Requested time range enables report generation for ranked top variants.
     Raises:
-        AssertionError: If Stage-B details are re-scored for top rows.
+        AssertionError: If Stage-B ranking path calls details scorer in hot loop.
     Side Effects:
         None.
     """
@@ -861,8 +904,9 @@ def test_staged_runner_v1_top_reports_use_retained_stage_b_details_without_resco
     assert tuple(item.total_return_pct for item in result.variants) == (4.0, 3.0)
     assert all(item.report is not None for item in result.variants)
     assert scorer.stage_a_score_variant_calls == result.stage_a_variants_total
-    assert scorer.stage_b_score_variant_calls == 0
-    assert scorer.stage_b_score_variant_with_details_calls == result.stage_b_variants_total
+    assert scorer.stage_b_score_variant_calls == result.stage_b_variants_total
+    assert scorer.legacy_score_variant_calls == 0
+    assert scorer.stage_b_score_variant_with_details_calls == len(result.variants)
 
 
 class _CancellingScorer:

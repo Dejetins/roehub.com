@@ -11,9 +11,12 @@ from typing import Any, Mapping, cast
 import numpy as np
 
 from trading.contexts.backtest.application.ports import (
+    BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
     BacktestVariantScoreDetailsV1,
+    RankingMetricsV1,
 )
+from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1
 from trading.contexts.backtest.domain.value_objects import (
     BacktestVariantScalar,
     ExecutionParamsV1,
@@ -156,8 +159,7 @@ class _PreparedTensorPlan:
             axis_map = self.axis_positions.get(axis_name)
             if axis_map is None or value not in axis_map:
                 raise ValueError(
-                    f"selection axis value is not present in prepared tensor: "
-                    f"{axis_name}={value!r}"
+                    f"selection axis value is not present in prepared tensor: {axis_name}={value!r}"
                 )
             coordinates.append(int(axis_map[value]))
         return _encode_mixed_radix(
@@ -185,7 +187,10 @@ class _PreparedGridContext:
     total_tensor_bytes: int
 
 
-class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
+class CloseFillBacktestStagedScorerV1(
+    BacktestStagedVariantScorer,
+    BacktestStagedVariantMetricScorer,
+):
     """
     Concrete staged scorer using close-fill engine v1 and indicator signal aggregation.
 
@@ -468,9 +473,9 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         risk_params: Mapping[str, BacktestVariantScalar],
         indicator_variant_key: str,
         variant_key: str,
-    ) -> Mapping[str, float]:
+    ) -> RankingMetricsV1:
         """
-        Score one variant using deterministic close-fill execution over aggregated signals.
+        Backward-compatible scoring shim delegating to metric-only scorer API.
 
         Args:
             stage: Stage literal (`stage_a` or `stage_b`).
@@ -481,15 +486,16 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             indicator_variant_key: Deterministic indicators-only variant key.
             variant_key: Deterministic full backtest variant key.
         Returns:
-            Mapping[str, float]: Mapping with `Total Return [%]` ranking metric.
+            RankingMetricsV1: Mapping with `Total Return [%]` ranking metric.
         Assumptions:
-            Stage A disables SL/TP regardless of provided `risk_params` values.
+            Legacy callers keep working while ranking hot paths migrate to
+            `score_variant_metric(...)`.
         Raises:
             ValueError: If stage literal is unsupported or one scalar payload is invalid.
         Side Effects:
-            Uses internal in-memory signal cache keyed by compute+signal identity.
+            Same as `score_variant_metric(...)`.
         """
-        details = self.score_variant_with_details(
+        return self.score_variant_metric(
             stage=stage,
             candles=candles,
             indicator_selections=indicator_selections,
@@ -498,7 +504,48 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             indicator_variant_key=indicator_variant_key,
             variant_key=variant_key,
         )
-        return details.metrics
+
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]],
+        risk_params: Mapping[str, BacktestVariantScalar],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> RankingMetricsV1:
+        """
+        Score one variant and return ranking metrics only for Stage A/Stage B hot paths.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Warmup-inclusive candles.
+            indicator_selections: Deterministic explicit indicator selections for variant.
+            signal_params: Signal parameter mapping per indicator.
+            risk_params: Risk payload for Stage B variant expansion.
+            indicator_variant_key: Deterministic indicators-only variant key.
+            variant_key: Deterministic full backtest variant key.
+        Returns:
+            RankingMetricsV1: Mapping with deterministic ranking metrics.
+        Assumptions:
+            Stage A still disables SL/TP regardless of provided `risk_params` values.
+        Raises:
+            ValueError: If stage literal is unsupported or one scalar payload is invalid.
+        Side Effects:
+            Uses internal in-memory signal cache keyed by compute+signal identity.
+        """
+        metrics, _, _, _ = self._score_variant_execution_payload(
+            stage=stage,
+            candles=candles,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
+        )
+        return metrics
 
     def score_variant_with_details(
         self,
@@ -524,6 +571,57 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             variant_key: Deterministic full backtest variant key.
         Returns:
             BacktestVariantScoreDetailsV1: Detailed payload with score metrics and execution data.
+        Assumptions:
+            Stage A still disables SL/TP regardless of provided `risk_params` values.
+        Raises:
+            ValueError: If stage literal is unsupported or one scalar payload is invalid.
+        Side Effects:
+            Uses internal in-memory signal cache keyed by compute+signal identity.
+        """
+        metrics, execution_params, resolved_risk_params, outcome = (
+            self._score_variant_execution_payload(
+                stage=stage,
+                candles=candles,
+                indicator_selections=indicator_selections,
+                signal_params=signal_params,
+                risk_params=risk_params,
+                indicator_variant_key=indicator_variant_key,
+                variant_key=variant_key,
+            )
+        )
+        return BacktestVariantScoreDetailsV1(
+            metrics=metrics,
+            target_slice=self._target_slice,
+            execution_params=execution_params,
+            risk_params=resolved_risk_params,
+            execution_outcome=outcome,
+        )
+
+    def _score_variant_execution_payload(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]],
+        risk_params: Mapping[str, BacktestVariantScalar],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> tuple[RankingMetricsV1, ExecutionParamsV1, RiskParamsV1, ExecutionOutcomeV1]:
+        """
+        Compute deterministic execution payload shared by metric-only and details scoring APIs.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Warmup-inclusive candles.
+            indicator_selections: Deterministic explicit indicator selections for variant.
+            signal_params: Signal parameter mapping per indicator.
+            risk_params: Risk payload for Stage B variant expansion.
+            indicator_variant_key: Deterministic indicators-only variant key.
+            variant_key: Deterministic full backtest variant key.
+        Returns:
+            tuple[RankingMetricsV1, ExecutionParamsV1, RiskParamsV1, ExecutionOutcomeV1]:
+                Ranking metrics plus execution payload required by details API.
         Assumptions:
             Stage A still disables SL/TP regardless of provided `risk_params` values.
         Raises:
@@ -565,13 +663,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
             risk_params=resolved_risk_params,
         )
         metrics = MappingProxyType({TOTAL_RETURN_METRIC_LITERAL: float(outcome.total_return_pct)})
-        return BacktestVariantScoreDetailsV1(
-            metrics=metrics,
-            target_slice=self._target_slice,
-            execution_params=execution_params,
-            risk_params=resolved_risk_params,
-            execution_outcome=outcome,
-        )
+        return (metrics, execution_params, resolved_risk_params, outcome)
 
     def _cached_signal(self, *, cache_key: str) -> _SignalCacheValue | None:
         """
@@ -670,9 +762,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
                 prepared_context=prepared_context,
             )
 
-        ordered_selections = tuple(
-            sorted(indicator_selections, key=lambda item: item.indicator_id)
-        )
+        ordered_selections = tuple(sorted(indicator_selections, key=lambda item: item.indicator_id))
         tensors_by_indicator: dict[str, IndicatorTensor] = {}
         indicator_inputs: dict[str, Mapping[str, BacktestVariantScalar]] = {}
         dependency_outputs: dict[str, Mapping[str, np.ndarray]] = {}
@@ -754,9 +844,7 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
         Side Effects:
             May call compute port only when prepared plan for selected id is absent.
         """
-        ordered_selections = tuple(
-            sorted(indicator_selections, key=lambda item: item.indicator_id)
-        )
+        ordered_selections = tuple(sorted(indicator_selections, key=lambda item: item.indicator_id))
         signal_inputs: list[IndicatorSignalEvaluationInputV1] = []
 
         # HOT PATH: avoid large intermediate mappings for prepared-tensor scoring.
@@ -800,10 +888,8 @@ class CloseFillBacktestStagedScorerV1(BacktestStagedVariantScorer):
                         dependency_variant_index = 0
                     else:
                         dependency_tensor = prepared_dependency.tensor
-                        dependency_variant_index = (
-                            prepared_dependency.variant_index_for_selection(
-                                selection=selection
-                            )
+                        dependency_variant_index = prepared_dependency.variant_index_for_selection(
+                            selection=selection
                         )
                     dependency_outputs[dependency_id] = (
                         indicator_primary_output_series_from_tensor_v1(

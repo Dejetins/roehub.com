@@ -172,7 +172,7 @@ def test_close_fill_scorer_v1_applies_stage_risk_policy() -> None:
     )
     selection = _selection(indicator_id="momentum.roc")
 
-    stage_a = scorer.score_variant(
+    stage_a = scorer.score_variant_metric(
         stage="stage_a",
         candles=candles,
         indicator_selections=(selection,),
@@ -181,7 +181,7 @@ def test_close_fill_scorer_v1_applies_stage_risk_policy() -> None:
         indicator_variant_key="a" * 64,
         variant_key="b" * 64,
     )
-    stage_b = scorer.score_variant(
+    stage_b = scorer.score_variant_metric(
         stage="stage_b",
         candles=candles,
         indicator_selections=(selection,),
@@ -193,6 +193,67 @@ def test_close_fill_scorer_v1_applies_stage_risk_policy() -> None:
 
     assert stage_a["Total Return [%]"] == pytest.approx(10.0)
     assert stage_b["Total Return [%]"] == pytest.approx(-10.0)
+
+
+def test_close_fill_scorer_v1_metric_api_and_legacy_api_do_not_call_details_path() -> None:
+    """
+    Verify metric-only and legacy scoring APIs avoid implicit details-path execution.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `score_variant` is backward-compatible shim over `score_variant_metric`.
+    Raises:
+        AssertionError: If metric/legacy API attempts to call details scorer path.
+    Side Effects:
+        None.
+    """
+    candles = _candles_from_closes((100.0, 102.0, 101.0))
+    compute = _FixedSeriesIndicatorCompute(
+        outputs={
+            "momentum.roc": np.asarray((1.0, 1.0, 1.0), dtype=np.float32),
+        }
+    )
+    scorer = CloseFillBacktestStagedScorerV1(
+        indicator_compute=compute,
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={"init_cash_quote": 1000.0, "fee_pct": 0.0, "slippage_pct": 0.0},
+        market_id=1,
+        target_slice=slice(0, 3),
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+    )
+    selection = _selection(indicator_id="momentum.roc")
+
+    def _raise_on_details_call(**_: object) -> object:
+        raise AssertionError("score_variant_with_details must not be called")
+
+    setattr(scorer, "score_variant_with_details", _raise_on_details_call)
+    metric_payload = scorer.score_variant_metric(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="b" * 64,
+    )
+    legacy_payload = scorer.score_variant(
+        stage="stage_b",
+        candles=candles,
+        indicator_selections=(selection,),
+        signal_params={},
+        risk_params={"sl_enabled": False, "sl_pct": None, "tp_enabled": False, "tp_pct": None},
+        indicator_variant_key="a" * 64,
+        variant_key="c" * 64,
+    )
+
+    assert metric_payload == legacy_payload
 
 
 def test_close_fill_scorer_v1_reuses_signal_cache_for_same_base_variant() -> None:

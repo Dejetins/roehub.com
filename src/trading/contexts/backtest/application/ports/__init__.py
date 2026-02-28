@@ -12,9 +12,11 @@ from .staged_runner import (
     BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1,
     BacktestGridDefaultsProvider,
     BacktestSignalParamsMap,
+    BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
     BacktestStagedVariantScorerWithDetails,
     BacktestVariantScoreDetailsV1,
+    RankingMetricsV1,
 )
 from .strategy_reader import BacktestStrategyReader, BacktestStrategySnapshot
 
@@ -29,9 +31,11 @@ __all__ = [
     "BacktestJobRequestDecoder",
     "BacktestGridDefaultsProvider",
     "BacktestSignalParamsMap",
+    "BacktestStagedVariantMetricScorer",
     "BacktestStagedVariantScorerWithDetails",
     "BacktestStagedVariantScorer",
     "BacktestVariantScoreDetailsV1",
+    "RankingMetricsV1",
     "BacktestStrategyReader",
     "BacktestStrategySnapshot",
     "CurrentUser",

@@ -13,6 +13,7 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.application.ports import (
     BacktestGridDefaultsProvider,
+    BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
     BacktestStagedVariantScorerWithDetails,
     BacktestVariantScoreDetailsV1,
@@ -46,6 +47,7 @@ from .staged_core_runner_v1 import (
 )
 
 TOTAL_RETURN_METRIC_LITERAL = "Total Return [%]"
+MetricScorerV1 = BacktestStagedVariantMetricScorer | BacktestStagedVariantScorer
 
 
 @dataclass(frozen=True, slots=True)
@@ -225,7 +227,7 @@ class BacktestStagedRunnerV1:
         preselect: int,
         top_k: int,
         indicator_compute: IndicatorCompute,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         ranking: BacktestRankingConfig | None = None,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
@@ -301,37 +303,17 @@ class BacktestStagedRunnerV1:
             cancel_checker=cancel_checker,
         )
 
-        details_scorer = (
-            _details_scorer(scorer=scorer) if requested_time_range is not None else None
-        )
         retained_details_by_variant_key: Mapping[str, BacktestVariantScoreDetailsV1] = {}
-        if details_scorer is None:
-            top_rows, stage_b_tasks = self._score_stage_b(
-                template=template,
-                grid_context=grid_context,
-                shortlist=shortlist,
-                candles=candles,
-                scorer=scorer,
-                top_k_limit=top_k,
-                ranking=ranking,
-                cancel_checker=cancel_checker,
-            )
-        else:
-            (
-                top_rows,
-                stage_b_tasks,
-                retained_details_by_variant_key,
-            ) = self._score_stage_b_with_retained_details(
-                template=template,
-                grid_context=grid_context,
-                shortlist=shortlist,
-                candles=candles,
-                scorer=scorer,
-                details_scorer=details_scorer,
-                top_k_limit=top_k,
-                ranking=ranking,
-                cancel_checker=cancel_checker,
-            )
+        top_rows, stage_b_tasks = self._score_stage_b(
+            template=template,
+            grid_context=grid_context,
+            shortlist=shortlist,
+            candles=candles,
+            scorer=scorer,
+            top_k_limit=top_k,
+            ranking=ranking,
+            cancel_checker=cancel_checker,
+        )
         top_payload_context = self._build_top_reports(
             requested_time_range=requested_time_range,
             top_rows=top_rows,
@@ -384,7 +366,7 @@ class BacktestStagedRunnerV1:
     def _prepare_scorer_for_grid_context(
         self,
         *,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         grid_context: BacktestGridBuildContextV1,
         candles: CandleArrays,
         max_compute_bytes_total: int,
@@ -423,7 +405,7 @@ class BacktestStagedRunnerV1:
         *,
         grid_context: BacktestGridBuildContextV1,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         shortlist_limit: int,
         ranking: BacktestRankingConfig | None = None,
         cancel_checker: Callable[[str], None] | None = None,
@@ -474,7 +456,7 @@ class BacktestStagedRunnerV1:
         grid_context: BacktestGridBuildContextV1,
         shortlist: list[BacktestStageAScoredVariantV1],
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         top_k_limit: int,
         ranking: BacktestRankingConfig | None = None,
         cancel_checker: Callable[[str], None] | None = None,
@@ -522,80 +504,12 @@ class BacktestStagedRunnerV1:
         )
         return (list(top_rows), top_tasks_by_variant_key)
 
-    def _score_stage_b_with_retained_details(
-        self,
-        *,
-        template: RunBacktestTemplate,
-        grid_context: BacktestGridBuildContextV1,
-        shortlist: list[BacktestStageAScoredVariantV1],
-        candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
-        details_scorer: BacktestStagedVariantScorerWithDetails,
-        top_k_limit: int,
-        ranking: BacktestRankingConfig | None = None,
-        cancel_checker: Callable[[str], None] | None = None,
-    ) -> tuple[
-        list[BacktestStageBScoredVariantV1],
-        Mapping[str, BacktestStageBTaskV1],
-        Mapping[str, BacktestVariantScoreDetailsV1],
-    ]:
-        """
-        Score Stage-B and retain details only for variants currently held by bounded top-k heap.
-
-        Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-        Related:
-          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
-          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
-          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
-        Args:
-            template: Resolved backtest template payload.
-            grid_context: Built staged grid context.
-            shortlist: Sorted Stage A shortlist rows.
-            candles: Dense candles forwarded to scorer.
-            scorer: Stage scorer port.
-            details_scorer: Details extension used for report payload reuse.
-            top_k_limit: Maximum number of Stage B rows retained in memory.
-            ranking:
-                Optional ranking config (`primary_metric`, optional `secondary_metric`).
-            cancel_checker: Optional cooperative cancellation callback by stage.
-        Returns:
-            tuple[
-                list[BacktestStageBScoredVariantV1],
-                Mapping[str, BacktestStageBTaskV1],
-                Mapping[str, BacktestVariantScoreDetailsV1],
-            ]:
-                Sorted Stage-B top rows, tasks mapping, and retained details for top rows.
-        Assumptions:
-            Stage B tie-break key is full `variant_key`.
-        Raises:
-            ValueError: If scorer payload lacks required ranking metric or limit is invalid.
-        Side Effects:
-            Retained details map grows only up to `top_k_limit`.
-        """
-        top_rows, top_tasks_by_variant_key, retained_details_by_variant_key = (
-            self._core_runner.run_stage_b_with_details(
-                template=template,
-                grid_context=grid_context,
-                shortlist=tuple(shortlist),
-                candles=candles,
-                scorer=scorer,
-                details_scorer=details_scorer,
-                top_k_limit=top_k_limit,
-                ranking=ranking,
-                cancel_checker=cancel_checker,
-            )
-        )
-        return (list(top_rows), top_tasks_by_variant_key, retained_details_by_variant_key)
-
     def _score_stage_a_variant(
         self,
         *,
         base_variant: BacktestStageABaseVariant,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
     ) -> BacktestStageAScoredVariantV1:
         """
         Score one Stage-A base variant through shared staged core helper.
@@ -659,7 +573,7 @@ class BacktestStagedRunnerV1:
         *,
         task: BacktestStageBTaskV1,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
     ) -> BacktestStageBScoredVariantV1:
         """
         Score one Stage-B task payload through shared staged core helper.
@@ -688,7 +602,7 @@ class BacktestStagedRunnerV1:
         task: BacktestStageBTaskV1,
         *,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
     ) -> tuple[BacktestStageBScoredVariantV1, BacktestStageBTaskV1]:
         """
         Score one Stage-B task and return both ranked row and original task payload.
@@ -726,7 +640,7 @@ class BacktestStagedRunnerV1:
         stage_b_tasks: Mapping[str, BacktestStageBTaskV1],
         retained_details_by_variant_key: Mapping[str, BacktestVariantScoreDetailsV1],
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         top_trades_n: int,
     ) -> _TopVariantPayloadContext:
         """
@@ -967,7 +881,7 @@ def _descending_text_key(*, value: str) -> tuple[int, ...]:
 
 def _details_scorer(
     *,
-    scorer: BacktestStagedVariantScorer,
+    scorer: MetricScorerV1,
 ) -> BacktestStagedVariantScorerWithDetails | None:
     """
     Resolve optional details extension from scorer without breaking base scorer contract.

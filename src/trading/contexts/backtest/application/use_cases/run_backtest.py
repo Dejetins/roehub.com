@@ -17,6 +17,7 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.application.ports import (
     BacktestGridDefaultsProvider,
+    BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
     BacktestStrategyReader,
     BacktestStrategySnapshot,
@@ -53,6 +54,7 @@ _DEFAULT_FEE_PCT_BY_MARKET_ID = {
     4: 0.1,
 }
 _DEFAULT_MAX_NUMBA_THREADS = max(1, os.cpu_count() or 1)
+MetricScorerV1 = BacktestStagedVariantMetricScorer | BacktestStagedVariantScorer
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,7 +102,7 @@ class RunBacktestUseCase:
         strategy_reader: BacktestStrategyReader,
         candle_timeline_builder: BacktestCandleTimelineBuilder | None = None,
         staged_runner: BacktestStagedRunnerV1 | None = None,
-        staged_scorer: BacktestStagedVariantScorer | None = None,
+        staged_scorer: MetricScorerV1 | None = None,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
@@ -187,9 +189,7 @@ class RunBacktestUseCase:
         if fixed_quote_default <= 0.0:
             raise ValueError("RunBacktestUseCase.fixed_quote_default must be > 0")
         if safe_profit_percent_default < 0.0 or safe_profit_percent_default > 100.0:
-            raise ValueError(
-                "RunBacktestUseCase.safe_profit_percent_default must be in [0, 100]"
-            )
+            raise ValueError("RunBacktestUseCase.safe_profit_percent_default must be in [0, 100]")
         if slippage_pct_default < 0.0:
             raise ValueError("RunBacktestUseCase.slippage_pct_default must be >= 0")
         if max_variants_per_compute <= 0:
@@ -493,9 +493,7 @@ class RunBacktestUseCase:
             updates=overrides.execution_params or {},
         )
         risk_grid = (
-            overrides.risk_grid
-            if overrides.risk_grid is not None
-            else base_template.risk_grid
+            overrides.risk_grid if overrides.risk_grid is not None else base_template.risk_grid
         )
 
         return RunBacktestTemplate(
@@ -559,7 +557,7 @@ class RunBacktestUseCase:
         *,
         template: RunBacktestTemplate,
         target_slice: slice,
-    ) -> BacktestStagedVariantScorer:
+    ) -> MetricScorerV1:
         """
         Resolve scorer for current execution, building default close-fill scorer when absent.
 
@@ -567,7 +565,7 @@ class RunBacktestUseCase:
             template: Resolved run template containing direction/sizing/execution settings.
             target_slice: Trading/reporting target slice inside warmup-inclusive timeline.
         Returns:
-            BacktestStagedVariantScorer: Scorer used by staged runner.
+            MetricScorerV1: Scorer used by staged runner.
         Assumptions:
             Injected scorer takes precedence over default close-fill scorer composition.
         Raises:

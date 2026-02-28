@@ -24,6 +24,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobRepository,
     BacktestJobRequestDecoder,
     BacktestJobResultsRepository,
+    BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
     BacktestStagedVariantScorerWithDetails,
 )
@@ -74,6 +75,7 @@ _TOTAL_RETURN_METRIC = "Total Return [%]"
 
 BacktestJobRunStatus = Literal["succeeded", "failed", "cancelled", "lease_lost"]
 _DEFAULT_MAX_NUMBA_THREADS = max(1, os.cpu_count() or 1)
+MetricScorerV1 = BacktestStagedVariantMetricScorer | BacktestStagedVariantScorer
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,7 +195,7 @@ class RunBacktestJobRunnerV1:
         grid_builder: BacktestGridBuilderV1 | None = None,
         reporting_service: BacktestReportingServiceV1 | None = None,
         core_runner: BacktestStagedCoreRunnerV1 | None = None,
-        staged_scorer: BacktestStagedVariantScorer | None = None,
+        staged_scorer: MetricScorerV1 | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
@@ -652,7 +654,7 @@ class RunBacktestJobRunnerV1:
     def _prepare_scorer_for_grid_context(
         self,
         *,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         grid_context: Any,
         candles: Any,
     ) -> None:
@@ -689,7 +691,7 @@ class RunBacktestJobRunnerV1:
         locked_by: str,
         context: _ResolvedJobRequestContext,
         timeline: Any,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         grid_context: Any,
     ) -> tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
         """
@@ -802,7 +804,7 @@ class RunBacktestJobRunnerV1:
         locked_by: str,
         context: _ResolvedJobRequestContext,
         timeline: Any,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         grid_context: Any,
         shortlist: tuple[BacktestJobTopVariantCandidateV1, ...],
         last_heartbeat_at: datetime,
@@ -944,7 +946,7 @@ class RunBacktestJobRunnerV1:
         locked_by: str,
         context: _ResolvedJobRequestContext,
         timeline: Any,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         ranked_candidates: tuple[BacktestJobTopVariantCandidateV1, ...],
         last_heartbeat_at: datetime,
     ) -> None:
@@ -1327,7 +1329,7 @@ class RunBacktestJobRunnerV1:
         *,
         template: RunBacktestTemplate,
         target_slice: slice,
-    ) -> BacktestStagedVariantScorer:
+    ) -> MetricScorerV1:
         """
         Resolve staged scorer implementation for current run context.
 
@@ -1335,7 +1337,7 @@ class RunBacktestJobRunnerV1:
             template: Effective run template.
             target_slice: Target trading/reporting slice.
         Returns:
-            BacktestStagedVariantScorer: Scorer used for stage execution.
+            MetricScorerV1: Scorer used for stage execution.
         Assumptions:
             Injected scorer takes precedence over default close-fill scorer composition.
         Raises:
@@ -1376,7 +1378,7 @@ class _BacktestJobLeaseLost(Exception):
 
 def _details_scorer(
     *,
-    scorer: BacktestStagedVariantScorer,
+    scorer: MetricScorerV1,
 ) -> BacktestStagedVariantScorerWithDetails | None:
     """
     Resolve optional details extension from base scorer contract.
@@ -1702,9 +1704,7 @@ def _apply_saved_overrides(
         else base_template.direction_mode
     )
     sizing_mode = (
-        overrides.sizing_mode
-        if overrides.sizing_mode is not None
-        else base_template.sizing_mode
+        overrides.sizing_mode if overrides.sizing_mode is not None else base_template.sizing_mode
     )
     signal_grids = _merge_signal_grids(
         base=base_template.signal_grids or {},

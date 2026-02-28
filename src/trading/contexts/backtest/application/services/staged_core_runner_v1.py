@@ -3,16 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from heapq import heappush, heapreplace
 from types import MappingProxyType
-from typing import Callable, Iterator, Mapping
+from typing import Callable, Iterator, Mapping, cast
 
 from trading.contexts.backtest.application.dto import (
     BacktestRankingConfig,
     RunBacktestTemplate,
 )
 from trading.contexts.backtest.application.ports import (
+    BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
     BacktestStagedVariantScorerWithDetails,
     BacktestVariantScoreDetailsV1,
+    RankingMetricsV1,
 )
 from trading.contexts.backtest.application.services.grid_builder_v1 import (
     STAGE_A_LITERAL,
@@ -47,6 +49,8 @@ StageBCheckpointCallbackV1 = Callable[
     None,
 ]
 CancelCheckerV1 = Callable[[str], None]
+MetricScorerV1 = BacktestStagedVariantMetricScorer | BacktestStagedVariantScorer
+ScoreVariantMetricFnV1 = Callable[..., RankingMetricsV1]
 StageAHeapEntryV1 = tuple[
     float,
     float,
@@ -59,7 +63,6 @@ StageBHeapEntryV1 = tuple[
     tuple[int, ...],
     "BacktestStageBScoredVariantV1",
     "BacktestStageBTaskV1",
-    BacktestVariantScoreDetailsV1 | None,
 ]
 _DEFAULT_RANKING_CONFIG_V1 = BacktestRankingConfig()
 _METRIC_DIRECTION_BY_LITERAL_V1 = MappingProxyType(
@@ -86,6 +89,33 @@ _SCORER_METRIC_KEYS_BY_LITERAL_V1 = MappingProxyType(
         _PROFIT_FACTOR_METRIC_KEY_LITERAL: (_PROFIT_FACTOR_METRIC_KEY_LITERAL,),
     }
 )
+
+
+def _resolve_score_variant_metric_fn(*, scorer: MetricScorerV1) -> ScoreVariantMetricFnV1:
+    """
+    Resolve metric-only scorer function with fail-fast guard for details-capable scorers.
+
+    Args:
+        scorer: Scorer implementation used by Stage A / Stage B ranking loops.
+    Returns:
+        ScoreVariantMetricFnV1: Callable producing ranking metrics payload.
+    Assumptions:
+        New scorers SHOULD expose `score_variant_metric(...)`; legacy scorers may expose
+        only `score_variant(...)`.
+    Raises:
+        ValueError: If scorer exposes details API but does not expose metric-only API.
+    Side Effects:
+        None.
+    """
+    score_variant_metric = getattr(scorer, "score_variant_metric", None)
+    if score_variant_metric is not None:
+        return cast(ScoreVariantMetricFnV1, score_variant_metric)
+    if getattr(scorer, "score_variant_with_details", None) is not None:
+        raise ValueError(
+            "scorer exposing score_variant_with_details must also expose score_variant_metric"
+        )
+    legacy_scorer = cast(BacktestStagedVariantScorer, scorer)
+    return cast(ScoreVariantMetricFnV1, legacy_scorer.score_variant)
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,9 +238,7 @@ class BacktestStagedCoreRunnerV1:
         if batch_size_default <= 0:
             raise ValueError("BacktestStagedCoreRunnerV1.batch_size_default must be > 0")
         if not isinstance(configurable_ranking_enabled, bool):
-            raise ValueError(
-                "BacktestStagedCoreRunnerV1.configurable_ranking_enabled must be bool"
-            )
+            raise ValueError("BacktestStagedCoreRunnerV1.configurable_ranking_enabled must be bool")
         self._batch_size_default = batch_size_default
         self._configurable_ranking_enabled = configurable_ranking_enabled
 
@@ -219,7 +247,7 @@ class BacktestStagedCoreRunnerV1:
         *,
         grid_context: BacktestGridBuildContextV1,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         shortlist_limit: int,
         ranking: BacktestRankingConfig | None = None,
         batch_size: int | None = None,
@@ -259,6 +287,7 @@ class BacktestStagedCoreRunnerV1:
             )
         )
         effective_batch = self._resolve_batch_size(batch_size=batch_size)
+        score_variant_metric = _resolve_score_variant_metric_fn(scorer=scorer)
         total = int(grid_context.stage_a_variants_total)
         if cancel_checker is not None:
             cancel_checker(STAGE_A_LITERAL)
@@ -273,6 +302,7 @@ class BacktestStagedCoreRunnerV1:
                 base_variant=base_variant,
                 candles=candles,
                 scorer=scorer,
+                score_variant_metric=score_variant_metric,
             )
             heap_entry = _stage_a_heap_entry(
                 row=row,
@@ -301,7 +331,7 @@ class BacktestStagedCoreRunnerV1:
         grid_context: BacktestGridBuildContextV1,
         shortlist: tuple[BacktestStageAScoredVariantV1, ...],
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         top_k_limit: int,
         ranking: BacktestRankingConfig | None = None,
         batch_size: int | None = None,
@@ -357,7 +387,7 @@ class BacktestStagedCoreRunnerV1:
         grid_context: BacktestGridBuildContextV1,
         shortlist: tuple[BacktestStageAScoredVariantV1, ...],
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
         top_k_limit: int,
         ranking: BacktestRankingConfig | None = None,
         details_scorer: BacktestStagedVariantScorerWithDetails | None = None,
@@ -370,7 +400,7 @@ class BacktestStagedCoreRunnerV1:
         Mapping[str, BacktestVariantScoreDetailsV1],
     ]:
         """
-        Score Stage-B variants and optionally retain details for variants currently in top-k heap.
+        Score Stage-B variants via metric-only loop and optionally score details post-ranking.
 
         Docs:
           - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
@@ -391,7 +421,7 @@ class BacktestStagedCoreRunnerV1:
                 Optional ranking config (`primary_metric`, optional `secondary_metric`)
                 from request/runtime defaults.
             details_scorer:
-                Optional scorer extension used to retain detailed execution payloads in heap.
+                Optional scorer extension used after ranking for retained top-k rows only.
             batch_size: Optional checkpoint boundary override.
             cancel_checker: Optional cooperative cancellation callback by stage.
             on_checkpoint:
@@ -402,13 +432,13 @@ class BacktestStagedCoreRunnerV1:
                 Mapping[str, BacktestStageBTaskV1],
                 Mapping[str, BacktestVariantScoreDetailsV1],
             ]:
-                Ranked rows, tasks mapping, and retained details for current top-k variants.
+                Ranked rows, tasks mapping, and optional details for current top-k variants.
         Assumptions:
             Final deterministic tie-break for Stage B is always `variant_key ASC`.
         Raises:
             ValueError: If limits/batch-size are invalid or scorer payload is malformed.
         Side Effects:
-            Retained details are bounded by heap capacity and dropped on heap evictions.
+            Details scorer is executed only for ranked top-k rows after hot loop completes.
         """
         if top_k_limit <= 0:
             raise ValueError("BacktestStagedCoreRunnerV1 top_k_limit must be > 0")
@@ -423,6 +453,7 @@ class BacktestStagedCoreRunnerV1:
         if cancel_checker is not None:
             cancel_checker(STAGE_B_LITERAL)
 
+        score_variant_metric = _resolve_score_variant_metric_fn(scorer=scorer)
         top_heap: list[StageBHeapEntryV1] = []
         processed = 0
         # HOT PATH: Stage-B scoring loop for shortlist x risk expansion tasks.
@@ -433,16 +464,15 @@ class BacktestStagedCoreRunnerV1:
         ):
             if cancel_checker is not None:
                 cancel_checker(STAGE_B_LITERAL)
-            row, details, metrics = self._score_stage_b_task_with_optional_details(
+            row, metrics = self._score_stage_b_task_with_metrics(
                 task=task,
                 candles=candles,
                 scorer=scorer,
-                details_scorer=details_scorer,
+                score_variant_metric=score_variant_metric,
             )
             heap_entry = _stage_b_heap_entry(
                 row=row,
                 task=task,
-                details=details,
                 metrics=metrics,
                 ranking_plan=ranking_plan,
             )
@@ -464,11 +494,18 @@ class BacktestStagedCoreRunnerV1:
                     _stage_b_tasks_from_heap(heap=top_heap),
                 )
 
-        return (
-            _stage_b_rows_from_heap(heap=top_heap),
-            _stage_b_tasks_from_heap(heap=top_heap),
-            _stage_b_details_from_heap(heap=top_heap),
-        )
+        ranked_rows = _stage_b_rows_from_heap(heap=top_heap)
+        ranked_tasks = _stage_b_tasks_from_heap(heap=top_heap)
+        retained_details_by_variant_key: Mapping[str, BacktestVariantScoreDetailsV1] = {}
+        if details_scorer is not None:
+            retained_details_by_variant_key = self._score_stage_b_ranked_rows_with_details(
+                ranked_rows=ranked_rows,
+                tasks_by_variant_key=ranked_tasks,
+                candles=candles,
+                details_scorer=details_scorer,
+                cancel_checker=cancel_checker,
+            )
+        return (ranked_rows, ranked_tasks, retained_details_by_variant_key)
 
     def _iter_stage_b_tasks(
         self,
@@ -521,7 +558,7 @@ class BacktestStagedCoreRunnerV1:
         *,
         base_variant: BacktestStageABaseVariant,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
     ) -> BacktestStageAScoredVariantV1:
         """
         Score one Stage-A base variant and return deterministic row.
@@ -543,6 +580,7 @@ class BacktestStagedCoreRunnerV1:
             base_variant=base_variant,
             candles=candles,
             scorer=scorer,
+            score_variant_metric=_resolve_score_variant_metric_fn(scorer=scorer),
         )
         return row
 
@@ -551,8 +589,9 @@ class BacktestStagedCoreRunnerV1:
         *,
         base_variant: BacktestStageABaseVariant,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
-    ) -> tuple[BacktestStageAScoredVariantV1, Mapping[str, float]]:
+        scorer: MetricScorerV1,
+        score_variant_metric: Callable[..., RankingMetricsV1],
+    ) -> tuple[BacktestStageAScoredVariantV1, RankingMetricsV1]:
         """
         Score one Stage-A base variant and return both deterministic row and raw metrics payload.
 
@@ -561,7 +600,7 @@ class BacktestStagedCoreRunnerV1:
             candles: Dense warmup-inclusive candles.
             scorer: Stage scorer contract implementation.
         Returns:
-            tuple[BacktestStageAScoredVariantV1, Mapping[str, float]]:
+            tuple[BacktestStageAScoredVariantV1, RankingMetricsV1]:
                 Deterministic scored row and raw metrics mapping from scorer.
         Assumptions:
             Stage A always uses disabled SL/TP payload.
@@ -570,7 +609,8 @@ class BacktestStagedCoreRunnerV1:
         Side Effects:
             None.
         """
-        metrics = scorer.score_variant(
+        _ = scorer
+        metrics = score_variant_metric(
             stage=STAGE_A_LITERAL,
             candles=candles,
             indicator_selections=base_variant.indicator_selections,
@@ -600,7 +640,7 @@ class BacktestStagedCoreRunnerV1:
         *,
         task: BacktestStageBTaskV1,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
+        scorer: MetricScorerV1,
     ) -> BacktestStageBScoredVariantV1:
         """
         Score one Stage-B task and return deterministic ranked row.
@@ -622,6 +662,7 @@ class BacktestStagedCoreRunnerV1:
             task=task,
             candles=candles,
             scorer=scorer,
+            score_variant_metric=_resolve_score_variant_metric_fn(scorer=scorer),
         )
         return row
 
@@ -630,8 +671,9 @@ class BacktestStagedCoreRunnerV1:
         *,
         task: BacktestStageBTaskV1,
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
-    ) -> tuple[BacktestStageBScoredVariantV1, Mapping[str, float]]:
+        scorer: MetricScorerV1,
+        score_variant_metric: Callable[..., RankingMetricsV1],
+    ) -> tuple[BacktestStageBScoredVariantV1, RankingMetricsV1]:
         """
         Score one Stage-B task and return both deterministic row and raw metrics payload.
 
@@ -640,7 +682,7 @@ class BacktestStagedCoreRunnerV1:
             candles: Dense warmup-inclusive candles.
             scorer: Stage scorer contract implementation.
         Returns:
-            tuple[BacktestStageBScoredVariantV1, Mapping[str, float]]:
+            tuple[BacktestStageBScoredVariantV1, RankingMetricsV1]:
                 Deterministic ranked row and raw metrics mapping from scorer.
         Assumptions:
             Stage B scoring uses risk-enabled payload from task.
@@ -649,7 +691,8 @@ class BacktestStagedCoreRunnerV1:
         Side Effects:
             None.
         """
-        metrics = scorer.score_variant(
+        _ = scorer
+        metrics = score_variant_metric(
             stage=STAGE_B_LITERAL,
             candles=candles,
             indicator_selections=task.indicator_selections,
@@ -671,77 +714,66 @@ class BacktestStagedCoreRunnerV1:
             metrics,
         )
 
-    def _score_stage_b_task_with_optional_details(
+    def _score_stage_b_ranked_rows_with_details(
         self,
         *,
-        task: BacktestStageBTaskV1,
+        ranked_rows: tuple[BacktestStageBScoredVariantV1, ...],
+        tasks_by_variant_key: Mapping[str, BacktestStageBTaskV1],
         candles: CandleArrays,
-        scorer: BacktestStagedVariantScorer,
-        details_scorer: BacktestStagedVariantScorerWithDetails | None,
-    ) -> tuple[
-        BacktestStageBScoredVariantV1,
-        BacktestVariantScoreDetailsV1 | None,
-        Mapping[str, float],
-    ]:
+        details_scorer: BacktestStagedVariantScorerWithDetails,
+        cancel_checker: CancelCheckerV1 | None,
+    ) -> Mapping[str, BacktestVariantScoreDetailsV1]:
         """
-        Score Stage-B task and optionally return detailed execution payload for retained top-k rows.
+        Score details only for already-ranked Stage-B top rows.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
           - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
           - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
         Args:
-            task: Stage-B task payload.
-            candles: Dense warmup-inclusive candles.
-            scorer: Base Stage-B scorer contract implementation.
-            details_scorer: Optional details scorer extension.
+            ranked_rows: Final ranked Stage-B rows from metric-only loop.
+            tasks_by_variant_key: Stage-B task mapping by `variant_key`.
+            candles: Dense warmup-inclusive candle arrays.
+            details_scorer: Details scorer used only after ranking is complete.
+            cancel_checker: Optional cooperative cancellation callback by stage.
         Returns:
-            tuple[
-                BacktestStageBScoredVariantV1,
-                BacktestVariantScoreDetailsV1 | None,
-                Mapping[str, float],
-            ]:
-                Ranked row, optional details payload, and metrics used for ranking keys.
+            Mapping[str, BacktestVariantScoreDetailsV1]: Details payload by `variant_key`.
         Assumptions:
-            Detailed payload metrics are deterministic and equivalent to ranking metric.
+            Ranked rows and task mapping originate from the same Stage-B scoring pass.
         Raises:
-            ValueError: If scorer payload lacks required ranking metric.
+            ValueError: If one ranked row has missing task payload or mismatched details metric.
         Side Effects:
-            None.
+            Executes details scorer only for retained top rows.
         """
-        if details_scorer is None:
-            row, metrics = self._score_stage_b_task_with_metrics(
-                task=task,
+        details_by_variant_key: dict[str, BacktestVariantScoreDetailsV1] = {}
+        for row in ranked_rows:
+            if cancel_checker is not None:
+                cancel_checker(STAGE_B_LITERAL)
+            task = tasks_by_variant_key.get(row.variant_key)
+            if task is None:
+                raise ValueError("missing Stage-B task for ranked variant_key")
+            details = details_scorer.score_variant_with_details(
+                stage=STAGE_B_LITERAL,
                 candles=candles,
-                scorer=scorer,
-            )
-            return (row, None, metrics)
-
-        details = details_scorer.score_variant_with_details(
-            stage=STAGE_B_LITERAL,
-            candles=candles,
-            indicator_selections=task.indicator_selections,
-            signal_params=task.signal_params,
-            risk_params=task.risk_params,
-            indicator_variant_key=task.indicator_variant_key,
-            variant_key=task.variant_key,
-        )
-        return (
-            BacktestStageBScoredVariantV1(
-                variant_index=task.variant_index,
+                indicator_selections=task.indicator_selections,
+                signal_params=task.signal_params,
+                risk_params=task.risk_params,
                 indicator_variant_key=task.indicator_variant_key,
                 variant_key=task.variant_key,
-                total_return_pct=_extract_metric_value_for_literal(
-                    metrics=details.metrics,
-                    metric_literal=_TOTAL_RETURN_METRIC_KEY_LITERAL,
-                ),
-            ),
-            details,
-            details.metrics,
-        )
+            )
+            detailed_total_return_pct = _extract_metric_value_for_literal(
+                metrics=details.metrics,
+                metric_literal=_TOTAL_RETURN_METRIC_KEY_LITERAL,
+            )
+            if abs(detailed_total_return_pct - row.total_return_pct) > 1e-12:
+                raise ValueError("detailed scorer payload must match ranked total return value")
+            details_by_variant_key[row.variant_key] = details
+        return details_by_variant_key
 
     def _resolve_batch_size(self, *, batch_size: int | None) -> int:
         """
@@ -836,7 +868,7 @@ def _resolve_ranking_plan(*, ranking: BacktestRankingConfig) -> _ResolvedRanking
 def _stage_a_heap_entry(
     *,
     row: BacktestStageAScoredVariantV1,
-    metrics: Mapping[str, float],
+    metrics: RankingMetricsV1,
     ranking_plan: _ResolvedRankingPlanV1,
 ) -> StageAHeapEntryV1:
     """
@@ -881,8 +913,7 @@ def _stage_b_heap_entry(
     *,
     row: BacktestStageBScoredVariantV1,
     task: BacktestStageBTaskV1,
-    details: BacktestVariantScoreDetailsV1 | None,
-    metrics: Mapping[str, float],
+    metrics: RankingMetricsV1,
     ranking_plan: _ResolvedRankingPlanV1,
 ) -> StageBHeapEntryV1:
     """
@@ -891,7 +922,6 @@ def _stage_b_heap_entry(
     Args:
         row: Scored Stage-B row.
         task: Stage-B task payload corresponding to scored row.
-        details: Optional retained details payload.
         metrics: Raw scorer metrics payload.
         ranking_plan: Pre-resolved ranking plan.
     Returns:
@@ -923,7 +953,6 @@ def _stage_b_heap_entry(
         _descending_text_key(value=row.variant_key),
         row,
         task,
-        details,
     )
 
 
@@ -952,7 +981,7 @@ def _heap_entry_outranks(
 
 def _heap_metric_component_from_literal(
     *,
-    metrics: Mapping[str, float],
+    metrics: RankingMetricsV1,
     metric_literal: str,
     metric_direction: str,
     scorer_metric_keys: tuple[str, ...],
@@ -983,9 +1012,7 @@ def _heap_metric_component_from_literal(
         return value
     if metric_direction == _DIRECTION_ASC_LITERAL:
         return -value
-    raise ValueError(
-        f"unsupported ranking direction for '{metric_literal}': {metric_direction!r}"
-    )
+    raise ValueError(f"unsupported ranking direction for '{metric_literal}': {metric_direction!r}")
 
 
 def _descending_text_key(*, value: str) -> tuple[int, ...]:
@@ -1008,7 +1035,7 @@ def _descending_text_key(*, value: str) -> tuple[int, ...]:
 
 def _extract_metric_value_for_literal(
     *,
-    metrics: Mapping[str, float],
+    metrics: RankingMetricsV1,
     metric_literal: str,
 ) -> float:
     """
@@ -1038,7 +1065,7 @@ def _extract_metric_value_for_literal(
 
 def _extract_metric_value(
     *,
-    metrics: Mapping[str, float],
+    metrics: RankingMetricsV1,
     metric_literal: str,
     scorer_metric_keys: tuple[str, ...],
 ) -> float:
@@ -1132,46 +1159,10 @@ def _stage_b_tasks_from_heap(
         None.
     """
     mapping: dict[str, BacktestStageBTaskV1] = {}
-    for _, _, _, row, task, _ in heap:
+    for _, _, _, row, task in heap:
         if row.variant_key in mapping:
             raise ValueError("duplicate Stage-B variant_key is not allowed")
         mapping[row.variant_key] = task
-    return mapping
-
-
-def _stage_b_details_from_heap(
-    *,
-    heap: list[StageBHeapEntryV1],
-) -> Mapping[str, BacktestVariantScoreDetailsV1]:
-    """
-    Build deterministic `variant_key -> details` mapping from bounded Stage-B heap entries.
-
-    Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-    Related:
-      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
-      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
-      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
-    Args:
-        heap: Internal bounded Stage-B heap entries.
-    Returns:
-        Mapping[str, BacktestVariantScoreDetailsV1]:
-            Retained details payload by deterministic `variant_key`.
-    Assumptions:
-        Retained details are present only when details scorer extension is enabled.
-    Raises:
-        ValueError: If duplicate `variant_key` is detected in heap.
-    Side Effects:
-        None.
-    """
-    mapping: dict[str, BacktestVariantScoreDetailsV1] = {}
-    for _, _, _, row, _, details in heap:
-        if details is None:
-            continue
-        if row.variant_key in mapping:
-            raise ValueError("duplicate Stage-B variant_key is not allowed")
-        mapping[row.variant_key] = details
     return mapping
 
 
