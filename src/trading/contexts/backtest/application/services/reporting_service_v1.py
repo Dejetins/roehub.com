@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from trading.contexts.backtest.application.dto import BacktestReportV1
+from trading.contexts.backtest.application.ports import BacktestVariantScoreDetailsV1
 from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 from trading.contexts.indicators.application.dto import CandleArrays
@@ -86,6 +87,52 @@ class BacktestReportingServiceV1:
             rows=rows,
             table_md=table_md,
             trades=trades_payload,
+        )
+
+    def build_report_from_details(
+        self,
+        *,
+        requested_time_range: TimeRange,
+        candles: CandleArrays,
+        details: BacktestVariantScoreDetailsV1,
+        include_table_md: bool = True,
+        include_trades: bool = False,
+    ) -> BacktestReportV1:
+        """
+        Build report payload from Stage-B details scorer output for one explicit variant.
+
+        Docs:
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/ports/staged_runner.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - apps/api/routes/backtests.py
+
+        Args:
+            requested_time_range: User request range for Start/End/Duration metrics.
+            candles: Warmup-inclusive candle arrays.
+            details: Deterministic Stage-B details payload from scorer.
+            include_table_md: Whether to include markdown `|Metric|Value|` representation.
+            include_trades: Whether to include full trade list in response payload.
+        Returns:
+            BacktestReportV1: Deterministic report rows with optional markdown/trades payload.
+        Assumptions:
+            Details payload corresponds to same candle timeline as `candles`.
+        Raises:
+            ValueError: Propagated from report builders and details invariants.
+        Side Effects:
+            None.
+        """
+        return self.build_report(
+            requested_time_range=requested_time_range,
+            candles=candles,
+            target_slice=details.target_slice,
+            execution_params=details.execution_params,
+            execution_outcome=details.execution_outcome,
+            include_table_md=include_table_md,
+            include_trades=include_trades,
         )
 
 

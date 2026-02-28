@@ -303,6 +303,47 @@ class _DeterministicScorerWithDetails:
         window = int(indicator_selections[0].params["window"])
         return {"Total Return [%]": float(window)}
 
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> dict[str, float]:
+        """
+        Return metric-only payload required by Stage-A/Stage-B ranking hot path contracts.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicator key for deterministic identity.
+            variant_key: Backtest variant key for deterministic identity.
+        Returns:
+            dict[str, float]: Deterministic ranking metric payload.
+        Assumptions:
+            Metric-only output is equal to legacy `score_variant` payload for this test double.
+        Raises:
+            KeyError: If `window` parameter is absent.
+        Side Effects:
+            None.
+        """
+        return self.score_variant(
+            stage=stage,
+            candles=candles,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
+        )
+
     def score_variant_with_details(
         self,
         *,
@@ -498,6 +539,7 @@ def test_run_backtest_use_case_returns_trades_only_for_configured_top_n() -> Non
         strategy_reader=_UnusedStrategyReader(),
         staged_scorer=_DeterministicScorerWithDetails(),
         top_trades_n_default=2,
+        eager_top_reports_enabled=True,
     )
     request = RunBacktestRequest(
         time_range=TimeRange(
@@ -530,6 +572,48 @@ def test_run_backtest_use_case_returns_trades_only_for_configured_top_n() -> Non
     assert response.variants[2].report.trades is None
     assert response.variants[0].report.table_md is not None
     assert response.variants[0].report.table_md.startswith("|Metric|Value|")
+
+
+def test_run_backtest_use_case_lazy_mode_omits_eager_reports_by_default() -> None:
+    """
+    Verify sync use-case keeps ranked variants and omits report payloads in default lazy mode.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `eager_top_reports_enabled` defaults to `False` during migration window.
+    Raises:
+        AssertionError: If report payload is unexpectedly present by default.
+    Side Effects:
+        None.
+    """
+    use_case = RunBacktestUseCase(
+        candle_feed=_AlignedOnlyCandleFeed(),
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        strategy_reader=_UnusedStrategyReader(),
+        staged_scorer=_DeterministicScorerWithDetails(),
+        top_trades_n_default=2,
+    )
+    request = RunBacktestRequest(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+        ),
+        template=_build_template(windows=(20, 25, 30)),
+        top_k=3,
+        preselect=3,
+    )
+
+    response = use_case.execute(
+        request=request,
+        current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
+    )
+
+    assert len(response.variants) == 3
+    assert response.variants[0].total_return_pct == 30.0
+    assert all(item.report is None for item in response.variants)
 
 
 def _execution_outcome_with_single_trade(*, total_return_pct: float) -> ExecutionOutcomeV1:

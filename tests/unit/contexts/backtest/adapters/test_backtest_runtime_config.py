@@ -80,6 +80,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.cpu.max_numba_threads == 4
     assert config.sync.sync_deadline_seconds == 55.0
     assert config.reporting.top_trades_n_default == 3
+    assert config.reporting.eager_top_reports_enabled is False
     assert config.execution.init_cash_quote_default == 10000.0
     assert config.execution.fixed_quote_default == 100.0
     assert config.execution.safe_profit_percent_default == 30.0
@@ -144,6 +145,7 @@ backtest:
     assert config.cpu.max_numba_threads > 0
     assert config.sync.sync_deadline_seconds == 55.0
     assert config.reporting.top_trades_n_default == 3
+    assert config.reporting.eager_top_reports_enabled is False
     assert config.execution.init_cash_quote_default == 10000.0
     assert config.execution.fixed_quote_default == 100.0
     assert config.execution.safe_profit_percent_default == 30.0

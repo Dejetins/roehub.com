@@ -170,6 +170,7 @@ def build_backtest_router(
             runtime_config.guards.max_compute_bytes_total // 2,
         ),
         max_numba_threads=runtime_config.cpu.max_numba_threads,
+        eager_top_reports_enabled=runtime_config.reporting.eager_top_reports_enabled,
     )
     runtime_defaults_response = build_backtest_runtime_defaults_response(
         config=runtime_config
@@ -180,6 +181,7 @@ def build_backtest_router(
         runtime_defaults_response=runtime_defaults_response,
         current_user_dependency=current_user_dependency,
         sync_deadline_seconds=runtime_config.sync.sync_deadline_seconds,
+        eager_top_reports_enabled=runtime_config.reporting.eager_top_reports_enabled,
     )
     if not runtime_config.jobs.enabled:
         return backtests_router

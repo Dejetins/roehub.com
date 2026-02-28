@@ -30,6 +30,7 @@ _WARMUP_BARS_DEFAULT = 200
 _TOP_K_DEFAULT = 300
 _PRESELECT_DEFAULT = 20000
 _TOP_TRADES_N_DEFAULT = 3
+_EAGER_TOP_REPORTS_ENABLED_DEFAULT = False
 _PRIMARY_METRIC_DEFAULT = BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1
 _SECONDARY_METRIC_DEFAULT = BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
 
@@ -133,6 +134,7 @@ class BacktestReportingRuntimeConfig:
     """
 
     top_trades_n_default: int = _TOP_TRADES_N_DEFAULT
+    eager_top_reports_enabled: bool = _EAGER_TOP_REPORTS_ENABLED_DEFAULT
 
     def __post_init__(self) -> None:
         """
@@ -145,12 +147,17 @@ class BacktestReportingRuntimeConfig:
         Assumptions:
             Trades payload is returned only for top-ranked variants to limit response size.
         Raises:
-            ValueError: If `top_trades_n_default` is non-positive.
+            ValueError: If `top_trades_n_default` is non-positive or
+                `eager_top_reports_enabled` is not boolean.
         Side Effects:
             None.
         """
         if self.top_trades_n_default <= 0:
             raise ValueError("backtest.reporting.top_trades_n_default must be > 0")
+        if not isinstance(self.eager_top_reports_enabled, bool):
+            raise ValueError(
+                "backtest.reporting.eager_top_reports_enabled must be bool"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -582,6 +589,11 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
             "top_trades_n_default",
             default=_TOP_TRADES_N_DEFAULT,
         ),
+        eager_top_reports_enabled=_get_bool(
+            reporting_map,
+            "eager_top_reports_enabled",
+            required=False,
+        ),
     )
     guards = BacktestGuardsRuntimeConfig(
         max_variants_per_compute=_get_int_with_default(
@@ -678,6 +690,7 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
             },
             "reporting": {
                 "top_trades_n_default": config.reporting.top_trades_n_default,
+                "eager_top_reports_enabled": config.reporting.eager_top_reports_enabled,
             },
             "jobs": {
                 "top_k_persisted_default": config.jobs.top_k_persisted_default,

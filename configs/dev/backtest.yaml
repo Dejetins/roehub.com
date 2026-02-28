@@ -25,6 +25,7 @@ backtest:
     parallel_workers: 1
   reporting:
     top_trades_n_default: 3
+    eager_top_reports_enabled: false
   execution:
     init_cash_quote_default: 10000
     fixed_quote_default: 100

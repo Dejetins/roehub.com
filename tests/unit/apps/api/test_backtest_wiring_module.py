@@ -163,6 +163,7 @@ def _runtime_config(
     max_compute_bytes_total: int = 5 * 1024**3,
     max_numba_threads: int = 4,
     sync_deadline_seconds: float = 55.0,
+    eager_top_reports_enabled: bool = False,
 ) -> BacktestRuntimeConfig:
     """
     Build minimal runtime config fixture for backtest wiring router-toggle tests.
@@ -173,6 +174,7 @@ def _runtime_config(
         max_compute_bytes_total: Memory guard limit.
         max_numba_threads: Runtime Numba threads cap.
         sync_deadline_seconds: Sync route cooperative hard deadline in seconds.
+        eager_top_reports_enabled: Feature flag for eager top reports in sync response.
     Returns:
         BacktestRuntimeConfig: Valid runtime config fixture.
     Assumptions:
@@ -187,7 +189,10 @@ def _runtime_config(
         warmup_bars_default=200,
         top_k_default=300,
         preselect_default=20000,
-        reporting=BacktestReportingRuntimeConfig(top_trades_n_default=3),
+        reporting=BacktestReportingRuntimeConfig(
+            top_trades_n_default=3,
+            eager_top_reports_enabled=eager_top_reports_enabled,
+        ),
         execution=BacktestExecutionRuntimeConfig(
             init_cash_quote_default=10000.0,
             fixed_quote_default=100.0,
@@ -302,6 +307,7 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         max_compute_bytes_total=1001,
         max_numba_threads=7,
         sync_deadline_seconds=42.5,
+        eager_top_reports_enabled=False,
     )
 
     monkeypatch.setattr(
@@ -370,7 +376,9 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     assert captured_kwargs["max_variants_per_compute"] == 50
     assert captured_kwargs["max_compute_bytes_total"] == 500
     assert captured_kwargs["max_numba_threads"] == 7
+    assert captured_kwargs["eager_top_reports_enabled"] is False
     assert captured_backtests_router_kwargs["sync_deadline_seconds"] == 42.5
+    assert captured_backtests_router_kwargs["eager_top_reports_enabled"] is False
 
 
 

@@ -3,13 +3,15 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping
+from typing import Mapping, cast
 from uuid import UUID
 
 from trading.contexts.backtest.application.dto import (
     BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
     BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
     BacktestRankingConfig,
+    BacktestReportV1,
+    BacktestVariantPayloadV1,
     RunBacktestRequest,
     RunBacktestResponse,
     RunBacktestSavedOverrides,
@@ -19,12 +21,17 @@ from trading.contexts.backtest.application.ports import (
     BacktestGridDefaultsProvider,
     BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
+    BacktestStagedVariantScorerWithDetails,
     BacktestStrategyReader,
     BacktestStrategySnapshot,
+    BacktestVariantScoreDetailsV1,
     CurrentUser,
 )
 from trading.contexts.backtest.application.services import (
+    STAGE_B_LITERAL,
+    BacktestCandleTimeline,
     BacktestCandleTimelineBuilder,
+    BacktestReportingServiceV1,
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
 )
@@ -38,6 +45,8 @@ from trading.contexts.backtest.domain.errors import (
     BacktestNotFoundError,
     BacktestValidationError,
 )
+from trading.contexts.backtest.domain.value_objects import build_backtest_variant_key_v1
+from trading.contexts.indicators.application.dto import build_variant_key_v1
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.ports.feeds import CandleFeed
 from trading.contexts.indicators.application.services.grid_builder import (
@@ -46,6 +55,7 @@ from trading.contexts.indicators.application.services.grid_builder import (
 )
 from trading.contexts.indicators.domain.specifications import GridParamSpec
 from trading.platform.errors import RoehubError
+from trading.shared_kernel.primitives import TimeRange
 
 _DEFAULT_FEE_PCT_BY_MARKET_ID = {
     1: 0.075,
@@ -103,6 +113,7 @@ class RunBacktestUseCase:
         candle_timeline_builder: BacktestCandleTimelineBuilder | None = None,
         staged_runner: BacktestStagedRunnerV1 | None = None,
         staged_scorer: MetricScorerV1 | None = None,
+        reporting_service: BacktestReportingServiceV1 | None = None,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
@@ -121,6 +132,7 @@ class RunBacktestUseCase:
         max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
         max_numba_threads: int = _DEFAULT_MAX_NUMBA_THREADS,
+        eager_top_reports_enabled: bool = False,
     ) -> None:
         """
         Initialize staged backtest use-case dependencies and runtime defaults.
@@ -141,6 +153,7 @@ class RunBacktestUseCase:
             candle_timeline_builder: Optional custom timeline builder (BKT-EPIC-02).
             staged_runner: Optional custom staged runner implementation.
             staged_scorer: Optional Stage A/Stage B scorer port implementation.
+            reporting_service: Optional report-builder service for variant-report endpoint.
             defaults_provider: Optional defaults provider for compute/signal grid fallback.
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k response limit.
@@ -161,6 +174,8 @@ class RunBacktestUseCase:
             max_compute_bytes_total: Stage memory guard limit.
             max_numba_threads:
                 Runtime CPU knob for backtest runs mapped to maximum Numba threads.
+            eager_top_reports_enabled:
+                Feature flag for legacy eager report payloads in `POST /api/backtests`.
         Returns:
             None.
         Assumptions:
@@ -200,6 +215,8 @@ class RunBacktestUseCase:
             raise ValueError("RunBacktestUseCase.max_numba_threads must be > 0")
         if not isinstance(configurable_ranking_enabled, bool):
             raise ValueError("RunBacktestUseCase.configurable_ranking_enabled must be bool")
+        if not isinstance(eager_top_reports_enabled, bool):
+            raise ValueError("RunBacktestUseCase.eager_top_reports_enabled must be bool")
 
         ranking_defaults = BacktestRankingConfig(
             primary_metric=ranking_primary_metric_default,
@@ -215,6 +232,7 @@ class RunBacktestUseCase:
         self._strategy_reader = strategy_reader
         self._staged_runner = staged_runner or BacktestStagedRunnerV1()
         self._staged_scorer = staged_scorer
+        self._reporting_service = reporting_service or BacktestReportingServiceV1()
         self._defaults_provider = defaults_provider
         self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
@@ -232,6 +250,7 @@ class RunBacktestUseCase:
         self._max_variants_per_compute = max_variants_per_compute
         self._max_compute_bytes_total = max_compute_bytes_total
         self._max_numba_threads = max_numba_threads
+        self._eager_top_reports_enabled = eager_top_reports_enabled
 
     def execute(
         self,
@@ -299,7 +318,9 @@ class RunBacktestUseCase:
                 defaults_provider=self._defaults_provider,
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
-                requested_time_range=request.time_range,
+                requested_time_range=self._resolve_requested_time_range_for_sync_response(
+                    request=request
+                ),
                 top_trades_n=resolved.top_trades_n,
                 run_control=run_control,
             )
@@ -315,6 +336,91 @@ class RunBacktestUseCase:
                 top_trades_n=resolved.top_trades_n,
                 variants=staged.variants,
                 total_indicator_compute_calls=staged.indicator_estimate_calls,
+            )
+        except RoehubError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            raise map_backtest_exception(error=error) from error
+
+    def build_variant_report(
+        self,
+        *,
+        request: RunBacktestRequest,
+        current_user: CurrentUser,
+        variant_payload: BacktestVariantPayloadV1,
+        include_trades: bool = False,
+        run_control: BacktestRunControlV1 | None = None,
+    ) -> BacktestReportV1:
+        """
+        Build on-demand deterministic report for one explicit variant payload.
+
+        Docs:
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+        Related:
+          - apps/api/routes/backtests.py
+          - apps/api/dto/backtests.py
+          - src/trading/contexts/backtest/application/services/reporting_service_v1.py
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+
+        Args:
+            request: Saved/ad-hoc run context envelope used for instrument/timeframe/timeline.
+            current_user: Authenticated user for saved-mode ownership checks.
+            variant_payload: Explicit variant payload selected in UI for lazy report load.
+            include_trades: Whether to include full trades payload in response report.
+            run_control: Optional cooperative cancellation/deadline control object.
+        Returns:
+            BacktestReportV1: Deterministic report (`rows`, `table_md`, optional `trades`).
+        Assumptions:
+            Variant payload keeps v1 `variant_key` semantics unchanged.
+        Raises:
+            RoehubError: Canonical mapped error for validation/not-found/forbidden/conflict/
+                unexpected.
+        Side Effects:
+            Reads candles, scores one explicit variant in Stage-B mode, and builds report table.
+        """
+        try:
+            if request is None:  # type: ignore[truthy-bool]
+                raise BacktestValidationError(
+                    "RunBacktestUseCase.build_variant_report requires request"
+                )
+            if current_user is None:  # type: ignore[truthy-bool]
+                raise BacktestValidationError(
+                    "RunBacktestUseCase.build_variant_report requires current_user"
+                )
+            if variant_payload is None:  # type: ignore[truthy-bool]
+                raise BacktestValidationError(
+                    "RunBacktestUseCase.build_variant_report requires variant_payload"
+                )
+
+            apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
+            if run_control is not None:
+                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL)
+
+            resolved = self._resolve_run_context(request=request, current_user=current_user)
+            timeline = self._candle_timeline_builder.build(
+                market_id=resolved.template.instrument_id.market_id,
+                symbol=resolved.template.instrument_id.symbol,
+                timeframe=resolved.template.timeframe,
+                requested_time_range=request.time_range,
+                warmup_bars=resolved.warmup_bars,
+            )
+            if run_control is not None:
+                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL)
+
+            scored_details = self._score_variant_payload_with_details(
+                template=resolved.template,
+                timeline=timeline,
+                variant_payload=variant_payload,
+            )
+            return self._reporting_service.build_report_from_details(
+                requested_time_range=request.time_range,
+                candles=timeline.candles,
+                details=scored_details,
+                include_table_md=True,
+                include_trades=include_trades,
             )
         except RoehubError:
             raise
@@ -590,6 +696,118 @@ class RunBacktestUseCase:
             fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
             max_variants_guard=self._max_variants_per_compute,
             max_compute_bytes_total=self._max_compute_bytes_total,
+        )
+
+    def _resolve_requested_time_range_for_sync_response(
+        self,
+        *,
+        request: RunBacktestRequest,
+    ) -> TimeRange | None:
+        """
+        Resolve whether sync `POST /api/backtests` should eagerly build top reports.
+
+        Docs:
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - apps/api/routes/backtests.py
+          - apps/api/dto/backtests.py
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+
+        Args:
+            request: Sync run request envelope.
+        Returns:
+            TimeRange | None: Request range for eager reports, otherwise `None` for lazy mode.
+        Assumptions:
+            Lazy mode keeps ranking/payload summary while deferring report body build.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self._eager_top_reports_enabled:
+            return request.time_range
+        return None
+
+    def _score_variant_payload_with_details(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        timeline: BacktestCandleTimeline,
+        variant_payload: BacktestVariantPayloadV1,
+    ) -> BacktestVariantScoreDetailsV1:
+        """
+        Score one explicit variant payload with Stage-B details scorer contract.
+
+        Docs:
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+          - src/trading/contexts/backtest/application/ports/staged_runner.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+
+        Args:
+            template: Resolved run template with instrument/timeframe context.
+            timeline: Warmup-inclusive candle timeline object built for request range.
+            variant_payload: Explicit selected variant payload.
+        Returns:
+            BacktestVariantScoreDetailsV1: Deterministic details for report assembly.
+        Assumptions:
+            Explicit payload is normalized and valid by DTO invariants.
+        Raises:
+            BacktestValidationError: If resolved scorer does not provide details API.
+            ValueError: If variant identity payload cannot be normalized.
+        Side Effects:
+            Scores one Stage-B variant using deterministic scorer implementation.
+        """
+        scorer = self._resolve_staged_scorer(
+            template=RunBacktestTemplate(
+                instrument_id=template.instrument_id,
+                timeframe=template.timeframe,
+                indicator_grids=template.indicator_grids,
+                indicator_selections=variant_payload.indicator_selections,
+                signal_grids=template.signal_grids,
+                risk_grid=template.risk_grid,
+                direction_mode=variant_payload.direction_mode,
+                sizing_mode=variant_payload.sizing_mode,
+                risk_params=variant_payload.risk_params,
+                execution_params=variant_payload.execution_params,
+            ),
+            target_slice=timeline.target_slice,
+        )
+        if getattr(scorer, "score_variant_with_details", None) is None:
+            raise BacktestValidationError(
+                "Variant-report requires scorer with deterministic details support"
+            )
+        details_scorer = cast(BacktestStagedVariantScorerWithDetails, scorer)
+        signal_params = variant_payload.signal_params or {}
+        risk_params = variant_payload.risk_params or {}
+        execution_params = variant_payload.execution_params or {}
+
+        indicator_variant_key = build_variant_key_v1(
+            instrument_id=str(template.instrument_id),
+            timeframe=template.timeframe.code,
+            indicators=variant_payload.indicator_selections,
+        )
+        variant_key = build_backtest_variant_key_v1(
+            indicator_variant_key=indicator_variant_key,
+            direction_mode=variant_payload.direction_mode,
+            sizing_mode=variant_payload.sizing_mode,
+            signals=signal_params,
+            risk_params=risk_params,
+            execution_params=execution_params,
+        )
+        return details_scorer.score_variant_with_details(
+            stage=STAGE_B_LITERAL,
+            candles=timeline.candles,
+            indicator_selections=variant_payload.indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
         )
 
 
