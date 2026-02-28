@@ -149,11 +149,13 @@ Finalizing запускается только если job не cancelled и н
 Шаги:
 
 1. Зафиксировать progress `stage=finalizing, processed_units=0, total_units=1`.
-2. Для persisted top rows (только `persisted_k`) пересчитать details/scoring payload детерминированно.
-3. Построить `report_table_md` для всех persisted rows.
-4. Построить `trades_json` только для rank `<= top_trades_n`.
-5. Перезаписать snapshot в `backtest_job_top_variants` (с markdown/trades полями).
-6. `finish(..., next_state="succeeded")`.
+2. Сохранить terminal snapshot без eager report bodies:
+   `report_table_md=NULL`, `trades_json=NULL`.
+3. Перезаписать snapshot в `backtest_job_top_variants` в summary-only формате.
+4. `finish(..., next_state="succeeded")`.
+
+Полный report/trades для выбранного варианта загружается отдельно через
+`POST /api/backtests/variant-report` (lazy policy).
 
 ### 4) Cancel semantics
 
@@ -206,7 +208,7 @@ Cancel best-effort:
 - Stage A tie-break фиксирован: `base_variant_key ASC`.
 - Stage B tie-break фиксирован: `variant_key ASC`.
 - Snapshot replace policy фиксирована: full replace (delete+insert contract) через results repository.
-- Non-succeeded jobs не имеют `report_table_md` в persisted rows.
+- Jobs `/top` остаётся summary-only для всех состояний, включая `succeeded`.
 - Все timestamps и hash literals остаются UTC/sha256 contracts из EPIC-09.
 
 ## Observability
@@ -243,7 +245,7 @@ Cancel best-effort:
 - 2-4 реплики воркера обрабатывают jobs параллельно без двойного исполнения одного job.
 - Cancel переводит job в `cancelled` (не в `failed`) и останавливает дальнейший compute.
 - При падении воркера job reclaim'ится и завершается terminal state.
-- Для `succeeded` persisted rows содержат `report_table_md`; trades только для `top_trades_n`.
+- Для `succeeded` persisted rows остаются summary-only; отчёты грузятся on-demand через `variant-report`.
 
 ## Связанные файлы
 

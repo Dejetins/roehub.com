@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
+from types import MappingProxyType
 
 import numpy as np
 import pytest
@@ -492,6 +495,65 @@ def test_signal_cache_key_is_hash_stable_and_separates_distinct_signal_params() 
     assert len(key_a) == 64
     assert key_a == key_b
     assert key_a != key_c
+
+
+def test_signal_cache_key_matches_legacy_canonical_hash_for_pre_normalized_payload() -> None:
+    """
+    Verify signal cache key fast-path keeps legacy canonical JSON hash contract unchanged.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Pre-normalized `MappingProxyType` payloads may skip re-sorting in optimized path.
+    Raises:
+        AssertionError: If optimized hash diverges from legacy canonical payload hash.
+    Side Effects:
+        None.
+    """
+    signal_params = MappingProxyType(
+        {
+            "momentum.rsi": MappingProxyType(
+                {
+                    "long_threshold": 30,
+                    "short_threshold": 70,
+                }
+            ),
+            "trend.adx": MappingProxyType(
+                {
+                    "long_delta_periods": -5,
+                    "short_delta_periods": -10,
+                }
+            ),
+        }
+    )
+    key = _signal_cache_key(
+        indicator_variant_key="a" * 64,
+        signal_params=signal_params,
+    )
+    legacy_payload = {
+        "indicator_variant_key": "a" * 64,
+        "signal_params": {
+            "momentum.rsi": {
+                "long_threshold": 30,
+                "short_threshold": 70,
+            },
+            "trend.adx": {
+                "long_delta_periods": -5,
+                "short_delta_periods": -10,
+            },
+        },
+    }
+    legacy_json = json.dumps(
+        legacy_payload,
+        sort_keys=True,
+        ensure_ascii=True,
+        separators=(",", ":"),
+    )
+    legacy_key = hashlib.sha256(legacy_json.encode("utf-8")).hexdigest()
+
+    assert key == legacy_key
 
 
 def test_close_fill_scorer_v1_cache_does_not_cross_talk_between_signal_params() -> None:

@@ -12,6 +12,7 @@ import hashlib
 import json
 import math
 from datetime import datetime
+from types import MappingProxyType
 from typing import Annotated, Any, Literal, Mapping, Sequence
 from uuid import UUID
 
@@ -845,16 +846,13 @@ def build_backtests_post_response(
     Returns:
         BacktestsPostResponse: Strict API response model.
     Assumptions:
-        `response.variants` may be sorted again defensively by ranking contract.
+        `response.variants` is already sorted by application DTO ranking contract.
     Raises:
         BacktestValidationError: If required hash source payload is missing.
     Side Effects:
         None.
     """
-    variants = sorted(
-        response.variants,
-        key=lambda item: (-item.total_return_pct, item.variant_key),
-    )
+    variants = response.variants
 
     spec_hash: str | None = None
     grid_request_hash: str | None = None
@@ -1541,19 +1539,16 @@ def _build_variant_payload_response(
     Returns:
         BacktestVariantPayloadResponse: Strict API payload for one variant.
     Assumptions:
-        Nested mapping keys must be sorted for deterministic JSON output.
+        Payload mappings are already normalized and ordered by application DTO.
     Raises:
         None.
     Side Effects:
         None.
     """
-    indicator_selections = sorted(
-        payload.indicator_selections,
-        key=lambda item: item.indicator_id,
-    )
     return BacktestVariantPayloadResponse(
         indicator_selections=[
-            _build_indicator_selection_response(selection=item) for item in indicator_selections
+            _build_indicator_selection_response(selection=item)
+            for item in payload.indicator_selections
         ],
         signal_params=_to_sorted_nested_scalar_mapping(values=payload.signal_params),
         risk_params=_to_sorted_scalar_mapping(payload.risk_params),
@@ -1958,6 +1953,13 @@ def _to_sorted_nested_scalar_mapping(
     """
     if values is None:
         return {}
+    if _is_pre_sorted_nested_scalar_mapping(values=values):
+        nested_fast: dict[str, dict[str, BacktestScalar]] = {}
+        for indicator_id, params in values.items():
+            nested_fast[indicator_id] = {
+                param_name: params[param_name] for param_name in params.keys()
+            }
+        return nested_fast
 
     nested: dict[str, dict[str, BacktestScalar]] = {}
     for indicator_id in sorted(values.keys()):
@@ -1994,7 +1996,90 @@ def _to_sorted_scalar_mapping(
     """
     if values is None:
         return {}
+    if _is_pre_sorted_scalar_mapping(values=values):
+        return {key: values[key] for key in values.keys()}
     return {key: values[key] for key in sorted(values.keys())}
+
+
+def _is_pre_sorted_nested_scalar_mapping(
+    *,
+    values: Mapping[str, Mapping[str, BacktestScalar]],
+) -> bool:
+    """
+    Check whether nested scalar mapping already follows deterministic sorted key order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+
+    Args:
+        values: Candidate nested mapping.
+    Returns:
+        bool: `True` when mapping can be copied without extra sort pass.
+    Assumptions:
+        Fast-path is reserved for immutable mapping-proxy payloads from application DTOs.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if not isinstance(values, MappingProxyType):
+        return False
+    previous_indicator_id = ""
+    for indicator_id, params in values.items():
+        if not isinstance(indicator_id, str):
+            return False
+        if indicator_id < previous_indicator_id:
+            return False
+        if not _is_pre_sorted_scalar_mapping(values=params):
+            return False
+        previous_indicator_id = indicator_id
+    return True
+
+
+def _is_pre_sorted_scalar_mapping(
+    *,
+    values: Mapping[str, BacktestRequestScalar | BacktestScalar],
+) -> bool:
+    """
+    Check whether scalar mapping already follows deterministic sorted key order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
+
+    Args:
+        values: Candidate scalar mapping.
+    Returns:
+        bool: `True` when mapping keys are already sorted and trimmed.
+    Assumptions:
+        Fast-path accepts only immutable `MappingProxyType` payloads.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if not isinstance(values, MappingProxyType):
+        return False
+    previous_key = ""
+    for raw_key in values.keys():
+        if not isinstance(raw_key, str):
+            return False
+        normalized_key = raw_key.strip()
+        if not normalized_key or normalized_key != raw_key:
+            return False
+        if normalized_key < previous_key:
+            return False
+        previous_key = normalized_key
+    return True
 
 
 def _normalize_json_value(*, value: Any) -> Any:

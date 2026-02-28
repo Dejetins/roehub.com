@@ -712,23 +712,23 @@ def test_post_backtests_saved_response_includes_hashes_and_explicit_payload() ->
     }
 
 
-def test_post_backtests_sorts_variants_deterministically_for_equal_returns() -> None:
+def test_post_backtests_preserves_application_variant_order() -> None:
     """
-    Verify route output preserves deterministic tie-break sorting by `variant_key` asc.
+    Verify route preserves deterministic variant ordering provided by application DTO.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Route defensively sorts variants by `(total_return_pct desc, variant_key asc)`.
+        Application response DTO already enforces deterministic ranking/tie-break ordering.
     Raises:
         AssertionError: If response order breaks deterministic tie-break contract.
     Side Effects:
         None.
     """
     client = _build_client(
-        use_case=_FakeRunBacktestUseCase(result=_loose_unsorted_template_response())
+        use_case=_FakeRunBacktestUseCase(result=_template_mode_two_variant_response())
     )
 
     response = client.post(
@@ -1187,61 +1187,33 @@ def _template_mode_response() -> RunBacktestResponse:
     )
 
 
-class _LooseRunBacktestResponse:
+def _template_mode_two_variant_response() -> RunBacktestResponse:
     """
-    Loose response object for testing route-level defensive variant sorting.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-    Related:
-      - tests/unit/apps/api/test_backtests_routes.py
-      - apps/api/dto/backtests.py
-      - apps/api/routes/backtests.py
-    """
-
-    def __init__(self) -> None:
-        """
-        Build unsorted tie-case response payload for route sorting tests.
-
-        Args:
-            None.
-        Returns:
-            None.
-        Assumptions:
-            Attributes match subset of `RunBacktestResponse` used by response mapper.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        self.mode = "template"
-        self.strategy_id = None
-        self.instrument_id = InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT"))
-        self.timeframe = Timeframe("1m")
-        self.warmup_bars = 200
-        self.top_k = 2
-        self.preselect = 100
-        self.top_trades_n = 1
-        self.variants = (
-            _variant(variant_index=1, variant_key="b" * 64, total_return_pct=12.0),
-            _variant(variant_index=0, variant_key="a" * 64, total_return_pct=12.0),
-        )
-        self.total_indicator_compute_calls = 1
-
-
-def _loose_unsorted_template_response() -> _LooseRunBacktestResponse:
-    """
-    Build unsorted tie-case response fixture for deterministic output-order test.
+    Build deterministic template-mode response fixture with two ranked variants.
 
     Args:
         None.
     Returns:
-        _LooseRunBacktestResponse: Fixture object with unsorted variants.
+        RunBacktestResponse: Template-mode use-case response fixture.
     Assumptions:
-        Route re-sorts variants by deterministic key contract.
+        Response is already sorted by `total_return_pct DESC, variant_key ASC`.
     Raises:
-        None.
+        ValueError: If fixture violates DTO invariants.
     Side Effects:
         None.
     """
-    return _LooseRunBacktestResponse()
+    return RunBacktestResponse(
+        mode="template",
+        strategy_id=None,
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        warmup_bars=200,
+        top_k=2,
+        preselect=100,
+        top_trades_n=1,
+        variants=(
+            _variant(variant_index=0, variant_key="a" * 64, total_return_pct=12.0),
+            _variant(variant_index=1, variant_key="b" * 64, total_return_pct=12.0),
+        ),
+        total_indicator_compute_calls=1,
+    )

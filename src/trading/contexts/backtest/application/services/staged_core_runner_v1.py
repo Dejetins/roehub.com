@@ -37,6 +37,14 @@ _PROFIT_FACTOR_METRIC_KEY_LITERAL = "profit_factor"
 _DIRECTION_ASC_LITERAL = "ASC"
 _DIRECTION_DESC_LITERAL = "DESC"
 _SECONDARY_METRIC_COMPONENT_DEFAULT = 0.0
+_STAGE_A_DISABLED_RISK_PARAMS: Mapping[str, BacktestVariantScalar] = MappingProxyType(
+    {
+        "sl_enabled": False,
+        "sl_pct": None,
+        "tp_enabled": False,
+        "tp_pct": None,
+    }
+)
 
 StageACheckpointCallbackV1 = Callable[[int, int], None]
 StageBCheckpointRowsMaterializerV1 = Callable[
@@ -573,17 +581,20 @@ class BacktestStagedCoreRunnerV1:
         """
         risk_variants = grid_context.risk_variants
         risk_total = len(risk_variants)
+        direction_mode = template.direction_mode
+        sizing_mode = template.sizing_mode
+        execution_params = template.execution_params
         for shortlist_index, stage_a_row in enumerate(shortlist):
             base_variant = stage_a_row.base_variant
             for risk_variant in risk_variants:
                 variant_index = (shortlist_index * risk_total) + risk_variant.risk_index
                 variant_key = build_backtest_variant_key_v1(
                     indicator_variant_key=base_variant.indicator_variant_key,
-                    direction_mode=template.direction_mode,
-                    sizing_mode=template.sizing_mode,
+                    direction_mode=direction_mode,
+                    sizing_mode=sizing_mode,
                     signals=base_variant.signal_params,
                     risk_params=risk_variant.risk_params,
-                    execution_params=template.execution_params,
+                    execution_params=execution_params,
                 )
                 yield BacktestStageBTaskV1(
                     variant_index=variant_index,
@@ -656,12 +667,7 @@ class BacktestStagedCoreRunnerV1:
             candles=candles,
             indicator_selections=base_variant.indicator_selections,
             signal_params=base_variant.signal_params,
-            risk_params={
-                "sl_enabled": False,
-                "sl_pct": None,
-                "tp_enabled": False,
-                "tp_pct": None,
-            },
+            risk_params=_STAGE_A_DISABLED_RISK_PARAMS,
             indicator_variant_key=base_variant.indicator_variant_key,
             variant_key=base_variant.base_variant_key,
         )

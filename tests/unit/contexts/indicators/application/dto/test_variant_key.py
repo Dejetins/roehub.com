@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+
 from trading.contexts.indicators.application.dto import (
     IndicatorVariantSelection,
     build_variant_key_v1,
@@ -220,3 +223,63 @@ def test_variant_key_ignores_input_mapping_and_indicator_ordering() -> None:
     )
 
     assert first_key == second_key
+
+
+def test_variant_key_matches_legacy_canonical_hash() -> None:
+    """
+    Verify optimized builder preserves legacy canonical JSON hash semantics.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Legacy hash contract was `json.dumps(..., sort_keys=True, ensure_ascii=False)`.
+    Raises:
+        AssertionError: If optimized path changes stable `variant_key` output.
+    Side Effects:
+        None.
+    """
+    indicators = (
+        IndicatorVariantSelection(
+            indicator_id="ma.sma",
+            inputs={"source": "close", "signal": "line"},
+            params={"window": 36, "offset": 0},
+        ),
+        IndicatorVariantSelection(
+            indicator_id="momentum.rsi",
+            inputs={"source": "close"},
+            params={"window": 14},
+        ),
+    )
+    optimized_key = build_variant_key_v1(
+        instrument_id="1:BTCUSDT",
+        timeframe="1m",
+        indicators=indicators,
+    )
+    legacy_payload = {
+        "schema_version": 1,
+        "instrument_id": "1:BTCUSDT",
+        "timeframe": "1m",
+        "indicators": [
+            {
+                "id": "ma.sma",
+                "inputs": [["signal", "line"], ["source", "close"]],
+                "params": [["offset", 0], ["window", 36]],
+            },
+            {
+                "id": "momentum.rsi",
+                "inputs": [["source", "close"]],
+                "params": [["window", 14]],
+            },
+        ],
+    }
+    legacy_json = json.dumps(
+        legacy_payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    legacy_key = hashlib.sha256(legacy_json.encode("utf-8")).hexdigest()
+
+    assert optimized_key == legacy_key

@@ -32,6 +32,14 @@ _FLOAT32_BYTES = 4
 _CANDLES_BYTES_PER_STEP = (5 * _FLOAT32_BYTES) + 8
 _RESERVE_FACTOR = 0.20
 _RESERVE_FIXED_BYTES = 64 * 1024**2
+_STAGE_A_DISABLED_RISK_PARAMS: Mapping[str, BacktestVariantScalar] = MappingProxyType(
+    {
+        "sl_enabled": False,
+        "sl_pct": None,
+        "tp_enabled": False,
+        "tp_pct": None,
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -288,12 +296,7 @@ class BacktestGridBuildContextV1:
                 direction_mode=self.direction_mode,
                 sizing_mode=self.sizing_mode,
                 signals=signal_params,
-                risk_params={
-                    "sl_enabled": False,
-                    "sl_pct": None,
-                    "tp_enabled": False,
-                    "tp_pct": None,
-                },
+                risk_params=_STAGE_A_DISABLED_RISK_PARAMS,
                 execution_params=self.execution_params,
             )
             yield BacktestStageABaseVariant(

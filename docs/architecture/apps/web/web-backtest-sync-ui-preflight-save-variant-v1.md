@@ -134,6 +134,10 @@ Sync UI не рендерит eager report из `POST /api/backtests`.
 - запрос отправляется в `POST /api/backtests/variant-report`;
 - загруженный report кэшируется в браузере по `variant_key`.
 
+Rollout note:
+- runtime flag `backtest.reporting.eager_top_reports_enabled` оставлен только для legacy fallback;
+  целевой режим UI/API: `false` (lazy-only).
+
 ### 3) `report.table_md` рендерится как markdown -> HTML (с sanitization)
 
 UI рендерит `report.table_md` как HTML, но обязательно с защитой от XSS:

@@ -165,6 +165,9 @@ Polling фиксирован как v1 механизм, т.к. SSE/WebSocket н
 
 UI всегда работает с summary `/top` и загружает report/trades только по explicit `Load report`.
 
+`backtest.reporting.eager_top_reports_enabled` не влияет на jobs `/top`: endpoint остаётся
+summary-only, отчёты идут через `variant-report`.
+
 ### 5) Jobs toggle маппится на UX "disabled"
 
 Вместо generic 404, UI показывает понятное сообщение.

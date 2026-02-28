@@ -187,6 +187,24 @@ class _PreparedGridContext:
     total_tensor_bytes: int
 
 
+@dataclass(frozen=True, slots=True)
+class _SignalCacheKeyMemoEntry:
+    """
+    Internal immutable memo entry for deterministic signal cache-key reuse by payload identity.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
+    """
+
+    signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]]
+    cache_key: str
+
+
 class CloseFillBacktestStagedScorerV1(
     BacktestStagedVariantScorer,
     BacktestStagedVariantMetricScorer,
@@ -304,6 +322,9 @@ class CloseFillBacktestStagedScorerV1(
         self._execution_engine = execution_engine or BacktestExecutionEngineV1()
 
         self._signals_cache: OrderedDict[str, _SignalCacheValue] = OrderedDict()
+        self._signals_cache_key_memo: OrderedDict[
+            tuple[str, int], _SignalCacheKeyMemoEntry
+        ] = OrderedDict()
         self._signals_cache_total_bytes = 0
         self._signals_cache_lock = Lock()
         self._prepared_grid_context: _PreparedGridContext | None = None
@@ -635,7 +656,7 @@ class CloseFillBacktestStagedScorerV1(
             raise ValueError("stage must be stage_a or stage_b")
 
         normalized_signal_params = _normalized_signal_params_for_scoring(values=signal_params)
-        cache_key = _signal_cache_key(
+        cache_key = self._resolve_signal_cache_key(
             indicator_variant_key=indicator_variant_key,
             signal_params=normalized_signal_params,
         )
@@ -664,6 +685,60 @@ class CloseFillBacktestStagedScorerV1(
         )
         metrics = MappingProxyType({TOTAL_RETURN_METRIC_LITERAL: float(outcome.total_return_pct)})
         return (metrics, execution_params, resolved_risk_params, outcome)
+
+    def _resolve_signal_cache_key(
+        self,
+        *,
+        indicator_variant_key: str,
+        signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]],
+    ) -> str:
+        """
+        Resolve deterministic signal cache key with identity-based memoization for hot loops.
+
+        Docs:
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+          - tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
+
+        Args:
+            indicator_variant_key: Deterministic indicators-only key.
+            signal_params: Normalized signal params mapping.
+        Returns:
+            str: Deterministic cache key for final signal vector reuse.
+        Assumptions:
+            Stage-B risk expansion repeatedly reuses identical `signal_params` objects.
+        Raises:
+            None.
+        Side Effects:
+            Mutates bounded in-memory key memo under scorer cache lock.
+        """
+        normalized_indicator_key = _normalize_indicator_variant_key_for_cache(
+            indicator_variant_key=indicator_variant_key
+        )
+        memo_slot = (normalized_indicator_key, id(signal_params))
+        with self._signals_cache_lock:
+            cached = self._signals_cache_key_memo.get(memo_slot)
+            if cached is not None and cached.signal_params is signal_params:
+                self._signals_cache_key_memo.move_to_end(memo_slot)
+                return cached.cache_key
+
+        cache_key = _signal_cache_key(
+            indicator_variant_key=normalized_indicator_key,
+            signal_params=signal_params,
+        )
+        with self._signals_cache_lock:
+            self._signals_cache_key_memo[memo_slot] = _SignalCacheKeyMemoEntry(
+                signal_params=signal_params,
+                cache_key=cache_key,
+            )
+            self._signals_cache_key_memo.move_to_end(memo_slot)
+            while len(self._signals_cache_key_memo) > self._signals_cache_max_entries:
+                self._signals_cache_key_memo.popitem(last=False)
+        return cache_key
 
     def _cached_signal(self, *, cache_key: str) -> _SignalCacheValue | None:
         """
@@ -1099,7 +1174,7 @@ def _signal_cache_key(
         ),
         "signal_params": _signal_params_json_payload(signal_params=signal_params),
     }
-    payload_json = json.dumps(payload, sort_keys=True, ensure_ascii=True, separators=(",", ":"))
+    payload_json = json.dumps(payload, ensure_ascii=True, separators=(",", ":"))
     return hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
 
 
@@ -1159,6 +1234,14 @@ def _signal_params_json_payload(
     Side Effects:
         None.
     """
+    if _is_pre_normalized_signal_params(values=signal_params):
+        payload_fast: dict[str, dict[str, BacktestVariantScalar]] = {}
+        for indicator_id, params in signal_params.items():
+            payload_fast[indicator_id] = {
+                param_name: params[param_name] for param_name in params.keys()
+            }
+        return payload_fast
+
     payload: dict[str, dict[str, BacktestVariantScalar]] = {}
     for indicator_id in sorted(signal_params.keys()):
         params = signal_params[indicator_id]
@@ -1399,20 +1482,28 @@ def _is_pre_normalized_signal_params(
     """
     if not isinstance(values, MappingProxyType):
         return False
+    previous_indicator_id = ""
     for indicator_id, params in values.items():
         if not isinstance(indicator_id, str):
             return False
         normalized_indicator_id = indicator_id.strip().lower()
         if not normalized_indicator_id or normalized_indicator_id != indicator_id:
             return False
+        if normalized_indicator_id < previous_indicator_id:
+            return False
         if not isinstance(params, MappingProxyType):
             return False
+        previous_param_name = ""
         for param_name in params.keys():
             if not isinstance(param_name, str):
                 return False
             normalized_param_name = param_name.strip().lower()
             if not normalized_param_name or normalized_param_name != param_name:
                 return False
+            if normalized_param_name < previous_param_name:
+                return False
+            previous_param_name = normalized_param_name
+        previous_indicator_id = normalized_indicator_id
     return True
 
 

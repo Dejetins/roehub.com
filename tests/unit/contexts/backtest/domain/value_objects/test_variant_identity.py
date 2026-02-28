@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import json
+from types import MappingProxyType
+
 from trading.contexts.backtest.domain.value_objects import build_backtest_variant_key_v1
 from trading.contexts.indicators.application.dto import (
     IndicatorVariantSelection,
@@ -125,3 +129,100 @@ def test_indicators_build_variant_key_v1_remains_compute_only() -> None:
 
     assert indicator_key_a == indicator_key_b
     assert backtest_key_a != backtest_key_b
+
+
+def test_build_backtest_variant_key_v1_matches_legacy_canonical_hash_for_fast_path() -> None:
+    """
+    Verify fast-path payload handling keeps legacy canonical hash semantics unchanged.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical payload must stay equivalent to historical `sort_keys=True` hash contract.
+    Raises:
+        AssertionError: If optimized builder changes `variant_key` semantics.
+    Side Effects:
+        None.
+    """
+    signal_params = MappingProxyType(
+        {
+            "momentum.rsi": MappingProxyType(
+                {
+                    "long_threshold": 30,
+                    "short_threshold": 70,
+                }
+            ),
+            "trend.adx": MappingProxyType(
+                {
+                    "long_delta_periods": -5,
+                    "short_delta_periods": -10,
+                }
+            ),
+        }
+    )
+    risk_params = MappingProxyType(
+        {
+            "sl_enabled": True,
+            "sl_pct": 3.0,
+            "tp_enabled": False,
+            "tp_pct": None,
+        }
+    )
+    execution_params = MappingProxyType(
+        {
+            "fee_pct": 0.075,
+            "fixed_quote": 100.0,
+            "init_cash_quote": 1000.0,
+            "safe_profit_percent": 30.0,
+            "slippage_pct": 0.01,
+        }
+    )
+
+    fast_key = build_backtest_variant_key_v1(
+        indicator_variant_key="A" * 64,
+        direction_mode="LONG-SHORT",
+        sizing_mode="ALL_IN",
+        signals=signal_params,
+        risk_params=risk_params,
+        execution_params=execution_params,
+    )
+    legacy_payload = {
+        "schema_version": 1,
+        "indicator_variant_key": "a" * 64,
+        "direction_mode": "long-short",
+        "sizing_mode": "all_in",
+        "signals": {
+            "momentum.rsi": {
+                "long_threshold": 30,
+                "short_threshold": 70,
+            },
+            "trend.adx": {
+                "long_delta_periods": -5,
+                "short_delta_periods": -10,
+            },
+        },
+        "risk": {
+            "sl_enabled": True,
+            "sl_pct": 3.0,
+            "tp_enabled": False,
+            "tp_pct": None,
+        },
+        "execution": {
+            "fee_pct": 0.075,
+            "fixed_quote": 100.0,
+            "init_cash_quote": 1000.0,
+            "safe_profit_percent": 30.0,
+            "slippage_pct": 0.01,
+        },
+    }
+    legacy_json = json.dumps(
+        legacy_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    legacy_key = hashlib.sha256(legacy_json.encode("utf-8")).hexdigest()
+
+    assert fast_key == legacy_key

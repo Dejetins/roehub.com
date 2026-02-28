@@ -115,6 +115,10 @@
 `POST /api/backtests/variant-report`), чтобы UI мог загрузить report/trades
 по явному действию `Load report` для выбранного `variant_key`.
 
+Rollout note:
+- flag `backtest.reporting.eager_top_reports_enabled` относится только к sync
+  `POST /backtests` и не меняет jobs `/top` policy.
+
 ### 7) Cancel endpoint idempotent и возвращает status payload (подтверждено)
 
 `POST /backtests/jobs/{job_id}/cancel`:

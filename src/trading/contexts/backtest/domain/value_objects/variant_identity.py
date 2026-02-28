@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Mapping
 
 BacktestVariantScalar = int | float | str | bool | None
@@ -100,17 +101,16 @@ def build_backtest_variant_key_v1(
         raise ValueError("sizing_mode must be non-empty")
 
     payload = {
-        "schema_version": 1,
-        "indicator_variant_key": normalized_indicator_key,
         "direction_mode": normalized_direction_mode,
-        "sizing_mode": normalized_sizing_mode,
-        "signals": _normalize_signals_mapping(values=signals),
-        "risk": _normalize_scalar_mapping(values=risk_params),
         "execution": _normalize_scalar_mapping(values=execution_params),
+        "indicator_variant_key": normalized_indicator_key,
+        "risk": _normalize_scalar_mapping(values=risk_params),
+        "schema_version": 1,
+        "signals": _normalize_signals_mapping(values=signals),
+        "sizing_mode": normalized_sizing_mode,
     }
     canonical_json = json.dumps(
         payload,
-        sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=True,
     )
@@ -137,6 +137,8 @@ def _normalize_scalar_mapping(
     """
     if values is None:
         return {}
+    if _is_pre_normalized_scalar_mapping(values=values):
+        return {key: values[key] for key in values.keys()}
 
     normalized: dict[str, BacktestVariantScalar] = {}
     for key in sorted(values.keys()):
@@ -176,6 +178,13 @@ def _normalize_signals_mapping(
     """
     if values is None:
         return {}
+    if _is_pre_normalized_signals_mapping(values=values):
+        normalized_fast: dict[str, dict[str, BacktestVariantScalar]] = {}
+        for indicator_id, params in values.items():
+            normalized_fast[indicator_id] = {
+                param_name: params[param_name] for param_name in params.keys()
+            }
+        return normalized_fast
 
     normalized: dict[str, dict[str, BacktestVariantScalar]] = {}
     for raw_indicator_id in sorted(values.keys(), key=lambda key: str(key).strip().lower()):
@@ -207,3 +216,97 @@ def _normalize_signals_mapping(
         normalized[indicator_id] = normalized_params
 
     return normalized
+
+
+def _is_pre_normalized_scalar_mapping(
+    *,
+    values: Mapping[str, BacktestVariantScalar],
+) -> bool:
+    """
+    Check whether scalar mapping already matches normalized deterministic key order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+
+    Args:
+        values: Candidate scalar mapping payload.
+    Returns:
+        bool: `True` when mapping can be reused without sort/normalize pass.
+    Assumptions:
+        Fast-path accepts only immutable `MappingProxyType` payloads.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if not isinstance(values, MappingProxyType):
+        return False
+    previous_key = ""
+    for raw_key in values.keys():
+        if not isinstance(raw_key, str):
+            return False
+        normalized_key = raw_key.strip()
+        if not normalized_key or normalized_key != raw_key:
+            return False
+        if normalized_key < previous_key:
+            return False
+        previous_key = normalized_key
+    return True
+
+
+def _is_pre_normalized_signals_mapping(
+    *,
+    values: BacktestSignalsMap,
+) -> bool:
+    """
+    Check whether nested signals mapping already matches canonical lowercase sorted shape.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+
+    Args:
+        values: Candidate nested `indicator_id -> param_name -> scalar` mapping.
+    Returns:
+        bool: `True` when nested mapping can be reused without re-normalization.
+    Assumptions:
+        Fast-path must remain conservative and reject mutable/non-canonical structures.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if not isinstance(values, MappingProxyType):
+        return False
+    previous_indicator_id = ""
+    for indicator_id, params in values.items():
+        if not isinstance(indicator_id, str):
+            return False
+        normalized_indicator_id = indicator_id.strip().lower()
+        if not normalized_indicator_id or normalized_indicator_id != indicator_id:
+            return False
+        if normalized_indicator_id < previous_indicator_id:
+            return False
+        if not isinstance(params, MappingProxyType):
+            return False
+        previous_param_name = ""
+        for param_name in params.keys():
+            if not isinstance(param_name, str):
+                return False
+            normalized_param_name = param_name.strip().lower()
+            if not normalized_param_name or normalized_param_name != param_name:
+                return False
+            if normalized_param_name < previous_param_name:
+                return False
+            previous_param_name = normalized_param_name
+        previous_indicator_id = normalized_indicator_id
+    return True

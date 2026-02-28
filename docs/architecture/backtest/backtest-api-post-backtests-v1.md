@@ -111,12 +111,15 @@ Response v1 включает:
 Зачем:
 - подтверждение воспроизводимости и защита от “тихих” изменений runtime defaults.
 
-### 6) Trades возвращаются только для `top_trades_n` (config default + request override)
+### 6) Sync response по умолчанию lazy; eager reports управляются feature flag
 
-- Метрики/таблица строятся для всех top-K вариантов.
-- Полный trade log включается в response только для первых `top_trades_n` вариантов (по ранжированию).
+- По умолчанию `POST /backtests` возвращает ranking + payload summary без `report` body.
+- Поля `rows/table_md/trades` загружаются on-demand через `POST /api/backtests/variant-report`.
+- Legacy eager mode включается только runtime flag:
+  `backtest.reporting.eager_top_reports_enabled=true`.
 
-Request v1 может override `top_trades_n` (валидируется, например: `1 <= top_trades_n <= top_k`).
+Даже в eager mode ранжирование остаётся metric-only (`total_return_pct` + tie-break по `variant_key`),
+а `top_trades_n` продолжает ограничивать объём trades payload.
 
 ### 7) Sync cancellation: disconnect + hard deadline (кооперативно, без kill)
 
@@ -213,7 +216,10 @@ Response содержит:
 
 - `variant_index`, `variant_key`, `indicator_variant_key`
 - `total_return_pct`
-- `report` (rows + table_md + optional trades)
+- `report`:
+  - `null` в lazy policy (default),
+  - `rows + table_md + optional trades` только когда
+    `backtest.reporting.eager_top_reports_enabled=true`
 - `payload` (explicit parameters for saving):
   - `indicator_selections[]`
   - `signals`

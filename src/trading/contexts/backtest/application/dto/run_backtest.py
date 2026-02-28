@@ -522,6 +522,17 @@ class BacktestVariantPayloadV1:
         """
         if len(self.indicator_selections) == 0:
             raise ValueError("BacktestVariantPayloadV1.indicator_selections must be non-empty")
+        if not _is_pre_sorted_indicator_selections(indicator_selections=self.indicator_selections):
+            object.__setattr__(
+                self,
+                "indicator_selections",
+                tuple(
+                    sorted(
+                        self.indicator_selections,
+                        key=lambda item: item.indicator_id,
+                    )
+                ),
+            )
 
         normalized_direction_mode = self.direction_mode.strip().lower()
         object.__setattr__(self, "direction_mode", normalized_direction_mode)
@@ -743,6 +754,8 @@ def _normalize_scalar_mapping(
     """
     if values is None:
         return {}
+    if _is_pre_normalized_scalar_mapping(values=values):
+        return {key: values[key] for key in values.keys()}
 
     normalized: dict[str, BacktestRequestScalar] = {}
     for key in sorted(values.keys()):
@@ -816,6 +829,13 @@ def _normalize_nested_scalar_mapping(
     """
     if values is None:
         return {}
+    if _is_pre_normalized_nested_scalar_mapping(values=values):
+        normalized_fast: dict[str, Mapping[str, BacktestRequestScalar]] = {}
+        for indicator_id, params in values.items():
+            normalized_fast[indicator_id] = MappingProxyType(
+                {name: params[name] for name in params.keys()}
+            )
+        return normalized_fast
 
     normalized: dict[str, Mapping[str, BacktestRequestScalar]] = {}
     for raw_indicator_id in sorted(values.keys(), key=lambda key: str(key).strip().lower()):
@@ -826,3 +846,121 @@ def _normalize_nested_scalar_mapping(
             _normalize_scalar_mapping(values=values[raw_indicator_id])
         )
     return normalized
+
+
+def _is_pre_sorted_indicator_selections(
+    *,
+    indicator_selections: tuple[IndicatorVariantSelection, ...],
+) -> bool:
+    """
+    Check whether indicator selections are already sorted by `indicator_id` asc.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+
+    Args:
+        indicator_selections: Candidate indicator selections tuple.
+    Returns:
+        bool: `True` when tuple is strictly sorted and duplicate-free.
+    Assumptions:
+        `IndicatorVariantSelection.indicator_id` is already normalized to lowercase.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    previous_indicator_id = ""
+    for selection in indicator_selections:
+        if selection.indicator_id <= previous_indicator_id:
+            return False
+        previous_indicator_id = selection.indicator_id
+    return True
+
+
+def _is_pre_normalized_scalar_mapping(
+    *,
+    values: Mapping[str, BacktestRequestScalar],
+) -> bool:
+    """
+    Check whether scalar mapping already matches canonical stripped key order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
+
+    Args:
+        values: Candidate scalar mapping.
+    Returns:
+        bool: `True` when mapping can skip extra normalize/sort pass.
+    Assumptions:
+        Fast-path accepts only immutable `MappingProxyType` payloads.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if not isinstance(values, MappingProxyType):
+        return False
+    previous_key = ""
+    for raw_key in values.keys():
+        if not isinstance(raw_key, str):
+            return False
+        normalized_key = raw_key.strip()
+        if not normalized_key or normalized_key != raw_key:
+            return False
+        if normalized_key < previous_key:
+            return False
+        previous_key = normalized_key
+    return True
+
+
+def _is_pre_normalized_nested_scalar_mapping(
+    *,
+    values: BacktestSignalScalarMap,
+) -> bool:
+    """
+    Check whether nested scalar mapping already matches lowercase sorted mapping-proxy shape.
+
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - apps/api/dto/backtests.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+
+    Args:
+        values: Candidate nested mapping.
+    Returns:
+        bool: `True` when nested payload can skip re-normalization.
+    Assumptions:
+        Fast-path must stay conservative and reject mutable/unsorted payloads.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if not isinstance(values, MappingProxyType):
+        return False
+    previous_indicator_id = ""
+    for indicator_id, params in values.items():
+        if not isinstance(indicator_id, str):
+            return False
+        normalized_indicator_id = indicator_id.strip().lower()
+        if not normalized_indicator_id or normalized_indicator_id != indicator_id:
+            return False
+        if normalized_indicator_id < previous_indicator_id:
+            return False
+        if not _is_pre_normalized_scalar_mapping(values=params):
+            return False
+        previous_indicator_id = normalized_indicator_id
+    return True
