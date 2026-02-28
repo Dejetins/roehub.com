@@ -8,7 +8,7 @@
 
 - Пользователь может:
   - запустить sync backtest в template-mode (ad-hoc grid) и в saved-mode (по `strategy_id`),
-  - увидеть top-K результаты (таблица + `report_table_md` + trades только для `top_trades_n`),
+  - увидеть top-K результаты и загрузить отчет варианта по кнопке `Load report`,
   - сохранить выбранный вариант как Strategy, открыв `/strategies/new` с предзаполненными полями.
 
 ## Контекст
@@ -42,6 +42,7 @@
   - `GET /api/backtests/runtime-defaults`
   - `POST /api/indicators/estimate`
   - `POST /api/backtests`
+  - `POST /api/backtests/variant-report`
   - (в дальнейшем) `POST /api/backtests/jobs` для async режима
   - `POST /api/strategies` для сохранения выбранного варианта
 
@@ -56,7 +57,7 @@ UI собирает `POST /api/backtests` request с `template` блоком:
 - instrument selection: `market_id`/`symbol` через `/api/market-data/*`
 - timeframe
 - `indicator_grids[]` (compute axes)
-- optional advanced: execution/risk_grid/signal_grids/direction/sizing/top_k/preselect/top_trades_n/warmup_bars
+- optional advanced: execution/risk_grid/signal_grids/direction/sizing/top_k/preselect/top_trades_n/warmup_bars + ranking (`primary_metric`, `secondary_metric`)
 
 Обязательный preflight:
 
@@ -69,6 +70,7 @@ UI выбирает стратегию из `GET /api/strategies` и запус�
 
 - `strategy_id`
 - `overrides?` (advanced блок)
+- `ranking?` (`primary_metric`, `secondary_metric`)
 
 Preflight в saved-mode не применяется (endpoint требует indicator grids).
 
@@ -81,9 +83,10 @@ UI отображает:
   - `total_return_pct`
   - `variant_key`
   - `indicator_variant_key`
-  - `report` summary
-- `report.table_md` рендерится как markdown -> HTML (см. решение 2).
-- trades показываются только для первых `top_trades_n` вариантов и только если API вернул `report.trades`.
+  - действие `Load report` (первая загрузка из API, повторная из browser cache по `variant_key`)
+- sync ответ `POST /api/backtests` не обязан содержать eager `report` body.
+- после `Load report` UI рендерит `rows/table_md/trades` из `POST /api/backtests/variant-report`.
+- `table_md` рендерится как markdown -> HTML (см. решение 2) с sanitization.
 
 ### 6) Save variant -> Strategy builder prefill
 
@@ -121,7 +124,17 @@ UI отображает:
 - проще навигация и меньше маршрутов;
 - результаты хранятся в состоянии страницы и теряются при reload.
 
-### 2) `report.table_md` рендерится как markdown -> HTML (с sanitization)
+### 2) Report загружается on-demand по `Load report` (lazy policy)
+
+Sync UI не рендерит eager report из `POST /api/backtests`.
+
+Вместо этого:
+
+- для каждой строки variants доступна кнопка `Load report`;
+- запрос отправляется в `POST /api/backtests/variant-report`;
+- загруженный report кэшируется в браузере по `variant_key`.
+
+### 3) `report.table_md` рендерится как markdown -> HTML (с sanitization)
 
 UI рендерит `report.table_md` как HTML, но обязательно с защитой от XSS:
 
@@ -134,7 +147,7 @@ UI рендерит `report.table_md` как HTML, но обязательно �
 Последствия:
 - добавляется pinned JS зависимость на markdown renderer и sanitizer (через CDN).
 
-### 3) Preflight обязателен для template-mode (POST /indicators/estimate)
+### 4) Preflight обязателен для template-mode (POST /indicators/estimate)
 
 UI должен выполнить preflight до запуска, чтобы:
 
@@ -145,7 +158,7 @@ UI должен выполнить preflight до запуска, чтобы:
 - preflight оценивает compute memory/variants по indicator grids и risk axes;
   сигнал-параметры (signal grids) в этом endpoint не учитываются.
 
-### 4) Save variant реализован как переход в strategy builder (prefill), а не прямой `POST /strategies`
+### 5) Save variant реализован как переход в strategy builder (prefill), а не прямой `POST /strategies`
 
 Кнопка `Save as Strategy` открывает `/strategies/new` с предзаполнением.
 
@@ -153,7 +166,7 @@ UI должен выполнить preflight до запуска, чтобы:
 - пользователь может отредактировать/дополнить strategy перед сохранением;
 - переиспользуем один builder и один UX.
 
-### 5) Prefill transport через `sessionStorage`
+### 6) Prefill transport через `sessionStorage`
 
 Prefill payload переносится между страницами через `sessionStorage` по ключу `prefill_id`.
 
@@ -162,7 +175,7 @@ Prefill payload переносится между страницами чере�
 - не кладём JSON payload в логи proxy/gateway,
 - простая реализация без новых backend endpoints.
 
-### 6) Sync run отменяется кооперативно при disconnect/abort
+### 7) Sync run отменяется кооперативно при disconnect/abort
 
 С 2026-02-25 backend route `POST /api/backtests` поддерживает кооперативную отмену:
 
@@ -174,7 +187,7 @@ Prefill payload переносится между страницами чере�
 - `AbortController`/уход со страницы не должен оставлять долгоживущий compute run;
 - backend может вернуть deterministic validation-style ошибку по deadline/cancel в случаях, когда соединение ещё активно.
 
-### 7) Sync guard budgets строже job budgets
+### 8) Sync guard budgets строже job budgets
 
 С 2026-02-25 sync path использует half-budget limits (`variants/bytes`) относительно `backtest.guards.*`,
 тогда как jobs path использует full limits.
@@ -188,6 +201,8 @@ Prefill payload переносится между страницами чере�
 
 - Все JSON API вызовы из UI идут на `/api/...` с `credentials: 'include'`.
 - `POST /api/backtests` mode selection: `strategy_id xor template`.
+- `POST /api/backtests` может содержать `ranking.primary_metric` и `ranking.secondary_metric`.
+- `POST /api/backtests/variant-report` вызывается только по explicit user action (`Load report`).
 - Preflight обязателен только для template-mode.
 - `limit`/guards semantics обрабатываются и показываются пользователю как 422 (deterministic payload).
 - `Save as Strategy` использует индикаторный payload shape:
@@ -204,7 +219,7 @@ Docs:
 - `docs/architecture/apps/web/web-strategy-ui-crud-builder-delete-v1.md` — strategy builder v1.
 
 API:
-- `apps/api/routes/backtests.py` — `POST /backtests`.
+- `apps/api/routes/backtests.py` — `POST /backtests`, `POST /backtests/variant-report`.
 - `apps/api/dto/backtests.py` — request/response DTO.
 - `apps/api/routes/indicators.py` — `POST /indicators/estimate`.
 - `apps/api/routes/strategies.py` — `POST /strategies`.
@@ -229,8 +244,10 @@ Manual smoke (через gateway):
 1) Открыть `/backtests` после логина.
 2) Template-mode: выбрать market/symbol/timeframe, добавить индикаторы.
 3) Нажать preflight (estimate), убедиться что run разрешается только после успешного preflight.
-4) Запустить sync backtest, увидеть top-K.
-5) Нажать `Save as Strategy` на варианте и убедиться что `/strategies/new` предзаполнен.
+4) В Advanced выбрать `primary_metric` / `secondary_metric`, запустить sync backtest.
+5) Для выбранной строки нажать `Load report`, убедиться что отчет загружается и рендерится.
+6) Повторно нажать `Load report`, убедиться что UI показывает cache-hit по `variant_key`.
+7) Нажать `Save as Strategy` на варианте и убедиться что `/strategies/new` предзаполнен.
 
 ## Риски и открытые вопросы
 

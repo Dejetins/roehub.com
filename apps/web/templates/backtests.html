@@ -5,6 +5,7 @@
     class="panel"
     data-backtest-page="sync"
     data-api-backtests-path="/api/backtests"
+    data-api-backtest-variant-report-path="/api/backtests/variant-report"
     data-api-backtest-runtime-defaults-path="/api/backtests/runtime-defaults"
     data-api-backtest-jobs-path="/api/backtests/jobs"
     data-api-estimate-path="/api/indicators/estimate"
@@ -172,6 +173,24 @@
             <option value="fixed_quote">fixed_quote</option>
             <option value="strategy_compound">strategy_compound</option>
             <option value="strategy_compound_profit_lock">strategy_compound_profit_lock</option>
+          </select>
+
+          <label for="backtest-ranking-primary-metric">primary_metric</label>
+          <select id="backtest-ranking-primary-metric">
+            <option value="">Use API default</option>
+            <option value="total_return_pct">total_return_pct</option>
+            <option value="max_drawdown_pct">max_drawdown_pct</option>
+            <option value="return_over_max_drawdown">return_over_max_drawdown</option>
+            <option value="profit_factor">profit_factor</option>
+          </select>
+
+          <label for="backtest-ranking-secondary-metric">secondary_metric</label>
+          <select id="backtest-ranking-secondary-metric">
+            <option value="">None (tie-break by variant_key)</option>
+            <option value="total_return_pct">total_return_pct</option>
+            <option value="max_drawdown_pct">max_drawdown_pct</option>
+            <option value="return_over_max_drawdown">return_over_max_drawdown</option>
+            <option value="profit_factor">profit_factor</option>
           </select>
 
           <label for="backtest-exec-init-cash">execution.init_cash_quote</label>

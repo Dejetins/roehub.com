@@ -5,6 +5,12 @@ const RANGE_PRESET_DAYS = new Map([
   ["30d", 30],
   ["90d", 90],
 ]);
+const RANKING_METRIC_LITERALS = new Set([
+  "max_drawdown_pct",
+  "profit_factor",
+  "return_over_max_drawdown",
+  "total_return_pct",
+]);
 
 document.addEventListener("DOMContentLoaded", () => {
   const pageRoot = document.querySelector(BACKTEST_PAGE_SELECTOR);
@@ -16,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initBacktestPage(pageRoot) {
   const backtestsPath = requireDataAttr(pageRoot, "apiBacktestsPath");
+  const backtestVariantReportPath = requireDataAttr(pageRoot, "apiBacktestVariantReportPath");
   const backtestJobsPath = requireDataAttr(pageRoot, "apiBacktestJobsPath");
   const estimatePath = requireDataAttr(pageRoot, "apiEstimatePath");
   const strategiesPath = requireDataAttr(pageRoot, "apiStrategiesPath");
@@ -62,6 +69,8 @@ function initBacktestPage(pageRoot) {
 
   const directionModeSelect = pageRoot.querySelector("#backtest-direction-mode");
   const sizingModeSelect = pageRoot.querySelector("#backtest-sizing-mode");
+  const rankingPrimaryMetricSelect = pageRoot.querySelector("#backtest-ranking-primary-metric");
+  const rankingSecondaryMetricSelect = pageRoot.querySelector("#backtest-ranking-secondary-metric");
   const executionInitCash = pageRoot.querySelector("#backtest-exec-init-cash");
   const executionFeePct = pageRoot.querySelector("#backtest-exec-fee-pct");
   const executionSlippagePct = pageRoot.querySelector("#backtest-exec-slippage-pct");
@@ -121,6 +130,8 @@ function initBacktestPage(pageRoot) {
     || rangeEndInput === null
     || directionModeSelect === null
     || sizingModeSelect === null
+    || rankingPrimaryMetricSelect === null
+    || rankingSecondaryMetricSelect === null
     || executionInitCash === null
     || executionFeePct === null
     || executionSlippagePct === null
@@ -168,9 +179,14 @@ function initBacktestPage(pageRoot) {
     searchDebounceId: 0,
     instrumentsAbortController: null,
     latestRun: null,
+    latestRunToken: 0,
     runtimeDefaults: null,
     executionFeeDirty: false,
     applyingFeeDefault: false,
+    reportCacheByVariantKey: new Map(),
+    reportLoadingKeys: new Set(),
+    reportErrorsByVariantKey: new Map(),
+    reportCacheHitKeys: new Set(),
   };
 
   const setPreflightSummary = (message) => {
@@ -381,15 +397,26 @@ function initBacktestPage(pageRoot) {
     }
     const defaultsRecord = asRecord(state.runtimeDefaults);
     const jobsRecord = asRecord(defaultsRecord.jobs);
+    const rankingRecord = asRecord(defaultsRecord.ranking);
     const topKDefault = readFiniteInteger(defaultsRecord.top_k_default);
     const preselectDefault = readFiniteInteger(defaultsRecord.preselect_default);
     const warmupBarsDefault = readFiniteInteger(defaultsRecord.warmup_bars_default);
     const jobsTopKCap = readFiniteInteger(jobsRecord.top_k_persisted_default);
+    const rankingPrimaryDefault = readOptionalRankingMetricLiteral({
+      rawValue: rankingRecord.primary_metric_default,
+      fieldLabel: "ranking.primary_metric_default",
+    });
+    const rankingSecondaryDefault = readOptionalRankingMetricLiteral({
+      rawValue: rankingRecord.secondary_metric_default,
+      fieldLabel: "ranking.secondary_metric_default",
+    });
     runtimeDefaultsHint.textContent = [
       "Runtime defaults:",
       `top_k=${topKDefault ?? "-"}`,
       `preselect=${preselectDefault ?? "-"}`,
-      `warmup_bars=${warmupBarsDefault ?? "-"}.`,
+      `warmup_bars=${warmupBarsDefault ?? "-"}`,
+      `primary_metric=${rankingPrimaryDefault ?? "-"}`,
+      `secondary_metric=${rankingSecondaryDefault ?? "-"}.`,
       `Jobs cap top_k_persisted_default=${jobsTopKCap ?? "-"}.`,
     ].join(" ");
     runtimeDefaultsHint.classList.remove("hidden");
@@ -401,6 +428,7 @@ function initBacktestPage(pageRoot) {
     }
     const defaultsRecord = asRecord(state.runtimeDefaults);
     const executionRecord = asRecord(defaultsRecord.execution);
+    const rankingRecord = asRecord(defaultsRecord.ranking);
 
     const warmupBarsDefault = readFiniteInteger(defaultsRecord.warmup_bars_default);
     const topKDefault = readFiniteInteger(defaultsRecord.top_k_default);
@@ -418,6 +446,24 @@ function initBacktestPage(pageRoot) {
     }
     if (topTradesDefault !== null) {
       topTradesInput.value = String(topTradesDefault);
+    }
+    const primaryMetricDefault = readOptionalRankingMetricLiteral({
+      rawValue: rankingRecord.primary_metric_default,
+      fieldLabel: "ranking.primary_metric_default",
+    });
+    const secondaryMetricDefault = readOptionalRankingMetricLiteral({
+      rawValue: rankingRecord.secondary_metric_default,
+      fieldLabel: "ranking.secondary_metric_default",
+    });
+    rankingPrimaryMetricSelect.value = primaryMetricDefault || "";
+    if (
+      secondaryMetricDefault !== null
+      && primaryMetricDefault !== null
+      && secondaryMetricDefault === primaryMetricDefault
+    ) {
+      rankingSecondaryMetricSelect.value = "";
+    } else {
+      rankingSecondaryMetricSelect.value = secondaryMetricDefault || "";
     }
 
     const initCashDefault = readFiniteNumber(executionRecord.init_cash_quote_default);
@@ -1171,6 +1217,19 @@ function initBacktestPage(pageRoot) {
     return parsed;
   };
 
+  const readOptionalRankingMetricLiteral = ({ rawValue, fieldLabel }) => {
+    const metric = String(rawValue || "").trim().toLowerCase();
+    if (metric.length === 0) {
+      return null;
+    }
+    if (!RANKING_METRIC_LITERALS.has(metric)) {
+      throw new Error(
+        `${fieldLabel} must be one of ${Array.from(RANKING_METRIC_LITERALS).sort(compareStableStrings).join(", ")}.`,
+      );
+    }
+    return metric;
+  };
+
   const buildExecutionPayload = () => {
     const execution = {};
     const initCash = readOptionalNumber(executionInitCash, "execution.init_cash_quote");
@@ -1261,9 +1320,25 @@ function initBacktestPage(pageRoot) {
   const buildAdvancedOptions = () => {
     const directionMode = String(directionModeSelect.value || "").trim();
     const sizingMode = String(sizingModeSelect.value || "").trim();
+    const primaryMetric = readOptionalRankingMetricLiteral({
+      rawValue: rankingPrimaryMetricSelect.value,
+      fieldLabel: "primary_metric",
+    });
+    const secondaryMetric = readOptionalRankingMetricLiteral({
+      rawValue: rankingSecondaryMetricSelect.value,
+      fieldLabel: "secondary_metric",
+    });
+    if (primaryMetric === null && secondaryMetric !== null) {
+      throw new Error("primary_metric is required when secondary_metric is provided.");
+    }
+    if (primaryMetric !== null && secondaryMetric !== null && primaryMetric === secondaryMetric) {
+      throw new Error("secondary_metric must be different from primary_metric.");
+    }
     return {
       directionMode: directionMode.length > 0 ? directionMode : null,
       sizingMode: sizingMode.length > 0 ? sizingMode : null,
+      rankingPrimaryMetric: primaryMetric,
+      rankingSecondaryMetric: secondaryMetric,
       execution: buildExecutionPayload(),
       riskGrid: buildRiskGridPayload(),
       topK: readOptionalPositiveInt(topKInput, "top_k"),
@@ -1421,6 +1496,14 @@ function initBacktestPage(pageRoot) {
     }
     if (advanced.warmupBars !== null) {
       requestPayload.warmup_bars = advanced.warmupBars;
+    }
+    if (advanced.rankingPrimaryMetric !== null) {
+      requestPayload.ranking = {
+        primary_metric: advanced.rankingPrimaryMetric,
+      };
+      if (advanced.rankingSecondaryMetric !== null) {
+        requestPayload.ranking.secondary_metric = advanced.rankingSecondaryMetric;
+      }
     }
 
     if (state.mode === "template") {
@@ -1654,7 +1737,133 @@ function initBacktestPage(pageRoot) {
       tradesDetails.appendChild(pre);
       reportNode.appendChild(tradesDetails);
     }
+    if (reportNode.childElementCount === 0) {
+      reportNode.textContent = "Report is empty.";
+    }
     return reportNode;
+  };
+
+  const readVariantReportStateByKey = (variantKey) => ({
+    isLoading: state.reportLoadingKeys.has(variantKey),
+    report: state.reportCacheByVariantKey.get(variantKey) || null,
+    error: state.reportErrorsByVariantKey.get(variantKey) || null,
+    cacheHit: state.reportCacheHitKeys.has(variantKey),
+  });
+
+  const buildVariantReportRequestPayload = ({ variantRecord }) => {
+    if (state.latestRun === null) {
+      throw new Error("Backtest result context is unavailable.");
+    }
+
+    const latestRunRecord = asRecord(state.latestRun);
+    const runRequestPayload = asRecord(latestRunRecord.requestPayload);
+    const runResponsePayload = asRecord(latestRunRecord.response);
+    const variantPayload = asRecord(variantRecord.payload);
+    if (Object.keys(variantPayload).length === 0) {
+      throw new Error("Variant payload is unavailable.");
+    }
+
+    const payload = {
+      time_range: normalizeJsonLikeValue(asRecord(runRequestPayload.time_range)),
+      variant: normalizeJsonLikeValue(variantPayload),
+      include_trades: Number(runResponsePayload.top_trades_n || 0) > 0,
+    };
+
+    const strategyId = String(runRequestPayload.strategy_id || "").trim();
+    const templatePayload = asRecord(runRequestPayload.template);
+    const hasTemplatePayload = Object.keys(templatePayload).length > 0;
+    if (strategyId.length > 0 && hasTemplatePayload) {
+      throw new Error("Report request mode conflict: both strategy_id and template are set.");
+    }
+    if (strategyId.length === 0 && !hasTemplatePayload) {
+      throw new Error("Report request mode is missing: strategy_id or template is required.");
+    }
+    if (strategyId.length > 0) {
+      payload.strategy_id = strategyId;
+    }
+
+    if (hasTemplatePayload) {
+      payload.template = normalizeJsonLikeValue(templatePayload);
+    }
+
+    const overridesPayload = asRecord(runRequestPayload.overrides);
+    if (Object.keys(overridesPayload).length > 0) {
+      payload.overrides = normalizeJsonLikeValue(overridesPayload);
+    }
+
+    const warmupBars = readFiniteInteger(runRequestPayload.warmup_bars);
+    if (warmupBars !== null && warmupBars > 0) {
+      payload.warmup_bars = warmupBars;
+    }
+    return payload;
+  };
+
+  const loadVariantReport = async (variantIndex) => {
+    if (state.latestRun === null) {
+      showPageError(pageRoot, "Backtest result is unavailable.", []);
+      return;
+    }
+
+    const latestRunRecord = asRecord(state.latestRun);
+    const response = asRecord(latestRunRecord.response);
+    const variants = Array.isArray(response.variants) ? response.variants : [];
+    const variant = variants[variantIndex];
+    if (!variant) {
+      showPageError(pageRoot, "Variant is unavailable.", []);
+      return;
+    }
+    const variantRecord = asRecord(variant);
+    const variantKey = String(variantRecord.variant_key || "").trim();
+    if (variantKey.length === 0) {
+      showPageError(pageRoot, "variant_key is required for report loading.", []);
+      return;
+    }
+
+    if (state.reportLoadingKeys.has(variantKey)) {
+      return;
+    }
+    if (state.reportCacheByVariantKey.has(variantKey)) {
+      state.reportErrorsByVariantKey.delete(variantKey);
+      state.reportCacheHitKeys.add(variantKey);
+      renderResults(response);
+      return;
+    }
+
+    const runToken = state.latestRunToken;
+    state.reportLoadingKeys.add(variantKey);
+    state.reportErrorsByVariantKey.delete(variantKey);
+    state.reportCacheHitKeys.delete(variantKey);
+    renderResults(response);
+
+    try {
+      const reportRequestPayload = buildVariantReportRequestPayload({ variantRecord });
+      const reportResponse = await fetch(backtestVariantReportPath, {
+        method: "POST",
+        credentials: 'include',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reportRequestPayload),
+      });
+      if (!reportResponse.ok) {
+        throw await buildHttpError(reportResponse);
+      }
+      const reportPayload = asRecord(await reportResponse.json());
+      if (runToken !== state.latestRunToken) {
+        return;
+      }
+      state.reportCacheByVariantKey.set(variantKey, reportPayload);
+    } catch (error) {
+      if (runToken !== state.latestRunToken) {
+        return;
+      }
+      const normalized = normalizeError(error);
+      state.reportErrorsByVariantKey.set(variantKey, normalized);
+    } finally {
+      if (runToken !== state.latestRunToken) {
+        return;
+      }
+      state.reportLoadingKeys.delete(variantKey);
+      renderResults(asRecord(state.latestRun).response);
+    }
   };
 
   const renderResults = (responsePayload) => {
@@ -1682,24 +1891,61 @@ function initBacktestPage(pageRoot) {
     } else {
       variants.forEach((variant, index) => {
         const variantRecord = asRecord(variant);
+        const variantKey = String(variantRecord.variant_key || "").trim();
+        const reportState = readVariantReportStateByKey(variantKey);
         const row = document.createElement("tr");
         row.appendChild(buildCell(String(variantRecord.variant_index ?? index)));
         row.appendChild(buildCell(String(variantRecord.total_return_pct ?? "")));
-        row.appendChild(buildCell(String(variantRecord.variant_key || "")));
+        row.appendChild(buildCell(String(variantKey)));
         row.appendChild(buildCell(String(variantRecord.indicator_variant_key || "")));
 
         const reportCell = document.createElement("td");
-        reportCell.appendChild(renderVariantReport(asRecord(variantRecord.report)));
+        if (variantKey.length === 0) {
+          reportCell.textContent = "variant_key is missing.";
+        } else if (reportState.isLoading) {
+          reportCell.textContent = "Loading report...";
+        } else if (reportState.error !== null) {
+          reportCell.textContent = String(reportState.error.message || "Report load failed.");
+          const errorDetails = Array.isArray(reportState.error.details) ? reportState.error.details : [];
+          if (errorDetails.length > 0) {
+            const detailsList = document.createElement("ul");
+            detailsList.className = "compact-list";
+            errorDetails.forEach((detail) => {
+              const item = document.createElement("li");
+              item.textContent = String(detail);
+              detailsList.appendChild(item);
+            });
+            reportCell.appendChild(detailsList);
+          }
+        } else if (reportState.report !== null) {
+          const cacheLabel = document.createElement("p");
+          cacheLabel.className = "muted-text";
+          cacheLabel.textContent = reportState.cacheHit
+            ? "Loaded from cache by variant_key."
+            : "Cached by variant_key.";
+          reportCell.appendChild(cacheLabel);
+          reportCell.appendChild(renderVariantReport(reportState.report));
+        } else {
+          reportCell.textContent = "Not loaded. Use Load report action.";
+        }
         row.appendChild(reportCell);
 
         const actionsCell = document.createElement("td");
+        const loadReportButton = buildActionButton({
+          label: "Load report",
+          disabled: variantKey.length === 0 || reportState.isLoading,
+          onClick: () => {
+            loadVariantReport(index);
+          },
+        });
+        actionsCell.appendChild(loadReportButton);
         const saveButton = buildActionButton({
           label: "Save as Strategy",
+          className: "button-link--secondary",
           onClick: () => {
             saveVariantAsStrategy(index);
           },
         });
-        saveButton.classList.add("button-link--secondary");
         actionsCell.appendChild(saveButton);
         row.appendChild(actionsCell);
 
@@ -1946,10 +2192,16 @@ function initBacktestPage(pageRoot) {
         throw await buildHttpError(response);
       }
       const payload = await response.json();
+      state.latestRunToken += 1;
       state.latestRun = {
         response: payload,
         context: request.context,
+        requestPayload: normalizeJsonLikeValue(request.payload),
       };
+      state.reportCacheByVariantKey.clear();
+      state.reportLoadingKeys.clear();
+      state.reportErrorsByVariantKey.clear();
+      state.reportCacheHitKeys.clear();
       renderResults(payload);
     } finally {
       state.isRunning = false;
@@ -2089,6 +2341,8 @@ function initBacktestPage(pageRoot) {
   [
     directionModeSelect,
     sizingModeSelect,
+    rankingPrimaryMetricSelect,
+    rankingSecondaryMetricSelect,
     executionInitCash,
     executionFeePct,
     executionSlippagePct,

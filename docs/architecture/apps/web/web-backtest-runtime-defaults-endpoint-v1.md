@@ -32,6 +32,10 @@
   "top_k_default": 300,
   "preselect_default": 20000,
   "top_trades_n_default": 3,
+  "ranking": {
+    "primary_metric_default": "total_return_pct",
+    "secondary_metric_default": null
+  },
   "execution": {
     "init_cash_quote_default": 10000.0,
     "fixed_quote_default": 100.0,
@@ -54,6 +58,8 @@
 - `top_k_default` <- `backtest.top_k_default`
 - `preselect_default` <- `backtest.preselect_default`
 - `top_trades_n_default` <- `backtest.reporting.top_trades_n_default`
+- `ranking.primary_metric_default` <- `backtest.ranking.primary_metric_default`
+- `ranking.secondary_metric_default` <- `backtest.ranking.secondary_metric_default`
 - `execution.init_cash_quote_default` <- `backtest.execution.init_cash_quote_default`
 - `execution.fixed_quote_default` <- `backtest.execution.fixed_quote_default`
 - `execution.safe_profit_percent_default` <- `backtest.execution.safe_profit_percent_default`
@@ -72,6 +78,7 @@
   `data-api-backtest-runtime-defaults-path="/api/backtests/runtime-defaults"`.
 - `apps/web/dist/backtest_ui.js` загружает defaults один раз при инициализации страницы:
   - префилл `Advanced` input `.value`;
+  - префилл ranking selectors (`primary_metric`, `secondary_metric`);
   - обновление `execution.fee_pct` при смене market, пока поле не стало user-dirty;
   - подсказка по cap `jobs.top_k_persisted_default`.
 
