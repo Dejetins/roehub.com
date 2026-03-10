@@ -17,7 +17,9 @@ concurrency:
 jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    runs-on: [self-hosted, Linux, X64, roehub, prod]
+    # Production deploy runs on Mac Studio self-hosted runner.
+    # Runner should be configured with labels: roehub, prod, mac-studio.
+    runs-on: [self-hosted, macOS, ARM64, roehub, prod, mac-studio]
     timeout-minutes: 20
 
     defaults:
