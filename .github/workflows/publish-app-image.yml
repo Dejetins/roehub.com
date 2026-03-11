@@ -3,6 +3,16 @@ name: Publish App Image
 on:
   push:
     branches: ["main"]
+    paths:
+      - "apps/**"
+      - "src/**"
+      - "configs/**"
+      - "alembic/**"
+      - "migrations/**"
+      - "alembic.ini"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "infra/docker/Dockerfile.market_data"
   workflow_dispatch:
 
 permissions:

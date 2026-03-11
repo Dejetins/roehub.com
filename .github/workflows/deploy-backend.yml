@@ -1,6 +1,11 @@
 name: Deploy Backend
 
 on:
+  push:
+    branches: ["main"]
+    paths:
+      - "infra/docker/docker-compose.backend.yml"
+      - "infra/monitoring/**"
   workflow_run:
     workflows: ["Publish App Image"]
     branches: ["main"]
@@ -22,7 +27,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: [self-hosted, macOS, ARM64, roehub, prod, mac-studio]
     timeout-minutes: 30
 
