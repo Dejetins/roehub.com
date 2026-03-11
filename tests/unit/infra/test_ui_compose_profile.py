@@ -33,9 +33,9 @@ def _load_main_compose() -> dict[str, Any]:
     return cast(dict[str, Any], parsed)
 
 
-def test_ui_profile_contains_gateway_api_web_and_db_bootstrap() -> None:
+def test_ui_profile_contains_api_web_and_db_bootstrap() -> None:
     """
-    Verify main compose defines expected `ui` profile services for WEB-EPIC-02.
+    Verify main compose defines expected `ui` profile services after gateway removal.
 
     Args:
         None.
@@ -51,22 +51,23 @@ def test_ui_profile_contains_gateway_api_web_and_db_bootstrap() -> None:
     compose_payload = _load_main_compose()
     services = compose_payload["services"]
 
-    for service_name in ("api", "web", "gateway", "db-bootstrap"):
+    for service_name in ("api", "web", "db-bootstrap"):
         assert service_name in services
         assert services[service_name]["profiles"] == ["ui"]
+    assert "gateway" not in services
 
 
-def test_ui_profile_publishes_gateway_and_localhost_api_to_host() -> None:
+def test_ui_profile_publishes_localhost_api_and_web_to_host() -> None:
     """
-    Verify UI profile publishes gateway and localhost-only API host mappings.
+    Verify UI profile publishes localhost-only API and web host mappings.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        API is intentionally published only on localhost for private admin or tailnet
-        proxy scenarios, while web remains internal-only behind gateway.
+        API and web are intentionally published only on localhost for private admin,
+        tailnet proxy, and local browser same-origin scenarios.
     Raises:
         AssertionError: If required host publishing drifts from expected contract.
     Side Effects:
@@ -75,12 +76,20 @@ def test_ui_profile_publishes_gateway_and_localhost_api_to_host() -> None:
     compose_payload = _load_main_compose()
     services = compose_payload["services"]
 
-    assert services["gateway"]["ports"] == [
-        "${GATEWAY_HOST_BIND:-127.0.0.1}:${GATEWAY_HOST_PORT:-8080}:80"
-    ]
     assert services["api"]["ports"] == ["${API_HOST_BIND:-127.0.0.1}:${API_HOST_PORT:-8000}:8000"]
-    assert "ports" not in services["web"]
+    assert services["web"]["ports"] == ["127.0.0.1:${WEB_HOST_PORT:-8010}:8010"]
     assert "ports" not in services["db-bootstrap"]
+
+
+def test_ui_profile_web_uses_same_origin_base_and_direct_api_upstream() -> None:
+    """
+    Verify web service relies on an internal `/api/*` proxy instead of a gateway container.
+    """
+    compose_payload = _load_main_compose()
+    web_env = compose_payload["services"]["web"]["environment"]
+
+    assert web_env["WEB_API_BASE_URL"] == "${WEB_API_BASE_URL:-http://127.0.0.1:8010}"
+    assert web_env["WEB_API_UPSTREAM_URL"] == "${WEB_API_UPSTREAM_URL:-http://api:8000}"
 
 
 def test_ui_profile_uses_conninfo_dsn_defaults_from_postgres_env() -> None:

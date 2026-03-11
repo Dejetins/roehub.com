@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 _WEB_API_BASE_URL_ENV = "WEB_API_BASE_URL"
+_WEB_API_UPSTREAM_URL_ENV = "WEB_API_UPSTREAM_URL"
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ class WebRuntimeSettings:
     """
 
     api_base_url: str
-
+    api_upstream_url: str
 
 
 def resolve_web_runtime_settings(*, environ: Mapping[str, str]) -> WebRuntimeSettings:
@@ -31,17 +32,24 @@ def resolve_web_runtime_settings(*, environ: Mapping[str, str]) -> WebRuntimeSet
     Returns:
         WebRuntimeSettings: Validated immutable runtime settings.
     Assumptions:
-        `WEB_API_BASE_URL` is configured in all target environments.
+        `WEB_API_BASE_URL` and `WEB_API_UPSTREAM_URL` are configured in all target
+        environments.
     Raises:
-        ValueError: If `WEB_API_BASE_URL` is missing or blank.
+        ValueError: If required web API URLs are missing or blank.
     Side Effects:
         None.
     """
     raw_api_base_url = environ.get(_WEB_API_BASE_URL_ENV)
     if raw_api_base_url is None or not raw_api_base_url.strip():
-        raise ValueError(
-            "resolve_web_runtime_settings requires non-empty WEB_API_BASE_URL"
-        )
+        raise ValueError("resolve_web_runtime_settings requires non-empty WEB_API_BASE_URL")
+
+    raw_api_upstream_url = environ.get(_WEB_API_UPSTREAM_URL_ENV)
+    if raw_api_upstream_url is None or not raw_api_upstream_url.strip():
+        raise ValueError("resolve_web_runtime_settings requires non-empty WEB_API_UPSTREAM_URL")
 
     normalized_api_base_url = raw_api_base_url.strip().rstrip("/")
-    return WebRuntimeSettings(api_base_url=normalized_api_base_url)
+    normalized_api_upstream_url = raw_api_upstream_url.strip().rstrip("/")
+    return WebRuntimeSettings(
+        api_base_url=normalized_api_base_url,
+        api_upstream_url=normalized_api_upstream_url,
+    )

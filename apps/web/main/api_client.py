@@ -94,13 +94,13 @@ class HttpxCurrentUserApiClient(CurrentUserApiClient):
         Initialize API adapter with immutable HTTP settings and optional mock transport.
 
         Args:
-            api_base_url: Absolute API base URL from `WEB_API_BASE_URL`.
+            api_base_url: Absolute same-origin API base URL from `WEB_API_BASE_URL`.
             timeout_seconds: HTTP timeout for current-user lookup.
             transport: Optional httpx transport override used in tests.
         Returns:
             None.
         Assumptions:
-            `api_base_url` points to server that accepts `/api/auth/current-user`.
+            `api_base_url` points to server that serves same-origin `/api/*` paths.
         Raises:
             ValueError: If URL is blank or timeout is non-positive.
         Side Effects:
@@ -157,7 +157,6 @@ class HttpxCurrentUserApiClient(CurrentUserApiClient):
         )
 
 
-
 def _build_request_headers(*, cookie_header: str | None) -> dict[str, str]:
     """
     Build deterministic request headers for identity current-user HTTP call.
@@ -179,7 +178,6 @@ def _build_request_headers(*, cookie_header: str | None) -> dict[str, str]:
     if not normalized_cookie:
         return {}
     return {"Cookie": normalized_cookie}
-
 
 
 def _build_success_result(*, response: httpx.Response) -> CurrentUserApiResult:

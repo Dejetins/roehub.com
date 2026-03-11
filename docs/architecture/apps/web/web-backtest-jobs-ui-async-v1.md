@@ -23,7 +23,7 @@
   - `POST /backtests/jobs/{job_id}/cancel`
   См. `docs/architecture/backtest/backtest-jobs-api-v1.md`, `apps/api/routes/backtest_jobs.py`.
 
-- UI работает same-origin через gateway (WEB-EPIC-02): browser calls `/api/*`.
+- UI работает same-origin через edge/web proxy (WEB-EPIC-02): browser calls `/api/*`.
 - Web UI уже имеет:
   - sync backtest UI `/backtests` (WEB-EPIC-05) с формой template/saved mode.
   - Strategy builder prefill через `sessionStorage` + `/strategies/new?prefill=...`.
@@ -208,7 +208,7 @@ python -m tools.docs.generate_docs_index
 python -m tools.docs.generate_docs_index --check
 ```
 
-Manual smoke (через gateway):
+Manual smoke (через same-origin `/api/*`):
 
 1) `/backtests` -> выбрать "Run as job" -> создать job -> redirect в `/backtests/jobs/{job_id}`.
 2) На details: проверить polling status/top, прогресс и best-so-far.

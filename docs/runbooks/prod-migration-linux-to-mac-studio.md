@@ -75,7 +75,8 @@ Browser
 
 - production web живет на `VPS`.
 - current SSR `apps/web` сохраняется, переписывать UI в static site сейчас не нужно.
-- `nginx gateway` перестает быть production-компонентом; он остается dev/local helper.
+- отдельный `gateway` полностью удален из runtime path; same-origin реализуют `VPS Caddy` и
+  встроенный `/api/*` proxy в `apps/web` для local/dev.
 
 Почему gateway можно убрать из production:
 
@@ -115,7 +116,7 @@ Browser
 - stateful backend services;
 - `api`;
 - `web`;
-- `gateway`.
+- local/dev `web` routing.
 
 Для новой схемы нужен split по ответственности.
 
@@ -135,21 +136,18 @@ Browser
 - `infra/docker/docker-compose.web.prod.yml`
   - `web`
 
-Текущий `gateway` должен остаться либо:
-
-- только для dev/local сценариев,
-- либо быть удален из production deploy path.
+Текущий dev/local `gateway` уже удален из репозитория и больше не участвует в deploy path.
 
 ### 2. Убрать production dependency от `--profile ui` на Mac Studio
 
-Сейчас `api`, `web`, `gateway`, `db-bootstrap` привязаны к `profiles: ["ui"]`.
+Сейчас `api`, `web`, `db-bootstrap` привязаны к `profiles: ["ui"]`.
 Это неудобно и ведет к путанице.
 
 Для production target:
 
 - `api` и `db-bootstrap` должны стать backend-сервисами;
 - `web` должен переехать в отдельный web compose для `VPS`;
-- `gateway` не должен быть обязательным production-сервисом.
+- local/dev same-origin должен работать без отдельного proxy-контейнера.
 
 ### 3. Перевести production deploy на GHCR images
 
@@ -796,8 +794,8 @@ docker ps --format 'table {{.Names}}\t{{.Status}}' | rg 'web|gateway' || true
 ## Связанные документы, которые тоже нужно обновить
 
 - `docs/runbooks/web-ui-gateway-same-origin.md`
-  - пометить `gateway` как dev/local solution;
-  - добавить примечание, что production same-origin теперь делает `Caddy` на `VPS`.
+  - переписать под local/dev same-origin без отдельного gateway;
+  - зафиксировать, что production same-origin делает `Caddy` на `VPS`.
 - `docs/runbooks/roehub-ui-autostart-systemd.md`
   - пометить как устаревший для новой production topology;
   - либо переписать под `VPS web only`, либо архивировать.

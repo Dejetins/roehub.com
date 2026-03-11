@@ -1,7 +1,7 @@
 # Web UI v1 -- Tests + Docs Index (WEB-EPIC-07)
 
 Документ фиксирует контракт WEB-EPIC-07: минимальный набор unit/smoke тестов для Milestone 6
-(Web UI + gateway + market-data reference API) и правила поддержки docs index.
+(Web UI + same-origin API proxy + market-data reference API) и правила поддержки docs index.
 
 ## Цель
 
@@ -13,7 +13,7 @@
 Milestone 6 добавил:
 
 - `apps/web` (SSR + HTMX) + auth UX.
-- same-origin gateway (Nginx) с `/api/*` префиксом и `/assets/*` статикой.
+- same-origin `/api/*` contract для browser-side UI.
 - Market-data reference API endpoints для UI (`/market-data/*`).
 - Strategy/backtest/backtest-jobs UI flows, которые работают browser-side через `/api/*`.
 
@@ -22,7 +22,7 @@ Milestone 6 добавил:
 - иметь smoke-level уверенность в том, что ключевые страницы под login gate и содержат нужные
   "hooks" для browser JS,
 - иметь unit-level уверенность, что reference endpoints защищены auth и детерминированы,
-- проверять, что инфраструктурные контракты delivery (nginx strip `/api`, compose profile `ui`)
+- проверять, что инфраструктурные контракты delivery (web `/api/*` proxy, compose profile `ui`)
   не дрейфуют,
 - не ломать CI из-за не обновленного индекса docs.
 
@@ -61,7 +61,7 @@ Milestone 6 добавил:
 ## Non-goals
 
 - Полные e2e UI тесты (Playwright) в v1.
-- Интеграционные тесты с реальным Postgres/ClickHouse/Nginx.
+- Интеграционные тесты с реальным Postgres/ClickHouse/edge proxy.
 
 ## Implementation notes (как именно фиксируем контракт)
 
@@ -76,8 +76,8 @@ Milestone 6 добавил:
 Хотя в scope EPIC-07 формально входят только API reference и web smoke, мы допускаем
 добавление shape assertions для:
 
-- Nginx gateway config (наличие `location ^~ /api/` и strip semantics).
-- Docker compose `ui` profile (наличие сервисов и port publishing только у gateway).
+- Web app same-origin API proxy semantics (strip `/api` -> upstream path).
+- Docker compose `ui` profile (наличие сервисов и localhost-only publishing у api/web).
 
 Причина:
 
@@ -95,7 +95,6 @@ Web smoke tests:
 - `tests/unit/apps/web/test_api_client.py`
 
 Infra smoke tests (optional усиление):
-- `tests/unit/infra/test_gateway_nginx_config.py`
 - `tests/unit/infra/test_ui_compose_profile.py`
 - `tests/unit/apps/migrations/test_bootstrap_decisions.py`
 
@@ -128,6 +127,6 @@ CI:
 ## Риски / что дальше
 
 - Unit/smoke тесты не заменяют e2e браузерные проверки (настоящий Telegram login widget,
-  gateway routing, реальные cookies). В v1 это принимаемый риск.
+  same-origin proxy routing, реальные cookies). В v1 это принимаемый риск.
 - Если понадобится повысить уверенность, следующий шаг — добавить Playwright smoke (login bypass
   в dev или тестовый bot) как отдельный EPIC.

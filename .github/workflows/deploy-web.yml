@@ -80,6 +80,7 @@ jobs:
           cat > /tmp/roehub-web.env <<EOF
           ROEHUB_APP_IMAGE=${{ steps.image.outputs.image_ref }}
           WEB_API_BASE_URL=https://roehub.com
+          WEB_API_UPSTREAM_URL=https://macstudio-daniil.tail0ebbbc.ts.net
           WEB_HOST_PORT=8010
           EOF
 

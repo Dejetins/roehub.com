@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -29,7 +30,12 @@ def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> Tes
     Side Effects:
         Creates isolated FastAPI app instance for each test.
     """
-    app = create_app(environ={"WEB_API_BASE_URL": "http://api.local"})
+    app = create_app(
+        environ={
+            "WEB_API_BASE_URL": "http://web.local",
+            "WEB_API_UPSTREAM_URL": "http://api.local",
+        }
+    )
     resolved_api_result = api_result or CurrentUserApiResult(
         status_code=200,
         user=WebCurrentUser(
@@ -44,10 +50,9 @@ def _build_test_client(*, api_result: CurrentUserApiResult | None = None) -> Tes
     return TestClient(app)
 
 
-
-def test_create_app_fails_fast_when_web_api_base_url_is_missing() -> None:
+def test_create_app_fails_fast_when_required_web_api_urls_are_missing() -> None:
     """
-    Verify web app startup fails fast when `WEB_API_BASE_URL` is not configured.
+    Verify web app startup fails fast when required web API URLs are not configured.
 
     Args:
         None.
@@ -56,12 +61,55 @@ def test_create_app_fails_fast_when_web_api_base_url_is_missing() -> None:
     Assumptions:
         Runtime config validation executes during app factory call.
     Raises:
-        AssertionError: If startup unexpectedly succeeds without required env var.
+        AssertionError: If startup unexpectedly succeeds without required env vars.
     Side Effects:
         None.
     """
     with pytest.raises(ValueError, match="WEB_API_BASE_URL"):
         create_app(environ={})
+
+    with pytest.raises(ValueError, match="WEB_API_UPSTREAM_URL"):
+        create_app(environ={"WEB_API_BASE_URL": "http://web.local"})
+
+
+def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
+    """
+    Verify `/api/*` requests are proxied by web app directly to API upstream.
+    """
+    captured: dict[str, str | None] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["method"] = request.method
+        captured["path"] = request.url.path
+        captured["query"] = request.url.query.decode()
+        captured["cookie"] = request.headers.get("cookie")
+        return httpx.Response(
+            status_code=200,
+            headers={"content-type": "application/json"},
+            json={"ok": True},
+        )
+
+    app = create_app(
+        environ={
+            "WEB_API_BASE_URL": "http://web.local",
+            "WEB_API_UPSTREAM_URL": "http://api.local",
+        }
+    )
+    app.state.api_proxy_transport = httpx.MockTransport(handler)
+    client = TestClient(app)
+
+    response = client.get(
+        "/api/auth/current-user?verbose=1",
+        headers={"cookie": "session=abc; mode=dev"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True}
+    assert captured["method"] == "GET"
+    assert captured["path"] == "/auth/current-user"
+    assert captured["query"] == "verbose=1"
+    assert captured["cookie"] == "session=abc; mode=dev"
+
 
 @pytest.mark.parametrize(
     ("path", "expected_location"),
@@ -109,7 +157,6 @@ def test_protected_page_redirects_to_login_on_unauthorized_current_user(
     assert response.headers["location"] == expected_location
 
 
-
 def test_login_page_sanitizes_external_next_parameter() -> None:
     """
     Verify login page strips external redirect target and keeps safe fallback `/`.
@@ -134,7 +181,6 @@ def test_login_page_sanitizes_external_next_parameter() -> None:
     assert match is not None
     assert match.group(1) == "/"
     assert "https://evil.example/path" not in response.text
-
 
 
 def test_logout_page_contains_api_logout_call_and_login_redirect() -> None:

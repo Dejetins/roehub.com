@@ -1,10 +1,10 @@
-# Шлюз Web UI с same-origin (WEB-EPIC-02)
+# Web UI local same-origin (WEB-EPIC-02)
 
 Статус:
 
-- production path больше не использует `gateway`;
-- публичный same-origin теперь делает `Caddy` на `VPS`;
-- этот ранбук остается только для dev/local сценариев с `web + api + gateway`.
+- `gateway` удален из репозитория;
+- production same-origin делает `Caddy` на `VPS`;
+- local/dev same-origin теперь обеспечивает сам `apps/web` через встроенный `/api/*` proxy.
 
 ## Обязательный файл окружения
 
@@ -17,6 +17,7 @@
 
 - `POSTGRES_PASSWORD`
 - `WEB_API_BASE_URL`
+- `WEB_API_UPSTREAM_URL`
 - `TELEGRAM_BOT_TOKEN`
 
 DSN-ключи `IDENTITY_PG_DSN`, `POSTGRES_DSN`, `STRATEGY_PG_DSN` можно не задавать:
@@ -32,12 +33,12 @@ DSN-ключи `IDENTITY_PG_DSN`, `POSTGRES_DSN`, `STRATEGY_PG_DSN` можно �
 ```bash
 docker compose -f infra/docker/docker-compose.yml \
   --env-file /etc/roehub/roehub.env \
-  --profile ui up -d --build
+  --profile ui up -d --build api web db-bootstrap
 ```
 
 Ожидаемый адрес:
 
-- `http://127.0.0.1:8080`
+- `http://127.0.0.1:8010`
 
 Быстрые проверки:
 
@@ -46,8 +47,8 @@ docker compose -f infra/docker/docker-compose.yml \
   --env-file /etc/roehub/roehub.env \
   --profile ui ps
 
-curl -i http://127.0.0.1:8080/api/auth/current-user
-curl -i http://127.0.0.1:8080/assets/site.css
+curl -i http://127.0.0.1:8010/api/auth/current-user
+curl -i http://127.0.0.1:8010/assets/site.css
 ```
 
 ## Поведение bootstrap БД
@@ -81,11 +82,11 @@ curl -i http://127.0.0.1:8080/assets/site.css
 Примечание:
 
 - production login widget работает через `VPS` edge на `https://roehub.com`;
-- `gateway` на dev-машине не должен использоваться как production ingress.
+- local/dev использует тот же `/api/*` browser contract, но без отдельного gateway-контейнера.
 
 Разработка:
 
-1. Пробросьте `127.0.0.1:8080` через туннель (`cloudflared` или `ngrok`).
+1. Пробросьте `127.0.0.1:8010` через туннель (`cloudflared` или `ngrok`).
 2. Установите домен туннеля в `@BotFather /setdomain`.
 3. Откройте страницу логина через URL туннеля.
 
@@ -102,12 +103,10 @@ curl -i http://127.0.0.1:8080/assets/site.css
 - Повторите `/setdomain` и подождите до нескольких минут, пока изменения распространятся на стороне Telegram.
 - Проверьте, что widget использует ожидаемый username бота.
 
-## Примечание по health-маршрутизации
+## Примечание по same-origin маршрутизации
 
-Gateway отрезает префикс `/api` и проксирует запрос в API upstream:
+`apps/web` принимает browser-side `/api/*` запросы и проксирует их в upstream API без `/api` префикса:
 
-- `/api/<path>` на gateway -> `/<path>` на API.
+- `/api/<path>` на web -> `/<path>` на API upstream.
 
-Если позже в API появится `/health`, через gateway он будет доступен как `/api/health`.
-
-Для production та же семантика теперь реализуется на `VPS Caddy` без отдельного `nginx gateway` контейнера.
+В production эту же семантику на публичном edge реализует `VPS Caddy`.

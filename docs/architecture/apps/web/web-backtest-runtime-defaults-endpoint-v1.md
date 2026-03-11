@@ -1,6 +1,6 @@
 # Web / API Contract -- Backtest runtime defaults endpoint v1
 
-Документ фиксирует контракт `GET /backtests/runtime-defaults` (через gateway как
+Документ фиксирует контракт `GET /backtests/runtime-defaults` (через same-origin `/api/*` proxy как
 `GET /api/backtests/runtime-defaults`) для PR2 web backtests UI.
 
 ## Цель
@@ -13,7 +13,7 @@
 
 - Method: `GET`
 - Path (API module): `/backtests/runtime-defaults`
-- Path (browser через gateway): `/api/backtests/runtime-defaults`
+- Path (browser через same-origin proxy): `/api/backtests/runtime-defaults`
 - Auth: тот же dependency, что и для `POST /backtests` (cookie-session -> current user).
 
 ## Источник данных и fail-fast

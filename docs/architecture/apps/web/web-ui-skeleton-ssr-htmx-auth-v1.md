@@ -15,7 +15,7 @@
   - backtest: `POST /backtests`.
   - backtest jobs: `POST/GET /backtests/jobs*`.
   - strategy: `POST/GET/DELETE /strategies*`, `POST /strategies/clone`.
-- Milestone 6 фиксирует same-origin delivery через gateway (Nginx): браузер вызывает API только по `/api/...`.
+- Milestone 6 фиксирует same-origin delivery: браузер вызывает API только по `/api/...`.
 - `apps/web` в WEB-EPIC-01 является HTML facade над API (web не wires domain/application use-cases напрямую).
 
 См.:
@@ -51,10 +51,13 @@
 
 ### 3) Internal API client (web -> api)
 
-- `WEB_API_BASE_URL` (env) задаёт базовый URL API для server-side запросов web приложения.
+- `WEB_API_BASE_URL` (env) задаёт same-origin base URL для server-side запросов web приложения.
+- `WEB_API_UPSTREAM_URL` (env) задаёт direct upstream URL для встроенного `/api/*` proxy.
   Примеры:
-  - docker: `http://api:8000`
-  - локально: `http://127.0.0.1:8000`
+  - docker/local web base: `http://127.0.0.1:8010`
+  - docker/local API upstream: `http://api:8000`
+  - production web base: `https://roehub.com`
+  - production API upstream: `https://macstudio-daniil.tail0ebbbc.ts.net`
 
 - Для authenticated вызовов web форвардит `Cookie` header из browser request в API request.
 
@@ -71,8 +74,9 @@
 
 Web приложение не импортирует и не wires `src/trading/**` use-cases. Вместо этого:
 
-- browser-side взаимодействия используют `/api/...` (через gateway в Milestone 6);
-- server-side (login gate, page loaders) используют internal HTTP client к `WEB_API_BASE_URL`.
+- browser-side взаимодействия используют `/api/...` через same-origin edge/proxy;
+- server-side (login gate, page loaders) используют internal HTTP client к `WEB_API_BASE_URL`;
+- local/dev web процесс сам проксирует `/api/*` в `WEB_API_UPSTREAM_URL`.
 
 Причины:
 - минимизируем дублирование composition root (уже есть `apps/api/main/app.py`);
@@ -97,7 +101,7 @@ Protected pages (`/strategies`, `/backtests`, `/backtests/jobs`) выполня�
 Все ссылки на CSS/JS в templates используют `/assets/...`.
 
 Причина:
-- этот префикс закреплён в WEB-EPIC-02 для Nginx gateway.
+- этот префикс закреплен как browser-side contract независимо от конкретного edge/proxy.
 
 ### 4) Logout реализован через JS call к `/api/auth/logout` (вариант 1)
 
@@ -165,7 +169,7 @@ python -m tools.docs.generate_docs_index
 python -m tools.docs.generate_docs_index --check
 ```
 
-Manual smoke (после появления gateway в WEB-EPIC-02):
+Manual smoke:
 
 1) Открыть `https://roehub.com/login`.
 2) Нажать Telegram login, убедиться что `POST /api/auth/telegram/login` устанавливает cookie.
@@ -175,4 +179,4 @@ Manual smoke (после появления gateway в WEB-EPIC-02):
 ## Риски и открытые вопросы
 
 - Риск: cookie-based auth без CSRF защиты для state-changing запросов. Митигация v1: same-origin + `SameSite=lax`. CSRF вводим в отдельном milestone/epic при необходимости.
-- Риск: без gateway (до WEB-EPIC-02) browser-side `/api/*` не будет доступен. Для проверки end-to-end нужен Nginx.
+- Риск: same-origin proxy semantics должны оставаться одинаковыми между local/dev web proxy и production VPS Caddy.

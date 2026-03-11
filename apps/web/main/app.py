@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlencode
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -25,7 +26,18 @@ _BOT_USERNAME = "RoehubAuth_bot"
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 _TEMPLATES_PATH = _PACKAGE_ROOT / "templates"
 _DIST_PATH = _PACKAGE_ROOT / "dist"
-
+_HOP_BY_HOP_HEADERS = {
+    "connection",
+    "content-length",
+    "host",
+    "keep-alive",
+    "proxy-authenticate",
+    "proxy-authorization",
+    "te",
+    "trailer",
+    "transfer-encoding",
+    "upgrade",
+}
 
 
 def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
@@ -45,7 +57,8 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     Returns:
         FastAPI: Configured Roehub Web application instance.
     Assumptions:
-        `WEB_API_BASE_URL` is configured before web process startup.
+        `WEB_API_BASE_URL` and `WEB_API_UPSTREAM_URL` are configured before web
+        process startup.
     Raises:
         ValueError: If runtime settings are invalid.
     Side Effects:
@@ -60,9 +73,9 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app.state.current_user_api_client = HttpxCurrentUserApiClient(
         api_base_url=runtime_settings.api_base_url
     )
+    app.state.api_proxy_transport = None
     _register_routes(app=app, templates=templates, runtime_settings=runtime_settings)
     return app
-
 
 
 def _register_routes(
@@ -173,6 +186,60 @@ def _register_routes(
                 error_message=None,
             ),
         )
+
+    @app.api_route(
+        "/api/{upstream_path:path}",
+        methods=["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"],
+    )
+    async def proxy_api_request(request: Request, upstream_path: str) -> Response:
+        """
+        Proxy same-origin browser API requests to configured upstream API runtime.
+
+        Args:
+            request: Incoming browser request addressed to `/api/*` on web origin.
+            upstream_path: API path segment without the `/api/` prefix.
+        Returns:
+            Response: Upstream API response mirrored back to browser.
+        Assumptions:
+            API upstream serves routes without `/api` prefix.
+        Raises:
+            None.
+        Side Effects:
+            Performs one outbound HTTP request to configured API upstream.
+        """
+        upstream_url = f"{runtime_settings.api_upstream_url}/{upstream_path}"
+        request_body = await request.body()
+        request_headers = _build_proxy_request_headers(request=request)
+        transport = getattr(request.app.state, "api_proxy_transport", None)
+        client_kwargs: dict[str, Any] = {"timeout": 30.0}
+        if transport is not None:
+            client_kwargs["transport"] = transport
+
+        try:
+            async with httpx.AsyncClient(**client_kwargs) as http_client:
+                upstream_response = await http_client.request(
+                    request.method,
+                    upstream_url,
+                    content=request_body,
+                    headers=request_headers,
+                    params=request.query_params,
+                )
+        except httpx.HTTPError as error:
+            return Response(
+                status_code=502,
+                content=f"API proxy request failed: {error}",
+                media_type="text/plain",
+            )
+
+        proxied_response = Response(
+            content=upstream_response.content,
+            status_code=upstream_response.status_code,
+        )
+        for header_name, header_value in upstream_response.headers.multi_items():
+            if header_name.lower() in _HOP_BY_HOP_HEADERS:
+                continue
+            proxied_response.headers.append(header_name, header_value)
+        return proxied_response
 
     @app.get("/strategies", response_class=HTMLResponse)
     def get_strategies_page(request: Request) -> Response:
@@ -339,9 +406,7 @@ def _register_routes(
             Performs server-side identity API call for current user lookup.
         """
         api_client = _resolve_current_user_api_client(request=request)
-        api_result = api_client.fetch_current_user(
-            cookie_header=request.headers.get("cookie")
-        )
+        api_result = api_client.fetch_current_user(cookie_header=request.headers.get("cookie"))
         if api_result.status_code == 200 and api_result.user is not None:
             return templates.TemplateResponse(
                 request,
@@ -357,7 +422,6 @@ def _register_routes(
             status_code=502,
             content='<span class="user-badge user-badge--error">api unavailable</span>',
         )
-
 
 
 def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClient:
@@ -380,6 +444,28 @@ def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClien
         raise ValueError("current_user_api_client is not configured in application state")
     return api_client
 
+
+def _build_proxy_request_headers(*, request: Request) -> dict[str, str]:
+    """
+    Copy browser request headers for upstream API proxying.
+
+    Args:
+        request: Incoming browser request for `/api/*`.
+    Returns:
+        dict[str, str]: Forwarded header mapping without hop-by-hop transport headers.
+    Assumptions:
+        Browser cookies and content negotiation headers should be preserved verbatim.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    forwarded_headers: dict[str, str] = {}
+    for header_name, header_value in request.headers.items():
+        if header_name.lower() in _HOP_BY_HOP_HEADERS:
+            continue
+        forwarded_headers[header_name] = header_value
+    return forwarded_headers
 
 
 def _render_protected_page(
@@ -441,7 +527,6 @@ def _render_protected_page(
     )
 
 
-
 def _build_login_redirect_response(*, current_path: str) -> RedirectResponse:
     """
     Build deterministic redirect response to `/login` with guarded `next` target.
@@ -460,7 +545,6 @@ def _build_login_redirect_response(*, current_path: str) -> RedirectResponse:
     safe_next_path = sanitize_next_path(raw_next=current_path)
     query = urlencode({"next": safe_next_path})
     return RedirectResponse(url=f"/login?{query}")
-
 
 
 def _build_api_error_message(*, api_result: CurrentUserApiResult) -> str | None:
@@ -485,7 +569,6 @@ def _build_api_error_message(*, api_result: CurrentUserApiResult) -> str | None:
     if api_result.error_message is None:
         return "Identity API request failed"
     return api_result.error_message
-
 
 
 def _build_template_context(

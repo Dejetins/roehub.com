@@ -15,7 +15,7 @@
 ## Контекст
 
 - Web слой: `apps/web` (SSR + Jinja2 + HTMX) уже реализует login gate (WEB-EPIC-01).
-- Same-origin доставка обеспечивается gateway (WEB-EPIC-02): browser вызывает JSON API по `/api/...`.
+- Same-origin доставка обеспечивается edge/web proxy (WEB-EPIC-02): browser вызывает JSON API по `/api/...`.
 - Strategy API уже реализован и является source-of-truth:
   - `GET /strategies` (owner-only, deterministic ordering)
   - `GET /strategies/{strategy_id}`
@@ -52,7 +52,7 @@
 Причина:
 - сохраняем “API as source of truth”,
 - исключаем дублирование DTO/валидаций на web-слое,
-- упрощаем gateway контракт.
+- упрощаем same-origin proxy contract.
 
 ### 3) List strategies page
 
@@ -169,7 +169,7 @@ python -m tools.docs.generate_docs_index
 python -m tools.docs.generate_docs_index --check
 ```
 
-Manual smoke (через gateway):
+Manual smoke (через same-origin `/api/*`):
 
 1) Открыть `http://127.0.0.1:8080/strategies`.
 2) Создать стратегию через `/strategies/new`.

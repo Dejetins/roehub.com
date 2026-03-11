@@ -14,7 +14,7 @@
 ## Контекст
 
 - Web слой: `apps/web` (SSR + Jinja2 + HTMX) с login gate (WEB-EPIC-01).
-- Same-origin gateway: browser вызывает JSON API по `/api/*` (WEB-EPIC-02).
+- Same-origin proxy: browser вызывает JSON API по `/api/*` (WEB-EPIC-02).
 - Sync backtest API (source-of-truth): `POST /backtests`.
   Контракт request/response и deterministic ordering описаны в:
   - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
@@ -176,7 +176,7 @@ Prefill payload переносится между страницами чере�
 
 Причины:
 - не раздуваем URL (payload может быть больше query string лимитов),
-- не кладём JSON payload в логи proxy/gateway,
+- не кладем JSON payload в логи edge/proxy,
 - простая реализация без новых backend endpoints.
 
 ### 7) Sync run отменяется кооперативно при disconnect/abort
@@ -243,7 +243,7 @@ python -m tools.docs.generate_docs_index
 python -m tools.docs.generate_docs_index --check
 ```
 
-Manual smoke (через gateway):
+Manual smoke (через same-origin `/api/*`):
 
 1) Открыть `/backtests` после логина.
 2) Template-mode: выбрать market/symbol/timeframe, добавить индикаторы.

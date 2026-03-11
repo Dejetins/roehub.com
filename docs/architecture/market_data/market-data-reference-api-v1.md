@@ -17,13 +17,12 @@ backed by ClickHouse reference tables `market_data.ref_market` and `market_data.
     - `market_data.ref_market` (ReplacingMergeTree(updated_at), key `market_id`)
     - `market_data.ref_instruments` (ReplacingMergeTree(updated_at), key `(market_id, symbol)`)
 
-- UI runs same-origin behind gateway (WEB-EPIC-02): browser calls JSON API via `/api/*`,
+- UI runs same-origin behind edge/web proxy (WEB-EPIC-02): browser calls JSON API via `/api/*`,
   but API router paths remain without `/api` prefix.
 
 Docs:
 - `docs/architecture/roadmap/milestone-6-epics-v1.md` (WEB-EPIC-03)
 - `docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md` (UI uses these endpoints)
-- `docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md` (same-origin `/api/*` contract)
 - `docs/architecture/market_data/market-data-reference-data-sync-v2.md` (how ref tables are populated)
 - `docs/architecture/shared-kernel-primitives.md` (MarketId/Symbol/InstrumentId semantics)
 
