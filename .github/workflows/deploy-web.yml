@@ -57,7 +57,7 @@ jobs:
           echo "image_ref=${image_repo}:${image_tag}" >> "$GITHUB_OUTPUT"
 
       - name: Start SSH agent
-        uses: webfactory/ssh-agent@v0.9.1
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.PROD_VPS_SSH_KEY }}
 
