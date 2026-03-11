@@ -1,66 +1,210 @@
-# Переезд продакшена с Linux на Mac Studio (macOS)
+# Переезд продакшена с Linux на Mac Studio + VPS edge
 
-Пошаговый runbook: перенос прод-стека Roehub (Docker Compose) + данных Postgres/ClickHouse на Mac Studio, настройка публичного `roehub.com` и удаленного управления.
+Актуальный production runbook для Roehub после смены решения по ingress:
 
-## Цели и принципы
+- `Mac Studio` остается приватным backend/data/compute host.
+- публичный web ingress и TLS живут на отдельном `VPS`.
+- старый Linux сервер выключается после подтвержденного cutover.
 
-- **Цель:** Mac Studio становится единственной production-машиной (Linux сервер будет выключен).
-- **Данные:** мигрируем **все** данные `Postgres` + `ClickHouse` (и при желании `Grafana/Prometheus/Redis` volumes).
-- **CI:** остается на GitHub-hosted runners (`ubuntu-latest`) — см. `b/.github/workflows/ci.yml`.
-- **Deploy:** выполняется на **self-hosted runner на Mac Studio** — адаптация `b/.github/workflows/deploy.yml`.
-- **Удаленное управление:** только через **Tailscale + SSH** (порт 22 наружу не открываем).
-- **Публичный доступ:** `roehub.com` должен работать с Mac Studio (TLS обязателен).
+Документ заменяет предыдущий план, в котором `Mac Studio` должен был сам принимать публичные `80/443`.
 
-## Что уже есть в репозитории (важно для миграции)
+## Целевая архитектура
 
-- Прод-лейаут деплоя:
-  - compose: `/opt/roehub/docker-compose.yml`
-  - env: `/etc/roehub/roehub.env`
-  - build context: `/opt/roehub/market-data-src`
-- Deploy workflow (сейчас Linux): `b/.github/workflows/deploy.yml`.
-- Compose (prod): `infra/docker/docker-compose.yml`.
+### Роли хостов
 
-## Публичный ingress (статический IP: `185.155.18.21`)
+- `VPS` (`155.212.170.144`, Ubuntu 24.04) - единственный публичный edge:
+  - `Caddy` как host-service;
+  - `web` SSR процесс/контейнер;
+  - `Let's Encrypt`;
+  - reverse proxy `/api/*` на `Mac Studio` через `Tailscale`.
+- `Mac Studio` (`tailscale: 100.74.213.43`) - приватный backend/data/compute host:
+  - `api`;
+  - `postgres`;
+  - `clickhouse`;
+  - `redis`;
+  - market-data workers/scheduler;
+  - `grafana`, `prometheus`, `blackbox`;
+  - `Colima` под пользователем `deploy`;
+  - self-hosted GitHub Actions runner.
+- старый Linux сервер - только источник миграции и временный tailnet node до полного вывода из эксплуатации.
 
-У вас есть выделенный статический IPv4 `185.155.18.21`, поэтому базовый и самый прозрачный вариант для продакшена:
+### Production flow
 
-- публичный `HTTPS` на Mac Studio через **Caddy** (Let's Encrypt)
-- Roehub gateway остается на `127.0.0.1:8080` и не торчит наружу
+```text
+Browser
+  -> https://roehub.com
+  -> VPS Caddy
+     -> /            -> web on VPS
+     -> /api/*       -> API on Mac Studio over Tailscale
+                          -> Postgres / ClickHouse / Redis / workers on Mac Studio
+```
 
-Ниже описаны два варианта (B — рекомендуемый при статическом IP).
+### Invariants
 
-### Вариант A: Cloudflare Tunnel (без проброса портов)
+- публичный DNS (`roehub.com`, `www.roehub.com`) указывает только на `VPS`.
+- `Mac Studio` не принимает публичные `80/443`.
+- SSH наружу на `Mac Studio` не открывается.
+- администрирование обоих хостов - через `Tailscale + SSH`.
+- monitoring и admin endpoints не публикуются в интернет.
+- production deploy разделен на два независимых контура:
+  - backend deploy -> `Mac Studio`;
+  - web/edge deploy -> `VPS`.
 
-Подходит, если:
+## Что больше не делаем
 
-- нет статического IPv4,
-- есть CGNAT,
-- не хочется открывать 80/443 на роутере,
-- нужен быстрый и предсказуемый TLS.
+Следующие шаги из старой версии runbook больше не являются production target:
 
-Минусы: зависимость от Cloudflare.
+- не поднимаем публичный `Caddy` на `Mac Studio`;
+- не держим `web` и `gateway` как production ingress на `Mac Studio`;
+- не пробрасываем `80/443` с домашнего роутера на `Mac Studio`;
+- не используем `Cloudflare Tunnel` как основной production ingress;
+- не используем `ispmanager` для production deployment;
+- не пытаемся завершить старый план "Mac Studio как единственный публичный origin".
 
-### Вариант B (рекомендуемый): Прямой вход на 80/443 + Caddy на Mac Studio
+Если что-то из этого уже было временно настроено в процессе диагностики, после cutover это нужно удалить.
 
-Подходит, если:
+## Что считаем правильным production design
 
-- есть публичный IPv4 `185.155.18.21`,
-- можно принимать входящие 80/443 на Mac Studio (и на периметре, если он есть),
-- хочется полностью self-hosted TLS.
+### Edge
 
-Минусы: нужно аккуратно закрыть остальную поверхность (SSH/прочие сервисы не выставлять наружу).
+- `Caddy` работает на `VPS` как системный сервис.
+- `www.roehub.com` делает `301` на `roehub.com`.
+- `Caddy` сам получает и обновляет сертификаты `Let's Encrypt`.
 
-Дальше в runbook шаги общие + развилка по ingress.
+### Web
 
----
+- production web живет на `VPS`.
+- current SSR `apps/web` сохраняется, переписывать UI в static site сейчас не нужно.
+- `nginx gateway` перестает быть production-компонентом; он остается dev/local helper.
 
-## Фаза 0 — Подготовка и стоп-линия (Linux прод)
+Почему gateway можно убрать из production:
 
-Задача: подготовить перенос так, чтобы можно было повторить и проверить, и чтобы данные были консистентны.
+- `apps/web` сам отдает `/assets/*` через `StaticFiles`;
+- same-origin routing `/api/*` можно реализовать напрямую в `Caddy` на `VPS`;
+- лишний hop и отдельный контейнер на публичном edge не нужны.
 
-На Linux прод-сервере:
+### Backend
 
-1) Зафиксировать версию стека и состояние:
+- `Mac Studio` держит stateful и compute-нагрузку.
+- API не публикуется напрямую в интернет.
+- внешний трафик к API идет только через `VPS`.
+
+### Deploy
+
+Рекомендуемая production-модель:
+
+- GitHub-hosted CI builds multi-arch image(s) и публикует их в `GHCR`.
+- `Mac Studio` не собирает production source bundle на лету, а делает `pull` готовых image tags.
+- `VPS` тоже делает `pull` из `GHCR`, а не build из git checkout.
+
+Это профессиональнее, чем текущий host-build deploy, потому что:
+
+- prod-хосты становятся thin runtime targets;
+- deploy детерминированнее;
+- одна и та же версия image разворачивается на `linux/amd64` (`VPS`) и `linux/arm64` (`Mac Studio`) через multi-arch manifest;
+- rollback проще.
+
+## Что нужно изменить в репозитории перед финальным cutover
+
+Текущие production артефакты в репозитории еще соответствуют старому плану и должны быть переработаны.
+
+### 1. Разделить production deployment на backend и web
+
+Текущий `infra/docker/docker-compose.yml` смешивает:
+
+- stateful backend services;
+- `api`;
+- `web`;
+- `gateway`.
+
+Для новой схемы нужен split по ответственности.
+
+Рекомендуемый target:
+
+- `infra/docker/docker-compose.backend.yml`
+  - `postgres`
+  - `clickhouse`
+  - `redis`
+  - `db-bootstrap`
+  - `api`
+  - `market-data-ws-worker`
+  - `market-data-scheduler`
+  - `grafana`
+  - `prometheus`
+  - `blackbox`
+- `infra/docker/docker-compose.web.prod.yml`
+  - `web`
+
+Текущий `gateway` должен остаться либо:
+
+- только для dev/local сценариев,
+- либо быть удален из production deploy path.
+
+### 2. Убрать production dependency от `--profile ui` на Mac Studio
+
+Сейчас `api`, `web`, `gateway`, `db-bootstrap` привязаны к `profiles: ["ui"]`.
+Это неудобно и ведет к путанице.
+
+Для production target:
+
+- `api` и `db-bootstrap` должны стать backend-сервисами;
+- `web` должен переехать в отдельный web compose для `VPS`;
+- `gateway` не должен быть обязательным production-сервисом.
+
+### 3. Перевести production deploy на GHCR images
+
+Рекомендуемый target:
+
+- один multi-arch app image для:
+  - `api`
+  - `web`
+  - `db-bootstrap`
+  - workers/scheduler
+- third-party images продолжают тянуться из upstream registries.
+
+Пример naming policy:
+
+- `ghcr.io/<owner>/roehub-app:<git-sha>`
+- `ghcr.io/<owner>/roehub-app:main`
+
+### 4. Разделить workflow deploy
+
+Текущий `.github/workflows/deploy.yml` больше не отражает production topology.
+
+Нужен target из двух workflow:
+
+- `.github/workflows/publish-app-image.yml`
+  - GitHub-hosted build/push multi-arch app image в `GHCR`
+- `.github/workflows/deploy-backend.yml`
+  - runs-on: `[self-hosted, macOS, ARM64, roehub, prod, mac-studio]`
+  - deploy backend stack на `Mac Studio`
+- `.github/workflows/deploy-web.yml`
+  - runs-on: `ubuntu-latest`
+  - SSH deploy на `root@VPS`
+  - deploy/reload `web` + `Caddy`
+
+Опционально:
+
+- GitHub Environment `production` с manual approval.
+
+### 4.1 GitHub variables/secrets для web deploy
+
+Минимум для `.github/workflows/deploy-web.yml`:
+
+- repository variable `PROD_VPS_HOST`
+- repository variable `PROD_VPS_USER`
+- repository secret `PROD_VPS_SSH_KEY`
+
+Важно:
+
+- `PROD_VPS_SSH_KEY` должен быть отдельным deploy key без passphrase;
+- текущий локальный ключ с passphrase удобен для ручной работы, но не подходит для GitHub Actions.
+
+## Фаза 0 - Стоп-линия и инвентаризация старого Linux
+
+Цель: зафиксировать, что старый Linux больше не источник production traffic и нужен только до завершения cutover.
+
+На старом Linux:
 
 ```bash
 docker --version
@@ -68,61 +212,37 @@ docker compose version
 docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 ```
 
-2) Убедиться, что есть актуальный env-файл и он содержит нужные ключи (минимум):
+Проверить, что уже забраны:
 
-- `POSTGRES_PASSWORD`
-- `CLICKHOUSE_PASSWORD`
-- `ROEHUB_ENV=prod`
-- `IDENTITY_COOKIE_SECURE=true` (в проде обязательно)
-- `GF_SERVER_ROOT_URL` (для grafana)
+- `/etc/roehub/roehub.env`
+- Postgres dump / restore assets
+- ClickHouse / Redis / Prometheus / Grafana volume exports
+- контрольные `sha256`
 
-Проверка (без вывода секретов):
+Если данные уже успешно восстановлены на `Mac Studio`, старый Linux больше не должен использоваться как fallback runtime.
 
-```bash
-sudo test -s /etc/roehub/roehub.env
-sudo rg -n '^(ROEHUB_ENV|POSTGRES_PASSWORD|CLICKHOUSE_PASSWORD|IDENTITY_COOKIE_SECURE|GF_SERVER_ROOT_URL)=' /etc/roehub/roehub.env
-```
+## Фаза 1 - Подготовить Mac Studio как private backend host
 
-3) Подготовить окно даунтайма для финального cutover (когда будем останавливать Linux и снимать volumes).
+### 1.1 Пользователи и доступ
 
----
+Рекомендуемая модель:
 
-## Фаза 1 — Сетевой доступ к Mac Studio (LAN + remote)
+- ваш основной macOS admin user - только администрирование;
+- `deploy` - non-admin пользователь для `Colima` и GitHub runner.
 
-### 1.1 Thunderbolt Bridge (быстрый локальный канал)
+SSH на `Mac Studio`:
 
-На MacBook Pro и Mac Studio:
+- только через `Tailscale`;
+- наружу `22/tcp` не открывать.
 
-1) `System Settings → Network` включить **Thunderbolt Bridge**.
-2) Задать статические IPv4 (пример):
+### 1.2 Tailscale
 
-- Mac Studio: `10.50.0.1/30`
-- MacBook Pro: `10.50.0.2/30`
+На `Mac Studio` должен быть стабильный tailnet access.
 
-3) Проверить ping и SSH:
+Текущий node:
 
-```bash
-ping 10.50.0.1
-ssh <user>@10.50.0.1
-```
-
-### 1.2 SSH на Mac Studio
-
-На Mac Studio:
-
-1) `System Settings → General → Sharing → Remote Login` включить.
-2) Разрешить доступ только для выделенного пользователя (см. Фаза 2).
-
-### 1.3 Tailscale (удаленное управление из другой сети)
-
-На Mac Studio:
-
-```bash
-# (если Homebrew еще не установлен — см. Фаза 2)
-brew install --cask tailscale
-```
-
-Дальше зайти в Tailscale и залогиниться в tailnet.
+- `macstudio-daniil`
+- `100.74.213.43`
 
 Проверка:
 
@@ -131,739 +251,156 @@ tailscale status
 tailscale ip -4
 ```
 
-На MacBook Pro:
+### 1.3 Colima и Docker
+
+`Colima` остается под пользователем `deploy`.
+
+Обязательные требования:
+
+- один runtime owner: `deploy`;
+- runtime restart после reboot;
+- mount `/opt/roehub` в VM (`virtiofs`), иначе monitoring bind-mounts ломаются.
+
+Проверка под `deploy`:
 
 ```bash
-brew install --cask tailscale
-```
-
-Рекомендация по SSH:
-
-- Не открывать порт 22 наружу (даже при статическом IP).
-- Ходить на Mac Studio по SSH через Tailscale IP/hostname.
-
-Пример `~/.ssh/config` на MacBook:
-
-```sshconfig
-Host roehub-studio-lan
-  HostName 10.50.0.1
-  User deploy
-  IdentityFile ~/.ssh/id_ed25519
-
-Host roehub-studio-vpn
-  HostName <mac-studio-tailnet-hostname>
-  User deploy
-  IdentityFile ~/.ssh/id_ed25519
-
-# (опционально) Если все же нужен прямой SSH по статическому IP:
-# Host roehub-studio-public
-#   HostName 185.155.18.21
-#   User deploy
-#   IdentityFile ~/.ssh/id_ed25519
-```
-
-Опционально (если все же открываете SSH наружу):
-
-- только key-based auth
-- `PasswordAuthentication no`
-- ограничить `AllowUsers deploy`
-- по возможности ограничить вход по IP (pf)
-
----
-
-## Фаза 2 — Подготовить Mac Studio как production-хост
-
-### 2.1 Создать пользователя для прод-операций
-
-Можно делать все из своего admin-аккаунта — это будет работать, но это хуже по безопасности и сопровождению.
-
-Почему отдельный пользователь — "по-взрослому":
-
-- **Least privilege:** GitHub Actions runner выполняет код из репозитория; если runner живет в твоем admin-аккаунте, компрометация job == компрометация твоего профиля/ключей/настроек.
-- **Меньше blast radius:** ошибочный скрипт деплоя не должен иметь `sudo` по умолчанию.
-- **Разделение секретов:** проще хранить production-артефакты (`/opt/roehub`, `/etc/roehub`) с понятными владельцами/правами.
-- **Аудит и стабильность:** отдельный user для автоматики меньше завязан на твой Keychain/GUI/личные тулзы.
-
-Рекомендуемая модель для твоего случая:
-
-- твой пользователь (admin) — **только** администрирование macOS и интерактивный SSH
-- `deploy` (standard user, без admin) — **только** GitHub Actions runner + docker/compose операции
-
-Важно: `deploy` не обязан иметь SSH-доступ. Можно оставить **Remote Login только для твоего пользователя**, а runner запускать от `deploy` как сервис.
-
-На Mac Studio (выполнить в Terminal под админом):
-
-```bash
-# создать пользователя deploy (пример)
-sudo sysadminctl -addUser deploy -shell /bin/zsh -home /Users/deploy
-sudo sysadminctl -resetPasswordFor deploy
-
-# убедиться, что deploy НЕ в группе admin
-dseditgroup -o checkmember -m deploy admin || true
-```
-
-Дальше в `System Settings → General → Sharing → Remote Login`:
-
-- выбрать **Only these users**
-- добавить **только** твой основной аккаунт
-- не добавлять `deploy`
-
-### 2.2 Установить базовый софт
-
-На Mac Studio под пользователем `deploy`:
-
-1) Homebrew (если еще нет):
-
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-2) Пакеты:
-
-```bash
-brew install git uv jq rsync zstd ripgrep docker-buildx
-```
-
-### 2.3 Docker engine (рекомендуем: Colima)
-
-Цель: иметь headless Docker engine, который можно запускать без GUI и использовать в GitHub Actions runner.
-
-Альтернатива: Docker Desktop (проще стартует/обслуживается, но GUI/лицензирование могут быть нежелательны для прод-сервера).
-
-На Mac Studio под `deploy`:
-
-```bash
-brew install colima docker docker-compose
-```
-
-Если ты уже запустил `colima start` под своим основным пользователем (не `deploy`) — это не ошибка,
-но важно помнить: у каждого пользователя свой `~/.colima` и свой Docker socket. Для прод-деплоя через
-GitHub Actions runner лучше, чтобы **runner и Colima жили под одним и тем же пользователем** (обычно `deploy`).
-
-Запуск Colima (подбери ресурсы под объем CH/PG; пример):
-
-```bash
-colima start --cpu 6 --memory 16 --disk 200
 docker version
 docker compose version
-
-# убедиться, что выбран docker context colima
 docker context ls
-docker context use colima
 ```
 
-Если `docker compose ...` не работает и пишет `unknown command: docker compose`:
+### 1.4 Серверный layout
 
-Это означает, что Compose v2 plugin не найден. Исправление (под тем же пользователем, который будет запускать deploy):
+Оставляем canonical layout:
 
-```bash
-brew install docker-compose
+- `/opt/roehub` - deploy bundle/runtime manifests
+- `/etc/roehub/roehub.env` - backend secrets
 
-mkdir -p ~/.docker/cli-plugins
-ln -sfn "$(brew --prefix)/opt/docker-compose/bin/docker-compose" ~/.docker/cli-plugins/docker-compose
-
-docker compose version
-```
-
-Если сборка образов падает с ошибкой про BuildKit/buildx (например:
-`BuildKit is enabled but the buildx component is missing or broken`):
-
-```bash
-brew install docker-buildx
-
-# проверить под пользователем deploy
-sudo -iu deploy /bin/zsh -lc "docker buildx version"
-```
-
-Альтернатива (не рекомендуется для этого репо): использовать команду `docker-compose` вместо `docker compose`.
-В репозитории и workflow'ах ожидается именно `docker compose`.
-
-Примечание:
-
-- Если ClickHouse/Postgres данные большие, **сразу** выделяй достаточно `--disk` (переразмерить позже сложнее).
-
-### 2.4 Подготовить серверный layout (/opt + /etc)
-
-На Mac Studio:
+Минимум:
 
 ```bash
 sudo mkdir -p /opt/roehub /etc/roehub
-
-# /opt/roehub должен быть writable для deploy (его использует deploy workflow)
 sudo chown -R deploy:staff /opt/roehub
 sudo chmod 755 /opt/roehub
-```
 
-Файл секретов:
-
-```bash
 sudo touch /etc/roehub/roehub.env
 sudo chown deploy:staff /etc/roehub/roehub.env
 sudo chmod 600 /etc/roehub/roehub.env
 ```
 
-Дальше мы скопируем содержимое с Linux (Фаза 5).
+### 1.5 Backend only на Mac Studio
 
-### 2.5 Настройки macOS для режима "сервер"
+Production target на `Mac Studio`:
 
-На Mac Studio (под админом):
+- оставить:
+  - `api`
+  - `postgres`
+  - `clickhouse`
+  - `redis`
+  - `market-data-ws-worker`
+  - `market-data-scheduler`
+  - `grafana`
+  - `prometheus`
+  - `blackbox`
+  - `Colima`
+  - `Tailscale`
+  - self-hosted runner
+- удалить после cutover:
+  - публичный `Caddy`
+  - `web`
+  - `gateway`
+  - любые временные публичные ingress-костыли
 
-```bash
-# не усыплять систему
-sudo pmset -a sleep 0
+### 1.6 Чего не должно быть на Mac Studio после cutover
 
-# автоперезапуск при потере питания
-sudo pmset -a autorestart 1
+- не должно быть production зависимости от домашнего роутера для `80/443`;
+- не должно быть активного публичного `Caddy`;
+- не должно быть production `web` контейнера;
+- не должно быть production `gateway` контейнера;
+- в `/etc/hosts` на рабочих машинах не должно оставаться временных записей для `roehub.com`.
 
-pmset -g
-```
+## Фаза 2 - Подготовить VPS как public edge
 
-Рекомендация:
+### 2.1 Базовые факты
 
-- отключить авто-установку апдейтов, которые могут ребутнуть машину в неожиданный момент
-- оставить только уведомления/ручную установку
+Текущий `VPS`:
 
-### 2.6 Автозапуск Colima после перезагрузки (launchd)
+- IP: `155.212.170.144`
+- OS: `Ubuntu 24.04`
+- size: `1 vCPU / 2 GB RAM / 40 GB SSD`
+- deploy user: `root`
+- `ispmanager` не используем
 
-Без этого после ребута Docker может не подняться сам.
+### 2.2 Базовая инициализация VPS
 
-Важно для Roehub: деплой кладет bundle в `/opt/roehub`, а compose монтирует файлы из `/opt/roehub/monitoring/**`.
-Colima VM по умолчанию шарит только `/Users`, поэтому нужно явно примонтировать `/opt/roehub` внутрь VM,
-иначе контейнеры `prometheus`/`blackbox` могут падать на bind-mount конфигов.
-
-Вариант (системный LaunchDaemon, стартует `colima` от имени пользователя `deploy`):
-
-1) Создать скрипт:
-
-```bash
-sudo tee /usr/local/bin/roehub_colima_start >/dev/null <<'SH'
-#!/usr/bin/env bash
-set -euo pipefail
-
-COLIMA_BIN="$(/opt/homebrew/bin/brew --prefix)/bin/colima"
-if [ ! -x "${COLIMA_BIN}" ]; then
-  echo "colima not found at ${COLIMA_BIN}" >&2
-  exit 1
-fi
-
-exec sudo -u deploy "${COLIMA_BIN}" start --cpu 6 --memory 16 --disk 200 --mount-type virtiofs --mount /opt/roehub:w
-SH
-
-sudo chmod +x /usr/local/bin/roehub_colima_start
-```
-
-2) Создать plist `/Library/LaunchDaemons/com.roehub.colima.plist`:
+Под `root`:
 
 ```bash
-sudo tee /Library/LaunchDaemons/com.roehub.colima.plist >/dev/null <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-  <dict>
-    <key>Label</key>
-    <string>com.roehub.colima</string>
-
-    <key>ProgramArguments</key>
-    <array>
-      <string>/usr/local/bin/roehub_colima_start</string>
-    </array>
-
-    <key>RunAtLoad</key>
-    <true/>
-
-    <key>StandardOutPath</key>
-    <string>/var/log/roehub_colima.out.log</string>
-    <key>StandardErrorPath</key>
-    <string>/var/log/roehub_colima.err.log</string>
-  </dict>
-</plist>
-PLIST
-
-sudo chown root:wheel /Library/LaunchDaemons/com.roehub.colima.plist
-sudo chmod 644 /Library/LaunchDaemons/com.roehub.colima.plist
-```
-
-3) Загрузить сервис:
-
-```bash
-sudo launchctl load -w /Library/LaunchDaemons/com.roehub.colima.plist
-sudo launchctl list | rg com.roehub.colima || true
-```
-
-Проверка (под `deploy`):
-
-```bash
+apt-get update
+apt-get install -y ca-certificates curl git jq rsync docker.io docker-compose-plugin
+systemctl enable --now docker
 docker version
 docker compose version
 ```
 
----
+### 2.3 Tailscale на VPS
 
-## Фаза 3 — GitHub Actions runner на Mac Studio (deploy)
+Цель: `VPS` должен видеть `Mac Studio` по tailnet.
 
-Цель: сохранить текущую модель деплоя (self-hosted runner), но перенести runner на Mac Studio.
-
-### 3.1 Создать runner в репозитории
-
-В GitHub:
-
-`Repo → Settings → Actions → Runners → New self-hosted runner → macOS`
-
-На Mac Studio под пользователем `deploy`:
+Установка:
 
 ```bash
-mkdir -p /opt/actions-runner/roehub
-cd /opt/actions-runner/roehub
-
-# дальше команды будут такими, как выдаст GitHub (curl + tar + ./config.sh)
+curl -fsSL https://tailscale.com/install.sh | sh
+tailscale up
+tailscale status
+tailscale ip -4
 ```
 
-Рекомендуемые labels для runner:
+После этого зафиксировать:
 
-- `roehub`
-- `prod`
-- `mac-studio`
+- Tailscale IPv4 `VPS`
+- имя node `VPS` в tailnet
 
-Пример (GitHub выдаст актуальный токен):
+Проверка связи с `Mac Studio`:
 
 ```bash
-./config.sh \
-  --url https://github.com/<ORG>/<REPO> \
-  --token <TOKEN> \
-  --name mac-studio-prod \
-  --labels roehub,prod,mac-studio \
-  --unattended
+ping 100.74.213.43
 ```
 
-### 3.2 Запустить runner как сервис (launchd)
+### 2.4 Caddy на VPS
 
-Рекомендуемый путь для macOS: service через `svc.sh`.
+`Caddy` на `VPS` - host-service, не контейнер.
+
+Установка:
 
 ```bash
-sudo ./svc.sh install
-sudo ./svc.sh start
+apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
+apt-get update
+apt-get install -y caddy
+systemctl enable caddy
 ```
 
-Проверка:
+### 2.5 Runtime layout на VPS
+
+Рекомендуемый layout:
+
+- `/opt/roehub-web` - docker compose + env для `web`
+- `/etc/caddy/Caddyfile` - public ingress config
 
 ```bash
-./svc.sh status
+mkdir -p /opt/roehub-web
 ```
 
-Важно: runner должен иметь доступ к `docker`/`docker compose` (Colima должен быть запущен для пользователя `deploy`).
+## Фаза 3 - DNS и публичный edge
 
----
+### 3.1 DNS target
 
-## Фаза 4 — Обновить deploy workflow под Mac Studio
+После cutover:
 
-Сейчас `b/.github/workflows/deploy.yml` привязан к Linux runner:
-
-```yaml
-runs-on: [self-hosted, Linux, X64, roehub, prod]
-```
-
-Нужно заменить на labels Mac Studio runner:
-
-```yaml
-runs-on: [self-hosted, mac-studio, roehub, prod]
-```
-
-Дополнительно (рекомендуется): включить manual approval через GitHub Environments:
-
-1) `Repo → Settings → Environments → New environment: production`
-2) включить `Required reviewers`.
-3) в job добавить:
-
-```yaml
-environment: production
-```
-
-После изменения workflow:
-
-- Сделай commit в `main`.
-- Убедись, что deploy job стартует **на Mac Studio runner**.
-
----
-
-## Фаза 5 — Перенос конфигурации и данных с Linux на Mac Studio
-
-### 5.1 Скопировать env-файл
-
-На Mac Studio (вытянуть с Linux по SSH):
-
-```bash
-scp <linux_user>@<linux_host>:/etc/roehub/roehub.env /tmp/roehub.env
-sudo mv /tmp/roehub.env /etc/roehub/roehub.env
-sudo chown deploy:staff /etc/roehub/roehub.env
-sudo chmod 600 /etc/roehub/roehub.env
-```
-
-Проверить, что переменные загрузились (не печатай секреты в лог):
-
-```bash
-sudo rg -n '^(ROEHUB_ENV|POSTGRES_DB|POSTGRES_USER|IDENTITY_COOKIE_SECURE)=' /etc/roehub/roehub.env
-```
-
-### 5.2 Остановить writer-сервисы на Linux (для консистентного snapshot)
-
-На Linux прод-сервере (минимум — остановить то, что пишет в базы):
-
-```bash
-# остановить весь стек (самый простой безопасный вариант)
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env down
-
-docker ps --format 'table {{.Names}}\t{{.Status}}' | rg 'roehub|postgres|clickhouse|prometheus|grafana|redis' || true
-```
-
-Примечание:
-
-- Если downtime критичен, вместо `down` можно сначала остановить только writer’ы, сделать backup, потом `down`.
-
-### 5.3 Перенос данных: рекомендуемая стратегия
-
-Для надежности и переносимости между Linux → macOS/ARM рекомендуемый минимум:
-
-- **Postgres:** логический дамп (`pg_dump` / `pg_dumpall --globals-only`) и restore.
-- **ClickHouse:** перенос volume (быстрее) или ClickHouse BACKUP (если хочется полностью "официально").
-
-Ниже приведены команды для обоих.
-
-### 5.4 Postgres: pg_dump (рекомендуется)
-
-На Linux (можно временно поднять только postgres, если уже сделали `down`):
-
-```bash
-set -euo pipefail
-
-# поднять только postgres, если он не запущен
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d postgres
-
-# дождаться готовности
-set -a
-source /etc/roehub/roehub.env
-set +a
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if docker exec -i roehub-postgres-1 pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 2
-done
-
-# загрузить env
-set -a
-source /etc/roehub/roehub.env
-set +a
-
-backup_dir="$HOME/roehub-backup-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$backup_dir"
-cd "$backup_dir"
-
-# globals (roles/privileges) — полезно, если есть дополнительные роли
-docker exec -i -e PGPASSWORD="$POSTGRES_PASSWORD" roehub-postgres-1 \
-  pg_dumpall --globals-only -U "$POSTGRES_USER" > pg_globals.sql
-
-# основной дамп БД
-docker exec -i -e PGPASSWORD="$POSTGRES_PASSWORD" roehub-postgres-1 \
-  pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc --no-owner --no-acl > roehub_pg.dump
-
-ls -lh
-sha256sum pg_globals.sql roehub_pg.dump > SHA256SUMS
-
-echo "PG backup dir: ${backup_dir}"
-pwd
-```
-
-### 5.5 ClickHouse: export volumes (быстро, обычно ок)
-
-Рекомендуем переносить volumes “как есть” (особенно ClickHouse).
-
-На Linux (после остановки стека):
-
-```bash
-set -euo pipefail
-
-backup_dir="$HOME/roehub-volume-backup-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "$backup_dir"
-cd "$backup_dir"
-
-# ВНИМАНИЕ: имена volumes зависят от COMPOSE_PROJECT_NAME.
-# При COMPOSE_PROJECT_NAME=roehub обычно это:
-vols=(
-  roehub_ch_data
-  roehub_ch_logs
-  # (опционально)
-  # roehub_redis_data
-  # roehub_prom_data
-  # grafana_data
-)
-
-for v in "${vols[@]}"; do
-  echo "Export volume: ${v}"
-  docker run --rm \
-    -v "${v}:/from" \
-    -v "$PWD:/to" \
-    alpine:3.20 \
-    tar -C /from -cf "/to/${v}.tar" .
-done
-
-sha256sum *.tar > SHA256SUMS
-ls -lh
-
-echo "CH volumes backup dir: ${backup_dir}"
-pwd
-```
-
-Если volumes называются иначе — посмотри:
-
-```bash
-docker volume ls
-```
-
-### 5.6 Передать архивы на Mac Studio
-
-Вариант 1 (простой): Mac Studio сам скачивает с Linux (outbound SSH).
-
-На Mac Studio:
-
-```bash
-# пример: забрать и pg_dump, и volume tar’ы
-mkdir -p ~/roehub-migrate
-
-rsync -avP <linux_user>@<linux_host>:~/roehub-backup-YYYYMMDD-HHMMSS/ ~/roehub-migrate/pg/
-rsync -avP <linux_user>@<linux_host>:~/roehub-volume-backup-YYYYMMDD-HHMMSS/ ~/roehub-migrate/volumes/
-
-cd ~/roehub-migrate/pg && shasum -a 256 -c SHA256SUMS
-cd ~/roehub-migrate/volumes && shasum -a 256 -c SHA256SUMS
-```
-
-Вариант 2: если SSH нестабилен — поставь `tailscale` на Linux и гоняй `rsync` по tailnet.
-
----
-
-## Фаза 6 — Импорт данных на Mac Studio
-
-Перед началом Фазы 6 убедись, что на Mac Studio подготовлен deploy bundle в `/opt/roehub`.
-
-Почему это важно:
-
-- команды ниже используют `/opt/roehub/docker-compose.yml`
-- этот файл обычно создается шагом `Sync deploy bundle to /opt/roehub` из workflow `b/.github/workflows/deploy.yml`
-
-Если workflow еще не запускался на Mac Studio runner, можно один раз синхронизировать bundle руками.
-
-### 5.x (подготовка) Синхронизировать deploy bundle в `/opt/roehub` (если файлов еще нет)
-
-На Mac Studio (под твоим основным пользователем, где лежит клон репозитория):
-
-```bash
-# ЗАЙДИ В КОРЕНЬ РЕПОЗИТОРИЯ (там где есть infra/, src/, apps/)
-cd /path/to/roehub.com
-
-REPO_ROOT="$(pwd)"
-
-sudo install -d /opt/roehub
-sudo install -d /opt/roehub/monitoring
-sudo install -d /opt/roehub/market-data-src
-sudo install -d /opt/roehub/market-data-src/infra
-
-# 1) main compose
-sudo install -m 0644 "${REPO_ROOT}/infra/docker/docker-compose.yml" /opt/roehub/docker-compose.yml
-
-# 2) market-data build context
-sudo rsync -a --delete "${REPO_ROOT}/src/" /opt/roehub/market-data-src/src/
-sudo rsync -a --delete "${REPO_ROOT}/apps/" /opt/roehub/market-data-src/apps/
-sudo rsync -a --delete "${REPO_ROOT}/configs/" /opt/roehub/market-data-src/configs/
-sudo rsync -a --delete "${REPO_ROOT}/alembic/" /opt/roehub/market-data-src/alembic/
-sudo rsync -a --delete "${REPO_ROOT}/migrations/" /opt/roehub/market-data-src/migrations/
-sudo rsync -a --delete "${REPO_ROOT}/infra/docker/" /opt/roehub/market-data-src/infra/docker/
-sudo install -m 0644 "${REPO_ROOT}/alembic.ini" /opt/roehub/market-data-src/alembic.ini
-sudo install -m 0644 "${REPO_ROOT}/pyproject.toml" /opt/roehub/market-data-src/pyproject.toml
-
-# 3) monitoring
-sudo rsync -a --delete "${REPO_ROOT}/infra/monitoring/monitoring/" /opt/roehub/monitoring/
-
-# owner for deploy user
-sudo chown -R deploy:staff /opt/roehub
-
-# checks
-test -s /opt/roehub/docker-compose.yml
-test -s /opt/roehub/monitoring/prometheus/prometheus.yml
-test -s /opt/roehub/monitoring/blackbox/blackbox.yml
-test -s /opt/roehub/market-data-src/infra/docker/Dockerfile.market_data
-```
-
-Перед импортом:
-
-1) Убедиться, что Docker работает (`docker version`).
-2) Убедиться, что `COMPOSE_PROJECT_NAME=roehub` используется везде (иначе имена volumes будут другими).
-
-### 6.1 ClickHouse: import volumes
-
-На Mac Studio:
-
-```bash
-set -euo pipefail
-
-cd ~/roehub-migrate/volumes
-
-vols=(
-  roehub_ch_data
-  roehub_ch_logs
-  # (опционально)
-  # roehub_redis_data
-  # roehub_prom_data
-  # grafana_data
-)
-
-for v in "${vols[@]}"; do
-  echo "Create volume: ${v}"
-  docker volume create "${v}" >/dev/null
-
-  echo "Import volume: ${v}"
-  docker run --rm \
-    -v "${v}:/to" \
-    -v "$PWD:/from" \
-    alpine:3.20 \
-    sh -c "tar -C /to -xf /from/${v}.tar"
-done
-
-docker volume ls | rg 'roehub_|grafana_data'
-```
-
-### 6.2 Postgres: restore из pg_dump
-
-На Mac Studio:
-
-```bash
-set -euo pipefail
-
-# поднять postgres (создаст empty volume, если его еще нет)
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d postgres
-
-set -a
-source /etc/roehub/roehub.env
-set +a
-
-# дождаться готовности
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  if docker exec -i roehub-postgres-1 pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 2
-done
-
-# применить globals (опционально; нужно только если на старом проде были дополнительные роли)
-# cat ~/roehub-migrate/pg/pg_globals.sql | docker exec -i roehub-postgres-1 psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d postgres
-
-# restore основной БД (custom format)
-cat ~/roehub-migrate/pg/roehub_pg.dump | docker exec -i -e PGPASSWORD="$POSTGRES_PASSWORD" roehub-postgres-1 \
-  pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists --no-owner --no-acl
-```
-
----
-
-## Фаза 7 — Первый запуск стека на Mac Studio (smoke)
-
-На Mac Studio:
-
-1) Первый деплой лучше сделать руками, чтобы видеть ошибки (после этого можно отдать на Actions).
-
-```bash
-export COMPOSE_PROJECT_NAME=roehub
-export MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src
-export MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data
-
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui up -d --build --remove-orphans
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env --profile ui ps
-```
-
-2) Быстрые проверки:
-
-```bash
-curl -fsS http://127.0.0.1:8080/ | head
-curl -i http://127.0.0.1:8080/api/auth/current-user
-
-docker logs --tail=200 roehub-postgres-1
-docker logs --tail=200 roehub-clickhouse-1
-docker logs --tail=200 prometheus
-```
-
-3) Проверка scrape market-data из Prometheus:
-
-```bash
-docker exec -it prometheus wget -T 2 -qO- http://market-data-ws-worker:9201/metrics | head
-docker exec -it prometheus wget -T 2 -qO- http://market-data-scheduler:9202/metrics | head
-```
-
-Если поднялось — можно включать deploy через GitHub Actions.
-
----
-
-## Фаза 8 — Публичный доступ `roehub.com` (TLS)
-
-### Вариант A: Cloudflare Tunnel
-
-На Mac Studio:
-
-```bash
-brew install cloudflare/cloudflare/cloudflared
-cloudflared --version
-```
-
-Дальше:
-
-1) Залогиниться и выдать cloudflared доступ к Cloudflare аккаунту:
-
-```bash
-cloudflared tunnel login
-```
-
-2) Создать tunnel:
-
-```bash
-cloudflared tunnel create roehub-mac-studio
-```
-
-3) Создать конфиг `~/.cloudflared/config.yml`:
-
-```yaml
-tunnel: roehub-mac-studio
-credentials-file: /Users/deploy/.cloudflared/<TUNNEL_ID>.json
-
-ingress:
-  - hostname: roehub.com
-    service: http://127.0.0.1:8080
-  - hostname: www.roehub.com
-    service: http://127.0.0.1:8080
-  - service: http_status:404
-```
-
-4) Привязать DNS записи к tunnel:
-
-```bash
-cloudflared tunnel route dns roehub-mac-studio roehub.com
-cloudflared tunnel route dns roehub-mac-studio www.roehub.com
-```
-
-5) Запустить как сервис:
-
-```bash
-sudo cloudflared service install
-sudo launchctl list | rg cloudflared || true
-```
-
-Проверка:
-
-```bash
-curl -I https://roehub.com/
-```
-
-### Вариант B: Статический IP + Caddy
-
-1) DNS:
-
-- `A roehub.com -> 185.155.18.21`
-- `A www.roehub.com -> 185.155.18.21`
+- `A roehub.com -> 155.212.170.144`
+- `A www.roehub.com -> 155.212.170.144`
 
 Проверка:
 
@@ -872,88 +409,323 @@ dig +short roehub.com A
 dig +short www.roehub.com A
 ```
 
-2) Убедиться, что входящие 80/443 реально приходят на Mac Studio (если есть внешний firewall/маршрутизатор — открыть там).
+### 3.2 Production Caddy config на VPS
 
-3) На Mac Studio:
-
-```bash
-brew install caddy
-sudo mkdir -p /etc/caddy
-```
-
-Примечание (Homebrew service):
-
-- `brew services` для `caddy` по умолчанию использует конфиг `/opt/homebrew/etc/Caddyfile`.
-- Чтобы не путаться, можно хранить "канонический" конфиг в `/etc/caddy/Caddyfile` и синхронизировать в Homebrew path:
-
-```bash
-sudo cp /etc/caddy/Caddyfile /opt/homebrew/etc/Caddyfile
-```
-
-4) Убедиться, что gateway слушает только localhost (рекомендуется):
-
-В `/etc/roehub/roehub.env`:
-
-```bash
-GATEWAY_HOST_BIND=127.0.0.1
-GATEWAY_HOST_PORT=8080
-```
-
-5) Создать `/etc/caddy/Caddyfile`:
+Production target для `Caddy`:
 
 ```caddyfile
-roehub.com, www.roehub.com {
+www.roehub.com {
+  redir https://roehub.com{uri} 301
+}
+
+roehub.com {
   encode zstd gzip
-  reverse_proxy 127.0.0.1:8080
+
+  handle_path /api/* {
+    reverse_proxy http://100.74.213.43:8000
+  }
+
+  reverse_proxy 127.0.0.1:8010
 }
 ```
 
-6) Запустить Caddy как сервис:
+Смысл:
+
+- `/api/*` strip'ается на edge и уходит в `Mac Studio API`;
+- все остальные маршруты идут на `web` на `VPS`.
+
+Важно:
+
+- это заменяет старую `nginx gateway` production схему;
+- `api` на `Mac Studio` по-прежнему не знает про `/api` prefix.
+
+### 3.3 TLS
+
+После перевода DNS на `VPS`:
 
 ```bash
-sudo brew services start caddy
-sudo brew services list | rg caddy
-```
-
-Проверка:
-
-```bash
+caddy validate --config /etc/caddy/Caddyfile
+systemctl reload caddy
 curl -I https://roehub.com/
 ```
 
-Если macOS Firewall включен и блокирует входящие — разреши `caddy` (опционально):
+## Фаза 4 - Backend runtime на Mac Studio
+
+### 4.1 State services
+
+На `Mac Studio` должны жить:
+
+- `postgres`
+- `clickhouse`
+- `redis`
+- metrics stack
+
+Эти данные уже были перенесены с Linux и проверены по `sha256`.
+
+### 4.2 API
+
+Production API должен обслуживаться на `Mac Studio` и быть доступен:
+
+- локально на `Mac Studio`;
+- с `MacBook` по private network;
+- с `VPS` по `Tailscale`.
+
+Важно:
+
+- API не должен зависеть от `web` или `gateway` на `Mac Studio`;
+- production API должен считаться backend service, а не частью `ui` profile.
+
+### 4.3 Monitoring
+
+`Grafana`, `Prometheus`, `Blackbox` остаются на `Mac Studio` и не публикуются наружу.
+
+Доступ к ним:
+
+- через `Tailscale`;
+- или через SSH port-forward.
+
+## Фаза 5 - Production images и registry
+
+### 5.1 Рекомендуемый target
+
+Перед cutover нужно перевести production deploy на images из `GHCR`.
+
+Target:
+
+- CI на GitHub-hosted runner собирает multi-arch app image;
+- пушит его в `GHCR`;
+- backend и web deploy используют один и тот же tag.
+
+### 5.2 Почему это обязательная часть новой схемы
+
+Без `GHCR` получится два разных anti-pattern:
+
+- `Mac Studio` строит production runtime из локального checkout;
+- `VPS` строит web из отдельного checkout по SSH.
+
+Это неудобно для:
+
+- traceability;
+- rollback;
+- repeatability;
+- гарантии одинаковой версии между web и backend.
+
+## Фаза 6 - Разделить deploy workflows
+
+### 6.1 Backend deploy workflow
+
+Цель:
+
+- deploy backend only на `Mac Studio` через self-hosted runner.
+
+Target обязанности workflow:
+
+- login в `GHCR`;
+- pull app image и внешних service images;
+- deploy backend compose;
+- smoke test `api` локально на `Mac Studio`.
+
+### 6.2 Web deploy workflow
+
+Цель:
+
+- deploy `web` на `VPS` через GitHub-hosted runner по SSH.
+
+Target обязанности workflow:
+
+- login в `GHCR`;
+- sync `docker-compose.web.prod.yml`, `Caddyfile`, и env на `VPS`;
+- `docker compose pull && docker compose up -d` для `web`;
+- `Caddyfile` validate/reload;
+- smoke test `https://roehub.com/` и `https://roehub.com/api/auth/current-user`.
+
+### 6.3 Runner topology
+
+Финальный target:
+
+- self-hosted runner только на `Mac Studio`;
+- на `VPS` self-hosted runner не нужен;
+- старый Linux runner должен быть удален после завершения cutover.
+
+## Фаза 7 - Поднять self-hosted runner на Mac Studio
+
+Это остается обязательным шагом и еще не завершено.
+
+На `Mac Studio` под пользователем `deploy`:
 
 ```bash
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add "$(brew --prefix)/bin/caddy" || true
-sudo /usr/libexec/ApplicationFirewall/socketfilterfw --unblockapp "$(brew --prefix)/bin/caddy" || true
+mkdir -p /opt/actions-runner/roehub
+cd /opt/actions-runner/roehub
 ```
 
----
+Дальше использовать команды из GitHub:
 
-## Фаза 9 — Cutover и отключение Linux
+`Repo -> Settings -> Actions -> Runners -> New self-hosted runner -> macOS`
 
-1) Убедиться, что Mac Studio стабильно обслуживает `https://roehub.com`.
-2) Убедиться, что market-data и метрики живы (Prometheus scrape ok).
-3) Отключить/удалить Linux runner (в GitHub Settings → Actions → Runners).
-4) Остановить Linux сервер.
+Рекомендуемые labels:
 
----
+- `roehub`
+- `prod`
+- `mac-studio`
 
-## Что обновить в документации (runbooks)
+Запуск как сервис:
 
-- `docs/runbooks/roehub-ui-autostart-systemd.md`
-  - пометить как Linux-only;
-  - добавить ссылку на этот документ для macOS.
-- `docs/runbooks/market-data-autonomous-docker.md`
-  - убрать Linux-специфичные пути (`/home/...`, `/opt/actions-runner/...`) или сделать их OS-agnostic;
-  - добавить пример для Mac Studio (layout `/opt/roehub`, env `/etc/roehub/roehub.env`).
+```bash
+sudo ./svc.sh install
+sudo ./svc.sh start
+./svc.sh status
+```
+
+Важно:
+
+- runner и `Colima` должны жить под одним и тем же пользователем `deploy`.
+
+## Фаза 8 - Smoke tests для новой topology
+
+### 8.1 Проверки на Mac Studio
+
+```bash
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env ps
+curl -i http://127.0.0.1:8000/auth/current-user
+```
+
+Ожидаемо:
+
+- compose stack healthy;
+- `401` без cookie на `/auth/current-user`.
+
+### 8.2 Проверки с VPS
+
+```bash
+curl -i http://100.74.213.43:8000/auth/current-user
+curl -I https://roehub.com/
+curl -i https://roehub.com/api/auth/current-user
+```
+
+Ожидаемо:
+
+- API на tailnet reachable;
+- главная страница отдается с `VPS`;
+- `/api/auth/current-user` возвращает `401` без cookie, но не `502`.
+
+### 8.3 Проверки браузером
+
+Проверить с внешней сети:
+
+- открывается `https://roehub.com/`;
+- login flow работает;
+- защищенные страницы (`/strategies`, `/backtests`) открываются после login;
+- cookies живут на `roehub.com` same-origin path.
+
+## Фаза 9 - Cleanup на Mac Studio после cutover
+
+Cleanup делаем не мгновенно, а staged:
+
+1. Сначала перевести production traffic на `VPS`.
+2. Подержать новый контур стабильно минимум один рабочий цикл.
+3. Только потом удалить устаревший public ingress с `Mac Studio`.
+
+### 9.1 Что удалить с Mac Studio
+
+- `Caddy` как публичный сервис;
+- `/opt/homebrew/etc/Caddyfile`, если использовался только для публичного ingress;
+- production `web` container;
+- production `gateway` container;
+- любые `hosts` overrides для `roehub.com` на админских машинах;
+- router port-forward `80/443 -> Mac Studio`.
+
+### 9.2 Что оставить на Mac Studio
+
+- `api`
+- data services
+- workers
+- monitoring
+- `Colima`
+- `Tailscale`
+- self-hosted runner
+
+### 9.3 Cleanup commands
+
+Примерно:
+
+```bash
+sudo brew services stop caddy || true
+sudo brew services list | rg caddy || true
+docker ps --format 'table {{.Names}}\t{{.Status}}' | rg 'web|gateway' || true
+```
+
+Финальный cleanup зависит от того, как именно были временно подняты `web/gateway/caddy` в процессе диагностики.
+
+## Фаза 10 - Когда можно выключать старый Linux сервер
+
+Старый Linux можно выключать только после выполнения всех условий ниже.
+
+### Hard criteria
+
+- данные уже восстановлены и проверены на `Mac Studio`;
+- `VPS` подключен к tailnet и стабильно видит `Mac Studio`;
+- DNS `roehub.com` и `www.roehub.com` переведены на `VPS`;
+- `Caddy` на `VPS` выдал валидный `Let's Encrypt` сертификат;
+- `https://roehub.com/` работает из внешней сети;
+- `https://roehub.com/api/auth/current-user` доходит до API и не дает `502`;
+- backend deploy через self-hosted runner на `Mac Studio` работает;
+- web deploy через GitHub-hosted runner по SSH на `VPS` работает;
+- старый Linux больше не обслуживает production traffic;
+- старый Linux runner удален из GitHub.
+
+### Recommended final actions
+
+1. Сделать финальный backup/снимок старого Linux.
+2. Удалить старый Linux runner из GitHub Settings.
+3. Остановить приложения на старом Linux.
+4. Выключить сервер.
+
+Если политика проекта - "без fallback", это не мешает сделать финальный snapshot перед выключением. Snapshot не считается рабочим fallback, но снижает операционный риск.
+
+## Что уже можно считать выполненным из старого runbook
+
+Для текущего проекта фактически уже были выполнены или в основном выполнены:
+
+- подготовка `Mac Studio` как runtime host;
+- перенос и проверка данных `Postgres` и volumes;
+- `Tailscale` доступ между вашими машинами;
+- `Colima` под `deploy`;
+- проверка, что stateful stack поднимается на `Mac Studio`.
+
+Что больше не нужно завершать по старой версии runbook:
+
+- публичный ingress через `Caddy` на `Mac Studio`;
+- домашний роутер как production edge;
+- попытки довести production сайт на домашнем IP.
+
+Что реально осталось сделать теперь:
+
+- включить `VPS` в production topology;
+- разрезать production deploy на `backend` и `web`;
+- перевести deploy на `GHCR`;
+- поднять self-hosted runner на `Mac Studio`;
+- перевести DNS на `VPS`;
+- удалить старый Linux runner и выключить старый Linux.
+
+## Связанные документы, которые тоже нужно обновить
+
 - `docs/runbooks/web-ui-gateway-same-origin.md`
-  - добавить секцию про production ingress (Cloudflare Tunnel или Caddy), чтобы было понятно, где TLS.
+  - пометить `gateway` как dev/local solution;
+  - добавить примечание, что production same-origin теперь делает `Caddy` на `VPS`.
+- `docs/runbooks/roehub-ui-autostart-systemd.md`
+  - пометить как устаревший для новой production topology;
+  - либо переписать под `VPS web only`, либо архивировать.
+- `.github/workflows/deploy.yml`
+  - удалить и заменить на `publish-app-image.yml`, `deploy-backend.yml`, `deploy-web.yml`.
+- `infra/docker/docker-compose.yml`
+  - перестать использовать как единый production manifest для двух разных хостов.
 
-## Пост-миграция (рекомендуется, но не блокер)
+## Post-cutover checklist
 
-- Настроить регулярные бэкапы:
-  - Postgres: `pg_dump`/volume snapshot;
-  - ClickHouse: volume snapshot/backup strategy.
-- Включить GitHub Environment `production` с manual approve для deploy.
-- Сохранить emergency-доступ: Screen Sharing (только как запасной канал) + физический доступ.
+- `roehub.com` публично работает с `VPS`.
+- web SSR работает на `VPS`.
+- API отвечает с `Mac Studio` через `VPS Caddy`.
+- monitoring доступен только приватно.
+- `Mac Studio` не торчит публично в интернет.
+- старый Linux выключен.
+- GitHub Actions deploy для backend и web работают независимо.

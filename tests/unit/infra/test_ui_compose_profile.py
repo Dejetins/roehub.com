@@ -56,18 +56,19 @@ def test_ui_profile_contains_gateway_api_web_and_db_bootstrap() -> None:
         assert services[service_name]["profiles"] == ["ui"]
 
 
-def test_ui_profile_publishes_only_gateway_to_host() -> None:
+def test_ui_profile_publishes_gateway_and_localhost_api_to_host() -> None:
     """
-    Verify only gateway service publishes host port mapping in `ui` profile.
+    Verify UI profile publishes gateway and localhost-only API host mappings.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        API and web are internal-only services on compose network.
+        API is intentionally published only on localhost for private admin or tailnet
+        proxy scenarios, while web remains internal-only behind gateway.
     Raises:
-        AssertionError: If host publishing is configured for non-gateway ui services.
+        AssertionError: If required host publishing drifts from expected contract.
     Side Effects:
         None.
     """
@@ -77,7 +78,7 @@ def test_ui_profile_publishes_only_gateway_to_host() -> None:
     assert services["gateway"]["ports"] == [
         "${GATEWAY_HOST_BIND:-127.0.0.1}:${GATEWAY_HOST_PORT:-8080}:80"
     ]
-    assert "ports" not in services["api"]
+    assert services["api"]["ports"] == ["${API_HOST_BIND:-127.0.0.1}:${API_HOST_PORT:-8000}:8000"]
     assert "ports" not in services["web"]
     assert "ports" not in services["db-bootstrap"]
 

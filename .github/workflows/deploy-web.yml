@@ -1,0 +1,107 @@
+name: Deploy Web
+
+on:
+  workflow_run:
+    workflows: ["Publish App Image"]
+    branches: ["main"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "GHCR image tag to deploy (defaults to main or workflow_run head SHA)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-web-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Resolve image tag
+        id: image
+        run: |
+          set -euxo pipefail
+          owner_lc="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          image_repo="ghcr.io/${owner_lc}/roehub-app"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
+            image_tag='${{ inputs.image_tag }}'
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            image_tag='${{ github.event.workflow_run.head_sha }}'
+          else
+            image_tag='main'
+          fi
+          echo "image_repo=${image_repo}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
+          echo "image_ref=${image_repo}:${image_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.PROD_VPS_SSH_KEY }}
+
+      - name: Trust VPS host key
+        run: |
+          set -euxo pipefail
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ vars.PROD_VPS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync web deploy files to VPS
+        run: |
+          set -euxo pipefail
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "install -d /opt/roehub-web"
+          scp infra/docker/docker-compose.web.prod.yml "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}:/opt/roehub-web/docker-compose.web.yml"
+          scp infra/caddy/Caddyfile.vps "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}:/etc/caddy/Caddyfile"
+
+      - name: Render web env file
+        run: |
+          set -euxo pipefail
+          cat > /tmp/roehub-web.env <<EOF
+          ROEHUB_APP_IMAGE=${{ steps.image.outputs.image_ref }}
+          WEB_API_BASE_URL=https://roehub.com
+          WEB_HOST_PORT=8010
+          EOF
+
+      - name: Deploy web on VPS
+        env:
+          GH_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euxo pipefail
+          scp /tmp/roehub-web.env "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}:/opt/roehub-web/roehub-web.env"
+          printf '%s' "${GH_TOKEN}" | ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "docker login ghcr.io -u '${GH_ACTOR}' --password-stdin"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "docker compose -f /opt/roehub-web/docker-compose.web.yml --env-file /opt/roehub-web/roehub-web.env pull web"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "docker compose -f /opt/roehub-web/docker-compose.web.yml --env-file /opt/roehub-web/roehub-web.env up -d"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "docker compose -f /opt/roehub-web/docker-compose.web.yml --env-file /opt/roehub-web/roehub-web.env ps"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "curl -fsS http://127.0.0.1:8010/ >/dev/null"
+
+      - name: Validate and reload Caddy on VPS
+        run: |
+          set -euxo pipefail
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "caddy fmt --overwrite /etc/caddy/Caddyfile"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "caddy validate --config /etc/caddy/Caddyfile"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "systemctl reload caddy"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "systemctl status caddy --no-pager -l"
+
+      - name: Smoke test public edge
+        run: |
+          set -euxo pipefail
+          test "$(curl -sS -o /tmp/web-root.html -w '%{http_code}' https://roehub.com/)" = '200'
+          test "$(curl -sS -o /tmp/web-api.json -w '%{http_code}' https://roehub.com/api/auth/current-user)" = '401'
+          test "$(curl -sS -o /tmp/web-www.headers -w '%{http_code}' -I https://www.roehub.com/)" = '301'

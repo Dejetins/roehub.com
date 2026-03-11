@@ -1,17 +1,10 @@
-services:
-  # api:
-  #   image: roehub-api
-  #   container_name: roehub-api-1
-  #   restart: unless-stopped
-  #   ports:
-  #     - "0.0.0.0:8000:8000"
-  #   env_file:
-  #     - /etc/roehub/roehub.env
-  #   depends_on:
-  #     - postgres
-  #     - clickhouse
-  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+x-roehub-app: &roehub-app
+  image: ${ROEHUB_APP_IMAGE:?ROEHUB_APP_IMAGE is required}
+  pull_policy: always
+  env_file:
+    - /etc/roehub/roehub.env
 
+services:
   postgres:
     image: postgres:16
     container_name: roehub-postgres-1
@@ -59,10 +52,7 @@ services:
       - redis_data:/data
 
   db-bootstrap:
-    profiles: ["ui"]
-    build:
-      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
-      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    <<: *roehub-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,10 +66,7 @@ services:
       - apps.migrations.bootstrap_main
 
   api:
-    profiles: ["ui"]
-    build:
-      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
-      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    <<: *roehub-app
     depends_on:
       clickhouse:
         condition: service_started
@@ -99,7 +86,6 @@ services:
       CH_HOST: ${CH_HOST:-clickhouse}
       CH_PORT: ${CH_PORT:-8123}
       CH_DATABASE: ${CH_DATABASE:-market_data}
-      # Use the same credentials as clickhouse container init.
       CH_USER: ${CLICKHOUSE_USER:-default}
       CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
       CH_SECURE: ${CH_SECURE:-0}
@@ -119,46 +105,8 @@ services:
     expose:
       - "8000"
 
-  web:
-    profiles: ["ui"]
-    build:
-      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
-      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
-    depends_on:
-      api:
-        condition: service_started
-    environment:
-      WEB_API_BASE_URL: ${WEB_API_BASE_URL:-http://gateway}
-    command:
-      - python
-      - -m
-      - apps.web.main.main
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8010"
-    expose:
-      - "8010"
-
-  gateway:
-    profiles: ["ui"]
-    build:
-      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
-      dockerfile: infra/docker/Dockerfile.gateway
-    depends_on:
-      api:
-        condition: service_started
-      web:
-        condition: service_started
-    expose:
-      - "80"
-    ports:
-      - "${GATEWAY_HOST_BIND:-127.0.0.1}:${GATEWAY_HOST_PORT:-8080}:80"
-
   market-data-ws-worker:
-    build:
-      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
-      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    <<: *roehub-app
     restart: unless-stopped
     depends_on:
       - clickhouse
@@ -184,9 +132,7 @@ services:
       - "9201"
 
   market-data-scheduler:
-    build:
-      context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
-      dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
+    <<: *roehub-app
     restart: unless-stopped
     depends_on:
       - clickhouse
@@ -248,10 +194,21 @@ services:
       - "--config.file=/etc/blackbox_exporter/config.yml"
 
 volumes:
-  pg_data: {}
-  ch_data: {}
-  ch_logs: {}
-  redis_data: {}
-  prom_data: {}
+  pg_data:
+    external: true
+    name: roehub_pg_data
+  ch_data:
+    external: true
+    name: roehub_ch_data
+  ch_logs:
+    external: true
+    name: roehub_ch_logs
+  redis_data:
+    external: true
+    name: roehub_redis_data
+  prom_data:
+    external: true
+    name: roehub_prom_data
   grafana_data:
     external: true
+    name: grafana_data

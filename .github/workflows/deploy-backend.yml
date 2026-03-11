@@ -1,0 +1,147 @@
+name: Deploy Backend
+
+on:
+  workflow_run:
+    workflows: ["Publish App Image"]
+    branches: ["main"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "GHCR image tag to deploy (defaults to main or workflow_run head SHA)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: deploy-backend-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: [self-hosted, macOS, ARM64, roehub, prod, mac-studio]
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Resolve image tag
+        id: image
+        run: |
+          set -euxo pipefail
+          owner_lc="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
+          image_repo="ghcr.io/${owner_lc}/roehub-app"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
+            image_tag='${{ inputs.image_tag }}'
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            image_tag='${{ github.event.workflow_run.head_sha }}'
+          else
+            image_tag='main'
+          fi
+          echo "image_repo=${image_repo}" >> "$GITHUB_OUTPUT"
+          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
+          echo "image_ref=${image_repo}:${image_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Show context
+        run: |
+          set -euxo pipefail
+          whoami
+          id
+          docker --version
+          docker compose version
+          tailscale version
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Assert server prerequisites
+        run: |
+          set -euxo pipefail
+          test -s /etc/roehub/roehub.env
+          test -d /opt/roehub
+          test -w /opt/roehub
+
+      - name: Sync backend deploy bundle
+        run: |
+          set -euxo pipefail
+          install -d /opt/roehub
+          install -d /opt/roehub/monitoring
+          install -m 0644 infra/docker/docker-compose.backend.yml /opt/roehub/docker-compose.backend.yml
+          if command -v rsync >/dev/null 2>&1; then
+            rsync -a --delete infra/monitoring/monitoring/ /opt/roehub/monitoring/
+          else
+            rm -rf /opt/roehub/monitoring/*
+            tar -C infra/monitoring/monitoring -cf - . | tar -C /opt/roehub/monitoring -xf -
+          fi
+          test -s /opt/roehub/docker-compose.backend.yml
+          test -s /opt/roehub/monitoring/prometheus/prometheus.yml
+          test -s /opt/roehub/monitoring/blackbox/blackbox.yml
+
+      - name: Ensure external volumes exist
+        run: |
+          set -euxo pipefail
+          for volume_name in roehub_pg_data roehub_ch_data roehub_ch_logs roehub_redis_data roehub_prom_data grafana_data; do
+            docker volume inspect "${volume_name}" >/dev/null 2>&1 || docker volume create "${volume_name}"
+          done
+
+      - name: Validate backend compose
+        env:
+          ROEHUB_APP_IMAGE: ${{ steps.image.outputs.image_ref }}
+        run: |
+          set -euxo pipefail
+          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env config >/dev/null
+
+      - name: Deploy backend stack
+        env:
+          COMPOSE_PROJECT_NAME: roehub
+          ROEHUB_APP_IMAGE: ${{ steps.image.outputs.image_ref }}
+        run: |
+          set -euxo pipefail
+          for attempt in 1 2 3 4 5; do
+            if docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env pull; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "docker compose pull failed after ${attempt} attempts"
+              exit 1
+            fi
+            sleep "$((attempt * 15))"
+          done
+          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans
+          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env ps
+
+      - name: Ensure tailnet-only API serve
+        run: |
+          set -euxo pipefail
+          if ! tailscale serve status | grep -q 'proxy http://127.0.0.1:8000'; then
+            tailscale serve reset
+            tailscale serve --bg http://127.0.0.1:8000
+          fi
+          tailscale serve status
+
+      - name: Smoke test backend API
+        run: |
+          set -euxo pipefail
+          status_code=''
+          for attempt in 1 2 3 4 5 6; do
+            status_code="$(curl -sS -o /tmp/backend-current-user.json -w '%{http_code}' http://127.0.0.1:8000/auth/current-user || true)"
+            if [ "${status_code}" = '401' ]; then
+              break
+            fi
+            sleep 5
+          done
+          test "${status_code}" = '401'
+          cat /tmp/backend-current-user.json
