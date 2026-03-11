@@ -1,6 +1,10 @@
 # Шлюз Web UI с same-origin (WEB-EPIC-02)
 
-Ранбук для локального и серверного запуска same-origin стека `web + api + gateway`.
+Статус:
+
+- production path больше не использует `gateway`;
+- публичный same-origin теперь делает `Caddy` на `VPS`;
+- этот ранбук остается только для dev/local сценариев с `web + api + gateway`.
 
 ## Обязательный файл окружения
 
@@ -74,6 +78,11 @@ curl -i http://127.0.0.1:8080/assets/site.css
 2. Выполните `/setdomain`.
 3. Установите домен `roehub.com`.
 
+Примечание:
+
+- production login widget работает через `VPS` edge на `https://roehub.com`;
+- `gateway` на dev-машине не должен использоваться как production ingress.
+
 Разработка:
 
 1. Пробросьте `127.0.0.1:8080` через туннель (`cloudflared` или `ngrok`).
@@ -100,3 +109,5 @@ Gateway отрезает префикс `/api` и проксирует запр�
 - `/api/<path>` на gateway -> `/<path>` на API.
 
 Если позже в API появится `/health`, через gateway он будет доступен как `/api/health`.
+
+Для production та же семантика теперь реализуется на `VPS Caddy` без отдельного `nginx gateway` контейнера.

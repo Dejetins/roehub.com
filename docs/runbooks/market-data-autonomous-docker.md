@@ -4,7 +4,7 @@ Runbook для `market-data-ws-worker` и `market-data-scheduler`.
 
 ## 1. Рекомендуемая прод-модель
 
-Прод использует **единый стек** `infra/docker/docker-compose.yml`:
+Прод использует backend manifest `infra/docker/docker-compose.backend.yml`:
 
 - `market-data-ws-worker`
 - `market-data-scheduler`
@@ -22,21 +22,21 @@ export COMPOSE_PROJECT_NAME=roehub
 export MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src
 export MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data
 
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env up -d --build --remove-orphans
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env ps
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans market-data-ws-worker market-data-scheduler
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env ps
 ```
 
 Логи:
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-ws-worker
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-scheduler
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-ws-worker
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-scheduler
 ```
 
 Остановка только market-data сервисов:
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env stop market-data-ws-worker market-data-scheduler
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env stop market-data-ws-worker market-data-scheduler
 ```
 
 ## 3. Проверка метрик и scrape
@@ -148,7 +148,7 @@ ORDER BY market_id;
 Если `market_id=3` отсутствует, проверьте логи на subscribe ACK ошибки:
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env logs --tail=2000 market-data-ws-worker | rg "bybit ws stream failed|ret_msg|subscribe|args size"
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env logs --tail=2000 market-data-ws-worker | rg "bybit ws stream failed|ret_msg|subscribe|args size"
 ```
 
 Типичный корень проблемы:
@@ -157,62 +157,5 @@ docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.e
 ## 8. Restart WS + Scheduler
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.yml --env-file /etc/roehub/roehub.env restart market-data-scheduler market-data-ws-worker
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env restart market-data-scheduler market-data-ws-worker
 ```
-
-```bash
-cd /opt/actions-runner/roehub_com/actions-runner/_work/roehub.com/roehub.com
-source /home/roe/venvs/roehub/bin/activate
-```
-
-Вот несколько типовых примеров запуска **этого** скрипта (через env-переменные).
-
-### 1) Посмотреть план (ничего не оптимизирует)
-
-```bash
-INSTRUMENT_KEY='binance:spot:BTCUSDT' DRY_RUN=1 \
-bash scripts/ops/optimize_canonical_partitions.sh
-```
-
-### 2) Запустить реально (по умолчанию: скан по 1 потоку, лимиты памяти как в скрипте)
-
-```bash
-INSTRUMENT_KEY='binance:spot:BTCUSDT' \
-bash scripts/ops/optimize_canonical_partitions.sh
-```
-
-### 3) Ограничить ресурсы сканирования (память/ядра)
-
-Например, сканировать **в 1 поток** и с лимитом **600MB** памяти:
-
-```bash
-INSTRUMENT_KEY='binance:spot:BTCUSDT' \
-SCAN_MAX_THREADS=1 SCAN_MAX_MEMORY_BYTES=$((600*1024*1024)) \
-bash scripts/ops/optimize_canonical_partitions.sh
-```
-
-### 4) Ограничить диапазон партиций (YYYYMMDD включительно)
-
-```bash
-INSTRUMENT_KEY='binance:spot:BTCUSDT' \
-PARTITION_FROM=20260201 PARTITION_TO=20260210 \
-bash scripts/ops/optimize_canonical_partitions.sh
-```
-
-### 5) Ограничить число оптимизируемых партиций и паузу между ними
-
-```bash
-INSTRUMENT_KEY='binance:spot:BTCUSDT' \
-MAX_PARTITIONS=3 SLEEP_SECONDS=5 \
-bash scripts/ops/optimize_canonical_partitions.sh
-```
-
-### 6) Задушить и скан, и OPTIMIZE (потоки/память отдельно)
-
-```bash
-INSTRUMENT_KEY='binance:spot:BTCUSDT' \
-SCAN_MAX_THREADS=1 SCAN_MAX_MEMORY_BYTES=$((500*1024*1024)) \
-OPTIMIZE_MAX_THREADS=1 OPTIMIZE_MAX_MEMORY_BYTES=$((700*1024*1024)) \
-bash scripts/ops/optimize_canonical_partitions.sh
-```
-

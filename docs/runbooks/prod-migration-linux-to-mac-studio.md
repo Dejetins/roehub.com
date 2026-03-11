@@ -414,18 +414,41 @@ dig +short www.roehub.com A
 Production target для `Caddy`:
 
 ```caddyfile
-www.roehub.com {
+http://roehub.com {
+  route {
+    handle /__edge_id {
+      respond "vps-edge\n" 200
+    }
+
+    redir https://roehub.com{uri} 308
+  }
+}
+
+http://www.roehub.com {
   redir https://roehub.com{uri} 301
 }
 
 roehub.com {
   encode zstd gzip
 
+  handle /__edge_id {
+    respond "vps-edge\n" 200
+  }
+
   handle_path /api/* {
-    reverse_proxy http://100.74.213.43:8000
+    reverse_proxy https://macstudio-daniil.tail0ebbbc.ts.net {
+      header_up Host macstudio-daniil.tail0ebbbc.ts.net
+      transport http {
+        tls_server_name macstudio-daniil.tail0ebbbc.ts.net
+      }
+    }
   }
 
   reverse_proxy 127.0.0.1:8010
+}
+
+www.roehub.com {
+  redir https://roehub.com{uri} 301
 }
 ```
 
@@ -549,11 +572,20 @@ Target обязанности workflow:
 
 ## Фаза 7 - Поднять self-hosted runner на Mac Studio
 
-Это остается обязательным шагом и еще не завершено.
+Это обязательный шаг для backend deploy на `Mac Studio`.
 
-На `Mac Studio` под пользователем `deploy`:
+На `Mac Studio`:
 
 ```bash
+sudo mkdir -p /opt/actions-runner/roehub
+sudo chown -R deploy:staff /opt/actions-runner
+sudo chmod 755 /opt/actions-runner /opt/actions-runner/roehub
+```
+
+Дальше под пользователем `deploy`:
+
+```bash
+sudo -iu deploy
 mkdir -p /opt/actions-runner/roehub
 cd /opt/actions-runner/roehub
 ```
@@ -568,17 +600,71 @@ cd /opt/actions-runner/roehub
 - `prod`
 - `mac-studio`
 
-Запуск как сервис:
+На macOS для headless `deploy`-пользователя стандартный `svc.sh` не подходит как финальный механизм,
+потому что он создает `LaunchAgent` в user GUI-session. Для production host нужен system `LaunchDaemon`,
+который запускает `runsvc.sh` от `deploy`.
+
+Кастомный `LaunchDaemon`:
 
 ```bash
-sudo ./svc.sh install
-sudo ./svc.sh start
-./svc.sh status
+sudo install -d -o deploy -g staff /Users/deploy/Library/Logs/roehub
+
+sudo tee /Library/LaunchDaemons/com.roehub.actions.runner.plist >/dev/null <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.roehub.actions.runner</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/opt/actions-runner/roehub/runsvc.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/opt/actions-runner/roehub</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>UserName</key>
+    <string>deploy</string>
+    <key>GroupName</key>
+    <string>staff</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+      <key>HOME</key>
+      <string>/Users/deploy</string>
+      <key>USER</key>
+      <string>deploy</string>
+      <key>LOGNAME</key>
+      <string>deploy</string>
+      <key>PATH</key>
+      <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>/Users/deploy/Library/Logs/roehub/actions.runner.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/deploy/Library/Logs/roehub/actions.runner.err.log</string>
+  </dict>
+</plist>
+PLIST
+
+sudo chown root:wheel /Library/LaunchDaemons/com.roehub.actions.runner.plist
+sudo chmod 644 /Library/LaunchDaemons/com.roehub.actions.runner.plist
+plutil -lint /Library/LaunchDaemons/com.roehub.actions.runner.plist
+
+sudo launchctl bootout system /Library/LaunchDaemons/com.roehub.actions.runner.plist 2>/dev/null || true
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.roehub.actions.runner.plist
+sudo launchctl enable system/com.roehub.actions.runner
+sudo launchctl kickstart -k system/com.roehub.actions.runner
+
+sudo launchctl print system/com.roehub.actions.runner | grep -E 'state =|pid =|last exit code ='
 ```
 
 Важно:
 
 - runner и `Colima` должны жить под одним и тем же пользователем `deploy`.
+- ожидаемый статус в GitHub UI: `Online` / `Idle`.
 
 ## Фаза 8 - Smoke tests для новой topology
 
@@ -597,14 +683,14 @@ curl -i http://127.0.0.1:8000/auth/current-user
 ### 8.2 Проверки с VPS
 
 ```bash
-curl -i http://100.74.213.43:8000/auth/current-user
+curl -i https://macstudio-daniil.tail0ebbbc.ts.net/auth/current-user
 curl -I https://roehub.com/
 curl -i https://roehub.com/api/auth/current-user
 ```
 
 Ожидаемо:
 
-- API на tailnet reachable;
+- private API через `Tailscale Serve` reachable;
 - главная страница отдается с `VPS`;
 - `/api/auth/current-user` возвращает `401` без cookie, но не `502`.
 

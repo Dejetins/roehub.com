@@ -107,10 +107,10 @@
 - [Market Data Metrics Reference (RU)](docs/runbooks/market-data-metrics-reference-ru.md) — `docs/runbooks/market-data-metrics-reference-ru.md` — Подробный справочник метрик для:
 - [Market Data Metrics](docs/runbooks/market-data-metrics.md) — `docs/runbooks/market-data-metrics.md` — Документ фиксирует основные Prometheus-метрики для:
 - [Runbook — Market Data Redis Streams](docs/runbooks/market-data-redis-streams.md) — `docs/runbooks/market-data-redis-streams.md` — Операционные команды для live feed stream’ов, которые публикует `market-data-ws-worker`.
-- [Переезд продакшена с Linux на Mac Studio (macOS)](docs/runbooks/prod-migration-linux-to-mac-studio.md) — `docs/runbooks/prod-migration-linux-to-mac-studio.md` — Пошаговый runbook: перенос прод-стека Roehub (Docker Compose) + данных Postgres/ClickHouse на Mac Studio, настройка публичного `roehub.com` и удаленного управления.
-- [Roehub UI Autostart (systemd) + Helper Commands](docs/runbooks/roehub-ui-autostart-systemd.md) — `docs/runbooks/roehub-ui-autostart-systemd.md` — This runbook documents how to:
+- [Переезд продакшена с Linux на Mac Studio + VPS edge](docs/runbooks/prod-migration-linux-to-mac-studio.md) — `docs/runbooks/prod-migration-linux-to-mac-studio.md` — Актуальный production runbook для Roehub после смены решения по ingress:
+- [Roehub UI Autostart (systemd) + Helper Commands](docs/runbooks/roehub-ui-autostart-systemd.md) — `docs/runbooks/roehub-ui-autostart-systemd.md` — Статус: архивный документ.
 - [Strategy live worker runbook](docs/runbooks/strategy-live-worker.md) — `docs/runbooks/strategy-live-worker.md` — Runbook для `apps/worker/strategy_live_runner`: как поднять worker, проверить метрики, проверить Redis Streams realtime output и (опционально) Telegram notify.
-- [Шлюз Web UI с same-origin (WEB-EPIC-02)](docs/runbooks/web-ui-gateway-same-origin.md) — `docs/runbooks/web-ui-gateway-same-origin.md` — Ранбук для локального и серверного запуска same-origin стека `web + api + gateway`.
+- [Шлюз Web UI с same-origin (WEB-EPIC-02)](docs/runbooks/web-ui-gateway-same-origin.md) — `docs/runbooks/web-ui-gateway-same-origin.md` — Статус:
 
 ### API
 

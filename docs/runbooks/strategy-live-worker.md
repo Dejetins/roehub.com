@@ -20,9 +20,12 @@ Runbook для `apps/worker/strategy_live_runner`: как поднять worker,
 - `docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md`
 - `docs/architecture/identity/identity-telegram-login-user-model-v1.md`
 
-## 2) Рекомендуемая модель запуска (единый compose стек)
+## 2) Рекомендуемая модель запуска
 
-Базовый стек уже описан в `infra/docker/docker-compose.yml` (postgres/clickhouse/redis/market-data/prometheus).
+Текущий production backend живет в `infra/docker/docker-compose.backend.yml`.
+
+Если нужен smoke/extension сценарий для `strategy-live-worker`, его нужно добавлять к backend-стеку,
+а не к публичному web ingress на `VPS`.
 
 Для smoke STR-EPIC-06 рекомендуется добавить 2 сервиса в тот же compose (пример):
 
@@ -117,15 +120,15 @@ clickhouse-client --host 127.0.0.1 --port 9000 \
 ### Запуск через compose
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml up -d --build
-docker compose -f infra/docker/docker-compose.yml ps
+docker compose -f infra/docker/docker-compose.backend.yml up -d --build
+docker compose -f infra/docker/docker-compose.backend.yml ps
 ```
 
 Логи:
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml logs -f --tail=200 strategy-live-worker
-docker compose -f infra/docker/docker-compose.yml logs -f --tail=200 api
+docker compose -f infra/docker/docker-compose.backend.yml logs -f --tail=200 strategy-live-worker
+docker compose -f infra/docker/docker-compose.backend.yml logs -f --tail=200 api
 ```
 
 ### Запуск вне docker (только если Redis доступен с хоста)
