@@ -110,6 +110,11 @@ uv run python -m apps.migrations.main
 Market data DDL (если еще не применен):
 
 ```bash
+export ROEHUB_ENV_FILE=/Users/daniildegtyarev/.config/roehub/roehub.env
+set -a
+source "$ROEHUB_ENV_FILE"
+set +a
+
 clickhouse-client --host 127.0.0.1 --port 9000 \
   --user "${CLICKHOUSE_USER:-default}" --password "${CLICKHOUSE_PASSWORD:-}" \
   --multiquery < migrations/clickhouse/market_data_ddl.sql
@@ -120,15 +125,18 @@ clickhouse-client --host 127.0.0.1 --port 9000 \
 ### Запуск через compose
 
 ```bash
-docker compose -f infra/docker/docker-compose.backend.yml up -d --build
-docker compose -f infra/docker/docker-compose.backend.yml ps
+export ROEHUB_APP_IMAGE=ghcr.io/dejetins/roehub-app:main
+export ROEHUB_ENV_FILE=/Users/daniildegtyarev/.config/roehub/roehub.env
+
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" up -d
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" ps
 ```
 
 Логи:
 
 ```bash
-docker compose -f infra/docker/docker-compose.backend.yml logs -f --tail=200 strategy-live-worker
-docker compose -f infra/docker/docker-compose.backend.yml logs -f --tail=200 api
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" logs -f --tail=200 strategy-live-worker
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" logs -f --tail=200 api
 ```
 
 ### Запуск вне docker (только если Redis доступен с хоста)

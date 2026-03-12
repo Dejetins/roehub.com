@@ -8,10 +8,10 @@
 
 ## Обязательный файл окружения
 
-Используйте тот же шаблон env-файла, что и в деплое:
+Используйте локальный env-файл, эквивалентный production env:
 
-- `/etc/roehub/roehub.env` на серверах
-- локальный эквивалентный путь (пример: `./infra/docker/.env.local`)
+- runtime owner path на `Mac Studio`: `/Users/daniildegtyarev/.config/roehub/roehub.env`
+- локальный dev path (пример): `./infra/docker/.env.local`
 
 Минимальные ключи для UI-профиля:
 
@@ -32,7 +32,7 @@ DSN-ключи `IDENTITY_PG_DSN`, `POSTGRES_DSN`, `STRATEGY_PG_DSN` можно �
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml \
-  --env-file /etc/roehub/roehub.env \
+  --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
   --profile ui up -d --build api web db-bootstrap
 ```
 
@@ -44,7 +44,7 @@ docker compose -f infra/docker/docker-compose.yml \
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml \
-  --env-file /etc/roehub/roehub.env \
+  --env-file /Users/daniildegtyarev/.config/roehub/roehub.env \
   --profile ui ps
 
 curl -i http://127.0.0.1:8010/api/auth/current-user

@@ -722,7 +722,7 @@ docker ps --format 'table {{.Names}}\t{{.Status}}' | rg 'web|gateway' || true
 - подготовка `Mac Studio` как runtime host;
 - перенос и проверка данных `Postgres` и volumes;
 - `Tailscale` доступ между вашими машинами;
-- `Colima` под `deploy`;
+- `Colima` под `daniildegtyarev`.
 - проверка, что stateful stack поднимается на `Mac Studio`.
 
 Что больше не нужно завершать по старой версии runbook:
