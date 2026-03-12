@@ -2,7 +2,7 @@ x-roehub-app: &roehub-app
   image: ${ROEHUB_APP_IMAGE:?ROEHUB_APP_IMAGE is required}
   pull_policy: always
   env_file:
-    - /etc/roehub/roehub.env
+    - ${ROEHUB_ENV_FILE:-/etc/roehub/roehub.env}
 
 services:
   postgres:

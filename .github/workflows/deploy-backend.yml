@@ -75,7 +75,7 @@ jobs:
       - name: Assert server prerequisites
         run: |
           set -euxo pipefail
-          test -s /etc/roehub/roehub.env
+          test -s /Users/daniildegtyarev/.config/roehub/roehub.env
           test -d /opt/roehub
           test -w /opt/roehub
 
@@ -105,18 +105,20 @@ jobs:
       - name: Validate backend compose
         env:
           ROEHUB_APP_IMAGE: ${{ steps.image.outputs.image_ref }}
+          ROEHUB_ENV_FILE: /Users/daniildegtyarev/.config/roehub/roehub.env
         run: |
           set -euxo pipefail
-          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env config >/dev/null
+          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" config >/dev/null
 
       - name: Deploy backend stack
         env:
           COMPOSE_PROJECT_NAME: roehub
           ROEHUB_APP_IMAGE: ${{ steps.image.outputs.image_ref }}
+          ROEHUB_ENV_FILE: /Users/daniildegtyarev/.config/roehub/roehub.env
         run: |
           set -euxo pipefail
           for attempt in 1 2 3 4 5; do
-            if docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env pull; then
+            if docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" pull; then
               break
             fi
             if [ "${attempt}" -eq 5 ]; then
@@ -125,8 +127,8 @@ jobs:
             fi
             sleep "$((attempt * 15))"
           done
-          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans
-          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env ps
+          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" up -d --remove-orphans
+          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" ps
 
       - name: Ensure tailnet-only API serve
         run: |

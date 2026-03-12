@@ -24,7 +24,7 @@
   - `redis`;
   - market-data workers/scheduler;
   - `grafana`, `prometheus`, `blackbox`;
-  - `Colima` под пользователем `deploy`;
+  - `Colima` под пользователем `daniildegtyarev`;
   - self-hosted GitHub Actions runner.
 - старый Linux сервер - только источник миграции и временный tailnet node до полного вывода из эксплуатации.
 
@@ -225,8 +225,9 @@ docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 
 Рекомендуемая модель:
 
-- ваш основной macOS admin user - только администрирование;
-- `deploy` - non-admin пользователь для `Colima` и GitHub runner.
+- текущий macOS admin user `daniildegtyarev` является runtime owner для `Colima`, backend stack,
+  `tailscale serve`, и локальных ops-команд;
+- self-hosted GitHub runner должен быть переоформлен на этого же runtime owner.
 
 SSH на `Mac Studio`:
 
@@ -251,17 +252,18 @@ tailscale ip -4
 
 ### 1.3 Colima и Docker
 
-`Colima` остается под пользователем `deploy`.
+`Colima` остается под пользователем `daniildegtyarev`.
 
 Обязательные требования:
 
-- один runtime owner: `deploy`;
+- один runtime owner: `daniildegtyarev`;
 - runtime restart после reboot;
 - mount `/opt/roehub` в VM (`virtiofs`), иначе monitoring bind-mounts ломаются.
 
-Проверка под `deploy`:
+Проверка под current runtime owner:
 
 ```bash
+colima status
 docker version
 docker compose version
 docker context ls
@@ -272,18 +274,19 @@ docker context ls
 Оставляем canonical layout:
 
 - `/opt/roehub` - deploy bundle/runtime manifests
-- `/etc/roehub/roehub.env` - backend secrets
+- `/Users/daniildegtyarev/.config/roehub/roehub.env` - backend secrets for runtime owner
 
 Минимум:
 
 ```bash
-sudo mkdir -p /opt/roehub /etc/roehub
-sudo chown -R deploy:staff /opt/roehub
+sudo mkdir -p /opt/roehub
+sudo chown -R daniildegtyarev:staff /opt/roehub
 sudo chmod 755 /opt/roehub
 
-sudo touch /etc/roehub/roehub.env
-sudo chown deploy:staff /etc/roehub/roehub.env
-sudo chmod 600 /etc/roehub/roehub.env
+mkdir -p /Users/daniildegtyarev/.config/roehub
+sudo cp /etc/roehub/roehub.env /Users/daniildegtyarev/.config/roehub/roehub.env
+sudo chown daniildegtyarev:staff /Users/daniildegtyarev/.config/roehub/roehub.env
+chmod 600 /Users/daniildegtyarev/.config/roehub/roehub.env
 ```
 
 ### 1.5 Backend only на Mac Studio
@@ -572,18 +575,9 @@ Target обязанности workflow:
 
 Это обязательный шаг для backend deploy на `Mac Studio`.
 
-На `Mac Studio`:
+На `Mac Studio` под текущим runtime owner:
 
 ```bash
-sudo mkdir -p /opt/actions-runner/roehub
-sudo chown -R deploy:staff /opt/actions-runner
-sudo chmod 755 /opt/actions-runner /opt/actions-runner/roehub
-```
-
-Дальше под пользователем `deploy`:
-
-```bash
-sudo -iu deploy
 mkdir -p /opt/actions-runner/roehub
 cd /opt/actions-runner/roehub
 ```
@@ -598,70 +592,24 @@ cd /opt/actions-runner/roehub
 - `prod`
 - `mac-studio`
 
-На macOS для headless `deploy`-пользователя стандартный `svc.sh` не подходит как финальный механизм,
-потому что он создает `LaunchAgent` в user GUI-session. Для production host нужен system `LaunchDaemon`,
-который запускает `runsvc.sh` от `deploy`.
+Если runner был исторически зарегистрирован под другим пользователем, его нужно удалить из GitHub,
+перерегистрировать под `daniildegtyarev`, и затем проверить, что labels и runtime окружение остались теми же.
 
-Кастомный `LaunchDaemon`:
+Если на `Mac Studio` включен automatic login под `daniildegtyarev`, runner можно держать в той же
+user-session модели, что и `Colima`/`tailscale serve`, и использовать штатный `svc.sh`.
+
+Базовая процедура перерегистрации:
 
 ```bash
-sudo install -d -o deploy -g staff /Users/deploy/Library/Logs/roehub
-
-sudo tee /Library/LaunchDaemons/com.roehub.actions.runner.plist >/dev/null <<'PLIST'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-  <dict>
-    <key>Label</key>
-    <string>com.roehub.actions.runner</string>
-    <key>ProgramArguments</key>
-    <array>
-      <string>/opt/actions-runner/roehub/runsvc.sh</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>/opt/actions-runner/roehub</string>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>UserName</key>
-    <string>deploy</string>
-    <key>GroupName</key>
-    <string>staff</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-      <key>HOME</key>
-      <string>/Users/deploy</string>
-      <key>USER</key>
-      <string>deploy</string>
-      <key>LOGNAME</key>
-      <string>deploy</string>
-      <key>PATH</key>
-      <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-    </dict>
-    <key>StandardOutPath</key>
-    <string>/Users/deploy/Library/Logs/roehub/actions.runner.out.log</string>
-    <key>StandardErrorPath</key>
-    <string>/Users/deploy/Library/Logs/roehub/actions.runner.err.log</string>
-  </dict>
-</plist>
-PLIST
-
-sudo chown root:wheel /Library/LaunchDaemons/com.roehub.actions.runner.plist
-sudo chmod 644 /Library/LaunchDaemons/com.roehub.actions.runner.plist
-plutil -lint /Library/LaunchDaemons/com.roehub.actions.runner.plist
-
-sudo launchctl bootout system /Library/LaunchDaemons/com.roehub.actions.runner.plist 2>/dev/null || true
-sudo launchctl bootstrap system /Library/LaunchDaemons/com.roehub.actions.runner.plist
-sudo launchctl enable system/com.roehub.actions.runner
-sudo launchctl kickstart -k system/com.roehub.actions.runner
-
-sudo launchctl print system/com.roehub.actions.runner | grep -E 'state =|pid =|last exit code ='
+./config.sh --url https://github.com/Dejetins/roehub.com --token <fresh_token> --name mac-studio-prod --labels roehub,prod,mac-studio --work _work --unattended --replace
+./svc.sh install
+./svc.sh start
+./svc.sh status
 ```
 
 Важно:
 
-- runner и `Colima` должны жить под одним и тем же пользователем `deploy`.
+- runner и `Colima` должны жить под одним и тем же пользователем `daniildegtyarev`.
 - ожидаемый статус в GitHub UI: `Online` / `Idle`.
 
 ## Фаза 8 - Smoke tests для новой topology
@@ -669,7 +617,8 @@ sudo launchctl print system/com.roehub.actions.runner | grep -E 'state =|pid =|l
 ### 8.1 Проверки на Mac Studio
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env ps
+export ROEHUB_ENV_FILE=/Users/daniildegtyarev/.config/roehub/roehub.env
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" ps
 curl -i http://127.0.0.1:8000/auth/current-user
 ```
 
@@ -803,6 +752,12 @@ docker ps --format 'table {{.Names}}\t{{.Status}}' | rg 'web|gateway' || true
   - удалить и заменить на `publish-app-image.yml`, `deploy-backend.yml`, `deploy-web.yml`.
 - `infra/docker/docker-compose.yml`
   - перестать использовать как единый production manifest для двух разных хостов.
+
+## Runtime operations
+
+Для текущих operational команд см.:
+
+- `docs/runbooks/mac-studio-backend-operations.md`
 
 ## Post-cutover checklist
 

@@ -1,4 +1,3 @@
-```md
 /* ============================================================
    ref_market — справочник “площадок” (биржа + тип рынка) с фиксированным market_id
    Пример market_id:
@@ -17,8 +16,6 @@
    - updated_at     DateTime64(3, UTC): версия записи для ReplacingMergeTree
    ============================================================ */
 
-```
-```sql
 CREATE DATABASE IF NOT EXISTS market_data;
 USE market_data;
 
@@ -34,9 +31,7 @@ CREATE TABLE IF NOT EXISTS market_data.ref_market
 )
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (market_id);
-```
 
-```md
 /* ============================================================
    ClickHouse DDL (RU) — "2 RAW + 1 CANONICAL" + 2 СПРАВОЧНИКА
    + Materialized View (MV) для raw -> canonical
@@ -63,9 +58,7 @@ ORDER BY (market_id);
    - symbol хранится строкой (LowCardinality) — это нормально и эффективно.
    - “торгуется/не торгуется” хранится в ref_instruments, а не дублируется в каждой минуте.
    ============================================================ */
-```
 
-```sql
 CREATE TABLE IF NOT EXISTS market_data.ref_instruments
 (
     market_id     UInt16,
@@ -86,13 +79,9 @@ CREATE TABLE IF NOT EXISTS market_data.ref_instruments
 ENGINE = ReplacingMergeTree(updated_at)
 ORDER BY (market_id, symbol);
 
-```
-```md
 /* ------------------------------------------------------------
    (1) raw_binance_klines_1m — сырые свечи Binance 1m (как пришло)
    ------------------------------------------------------------ */
-```
-```sql
 CREATE TABLE IF NOT EXISTS market_data.raw_binance_klines_1m
 (
     market_id      UInt16,                                  -- 1 (binance spot) или 2 (binance futures)
@@ -122,14 +111,10 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMMDD(open_time)
 ORDER BY (market_id, symbol, open_time)
 SETTINGS index_granularity = 8192;
-```
-```md
 /* ------------------------------------------------------------
    (2) raw_bybit_klines_1m — сырые свечи Bybit 1m (как пришло)
    ------------------------------------------------------------ */
-```
 
-```sql
 CREATE TABLE IF NOT EXISTS market_data.raw_bybit_klines_1m
 (
     market_id      UInt16,                                  -- 3 (bybit spot) или 4 (bybit futures)
@@ -156,15 +141,11 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMMDD(start_time_utc)
 ORDER BY (market_id, symbol, start_time_utc)
 SETTINGS index_granularity = 8192;
-```
-```md
 /* ------------------------------------------------------------
    (3) canonical_candles_1m — канонические свечи 1m (единый формат)
    - Это единственная таблица, которую читают стратегии/бектест/ML.
    - ReplacingMergeTree(ingested_at): “последняя версия победит” после фоновых merge.
    ------------------------------------------------------------ */
-```
-```sql
 CREATE TABLE IF NOT EXISTS market_data.canonical_candles_1m
 (
     market_id      UInt16,                                  -- 1..4
@@ -194,9 +175,7 @@ ENGINE = ReplacingMergeTree(ingested_at)
 PARTITION BY toYYYYMMDD(ts_open)
 ORDER BY (market_id, symbol, ts_open)
 SETTINGS index_granularity = 8192;
-```
 
-```md
 /* ============================================================
    Materialized Views (MV) raw -> canonical
    Важно:
@@ -214,9 +193,7 @@ SETTINGS index_granularity = 8192;
    - quote_asset_volume -> volume_quote
    - taker_* и trades_count заполняются (у Binance есть)
    ------------------------------------------------------------ */
-```
 
-```sql
 CREATE MATERIALIZED VIEW IF NOT EXISTS market_data.mv_raw_binance_to_canonical_1m
 TO market_data.canonical_candles_1m
 AS
@@ -241,8 +218,6 @@ SELECT
     ingested_at,
     ingest_id
 FROM market_data.raw_binance_klines_1m;
-```
-```md
 /* ------------------------------------------------------------
    MV: Bybit raw -> canonical
    Маппинг:
@@ -252,8 +227,6 @@ FROM market_data.raw_binance_klines_1m;
    - turnover -> volume_quote
    - trades_count/taker_* = NULL (у Bybit в твоём источнике их нет)
    ------------------------------------------------------------ */
-```
-```sql
 CREATE MATERIALIZED VIEW IF NOT EXISTS market_data.mv_raw_bybit_to_canonical_1m
 TO market_data.canonical_candles_1m
 AS
@@ -278,4 +251,3 @@ SELECT
     ingested_at,
     ingest_id
 FROM market_data.raw_bybit_klines_1m;
-```

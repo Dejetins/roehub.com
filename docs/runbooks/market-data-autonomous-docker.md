@@ -15,28 +15,33 @@ Runbook для `market-data-ws-worker` и `market-data-scheduler`.
 
 `host.docker.internal` для market-data метрик в Linux больше не нужен.
 
+Текущий runtime owner на `Mac Studio`:
+
+- `daniildegtyarev`
+- env file: `/Users/daniildegtyarev/.config/roehub/roehub.env`
+
 ## 2. Деплой/перезапуск в фоне (prod host)
 
 ```bash
 export COMPOSE_PROJECT_NAME=roehub
-export MARKET_DATA_BUILD_CONTEXT=/opt/roehub/market-data-src
-export MARKET_DATA_DOCKERFILE=infra/docker/Dockerfile.market_data
+export ROEHUB_APP_IMAGE=ghcr.io/dejetins/roehub-app:main
+export ROEHUB_ENV_FILE=/Users/daniildegtyarev/.config/roehub/roehub.env
 
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env up -d --remove-orphans market-data-ws-worker market-data-scheduler
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env ps
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" up -d --remove-orphans market-data-ws-worker market-data-scheduler
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" ps
 ```
 
 Логи:
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-ws-worker
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env logs -f --tail=200 market-data-scheduler
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" logs -f --tail=200 market-data-ws-worker
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" logs -f --tail=200 market-data-scheduler
 ```
 
 Остановка только market-data сервисов:
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env stop market-data-ws-worker market-data-scheduler
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" stop market-data-ws-worker market-data-scheduler
 ```
 
 ## 3. Проверка метрик и scrape
@@ -148,7 +153,7 @@ ORDER BY market_id;
 Если `market_id=3` отсутствует, проверьте логи на subscribe ACK ошибки:
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env logs --tail=2000 market-data-ws-worker | rg "bybit ws stream failed|ret_msg|subscribe|args size"
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" logs --tail=2000 market-data-ws-worker | rg "bybit ws stream failed|ret_msg|subscribe|args size"
 ```
 
 Типичный корень проблемы:
@@ -157,5 +162,5 @@ docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/
 ## 8. Restart WS + Scheduler
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file /etc/roehub/roehub.env restart market-data-scheduler market-data-ws-worker
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" restart market-data-scheduler market-data-ws-worker
 ```
