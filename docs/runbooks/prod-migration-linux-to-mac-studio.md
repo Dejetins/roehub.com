@@ -23,7 +23,8 @@
   - `clickhouse`;
   - `redis`;
   - market-data workers/scheduler;
-  - `grafana`, `prometheus`, `blackbox`;
+  - `grafana`, `prometheus`, `blackbox`, `cadvisor`;
+  - `postgres_exporter`, `redis_exporter`, `clickhouse_exporter`;
   - `Colima` под пользователем `daniildegtyarev`;
   - self-hosted GitHub Actions runner.
 - старый Linux сервер - только источник миграции и временный tailnet node до полного вывода из эксплуатации.
@@ -133,6 +134,10 @@ Browser
   - `grafana`
   - `prometheus`
   - `blackbox`
+  - `cadvisor`
+  - `postgres_exporter`
+  - `redis_exporter`
+  - `clickhouse_exporter`
 - `infra/docker/docker-compose.web.prod.yml`
   - `web`
 

@@ -104,7 +104,7 @@
 - [Runbook — Numba warmup / JIT](docs/runbooks/indicators-numba-warmup-jit.md) — `docs/runbooks/indicators-numba-warmup-jit.md` — Документ помогает диагностировать задержки первого расчёта индикаторов и отличать ожидаемый JIT warmup от неисправности.
 - [Runbook — Troubleshooting: why NaN?](docs/runbooks/indicators-why-nan.md) — `docs/runbooks/indicators-why-nan.md` — Документ объясняет, откуда берутся `NaN` в `indicators` и как отличить корректную политику от дефекта.
 - [Mac Studio Backend Operations](docs/runbooks/mac-studio-backend-operations.md) — `docs/runbooks/mac-studio-backend-operations.md` — Операционный ранбук для backend runtime на `Mac Studio` в текущей production topology.
-- [Mac Studio Monitoring Plan](docs/runbooks/mac-studio-monitoring-plan.md) — `docs/runbooks/mac-studio-monitoring-plan.md` — План внедрения системного и контейнерного мониторинга для текущей production topology:
+- [Mac Studio Monitoring Plan](docs/runbooks/mac-studio-monitoring-plan.md) — `docs/runbooks/mac-studio-monitoring-plan.md` — Реализованный план мониторинга для текущей production topology:
 - [Market Data Docker Runbook](docs/runbooks/market-data-autonomous-docker.md) — `docs/runbooks/market-data-autonomous-docker.md` — Runbook для `market-data-ws-worker` и `market-data-scheduler`.
 - [Market Data Metrics Reference (RU)](docs/runbooks/market-data-metrics-reference-ru.md) — `docs/runbooks/market-data-metrics-reference-ru.md` — Подробный справочник метрик для:
 - [Market Data Metrics](docs/runbooks/market-data-metrics.md) — `docs/runbooks/market-data-metrics.md` — Документ фиксирует основные Prometheus-метрики для:

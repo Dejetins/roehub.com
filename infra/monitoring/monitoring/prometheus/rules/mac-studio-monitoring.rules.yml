@@ -1,0 +1,168 @@
+groups:
+  - name: mac-studio-infra-health
+    rules:
+      - alert: NodeExporterDown
+        expr: max(up{job="node_exporter"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Node exporter is down on Mac Studio host
+          description: Prometheus cannot scrape host.lima.internal:9100 for 2 minutes.
+
+      - alert: CadvisorDown
+        expr: max(up{job="cadvisor"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: cAdvisor is down
+          description: Container metrics are unavailable for 2 minutes.
+
+      - alert: PostgresExporterDown
+        expr: max(up{job="postgres_exporter"}) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: postgres_exporter is down
+          description: Prometheus cannot scrape postgres_exporter:9187 for 2 minutes.
+
+      - alert: RedisExporterDown
+        expr: max(up{job="redis_exporter"}) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: redis_exporter is down
+          description: Prometheus cannot scrape redis_exporter:9121 for 2 minutes.
+
+      - alert: ClickHouseExporterDown
+        expr: max(up{job="clickhouse_exporter"}) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: clickhouse_exporter is down
+          description: Prometheus cannot scrape clickhouse_exporter:9116 for 2 minutes.
+
+      - alert: ApiMetricsDown
+        expr: max(up{job="api"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: API metrics endpoint is down
+          description: Prometheus cannot scrape api:8000/metrics for 2 minutes.
+
+      - alert: ApiHealthDown
+        expr: max(probe_success{job="blackbox_http",service="api_health"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: API /health probe is failing
+          description: Blackbox probe to http://api:8000/health has failed for 2 minutes.
+
+      - alert: PostgresTcpDown
+        expr: max(probe_success{job="blackbox_tcp",service="postgres_tcp"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Postgres TCP probe is failing
+          description: Blackbox TCP connectivity to postgres:5432 has failed for 2 minutes.
+
+      - alert: RedisTcpDown
+        expr: max(probe_success{job="blackbox_tcp",service="redis_tcp"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Redis TCP probe is failing
+          description: Blackbox TCP connectivity to redis:6379 has failed for 2 minutes.
+
+      - alert: ClickHouseHttpPingDown
+        expr: max(probe_success{job="blackbox_http",service="clickhouse_http_ping"}) == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: ClickHouse HTTP /ping probe is failing
+          description: Blackbox HTTP probe to http://clickhouse:8123/ping has failed for 2 minutes.
+
+  - name: mac-studio-resource-pressure
+    rules:
+      - alert: HostHighCpu
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{job="node_exporter",mode="idle"}[5m])) * 100) > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Mac Studio host CPU is above 85%
+          description: Host CPU utilization has stayed above 85% for 10 minutes.
+
+      - alert: HostDiskLow
+        expr: min by (instance, mountpoint) (100 * node_filesystem_avail_bytes{job="node_exporter",fstype!=""} / node_filesystem_size_bytes{job="node_exporter",fstype!=""}) < 15
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Mac Studio filesystem free space is below 15%
+          description: At least one filesystem exposed by node_exporter has less than 15% free space.
+
+      - alert: ContainerHighCpu
+        expr: sum by (container_label_com_docker_compose_service) (rate(container_cpu_usage_seconds_total{job="cadvisor",container_label_com_docker_compose_service!=""}[5m])) > 0.8
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Container CPU usage is elevated
+          description: One compose service has consumed more than 0.8 CPU cores for 15 minutes.
+
+      - alert: ContainerHighMemory
+        expr: sum by (container_label_com_docker_compose_service) (container_memory_working_set_bytes{job="cadvisor",container_label_com_docker_compose_service!=""}) > 1500000000
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Container memory usage is elevated
+          description: One compose service is using more than 1.5 GB working set for 15 minutes.
+
+      - alert: ContainerRestartedRecently
+        expr: sum by (container_label_com_docker_compose_service) (changes(container_start_time_seconds{job="cadvisor",container_label_com_docker_compose_service!=""}[15m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Container restarted in the last 15 minutes
+          description: cAdvisor detected at least one container restart in the last 15 minutes.
+
+  - name: mac-studio-market-data
+    rules:
+      - alert: ClickHouseServiceDegraded
+        expr: max(clickhouse_exporter_scrape_success{job="clickhouse_exporter"}) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: ClickHouse exporter cannot query ClickHouse
+          description: The repo-managed clickhouse_exporter has failed to read ClickHouse metrics for 5 minutes.
+
+      - alert: MarketDataWorkerErrorsGrowing
+        expr: increase(ws_errors_total{job="market-data-ws-worker"}[15m]) > 0 or increase(insert_errors_total{job="market-data-ws-worker"}[15m]) > 0 or increase(redis_publish_errors_total{job="market-data-ws-worker"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Market-data worker errors increased
+          description: WS, insert, or Redis publish errors increased during the last 15 minutes.
+
+      - alert: SchedulerJobErrorsGrowing
+        expr: increase(scheduler_job_errors_total{job="market-data-scheduler"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Market-data scheduler errors increased
+          description: Scheduler job errors increased during the last 15 minutes.

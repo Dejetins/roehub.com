@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi import APIRouter
@@ -62,6 +63,14 @@ def _load_app_module(*, monkeypatch):
     monkeypatch.setenv("ROEHUB_NUMBA_NUM_THREADS", "1")
     monkeypatch.setenv("NUMBA_NUM_THREADS", "1")
     monkeypatch.setenv("STRATEGY_PG_DSN", "postgresql://user:pass@localhost:5432/roehub")
+    original_read_text = Path.read_text
+
+    def _safe_read_text(self: Path, *args, **kwargs) -> str:
+        if self == Path("/etc/roehub/roehub.env"):
+            return ""
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", _safe_read_text)
     return importlib.import_module("apps.api.main.app")
 
 
@@ -173,6 +182,8 @@ def test_create_app_includes_strategy_router_when_enabled(monkeypatch) -> None:
         if hasattr(route, "path")
     }
 
+    assert "/health" in paths
+    assert "/metrics" in paths
     assert "/strategies/ping" in paths
     assert "/backtests/ping" in paths
     assert "/market-data/markets" in paths
@@ -207,6 +218,8 @@ def test_create_app_skips_strategy_router_when_disabled(monkeypatch) -> None:
         if hasattr(route, "path")
     }
 
+    assert "/health" in paths
+    assert "/metrics" in paths
     assert "/strategies/ping" not in paths
     assert "/identity/ping" in paths
     assert "/indicators/ping" in paths

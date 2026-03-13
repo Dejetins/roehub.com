@@ -24,6 +24,10 @@ def test_backend_prod_compose_contains_private_backend_services_only() -> None:
         "redis",
         "db-bootstrap",
         "api",
+        "cadvisor",
+        "postgres_exporter",
+        "redis_exporter",
+        "clickhouse_exporter",
         "market-data-ws-worker",
         "market-data-scheduler",
         "grafana",
@@ -42,6 +46,34 @@ def test_backend_prod_compose_publishes_api_on_localhost_only() -> None:
 
     assert api_service["ports"] == ["${API_HOST_BIND:-127.0.0.1}:${API_HOST_PORT:-8000}:8000"]
     assert api_service["image"] == "${ROEHUB_APP_IMAGE:?ROEHUB_APP_IMAGE is required}"
+
+
+def test_backend_prod_compose_provisions_monitoring_assets_and_exporters() -> None:
+    payload = _load_yaml(relative_path="infra/docker/docker-compose.backend.yml")
+    services = payload["services"]
+
+    assert services["cadvisor"]["image"] == "ghcr.io/google/cadvisor:v0.56.2"
+    assert services["postgres_exporter"]["image"] == (
+        "quay.io/prometheuscommunity/postgres-exporter:v0.18.1"
+    )
+    assert services["redis_exporter"]["image"] == "oliver006/redis_exporter:v1.80.1"
+    assert services["clickhouse_exporter"]["image"] == (
+        "${ROEHUB_APP_IMAGE:?ROEHUB_APP_IMAGE is required}"
+    )
+    assert services["clickhouse_exporter"]["command"] == [
+        "python",
+        "-m",
+        "apps.monitoring.clickhouse_exporter",
+    ]
+    assert "./monitoring/prometheus/rules:/etc/prometheus/rules:ro" in services["prometheus"][
+        "volumes"
+    ]
+    assert "./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro" in services[
+        "grafana"
+    ]["volumes"]
+    assert "./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro" in services[
+        "grafana"
+    ]["volumes"]
 
 
 def test_web_prod_compose_contains_only_web_service() -> None:

@@ -11,7 +11,8 @@ from typing import Mapping
 from fastapi import FastAPI
 
 from apps.api.common import register_api_error_handlers
-from apps.api.routes import build_indicators_router
+from apps.api.monitoring import install_metrics_middleware
+from apps.api.routes import build_indicators_router, build_operations_router
 from apps.api.wiring.modules import (
     bind_indicators_runtime_dependencies,
     build_backtest_router,
@@ -40,12 +41,15 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
       docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md,
       docs/architecture/market_data/market-data-reference-api-v1.md,
       docs/architecture/backtest/backtest-api-post-backtests-v1.md,
-      docs/architecture/api/api-errors-and-422-payload-v1.md
+      docs/architecture/api/api-errors-and-422-payload-v1.md,
+      docs/runbooks/mac-studio-monitoring-plan.md
     Related: apps.api.routes.indicators,
+      apps.api.routes.operations,
       apps.api.routes.identity,
       apps.api.wiring.modules.identity,
       apps.api.wiring.modules.indicators,
-      trading.contexts.indicators.application.ports.compute.indicator_compute
+      trading.contexts.indicators.application.ports.compute.indicator_compute,
+      apps.api.monitoring
 
     Args:
         environ: Optional environment mapping override.
@@ -72,8 +76,10 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         title="Roehub API",
         version="1.0.0",
     )
+    install_metrics_middleware(app=app)
     register_api_error_handlers(app=app)
     register_two_factor_required_exception_handler(app=app)
+    app.include_router(build_operations_router())
     identity_module = build_identity_api_module(environ=effective_environ)
     app.include_router(identity_module.router)
     if is_strategy_api_enabled(environ=effective_environ):

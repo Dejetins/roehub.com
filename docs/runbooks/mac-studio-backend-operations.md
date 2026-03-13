@@ -61,8 +61,8 @@ docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV
 Monitoring:
 
 ```bash
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" up -d grafana prometheus blackbox
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" restart grafana prometheus blackbox
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" up -d grafana prometheus blackbox cadvisor postgres_exporter redis_exporter clickhouse_exporter
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" restart grafana prometheus blackbox cadvisor postgres_exporter redis_exporter clickhouse_exporter
 ```
 
 App layer:
@@ -89,6 +89,10 @@ docker logs --tail=100 roehub-market-data-scheduler-1
 docker logs --tail=100 grafana
 docker logs --tail=100 prometheus
 docker logs --tail=100 blackbox
+docker logs --tail=100 cadvisor
+docker logs --tail=100 postgres_exporter
+docker logs --tail=100 redis_exporter
+docker logs --tail=100 clickhouse_exporter
 ```
 
 Follow logs:
@@ -107,7 +111,9 @@ Local host checks on `Mac Studio`:
 curl -I http://127.0.0.1:3000
 curl -I http://127.0.0.1:9090
 curl -I http://127.0.0.1:9115
-curl -i http://127.0.0.1:8000/auth/current-user
+curl -fsS http://127.0.0.1:8000/health
+curl -fsS http://127.0.0.1:8000/metrics | head
+curl -fsS http://127.0.0.1:9100/metrics | head
 ```
 
 Expected:
@@ -115,7 +121,32 @@ Expected:
 - `Grafana` -> `200` or `302 /login`
 - `Prometheus` -> `200` or `405` on `HEAD`
 - `Blackbox` -> `200`
-- `API /auth/current-user` -> `401`
+- `API /health` -> `200 {"status":"ok"}`
+- `API /metrics` -> Prometheus text exposition
+- `node_exporter` -> Prometheus text exposition
+
+Prometheus target validation:
+
+```bash
+curl -fsS http://127.0.0.1:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health, scrapeUrl: .scrapeUrl}'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=probe_success'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=clickhouse_exporter_scrape_success'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=http_requests_total'
+```
+
+Grafana provisioning validation:
+
+```bash
+curl -fsS http://127.0.0.1:3000/api/health
+```
+
+В UI Grafana ожидается папка `Roehub Monitoring` и dashboards:
+
+- `Platform Overview`
+- `Mac Studio Host`
+- `Containers`
+- `Datastores`
+- `API and Market Data`
 
 ## ClickHouse DDL
 
@@ -172,6 +203,7 @@ ClickHouse:
 Current recommended autostart on `Mac Studio`:
 
 - `brew services start colima`
+- `brew services start node_exporter`
 - user `LaunchAgent` for `Tailscale.app`
 - user `LaunchAgent` for `tailscale serve`
 - user `LaunchAgent` for backend compose startup script
@@ -180,9 +212,36 @@ Check startup components:
 
 ```bash
 brew services list | grep colima
+brew services list | grep node_exporter
 launchctl list | grep roehub
 tail -n 100 "$HOME/Library/Logs/roehub/backend.out.log"
 tail -n 100 "$HOME/Library/Logs/roehub/backend.err.log"
 tail -n 100 "$HOME/Library/Logs/com.roehub.tailscale-serve.out.log"
 tail -n 100 "$HOME/Library/Logs/com.roehub.tailscale-serve.err.log"
+```
+
+## Monitoring rollout
+
+Install host exporter:
+
+```bash
+cd /opt/roehub
+bash infra/monitoring/host-macos/install-node-exporter.sh
+```
+
+Bring up monitoring stack:
+
+```bash
+docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" up -d \
+  grafana prometheus blackbox cadvisor postgres_exporter redis_exporter clickhouse_exporter
+```
+
+Quick queries:
+
+```bash
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job=\"node_exporter\"}'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job=\"cadvisor\"}'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=pg_up{job=\"postgres_exporter\"}'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=redis_up{job=\"redis_exporter\"}'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=clickhouse_exporter_scrape_success{job=\"clickhouse_exporter\"}'
 ```

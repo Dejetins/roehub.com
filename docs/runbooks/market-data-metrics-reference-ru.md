@@ -160,3 +160,58 @@ increase(scheduler_job_errors_total{job="startup_scan"}[1h])
 
 - Симптом: высокий `rest_fill_active`, растет `rest_fill_duration_seconds`, истории догружается медленно.
 - Проверьте лимиты API/ошибки REST и `rest_concurrency_instruments`.
+
+## Как это используется в Mac Studio monitoring
+
+Эти метрики напрямую используются в provisioned dashboard `API and Market Data` и в Prometheus alert rules.
+
+Базовые panel queries:
+
+Worker insert p95:
+
+```promql
+histogram_quantile(
+  0.95,
+  sum(rate(insert_duration_seconds_bucket{job="market-data-ws-worker"}[5m])) by (le)
+)
+```
+
+Worker reconnects за 15 минут:
+
+```promql
+increase(ws_reconnects_total{job="market-data-ws-worker"}[15m])
+```
+
+Scheduler errors за 15 минут:
+
+```promql
+increase(scheduler_job_errors_total{job="market-data-scheduler"}[15m])
+```
+
+Pipeline throughput:
+
+```promql
+sum(rate(insert_rows_total{job="market-data-ws-worker"}[5m]))
+```
+
+```promql
+sum(rate(redis_publish_total{job="market-data-ws-worker"}[5m]))
+```
+
+Alert-oriented queries:
+
+```promql
+increase(ws_errors_total{job="market-data-ws-worker"}[15m]) > 0
+```
+
+```promql
+increase(insert_errors_total{job="market-data-ws-worker"}[15m]) > 0
+```
+
+```promql
+increase(redis_publish_errors_total{job="market-data-ws-worker"}[15m]) > 0
+```
+
+```promql
+increase(scheduler_job_errors_total{job="market-data-scheduler"}[15m]) > 0
+```

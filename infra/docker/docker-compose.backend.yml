@@ -167,6 +167,8 @@ services:
       GF_SERVER_ROOT_URL: ${GF_SERVER_ROOT_URL}
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
 
   prometheus:
     image: prom/prometheus:latest
@@ -176,6 +178,7 @@ services:
       - "127.0.0.1:9090:9090"
     volumes:
       - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
       - prom_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
@@ -192,6 +195,70 @@ services:
       - ./monitoring/blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
     command:
       - "--config.file=/etc/blackbox_exporter/config.yml"
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.56.2
+    container_name: cadvisor
+    privileged: true
+    restart: unless-stopped
+    expose:
+      - "8080"
+    volumes:
+      - /:/rootfs:ro
+      - /dev/disk:/dev/disk:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /var/run:/var/run:ro
+
+  postgres_exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.18.1
+    container_name: postgres_exporter
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+      DATA_SOURCE_URI: "postgres:5432/${POSTGRES_DB:-roehub}?sslmode=disable"
+      DATA_SOURCE_USER: ${POSTGRES_USER:-roehub}
+    expose:
+      - "9187"
+
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.80.1
+    container_name: redis_exporter
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+    environment:
+      REDIS_ADDR: redis://redis:6379
+      REDIS_PASSWORD: ${ROEHUB_REDIS_PASSWORD:-}
+    expose:
+      - "9121"
+
+  clickhouse_exporter:
+    <<: *roehub-app
+    container_name: clickhouse_exporter
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_started
+    environment:
+      CH_DATABASE: ${CH_DATABASE:-market_data}
+      CH_PASSWORD: ${CLICKHOUSE_PASSWORD:-}
+      CH_USER: ${CLICKHOUSE_USER:-default}
+      CLICKHOUSE_EXPORTER_HOST: 0.0.0.0
+      CLICKHOUSE_EXPORTER_PORT: "9116"
+      CLICKHOUSE_EXPORTER_SCRAPE_URI: http://clickhouse:8123/
+      CLICKHOUSE_EXPORTER_TIMEOUT_SECONDS: "5.0"
+      CLICKHOUSE_EXPORTER_VERIFY_TLS: "0"
+    command:
+      - python
+      - -m
+      - apps.monitoring.clickhouse_exporter
+    expose:
+      - "9116"
 
 volumes:
   pg_data:
