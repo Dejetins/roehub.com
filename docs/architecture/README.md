@@ -104,13 +104,14 @@
 - [Runbook — Numba cache dir + threads](docs/runbooks/indicators-numba-cache-and-threads.md) — `docs/runbooks/indicators-numba-cache-and-threads.md` — Документ описывает, как управлять `numba_cache_dir` и количеством потоков (`NUMBA_NUM_THREADS`) для `indicators` compute.
 - [Runbook — Numba warmup / JIT](docs/runbooks/indicators-numba-warmup-jit.md) — `docs/runbooks/indicators-numba-warmup-jit.md` — Документ помогает диагностировать задержки первого расчёта индикаторов и отличать ожидаемый JIT warmup от неисправности.
 - [Runbook — Troubleshooting: why NaN?](docs/runbooks/indicators-why-nan.md) — `docs/runbooks/indicators-why-nan.md` — Документ объясняет, откуда берутся `NaN` в `indicators` и как отличить корректную политику от дефекта.
-- [Mac Studio Backend Operations](docs/runbooks/mac-studio-backend-operations.md) — `docs/runbooks/mac-studio-backend-operations.md` — Операционный ранбук для backend runtime на `Mac Studio` в текущей production topology.
+- [Mac Studio Backend Operations](docs/runbooks/mac-studio-backend-operations.md) — `docs/runbooks/mac-studio-backend-operations.md` — Статус: архивный документ.
 - [Mac Studio Monitoring Plan](docs/runbooks/mac-studio-monitoring-plan.md) — `docs/runbooks/mac-studio-monitoring-plan.md` — Реализованный план мониторинга для текущей production topology:
-- [Market Data Docker Runbook](docs/runbooks/market-data-autonomous-docker.md) — `docs/runbooks/market-data-autonomous-docker.md` — Runbook для `market-data-ws-worker` и `market-data-scheduler`.
+- [Mac Studio Native Backend Operations](docs/runbooks/mac-studio-native-backend-operations.md) — `docs/runbooks/mac-studio-native-backend-operations.md` — Актуальный операционный ранбук для production backend runtime на `Mac Studio` без Docker/Colima.
+- [Market Data Docker Runbook](docs/runbooks/market-data-autonomous-docker.md) — `docs/runbooks/market-data-autonomous-docker.md` — Статус: legacy/local-only path.
 - [Market Data Metrics Reference (RU)](docs/runbooks/market-data-metrics-reference-ru.md) — `docs/runbooks/market-data-metrics-reference-ru.md` — Подробный справочник метрик для:
 - [Market Data Metrics](docs/runbooks/market-data-metrics.md) — `docs/runbooks/market-data-metrics.md` — Документ фиксирует основные Prometheus-метрики для:
 - [Runbook — Market Data Redis Streams](docs/runbooks/market-data-redis-streams.md) — `docs/runbooks/market-data-redis-streams.md` — Операционные команды для live feed stream’ов, которые публикует `market-data-ws-worker`.
-- [Переезд продакшена с Linux на Mac Studio + VPS edge](docs/runbooks/prod-migration-linux-to-mac-studio.md) — `docs/runbooks/prod-migration-linux-to-mac-studio.md` — Актуальный production runbook для Roehub после смены решения по ingress:
+- [Переезд продакшена с Linux на Mac Studio + VPS edge](docs/runbooks/prod-migration-linux-to-mac-studio.md) — `docs/runbooks/prod-migration-linux-to-mac-studio.md` — Статус: завершенный этап migration на новую topology.
 - [Roehub UI Autostart (systemd) + Helper Commands](docs/runbooks/roehub-ui-autostart-systemd.md) — `docs/runbooks/roehub-ui-autostart-systemd.md` — Статус: архивный документ.
 - [Strategy live worker runbook](docs/runbooks/strategy-live-worker.md) — `docs/runbooks/strategy-live-worker.md` — Runbook для `apps/worker/strategy_live_runner`: как поднять worker, проверить метрики, проверить Redis Streams realtime output и (опционально) Telegram notify.
 - [Web UI local same-origin (WEB-EPIC-02)](docs/runbooks/web-ui-gateway-same-origin.md) — `docs/runbooks/web-ui-gateway-same-origin.md` — Статус:

@@ -88,7 +88,7 @@ market_data:
   live_feed:
     redis_streams:
       enabled: true
-      host: "redis"
+      host: "127.0.0.1"
       port: 6379
       db: 0
       password_env: "ROEHUB_REDIS_PASSWORD"

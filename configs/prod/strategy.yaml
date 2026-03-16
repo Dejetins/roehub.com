@@ -10,7 +10,7 @@ strategy:
 
     redis_streams:
       enabled: true
-      host: "redis"
+      host: "127.0.0.1"
       port: 6379
       db: 0
       password_env: "ROEHUB_REDIS_PASSWORD"
@@ -28,7 +28,7 @@ strategy:
   realtime_output:
     redis_streams:
       enabled: true
-      host: "redis"
+      host: "127.0.0.1"
       port: 6379
       db: 0
       password_env: "ROEHUB_REDIS_PASSWORD"
