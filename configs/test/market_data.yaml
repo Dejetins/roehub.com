@@ -1,0 +1,108 @@
+version: 1
+
+market_data:
+  markets:
+    - market_id: 1
+      exchange: binance
+      market_type: spot
+      market_code: binance:spot
+      rest:
+        base_url: "https://api.binance.com"
+        earliest_available_ts_utc: "2017-01-01T00:00:00Z"
+        timeout_s: 15.0
+        retries: 3
+        backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
+        limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 2 }
+      ws:
+        url: "wss://stream.binance.com:9443/stream"
+        ping_interval_s: 20.0
+        pong_timeout_s: 10.0
+        reconnect: { min_delay_s: 0.5, max_delay_s: 30.0, factor: 1.7, jitter_s: 0.2 }
+        max_symbols_per_connection: 200
+
+    - market_id: 2
+      exchange: binance
+      market_type: futures
+      market_code: binance:futures
+      rest:
+        base_url: "https://fapi.binance.com"
+        earliest_available_ts_utc: "2019-09-01T00:00:00Z"
+        timeout_s: 15.0
+        retries: 3
+        backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
+        limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 2 }
+      ws:
+        url: "wss://fstream.binance.com/stream"
+        ping_interval_s: 20.0
+        pong_timeout_s: 10.0
+        reconnect: { min_delay_s: 0.5, max_delay_s: 30.0, factor: 1.7, jitter_s: 0.2 }
+        max_symbols_per_connection: 200
+
+    - market_id: 3
+      exchange: bybit
+      market_type: spot
+      market_code: bybit:spot
+      rest:
+        base_url: "https://api.bybit.com"
+        earliest_available_ts_utc: "2018-01-01T00:00:00Z"
+        timeout_s: 15.0
+        retries: 3
+        backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
+        limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 2 }
+      ws:
+        url: "wss://stream.bybit.com/v5/public/spot"
+        ping_interval_s: 20.0
+        pong_timeout_s: 10.0
+        reconnect: { min_delay_s: 0.5, max_delay_s: 30.0, factor: 1.7, jitter_s: 0.2 }
+        max_symbols_per_connection: 10
+
+    - market_id: 4
+      exchange: bybit
+      market_type: futures
+      market_code: bybit:futures
+      rest:
+        base_url: "https://api.bybit.com"
+        earliest_available_ts_utc: "2018-01-01T00:00:00Z"
+        timeout_s: 15.0
+        retries: 3
+        backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
+        limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 2 }
+      ws:
+        url: "wss://stream.bybit.com/v5/public/linear"
+        ping_interval_s: 20.0
+        pong_timeout_s: 10.0
+        reconnect: { min_delay_s: 0.5, max_delay_s: 30.0, factor: 1.7, jitter_s: 0.2 }
+        max_symbols_per_connection: 200
+
+  ingestion:
+    flush_interval_ms: 250
+    max_buffer_rows: 2000
+    rest_concurrency_instruments: 2
+    tail_lookback_minutes: 120
+    rest_inter_instrument_delay_s: 1.0
+
+  live_feed:
+    redis_streams:
+      enabled: true
+      host: "127.0.0.1"
+      port: 16379
+      db: 0
+      password_env: "ROEHUB_REDIS_PASSWORD"
+      socket_timeout_s: 2.0
+      connect_timeout_s: 2.0
+      stream_mode: "per_instrument"
+      stream_prefix: "md.candles.1m"
+      retention_days: 3
+
+  scheduler:
+    jobs:
+      sync_whitelist:
+        interval_seconds: 60
+      enrich:
+        interval_seconds: 21600
+      rest_insurance_catchup:
+        interval_seconds: 1800
+
+  backfill:
+    max_days_per_insert: 3
+    chunk_align: "utc_day"

@@ -1,0 +1,52 @@
+<clickhouse>
+  <users>
+    <default>
+      <networks>
+        <ip>127.0.0.1</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <access_management>1</access_management>
+    </default>
+
+    <roe>
+      <password from_env="CLICKHOUSE_PASSWORD" />
+      <networks>
+        <ip>127.0.0.1</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <access_management>1</access_management>
+    </roe>
+
+    <roehub>
+      <password from_env="CLICKHOUSE_PASSWORD" />
+      <networks>
+        <ip>127.0.0.1</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+      <access_management>1</access_management>
+    </roehub>
+  </users>
+
+  <profiles>
+    <default>
+      <max_memory_usage>10000000000</max_memory_usage>
+      <readonly>0</readonly>
+    </default>
+  </profiles>
+
+  <quotas>
+    <default>
+      <interval>
+        <duration>3600</duration>
+        <queries>0</queries>
+        <errors>0</errors>
+        <result_rows>0</result_rows>
+        <read_rows>0</read_rows>
+        <execution_time>0</execution_time>
+      </interval>
+    </default>
+  </quotas>
+</clickhouse>

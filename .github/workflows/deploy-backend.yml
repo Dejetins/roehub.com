@@ -4,22 +4,21 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "infra/docker/docker-compose.backend.yml"
-      - "infra/monitoring/**"
-  workflow_run:
-    workflows: ["Publish App Image"]
-    branches: ["main"]
-    types: [completed]
+      - "apps/**"
+      - "src/**"
+      - "configs/**"
+      - "alembic/**"
+      - "migrations/**"
+      - ".python-version"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "scripts/macos/**"
+      - "infra/macos/**"
+      - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
-    inputs:
-      image_tag:
-        description: "GHCR image tag to deploy (defaults to main or workflow_run head SHA)"
-        required: false
-        type: string
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
   group: deploy-backend-main
@@ -27,7 +26,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: [self-hosted, macOS, ARM64, roehub, prod, mac-studio]
     timeout-minutes: 30
 
@@ -38,110 +36,141 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-
-      - name: Resolve image tag
-        id: image
-        run: |
-          set -euxo pipefail
-          owner_lc="$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')"
-          image_repo="ghcr.io/${owner_lc}/roehub-app"
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.image_tag }}" ]; then
-            image_tag='${{ inputs.image_tag }}'
-          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
-            image_tag='${{ github.event.workflow_run.head_sha }}'
-          else
-            image_tag='main'
-          fi
-          echo "image_repo=${image_repo}" >> "$GITHUB_OUTPUT"
-          echo "image_tag=${image_tag}" >> "$GITHUB_OUTPUT"
-          echo "image_ref=${image_repo}:${image_tag}" >> "$GITHUB_OUTPUT"
+        with:
+          fetch-depth: 2
 
       - name: Show context
         run: |
           set -euxo pipefail
+          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
           whoami
           id
-          docker --version
-          docker compose version
+          sw_vers
+          uv --version
           tailscale version
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
 
       - name: Assert server prerequisites
         run: |
           set -euxo pipefail
+          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
+          command -v uv
           test -s /Users/daniildegtyarev/.config/roehub/roehub.env
           test -d /opt/roehub
           test -w /opt/roehub
+          install -d /opt/roehub/app
+          install -d /opt/roehub/config
+          install -d /Users/daniildegtyarev/Library/LaunchAgents
 
-      - name: Sync backend deploy bundle
+      - name: Validate repo layout for native deploy
         run: |
           set -euxo pipefail
-          install -d /opt/roehub
-          install -d /opt/roehub/monitoring
-          install -m 0644 infra/docker/docker-compose.backend.yml /opt/roehub/docker-compose.backend.yml
+          for required_path in apps src configs alembic migrations scripts/macos infra/macos .python-version pyproject.toml uv.lock; do
+            test -e "${required_path}"
+          done
+
+      - name: Sync backend source bundle
+        run: |
+          set -euxo pipefail
+          install -d /opt/roehub/app
           if command -v rsync >/dev/null 2>&1; then
-            rsync -a --delete infra/monitoring/monitoring/ /opt/roehub/monitoring/
+            rsync -a --delete apps/ /opt/roehub/app/apps/
+            rsync -a --delete src/ /opt/roehub/app/src/
+            rsync -a --delete configs/ /opt/roehub/app/configs/
+            rsync -a --delete alembic/ /opt/roehub/app/alembic/
+            rsync -a --delete migrations/ /opt/roehub/app/migrations/
+            rsync -a --delete scripts/macos/ /opt/roehub/app/scripts/macos/
+            rsync -a --delete infra/macos/ /opt/roehub/app/infra/macos/
           else
-            rm -rf /opt/roehub/monitoring/*
-            tar -C infra/monitoring/monitoring -cf - . | tar -C /opt/roehub/monitoring -xf -
+            rm -rf /opt/roehub/app/apps /opt/roehub/app/src /opt/roehub/app/configs /opt/roehub/app/alembic /opt/roehub/app/migrations /opt/roehub/app/scripts/macos /opt/roehub/app/infra/macos
+            mkdir -p /opt/roehub/app/scripts /opt/roehub/app/infra
+            tar -C . -cf - apps src configs alembic migrations scripts/macos infra/macos | tar -C /opt/roehub/app -xf -
           fi
-          test -s /opt/roehub/docker-compose.backend.yml
-          test -s /opt/roehub/monitoring/prometheus/prometheus.yml
-          test -s /opt/roehub/monitoring/blackbox/blackbox.yml
+          install -m 0644 .python-version /opt/roehub/app/.python-version
+          install -m 0644 pyproject.toml /opt/roehub/app/pyproject.toml
+          install -m 0644 uv.lock /opt/roehub/app/uv.lock
+          test -s /opt/roehub/app/pyproject.toml
+          test -s /opt/roehub/app/uv.lock
 
-      - name: Ensure external volumes exist
+      - name: Install native runtime configs
         run: |
           set -euxo pipefail
-          for volume_name in roehub_pg_data roehub_ch_data roehub_ch_logs roehub_redis_data roehub_prom_data grafana_data; do
-            docker volume inspect "${volume_name}" >/dev/null 2>&1 || docker volume create "${volume_name}"
+          install -d /opt/roehub/config
+          install -d /opt/roehub/clickhouse/users.d
+          install -m 0644 /opt/roehub/app/infra/macos/prometheus/prometheus.prod.yml /opt/roehub/config/prometheus.prod.yml
+          install -m 0644 /opt/roehub/app/infra/macos/blackbox/blackbox.yml /opt/roehub/config/blackbox.yml
+          install -m 0644 /opt/roehub/app/infra/macos/clickhouse/config.xml /opt/roehub/config/clickhouse.config.xml
+          install -m 0644 /opt/roehub/app/infra/macos/clickhouse/users.d/roehub.xml /opt/roehub/config/clickhouse.users.roehub.xml
+
+      - name: Install production launchd plists
+        run: |
+          set -euxo pipefail
+          install -d /Users/daniildegtyarev/Library/LaunchAgents
+          for plist in \
+            com.roehub.api.plist \
+            com.roehub.market-data-ws-worker.plist \
+            com.roehub.market-data-scheduler.plist \
+            com.roehub.clickhouse.plist \
+            com.roehub.blackbox-exporter.plist
+          do
+            install -m 0644 "/opt/roehub/app/infra/macos/launchd/${plist}" "/Users/daniildegtyarev/Library/LaunchAgents/${plist}"
           done
 
-      - name: Validate backend compose
-        env:
-          ROEHUB_APP_IMAGE: ${{ steps.image.outputs.image_ref }}
-          ROEHUB_ENV_FILE: /Users/daniildegtyarev/.config/roehub/roehub.env
+      - name: Build/update Python runtime
         run: |
           set -euxo pipefail
-          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" config >/dev/null
+          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
+          cd /opt/roehub/app
+          uv python install 3.12
+          uv sync --locked
+          uv run python -V
 
-      - name: Deploy backend stack
-        env:
-          COMPOSE_PROJECT_NAME: roehub
-          ROEHUB_APP_IMAGE: ${{ steps.image.outputs.image_ref }}
-          ROEHUB_ENV_FILE: /Users/daniildegtyarev/.config/roehub/roehub.env
+      - name: Detect monitoring config changes
+        id: changes
         run: |
-          set -euxo pipefail
-          for attempt in 1 2 3 4 5; do
-            if docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" pull; then
-              break
-            fi
-            if [ "${attempt}" -eq 5 ]; then
-              echo "docker compose pull failed after ${attempt} attempts"
-              exit 1
-            fi
-            sleep "$((attempt * 15))"
-          done
-          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" up -d --remove-orphans
-          docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" ps
-
-      - name: Ensure tailnet-only API serve
-        run: |
-          set -euxo pipefail
-          if ! tailscale serve status | grep -q 'proxy http://127.0.0.1:8000'; then
-            tailscale serve reset
-            tailscale serve --bg http://127.0.0.1:8000
+          set -euo pipefail
+          changed_files=''
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            changed_files="$(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" || true)"
+          elif git rev-parse HEAD~1 >/dev/null 2>&1; then
+            changed_files="$(git diff --name-only HEAD~1 HEAD || true)"
           fi
-          tailscale serve status
+          monitoring_changed=0
+          if printf '%s\n' "$changed_files" | grep -Eq '^(infra/macos/prometheus/|infra/macos/blackbox/|infra/macos/launchd/com\.roehub\.blackbox-exporter\.plist)'; then
+            monitoring_changed=1
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            monitoring_changed=1
+          fi
+          echo "monitoring_changed=${monitoring_changed}" >> "$GITHUB_OUTPUT"
+
+      - name: Reload production launchd services
+        run: |
+          set -euxo pipefail
+          uid="$(id -u)"
+          for plist in \
+            com.roehub.clickhouse.plist \
+            com.roehub.blackbox-exporter.plist \
+            com.roehub.api.plist \
+            com.roehub.market-data-ws-worker.plist \
+            com.roehub.market-data-scheduler.plist
+          do
+            launchctl bootout "gui/${uid}" "/Users/daniildegtyarev/Library/LaunchAgents/${plist}" || true
+            launchctl bootstrap "gui/${uid}" "/Users/daniildegtyarev/Library/LaunchAgents/${plist}"
+          done
+
+      - name: Reload monitoring host services
+        if: steps.changes.outputs.monitoring_changed == '1'
+        run: |
+          set -euxo pipefail
+          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+          brew services restart prometheus
+          brew services restart grafana
+          sleep 5
 
       - name: Smoke test backend API
         run: |
           set -euxo pipefail
+          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
           status_code=''
           for attempt in 1 2 3 4 5 6; do
             status_code="$(curl -sS -o /tmp/backend-current-user.json -w '%{http_code}' http://127.0.0.1:8000/auth/current-user || true)"
@@ -151,4 +180,15 @@ jobs:
             sleep 5
           done
           test "${status_code}" = '401'
-          cat /tmp/backend-current-user.json
+          for metrics_port in 9201 9202; do
+            ok='0'
+            for attempt in 1 2 3 4 5 6; do
+              if curl -fsS "http://127.0.0.1:${metrics_port}/metrics" >/tmp/backend-metrics-${metrics_port}.txt; then
+                ok='1'
+                break
+              fi
+              sleep 5
+            done
+            test "${ok}" = '1'
+          done
+          tailscale serve status

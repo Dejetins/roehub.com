@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.roehub.test.blackbox-exporter</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>LimitLoadToSessionType</key>
+  <string>Aqua</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/roehub/bin/blackbox_exporter</string>
+    <string>--config.file=/opt/roehub/config/blackbox.test.yml</string>
+    <string>--web.listen-address=127.0.0.1:19115</string>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/daniildegtyarev/Library/Logs/roehub/test-blackbox-exporter.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/daniildegtyarev/Library/Logs/roehub/test-blackbox-exporter.err.log</string>
+</dict>
+</plist>

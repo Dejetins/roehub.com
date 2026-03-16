@@ -16,9 +16,13 @@ set -Eeuo pipefail
 #   INSTRUMENT_KEY='binance:spot:BTCUSDT' DRY_RUN=1 bash scripts/ops/optimize_canonical_partitions.sh
 #   INSTRUMENT_KEY='binance:spot:BTCUSDT' MAX_PARTITIONS=5 SLEEP_SECONDS=3 bash scripts/ops/optimize_canonical_partitions.sh
 
-COMPOSE_FILE="${COMPOSE_FILE:-/opt/roehub/docker-compose.yml}"
-ENV_FILE="${ENV_FILE:-/etc/roehub/roehub.env}"
-SERVICE="${SERVICE:-clickhouse}"
+ENV_FILE="${ENV_FILE:-/Users/daniildegtyarev/.config/roehub/roehub.env}"
+
+CLICKHOUSE_BIN="${CLICKHOUSE_BIN:-/opt/clickhouse/clickhouse}"
+CH_HOST="${CH_HOST:-127.0.0.1}"
+CH_PORT="${CH_PORT:-9000}"
+CH_USER="${CH_USER:-}"
+CH_PASSWORD="${CH_PASSWORD:-}"
 
 DB="${DB:-market_data}"
 TABLE="${TABLE:-canonical_candles_1m}"
@@ -32,15 +36,22 @@ DRY_RUN="${DRY_RUN:-0}"                 # 1 = print plan only, do not optimize
 INSTRUMENT_KEY="${INSTRUMENT_KEY:-}"
 INSTRUMENT_KEY_COL="${INSTRUMENT_KEY_COL:-instrument_key}"
 
-compose_cmd=(
-  docker compose
-  -f "${COMPOSE_FILE}"
-  --env-file "${ENV_FILE}"
-)
+if [[ -s "${ENV_FILE}" ]]; then
+  set -a
+  source "${ENV_FILE}"
+  set +a
+fi
+
+CH_USER="${CH_USER:-${CLICKHOUSE_USER:-default}}"
+CH_PASSWORD="${CH_PASSWORD:-${CLICKHOUSE_PASSWORD:-}}"
 
 ch_query() {
   local query="$1"
-  "${compose_cmd[@]}" exec -T "${SERVICE}" clickhouse-client -q "${query}"
+  if [[ -n "${CH_PASSWORD}" ]]; then
+    "${CLICKHOUSE_BIN}" client --host "${CH_HOST}" --port "${CH_PORT}" --user "${CH_USER}" --password "${CH_PASSWORD}" --query "${query}"
+    return
+  fi
+  "${CLICKHOUSE_BIN}" client --host "${CH_HOST}" --port "${CH_PORT}" --user "${CH_USER}" --query "${query}"
 }
 
 timestamp() {
