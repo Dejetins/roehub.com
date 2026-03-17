@@ -12,10 +12,29 @@ BLACKBOX_ARCHIVE="blackbox_exporter-${BLACKBOX_VERSION}.darwin-arm64.tar.gz"
 BLACKBOX_URL="https://github.com/prometheus/blackbox_exporter/releases/download/v${BLACKBOX_VERSION}/${BLACKBOX_ARCHIVE}"
 BLACKBOX_SHA256="ec6c70ccca92e209dd22be76a4fa244f4bd31afdae3ddb2bb082144100ec52bb"
 
+ensure_writable_dir() {
+  local dir="$1"
+  mkdir -p "$dir" 2>/dev/null || true
+  if [[ -d "$dir" && -w "$dir" ]]; then
+    return
+  fi
+
+  cat >&2 <<EOF
+error: directory is not writable: $dir
+run once and retry:
+  sudo install -d -m 755 -o $(id -un) -g staff "$dir"
+EOF
+  exit 1
+}
+
 brew update
 brew install uv postgresql@16 redis grafana prometheus
 
-mkdir -p /opt/clickhouse /opt/roehub/bin /opt/roehub/state/downloads
+ensure_writable_dir /opt/clickhouse
+ensure_writable_dir /opt/roehub/bin
+ensure_writable_dir /opt/roehub/state/downloads
+ensure_writable_dir /opt/homebrew/var/lib/grafana
+ensure_writable_dir /opt/homebrew/var/log/grafana
 
 curl -fsSL "$CLICKHOUSE_URL" -o /opt/clickhouse/clickhouse
 echo "${CLICKHOUSE_SHA256}  /opt/clickhouse/clickhouse" | shasum -a 256 -c -

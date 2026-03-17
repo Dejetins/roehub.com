@@ -186,7 +186,6 @@ Test endpoints добавляем:
   - перевести в архивный статус и сослаться на native runbook
 - `docs/runbooks/prod-migration-linux-to-mac-studio.md`
   - убрать `Colima`/Docker backend как target state
-  - зафиксировать native backend/runtime layout
 - `docs/runbooks/market-data-autonomous-docker.md`
   - оставить Docker как legacy/local-only path
   - добавить ссылку на native production path
@@ -1179,3 +1178,45 @@ curl -fsS http://127.0.0.1:19202/metrics | head
 - существует отдельная native test environment на том же `Mac Studio`
 - текущий Docker stack и его volumes удалены
 - документация, workflows и scripts в репозитории соответствуют новой native topology
+
+
+Выполни по порядку:
+export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+export ROEHUB_ENV_FILE=/Users/daniildegtyarev/.config/roehub/roehub.env
+# 1) CLICKHOUSE: запускаем вручную (обход launchd)
+launchctl bootout "gui/$(id -u)" "/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.clickhouse.plist" || true
+pkill -f "/opt/clickhouse/clickhouse server" || true
+mkdir -p /opt/roehub/clickhouse/data /opt/roehub/clickhouse/tmp /opt/roehub/clickhouse/logs /opt/roehub/clickhouse/backups /opt/roehub/clickhouse/access /opt/roehub/clickhouse/user_files /opt/roehub/clickhouse/format_schemas
+sudo chown -R daniildegtyarev:staff /opt/roehub/clickhouse /opt/roehub/config
+nohup /bin/zsh -lc 'ulimit -n 262144; set -a; source /Users/daniildegtyarev/.config/roehub/roehub.env; set +a; exec /opt/clickhouse/clickhouse server --config-file /opt/roehub/config/clickhouse.config.xml' >/Users/daniildegtyarev/Library/Logs/roehub/clickhouse.manual.out.log 2>/Users/daniildegtyarev/Library/Logs/roehub/clickhouse.manual.err.log &
+sleep 6
+/opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --query "SELECT version()"
+Если версия вывелась — продолжай:
+set -a
+source "$ROEHUB_ENV_FILE"
+set +a
+/opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --user "${CLICKHOUSE_USER:-roe}" --password "$CLICKHOUSE_PASSWORD" --query "CREATE DATABASE IF NOT EXISTS market_data"
+/opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --user "${CLICKHOUSE_USER:-roe}" --password "$CLICKHOUSE_PASSWORD" --multiquery < /Users/daniildegtyarev/projects/roehub.com/migrations/clickhouse/market_data_ddl.sql
+Теперь Grafana:
+# 2) GRAFANA: чистый старт
+brew services stop grafana || true
+python3 -c "import os,shutil; p='/opt/homebrew/var/lib/grafana'; os.makedirs(p,exist_ok=True); [shutil.rmtree(os.path.join(p,n)) if os.path.isdir(os.path.join(p,n)) and not os.path.islink(os.path.join(p,n)) else os.unlink(os.path.join(p,n)) for n in os.listdir(p)]"
+sudo chown -R daniildegtyarev:staff /opt/homebrew/var/lib/grafana /opt/homebrew/var/log/grafana
+brew services start grafana
+sleep 5
+curl -I http://127.0.0.1:3000
+И финальная проверка:
+brew services restart postgresql@16
+brew services restart redis
+brew services restart prometheus
+launchctl bootout "gui/$(id -u)" "/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.blackbox-exporter.plist" || true
+launchctl bootstrap "gui/$(id -u)" "/Users/daniildegtyarev/Library/LaunchAgents/com.roehub.blackbox-exporter.plist"
+sleep 3
+pg_isready -h 127.0.0.1 -p 5432
+redis-cli -h 127.0.0.1 -p 6379 PING
+/opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --query "SELECT 1"
+curl -I http://127.0.0.1:3000
+curl -I http://127.0.0.1:9090
+curl -I http://127.0.0.1:9115
+Если первый блок снова не поднимет ClickHouse — сразу пришли:
+tail -n 120 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse.manual.err.log
