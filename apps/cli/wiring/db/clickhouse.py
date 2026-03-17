@@ -13,8 +13,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_k
 
 
 class RawKlineWriter(Protocol):
-    def write_1m(self, rows) -> None:
-        ...
+    def write_1m(self, rows) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,12 +41,13 @@ class ClickHouseSettingsLoader:
     """
     Env — источник правды.
     Но для server-side запуска (и ноутбуков) поддерживаем fallback из env-file:
+    - path из ROEHUB_ENV_FILE (если задан)
     - /etc/roehub/roehub.env (как в docker-compose)
     Плюс поддерживаем алиасы CLICKHOUSE_* -> CH_* (user/password/db).
 
     Приоритет значений:
     1) os.environ (или переданный mapping)
-    2) env-file (/etc/roehub/roehub.env), если существует
+    2) env-file (ROEHUB_ENV_FILE, затем /etc/roehub/roehub.env), если читается
     3) дефолты
     """
 
@@ -55,7 +55,11 @@ class ClickHouseSettingsLoader:
         self._env = environ
 
     def load(self) -> ClickHouseSettings:
-        file_env = _read_env_file(Path("/etc/roehub/roehub.env"))
+        file_env: dict[str, str] = {}
+        env_file = str(self._env.get("ROEHUB_ENV_FILE", "")).strip()
+        if env_file:
+            file_env.update(_read_env_file(Path(env_file)))
+        file_env.update(_read_env_file(Path("/etc/roehub/roehub.env")))
 
         def pick(*keys: str, default: str) -> str:
             for k in keys:
@@ -139,7 +143,12 @@ def _read_env_file(path: Path) -> dict[str, str]:
         return {}
 
     out: dict[str, str] = {}
-    for line in path.read_text(encoding="utf-8").splitlines():
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+
+    for line in lines:
         s = line.strip()
         if not s or s.startswith("#"):
             continue
