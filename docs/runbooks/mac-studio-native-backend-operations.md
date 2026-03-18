@@ -50,7 +50,7 @@ Production:
 - `com.roehub.clickhouse-exporter` (`launchd`, `127.0.0.1:9116`)
 - `com.roehub.redis-exporter` (`launchd`, `127.0.0.1:9121`)
 - `com.roehub.postgres-exporter` (`launchd`, `127.0.0.1:9187`)
-- `com.roehub.tailscale-runtime` (`launchd`, periodic reconnection/check + serve sync)
+- `com.roehub.tailscale-runtime` (`launchd`, periodic one-shot reconnection/check + serve sync)
 - `com.roehub.api` (`launchd`, `127.0.0.1:8000`)
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
@@ -126,6 +126,9 @@ curl -fsS http://127.0.0.1:9202/metrics | head
 redis-cli -h 127.0.0.1 -p 6379 PING
 tailscale serve status
 ```
+
+Примечание по `com.roehub.tailscale-runtime`: это periodic one-shot job (`StartInterval`),
+поэтому `state = not running` между запусками — нормально; важно, чтобы `last exit code = 0`.
 
 Test:
 
@@ -225,3 +228,9 @@ launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\
 - вручную поднимите соединение: `tailscale up`;
 - примените serve mapping: `bash scripts/macos/configure_tailscale_serve.sh`;
 - перезапустите runtime agent: `bash scripts/macos/reload_launchd_services.sh prod`.
+
+`com.roehub.tailscale-runtime` показывает `state = not running`, но backend уже `Running`:
+
+- это штатно для one-shot periodic job;
+- если при этом `tailscale status --json | jq -r '.BackendState'` = `Running` и `tailscale serve status` содержит все нужные mapping, действия не требуются;
+- если `last exit code != 0`, посмотрите `tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/tailscale-runtime.err.log`.

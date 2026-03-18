@@ -31,6 +31,35 @@ get_backend_state() {
   "$TAILSCALE_BIN" status --json 2>/dev/null | python -c 'import json,sys; print(json.load(sys.stdin).get("BackendState", ""))' 2>/dev/null || true
 }
 
+has_required_serve_config() {
+  local status
+  local required
+
+  status="$($TAILSCALE_BIN serve status 2>/dev/null || true)"
+  if [[ -z "$status" ]]; then
+    return 1
+  fi
+
+  for required in \
+    "tcp://127.0.0.1:5432" \
+    "tcp://127.0.0.1:8123" \
+    "tcp://127.0.0.1:9000" \
+    "tcp://127.0.0.1:15433" \
+    "tcp://127.0.0.1:18124" \
+    "tcp://127.0.0.1:19001" \
+    "http://127.0.0.1:8000" \
+    "http://127.0.0.1:3000" \
+    "http://127.0.0.1:18000" \
+    "http://127.0.0.1:13000"
+  do
+    if [[ "$status" != *"$required"* ]]; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
 TAILSCALE_BIN="$(resolve_tailscale_bin)"
 state="$(get_backend_state)"
 
@@ -45,4 +74,6 @@ if [[ "$state" != "Running" ]]; then
   exit 1
 fi
 
-TAILSCALE_SKIP_RESET=1 "$SCRIPT_DIR/configure_tailscale_serve.sh"
+if ! has_required_serve_config; then
+  "$SCRIPT_DIR/configure_tailscale_serve.sh"
+fi
