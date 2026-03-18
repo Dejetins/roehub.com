@@ -50,6 +50,7 @@ Production:
 - `com.roehub.clickhouse-exporter` (`launchd`, `127.0.0.1:9116`)
 - `com.roehub.redis-exporter` (`launchd`, `127.0.0.1:9121`)
 - `com.roehub.postgres-exporter` (`launchd`, `127.0.0.1:9187`)
+- `com.roehub.tailscale-runtime` (`launchd`, periodic reconnection/check + serve sync)
 - `com.roehub.api` (`launchd`, `127.0.0.1:8000`)
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
@@ -169,6 +170,7 @@ tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/blackbox-exporter.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse-exporter.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/redis-exporter.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/postgres-exporter.err.log
+tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/tailscale-runtime.err.log
 ```
 
 Проверка active launch agents:
@@ -211,5 +213,15 @@ launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\
 
 - проверьте статус launchd: `launchctl print gui/$(id -u)/com.roehub.clickhouse-exporter`;
 - проверьте ошибки: `tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse-exporter.err.log`;
+- если есть `TypeError: unhashable type: 'ClickHouseExporterCollector'`, обновите код (`git pull`) и перезапустите сервис;
 - проверьте модуль вручную: `/opt/roehub/app/.venv/bin/python -m apps.monitoring.clickhouse_exporter --host 127.0.0.1 --port 9116 --scrape-uri http://127.0.0.1:8123/ --database market_data --user ${CLICKHOUSE_USER:-roe} --password ${CLICKHOUSE_PASSWORD:-}`;
 - после исправления перезапустите: `bash scripts/macos/reload_launchd_services.sh prod`.
+
+`tailscale` после reboot не входит в `Running`, serve недоступен:
+
+- проверьте launch agent: `launchctl print gui/$(id -u)/com.roehub.tailscale-runtime`;
+- проверьте ошибку рантайма: `tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/tailscale-runtime.err.log`;
+- проверьте backend state: `tailscale status --json | jq -r '.BackendState'`;
+- вручную поднимите соединение: `tailscale up`;
+- примените serve mapping: `bash scripts/macos/configure_tailscale_serve.sh`;
+- перезапустите runtime agent: `bash scripts/macos/reload_launchd_services.sh prod`.

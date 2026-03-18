@@ -1,18 +1,9 @@
-"""
-Monitoring services and exporters package.
+"""Monitoring services and exporters package."""
 
-Docs:
-  - docs/runbooks/mac-studio-monitoring-plan.md
-Related:
-  - apps/monitoring/clickhouse_exporter.py
-"""
+from __future__ import annotations
 
-from .clickhouse_exporter import (
-    ClickHouseExporterCollector,
-    ClickHouseMetricsSnapshot,
-    HttpClickHouseMetricsClient,
-    main,
-)
+from importlib import import_module
+from typing import Any
 
 __all__ = [
     "ClickHouseExporterCollector",
@@ -20,3 +11,10 @@ __all__ = [
     "HttpClickHouseMetricsClient",
     "main",
 ]
+
+
+def __getattr__(name: str) -> Any:
+    if name in __all__:
+        module = import_module(".clickhouse_exporter", __name__)
+        return getattr(module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

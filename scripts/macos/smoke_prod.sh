@@ -19,4 +19,13 @@ curl -fsS http://127.0.0.1:9202/metrics >/tmp/roehub-metrics-9202.txt
 
 /opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --query "SELECT 1"
 redis-cli -h 127.0.0.1 -p 6379 PING
+python - <<'PY'
+import json, subprocess, sys
+
+output = subprocess.check_output(["tailscale", "status", "--json"], text=True)
+state = json.loads(output).get("BackendState")
+if state != "Running":
+    raise SystemExit(f"tailscale backend is not running: {state}")
+print(f"tailscale backend state: {state}")
+PY
 tailscale serve status

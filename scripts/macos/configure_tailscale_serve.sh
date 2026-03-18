@@ -1,9 +1,34 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-TAILSCALE_BIN="${TAILSCALE_BIN:-/usr/local/bin/tailscale}"
+resolve_tailscale_bin() {
+  local candidate
+  for candidate in \
+    "${TAILSCALE_BIN:-}" \
+    /usr/local/bin/tailscale \
+    /opt/homebrew/bin/tailscale
+  do
+    if [[ -n "$candidate" && -x "$candidate" ]]; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
 
-"$TAILSCALE_BIN" serve reset || true
+  candidate="$(command -v tailscale 2>/dev/null || true)"
+  if [[ -n "$candidate" && -x "$candidate" ]]; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  printf 'error: tailscale binary not found\n' >&2
+  return 1
+}
+
+TAILSCALE_BIN="$(resolve_tailscale_bin)"
+
+if [[ "${TAILSCALE_SKIP_RESET:-0}" != "1" ]]; then
+  "$TAILSCALE_BIN" serve reset || true
+fi
 
 # Production endpoints.
 "$TAILSCALE_BIN" serve --bg http://127.0.0.1:8000

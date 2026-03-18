@@ -248,7 +248,7 @@ class HttpClickHouseMetricsClient:
         return float(rows[0]["value"])
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, eq=False)
 class ClickHouseExporterCollector:
     """
     Prometheus custom collector that exposes selected ClickHouse service metrics.

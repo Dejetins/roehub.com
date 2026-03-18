@@ -22,7 +22,8 @@ for plist in \
   com.roehub.blackbox-exporter.plist \
   com.roehub.postgres-exporter.plist \
   com.roehub.redis-exporter.plist \
-  com.roehub.clickhouse-exporter.plist
+  com.roehub.clickhouse-exporter.plist \
+  com.roehub.tailscale-runtime.plist
 do
   install -m 0644 "$REPO_ROOT/infra/macos/launchd/$plist" "$LAUNCH_AGENTS_DIR/$plist"
 done
