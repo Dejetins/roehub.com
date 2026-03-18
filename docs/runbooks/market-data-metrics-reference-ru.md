@@ -1,246 +1,307 @@
 # Market Data Metrics Reference (RU)
 
-Подробный справочник метрик для:
-- `market-data-ws-worker` (`http://<host>:9201/metrics`)
-- `market-data-scheduler` (`http://<host>:9202/metrics`)
+Статус: production monitoring baseline для native runtime на `Mac Studio`.
 
-В production Prometheus опрашивает их по loopback-адресам `Mac Studio`:
-- `http://127.0.0.1:9201/metrics` (job `market-data-ws-worker`)
-- `http://127.0.0.1:9202/metrics` (job `market-data-scheduler`)
+Документ описывает:
+- полный каталог метрик, которые используются в текущем операционном контуре market-data и monitoring;
+- какие метрики критичны в первую очередь;
+- как интерпретировать отклонения.
 
-Source of truth для scrape-конфига:
+Source of truth scrape-конфига:
 - `infra/macos/prometheus/prometheus.prod.yml`
 
-В production вместе с market-data jobs также поднимаются infra jobs:
-- `node-exporter` (`127.0.0.1:9100`)
+## Контур сервисов и jobs
+
+В production в этом документе покрываются jobs:
+- `market-data-ws-worker` (`127.0.0.1:9201`)
+- `market-data-scheduler` (`127.0.0.1:9202`)
+- `clickhouse-exporter` (`127.0.0.1:9116`)
 - `postgres-exporter` (`127.0.0.1:9187`)
 - `redis-exporter` (`127.0.0.1:9121`)
-- `clickhouse-exporter` (`127.0.0.1:9116`)
+- `node-exporter` (`127.0.0.1:9100`)
+- `blackbox-http` / `blackbox-tcp` (`127.0.0.1:9115`)
+- `prometheus` (`127.0.0.1:9090`)
 
-Документ отвечает на вопросы:
-- что считает каждая метрика;
-- когда метрика должна расти;
-- какие аномалии это обычно означает;
-- какие label значения ожидаемы.
+## Самые важные метрики (операционный минимум)
 
-## Общие правила интерпретации
+| Сервис | Критичные метрики | Что значит норма |
+|---|---|---|
+| `market-data-ws-worker` | `ws_connected`, `ws_messages_total`, `insert_errors_total`, `redis_publish_errors_total`, `ws_closed_to_insert_done_seconds` | Соединения есть, сообщения/вставки растут, ошибок за окно нет, p95 latency стабильна |
+| `market-data-scheduler` | `scheduler_job_errors_total`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total` | Ошибки не растут, enqueue идет по плану, gap-progress не стоит при необходимости catchup |
+| `clickhouse-exporter` | `clickhouse_exporter_scrape_success`, `clickhouse_uptime_seconds`, `clickhouse_system_event_total{event="InsertedRows"}` | `scrape_success=1`, uptime растет, вставки есть при живом потоке |
+| `postgres-exporter` | `pg_up`, `pg_exporter_last_scrape_error`, `pg_stat_database_numbackends` | `pg_up=1`, scrape без ошибок, число коннектов в разумном диапазоне |
+| `redis-exporter` | `redis_up`, `redis_exporter_last_scrape_error`, `redis_commands_processed_total`, `redis_memory_used_bytes` | `redis_up=1`, команды обрабатываются, память без резких аномалий |
+| `node-exporter` | `node_load1`, `node_memory_free_bytes`, `node_filesystem_avail_bytes` | Нет длительной перегрузки CPU, памяти и диска достаточно |
+| monitoring (`blackbox`, `prometheus`) | `probe_success`, `probe_http_status_code`, `prometheus_tsdb_head_series`, `prometheus_rule_group_last_duration_seconds` | Пробы успешны, Prometheus стабильно скрапит и считает правила |
 
-- Метрики процесса живут в памяти процесса. После рестарта counters/histograms стартуют с нуля.
-- `Counter` только растет в рамках одного процесса.
-- `Gauge` может расти и уменьшаться.
-- `Histogram` публикует серии:
-  - `_bucket{le="..."}`
-  - `_sum`
-  - `_count`
+## Полный каталог метрик
 
-## Worker: `market-data-ws-worker`
+Важно:
+- ниже перечислены все метрики, которые считаются обязательными в текущем monitoring baseline Roehub;
+- для Counter/Histogram дополнительно автоматически публикуются серии `*_created`, `*_bucket`, `*_sum`, `*_count` (см. раздел про автоматические серии).
 
-| Метрика | Тип | Labels | Что означает | Нормальное поведение |
+### 1) `market-data-ws-worker`
+
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
-| `ws_connected` | Gauge | - | Текущее число активных WS-соединений | Положительное число, меняется при reconnect |
-| `ws_reconnects_total` | Counter | - | Кол-во переподключений WS | Редкий рост; бурный рост = проблемы сети/endpoint |
-| `ws_messages_total` | Counter | - | Кол-во полученных WS-сообщений | Постоянный рост при нормальном рынке |
-| `ws_errors_total` | Counter | - | Кол-во ошибок WS-обработки | Должен быть близко к 0; рост требует проверки логов |
-| `ignored_non_closed_total` | Counter | - | Сообщения, отброшенные как non-closed kline | Рост ожидаем, это штатная фильтрация |
-| `insert_rows_total` | Counter | - | Кол-во строк, записанных в raw | Постоянный рост при ingestion |
-| `insert_batches_total` | Counter | - | Кол-во батчей вставки в raw | Рост вместе с `insert_rows_total` |
-| `insert_duration_seconds` | Histogram | - | Длительность одного raw insert batch | p95/p99 должны оставаться стабильными |
-| `insert_errors_total` | Counter | - | Ошибки вставки в raw | Норма: 0 или редкие единичные всплески |
-| `ws_closed_to_insert_start_seconds` | Histogram | - | Латентность closed-candle -> начало insert | Основная pre-insert часть SLO |
-| `ws_closed_to_insert_done_seconds` | Histogram | - | Латентность closed-candle -> успешный insert done | Основной SLO для EPIC 3 (p95 <= 1s локально) |
-| `ws_out_of_order_total` | Counter | - | WS-свечи пришли с минутой меньше `last_seen` (out-of-order) | Допустим редкий рост |
-| `ws_duplicates_total` | Counter | - | WS-дубли по минутам | Возможен редкий рост |
-| `rest_fill_tasks_total` | Counter | - | Принятые в очередь REST fill задачи | Растет при gap/reconnect/bootstrap/tail |
-| `rest_fill_active` | Gauge | - | Текущее число выполняющихся REST fill задач | Колеблется от 0 до `rest_concurrency_instruments` |
-| `rest_fill_errors_total` | Counter | - | Ошибки выполнения REST fill задач | Норма: близко к 0 |
-| `rest_fill_duration_seconds` | Histogram | - | Длительность REST fill задачи | Зависит от размера диапазона и лимитов API |
-| `redis_publish_total` | Counter | - | Успешные публикации WS candle в Redis Streams | Должен стабильно расти при живом WS потоке |
-| `redis_publish_errors_total` | Counter | - | Ошибки публикации в Redis Streams | Рост указывает на недоступность/ошибки Redis |
-| `redis_publish_duplicates_total` | Counter | - | Дубликаты/нарушение монотонности Stream ID (XADD) | Допустим редкий рост, обработка best-effort |
-| `redis_publish_duration_seconds` | Histogram | - | Длительность вызова publish (XADD) | Используется для контроля латентности live feed |
+| `ws_connected` | Gauge | - | Текущее число активных WS-соединений | Обычно > 0 |
+| `ws_reconnects_total` | Counter | - | Счетчик переподключений WS | Медленный рост; всплески = сеть/endpoint |
+| `ws_messages_total` | Counter | - | Счетчик полученных WS-сообщений | Стабильный рост на живом рынке |
+| `ws_errors_total` | Counter | - | Ошибки обработки WS | Рост за окно = инцидент |
+| `ignored_non_closed_total` | Counter | - | Отброшенные non-closed kline | Рост ожидаем |
+| `insert_rows_total` | Counter | - | Записанные строки в raw | Стабильный рост |
+| `insert_batches_total` | Counter | - | Число insert-батчей | Растет вместе с `insert_rows_total` |
+| `insert_duration_seconds` | Histogram | - | Длительность insert-батча | p95/p99 без резких скачков |
+| `insert_errors_total` | Counter | - | Ошибки вставки | Рост за окно = инцидент |
+| `ws_closed_to_insert_start_seconds` | Histogram | - | Latency: closed-candle -> start insert | Контроль pre-insert части |
+| `ws_closed_to_insert_done_seconds` | Histogram | - | Latency: closed-candle -> insert done | Основной end-to-end SLO |
+| `ws_out_of_order_total` | Counter | - | Out-of-order свечи | Редкий рост допустим |
+| `ws_duplicates_total` | Counter | - | Дубли свечей | Редкий рост допустим |
+| `redis_publish_total` | Counter | - | Успешные публикации в Redis Streams | Стабильный рост |
+| `redis_publish_errors_total` | Counter | - | Ошибки публикации в Redis | Рост за окно = проблема live feed |
+| `redis_publish_duplicates_total` | Counter | - | Дубли/нарушение монотонности stream id | Редкий рост допустим |
+| `redis_publish_duration_seconds` | Histogram | - | Длительность вызова publish | Контроль латентности live feed |
+| `rest_fill_tasks_total` | Counter | - | Принятые rest fill задачи | Растет при bootstrap/gap/tail |
+| `rest_fill_active` | Gauge | - | Текущее число активных fill задач | Колеблется в пределах concurrency |
+| `rest_fill_errors_total` | Counter | - | Ошибки rest fill задач | Рост за окно = деградация fill |
+| `rest_fill_duration_seconds` | Histogram | - | Длительность rest fill задачи | p95/p99 контролируют скорость catchup |
 
-## Scheduler: `market-data-scheduler`
+### 2) `market-data-scheduler`
 
-| Метрика | Тип | Labels | Что означает | Нормальное поведение |
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
-| `scheduler_job_runs_total` | Counter | `job` | Кол-во запусков job | Растет по расписанию |
-| `scheduler_job_errors_total` | Counter | `job` | Ошибки job | В идеале 0 |
-| `scheduler_job_duration_seconds` | Histogram | `job` | Длительность job | Стабильная, без резких скачков |
-| `scheduler_tasks_planned_total` | Counter | `reason` | Сколько fill-задач запланировано planner'ом | На старте обычно заметный рост |
-| `scheduler_tasks_enqueued_total` | Counter | `reason` | Сколько из запланированных реально enqueued в queue | Обычно <= planned (из-за дедупликации) |
-| `scheduler_startup_scan_instruments_total` | Counter | - | Сколько инструментов обработано startup scan | Растет на каждый startup scan |
-| `scheduler_rest_catchup_instruments_total` | Counter | `status` | Сколько инструментов обработал periodic rest catchup | Рост по `status="ok"` в штатном режиме |
-| `scheduler_rest_catchup_tail_minutes_total` | Counter | - | Сколько tail-минут суммарно запрошено periodic catchup | Растет на каждом S3-запуске |
-| `scheduler_rest_catchup_tail_rows_written_total` | Counter | - | Сколько tail-строк реально записано periodic catchup | Обычно растет при отставании хвоста |
-| `scheduler_rest_catchup_gap_days_scanned_total` | Counter | - | Сколько UTC-дней просканировано на gaps | Растет стабильно при каждом full scan |
-| `scheduler_rest_catchup_gap_days_with_gaps_total` | Counter | - | Сколько дней найдено с gaps | Должен уменьшать темп роста после стабилизации |
-| `scheduler_rest_catchup_gap_ranges_filled_total` | Counter | - | Сколько gap-диапазонов отправлено в fill | Рост в фазе восстановления истории |
-| `scheduler_rest_catchup_gap_rows_written_total` | Counter | - | Сколько gap-строк записано | Ключевой индикатор, что дыры реально закрываются |
+| `scheduler_job_runs_total` | Counter | `job` | Число запусков scheduler jobs | Растет по расписанию |
+| `scheduler_job_errors_total` | Counter | `job` | Ошибки scheduler jobs | Рост за окно = инцидент |
+| `scheduler_job_duration_seconds` | Histogram | `job` | Длительность job | Резкие скачки = деградация |
+| `scheduler_tasks_planned_total` | Counter | `reason` | Запланированные задачи | Рост ожидаем при bootstrap/catchup |
+| `scheduler_tasks_enqueued_total` | Counter | `reason` | Реально enqueued задачи | Обычно <= planned |
+| `scheduler_startup_scan_instruments_total` | Counter | - | Сколько инструментов обработал startup scan | Рост при startup scan |
+| `scheduler_rest_catchup_instruments_total` | Counter | `status` | Обработанные инструменты periodic catchup | Норма: рост по `status="ok"` |
+| `scheduler_rest_catchup_tail_minutes_total` | Counter | - | Сумма tail-минут periodic catchup | Рост при tail-repair |
+| `scheduler_rest_catchup_tail_rows_written_total` | Counter | - | Записанные tail-строки | Рост при хвостовом отставании |
+| `scheduler_rest_catchup_gap_days_scanned_total` | Counter | - | Просканированные UTC-дни на gaps | Стабильный рост при scan |
+| `scheduler_rest_catchup_gap_days_with_gaps_total` | Counter | - | Дни, где найдены gaps | После стабилизации темп падает |
+| `scheduler_rest_catchup_gap_ranges_filled_total` | Counter | - | Закрытые gap-диапазоны | Рост в фазе восстановления |
+| `scheduler_rest_catchup_gap_rows_written_total` | Counter | - | Записанные строки по gaps | Ключевой индикатор реального прогресса |
 
-### `job` labels
+### 3) `clickhouse-exporter`
 
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
+|---|---|---|---|---|
+| `clickhouse_exporter_scrape_duration_seconds` | Gauge | - | Длительность последнего scrape ClickHouse | Без резких пиков |
+| `clickhouse_exporter_scrape_success` | Gauge | - | Успех последнего scrape (`1`/`0`) | Должно быть `1` |
+| `clickhouse_uptime_seconds` | Gauge | - | Uptime процесса ClickHouse | Должен расти |
+| `clickhouse_system_metric_value` | Gauge | `metric` | Текущее значение из `system.metrics` | Зависит от `metric` |
+| `clickhouse_system_event_total` | Counter | `event` | Кумулятивные счетчики из `system.events` | Ключевые события должны расти |
+
+`clickhouse_system_metric_value{metric=...}` в baseline:
+- `BackgroundMergesAndMutationsPoolTask`
+- `HTTPConnection`
+- `Query`
+- `TCPConnection`
+
+`clickhouse_system_event_total{event=...}` в baseline:
+- `InsertedBytes`
+- `InsertedRows`
+- `Query`
+- `SelectQuery`
+- `SelectedBytes`
+- `SelectedRows`
+
+### 4) `postgres-exporter`
+
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
+|---|---|---|---|---|
+| `pg_up` | Gauge | - | Доступность PostgreSQL для экспортера | Должно быть `1` |
+| `pg_exporter_last_scrape_error` | Gauge | - | Ошибка последнего scrape (`1`/`0`) | Должно быть `0` |
+| `pg_exporter_last_scrape_duration_seconds` | Gauge | - | Длительность последнего scrape | Без резких пиков |
+| `pg_exporter_scrapes_total` | Counter | - | Число scrape экспортера | Растет |
+| `pg_scrape_collector_success` | Gauge | `collector` | Успешность коллектора | Должно быть `1` |
+| `pg_scrape_collector_duration_seconds` | Gauge | `collector` | Длительность коллектора | Контроль деградации |
+| `pg_stat_database_xact_commit` | Counter | `datid`,`datname` | Число commit транзакций | Растет при нагрузке |
+| `pg_stat_database_xact_rollback` | Counter | `datid`,`datname` | Число rollback транзакций | Рост анализируется в контексте ошибок |
+| `pg_stat_database_numbackends` | Gauge | `datid`,`datname` | Текущее число backend-соединений | Не должно упираться в лимит |
+| `pg_stat_activity_count` | Gauge | `datname`,`state`,... | Активность сессий по состояниям | Нет аномального роста `active/idle in transaction` |
+| `pg_locks_count` | Gauge | `datname`,`mode` | Число locks по режимам | Пики + latency = расследование |
+| `pg_database_size_bytes` | Gauge | `datname` | Размер БД | Рост контролируется capacity-планом |
+| `pg_settings_max_connections` | Gauge | `server` | Лимит max_connections | Сопоставлять с `numbackends` |
+| `pg_replication_is_replica` | Gauge | - | Признак replica (`1`) или primary (`0`) | Для текущего контура ожидается `0` |
+| `pg_replication_lag_seconds` | Gauge | - | Lag репликации в секундах | Для single-node/primary обычно `0` |
+
+### 5) `redis-exporter`
+
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
+|---|---|---|---|---|
+| `redis_up` | Gauge | - | Доступность Redis для экспортера | Должно быть `1` |
+| `redis_exporter_last_scrape_error` | Gauge | `err` | Ошибка последнего scrape (`1`/`0`) | Должно быть `0` |
+| `redis_exporter_last_scrape_duration_seconds` | Gauge | - | Длительность последнего scrape | Без резких пиков |
+| `redis_exporter_scrapes_total` | Counter | - | Число scrape экспортера | Растет |
+| `redis_connected_clients` | Gauge | - | Подключенные клиенты | Контроль пиков |
+| `redis_blocked_clients` | Gauge | - | Заблокированные клиенты | Длительный рост = деградация |
+| `redis_commands_processed_total` | Counter | - | Обработанные команды | Растет при живой нагрузке |
+| `redis_commands_total` | Counter | `cmd` | Число команд по типу | Нагрузка по командам |
+| `redis_commands_failed_calls_total` | Counter | `cmd` | Ошибки выполнения команд | Рост = ошибки/таймауты |
+| `redis_commands_rejected_calls_total` | Counter | `cmd` | Отклоненные команды | Рост = лимиты/проблемы сервера |
+| `redis_memory_used_bytes` | Gauge | - | Используемая память Redis | Контроль capacity |
+| `redis_mem_fragmentation_ratio` | Gauge | - | Фрагментация памяти | Стабильно высокий уровень = tuning |
+| `redis_db_keys` | Gauge | `db` | Число ключей в DB | Контроль роста данных |
+| `redis_evicted_keys_total` | Counter | - | Вытесненные ключи | Рост = pressure по памяти |
+| `redis_expired_keys_total` | Counter | - | Истекшие ключи | Рост ожидаем для TTL-нагрузки |
+| `redis_keyspace_hits_total` | Counter | - | Cache hits | Используется вместе с misses |
+| `redis_keyspace_misses_total` | Counter | - | Cache misses | Рост без hits = низкая эффективность |
+| `redis_total_reads_processed` | Counter | - | Количество read-операций | Нагрузка чтения |
+| `redis_total_writes_processed` | Counter | - | Количество write-операций | Нагрузка записи |
+| `redis_instance_info` | Gauge | `redis_version`,`role`,... | Техническая информация об инстансе | Для валидации роли/версии |
+
+### 6) `node-exporter`
+
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
+|---|---|---|---|---|
+| `node_exporter_build_info` | Gauge | `version`,... | Версия node_exporter | Контроль версии |
+| `node_boot_time_seconds` | Gauge | - | Время старта хоста | Используется для детекта reboot |
+| `node_cpu_seconds_total` | Counter | `cpu`,`mode` | CPU-время по ядрам/режимам | Высокий non-idle = нагрузка |
+| `node_load1` | Gauge | - | Load average за 1 минуту | Рост > доступных CPU = перегрузка |
+| `node_load5` | Gauge | - | Load average за 5 минут | Тренд средней нагрузки |
+| `node_load15` | Gauge | - | Load average за 15 минут | Долгий тренд нагрузки |
+| `node_memory_total_bytes` | Gauge | - | Общая память | База для расчетов использования |
+| `node_memory_free_bytes` | Gauge | - | Свободная память | Длительное падение = pressure |
+| `node_memory_active_bytes` | Gauge | - | Активно используемая память | Контекст pressure |
+| `node_filesystem_size_bytes` | Gauge | `mountpoint`,... | Размер ФС | Capacity |
+| `node_filesystem_avail_bytes` | Gauge | `mountpoint`,... | Доступное место ФС | Критично для data/log storage |
+| `node_disk_read_bytes_total` | Counter | `device` | Прочитанные байты диска | IO-профиль чтения |
+| `node_disk_written_bytes_total` | Counter | `device` | Записанные байты диска | IO-профиль записи |
+| `node_network_receive_bytes_total` | Counter | `device` | Полученные байты сети | Сетевой трафик ingress |
+| `node_network_transmit_bytes_total` | Counter | `device` | Отправленные байты сети | Сетевой трафик egress |
+| `node_time_seconds` | Gauge | - | Текущее время хоста | Тех.проверка времени |
+| `node_uname_info` | Gauge | `sysname`,`release`,... | Информация об ОС/ядре | Диагностика окружения |
+
+### 7) `blackbox-exporter` (`blackbox-http`, `blackbox-tcp`)
+
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
+|---|---|---|---|---|
+| `probe_success` | Gauge | `instance`,`job` | Результат пробы (`1`/`0`) | Должно быть `1` |
+| `probe_duration_seconds` | Gauge | `instance`,`job` | Полная длительность пробы | Без резких пиков |
+| `probe_http_status_code` | Gauge | `instance`,`job` | HTTP-код целевого endpoint | Должен соответствовать ожиданию |
+| `probe_http_duration_seconds` | Gauge | `phase`,`instance`,`job` | HTTP latency по фазам | Рост фаз = деградация сети/цели |
+| `probe_tcp_connect_duration_seconds` | Gauge | `instance`,`job` | Время TCP connect | Рост = сеть/порт/нагрузка |
+
+### 8) `prometheus` (self metrics)
+
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
+|---|---|---|---|---|
+| `up{job="prometheus"}` | Gauge | `job`,`instance` | Доступность самого Prometheus | Должно быть `1` |
+| `prometheus_config_last_reload_successful` | Gauge | - | Успешность последнего reload конфига | Должно быть `1` |
+| `prometheus_tsdb_head_series` | Gauge | - | Число активных series в head | Резкие скачки = cardinality-риск |
+| `prometheus_target_scrape_pool_targets` | Gauge | `scrape_job` | Число targets по job | Соответствует конфигу |
+| `prometheus_rule_group_last_duration_seconds` | Gauge | `rule_group` | Длительность последнего rule eval | Не должно приближаться к interval |
+| `prometheus_rule_group_last_evaluation_timestamp_seconds` | Gauge | `rule_group` | Время последней оценки rules | Должно обновляться регулярно |
+
+## Автоматические серии Prometheus
+
+Для полноты интерпретации:
+- у Counter обычно есть основная серия и `*_created`;
+- у Histogram есть `*_bucket`, `*_sum`, `*_count`, `*_created`;
+- поэтому при проверке "всех" серий на endpoint метрик число строк всегда больше числа логических метрик в таблицах выше.
+
+## Справочник labels
+
+`scheduler job`:
 - `sync_whitelist`
 - `enrich`
 - `startup_scan`
 - `rest_insurance_catchup`
 
-### `reason` labels (scheduler tasks)
+`scheduler reason`:
+- `scheduler_bootstrap`
+- `historical_backfill`
+- `scheduler_tail`
 
-- `scheduler_bootstrap` — canonical пустой, диапазон `[earliest, now_floor)`.
-- `historical_backfill` — canonical начинается позже earliest, диапазон `[earliest, canonical_min)`.
-- `scheduler_tail` — страховочный хвост `[max(canonical_max+1m, now_floor-lookback), now_floor)`.
+`scheduler status`:
+- `ok`
+- `failed`
+- `skipped_no_seed`
 
-### `status` labels (`scheduler_rest_catchup_instruments_total`)
+`clickhouse_system_metric_value{metric=...}`:
+- `BackgroundMergesAndMutationsPoolTask`
+- `HTTPConnection`
+- `Query`
+- `TCPConnection`
 
-- `ok` — инструмент успешно обработан `RestCatchUp1mUseCase`.
-- `failed` — processing упал с исключением (смотреть логи).
-- `skipped_no_seed` — canonical пустой; инструмент оставлен planner-ветке bootstrap.
+`clickhouse_system_event_total{event=...}`:
+- `InsertedBytes`
+- `InsertedRows`
+- `Query`
+- `SelectQuery`
+- `SelectedBytes`
+- `SelectedRows`
 
-## Быстрые проверки с `curl`
+## Быстрые проверки
 
-```bash
-curl -fsS http://localhost:9201/metrics | rg "ws_|insert_|rest_fill_"
-curl -fsS http://localhost:9202/metrics | rg "scheduler_(job_|tasks_|startup_scan_)"
-curl -fsS http://localhost:9202/metrics | rg "scheduler_rest_catchup_"
-curl -fsS http://localhost:9201/metrics | rg "redis_publish_"
-```
-
-Исторические задачи scheduler:
-
-```bash
-curl -fsS http://localhost:9202/metrics | rg "scheduler_tasks_(planned|enqueued)_total.*historical_backfill"
-curl -fsS http://localhost:9202/metrics | rg "scheduler_rest_catchup_gap_(days|ranges|rows)"
-```
-
-Ошибка job:
+Проверка health всех jobs:
 
 ```bash
-curl -fsS http://localhost:9202/metrics | rg "scheduler_job_errors_total"
+curl -fsS http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.health)\t\(.scrapeUrl)"' | sort
 ```
 
-## PromQL для SLO и диагностики
+Проверка presence всех baseline метрик по сервисам:
 
-Worker p95 closed->insert done (5m окно):
+```bash
+curl -fsS http://127.0.0.1:9201/metrics | rg '^(ws_|insert_|rest_fill_|redis_publish_)'
+curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_'
+curl -fsS http://127.0.0.1:9116/metrics | rg '^clickhouse_'
+curl -fsS http://127.0.0.1:9187/metrics | rg '^pg_'
+curl -fsS http://127.0.0.1:9121/metrics | rg '^redis_'
+curl -fsS http://127.0.0.1:9100/metrics | rg '^node_'
+```
+
+## PromQL для дежурного мониторинга
+
+Состояние jobs:
+
+```promql
+sum by (job) (
+  up{job=~"prometheus|node-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|market-data-ws-worker|market-data-scheduler"}
+)
+```
+
+Состояние blackbox probes:
+
+```promql
+sum by (job, instance) (probe_success{job=~"blackbox-http|blackbox-tcp"})
+```
+
+Worker p95 closed->insert done:
 
 ```promql
 histogram_quantile(
   0.95,
-  sum(rate(ws_closed_to_insert_done_seconds_bucket[5m])) by (le)
+  sum(rate(ws_closed_to_insert_done_seconds_bucket{job="market-data-ws-worker"}[5m])) by (le)
 )
 ```
 
-Worker p95 insert duration:
+Ошибки worker за 15 минут:
 
 ```promql
-histogram_quantile(
-  0.95,
-  sum(rate(insert_duration_seconds_bucket[5m])) by (le)
-)
+increase(ws_errors_total{job="market-data-ws-worker"}[15m])
++ increase(insert_errors_total{job="market-data-ws-worker"}[15m])
++ increase(redis_publish_errors_total{job="market-data-ws-worker"}[15m])
 ```
 
-Рост ошибок REST fill:
-
-```promql
-increase(rest_fill_errors_total[15m])
-```
-
-Рост ошибок Redis публикации:
-
-```promql
-increase(redis_publish_errors_total[15m])
-```
-
-Ошибки startup scan:
-
-```promql
-increase(scheduler_job_errors_total{job="startup_scan"}[1h])
-```
-
-## Типовые операционные сценарии
-
-- Симптом: `first_ts` новых инструментов "свежий", истории нет.
-- Смотрите:
-  - `scheduler_tasks_planned_total{reason="historical_backfill"}`
-  - `scheduler_tasks_enqueued_total{reason="historical_backfill"}`
-  - `scheduler_job_errors_total{job="startup_scan"}` и логи scheduler.
-
-- Симптом: много planned, мало enqueued.
-- Обычно это дедуп задач в очереди (ожидаемо). Критично только если при этом прогресс в canonical не двигается.
-
-- Симптом: высокий `rest_fill_active`, растет `rest_fill_duration_seconds`, истории догружается медленно.
-- Проверьте лимиты API/ошибки REST и `rest_concurrency_instruments`.
-
-## Как это используется в Mac Studio monitoring
-
-Эти метрики напрямую используются в provisioned dashboard `API and Market Data` и в Prometheus alert rules.
-
-Базовые panel queries:
-
-Worker insert p95:
-
-```promql
-histogram_quantile(
-  0.95,
-  sum(rate(insert_duration_seconds_bucket{job="market-data-ws-worker"}[5m])) by (le)
-)
-```
-
-Worker reconnects за 15 минут:
-
-```promql
-increase(ws_reconnects_total{job="market-data-ws-worker"}[15m])
-```
-
-Scheduler errors за 15 минут:
+Ошибки scheduler за 15 минут:
 
 ```promql
 increase(scheduler_job_errors_total{job="market-data-scheduler"}[15m])
 ```
 
-Pipeline throughput:
+Состояние ClickHouse exporter:
 
 ```promql
-sum(rate(insert_rows_total{job="market-data-ws-worker"}[5m]))
+clickhouse_exporter_scrape_success{job="clickhouse-exporter"}
 ```
 
-```promql
-sum(rate(redis_publish_total{job="market-data-ws-worker"}[5m]))
-```
+## Связанные документы
 
-Alert-oriented queries:
-
-```promql
-increase(ws_errors_total{job="market-data-ws-worker"}[15m]) > 0
-```
-
-```promql
-increase(insert_errors_total{job="market-data-ws-worker"}[15m]) > 0
-```
-
-```promql
-increase(redis_publish_errors_total{job="market-data-ws-worker"}[15m]) > 0
-```
-
-```promql
-increase(scheduler_job_errors_total{job="market-data-scheduler"}[15m]) > 0
-```
-
-## Cross-check с infra metrics
-
-При расследовании деградации pipeline проверяйте инфраструктурные ряды в том же окне:
-
-```promql
-rate(node_cpu_seconds_total{mode!="idle",job="node-exporter"}[5m])
-```
-
-```promql
-sum(rate(pg_stat_database_xact_commit{job="postgres-exporter"}[5m]))
-```
-
-```promql
-sum(rate(redis_commands_processed_total{job="redis-exporter"}[5m]))
-```
-
-```promql
-sum(rate(clickhouse_system_event_total{event="InsertedRows",job="clickhouse-exporter"}[5m]))
-```
+- `docs/runbooks/market-data-metrics.md`
+- `docs/runbooks/mac-studio-monitoring-plan.md`
+- `docs/runbooks/mac-studio-native-backend-operations.md`
+- `infra/macos/prometheus/prometheus.prod.yml`

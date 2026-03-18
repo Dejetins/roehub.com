@@ -206,3 +206,10 @@ launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\
 - проверьте наличие бинарей: `/opt/roehub/bin/postgres_exporter`, `/opt/roehub/bin/redis_exporter`;
 - переустановите prerequisites: `bash scripts/macos/install_native_backend_prereqs.sh`;
 - проверьте exporter-коннекторы в env (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `ROEHUB_REDIS_PASSWORD`).
+
+`clickhouse-exporter` в `down`/`connection refused` на `127.0.0.1:9116`:
+
+- проверьте статус launchd: `launchctl print gui/$(id -u)/com.roehub.clickhouse-exporter`;
+- проверьте ошибки: `tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse-exporter.err.log`;
+- проверьте модуль вручную: `/opt/roehub/app/.venv/bin/python -m apps.monitoring.clickhouse_exporter --host 127.0.0.1 --port 9116 --scrape-uri http://127.0.0.1:8123/ --database market_data --user ${CLICKHOUSE_USER:-roe} --password ${CLICKHOUSE_PASSWORD:-}`;
+- после исправления перезапустите: `bash scripts/macos/reload_launchd_services.sh prod`.

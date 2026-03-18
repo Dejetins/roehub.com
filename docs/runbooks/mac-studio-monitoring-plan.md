@@ -74,6 +74,16 @@ bash scripts/macos/reload_launchd_services.sh prod
 - market data pipeline metrics (`ws_*`, `insert_*`, `rest_fill_*`, `scheduler_*`, `redis_publish_*`)
 - Prometheus self metrics
 
+## Ключевые метрики по сервисам
+
+- monitoring stack: `up{job=...}`, `probe_success`, `probe_http_status_code`, `prometheus_tsdb_head_series`
+- host: `node_cpu_seconds_total`, `node_load1`, `node_memory_free_bytes`, `node_filesystem_avail_bytes`
+- PostgreSQL: `pg_up`, `pg_exporter_last_scrape_error`, `pg_stat_database_xact_commit`, `pg_stat_database_numbackends`
+- Redis: `redis_up`, `redis_exporter_last_scrape_error`, `redis_commands_processed_total`, `redis_memory_used_bytes`, `redis_mem_fragmentation_ratio`
+- ClickHouse exporter: `clickhouse_exporter_scrape_success`, `clickhouse_uptime_seconds`, `clickhouse_system_event_total{event="InsertedRows"}`
+- market-data worker: `ws_connected`, `ws_messages_total`, `ws_errors_total`, `insert_errors_total`, `ws_closed_to_insert_done_seconds`
+- market-data scheduler: `scheduler_job_errors_total`, `scheduler_job_duration_seconds`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total`
+
 ## Вне scope
 
 Следующие docker-era элементы не используются и не считаются частью target state:
