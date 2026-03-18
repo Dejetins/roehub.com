@@ -19,7 +19,10 @@ for plist in \
   com.roehub.market-data-ws-worker.plist \
   com.roehub.market-data-scheduler.plist \
   com.roehub.clickhouse.plist \
-  com.roehub.blackbox-exporter.plist
+  com.roehub.blackbox-exporter.plist \
+  com.roehub.postgres-exporter.plist \
+  com.roehub.redis-exporter.plist \
+  com.roehub.clickhouse-exporter.plist
 do
   install -m 0644 "$REPO_ROOT/infra/macos/launchd/$plist" "$LAUNCH_AGENTS_DIR/$plist"
 done
@@ -28,6 +31,10 @@ cat > /opt/homebrew/etc/prometheus.args <<'EOF'
 --config.file=/opt/roehub/config/prometheus.prod.yml
 --storage.tsdb.path=/opt/homebrew/var/prometheus
 --storage.tsdb.retention.time=90d
+EOF
+
+cat > /opt/homebrew/etc/node_exporter.args <<'EOF'
+--web.listen-address=127.0.0.1:9100
 EOF
 
 echo "prod native templates installed"

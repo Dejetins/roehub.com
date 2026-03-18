@@ -1,260 +1,150 @@
 # Mac Studio Monitoring Plan
 
-Реализованный план мониторинга для текущей production topology:
+Статус: актуальный production monitoring для native backend runtime на `Mac Studio`.
 
-- `Mac Studio` = приватный backend/data/compute host
-- `VPS` = публичный edge и TLS termination
-- `Prometheus`, `Grafana`, `Blackbox` уже живут на `Mac Studio`
-- backend runtime по-прежнему принадлежит пользователю `daniildegtyarev`
+Документ фиксирует target production monitoring baseline без Docker/Colima runtime:
 
-Документ фиксирует уже внедренную repo-managed схему мониторинга: что именно собирается, какими
-компонентами, какие файлы отвечают за runtime, и как проверить rollout без ручных Grafana click-ops.
+- `Mac Studio` держит backend/data/monitoring;
+- `VPS` остается публичным edge;
+- monitoring собирается локально с `127.0.0.1` целей;
+- source of truth для scrape-конфигурации: `infra/macos/prometheus/prometheus.prod.yml`.
 
-## Что собирается
+## Что реально мониторится сейчас
 
-### Host metrics
+## Prometheus jobs
 
-Host-уровень закрыт через `node_exporter` на macOS host service.
+Текущий `prometheus.prod.yml` содержит jobs:
 
-- target для scrape из `Prometheus` контейнера: `host.lima.internal:9100`
-- установка и user-level autostart: `infra/monitoring/host-macos/install-node-exporter.sh`
-- expected model: `brew services start node_exporter` под `daniildegtyarev`
+- `prometheus` (`127.0.0.1:9090`)
+- `node-exporter` (`127.0.0.1:9100`)
+- `postgres-exporter` (`127.0.0.1:9187`)
+- `redis-exporter` (`127.0.0.1:9121`)
+- `clickhouse-exporter` (`127.0.0.1:9116`)
+- `blackbox-http` (через `127.0.0.1:9115/probe`)
+- `blackbox-tcp` (через `127.0.0.1:9115/probe`)
+- `market-data-ws-worker` (`127.0.0.1:9201/metrics`)
+- `market-data-scheduler` (`127.0.0.1:9202/metrics`)
 
-Собираются:
+HTTP probes:
 
-- CPU / load / uptime
-- RAM / filesystem / disk IO
-- network traffic / errors
+- `http://127.0.0.1:3000/api/health` (Grafana)
+- `http://127.0.0.1:8123/ping` (ClickHouse HTTP)
+- `http://127.0.0.1:8000/openapi.json` (API process availability)
 
-Сознательно не собираются на этом этапе:
+TCP probes:
 
-- hardware temperature
-- fan speed
-- power / energy metrics
+- `127.0.0.1:5432` (Postgres)
+- `127.0.0.1:9000` (ClickHouse native)
 
-Для них потребуется отдельный macOS-specific exporter или textfile collector с кастомным script.
+## Service ownership
 
-### Container metrics
+- `prometheus`, `grafana`, `postgresql@16`, `redis` — `brew services`
+- `node_exporter` — `brew services`
+- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `market-data-*` — user `launchd` services
 
-Container/runtime-уровень закрыт через `cadvisor` в backend compose stack.
-
-Файл:
-
-- `infra/docker/docker-compose.backend.yml`
-
-Собираются:
-
-- CPU / RAM / filesystem / network per container
-- restart indicators через `changes(container_start_time_seconds[...])`
-- `container_last_seen` для lifecycle visibility
-
-### Service metrics
-
-В compose добавлены сервисные exporters:
-
-- `postgres_exporter`
-- `redis_exporter`
-- `clickhouse_exporter`
-
-`postgres_exporter` и `redis_exporter` используют стандартные upstream images.
-
-`clickhouse_exporter` реализован как repo-managed Python service в `ROEHUB_APP_IMAGE`:
-
-- module: `apps.monitoring.clickhouse_exporter`
-- scrape endpoint: `clickhouse_exporter:9116/metrics`
-- reason: избежать зависимости от stale/неочевидного third-party image на ARM runtime
-
-Он публикует:
-
-- `clickhouse_exporter_scrape_success`
-- `clickhouse_exporter_scrape_duration_seconds`
-- `clickhouse_uptime_seconds`
-- `clickhouse_system_metric_value{metric=...}`
-- `clickhouse_system_event_total{event=...}`
-
-### API health and API metrics
-
-API теперь публикует:
-
-- `GET /health` -> `200 {"status": "ok"}`
-- `GET /metrics` -> Prometheus exposition
-
-HTTP instrumentation добавлена в `apps/api/monitoring.py`.
-
-Собираются:
-
-- `http_requests_total`
-- `http_request_duration_seconds`
-- `http_requests_in_progress`
-
-`/health` и `/metrics` исключены из request counters/histograms, чтобы monitoring traffic не загрязнял
-основную API телеметрию.
-
-## Repo-managed monitoring assets
-
-### Compose
-
-Файл:
-
-- `infra/docker/docker-compose.backend.yml`
-
-Добавлены сервисы:
-
-- `cadvisor`
-- `postgres_exporter`
-- `redis_exporter`
-- `clickhouse_exporter`
-
-И provisioning mounts:
-
-- Grafana dashboards + datasources
-- Prometheus alert rules
-
-Persistent volumes `prom_data` и `grafana_data` не меняются и не удаляются.
-
-### Prometheus
-
-Файлы:
-
-- `infra/monitoring/monitoring/prometheus/prometheus.yml`
-- `infra/monitoring/monitoring/prometheus/rules/mac-studio-monitoring.rules.yml`
-
-Scrape jobs:
-
-- `api`
-- `blackbox`
-- `blackbox_http`
-- `blackbox_tcp`
-- `cadvisor`
-- `clickhouse_exporter`
-- `market-data-scheduler`
-- `market-data-ws-worker`
-- `node_exporter`
-- `postgres_exporter`
-- `prometheus`
-- `redis_exporter`
-
-Blackbox probes:
-
-- `http://api:8000/health`
-- `http://clickhouse:8123/ping`
-- `http://grafana:3000/api/health`
-- `http://prometheus:9090/-/healthy`
-- `postgres:5432`
-- `redis:6379`
-- `clickhouse:9000`
-
-Alert rules покрывают:
-
-- exporter down / service down
-- API `/health` down
-- host high CPU / host low disk free
-- container high CPU / high memory / recent restart
-- market-data worker and scheduler error growth
-
-### Grafana provisioning
-
-Файлы:
-
-- `infra/monitoring/monitoring/grafana/provisioning/datasources/roehub-prometheus.yml`
-- `infra/monitoring/monitoring/grafana/provisioning/dashboards/roehub-dashboards.yml`
-- `infra/monitoring/monitoring/grafana/dashboards/roehub/01-platform-overview.json`
-- `infra/monitoring/monitoring/grafana/dashboards/roehub/02-mac-studio-host.json`
-- `infra/monitoring/monitoring/grafana/dashboards/roehub/03-containers.json`
-- `infra/monitoring/monitoring/grafana/dashboards/roehub/04-datastores.json`
-- `infra/monitoring/monitoring/grafana/dashboards/roehub/05-api-market-data.json`
-
-Provisioned dashboards:
-
-1. `Platform Overview`
-2. `Mac Studio Host`
-3. `Containers`
-4. `Datastores`
-5. `API and Market Data`
-
-Все dashboards используют datasource UID `roehub-prometheus` и загружаются из репозитория.
-
-## Rollout sequence
-
-### 1. Host node_exporter
-
-На `Mac Studio`:
+## Install and bootstrap commands
 
 ```bash
-cd /opt/roehub
-bash infra/monitoring/host-macos/install-node-exporter.sh
-brew services list | grep node_exporter
-curl -fsS http://127.0.0.1:9100/metrics | head
+bash scripts/macos/install_native_backend_prereqs.sh
+bash scripts/macos/bootstrap_native_prod.sh
+brew services start node_exporter
+bash scripts/macos/reload_launchd_services.sh prod
 ```
 
-### 2. Monitoring services in backend compose
+Файлы, которые ставят production monitoring baseline:
 
-```bash
-export ROEHUB_ENV_FILE=/Users/daniildegtyarev/.config/roehub/roehub.env
-cd /opt/roehub
+- `infra/macos/prometheus/prometheus.prod.yml`
+- `infra/macos/launchd/com.roehub.blackbox-exporter.plist`
+- `infra/macos/launchd/com.roehub.postgres-exporter.plist`
+- `infra/macos/launchd/com.roehub.redis-exporter.plist`
+- `infra/macos/launchd/com.roehub.clickhouse-exporter.plist`
+- `scripts/macos/install_native_backend_prereqs.sh`
+- `scripts/macos/bootstrap_native_prod.sh`
+- `scripts/macos/reload_launchd_services.sh`
 
-docker compose -f /opt/roehub/docker-compose.backend.yml --env-file "$ROEHUB_ENV_FILE" up -d \
-  prometheus grafana blackbox cadvisor postgres_exporter redis_exporter clickhouse_exporter api \
-  market-data-ws-worker market-data-scheduler
-```
+## Metric coverage
 
-### 3. Prometheus target validation
+В baseline гарантированно покрыты:
+
+- availability/liveness ключевых endpoints через `probe_success`
+- host базовые метрики (`node_*`)
+- PostgreSQL метрики (`pg_*`)
+- Redis метрики (`redis_*`)
+- ClickHouse exporter метрики (`clickhouse_*`)
+- market data pipeline metrics (`ws_*`, `insert_*`, `rest_fill_*`, `scheduler_*`, `redis_publish_*`)
+- Prometheus self metrics
+
+## Вне scope
+
+Следующие docker-era элементы не используются и не считаются частью target state:
+
+- `cadvisor`
+- scrape по compose DNS именам
+
+## Runtime checks
+
+## 1) Проверка jobs/targets
 
 ```bash
 curl -fsS http://127.0.0.1:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health, scrapeUrl: .scrapeUrl}'
 ```
 
-Ожидаемые healthy targets:
+Ожидаемо: все текущие jobs в `health: "up"`.
 
-- `api`
-- `blackbox`
-- `cadvisor`
-- `clickhouse_exporter`
-- `market-data-scheduler`
-- `market-data-ws-worker`
-- `node_exporter`
-- `postgres_exporter`
-- `prometheus`
-- `redis_exporter`
-
-### 4. Probe and metric validation
+## 2) Проверка ключевых probe/availability метрик
 
 ```bash
 curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up'
 curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=probe_success'
-curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=clickhouse_exporter_scrape_success'
-curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=http_requests_total'
+curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job=~"node-exporter|postgres-exporter|redis-exporter|clickhouse-exporter"}'
 ```
 
-### 5. Grafana validation
+## 3) Проверка exporter endpoint'ов
 
 ```bash
-curl -fsS http://127.0.0.1:3000/api/health
+curl -fsS http://127.0.0.1:9100/metrics | rg '^node_'
+curl -fsS http://127.0.0.1:9187/metrics | rg '^pg_'
+curl -fsS http://127.0.0.1:9121/metrics | rg '^redis_'
+curl -fsS http://127.0.0.1:9116/metrics | rg '^clickhouse_'
 ```
 
-Дальше в UI Grafana проверить папку `Roehub Monitoring` и наличие пяти provisioned dashboards.
+## 4) Проверка market-data метрик
+
+```bash
+curl -fsS http://127.0.0.1:9201/metrics | rg 'ws_|insert_|rest_fill_|redis_publish_'
+curl -fsS http://127.0.0.1:9202/metrics | rg 'scheduler_(job_|tasks_|startup_scan_|rest_catchup_)'
+```
+
+## 5) Проверка сервисов хоста
+
+```bash
+brew services list
+launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|api|market-data)'
+curl -I http://127.0.0.1:3000
+curl -I http://127.0.0.1:9090
+curl -I http://127.0.0.1:9100
+curl -I http://127.0.0.1:9115
+curl -I http://127.0.0.1:9116
+curl -I http://127.0.0.1:9121
+curl -I http://127.0.0.1:9187
+curl -i http://127.0.0.1:8000/auth/current-user
+```
 
 ## Minimum done state
 
-Реализация считается в рабочем состоянии, когда одновременно выполняется всё ниже:
+Monitoring считается в рабочем состоянии, когда одновременно выполняется все ниже:
 
-- `Prometheus` успешно scrapes `host.lima.internal:9100`
-- `Prometheus` успешно scrapes `cadvisor`
-- `Prometheus` успешно scrapes `postgres_exporter`, `redis_exporter`, `clickhouse_exporter`
-- `Blackbox` probes успешны для `API /health`, `Prometheus`, `Grafana`, `Postgres`, `Redis`, `ClickHouse`
-- `Grafana` автоматически поднимает dashboards из репозитория
-- `API /health` используется для monitoring и больше не опирается на `401` из auth endpoints
-
-## Follow-up, который сознательно отложен
-
-- host hardware temperature / fan / power metrics
-- Grafana unified alerting rules внутри Grafana; сейчас источник истины только Prometheus alert rules
-- deploy metadata panels (git SHA, image tag) как отдельные exported metrics
+- Prometheus target list показывает текущие jobs в `up`
+- `probe_success` не сигнализирует массовых падений probes
+- `node-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter` отдают метрики
+- `market-data-ws-worker` и `market-data-scheduler` метрики доступны
+- `Grafana` отвечает (`302` на `/` или `200` на `/api/health`)
+- API отвечает (`401` на `/auth/current-user` без cookie)
 
 ## Связанные документы
 
-- `docs/runbooks/mac-studio-backend-operations.md`
+- `docs/runbooks/mac-studio-native-backend-operations.md`
+- `docs/runbooks/market-data-metrics.md`
 - `docs/runbooks/market-data-metrics-reference-ru.md`
-- `docs/runbooks/prod-migration-linux-to-mac-studio.md`
-- `infra/docker/docker-compose.backend.yml`
-- `infra/monitoring/monitoring/prometheus/prometheus.yml`
+- `infra/macos/prometheus/prometheus.prod.yml`
+- `infra/macos/blackbox/blackbox.yml`

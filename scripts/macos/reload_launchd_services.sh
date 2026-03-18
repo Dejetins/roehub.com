@@ -8,6 +8,9 @@ LAUNCH_AGENTS_DIR="/Users/daniildegtyarev/Library/LaunchAgents"
 prod_services=(
   com.roehub.clickhouse.plist
   com.roehub.blackbox-exporter.plist
+  com.roehub.postgres-exporter.plist
+  com.roehub.redis-exporter.plist
+  com.roehub.clickhouse-exporter.plist
   com.roehub.api.plist
   com.roehub.market-data-ws-worker.plist
   com.roehub.market-data-scheduler.plist
@@ -46,4 +49,4 @@ for service in "${services[@]}"; do
   launchctl bootstrap "gui/${UID_VALUE}" "${LAUNCH_AGENTS_DIR}/${service}"
 done
 
-launchctl list | grep -E "roehub|clickhouse|blackbox" || true
+launchctl list | grep -E "roehub|clickhouse|blackbox|redis-exporter|postgres-exporter" || true

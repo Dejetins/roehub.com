@@ -23,6 +23,10 @@
 - test env: `/Users/daniildegtyarev/.config/roehub/roehub.test.env`
 - launch agents: `/Users/daniildegtyarev/Library/LaunchAgents`
 
+Совместимый env-path для legacy loaders:
+
+- `/etc/roehub/roehub.env` -> symlink на `/Users/daniildegtyarev/.config/roehub/roehub.env`
+
 Ключевые файлы конфигурации:
 
 - `/opt/roehub/config/prometheus.prod.yml`
@@ -40,8 +44,12 @@ Production:
 - `redis` (`brew services`, `127.0.0.1:6379`)
 - `grafana` (`brew services`, `127.0.0.1:3000`)
 - `prometheus` (`brew services`, `127.0.0.1:9090`)
+- `node_exporter` (`brew services`, `127.0.0.1:9100`)
 - `com.roehub.clickhouse` (`launchd`, `127.0.0.1:8123/9000`)
 - `com.roehub.blackbox-exporter` (`launchd`, `127.0.0.1:9115`)
+- `com.roehub.clickhouse-exporter` (`launchd`, `127.0.0.1:9116`)
+- `com.roehub.redis-exporter` (`launchd`, `127.0.0.1:9121`)
+- `com.roehub.postgres-exporter` (`launchd`, `127.0.0.1:9187`)
 - `com.roehub.api` (`launchd`, `127.0.0.1:8000`)
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
@@ -89,16 +97,27 @@ bash scripts/macos/smoke_test.sh
 bash scripts/macos/configure_tailscale_serve.sh
 ```
 
+Проверка/восстановление env symlink:
+
+```bash
+sudo install -d -m 755 /etc/roehub
+sudo ln -sfn /Users/daniildegtyarev/.config/roehub/roehub.env /etc/roehub/roehub.env
+```
+
 ## Manual health checks
 
 Production:
 
 ```bash
 brew services list
-launchctl list | grep -E "roehub|clickhouse|blackbox|actions.runner|tailscale"
+launchctl list | grep -E "roehub|clickhouse|blackbox|redis-exporter|postgres-exporter|actions.runner|tailscale"
 curl -I http://127.0.0.1:3000
 curl -I http://127.0.0.1:9090
+curl -I http://127.0.0.1:9100
 curl -I http://127.0.0.1:9115
+curl -I http://127.0.0.1:9116
+curl -I http://127.0.0.1:9121
+curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:9201/metrics | head
 curl -fsS http://127.0.0.1:9202/metrics | head
@@ -120,6 +139,12 @@ curl -fsS http://127.0.0.1:19201/metrics | head
 curl -fsS http://127.0.0.1:19202/metrics | head
 ```
 
+Проверка Prometheus targets после reboot:
+
+```bash
+curl -fsS http://127.0.0.1:9090/api/v1/targets | jq '.data.activeTargets[] | {job: .labels.job, health: .health, scrapeUrl: .scrapeUrl}'
+```
+
 ## Logs and diagnostics
 
 Homebrew services logs (через launchctl):
@@ -129,6 +154,7 @@ brew services info postgresql@16
 brew services info redis
 brew services info grafana
 brew services info prometheus
+brew services info node_exporter
 ```
 
 Custom service logs:
@@ -140,6 +166,9 @@ tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/market-data-ws-worker.err
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/market-data-scheduler.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/blackbox-exporter.err.log
+tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse-exporter.err.log
+tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/redis-exporter.err.log
+tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/postgres-exporter.err.log
 ```
 
 Проверка active launch agents:
@@ -147,3 +176,33 @@ tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/blackbox-exporter.err.log
 ```bash
 launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\.)"
 ```
+
+## Frequent failure modes
+
+`com.roehub.clickhouse` падает при старте с `last exit code = 91`:
+
+- проверьте `/opt/roehub/config/clickhouse.users.roehub.xml`;
+- у пользователя `default` должен быть `no_password`;
+- проверьте внутренний лог: `/opt/roehub/clickhouse/logs/clickhouse-server.err.log`.
+
+`grafana` в `brew services` показывает `error 78`:
+
+- проверьте права на `/opt/homebrew/var/lib` и `/opt/homebrew/var/lib/grafana`;
+- `daniildegtyarev` должен иметь execute/read/write доступ к этим путям;
+- проверьте логи: `/opt/homebrew/var/log/grafana-stderr.log`.
+
+`market-data-*` падают с `PermissionError: /etc/roehub/roehub.env`:
+
+- восстановите symlink `/etc/roehub/roehub.env` -> user env;
+- перезагрузите services: `bash scripts/macos/reload_launchd_services.sh prod`.
+
+`api` падает с `STRATEGY_PG_DSN is required`:
+
+- добавьте `STRATEGY_PG_DSN`, `IDENTITY_PG_DSN`, `POSTGRES_DSN` в prod env;
+- перезагрузите `com.roehub.api`.
+
+`postgres-exporter`/`redis-exporter` не стартуют:
+
+- проверьте наличие бинарей: `/opt/roehub/bin/postgres_exporter`, `/opt/roehub/bin/redis_exporter`;
+- переустановите prerequisites: `bash scripts/macos/install_native_backend_prereqs.sh`;
+- проверьте exporter-коннекторы в env (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `ROEHUB_REDIS_PASSWORD`).

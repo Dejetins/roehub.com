@@ -4,9 +4,18 @@
 - `market-data-ws-worker` (`http://<host>:9201/metrics`)
 - `market-data-scheduler` (`http://<host>:9202/metrics`)
 
-В production Prometheus опрашивает их по DNS внутри compose-сети:
-- `http://market-data-ws-worker:9201/metrics`
-- `http://market-data-scheduler:9202/metrics`
+В production Prometheus опрашивает их по loopback-адресам `Mac Studio`:
+- `http://127.0.0.1:9201/metrics` (job `market-data-ws-worker`)
+- `http://127.0.0.1:9202/metrics` (job `market-data-scheduler`)
+
+Source of truth для scrape-конфига:
+- `infra/macos/prometheus/prometheus.prod.yml`
+
+В production вместе с market-data jobs также поднимаются infra jobs:
+- `node-exporter` (`127.0.0.1:9100`)
+- `postgres-exporter` (`127.0.0.1:9187`)
+- `redis-exporter` (`127.0.0.1:9121`)
+- `clickhouse-exporter` (`127.0.0.1:9116`)
 
 Документ отвечает на вопросы:
 - что считает каждая метрика;
@@ -214,4 +223,24 @@ increase(redis_publish_errors_total{job="market-data-ws-worker"}[15m]) > 0
 
 ```promql
 increase(scheduler_job_errors_total{job="market-data-scheduler"}[15m]) > 0
+```
+
+## Cross-check с infra metrics
+
+При расследовании деградации pipeline проверяйте инфраструктурные ряды в том же окне:
+
+```promql
+rate(node_cpu_seconds_total{mode!="idle",job="node-exporter"}[5m])
+```
+
+```promql
+sum(rate(pg_stat_database_xact_commit{job="postgres-exporter"}[5m]))
+```
+
+```promql
+sum(rate(redis_commands_processed_total{job="redis-exporter"}[5m]))
+```
+
+```promql
+sum(rate(clickhouse_system_event_total{event="InsertedRows",job="clickhouse-exporter"}[5m]))
 ```

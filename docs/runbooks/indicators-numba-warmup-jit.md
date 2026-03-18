@@ -31,7 +31,8 @@ printenv | rg 'NUMBA_NUM_THREADS|NUMBA_CACHE_DIR|ROEHUB_NUMBA_NUM_THREADS|ROEHUB
 ### 2) Наличие warmup-лога на старте
 
 ```bash
-docker logs --tail 300 roehub-api | rg 'compute_numba warmup complete|warmup_seconds|numba_num_threads_effective|numba_cache_dir'
+tail -n 300 /Users/daniildegtyarev/Library/Logs/roehub/api.out.log | rg 'compute_numba warmup complete|warmup_seconds|numba_num_threads_effective|numba_cache_dir'
+tail -n 300 /Users/daniildegtyarev/Library/Logs/roehub/api.err.log
 ```
 
 Ожидание:
@@ -55,7 +56,7 @@ ls -la .cache/numba/prod
 2. Если прогрев слишком долгий, снизить стартовую конкуренцию и размер warmup-контекста:
    - временно уменьшить `numba_num_threads`.
 3. Если после рестарта снова "холодный" старт, проверить персистентность cache dir:
-   - `numba_cache_dir` должен быть mounted volume в контейнере.
+   - `numba_cache_dir` должен указывать на постоянный host path (не tmp).
 4. Для smoke-проверки после изменений запустить:
 
 ```bash

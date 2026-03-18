@@ -8,7 +8,11 @@ launchctl list | grep -E "roehub|clickhouse|blackbox|actions.runner|tailscale" |
 
 curl -I http://127.0.0.1:3000
 curl -I http://127.0.0.1:9090
+curl -I http://127.0.0.1:9100
 curl -I http://127.0.0.1:9115
+curl -I http://127.0.0.1:9116
+curl -I http://127.0.0.1:9121
+curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:9201/metrics >/tmp/roehub-metrics-9201.txt
 curl -fsS http://127.0.0.1:9202/metrics >/tmp/roehub-metrics-9202.txt
