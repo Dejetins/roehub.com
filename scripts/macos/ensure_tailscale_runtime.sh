@@ -28,7 +28,7 @@ resolve_tailscale_bin() {
 }
 
 get_backend_state() {
-  "$TAILSCALE_BIN" status --json 2>/dev/null | python -c 'import json,sys; print(json.load(sys.stdin).get("BackendState", ""))' 2>/dev/null || true
+  "$TAILSCALE_BIN" status --json 2>/dev/null | /usr/bin/awk -F '"' '/"BackendState"[[:space:]]*:/ {print $4; exit}' || true
 }
 
 has_required_serve_config() {
