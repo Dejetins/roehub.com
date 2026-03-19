@@ -156,5 +156,6 @@ Monitoring считается в рабочем состоянии, когда �
 - `docs/runbooks/mac-studio-native-backend-operations.md`
 - `docs/runbooks/market-data-metrics.md`
 - `docs/runbooks/market-data-metrics-reference-ru.md`
+- `docs/runbooks/prod-dashboard-metrics-reference-ru.md`
 - `infra/macos/prometheus/prometheus.prod.yml`
 - `infra/macos/blackbox/blackbox.yml`

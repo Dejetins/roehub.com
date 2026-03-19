@@ -5,6 +5,9 @@
 Полное подробное описание каждой метрики (на русском):
 - `docs/runbooks/market-data-metrics-reference-ru.md`
 
+Референс по прод-дашборду (панели, PromQL, типы визуализации):
+- `docs/runbooks/prod-dashboard-metrics-reference-ru.md`
+
 Source of truth scrape-конфига:
 - `infra/macos/prometheus/prometheus.prod.yml`
 
