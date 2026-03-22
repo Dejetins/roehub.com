@@ -8,6 +8,7 @@ on:
       - "src/**"
       - "configs/**"
       - "alembic/**"
+      - "alembic.ini"
       - "migrations/**"
       - ".python-version"
       - "pyproject.toml"
@@ -64,7 +65,7 @@ jobs:
       - name: Validate repo layout for native deploy
         run: |
           set -euxo pipefail
-          for required_path in apps src configs alembic migrations scripts/macos infra/macos .python-version pyproject.toml uv.lock; do
+          for required_path in apps src configs alembic alembic.ini migrations scripts/macos infra/macos .python-version pyproject.toml uv.lock; do
             test -e "${required_path}"
           done
 
@@ -86,8 +87,10 @@ jobs:
             tar -C . -cf - apps src configs alembic migrations scripts/macos infra/macos | tar -C /opt/roehub/app -xf -
           fi
           install -m 0644 .python-version /opt/roehub/app/.python-version
+          install -m 0644 alembic.ini /opt/roehub/app/alembic.ini
           install -m 0644 pyproject.toml /opt/roehub/app/pyproject.toml
           install -m 0644 uv.lock /opt/roehub/app/uv.lock
+          test -s /opt/roehub/app/alembic.ini
           test -s /opt/roehub/app/pyproject.toml
           test -s /opt/roehub/app/uv.lock
 
@@ -123,6 +126,18 @@ jobs:
           uv python install 3.12
           uv sync --locked
           uv run python -V
+
+      - name: Run DB bootstrap and migrations
+        run: |
+          set -euo pipefail
+          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
+          cd /opt/roehub/app
+          set -a
+          source /Users/daniildegtyarev/.config/roehub/roehub.env
+          set +a
+          identity_dsn="${IDENTITY_PG_DSN:-host=127.0.0.1 port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}}"
+          postgres_dsn="${POSTGRES_DSN:-host=127.0.0.1 port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}}"
+          /opt/roehub/app/.venv/bin/python -m apps.migrations.bootstrap_main --identity-dsn "$identity_dsn" --postgres-dsn "$postgres_dsn"
 
       - name: Detect monitoring config changes
         id: changes

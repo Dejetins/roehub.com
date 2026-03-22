@@ -72,6 +72,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - Redis метрики (`redis_*`)
 - ClickHouse exporter метрики (`clickhouse_*`)
 - market data pipeline metrics (`ws_*`, `insert_*`, `rest_fill_*`, `scheduler_*`, `redis_publish_*`)
+- API auth path health (`http_requests_total`, `http_request_duration_seconds`)
 - Prometheus self metrics
 
 ## Ключевые метрики по сервисам
@@ -83,6 +84,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - ClickHouse exporter: `clickhouse_exporter_scrape_success`, `clickhouse_uptime_seconds`, `clickhouse_system_event_total{event="InsertedRows"}`
 - market-data worker: `ws_connected`, `ws_messages_total`, `ws_errors_total`, `insert_errors_total`, `ws_closed_to_insert_done_seconds`
 - market-data scheduler: `scheduler_job_errors_total`, `scheduler_job_duration_seconds`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total`
+- auth/login API (через `http://127.0.0.1:8000/metrics`): `http_requests_total{path="/auth/telegram/login",status_code=~"5.."}`, `http_request_duration_seconds_count{path="/auth/telegram/login"}`
 
 ## Вне scope
 
@@ -107,6 +109,7 @@ curl -fsS http://127.0.0.1:9090/api/v1/targets | jq '.data.activeTargets[] | {jo
 curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up'
 curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=probe_success'
 curl -fsS 'http://127.0.0.1:9090/api/v1/query?query=up{job=~"node-exporter|postgres-exporter|redis-exporter|clickhouse-exporter"}'
+curl -fsS http://127.0.0.1:8000/metrics | rg 'http_requests_total\{method="POST",path="/auth/telegram/login",status_code="500"\}'
 ```
 
 ## 3) Проверка exporter endpoint'ов

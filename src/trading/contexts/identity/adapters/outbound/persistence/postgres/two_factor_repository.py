@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from trading.contexts.identity.adapters.outbound.persistence.postgres.gateway import (
@@ -233,8 +233,56 @@ def _map_two_factor_row(*, row: Mapping[str, Any]) -> TwoFactorAuth:
             user_id=UserId.from_string(str(row["user_id"])),
             totp_secret_enc=secret_enc,
             enabled=bool(row["enabled"]),
-            enabled_at=row["enabled_at"],
-            updated_at=row["updated_at"],
+            enabled_at=_normalize_optional_utc_datetime(
+                value=row["enabled_at"],
+                field_name="enabled_at",
+            ),
+            updated_at=_normalize_utc_datetime(value=row["updated_at"], field_name="updated_at"),
         )
     except (KeyError, TypeError, ValueError) as error:
         raise ValueError("PostgresIdentityTwoFactorRepository cannot map 2FA row") from error
+
+
+def _normalize_utc_datetime(*, value: Any, field_name: str) -> datetime:
+    """
+    Normalize DB timestamp into timezone-aware UTC datetime.
+
+    Args:
+        value: Raw timestamp value returned by psycopg row mapping.
+        field_name: Logical field label used in deterministic error messages.
+    Returns:
+        datetime: UTC-normalized datetime value.
+    Assumptions:
+        PostgreSQL `timestamptz` values are timezone-aware and may use non-UTC offsets.
+    Raises:
+        ValueError: If value is missing timezone information or has unsupported type.
+    Side Effects:
+        None.
+    """
+    if not isinstance(value, datetime):
+        raise ValueError(f"{field_name} must be datetime")
+    offset = value.utcoffset()
+    if value.tzinfo is None or offset is None:
+        raise ValueError(f"{field_name} must be timezone-aware datetime")
+    return value.astimezone(timezone.utc)
+
+
+def _normalize_optional_utc_datetime(*, value: Any, field_name: str) -> datetime | None:
+    """
+    Normalize nullable DB timestamp into optional UTC datetime.
+
+    Args:
+        value: Optional raw timestamp value returned by psycopg row mapping.
+        field_name: Logical field label used in deterministic error messages.
+    Returns:
+        datetime | None: UTC-normalized timestamp or `None`.
+    Assumptions:
+        Null values are represented as `None`.
+    Raises:
+        ValueError: If non-null value has unsupported type or timezone shape.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        return None
+    return _normalize_utc_datetime(value=value, field_name=field_name)

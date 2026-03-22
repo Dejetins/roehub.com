@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -266,7 +266,6 @@ class PostgresIdentityExchangeKeysRepository(ExchangeKeysRepository):
         return row is not None
 
 
-
 def _map_exchange_key_row(*, row: Mapping[str, Any]) -> ExchangeKey:
     """
     Map SQL row mapping into immutable domain `ExchangeKey` entity.
@@ -326,12 +325,60 @@ def _map_exchange_key_row(*, row: Mapping[str, Any]) -> ExchangeKey:
             api_key_last4=api_key_last4,
             api_secret_enc=api_secret_enc,
             passphrase_enc=passphrase_enc,
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
+            created_at=_normalize_utc_datetime(value=row["created_at"], field_name="created_at"),
+            updated_at=_normalize_utc_datetime(value=row["updated_at"], field_name="updated_at"),
             is_deleted=bool(row["is_deleted"]),
-            deleted_at=row["deleted_at"],
+            deleted_at=_normalize_optional_utc_datetime(
+                value=row["deleted_at"],
+                field_name="deleted_at",
+            ),
         )
     except (KeyError, TypeError, ValueError) as error:
         raise ValueError(
             "PostgresIdentityExchangeKeysRepository cannot map exchange key row"
         ) from error
+
+
+def _normalize_utc_datetime(*, value: Any, field_name: str) -> datetime:
+    """
+    Normalize DB timestamp into timezone-aware UTC datetime.
+
+    Args:
+        value: Raw timestamp value returned by psycopg row mapping.
+        field_name: Logical field label used in deterministic error messages.
+    Returns:
+        datetime: UTC-normalized datetime value.
+    Assumptions:
+        PostgreSQL `timestamptz` values are timezone-aware and may use non-UTC offsets.
+    Raises:
+        ValueError: If value is missing timezone information or has unsupported type.
+    Side Effects:
+        None.
+    """
+    if not isinstance(value, datetime):
+        raise ValueError(f"{field_name} must be datetime")
+    offset = value.utcoffset()
+    if value.tzinfo is None or offset is None:
+        raise ValueError(f"{field_name} must be timezone-aware datetime")
+    return value.astimezone(timezone.utc)
+
+
+def _normalize_optional_utc_datetime(*, value: Any, field_name: str) -> datetime | None:
+    """
+    Normalize nullable DB timestamp into optional UTC datetime.
+
+    Args:
+        value: Optional raw timestamp value returned by psycopg row mapping.
+        field_name: Logical field label used in deterministic error messages.
+    Returns:
+        datetime | None: UTC-normalized timestamp or `None`.
+    Assumptions:
+        Null values are represented as `None`.
+    Raises:
+        ValueError: If non-null value has unsupported type or timezone shape.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        return None
+    return _normalize_utc_datetime(value=value, field_name=field_name)

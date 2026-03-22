@@ -85,6 +85,16 @@ bash scripts/macos/reload_launchd_services.sh test
 bash scripts/macos/reload_launchd_services.sh all
 ```
 
+Schema bootstrap (identity SQL + Alembic):
+
+```bash
+cd /opt/roehub/app
+set -a
+source /Users/daniildegtyarev/.config/roehub/roehub.env
+set +a
+/opt/roehub/app/.venv/bin/python -m apps.migrations.bootstrap_main
+```
+
 Быстрые smoke-проверки:
 
 ```bash
@@ -124,6 +134,10 @@ curl -fsS http://127.0.0.1:9201/metrics | head
 curl -fsS http://127.0.0.1:9202/metrics | head
 /opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --query "SELECT 1"
 redis-cli -h 127.0.0.1 -p 6379 PING
+set -a
+source /Users/daniildegtyarev/.config/roehub/roehub.env
+set +a
+PGPASSWORD="${POSTGRES_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -Atqc "SELECT to_regclass('public.identity_users'), to_regclass('public.identity_exchange_keys'), to_regclass('public.alembic_version')"
 tailscale serve status
 ```
 
@@ -205,6 +219,24 @@ launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\
 
 - добавьте `STRATEGY_PG_DSN`, `IDENTITY_PG_DSN`, `POSTGRES_DSN` в prod env;
 - перезагрузите `com.roehub.api`.
+
+`/auth/telegram/login` падает с `500` и в логе есть `psycopg.errors.UndefinedTable: relation "identity_users" does not exist`:
+
+- выполните schema bootstrap: `/opt/roehub/app/.venv/bin/python -m apps.migrations.bootstrap_main`;
+- проверьте таблицы: `to_regclass('public.identity_users')`, `to_regclass('public.identity_exchange_keys')`, `to_regclass('public.alembic_version')`;
+- перезагрузите `com.roehub.api`.
+
+`/auth/telegram/login` отвечает `422` с `invalid_telegram_payload` и текстом `PostgresIdentityUserRepository cannot map user row`:
+
+- обновите backend до версии с UTC-normalization в `identity` postgres repositories;
+- перезапустите `com.roehub.api`;
+- повторите login-проверку.
+
+Schema bootstrap падает с `Missing Alembic config file: /opt/roehub/app/alembic.ini`:
+
+- доставьте `alembic.ini` в `/opt/roehub/app/alembic.ini`;
+- проверьте, что deploy workflow копирует `alembic.ini` вместе с `apps/`, `src/`, `alembic/`, `migrations/`;
+- повторите `/opt/roehub/app/.venv/bin/python -m apps.migrations.bootstrap_main`.
 
 `postgres-exporter`/`redis-exporter` не стартуют:
 
