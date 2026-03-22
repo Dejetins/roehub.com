@@ -251,3 +251,69 @@ SELECT
     ingested_at,
     ingest_id
 FROM market_data.raw_bybit_klines_1m;
+
+/* ------------------------------------------------------------
+   (4) canonical_candles_1m_stats — служебная агрегированная статистика
+   по инструментам для ultra-fast exact отчётов по свечам.
+
+   Важно:
+   - это не дополнительная “таблица со свечами”, а агрегаты по canonical;
+   - хранит aggregate states (sum/min/max/groupBitmap) для быстрого merge;
+   - groupBitmap по minute_key даёт exact уникальные минуты.
+   ------------------------------------------------------------ */
+CREATE TABLE IF NOT EXISTS market_data.canonical_candles_1m_stats
+(
+    market_id            UInt16,
+    symbol               LowCardinality(String),
+    rows_state           AggregateFunction(sum, UInt64),
+    first_ts_state       AggregateFunction(min, DateTime64(3, 'UTC')),
+    last_ts_state        AggregateFunction(max, DateTime64(3, 'UTC')),
+    minute_bitmap_state  AggregateFunction(groupBitmap, UInt32)
+)
+ENGINE = AggregatingMergeTree
+ORDER BY (market_id, symbol);
+
+/* ------------------------------------------------------------
+   MV: canonical -> canonical_candles_1m_stats
+   Обновляет агрегаты автоматически на новых вставках в canonical.
+   ------------------------------------------------------------ */
+CREATE MATERIALIZED VIEW IF NOT EXISTS market_data.mv_canonical_candles_1m_to_stats
+TO market_data.canonical_candles_1m_stats
+AS
+SELECT
+    market_id,
+    symbol,
+    sumState(toUInt64(1)) AS rows_state,
+    minState(ts_open) AS first_ts_state,
+    maxState(ts_open) AS last_ts_state,
+    groupBitmapState(toUInt32(intDiv(toUnixTimestamp(ts_open), 60))) AS minute_bitmap_state
+FROM market_data.canonical_candles_1m
+GROUP BY
+    market_id,
+    symbol;
+
+/* ------------------------------------------------------------
+   One-time backfill canonical -> stats.
+
+   Guard:
+   - вставка выполняется только если stats таблица пуста;
+   - защищает от повторного удвоения aggregate states.
+   ------------------------------------------------------------ */
+INSERT INTO market_data.canonical_candles_1m_stats
+SELECT
+    market_id,
+    symbol,
+    sumState(toUInt64(1)) AS rows_state,
+    minState(ts_open) AS first_ts_state,
+    maxState(ts_open) AS last_ts_state,
+    groupBitmapState(toUInt32(intDiv(toUnixTimestamp(ts_open), 60))) AS minute_bitmap_state
+FROM market_data.canonical_candles_1m
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM market_data.canonical_candles_1m_stats
+    LIMIT 1
+)
+GROUP BY
+    market_id,
+    symbol;

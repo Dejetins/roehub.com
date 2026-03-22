@@ -102,6 +102,17 @@ bash scripts/macos/smoke_prod.sh
 bash scripts/macos/smoke_test.sh
 ```
 
+ClickHouse partition dedup (safe full-history run):
+
+```bash
+bash scripts/macos/clickhouse_partition_dedup.sh all
+```
+
+Подробный runbook:
+
+- `docs/runbooks/clickhouse-partition-dedup.md`
+- `docs/runbooks/clickhouse-memory-profiles.md`
+
 Настройка `tailscale serve`:
 
 ```bash
