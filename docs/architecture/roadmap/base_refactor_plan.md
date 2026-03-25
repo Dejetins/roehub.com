@@ -1,397 +1,1344 @@
-# Base Refactor Plan: Daily Precompute Artifacts + Backtest Engine v2 (Sync-First)
+# Base Refactor Plan: Backtest Engine v2 Milestone / EPIC Map
 
-План перехода backtest на engine v2 с daily precompute артефактами в `.npy`.
-ClickHouse используется только в precompute, на hot path backtest данных из CH нет.
+Этот документ не формулирует новую архитектуру с нуля.
+Он раскладывает уже утверждённую архитектуру из
+`docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+в исполнимый roadmap по milestone и EPIC'ам, в логическом порядке внедрения.
+
+Если между этим документом и
+`docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+есть расхождение, источником истины считается final plan v2.
 
 Референсы:
+- `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `tests/notebook_tests/06_backtest_compute.ipynb`
 - `tests/notebook_tests/05_hit_time_grid.ipynb`
 - `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
 - `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
-- `docs/architecture/shared-kernel-primitives.md`
+- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
+- `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
+- `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
 - `configs/prod/indicators.yaml`
 
 ---
 
 ## Зафиксированные решения
 
-- Engine v2 полностью замещает старый backtest engine (v1 не остается как "альтернатива").
-- Приоритет внедрения: сначала sync runner (`POST /backtests`), затем job runner.
-- Базовые цены храним только в `1m`.
-  Любые таймфреймы для индикаторов/бектеста строятся из `1m` через rollup.
-- Храним готовые дискретные сигналы `{-1,0,1}`; сырые значения индикаторов не сохраняем.
-- Сигналы храним отдельно (не одним огромным файлом): по инструменту + таймфрейму + `indicator_id`.
-- Manifest делаем в YAML (`manifest.yaml`), как человекочитаемый паспорт артефактов.
+- Engine v2 является целевой production-архитектурой backtest.
+- bounded context `backtest` сохраняется; v2 внедряется новыми модулями внутри него.
+- Приоритет внедрения: сначала sync path, затем background path.
+- Artifact store публикуется через два слота: `slot_a` / `slot_b` + pointer file `current.yaml`.
+- Published slot не переписывается in-place.
+- Если неактивный слот ещё pinned активными background run, новый publish не стартует.
+- Backtest request TF ограничены списком:
+  - `15m`
+  - `30m`
+  - `1h`
+  - `2h`
+  - `4h`
+  - `6h`
+  - `8h`
+  - `1d`
+  - `2d`
+  - `3d`
+- `1m` и `5m` запрещены как request timeframe.
+- `1m` остаётся внутренней базой для:
+  - source prices,
+  - `1m hit-times`,
+  - mappings request TF -> `1m`.
+- Risk semantics фиксируются как `1m hit-time only`.
+- Signals хранятся как `int8` с кодировкой `{-1, 0, 1}`.
+- Layout signal matrices фиксируется как `[V, T_tf]`.
+- Из всех систем полностью удаляются:
+  - `momentum.stoch_rsi`
+  - `trend.ichimoku`
+  - `volatility.bbands`
+  - `volatility.bbands_bandwidth`
+  - `volatility.bbands_percent_b`
+  - `momentum.macd`
+  - `momentum.ppo`
+  - `trend.chandelier_exit`
+  - `volume.vwap_deviation`
+  - `trend.keltner`
+  - `trend.supertrend`
+- `signals.v1.params` добавляются в `configs/*/indicators.yaml`, но в initial v2 работают только как default-only.
+- `POST /backtests` становится create-and-execute persisted run endpoint.
+- Отдельный ручной `Estimate preflight` убирается из пользовательского launch flow.
+- Если sync budgets не проходят, но full background budgets проходят, run автоматически переводится в background execution.
+- Все пользовательские запуски попадают в `Backtest history`.
+- Persisted результат хранится только как summary-only `top N`.
+- Trades/report bodies не входят в persisted top results.
+- Detail page варианта пересчитывает ровно один вариант лениво, по pinned artifact slot исходного run.
+- Физически переиспользуется существующее семейство PG таблиц:
+  - `backtest_jobs`
+  - `backtest_job_top_variants`
+  - `backtest_job_stage_a_shortlist`
+- Пользователь может выбирать несколько `inputs.source` через UI; доступные значения берутся из runtime defaults.
 
 ---
 
-## Система координат (layout артефактов)
+## Принцип декомпозиции
 
-Базовая координатная сетка: `exchange / market_type / symbol`.
+План делится на 11 milestone:
 
-`asof_date` (UTC, T-1) хранится в `manifest.yaml` и означает: "артефакты обновлены и консистентны до конца этой даты".
-Директория артефактов стабильная и переиспользуется; daily precompute делает обновление хвоста, а не пересборку всего датасета.
+1. зафиксировать контракты, baseline docs и benchmark/parity baseline;
+2. очистить scope индикаторов и runtime-конфигов;
+3. зафиксировать artifact store, manifests и publish semantics;
+4. построить precompute pipeline для prices и mappings;
+5. построить precompute pipeline для signals;
+6. построить `1m hit-times` и перенести алгоритмические kernel-правила из notebook;
+7. реализовать runtime kernels v2;
+8. обобщить persisted run storage и перевести sync API на новый contract;
+9. перевести background execution;
+10. перевести web UX;
+11. удалить legacy path, закрыть документы и runbooks.
 
-Workspace layout (v1):
+Такой порядок выбран, чтобы:
 
-```
-artifacts/backtest/v2/
-  <exchange>/<market_type>/<symbol>/
-    manifest.yaml
-    prices/
-      prices_1m.npy
-      prices_1m_columns.npy
-    signals/
-      <timeframe>/
-        <indicator_id>/
-          signals.i8.npy
-          manifest.yaml
-    hit_times/
-      <timeframe>/
-        tp_values.npy
-        sl_values.npy
-        long_tp.u32.npy
-        long_sl.u32.npy
-        short_tp.u32.npy
-        short_sl.u32.npy
-        manifest.yaml
-```
-
-Пояснения:
-- `prices/prices_1m.npy` содержит только 1m OHLCV + time (без сигналов).
-- `signals/<timeframe>/<indicator_id>/signals.i8.npy` содержит только сигналы данного индикатора на данном таймфрейме для полного grid (из `configs/prod/indicators.yaml` + signal-params, если есть).
-- `hit_times/<timeframe>/*` содержит hit-time grids для TP/SL на данном execution timeframe.
-- `asof_date` = последняя полностью материализованная дата (UTC), по политике T-1.
+- сначала зафиксировать все неизменяемые контракты;
+- затем убрать из scope то, что делает storage/runtime непрактичными;
+- затем построить данные;
+- затем подключать runtime к API и UX;
+- только после этого удалять legacy.
 
 ---
 
-## Manifest (YAML): что это и зачем
+## Порядок внедрения (рекомендуемый)
 
-`manifest.yaml` нужен для:
-- детерминированной валидации артефактов (dtype/shape/хэши/совместимость),
-- воспроизводимости (какой конфиг/код сгенерировал файлы),
-- прозрачного дебага (человеку понятно, что лежит в каталоге).
+1. Milestone R0 — Базовые контракты, baseline docs и benchmark baseline.
+2. Milestone R1 — Чистка indicator zoo и runtime defaults/config.
+3. Milestone R2 — Artifact store contracts + `slot_a/slot_b` publish model.
+4. Milestone R3 — Precompute prices и `tf -> 1m` mappings.
+5. Milestone R4 — Precompute signals для всего remaining zoo.
+6. Milestone R5 — `1m hit-times` + перенос notebook kernel semantics в production docs/tests.
+7. Milestone R6 — Runtime kernels v2.
+8. Milestone R7 — Persisted run storage generalization + sync API cutover.
+9. Milestone R8 — Background execution cutover.
+10. Milestone R9 — Web UI/history/detail/strategy-save flows.
+11. Milestone R10 — Legacy cleanup, финальная синхронизация docs/runbooks/benchmarks.
 
-Manifest не заменяет координатную систему путей: пути и имена файлов должны быть предсказуемыми и без сканирования.
+Нельзя перепрыгивать через зависимые этапы.
+Например:
 
-### Root `manifest.yaml` (на уровне `<exchange>/<market_type>/<symbol>/`)
-
-Рекомендуемые поля (v1):
-
-```yaml
-schema_version: 1
-artifact_kind: backtest_artifacts
-artifact_version: v2
-
-identity:
-  exchange: binance
-  market_type: futures
-  symbol: BTCUSDT
-  asof_date: "2026-03-05"   # UTC, T-1 (последняя полностью материализованная дата)
-
-time_unit: ms
-
-prices_1m:
-  path: prices/prices_1m.npy
-  columns_path: prices/prices_1m_columns.npy
-  dtype: float32
-  shape: [T, C]
-  sha256: "..."
-  columns_sha256: "..."
-  time_columns: [open_time, close_time]
-  ohlcv_columns: [open, high, low, close, volume]
-  data_range:
-    start_open_time_ms: 0
-    end_close_time_ms: 0
-    rows: T
-  update:
-    recompute_from_open_time_ms: 0
-
-rollup:
-  policy_id: backtest_rollup_best_effort@1
-
-signals:
-  policy_id: signals_from_indicators_v1
-  timeframes: ["1m", "5m", "15m", "1h", "4h", "1d"]
-
-hit_times:
-  timeframes: ["1m", "5m", "15m", "1h", "4h", "1d"]
-
-config:
-  indicators_yaml_path: configs/prod/indicators.yaml
-  indicators_yaml_sha256: "..."
-  indicators_formula_yaml_path: docs/architecture/indicators/indicators_formula.yaml
-  indicators_formula_yaml_sha256: "..."
-  backtest_v2_spec_path: docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
-
-provenance:
-  git_sha: "..."
-  created_at_utc: "2026-03-06T12:34:56Z"
-  generator_version: backtest-artifacts@1
-```
-
-Примечания:
-- `policy_id` фиксирует выбранную rollup семантику для backtest artifacts.
-  Это важно, потому что strict rollup из shared-kernel и best-effort rollup из backtest v1 дают разные derived свечи.
-- Root manifest не обязан перечислять все `indicator_id` и все файлы сигналов; discovery делается по координатам пути.
-
-### Signal `manifest.yaml` (на уровне `signals/<timeframe>/<indicator_id>/`)
-
-Рекомендуемые поля (v1):
-
-```yaml
-schema_version: 1
-kind: indicator_signals
-
-identity:
-  timeframe: "5m"
-  indicator_id: "ma.sma"
-
-grid:
-  inputs:
-    source: ["close", "hlc3", "ohlc4", "low", "high", "open"]
-  params:
-    window: {mode: range, start: 5, stop_incl: 200, step: 1}
-  signal_params:
-    v1: {}
-  order: ["inputs.source", "params.window"]
-
-signals:
-  path: signals.i8.npy
-  dtype: int8
-  shape: [T_tf, V]
-  sha256: "..."
-  encoding:
-    long: 1
-    neutral: 0
-    short: -1
-
-timeline:
-  time_unit: ms
-  cadence_ms: 300000
-  start_open_time_ms: 0
-  end_close_time_ms: 0
-  rows: T_tf
-
-update:
-  recompute_lookback_bars: 200
-  recompute_from_open_time_ms: 0
-```
-
-Смысл `grid.order`: детерминированное соответствие "вариант -> индекс столбца".
-
-Примечание по dtype сигналов:
-- `int8` выбран потому, что значения сигналов — трёхзначные `{-1,0,1}` и должны быть mmap-friendly и Numba-friendly.
-- "int1" как dtype в numpy нет; битовая упаковка возможна как отдельная оптимизация хранения, но добавляет слой кодирования/декодирования.
-
-### Hit-times `manifest.yaml` (на уровне `hit_times/<timeframe>/`)
-
-```yaml
-schema_version: 1
-kind: hit_times
-
-identity:
-  timeframe: "5m"
-
-tp_values:
-  path: tp_values.npy
-  dtype: float32
-  shape: [N_TP]
-  sha256: "..."
-
-sl_values:
-  path: sl_values.npy
-  dtype: float32
-  shape: [N_SL]
-  sha256: "..."
-
-tables:
-  long_tp:  {path: long_tp.u32.npy,  dtype: uint32, shape: [N_TP, T_tf], sha256: "..."}
-  long_sl:  {path: long_sl.u32.npy,  dtype: uint32, shape: [N_SL, T_tf], sha256: "..."}
-  short_tp: {path: short_tp.u32.npy, dtype: uint32, shape: [N_TP, T_tf], sha256: "..."}
-  short_sl: {path: short_sl.u32.npy, dtype: uint32, shape: [N_SL, T_tf], sha256: "..."}
-
-semantics:
-  sentinel_exit_index: T_tf
-  monotone_by_level: true
-```
+- нельзя делать history/detail UX до фиксации persisted run storage contract;
+- нельзя переводить sync runtime на artifacts до появления manifest/validator/load contracts;
+- нельзя запускать background auto-fallback, пока worker не умеет читать pinned artifact slot.
 
 ---
 
-## Инкрементальное обновление (tail update)
+## Milestone R0 — Baseline docs, contracts и baseline measurements
 
-Ежедневный precompute не пересобирает весь датасет. Он:
-- пересчитывает хвост начиная с минимального времени из `manifest.yaml`,
-- перезаписывает пересекающийся хвост,
-- дописывает новые строки.
+Цель: зафиксировать утверждённую архитектуру как source-of-truth, убрать конкурирующие трактовки и подготовить минимальный parity/perf baseline для дальнейших шагов.
 
-Где хранится "минимальное время обновления":
-- Для цен: `prices_1m.update.recompute_from_open_time_ms` в root `manifest.yaml`.
-- Для сигналов: `update.recompute_from_open_time_ms` в `signals/<tf>/<indicator_id>/manifest.yaml`.
+### EPIC R0-01 — Зафиксировать source-of-truth документы
 
-Как выбирается хвост для сигналов:
-- Для каждого `indicator_id` и `timeframe` manifest хранит `update.recompute_lookback_bars`.
-- `recompute_lookback_bars` должен покрывать warmup всех вариантов grid (например, для MA с `window=5..200` это `200` баров на выбранном TF).
-- На каждом daily update `recompute_from_open_time_ms` обновляется так, чтобы следующий запуск мог начать пересчет с корректным warmup (обычно: "конец данных минус lookback").
+**Цель:** синхронизировать roadmap, final plan и связанные backtest docs, чтобы команда работала по одному набору решений.
 
-Пример (как я понял твою идею):
-- Есть существующий `signals/5m/ma.sma/signals.i8.npy` до `end_close_time_ms`.
-- `recompute_lookback_bars=200`.
-- При очередном daily update добавились новые бары 5m.
-- Мы считаем `recompute_from_open_time_ms = (new_end_close_time_ms - 200 * 5m)` (с выравниванием по bucket-open выбранного TF),
-  пересчитываем сигналы на отрезке `[recompute_from, new_end]` для полного grid,
-  перезаписываем хвост и дописываем новые строки.
+**Scope:**
+- зафиксировать `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md` как final architecture baseline;
+- обновить этот `base_refactor_plan.md` до milestone/epic roadmap;
+- явно пометить старые предположения в смежных docs как superseded, если они противоречат final plan;
+- зафиксировать, что новые milestone не вводят альтернативную архитектуру.
 
-Это обеспечивает, что rolling/lag-логика (окна/дельты/пороговые правила) корректна на границе обновления без полного пересчета истории.
+**Non-goals:**
+- реализация кода;
+- детальный UI copywriting.
 
-## Milestone R0 — Контракты артефактов (YAML manifests + loader/validator)
+**DoD:**
+- есть один final architecture doc и один execution roadmap;
+- старые conflicting assumptions не остаются неявными.
 
-Цель: зафиксировать форматы и сделать базовую инфраструктуру чтения/валидации.
-
-EPIC R0-01 — Artifact store API (FS) + path builder
-- Ввести единый builder путей по координатам (`exchange/market_type/symbol`).
-- Реализовать FS-store: read-only load + list timeframes/indicator_ids (опционально).
-
-EPIC R0-02 — YAML manifests + schema v1
-- Ввести root `manifest.yaml`, signal `manifest.yaml`, hit-times `manifest.yaml`.
-- Ввести `schema_version` и fail-fast валидацию структуры.
-
-EPIC R0-03 — Validators
-- Валидатор `prices_1m.npy`:
-  - dtype/shape,
-  - обязательные колонки time/OHLCV,
-  - монотонность времени.
-- Валидатор signal artifacts:
-  - dtype `int8`, значения в `{-1,0,1}`,
-  - `shape[0] == T_tf`.
-- Валидатор hit-time artifacts:
-  - dtype `uint32`, формы,
-  - монотонность по уровням,
-  - sentinel semantics.
-
-Paths (планируемые):
-- `src/trading/contexts/backtest_v2/**`
-- `src/trading/contexts/backtest_v2/adapters/outbound/artifacts_fs/**`
-
-DoD:
-- Можно проверить целостность артефактного каталога одной командой (fail-fast).
+**Основные документы:**
+- `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+- `docs/architecture/roadmap/base_refactor_plan.md`
+- `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 
 ---
 
-## Milestone R1 — Precompute: export prices `1m`
+### EPIC R0-02 — Benchmark/parity baseline до начала cutover
 
-Цель: поддерживать базовые цены `1m` как растущий артефакт и ежедневно обновлять только хвост.
+**Цель:** зафиксировать измеримую baseline-картину, чтобы далее оценивать реальный эффект рефакторинга.
 
-EPIC R1-01 — Extract canonical `1m` -> `prices/prices_1m.npy`
-- Источник правды: `market_data.canonical_candles_1m` через существующие reader/ACL.
-- Сохранить `prices_1m.npy` (OHLCV+time) + `prices_1m_columns.npy`.
-- Инкрементально обновлять хвост:
-  - старт пересчета берем из `manifest.yaml` (`prices_1m.update.recompute_from_open_time_ms`),
-  - перезаписываем пересекающийся хвост и дописываем новые строки до конца `asof_date`.
-- Обновить root `manifest.yaml` (`identity.asof_date`, `prices_1m.data_range.*`, `prices_1m.update.*`).
+**Scope:**
+- подготовить representative datasets и сценарии запуска для:
+  - sync small-run,
+  - large-run,
+  - background-run;
+- зафиксировать baseline perf v1:
+  - wall-clock,
+  - CPU time,
+  - memory footprint,
+  - количество CH calls в hot path;
+- зафиксировать parity fixtures:
+  - Stage A без риска,
+  - Stage B legacy close-fill,
+  - будущий v2 `1m risk execution`.
 
-EPIC R1-02 — T-1 policy + scheduler job
-- Daily job обновляет артефакты до конца `asof_date = today_utc - 1 day`.
+**Non-goals:**
+- обещание полной parity между v1 и v2 там, где меняется execution semantics;
+- оптимизация baseline v1.
 
-DoD:
-- Sync backtest может загрузить `prices_1m.npy` и построить derived candles через rollup.
+**DoD:**
+- есть baseline doc/fixtures;
+- последующие milestone могут ссылаться на измеряемый baseline.
 
----
+**Основные документы:**
+- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `tests/notebook_tests/06_backtest_compute.ipynb`
+- `tests/notebook_tests/05_hit_time_grid.ipynb`
 
-## Milestone R2 — Precompute: export signals (all indicators, per TF, per indicator)
-
-Цель: по ценам `1m` ежедневно предрасчитывать дискретные сигналы `{-1,0,1}` для полного grid всех индикаторов из `configs/prod/indicators.yaml`.
-
-EPIC R2-01 — Rollup reuse/normalize (для compute)
-- Переиспользовать существующий rollup (backtest/strategy), при необходимости выделить общий модуль.
-- Rollup используется:
-  - в precompute (для расчета сигналов и hit-times на TF > 1m),
-  - в sync runner (для построения свечей TF на вход engine v2).
-
-EPIC R2-02 — Signal rules engine (v1)
-- Реализовать вычисление сигналов по `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`.
-- Спецификация rule families живет в docs, runtime реализация в коде.
-
-EPIC R2-03 — Signal params grid
-- Поддержать signal params ranges (thresholds/delta periods/etc) в `configs/prod/indicators.yaml` по форме из `backtest-signals-from-indicators-v1.md`.
-
-EPIC R2-04 — Export format
-- Для каждого `timeframe` и `indicator_id`:
-  - сохранить `signals.i8.npy` shape `[T_tf, V]` (V = число вариантов grid),
-  - сохранить `signals/<tf>/<indicator_id>/manifest.yaml` с grid/order + sha256.
-  - инкрементально обновлять хвост начиная с `update.recompute_from_open_time_ms`:
-    - пересчитываем сигналы на tail-window, достаточном для warmup всех вариантов grid,
-    - перезаписываем пересекающийся хвост и дописываем новые строки.
-
-DoD:
-- Для любого `indicator_id` из `configs/prod/indicators.yaml` можно загрузить сигналовую матрицу по координатам пути.
+**Основные пути:**
+- `tests/**`
+- `src/trading/contexts/backtest/**`
 
 ---
 
-## Milestone R3 — Precompute: hit-time grids (TP/SL)
+### EPIC R0-03 — Зафиксировать runtime/config contracts
 
-Цель: считать hit-time grids и сохранять как mmap-friendly `uint32` таблицы.
+**Цель:** на раннем этапе заморозить основные runtime knobs, чтобы следующие milestone не меняли форму API и артефактов.
 
-EPIC R3-01 — TP/SL values
-- Уровни TP/SL фиксируются как явные массивы `tp_values.npy` и `sl_values.npy`.
+**Scope:**
+- зафиксировать allowed request TF;
+- зафиксировать ranking metrics и sortable summary columns;
+- зафиксировать `top_n_default` / `top_n_max` как runtime-config knobs;
+- зафиксировать `signals.v1.params: default-only`;
+- зафиксировать auto-preflight и auto-fallback semantics.
 
-EPIC R3-02 — Hit-time compute + export
-- Вынести из `tests/notebook_tests/05_hit_time_grid.ipynb` в production код:
-  - вычисление `long_tp/long_sl/short_tp/short_sl`,
-  - export через `np.lib.format.open_memmap`.
+**Non-goals:**
+- реализация web UI;
+- ввод новых ranking metrics, которых нет в approved final plan.
 
-EPIC R3-03 — Hit-times manifest + validators
-- Записать `hit_times/<tf>/manifest.yaml` и валидировать монотонность.
+**DoD:**
+- runtime/config contract зафиксирован в docs;
+- последующие milestone не переопределяют эти правила.
 
-DoD:
-- Engine v2 может загрузить hit-time grids и использовать их для fast grid-search.
+**Основные документы:**
+- `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
 
 ---
 
-## Milestone R4 — Backtest Engine v2: Sync runner (замена v1)
+## Milestone R1 — Scope cleanup: indicators, timeframes, defaults
 
-Цель: реализовать engine v2 и сделать `POST /backtests` sync путем по артефактам.
+Цель: убрать из продукта всё, что делает artifact-backed runtime непрактичным или конфликтует с утверждённой v2-моделью.
 
-EPIC R4-01 — Engine v2 core
-- Реализовать алгоритм из:
+### EPIC R1-01 — Полное удаление 11 тяжёлых индикаторов
+
+**Цель:** физически убрать из системы индикаторы, дающие основной combinatorial explosion.
+
+**Scope:**
+- удалить 11 индикаторов из:
+  - `configs/*/indicators.yaml`,
+  - registry/definitions,
+  - compute kernels,
+  - signal docs,
+  - API/UI выбора,
+  - тестов,
+  - архитектурных документов;
+- убедиться, что runtime defaults и API deterministic reject'ят эти indicator_id.
+
+**Non-goals:**
+- мягкий режим “не используем, но оставляем в коде”;
+- отдельный legacy compatibility layer для удалённых индикаторов.
+
+**DoD:**
+- перечисленные indicator_id больше не поддерживаются ни в config, ни в runtime;
+- docs и tests не содержат их как valid choice.
+
+**Основные файлы:**
+- `configs/prod/indicators.yaml`
+- `src/trading/contexts/indicators/domain/definitions/momentum.py`
+- `src/trading/contexts/indicators/domain/definitions/trend.py`
+- `src/trading/contexts/indicators/domain/definitions/volatility.py`
+- `src/trading/contexts/indicators/domain/definitions/volume.py`
+- `src/trading/contexts/indicators/adapters/outbound/compute_numpy/momentum.py`
+- `src/trading/contexts/indicators/adapters/outbound/compute_numpy/trend.py`
+- `src/trading/contexts/indicators/adapters/outbound/compute_numpy/volatility.py`
+- `src/trading/contexts/indicators/adapters/outbound/compute_numpy/volume.py`
+- `src/trading/contexts/indicators/adapters/outbound/registry/yaml_indicator_registry.py`
+- `src/trading/contexts/indicators/domain/definitions/__init__.py`
+- `src/trading/contexts/indicators/adapters/outbound/compute_numba/warmup.py`
+
+**Основные документы:**
+- `docs/architecture/indicators/indicators_formula.yaml`
+- `docs/architecture/indicators/indicators-trend.md`
+- `docs/architecture/indicators/indicators-momentum.md`
+- `docs/architecture/indicators/indicators-volatility.md`
+- `docs/architecture/indicators/indicators-volume.md`
+
+---
+
+### EPIC R1-02 — `signals.v1.params` schema и default-only enforcement
+
+**Цель:** привести config/schema к новой signal-модели без signal-grid explosion.
+
+**Scope:**
+- добавить `signals.v1.params` в `configs/*/indicators.yaml` для поддержанных indicator_id;
+- зафиксировать default values;
+- обновить defaults provider и validators так, чтобы non-default signal params deterministic reject'ились;
+- синхронизировать signal docs с новым config shape.
+
+**Non-goals:**
+- full signal params grid;
+- поддержка произвольных signal-range overrides в initial v2.
+
+**DoD:**
+- `signals.v1.params` присутствуют в schema/config;
+- request с non-default signal params детерминированно отклоняется.
+
+**Основные файлы:**
+- `configs/prod/indicators.yaml`
+- `src/trading/contexts/backtest/adapters/outbound/defaults/indicators_yaml_defaults_provider.py`
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
+
+---
+
+### EPIC R1-03 — Ограничение request TF и runtime defaults
+
+**Цель:** зафиксировать продуктовый/технический contract для request timeframes, ranking metrics, source choices и configurable `top N`.
+
+**Scope:**
+- исключить `1m` и `5m` из backtest request defaults и UI defaults;
+- зафиксировать allowed request TF;
+- добавить/обновить runtime defaults contract для:
+  - ranking metrics,
+  - sortable columns,
+  - `top_n_default`,
+  - `top_n_max`,
+  - allowed `inputs.source` per indicator;
+- убедиться, что API/runtime валидируют запрещённые TF.
+
+**Non-goals:**
+- изменение market-data ingestion;
+- поддержка UI hardcoded options.
+
+**DoD:**
+- runtime defaults полностью описывают launch form;
+- запрещённые TF deterministic reject'ятся на backend.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
+- `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
+
+---
+
+## Milestone R2 — Artifact store contracts: slots, manifests, validators
+
+Цель: зафиксировать filesystem layout и publish semantics, чтобы и precompute, и runtime читали один и тот же контракт.
+
+### EPIC R2-01 — Path builder и slot layout
+
+**Цель:** ввести детерминированную координатную систему для artifact store.
+
+**Scope:**
+- путь строится по координатам:
+  - `exchange`
+  - `market_type`
+  - `symbol`
+- внутри symbol root:
+  - `current.yaml`
+  - `slot_a/`
+  - `slot_b/`
+- внутри слота:
+  - `manifest.yaml`
+  - `prices/<tf>/...`
+  - `signals/<tf>/<indicator_id>/...`
+  - `mappings/<tf>/...`
+  - `hit_times/1m/...`
+- реализовать path builder и loader contract без directory scanning как обязательного шага hot path.
+
+**Non-goals:**
+- хранение ежедневной истории slot version на диске;
+- archive/compression policy.
+
+**DoD:**
+- layout и path contracts описаны и реализуемы без неоднозначности.
+
+**Основные пути:**
+- `src/trading/contexts/backtest/adapters/outbound/artifacts_fs/**`
+- `src/trading/contexts/backtest/application/services/v2/**`
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-artifact-store-v2.md`
+
+---
+
+### EPIC R2-02 — `current.yaml`, slot publishing и pinning contract
+
+**Цель:** обеспечить безопасную публикацию новых артефактов без in-place mutations.
+
+**Scope:**
+- зафиксировать `current.yaml` contract:
+  - `active_slot`
+  - `slot_generation`
+  - `asof_date`
+  - `manifest_sha256`
+  - `published_at_utc`
+- зафиксировать publish sequence:
+  1. build inactive slot
+  2. validate whole slot
+  3. atomically switch `current.yaml`
+- зафиксировать правило:
+  - если inactive slot ещё pinned активным background run, publish не стартует;
+- зафиксировать slot pinning metadata, которую runtime/job storage должен хранить.
+
+**Non-goals:**
+- retention policy более чем на два слота;
+- автоматическая очистка historical snapshots, которых здесь нет по дизайну.
+
+**DoD:**
+- publish semantics описаны без двусмысленности;
+- background run имеет стабильную slot identity.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- `docs/runbooks/backtest-artifacts-rebuild.md`
+
+---
+
+### EPIC R2-03 — Manifest schemas и validators
+
+**Цель:** ввести fail-fast проверки целостности слота.
+
+**Scope:**
+- root `manifest.yaml`;
+- per-indicator signal `manifest.yaml`;
+- `hit_times/1m/manifest.yaml`;
+- validators на:
+  - dtype
+  - shape
+  - monotonic time arrays
+  - signal value set `{-1,0,1}`
+  - axis order contract
+  - mapping bounds
+  - hit-time monotonicity
+  - hash/provenance fields
+
+**Non-goals:**
+- expensive full-file hashing на hot path runtime;
+- dynamic schema discovery в runtime.
+
+**DoD:**
+- слот можно целиком провалидировать перед publish;
+- runtime получает fixed metadata, а не вычисляет её на месте.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+
+---
+
+### EPIC R2-04 — Artifact runtime/precompute config
+
+**Цель:** отделить artifact pipeline configuration от общего runtime request config.
+
+**Scope:**
+- завести/обновить `configs/<env>/backtest_artifacts.yaml`;
+- зафиксировать в нём:
+  - artifact root
+  - allowed artifact TF
+  - TP/SL grid для `1m hit-times`
+  - slot policy
+  - publish schedule
+  - lookback policy
+  - validation budgets
+- загрузчик/валидатор должен fail-fast валидировать эти поля.
+
+**Non-goals:**
+- перенос всех backtest runtime knobs в `backtest_artifacts.yaml`;
+- скрытая магия через env без явного config contract.
+
+**DoD:**
+- artifact pipeline настраивается отдельным конфигом;
+- config shape документирован и валидируется.
+
+**Основные файлы:**
+- `configs/dev/backtest_artifacts.yaml`
+- `configs/test/backtest_artifacts.yaml`
+- `configs/prod/backtest_artifacts.yaml`
+
+---
+
+## Milestone R3 — Precompute prices и mappings
+
+Цель: материализовать price arrays для всех разрешённых TF и связи request TF -> `1m`, не трогая runtime hot path.
+
+### EPIC R3-01 — Canonical `1m` export в inactive slot
+
+**Цель:** построить источник правды для всего precompute pipeline.
+
+**Scope:**
+- читать `market_data.canonical_candles_1m` через существующие reader/ACL;
+- материализовать:
+  - `prices/1m/open_time.i64.npy`
+  - `prices/1m/close_time.i64.npy`
+  - `prices/1m/ohlcv.f32.npy`
+- поддержать tail update c lookback там, где это нужно pipeline;
+- не смешивать timestamps и float OHLCV в одном homogeneous массиве.
+
+**Non-goals:**
+- использование CH в runtime;
+- хранение `prices_1m_columns.npy` legacy-формата как нового стандарта.
+
+**DoD:**
+- inactive slot умеет получить корректный `1m` price base;
+- root manifest отражает coverage.
+
+**Основные файлы:**
+- `src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py`
+- `src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/market_data_candle_feed.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py`
+
+---
+
+### EPIC R3-02 — Rollup allowed TF prices
+
+**Цель:** заранее материализовать цены всех разрешённых request TF.
+
+**Scope:**
+- строить из `1m` только разрешённые TF:
+  - `15m`
+  - `30m`
+  - `1h`
+  - `2h`
+  - `4h`
+  - `6h`
+  - `8h`
+  - `1d`
+  - `2d`
+  - `3d`
+- для каждого TF сохранять:
+  - `open_time.i64.npy`
+  - `close_time.i64.npy`
+  - `ohlcv.f32.npy`
+- валидировать rollup coverage и boundary alignment.
+
+**Non-goals:**
+- runtime rollup при backtest request;
+- хранение `1m`/`5m` как request-level runtime datasets.
+
+**DoD:**
+- runtime может загружать prices нужного TF без CH и без rollup.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
+- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+
+---
+
+### EPIC R3-03 — Build `tf -> 1m` mappings
+
+**Цель:** быстро переводить bars request timeframe в minute execution space.
+
+**Scope:**
+- для каждого разрешённого request TF строить:
+  - `bar_open_1m_idx.u32.npy`
+  - `bar_close_1m_idx.u32.npy`
+- валидировать:
+  - bounds
+  - monotonicity
+  - соответствие price arrays
+
+**Non-goals:**
+- runtime binary search по timestamps на каждом trade;
+- отдельные mappings для неразрешённых TF.
+
+**DoD:**
+- runtime Stage B может перейти от request bar к `1m` за O(1).
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+
+---
+
+### EPIC R3-04 — Slot build/publish flow для prices+mappings
+
+**Цель:** довести price stage до publish-ready формы.
+
+**Scope:**
+- build в inactive slot;
+- validation before publish;
+- запись root manifest;
+- атомарный switch `current.yaml`;
+- smoke tests на loader/publisher.
+
+**Non-goals:**
+- сигналы;
+- hit-times.
+
+**DoD:**
+- можно опубликовать слот, содержащий только validated prices+mappings stage.
+
+**Основные пути:**
+- `src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py`
+
+---
+
+## Milestone R4 — Precompute signals
+
+Цель: ежедневно материализовать дискретные сигналовые матрицы для всего remaining zoo индикаторов на всех разрешённых TF.
+
+### EPIC R4-01 — Signal rules engine v2-aligned
+
+**Цель:** привести production signal rule application к contract из `backtest-signals-from-indicators-v1.md`.
+
+**Scope:**
+- использовать signal families и semantics из docs;
+- поддержать `inputs.source` как явный axis;
+- поддержать `signals.v1.params` только в default-only режиме;
+- не хранить raw indicator values как artifact.
+
+**Non-goals:**
+- signal-grid expansion beyond defaults;
+- runtime signal derivation на hot path.
+
+**DoD:**
+- любой поддержанный indicator output превращается в `{-1,0,1}` по фиксированным правилам.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
+- `docs/architecture/indicators/indicators_formula.yaml`
+
+---
+
+### EPIC R4-02 — Export `signals.i8.npy` per timeframe + indicator
+
+**Цель:** получить mmap-friendly signal artifacts в layout `[V, T_tf]`.
+
+**Scope:**
+- для каждого `timeframe + indicator_id` сохранять отдельный `signals.i8.npy`;
+- shape фиксируется как `[V, T_tf]`;
+- хранить per-indicator `manifest.yaml` с:
+  - `indicator_id`
+  - `timeframe`
+  - `grid`
+  - deterministic axis order
+  - rows count
+  - timeline coverage
+  - sha/dtype/shape
+
+**Non-goals:**
+- один общий giant signal file на весь instrument;
+- shape `[T, V]`.
+
+**DoD:**
+- runtime может загрузить ровно нужные row ranges без полного чтения всех variants.
+
+**Основные пути:**
+- `src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py`
+- `src/trading/contexts/backtest/adapters/outbound/artifacts_fs/**`
+
+---
+
+### EPIC R4-03 — Tail update logic для signals
+
+**Цель:** поддержать ежедневное обновление signals без полного пересчёта всей истории.
+
+**Scope:**
+- для каждого `indicator_id + timeframe` хранить и использовать lookback policy;
+- пересчитывать хвост на достаточной длине для warmup/lag semantics;
+- перезаписывать пересекающийся tail segment в inactive slot;
+- обновлять signal manifest coverage metadata.
+
+**Non-goals:**
+- in-place mutation active slot;
+- обязательный full historical rebuild на каждый daily update.
+
+**DoD:**
+- daily signal rebuild ограничен хвостом и валидно покрывает warmup semantics.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+
+---
+
+### EPIC R4-04 — Source axis coverage и runtime defaults integration
+
+**Цель:** сделать `inputs.source` частью и precompute coverage, и launch UX.
+
+**Scope:**
+- гарантировать, что signal row order учитывает `inputs.source`;
+- runtime defaults должны возвращать per-indicator allowed source values;
+- summary/detail payloads должны уметь сохранять explicit source selection как часть variant payload.
+
+**Non-goals:**
+- hardcoded UI списки `close/open/...`;
+- implicit default source без явного payload.
+
+**DoD:**
+- source selection проходит сквозь config -> precompute -> runtime -> persisted summary rows -> detail page.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
+
+---
+
+## Milestone R5 — `1m hit-times` и notebook-algorithm extraction
+
+Цель: вынести из research notebooks production-ready risk primitives и зафиксировать их как runtime contract.
+
+### EPIC R5-01 — Перенос `1m hit-time` grid compute из notebook
+
+**Цель:** материализовать единый `1m hit-times` слой для всех backtest run.
+
+**Scope:**
+- использовать notebook ideas из `tests/notebook_tests/05_hit_time_grid.ipynb`;
+- строить:
+  - `tp_values.f32.npy`
+  - `sl_values.f32.npy`
+  - `long_tp.u32.npy`
+  - `long_sl.u32.npy`
+  - `short_tp.u32.npy`
+  - `short_sl.u32.npy`
+- sentinel и monotonicity semantics должны быть явно описаны и валидированы.
+
+**Non-goals:**
+- отдельные hit-times для каждого request TF;
+- runtime расчёт hit-times на лету.
+
+**DoD:**
+- published slot содержит валидный `hit_times/1m`;
+- runtime может использовать его без дополнительной подготовки.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+
+---
+
+### EPIC R5-02 — Документировать перенос алгоритма из `06_backtest_compute.ipynb`
+
+**Цель:** чётко зафиксировать, что именно переносится из notebook в production kernels.
+
+**Scope:**
+- описать:
+  - signal aggregation
+  - compact trade list
+  - `1m` risk exits
+  - fast TP/SL grid search
+  - exact replay best TP/SL cell
+  - metric calculation over compact trades
+- отдельно зафиксировать, что notebook не переносится как literal orchestration script;
+- выделить generic kernels от notebook-specific research details.
+
+**Non-goals:**
+- порт notebook как есть;
+- перенос notebook pair-specific эвристик в production runtime без отдельного решения.
+
+**DoD:**
+- docs описывают new algorithm понятно и без противоречий.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+- `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+
+---
+
+### EPIC R5-03 — Golden fixtures для новой execution semantics
+
+**Цель:** закрепить корректность Stage B в новых правилах `signal_tf + 1m risk`.
+
+**Scope:**
+- подготовить golden fixtures на:
+  - entry mapping request TF -> `1m`
+  - TP/SL earliest hit
+  - earliest signal-exit mapping
+  - tie-break rules
+  - exact best-cell replay
+- фиксировать expected metrics для representative cases.
+
+**Non-goals:**
+- обещание полного совпадения с legacy close-fill;
+- fuzzy manual notebook comparison без формальных expected outputs.
+
+**DoD:**
+- Stage B kernels можно тестировать deterministic fixtures.
+
+**Основные пути:**
+- `tests/**`
+- `src/trading/contexts/backtest/application/services/v2/**`
+
+---
+
+## Milestone R6 — Runtime kernels v2
+
+Цель: реализовать сам artifact-backed runtime без CH/IndicatorCompute в hot path.
+
+### EPIC R6-01 — Artifact loaders и slot-pinned runtime context
+
+**Цель:** построить слой загрузки артефактов, пригодный для sync и background run.
+
+**Scope:**
+- resolver `current.yaml`;
+- loader root manifest;
+- loaders:
+  - price arrays
+  - signal matrices
+  - mappings
+  - `1m hit-times`
+- runtime context должен pin'ить:
+  - `artifact_slot`
+  - `slot_generation`
+  - `artifact_asof_date`
+  - `artifact_manifest_hash`
+
+**Non-goals:**
+- runtime filesystem scanning;
+- hash recomputation на hot path.
+
+**DoD:**
+- sync/background run стартуют с одинакового slot-pinned context.
+
+**Основные файлы:**
+- `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py`
+- `src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py`
+- `src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py`
+
+---
+
+### EPIC R6-02 — Stage A kernels
+
+**Цель:** заменить variant-by-variant Python loop на batch-oriented signal aggregation и trade compaction.
+
+**Scope:**
+- загрузка subset row ranges из signal matrices;
+- сборка final signal на request timeframe;
+- compact trade list без risk exits;
+- exact no-risk metrics для shortlist/ranking stage;
+- chunked variant processing.
+
+**Non-goals:**
+- materialize trades/report для всех variants;
+- bar-by-bar legacy replay.
+
+**DoD:**
+- Stage A работает по artifacts-only inputs и даёт deterministic shortlist.
+
+**Основные файлы:**
+- `src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py`
+- `src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py`
+
+---
+
+### EPIC R6-03 — Stage B kernels
+
+**Цель:** реализовать новую risk execution semantics через `1m hit-times`.
+
+**Scope:**
+- mapping request timeframe entries в `1m`;
+- earliest TP/SL hits через precomputed hit-time tables;
+- signal-exit mapping request TF -> `1m`;
+- actual exit = earliest of TP/SL/signal-exit;
+- fast search по TP/SL grid;
+- exact replay only для best cell.
+
+**Non-goals:**
+- old close-fill engine;
+- runtime compute of TP/SL hit-times.
+
+**DoD:**
+- Stage B не использует legacy execution engine;
+- notebooks-derived algorithm rules реализуемы в production kernels.
+
+**Основные файлы:**
+- `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py`
+- `src/trading/contexts/backtest/application/services/v2/metrics_kernel.py`
+
+---
+
+### EPIC R6-04 — Ranking metrics и top-N materialization
+
+**Цель:** завершить runtime layer продуктовым ranking contract.
+
+**Scope:**
+- поддержать ranking metric selection:
+  - `total_return_pct`
+  - `max_drawdown_pct`
+  - `return_over_max_drawdown`
+  - `profit_factor`
+  - `sharpe_trades`
+  - `win_rate_pct`
+- materialize только summary rows top-N;
+- не materialize trades/report bodies в runtime summary result;
+- добавить deterministic tie-break.
+
+**Non-goals:**
+- recompute top-N при локальной UI sorting;
+- отдельный persisted detail result.
+
+**DoD:**
+- runtime выдаёт summary-only table top-N, пригодную для persisted storage.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+
+---
+
+## Milestone R7 — Persisted run storage и sync API cutover
+
+Цель: перевести `POST /backtests` на новую persisted run модель и общий storage contract.
+
+### EPIC R7-01 — Generalize PG jobs storage into persisted run storage
+
+**Цель:** переиспользовать существующие job tables как единое хранилище всех backtest run.
+
+**Scope:**
+- логически обобщить:
+  - `backtest_jobs`
+  - `backtest_job_top_variants`
+  - `backtest_job_stage_a_shortlist`
+- добавить/зафиксировать поля:
+  - `execution_mode`
+  - `market_id`
+  - `symbol`
+  - `timeframe`
+  - `requested_top_n`
+  - `ranking_primary_metric`
+  - `ranking_secondary_metric`
+  - `artifact_slot`
+  - `artifact_slot_generation`
+  - `artifact_manifest_hash`
+- top rows хранят:
+  - `rank`
+  - `variant_key`
+  - `variant_index`
+  - `payload_json`
+  - `summary_metrics_json`
+  - `best_tp_pct`
+  - `best_sl_pct`
+- `report_table_md` и `trades_json` удаляются из persisted results contract или оставляются постоянно `NULL` на переходный период.
+
+**Non-goals:**
+- второй parallel persistence stack для sync results;
+- persisted detail result storage.
+
+**DoD:**
+- inline и background run используют одно и то же storage семейство.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+
+**Основные пути:**
+- `alembic/versions/*`
+- `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/**`
+- `src/trading/contexts/backtest/application/ports/**`
+
+---
+
+### EPIC R7-02 — `POST /backtests` becomes create-and-execute persisted run
+
+**Цель:** убрать ephemeral sync run и встроить auto-preflight в единый run flow.
+
+**Scope:**
+- `POST /backtests`:
+  - всегда делает internal preflight;
+  - всегда создаёт persisted run record;
+  - если sync budgets проходят, исполняет run inline;
+  - если full budgets не проходят, возвращает deterministic `422`;
+- response metadata должна включать:
+  - `run_id`
+  - `state`
+  - `execution_mode`
+  - `engine_version`
+  - `artifact_slot`
+  - `artifact_slot_generation`
+  - `artifact_asof_date`
+  - `artifact_manifest_hash`
+
+**Non-goals:**
+- отдельная пользовательская кнопка preflight;
+- сохранение trades/report bodies в sync response как persisted contract.
+
+**DoD:**
+- sync launch flow соответствует утверждённому persisted run contract.
+
+**Основные файлы:**
+- `src/trading/contexts/backtest/application/use_cases/run_backtest.py`
+- `apps/api/routes/**`
+- `apps/api/wiring/modules/**`
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+
+---
+
+### EPIC R7-03 — History/top/detail runtime API
+
+**Цель:** ввести единый public contract поверх persisted run storage.
+
+**Scope:**
+- endpoints:
+  - `GET /backtests/runs`
+  - `GET /backtests/runs/{run_id}`
+  - `GET /backtests/runs/{run_id}/top`
+  - `POST /backtests/runs/{run_id}/cancel`
+- runtime defaults endpoint должен отдавать:
+  - allowed TF
+  - supported indicator ids
+  - `signals.v1.params: default-only`
+  - ranking metrics
+  - sortable summary columns
+  - `top_n_default`
+  - `top_n_max`
+  - available `inputs.source`
+
+**Non-goals:**
+- public UX через `/backtests/jobs*` как финальный контракт;
+- realtime transport beyond polling.
+
+**DoD:**
+- history и run retrieval API покрывают весь product flow summary-level результатов.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+
+---
+
+### EPIC R7-04 — Lazy single-variant detail API
+
+**Цель:** отделить summary-level persisted results от тяжёлого detail расчёта.
+
+**Scope:**
+- detail endpoint/page flow получает:
+  - persisted `run_id`
+  - variant identity/payload;
+- backend заново считает один вариант по:
+  - pinned artifact slot исходного run
+  - explicit variant params
+  - original range/request semantics
+- отдаёт:
+  - detailed stats
+  - equity/price chart series
+  - trades list
+  - графическую разметку сделок
+
+**Non-goals:**
+- persisted storage detail results;
+- full top-N recompute при открытии detail page.
+
+**DoD:**
+- detail flow существует отдельно от summary persistence.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
+
+---
+
+## Milestone R8 — Background execution cutover
+
+Цель: перевести worker и auto-fallback semantics на тот же artifact-backed runtime.
+
+### EPIC R8-01 — Worker uses slot-pinned runtime v2
+
+**Цель:** сделать background run execution воспроизводимым и идентичным sync path по алгоритму.
+
+**Scope:**
+- worker использует тот же runtime facade, что и sync;
+- pinned fields сохраняются в job/run record;
+- worker читает artifacts только через slot-pinned identity;
+- в hot path worker нет CH и `IndicatorCompute.compute(...)`.
+
+**Non-goals:**
+- separate worker-only runtime;
+- legacy Stage A/B loop в v2 worker path.
+
+**DoD:**
+- background run и sync run используют один и тот же runtime contract.
+
+**Основные файлы:**
+- `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py`
+- `apps/worker/backtest_job_runner/**`
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+
+---
+
+### EPIC R8-02 — Auto fallback `sync -> background`
+
+**Цель:** завершить единый launch contract, где пользователь не выбирает режим вручную при превышении sync budgets.
+
+**Scope:**
+- если sync budgets fail, но full budgets pass:
+  - API создаёт background run;
+  - response явно показывает `execution_mode=background_auto`;
+  - history entry появляется сразу;
+- cancel/status/progress semantics едины для всех background run.
+
+**Non-goals:**
+- hidden fallback без явной индикации в API/UI;
+- ручное дублирование launch flow отдельным endpoints contract как product default.
+
+**DoD:**
+- auto-fallback работает end-to-end и не выглядит как неявная магия.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
+
+---
+
+### EPIC R8-03 — Background safety, cancel и slot publish interaction
+
+**Цель:** закрепить эксплуатационные гарантии при параллельной работе publish и background run.
+
+**Scope:**
+- active background run pin'ит slot;
+- publish блокируется, если inactive slot занят pinned run;
+- cancel остаётся best-effort, но не нарушает slot safety;
+- progress/history list корректно отражают `queued/running/succeeded/failed/cancelled`.
+
+**Non-goals:**
+- точный cursor-resume Stage B beyond already approved semantics;
+- многопоточная обработка одного run несколькими worker'ами.
+
+**DoD:**
+- long-running background run не ломается из-за publish cycle;
+- publish policy согласована с worker behavior.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
+- `docs/runbooks/backtest-artifacts-rebuild.md`
+
+---
+
+## Milestone R9 — Web UI: launch, history, summary table, detail page
+
+Цель: привести web UX к новой persisted run модели и убрать старую ручную preflight-схему.
+
+### EPIC R9-01 — Launch form v2
+
+**Цель:** обновить страницу запуска backtest под новый backend contract.
+
+**Scope:**
+- убрать обязательный manual `Estimate preflight`;
+- форма выбирает:
+  - instrument
+  - timeframe
+  - indicators
+  - multiple `inputs.source`
+  - ranking metric
+  - desired `top N` в пределах runtime config
+- форма работает через new runtime defaults contract.
+
+**Non-goals:**
+- отдельная user-facing кнопка preflight;
+- hardcoded indicator source lists.
+
+**DoD:**
+- launch form соответствует backend contract и не требует manual preflight step.
+
+**Основные документы:**
+- `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
+- `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
+
+**Основные пути:**
+- `apps/web/**`
+
+---
+
+### EPIC R9-02 — Summary table и Backtest history
+
+**Цель:** дать пользователю единый способ открывать старые run без пересчёта grid.
+
+**Scope:**
+- вкладка `Backtest history`;
+- run summary page;
+- одна summary table:
+  - `top N`
+  - локальная пересортировка по summary columns
+  - без trades внутри таблицы
+- history entries должны показывать:
+  - status
+  - execution mode
+  - key metadata
+  - возможность открыть old run.
+
+**Non-goals:**
+- сохранение trades/report bodies внутри history rows;
+- новый расчёт top-N при каждой сортировке колонок.
+
+**DoD:**
+- пользователь может открыть старый run и увидеть persisted summary-only results.
+
+**Основные документы:**
+- `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+
+---
+
+### EPIC R9-03 — Variant detail page + save variant via existing strategy flow
+
+**Цель:** отделить summary UX от тяжелого per-variant detail и не вводить лишнее storage.
+
+**Scope:**
+- отдельная страница варианта;
+- ленивый one-variant recompute;
+- показ:
+  - chart
+  - trades
+  - detailed metrics
+- save from summary/detail через existing Strategy persistence flow, а не через новый отдельный “favorites storage” в этом milestone.
+
+**Non-goals:**
+- persisted detail result;
+- новая отдельная БД-сущность избранного, не зафиксированная в текущей документации.
+
+**DoD:**
+- variant detail page работает без пересчёта всей grid;
+- save variant reuses existing strategy flow.
+
+**Основные документы:**
+- `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
+- `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
+
+---
+
+## Milestone R10 — Legacy cleanup, финальные docs, tests и runbooks
+
+Цель: завершить миграцию, убрать противоречивые legacy path и довести документацию до консистентного состояния.
+
+### EPIC R10-01 — Убрать legacy hot path из production usage
+
+**Цель:** исключить runtime-зависимости, от которых v2 должен был избавить систему.
+
+**Scope:**
+- убрать/закрыть production path через:
+  - `candle_timeline_builder.py`
+  - `staged_runner_v1.py`
+  - `staged_core_runner_v1.py`
+  - `close_fill_scorer_v1.py`
+  - `execution_engine_v1.py`
+  - `grid_builder_v1.py`
+- оставить controlled legacy fallback только на переходный период, если это явно нужно rollout'у;
+- затем удалить fallback.
+
+**Non-goals:**
+- бесконечное сосуществование двух production engines;
+- скрытый silent fallback на v1.
+
+**DoD:**
+- v2 является единственным production path для покрытого scope.
+
+**Основные файлы:**
+- `src/trading/contexts/backtest/application/services/staged_runner_v1.py`
+- `src/trading/contexts/backtest/application/services/staged_core_runner_v1.py`
+- `src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py`
+- `src/trading/contexts/backtest/application/services/execution_engine_v1.py`
+- `src/trading/contexts/backtest/application/services/grid_builder_v1.py`
+- `src/trading/contexts/backtest/application/services/candle_timeline_builder.py`
+
+---
+
+### EPIC R10-02 — Финальная синхронизация docs
+
+**Цель:** обновить весь связанный doc set под реальную v2-систему.
+
+**Scope:**
+- создать:
+  - `docs/architecture/backtest/backtest-artifact-store-v2.md`
+  - `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+  - `docs/architecture/backtest/backtest-runs-history-v2.md`
+  - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
+  - `docs/runbooks/backtest-artifacts-rebuild.md`
+- обновить:
   - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
-  - `tests/notebook_tests/06_backtest_compute.ipynb`
-- Адаптировать входы к формату "prices отдельно, signals отдельно":
-  - загружать нужные `signals.i8.npy` для выбранных индикаторов,
-  - собирать нужные матрицы/представления в памяти только для конкретного запроса.
+  - `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
+  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+  - `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+  - `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
+  - `docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md`
+  - `docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md`
+  - `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
+  - `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 
-EPIC R4-02 — Sync API integration
-- `POST /backtests` использует engine v2 и artifacts loader.
-- Guards/422 ошибки остаются детерминированными.
+**Non-goals:**
+- оставлять v1 docs без пометки superseded там, где контракт уже изменён;
+- поддерживать несколько разных описаний одной и той же runtime semantics.
 
-EPIC R4-03 — Удаление v1 path
-- Удалить/закрыть кодовые пути старого engine v1 после прохождения тестов и golden fixtures.
-
-DoD:
-- Один и тот же запрос + один и тот же набор артефактов -> один и тот же результат.
-- ClickHouse не используется на hot path sync backtest.
-
----
-
-## Milestone R5 — Job runner (вторым этапом)
-
-Цель: job runner использует тот же engine v2 и те же артефакты.
-
-EPIC R5-01 — Jobs request snapshot
-- В job snapshot хранить:
-  - координаты артефакта (`exchange/market_type/symbol`),
-  - cutoff `asof_date` (или `end_close_time_ms`) на момент создания job, чтобы результат был воспроизводим даже если артефакты обновятся.
-
-EPIC R5-02 — Worker integration
-- Job-runner загружает артефакты и запускает engine v2.
-
-DoD:
-- Jobs path дает те же результаты, что и sync, при одинаковых входах.
+**DoD:**
+- docs не противоречат фактической реализации и друг другу.
 
 ---
 
-## Milestone R6 — Эксплуатация (retention)
+### EPIC R10-03 — Tests, perf gates и runbooks
 
-EPIC R6-01 — Retention/GC
-- Политика хранения снапшотов (N дней).
+**Цель:** закрыть миграцию не только кодом, но и проверками/эксплуатацией.
+
+**Scope:**
+- unit/integration/golden tests для:
+  - artifact validators
+  - slot publish/pinning
+  - signal loaders
+  - Stage A/Stage B kernels
+  - persisted run storage
+  - history/detail API
+- perf gates:
+  - `0` CH calls на hot path
+  - `0` `IndicatorCompute.compute(...)` calls на hot path
+  - измеримый speedup против baseline
+- runbooks:
+  - artifact rebuild
+  - background run troubleshooting
+  - rollout / rollback guidance
+
+**Non-goals:**
+- абстрактная “надеемся, что быстро” без perf measurements;
+- перенос operational knowledge только в головы команды.
+
+**DoD:**
+- migration считается завершённой только после прохождения test/perf/runbook closure.
+
+**Основные документы:**
+- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `docs/runbooks/backtest-artifacts-rebuild.md`
+
+---
+
+## Что не входит в initial v2
+
+Ниже перечислено то, что в этом roadmap не считается частью обязательного initial scope:
+
+- full signal-grid expansion для `signals.v1.params`;
+- возврат удалённых тяжёлых индикаторов;
+- request TF `1m` и `5m`;
+- хранение ежедневной длинной истории artifact snapshots поверх `slot_a/slot_b`;
+- persisted storage для detail page trades/equity;
+- новый отдельный persistence layer для “favorites”, не опирающийся на уже существующий strategy flow;
+- архивирование/сжатие active runtime artifacts как обязательная часть initial v2;
+- generic platform jobs framework вне контекста backtest.
+
+---
+
+## Итоговая логика исполнения плана
+
+План должен выполняться не “по файлам”, а по цепочке зависимостей:
+
+1. сначала заморозить решения и метрики успеха;
+2. затем вычистить scope;
+3. затем построить artifact contracts;
+4. затем построить сами artifacts;
+5. затем реализовать runtime;
+6. затем перевести storage/API;
+7. затем перевести worker и web UX;
+8. только потом удалять legacy.
+
+Именно в таком порядке milestone не конфликтуют друг с другом и не требуют постоянного пересмотра уже принятых решений.
