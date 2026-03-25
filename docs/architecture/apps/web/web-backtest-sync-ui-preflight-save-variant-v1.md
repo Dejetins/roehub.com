@@ -4,6 +4,23 @@
 обязательный preflight в template-mode и сохранение выбранного варианта как Strategy через переход
 в strategy builder с prefill.
 
+## Status
+
+- Status: historical v1 sync UX contract with R0 freeze notes.
+- Superseded by target-v2 UX:
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+  - `docs/architecture/roadmap/base_refactor_plan.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- Historical scope kept here:
+  - manual template-mode preflight,
+  - separate sync result page state without persisted history,
+  - legacy `top_k` naming in advanced controls.
+- R0 target freeze, not yet implemented here:
+  - server-side auto-preflight replaces manual required preflight,
+  - sync/background mode becomes one launch flow with `execution_mode`,
+  - `top_n_default` / `top_n_max` become frozen target terms,
+  - request TF target contract excludes `1m` and `5m`.
+
 ## Цель
 
 - Пользователь может:

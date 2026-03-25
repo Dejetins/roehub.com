@@ -57,6 +57,15 @@
 - [market_data_candle_feed.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/market_data_candle_feed.py)
 - [canonical_candle_reader.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py)
 
+## 2A. R0 implementation references
+
+Эти документы фиксируют baseline артефакты, которые должны существовать до начала runtime cutover:
+
+- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-v2-benchmarks.md)
+- [web-backtest-runtime-defaults-endpoint-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md)
+
+Они не отменяют этот final plan, а делают его исполнимым на уровне benchmark protocol и frozen contract surface.
+
 ## 3. Подтверждённые наблюдения о текущей реализации
 
 ### 3.1 Runtime всё ещё зависит от ClickHouse

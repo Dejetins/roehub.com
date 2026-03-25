@@ -2,6 +2,22 @@
 
 Документ фиксирует архитектурный контракт EPIC-10: новый воркер `backtest-job-runner`, который забирает queued jobs из Postgres, выполняет backtest батчами, пишет progress и best-so-far top-K snapshots, корректно обрабатывает cancel и lease/reclaim.
 
+## Status
+
+- Status: active v1 worker contract with R0 freeze notes.
+- Superseded by target-v2 orchestration decisions:
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+  - `docs/architecture/roadmap/base_refactor_plan.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- Historical scope kept here:
+  - current streaming worker orchestration,
+  - current `top_k_persisted_default` snapshot cap,
+  - current lease/reclaim/cancel behavior.
+- R0 target freeze, not yet cut over:
+  - worker must eventually consume the same artifact-backed runtime as sync path,
+  - persisted result vocabulary shifts to summary-only `top N`,
+  - run metadata must surface `execution_mode` and slot-pinning fields without removing current tables first.
+
 ## Цель
 
 - Добавить отдельный worker-процесс для async backtest jobs (без блокировки API/UI).

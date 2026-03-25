@@ -75,6 +75,49 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.preselect_default == 20000
     assert config.ranking.primary_metric_default == "total_return_pct"
     assert config.ranking.secondary_metric_default is None
+    assert config.contracts.allowed_request_timeframes == (
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "4h",
+        "6h",
+        "8h",
+        "1d",
+        "2d",
+        "3d",
+    )
+    assert config.contracts.forbidden_request_timeframes == ("1m", "5m")
+    assert config.contracts.top_n_default == 100
+    assert config.contracts.top_n_max == 300
+    assert config.contracts.ranking_metrics == (
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct",
+    )
+    assert config.contracts.sortable_summary_columns == (
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct",
+        "trade_count",
+        "avg_trade_ret_pct",
+        "avg_trade_exec_bars",
+        "exposure_pct",
+        "best_tp_pct",
+        "best_sl_pct",
+    )
+    assert config.contracts.signals_v1_params_path == "signals.v1.params"
+    assert config.contracts.signals_v1_params_policy == "default-only"
+    assert config.contracts.risk_model == "signal_tf + 1m_risk"
+    assert config.contracts.execution_mode == "auto"
+    assert config.contracts.auto_preflight_enabled is True
+    assert config.contracts.auto_fallback_to_background_enabled is True
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5368709120
     assert config.cpu.max_numba_threads == 4
@@ -140,6 +183,27 @@ backtest:
     assert config.preselect_default == 20000
     assert config.ranking.primary_metric_default == "total_return_pct"
     assert config.ranking.secondary_metric_default is None
+    assert config.contracts.allowed_request_timeframes == (
+        "15m",
+        "30m",
+        "1h",
+        "2h",
+        "4h",
+        "6h",
+        "8h",
+        "1d",
+        "2d",
+        "3d",
+    )
+    assert config.contracts.forbidden_request_timeframes == ("1m", "5m")
+    assert config.contracts.top_n_default == 100
+    assert config.contracts.top_n_max == 300
+    assert config.contracts.signals_v1_params_path == "signals.v1.params"
+    assert config.contracts.signals_v1_params_policy == "default-only"
+    assert config.contracts.risk_model == "signal_tf + 1m_risk"
+    assert config.contracts.execution_mode == "auto"
+    assert config.contracts.auto_preflight_enabled is True
+    assert config.contracts.auto_fallback_to_background_enabled is True
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5 * 1024**3
     assert config.cpu.max_numba_threads > 0
@@ -337,6 +401,24 @@ backtest:
   ranking:
     primary_metric_default: RETURN_OVER_MAX_DRAWDOWN
     secondary_metric_default: profit_factor
+  contracts:
+    request_timeframes:
+      allowed: [30m, 1h]
+      forbidden: [1m, 5m]
+    summary:
+      top_n_default: 25
+      top_n_max: 40
+      ranking_metrics: [profit_factor, total_return_pct]
+      sortable_columns: [profit_factor, total_return_pct, best_tp_pct]
+    signals:
+      params_path: signals.v1.params
+      params_policy: default-only
+    execution:
+      risk_model: signal_tf + 1m_risk
+    launch:
+      execution_mode: auto
+      auto_preflight_enabled: true
+      auto_fallback_to_background_enabled: true
   reporting:
     top_trades_n_default: 5
   guards:
@@ -374,6 +456,16 @@ backtest:
     assert config.preselect_default == 30
     assert config.ranking.primary_metric_default == "return_over_max_drawdown"
     assert config.ranking.secondary_metric_default == "profit_factor"
+    assert config.contracts.allowed_request_timeframes == ("30m", "1h")
+    assert config.contracts.forbidden_request_timeframes == ("1m", "5m")
+    assert config.contracts.top_n_default == 25
+    assert config.contracts.top_n_max == 40
+    assert config.contracts.ranking_metrics == ("profit_factor", "total_return_pct")
+    assert config.contracts.sortable_summary_columns == (
+        "profit_factor",
+        "total_return_pct",
+        "best_tp_pct",
+    )
     assert config.guards.max_variants_per_compute == 1200
     assert config.guards.max_compute_bytes_total == 1234567
     assert config.cpu.max_numba_threads == 6
@@ -430,6 +522,49 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="top_k_persisted_default"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_invalid_contract_top_n_bounds(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when frozen `top_n` bounds violate deterministic ordering.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Frozen R0 contract requires `top_n_default <= top_n_max`.
+    Raises:
+        AssertionError: If invalid contract payload does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  contracts:
+    summary:
+      top_n_default: 200
+      top_n_max: 100
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="top_n_default"):
         load_backtest_runtime_config(config_path)
 
 
@@ -770,6 +905,79 @@ backtest:
     hash_b = build_backtest_runtime_config_hash(config=load_backtest_runtime_config(config_b))
 
     assert hash_a != hash_b
+
+
+def test_build_backtest_runtime_config_hash_ignores_contract_freeze_fields(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify additive R0 contract-freeze fields do not affect current v1 runtime hash.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `build_backtest_runtime_config_hash` includes only current result-affecting sections.
+    Raises:
+        AssertionError: If hash changes when only additive freeze fields differ.
+    Side Effects:
+        None.
+    """
+    config_a = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  contracts:
+    summary:
+      top_n_default: 100
+      top_n_max: 300
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+        filename="backtest_contract_a.yaml",
+    )
+    config_b = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  contracts:
+    request_timeframes:
+      allowed: [30m, 1h, 4h]
+      forbidden: [1m, 5m]
+    summary:
+      top_n_default: 25
+      top_n_max: 40
+      ranking_metrics: [profit_factor, total_return_pct]
+      sortable_columns: [profit_factor, total_return_pct]
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+        filename="backtest_contract_b.yaml",
+    )
+
+    hash_a = build_backtest_runtime_config_hash(config=load_backtest_runtime_config(config_a))
+    hash_b = build_backtest_runtime_config_hash(config=load_backtest_runtime_config(config_b))
+
+    assert hash_a == hash_b
 
 
 def test_build_backtest_runtime_config_hash_ignores_operational_jobs_fields(

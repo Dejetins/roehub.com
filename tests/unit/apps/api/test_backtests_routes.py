@@ -367,6 +367,61 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
         "jobs": {
             "top_k_persisted_default": 300,
         },
+        "contracts": {
+            "request_timeframes": {
+                "allowed": [
+                    "15m",
+                    "30m",
+                    "1h",
+                    "2h",
+                    "4h",
+                    "6h",
+                    "8h",
+                    "1d",
+                    "2d",
+                    "3d",
+                ],
+                "forbidden": ["1m", "5m"],
+            },
+            "summary": {
+                "top_n_default": 100,
+                "top_n_max": 300,
+                "ranking_metrics": [
+                    "total_return_pct",
+                    "max_drawdown_pct",
+                    "return_over_max_drawdown",
+                    "profit_factor",
+                    "sharpe_trades",
+                    "win_rate_pct",
+                ],
+                "sortable_columns": [
+                    "total_return_pct",
+                    "max_drawdown_pct",
+                    "return_over_max_drawdown",
+                    "profit_factor",
+                    "sharpe_trades",
+                    "win_rate_pct",
+                    "trade_count",
+                    "avg_trade_ret_pct",
+                    "avg_trade_exec_bars",
+                    "exposure_pct",
+                    "best_tp_pct",
+                    "best_sl_pct",
+                ],
+            },
+            "signals": {
+                "params_path": "signals.v1.params",
+                "params_policy": "default-only",
+            },
+            "execution": {
+                "risk_model": "signal_tf + 1m_risk",
+            },
+            "launch": {
+                "execution_mode": "auto",
+                "auto_preflight_enabled": True,
+                "auto_fallback_to_background_enabled": True,
+            },
+        },
     }
     assert list(
         response_one.json()["execution"]["fee_pct_default_by_market_id"].keys()

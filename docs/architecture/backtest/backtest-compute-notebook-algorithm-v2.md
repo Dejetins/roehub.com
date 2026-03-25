@@ -5,6 +5,21 @@
 
 Ключевая идея ускорения: вместо полного «бар-за-баром» re-play на каждой ячейке TP/SL строится компактный trade list, а grid-search делается через монотонные hit-time таблицы и разложение вкладов в difference-буферы (Numba).
 
+## Status
+
+- Status: algorithm reference for R0 parity baseline, not alternative product architecture.
+- Superseded by for launch/runtime contract decisions:
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+  - `docs/architecture/roadmap/base_refactor_plan.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- Historical/reference scope kept here:
+  - notebook-derived kernel rules,
+  - parity reference for future `signal_tf + 1m_risk` cutover,
+  - research-time execution examples such as `exec_tf = 5m`.
+- R0 freeze clarification:
+  - `5m` in notebook examples is a reference execution timeline, not an allowed request TF in target contract;
+  - current notebook fallback/recompute branches do not redefine approved launch/runtime/storage semantics.
+
 ---
 
 ## 1. Общие принципы

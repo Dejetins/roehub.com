@@ -2,6 +2,22 @@
 
 Документ фиксирует архитектурный контракт EPIC-09: схему хранения backtest jobs в Postgres, state machine, репозиторные порты и правила детерминизма для последующих EPIC-10/11.
 
+## Status
+
+- Status: active v1 jobs storage contract with R0 freeze notes.
+- Superseded by target-v2 storage direction:
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+  - `docs/architecture/roadmap/base_refactor_plan.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- Historical scope kept here:
+  - current `backtest_jobs` / `backtest_job_top_variants` / `backtest_job_stage_a_shortlist` contract,
+  - current `top_k_persisted_default` hash participation,
+  - current jobs-only state machine.
+- R0 target freeze, not yet migrated:
+  - same PG table family becomes basis for unified persisted runs/history,
+  - result vocabulary shifts from `top_k` to `top_n` without breaking current fields,
+  - future run metadata must carry `execution_mode` and artifact slot identity.
+
 ## Цель
 
 - Добавить устойчивое Postgres-хранилище для async backtest jobs.

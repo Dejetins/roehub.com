@@ -77,6 +77,131 @@ class BacktestRuntimeRankingDefaultsResponse(BaseModel):
     secondary_metric_default: str | None = None
 
 
+class BacktestRuntimeRequestTimeframesContractResponse(BaseModel):
+    """
+    API response model for frozen R0 request-timeframe contract literals.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    allowed: list[str]
+    forbidden: list[str]
+
+
+class BacktestRuntimeSummaryContractResponse(BaseModel):
+    """
+    API response model for frozen R0 summary/ranking contract surface.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    top_n_default: int
+    top_n_max: int
+    ranking_metrics: list[str]
+    sortable_columns: list[str]
+
+
+class BacktestRuntimeSignalsContractResponse(BaseModel):
+    """
+    API response model for frozen R0 signal-params contract surface.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    params_path: str
+    params_policy: str
+
+
+class BacktestRuntimeExecutionContractResponse(BaseModel):
+    """
+    API response model for frozen R0 execution semantics contract.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    risk_model: str
+
+
+class BacktestRuntimeLaunchContractResponse(BaseModel):
+    """
+    API response model for frozen R0 launch/execution-mode contract surface.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    execution_mode: str
+    auto_preflight_enabled: bool
+    auto_fallback_to_background_enabled: bool
+
+
+class BacktestRuntimeContractsResponse(BaseModel):
+    """
+    API response model for additive frozen R0 contract surface.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_timeframes: BacktestRuntimeRequestTimeframesContractResponse
+    summary: BacktestRuntimeSummaryContractResponse
+    signals: BacktestRuntimeSignalsContractResponse
+    execution: BacktestRuntimeExecutionContractResponse
+    launch: BacktestRuntimeLaunchContractResponse
+
+
 class BacktestRuntimeDefaultsResponse(BaseModel):
     """
     API response model for deterministic runtime defaults contract.
@@ -101,6 +226,7 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
     ranking: BacktestRuntimeRankingDefaultsResponse
     execution: BacktestRuntimeExecutionDefaultsResponse
     jobs: BacktestRuntimeJobsDefaultsResponse
+    contracts: BacktestRuntimeContractsResponse
 
 
 def build_backtest_runtime_defaults_response(
@@ -155,13 +281,45 @@ def build_backtest_runtime_defaults_response(
         jobs=BacktestRuntimeJobsDefaultsResponse(
             top_k_persisted_default=config.jobs.top_k_persisted_default,
         ),
+        contracts=BacktestRuntimeContractsResponse(
+            request_timeframes=BacktestRuntimeRequestTimeframesContractResponse(
+                allowed=list(config.contracts.allowed_request_timeframes),
+                forbidden=list(config.contracts.forbidden_request_timeframes),
+            ),
+            summary=BacktestRuntimeSummaryContractResponse(
+                top_n_default=config.contracts.top_n_default,
+                top_n_max=config.contracts.top_n_max,
+                ranking_metrics=list(config.contracts.ranking_metrics),
+                sortable_columns=list(config.contracts.sortable_summary_columns),
+            ),
+            signals=BacktestRuntimeSignalsContractResponse(
+                params_path=config.contracts.signals_v1_params_path,
+                params_policy=config.contracts.signals_v1_params_policy,
+            ),
+            execution=BacktestRuntimeExecutionContractResponse(
+                risk_model=config.contracts.risk_model,
+            ),
+            launch=BacktestRuntimeLaunchContractResponse(
+                execution_mode=config.contracts.execution_mode,
+                auto_preflight_enabled=config.contracts.auto_preflight_enabled,
+                auto_fallback_to_background_enabled=(
+                    config.contracts.auto_fallback_to_background_enabled
+                ),
+            ),
+        ),
     )
 
 
 __all__ = [
+    "BacktestRuntimeContractsResponse",
     "BacktestRuntimeDefaultsResponse",
     "BacktestRuntimeExecutionDefaultsResponse",
+    "BacktestRuntimeExecutionContractResponse",
     "BacktestRuntimeJobsDefaultsResponse",
+    "BacktestRuntimeLaunchContractResponse",
     "BacktestRuntimeRankingDefaultsResponse",
+    "BacktestRuntimeRequestTimeframesContractResponse",
+    "BacktestRuntimeSignalsContractResponse",
+    "BacktestRuntimeSummaryContractResponse",
     "build_backtest_runtime_defaults_response",
 ]

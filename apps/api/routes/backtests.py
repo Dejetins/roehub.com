@@ -110,7 +110,9 @@ def build_backtests_router(
         Args:
             principal: Authenticated user principal resolved by identity dependency.
         Returns:
-            BacktestRuntimeDefaultsResponse: Startup-prebuilt deterministic defaults payload.
+            BacktestRuntimeDefaultsResponse:
+                Startup-prebuilt deterministic defaults payload, including additive
+                frozen R0 `contracts.*` fields.
         Assumptions:
             Runtime defaults payload is derived from validated startup config.
         Raises:

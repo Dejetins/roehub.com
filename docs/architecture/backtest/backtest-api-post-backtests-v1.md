@@ -2,6 +2,24 @@
 
 Фиксирует контракт BKT-EPIC-07: HTTP API v1 для синхронного (small-run) backtest запуска в двух режимах (saved/ad-hoc), с deterministic top-K ответом и unified deterministic 422 ошибками.
 
+## Status
+
+- Status: active v1 sync contract with R0 freeze notes.
+- Superseded by target-v2 contract:
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+  - `docs/architecture/roadmap/base_refactor_plan.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- Historical scope kept here:
+  - current `POST /backtests` sync behavior,
+  - legacy `top_k_*` naming and response fields,
+  - current manual split between sync and jobs endpoints.
+- R0 target freeze, not yet enforced as breaking API change:
+  - allowed request TF: `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `1d`, `2d`, `3d`;
+  - forbidden request TF in target contract: `1m`, `5m`;
+  - `signals.v1.params` are `default-only`;
+  - launch semantics move to auto-preflight + auto-fallback;
+  - additive `top_n_default` / `top_n_max` naming is published via runtime defaults, while current request/response still keep `top_k`.
+
 ## Цель
 
 - Дать UI один endpoint `POST /backtests`, который:

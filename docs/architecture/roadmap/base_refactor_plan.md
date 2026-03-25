@@ -222,6 +222,16 @@
 
 ---
 
+### R0 artifact matrix
+
+| EPIC | Что должно существовать после R0 |
+|---|---|
+| R0-01 | source-of-truth roadmap + final plan + explicit superseded/status markers в конфликтующих v1 docs |
+| R0-02 | `docs/architecture/backtest/backtest-v2-benchmarks.md` + deterministic benchmark/parity fixtures в `tests/perf_smoke/contexts/backtest/**` |
+| R0-03 | frozen runtime/config contract в `configs/<env>/backtest.yaml`, runtime loader, `/backtests/runtime-defaults`, unit tests |
+
+---
+
 ## Milestone R1 — Scope cleanup: indicators, timeframes, defaults
 
 Цель: убрать из продукта всё, что делает artifact-backed runtime непрактичным или конфликтует с утверждённой v2-моделью.

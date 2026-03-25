@@ -2,6 +2,7 @@ from .acl import StrategyRepositoryBacktestStrategyReader
 from .config import (
     BacktestCpuRuntimeConfig,
     BacktestExecutionRuntimeConfig,
+    BacktestFrozenContractRuntimeConfig,
     BacktestGuardsRuntimeConfig,
     BacktestJobsRuntimeConfig,
     BacktestRankingRuntimeConfig,
@@ -26,6 +27,7 @@ __all__ = [
     "StrategyRepositoryBacktestStrategyReader",
     "BacktestCpuRuntimeConfig",
     "BacktestExecutionRuntimeConfig",
+    "BacktestFrozenContractRuntimeConfig",
     "BacktestGuardsRuntimeConfig",
     "BacktestJobsRuntimeConfig",
     "BacktestRankingRuntimeConfig",

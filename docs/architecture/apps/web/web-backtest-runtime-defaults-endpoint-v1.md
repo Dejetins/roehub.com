@@ -3,6 +3,20 @@
 Документ фиксирует контракт `GET /backtests/runtime-defaults` (через same-origin `/api/*` proxy как
 `GET /api/backtests/runtime-defaults`) для PR2 web backtests UI.
 
+## Status
+
+- Status: active v1 endpoint contract with additive R0 freeze fields.
+- Superseded by target-v2 source-of-truth:
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+  - `docs/architecture/roadmap/base_refactor_plan.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- Historical scope kept here:
+  - current browser prefill defaults already loaded on API startup,
+  - legacy `top_k_*` fields required for backward compatibility.
+- R0 freeze addition:
+  - endpoint now publishes additive `contracts.*` fields for target-v2 semantics,
+  - current request/response/runtime behavior is not broken or silently renamed.
+
 ## Цель
 
 - Дать браузеру один стабильный endpoint для загрузки runtime defaults, которые уже
@@ -24,7 +38,7 @@
   - `src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py`
 - Endpoint не читает YAML на каждый request; использует предсобранный DTO из startup config.
 
-## Response contract v1
+## Response contract v1 + R0 additive freeze
 
 ```json
 {
@@ -48,6 +62,50 @@
   },
   "jobs": {
     "top_k_persisted_default": 300
+  },
+  "contracts": {
+    "request_timeframes": {
+      "allowed": ["15m", "30m", "1h", "2h", "4h", "6h", "8h", "1d", "2d", "3d"],
+      "forbidden": ["1m", "5m"]
+    },
+    "summary": {
+      "top_n_default": 100,
+      "top_n_max": 300,
+      "ranking_metrics": [
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct"
+      ],
+      "sortable_columns": [
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct",
+        "trade_count",
+        "avg_trade_ret_pct",
+        "avg_trade_exec_bars",
+        "exposure_pct",
+        "best_tp_pct",
+        "best_sl_pct"
+      ]
+    },
+    "signals": {
+      "params_path": "signals.v1.params",
+      "params_policy": "default-only"
+    },
+    "execution": {
+      "risk_model": "signal_tf + 1m_risk"
+    },
+    "launch": {
+      "execution_mode": "auto",
+      "auto_preflight_enabled": true,
+      "auto_fallback_to_background_enabled": true
+    }
   }
 }
 ```
@@ -66,11 +124,30 @@
 - `execution.slippage_pct_default` <- `backtest.execution.slippage_pct_default`
 - `execution.fee_pct_default_by_market_id` <- `backtest.execution.fee_pct_default_by_market_id`
 - `jobs.top_k_persisted_default` <- `backtest.jobs.top_k_persisted_default`
+- `contracts.request_timeframes.allowed` <- `backtest.contracts.request_timeframes.allowed`
+- `contracts.request_timeframes.forbidden` <- `backtest.contracts.request_timeframes.forbidden`
+- `contracts.summary.top_n_default` <- `backtest.contracts.summary.top_n_default`
+- `contracts.summary.top_n_max` <- `backtest.contracts.summary.top_n_max`
+- `contracts.summary.ranking_metrics` <- `backtest.contracts.summary.ranking_metrics`
+- `contracts.summary.sortable_columns` <- `backtest.contracts.summary.sortable_columns`
+- `contracts.signals.params_path` <- `backtest.contracts.signals.params_path`
+- `contracts.signals.params_policy` <- `backtest.contracts.signals.params_policy`
+- `contracts.execution.risk_model` <- `backtest.contracts.execution.risk_model`
+- `contracts.launch.execution_mode` <- `backtest.contracts.launch.execution_mode`
+- `contracts.launch.auto_preflight_enabled` <- `backtest.contracts.launch.auto_preflight_enabled`
+- `contracts.launch.auto_fallback_to_background_enabled` <- `backtest.contracts.launch.auto_fallback_to_background_enabled`
 
 Детерминизм:
 
 - `fee_pct_default_by_market_id` сериализуется в key-sorted порядке по market id.
+- массивы `contracts.*` сериализуются в YAML-defined order; порядок является частью frozen contract surface.
 - Payload содержит только non-secret значения, нужные для browser prefill/validation hints.
+
+## Migration note: `top_k` vs `top_n`
+
+- `top_k_default` и `jobs.top_k_persisted_default` остаются обязательными legacy-полями для текущего v1 runtime/API.
+- `contracts.summary.top_n_default` и `contracts.summary.top_n_max` фиксируют target-v2 vocabulary.
+- До runtime cutover UI/API не должны silently переименовывать `top_k` поля; mapping должен быть явным и тестируемым.
 
 ## Использование в UI
 
@@ -80,7 +157,8 @@
   - префилл `Advanced` input `.value`;
   - префилл ranking selectors (`primary_metric`, `secondary_metric`);
   - обновление `execution.fee_pct` при смене market, пока поле не стало user-dirty;
-  - подсказка по cap `jobs.top_k_persisted_default`.
+  - подсказка по cap `jobs.top_k_persisted_default`;
+  - чтение frozen target-v2 literals из `contracts.*` без изменения текущего v1 request shape.
 
 ## Связанные файлы
 

@@ -2,6 +2,22 @@
 
 Фиксирует контракт BKT-EPIC-03: как backtest v1 превращает значения индикаторов (primary output) и данные свечей в дискретные сигналы `LONG|SHORT|NEUTRAL`, и как эти сигналы агрегируются AND-политикой для стратегии.
 
+## Status
+
+- Status: historical v1 signal-rules catalog with R0 freeze notes.
+- Superseded by target-v2 product constraints:
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+  - `docs/architecture/roadmap/base_refactor_plan.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- Historical scope kept here:
+  - current v1 signal families and legacy indicator catalog,
+  - current AND aggregation and NaN semantics,
+  - current signal-grid description as v1 reference.
+- R0 target freeze, not yet applied as breaking cleanup:
+  - `signals.v1.params` remain `default-only`,
+  - request-timeframe target contract excludes `1m` and `5m`,
+  - 11 heavy indicators listed in final plan are kept here only as historical v1 context until R1 cleanup.
+
 ## Цель
 
 - Формально зафиксировать v1 “signal rules catalog”: для каждого `indicator_id` из `configs/prod/indicators.yaml` определить детерминированное правило получения `LONG|SHORT|NEUTRAL`.

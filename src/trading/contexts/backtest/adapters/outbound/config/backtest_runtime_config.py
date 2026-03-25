@@ -33,6 +33,49 @@ _TOP_TRADES_N_DEFAULT = 3
 _EAGER_TOP_REPORTS_ENABLED_DEFAULT = False
 _PRIMARY_METRIC_DEFAULT = BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1
 _SECONDARY_METRIC_DEFAULT = BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
+_ALLOWED_REQUEST_TIMEFRAMES_CONTRACT_DEFAULT = (
+    "15m",
+    "30m",
+    "1h",
+    "2h",
+    "4h",
+    "6h",
+    "8h",
+    "1d",
+    "2d",
+    "3d",
+)
+_FORBIDDEN_REQUEST_TIMEFRAMES_CONTRACT_DEFAULT = ("1m", "5m")
+_RANKING_METRICS_CONTRACT_DEFAULT = (
+    "total_return_pct",
+    "max_drawdown_pct",
+    "return_over_max_drawdown",
+    "profit_factor",
+    "sharpe_trades",
+    "win_rate_pct",
+)
+_SORTABLE_SUMMARY_COLUMNS_CONTRACT_DEFAULT = (
+    "total_return_pct",
+    "max_drawdown_pct",
+    "return_over_max_drawdown",
+    "profit_factor",
+    "sharpe_trades",
+    "win_rate_pct",
+    "trade_count",
+    "avg_trade_ret_pct",
+    "avg_trade_exec_bars",
+    "exposure_pct",
+    "best_tp_pct",
+    "best_sl_pct",
+)
+_TOP_N_DEFAULT_CONTRACT = 100
+_TOP_N_MAX_DEFAULT_CONTRACT = 300
+_SIGNALS_V1_PARAMS_PATH_CONTRACT_DEFAULT = "signals.v1.params"
+_SIGNALS_V1_PARAMS_POLICY_CONTRACT_DEFAULT = "default-only"
+_RISK_MODEL_CONTRACT_DEFAULT = "signal_tf + 1m_risk"
+_EXECUTION_MODE_CONTRACT_DEFAULT = "auto"
+_AUTO_PREFLIGHT_ENABLED_CONTRACT_DEFAULT = True
+_AUTO_FALLBACK_TO_BACKGROUND_ENABLED_CONTRACT_DEFAULT = True
 
 _INIT_CASH_QUOTE_DEFAULT = 10000.0
 _FIXED_QUOTE_DEFAULT = 100.0
@@ -211,6 +254,120 @@ class BacktestRankingRuntimeConfig:
                 "backtest.ranking.primary_metric_default"
             )
         object.__setattr__(self, "secondary_metric_default", normalized_secondary_metric)
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestFrozenContractRuntimeConfig:
+    """
+    Frozen R0 runtime contract surface published additively next to legacy v1 defaults.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - configs/dev/backtest.yaml
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+    """
+
+    allowed_request_timeframes: tuple[str, ...] = _ALLOWED_REQUEST_TIMEFRAMES_CONTRACT_DEFAULT
+    forbidden_request_timeframes: tuple[str, ...] = (
+        _FORBIDDEN_REQUEST_TIMEFRAMES_CONTRACT_DEFAULT
+    )
+    ranking_metrics: tuple[str, ...] = _RANKING_METRICS_CONTRACT_DEFAULT
+    sortable_summary_columns: tuple[str, ...] = _SORTABLE_SUMMARY_COLUMNS_CONTRACT_DEFAULT
+    top_n_default: int = _TOP_N_DEFAULT_CONTRACT
+    top_n_max: int = _TOP_N_MAX_DEFAULT_CONTRACT
+    signals_v1_params_path: str = _SIGNALS_V1_PARAMS_PATH_CONTRACT_DEFAULT
+    signals_v1_params_policy: str = _SIGNALS_V1_PARAMS_POLICY_CONTRACT_DEFAULT
+    risk_model: str = _RISK_MODEL_CONTRACT_DEFAULT
+    execution_mode: str = _EXECUTION_MODE_CONTRACT_DEFAULT
+    auto_preflight_enabled: bool = _AUTO_PREFLIGHT_ENABLED_CONTRACT_DEFAULT
+    auto_fallback_to_background_enabled: bool = (
+        _AUTO_FALLBACK_TO_BACKGROUND_ENABLED_CONTRACT_DEFAULT
+    )
+
+    def __post_init__(self) -> None:
+        """
+        Validate R0 contract-freeze literals and deterministic ordering.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            These fields freeze approved v2 target semantics while current v1 `top_k_*`
+            fields and endpoint behavior remain backward compatible.
+        Raises:
+            ValueError: If one contract field violates the R0 freeze invariants.
+        Side Effects:
+            Normalizes literal sequences and ranking metric identifiers.
+        """
+        normalized_allowed_timeframes = _normalize_literal_sequence(
+            values=self.allowed_request_timeframes,
+            field_path="backtest.contracts.request_timeframes.allowed",
+        )
+        normalized_forbidden_timeframes = _normalize_literal_sequence(
+            values=self.forbidden_request_timeframes,
+            field_path="backtest.contracts.request_timeframes.forbidden",
+        )
+        if set(normalized_allowed_timeframes) & set(normalized_forbidden_timeframes):
+            raise ValueError(
+                "backtest.contracts.request_timeframes.allowed and forbidden must be disjoint"
+            )
+        object.__setattr__(self, "allowed_request_timeframes", normalized_allowed_timeframes)
+        object.__setattr__(self, "forbidden_request_timeframes", normalized_forbidden_timeframes)
+
+        normalized_ranking_metrics = _normalize_literal_sequence(
+            values=self.ranking_metrics,
+            field_path="backtest.contracts.summary.ranking_metrics",
+        )
+        object.__setattr__(self, "ranking_metrics", normalized_ranking_metrics)
+
+        normalized_sortable_columns = _normalize_literal_sequence(
+            values=self.sortable_summary_columns,
+            field_path="backtest.contracts.summary.sortable_columns",
+        )
+        object.__setattr__(self, "sortable_summary_columns", normalized_sortable_columns)
+
+        if self.top_n_default <= 0:
+            raise ValueError("backtest.contracts.summary.top_n_default must be > 0")
+        if self.top_n_max <= 0:
+            raise ValueError("backtest.contracts.summary.top_n_max must be > 0")
+        if self.top_n_default > self.top_n_max:
+            raise ValueError(
+                "backtest.contracts.summary.top_n_default must be <= "
+                "backtest.contracts.summary.top_n_max"
+            )
+        if self.signals_v1_params_path != _SIGNALS_V1_PARAMS_PATH_CONTRACT_DEFAULT:
+            raise ValueError(
+                "backtest.contracts.signals.params_path must be "
+                f"{_SIGNALS_V1_PARAMS_PATH_CONTRACT_DEFAULT!r}"
+            )
+        if self.signals_v1_params_policy != _SIGNALS_V1_PARAMS_POLICY_CONTRACT_DEFAULT:
+            raise ValueError(
+                "backtest.contracts.signals.params_policy must be "
+                f"{_SIGNALS_V1_PARAMS_POLICY_CONTRACT_DEFAULT!r}"
+            )
+        if self.risk_model != _RISK_MODEL_CONTRACT_DEFAULT:
+            raise ValueError(
+                "backtest.contracts.execution.risk_model must be "
+                f"{_RISK_MODEL_CONTRACT_DEFAULT!r}"
+            )
+        if self.execution_mode != _EXECUTION_MODE_CONTRACT_DEFAULT:
+            raise ValueError(
+                "backtest.contracts.launch.execution_mode must be "
+                f"{_EXECUTION_MODE_CONTRACT_DEFAULT!r}"
+            )
+        if self.auto_preflight_enabled is not True:
+            raise ValueError(
+                "backtest.contracts.launch.auto_preflight_enabled must be true"
+            )
+        if self.auto_fallback_to_background_enabled is not True:
+            raise ValueError(
+                "backtest.contracts.launch.auto_fallback_to_background_enabled must be true"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -398,6 +555,9 @@ class BacktestRuntimeConfig:
     version: int
     jobs: BacktestJobsRuntimeConfig
     sync: BacktestSyncRuntimeConfig
+    contracts: BacktestFrozenContractRuntimeConfig = field(
+        default_factory=BacktestFrozenContractRuntimeConfig
+    )
     warmup_bars_default: int = _WARMUP_BARS_DEFAULT
     top_k_default: int = _TOP_K_DEFAULT
     preselect_default: int = _PRESELECT_DEFAULT
@@ -450,6 +610,8 @@ class BacktestRuntimeConfig:
             raise ValueError("backtest.jobs section must be configured")
         if self.sync is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest.sync section must be configured")
+        if self.contracts is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.contracts section must be configured")
 
 
 
@@ -527,8 +689,18 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     reporting_map = _get_mapping(backtest_map, "reporting", required=False)
     guards_map = _get_mapping(backtest_map, "guards", required=False)
     cpu_map = _get_mapping(backtest_map, "cpu", required=False)
+    contracts_map = _get_mapping(backtest_map, "contracts", required=False)
     jobs_map = _get_mapping(backtest_map, "jobs", required=True)
     sync_map = _get_mapping(backtest_map, "sync", required=True)
+    contracts_request_timeframes_map = _get_mapping(
+        contracts_map,
+        "request_timeframes",
+        required=False,
+    )
+    contracts_summary_map = _get_mapping(contracts_map, "summary", required=False)
+    contracts_signals_map = _get_mapping(contracts_map, "signals", required=False)
+    contracts_execution_map = _get_mapping(contracts_map, "execution", required=False)
+    contracts_launch_map = _get_mapping(contracts_map, "launch", required=False)
 
     warmup_bars_default = _get_int_with_default(
         backtest_map,
@@ -628,11 +800,74 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     sync = BacktestSyncRuntimeConfig(
         sync_deadline_seconds=_get_float(sync_map, "sync_deadline_seconds", required=True)
     )
+    contracts = BacktestFrozenContractRuntimeConfig(
+        allowed_request_timeframes=_get_str_sequence_with_default(
+            contracts_request_timeframes_map,
+            "allowed",
+            default=_ALLOWED_REQUEST_TIMEFRAMES_CONTRACT_DEFAULT,
+        ),
+        forbidden_request_timeframes=_get_str_sequence_with_default(
+            contracts_request_timeframes_map,
+            "forbidden",
+            default=_FORBIDDEN_REQUEST_TIMEFRAMES_CONTRACT_DEFAULT,
+        ),
+        ranking_metrics=_get_str_sequence_with_default(
+            contracts_summary_map,
+            "ranking_metrics",
+            default=_RANKING_METRICS_CONTRACT_DEFAULT,
+        ),
+        sortable_summary_columns=_get_str_sequence_with_default(
+            contracts_summary_map,
+            "sortable_columns",
+            default=_SORTABLE_SUMMARY_COLUMNS_CONTRACT_DEFAULT,
+        ),
+        top_n_default=_get_int_with_default(
+            contracts_summary_map,
+            "top_n_default",
+            default=_TOP_N_DEFAULT_CONTRACT,
+        ),
+        top_n_max=_get_int_with_default(
+            contracts_summary_map,
+            "top_n_max",
+            default=_TOP_N_MAX_DEFAULT_CONTRACT,
+        ),
+        signals_v1_params_path=_get_str_with_default(
+            contracts_signals_map,
+            "params_path",
+            default=_SIGNALS_V1_PARAMS_PATH_CONTRACT_DEFAULT,
+        ),
+        signals_v1_params_policy=_get_str_with_default(
+            contracts_signals_map,
+            "params_policy",
+            default=_SIGNALS_V1_PARAMS_POLICY_CONTRACT_DEFAULT,
+        ),
+        risk_model=_get_str_with_default(
+            contracts_execution_map,
+            "risk_model",
+            default=_RISK_MODEL_CONTRACT_DEFAULT,
+        ),
+        execution_mode=_get_str_with_default(
+            contracts_launch_map,
+            "execution_mode",
+            default=_EXECUTION_MODE_CONTRACT_DEFAULT,
+        ),
+        auto_preflight_enabled=_get_bool_with_default(
+            contracts_launch_map,
+            "auto_preflight_enabled",
+            default=_AUTO_PREFLIGHT_ENABLED_CONTRACT_DEFAULT,
+        ),
+        auto_fallback_to_background_enabled=_get_bool_with_default(
+            contracts_launch_map,
+            "auto_fallback_to_background_enabled",
+            default=_AUTO_FALLBACK_TO_BACKGROUND_ENABLED_CONTRACT_DEFAULT,
+        ),
+    )
 
     return BacktestRuntimeConfig(
         version=version,
         jobs=jobs,
         sync=sync,
+        contracts=contracts,
         warmup_bars_default=warmup_bars_default,
         top_k_default=top_k_default,
         preselect_default=preselect_default,
@@ -663,7 +898,8 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
         str: Canonical SHA-256 hash string.
     Assumptions:
         Hash includes result-affecting defaults (ranking/execution/reporting/persisted top-k)
-        and excludes operational-only knobs.
+        and excludes operational-only knobs plus additive R0 contract-freeze fields that do
+        not affect current v1 execution.
     Raises:
         TypeError: If payload normalization fails for unsupported node type.
     Side Effects:
@@ -785,6 +1021,27 @@ def _get_bool(data: Mapping[str, Any], key: str, *, required: bool) -> bool:
         raise ValueError(f"expected bool at key '{key}', got {type(value).__name__}")
     return value
 
+
+def _get_bool_with_default(data: Mapping[str, Any], key: str, *, default: bool) -> bool:
+    """
+    Read optional boolean with explicit fallback default.
+
+    Args:
+        data: Source mapping.
+        key: Boolean key name.
+        default: Fallback value for absent key.
+    Returns:
+        bool: Parsed boolean value.
+    Assumptions:
+        Optional contract-freeze booleans default to approved R0 target semantics.
+    Raises:
+        ValueError: If provided value type is invalid.
+    Side Effects:
+        None.
+    """
+    if key not in data:
+        return default
+    return _get_bool(data, key, required=True)
 
 
 def _get_int(data: Mapping[str, Any], key: str, *, required: bool) -> int:
@@ -909,6 +1166,43 @@ def _get_str_with_default(data: Mapping[str, Any], key: str, *, default: str) ->
     return _get_str(data, key, required=True)
 
 
+def _get_str_sequence_with_default(
+    data: Mapping[str, Any],
+    key: str,
+    *,
+    default: Sequence[str],
+) -> tuple[str, ...]:
+    """
+    Read optional ordered sequence of string literals with explicit fallback.
+
+    Args:
+        data: Source mapping.
+        key: Sequence key name.
+        default: Fallback ordered literals for absent key.
+    Returns:
+        tuple[str, ...]: Parsed string literals preserving YAML order.
+    Assumptions:
+        Runtime contract sequences are authored as YAML arrays of strings.
+    Raises:
+        ValueError: If provided value is not a sequence of strings.
+    Side Effects:
+        None.
+    """
+    if key not in data:
+        return tuple(default)
+    value = data[key]
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError(f"expected sequence[str] at key '{key}', got {type(value).__name__}")
+    normalized_values: list[str] = []
+    for item in value:
+        if not isinstance(item, str):
+            raise ValueError(
+                f"expected sequence[str] at key '{key}', got item type {type(item).__name__}"
+            )
+        normalized_values.append(item)
+    return tuple(normalized_values)
+
+
 def _get_optional_str_with_default(
     data: Mapping[str, Any],
     key: str,
@@ -939,6 +1233,41 @@ def _get_optional_str_with_default(
     if not isinstance(value, str):
         raise ValueError(f"expected str at key '{key}', got {type(value).__name__}")
     return value
+
+
+def _normalize_literal_sequence(
+    *,
+    values: Sequence[str],
+    field_path: str,
+) -> tuple[str, ...]:
+    """
+    Normalize one ordered literal sequence while preserving author-defined order.
+
+    Args:
+        values: Sequence of raw string literals.
+        field_path: Dotted field path used in validation errors.
+    Returns:
+        tuple[str, ...]: Normalized non-empty unique literals.
+    Assumptions:
+        Literal ordering is part of the published runtime contract surface.
+    Raises:
+        ValueError: If sequence is empty, contains blank strings, or duplicates.
+    Side Effects:
+        None.
+    """
+    normalized_values: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        normalized_value = raw_value.strip()
+        if not normalized_value:
+            raise ValueError(f"{field_path} must not contain blank literals")
+        if normalized_value in seen:
+            raise ValueError(f"{field_path} must not contain duplicates")
+        seen.add(normalized_value)
+        normalized_values.append(normalized_value)
+    if len(normalized_values) == 0:
+        raise ValueError(f"{field_path} must not be empty")
+    return tuple(normalized_values)
 
 
 def _get_float(data: Mapping[str, Any], key: str, *, required: bool) -> float:
@@ -1066,6 +1395,7 @@ def _normalize_json_value(*, value: Any) -> Any:
 __all__ = [
     "BacktestCpuRuntimeConfig",
     "BacktestExecutionRuntimeConfig",
+    "BacktestFrozenContractRuntimeConfig",
     "BacktestGuardsRuntimeConfig",
     "BacktestJobsRuntimeConfig",
     "BacktestRankingRuntimeConfig",

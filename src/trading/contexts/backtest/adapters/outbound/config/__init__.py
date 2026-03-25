@@ -1,6 +1,7 @@
 from .backtest_runtime_config import (
     BacktestCpuRuntimeConfig,
     BacktestExecutionRuntimeConfig,
+    BacktestFrozenContractRuntimeConfig,
     BacktestGuardsRuntimeConfig,
     BacktestJobsRuntimeConfig,
     BacktestRankingRuntimeConfig,
@@ -15,6 +16,7 @@ from .backtest_runtime_config import (
 __all__ = [
     "BacktestCpuRuntimeConfig",
     "BacktestExecutionRuntimeConfig",
+    "BacktestFrozenContractRuntimeConfig",
     "BacktestGuardsRuntimeConfig",
     "BacktestJobsRuntimeConfig",
     "BacktestRankingRuntimeConfig",

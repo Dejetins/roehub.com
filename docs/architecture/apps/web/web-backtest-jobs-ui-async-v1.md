@@ -4,6 +4,22 @@
 в `apps/web` с polling (без SSE/WebSocket), deterministic pagination cursor и lazy report policy
 для `/top` (summary-only rows + `Load report` on-demand через `variant-report`).
 
+## Status
+
+- Status: historical v1 jobs UX contract with R0 freeze notes.
+- Superseded by target-v2 UX:
+  - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+  - `docs/architecture/roadmap/base_refactor_plan.md`
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- Historical scope kept here:
+  - отдельные `/backtests/jobs*` маршруты,
+  - split sync/jobs launch model,
+  - polling around current job storage/worker semantics.
+- R0 target freeze, not yet implemented here:
+  - user-visible history становится unified `backtest run`,
+  - sync overflow должен auto-fallback в background вместо ручного mode toggle,
+  - summary-only top-N и lazy detail page становятся canonical result UX.
+
 ## Цель
 
 - Пользователь может:
