@@ -16,12 +16,9 @@
 
 - `momentum.cci`
 - `momentum.fisher`
-- `momentum.macd`
-- `momentum.ppo`
 - `momentum.roc`
 - `momentum.rsi`
 - `momentum.stoch`
-- `momentum.stoch_rsi`
 - `momentum.trix`
 - `momentum.williams_r`
 
@@ -29,12 +26,9 @@
 
 - `momentum.cci`
 - `momentum.fisher`
-- `momentum.macd`
-- `momentum.ppo`
 - `momentum.roc`
 - `momentum.rsi`
 - `momentum.stoch`
-- `momentum.stoch_rsi`
 - `momentum.trix`
 - `momentum.williams_r`
 
@@ -60,10 +54,9 @@
 
 ## Group-specific gotchas
 
-- RSI/TRIX/MACD/PPO используют stateful EMA/RMA цепочки и reset-on-NaN.
-- Для ROC/PPO/stoch-производных есть чувствительность к делению на 0: результат `NaN`, не clamp.
-- MACD/PPO критичны к согласованности параметров `fast_window < slow_window`; иначе получаются неожиданные формы кривой даже при валидном типе.
-- Для `stoch_rsi` warmup складывается из warmup RSI и последующего rolling-окна.
+- RSI/TRIX используют stateful EMA/RMA цепочки и reset-on-NaN.
+- Для ROC и stochastic-семантики чувствительность к делению на 0 сохраняется: результат `NaN`, не clamp.
+- `momentum.stoch` и `momentum.trix` остаются самыми чувствительными к warmup среди поддерживаемых `momentum.*`.
 
 ## How this group is validated
 

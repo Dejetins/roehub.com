@@ -19,6 +19,10 @@
   - user-visible history становится unified `backtest run`,
   - sync overflow должен auto-fallback в background вместо ручного mode toggle,
   - summary-only top-N и lazy detail page становятся canonical result UX.
+- R1 practical contract:
+  - create form reuse на `/backtests` обязан использовать backend runtime defaults catalog,
+  - request TF `1m` и `5m` детерминированно отклоняются backend-ом,
+  - request-level signal params остаются `default-only`.
 
 ## Цель
 
@@ -67,6 +71,8 @@ Job creation происходит на `/backtests` (reuse формы WEB-EPIC-0
 
 - UI toggle "Run as job" вызывает browser-side `POST /api/backtests/jobs`.
 - На успех: redirect на `/backtests/jobs/{job_id}`.
+- Indicator/source selectors и допустимые timeframe reuse-ятся из
+  `GET /api/backtests/runtime-defaults`.
 
 `/backtests/jobs` page содержит ссылку/кнопку "Create job" -> `/backtests`.
 

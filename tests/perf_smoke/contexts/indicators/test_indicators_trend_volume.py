@@ -10,7 +10,6 @@ from trading.contexts.indicators.adapters.outbound.compute_numba import NumbaInd
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
     ComputeRequest,
-    ExplicitValuesSpec,
     RangeValuesSpec,
 )
 from trading.contexts.indicators.domain.definitions import all_defs
@@ -119,9 +118,8 @@ def test_indicators_trend_volume_perf_smoke(tmp_path: Path) -> None:
             layout_preference=Layout.TIME_MAJOR,
         ),
         GridSpec(
-            indicator_id=IndicatorId("volume.vwap_deviation"),
+            indicator_id=IndicatorId("volume.vwap"),
             params={
-                "mult": ExplicitValuesSpec(name="mult", values=(1.0, 2.0, 3.0)),
                 "window": RangeValuesSpec(
                     name="window",
                     start=5,
@@ -154,4 +152,4 @@ def test_indicators_trend_volume_perf_smoke(tmp_path: Path) -> None:
         assert elapsed > 0.0
 
     assert elapsed_by_id["trend.adx"] > 0.0
-    assert elapsed_by_id["volume.vwap_deviation"] > 0.0
+    assert elapsed_by_id["volume.vwap"] > 0.0

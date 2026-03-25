@@ -242,7 +242,6 @@ class ComputeNumbaWarmupRunner:
         source_variants = np.ascontiguousarray(
             np.repeat(source_f32.reshape(1, t_size), repeats=variants, axis=0)
         )
-        mults_f64 = np.linspace(1.5, 2.5, variants, dtype=np.float64)
         annualizations_i64 = np.array([252, 365, 252, 365, 252], dtype=np.int64)
 
         for indicator_id in (
@@ -272,13 +271,6 @@ class ComputeNumbaWarmupRunner:
                 close=source_f32,
                 windows=windows,
             )
-        if is_supported_volatility_indicator(indicator_id="volatility.bbands"):
-            _ = compute_volatility_grid_f32(
-                indicator_id="volatility.bbands",
-                source_variants=source_variants,
-                windows=windows,
-                mults=mults_f64,
-            )
         if is_supported_volatility_indicator(indicator_id="volatility.hv"):
             _ = compute_volatility_grid_f32(
                 indicator_id="volatility.hv",
@@ -293,15 +285,6 @@ class ComputeNumbaWarmupRunner:
                 source_variants=source_variants,
                 windows=windows,
             )
-        if is_supported_momentum_indicator(indicator_id="momentum.macd"):
-            _ = compute_momentum_grid_f32(
-                indicator_id="momentum.macd",
-                source_variants=source_variants,
-                fast_windows=np.array([8, 10, 12, 14, 16], dtype=np.int64),
-                slow_windows=np.array([20, 22, 24, 26, 28], dtype=np.int64),
-                signal_windows=np.array([5, 7, 9, 11, 13], dtype=np.int64),
-            )
-
         high_f32 = source_f32 + np.float32(1.2)
         low_f32 = source_f32 - np.float32(1.2)
         close_f32 = source_f32 + np.float32(0.3)
@@ -314,15 +297,6 @@ class ComputeNumbaWarmupRunner:
                 close=close_f32,
                 windows=windows,
                 smoothings=np.array([5, 7, 9, 11, 13], dtype=np.int64),
-            )
-        if is_supported_trend_indicator(indicator_id="trend.supertrend"):
-            _ = compute_trend_grid_f32(
-                indicator_id="trend.supertrend",
-                high=high_f32,
-                low=low_f32,
-                close=close_f32,
-                windows=windows,
-                mults=mults_f64,
             )
         if is_supported_trend_indicator(indicator_id="trend.linreg_slope"):
             _ = compute_trend_grid_f32(
@@ -349,17 +323,6 @@ class ComputeNumbaWarmupRunner:
                 volume=volume_f32,
                 windows=windows,
             )
-        if is_supported_volume_indicator(indicator_id="volume.vwap_deviation"):
-            _ = compute_volume_grid_f32(
-                indicator_id="volume.vwap_deviation",
-                high=high_f32,
-                low=low_f32,
-                close=close_f32,
-                volume=volume_f32,
-                windows=windows,
-                mults=mults_f64,
-            )
-
         open_f32 = source_f32 - np.float32(0.15)
         lefts_i64 = np.array([2, 3, 4, 5, 6], dtype=np.int64)
         rights_i64 = np.array([2, 3, 4, 5, 6], dtype=np.int64)

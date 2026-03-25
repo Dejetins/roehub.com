@@ -53,7 +53,6 @@ def defs() -> tuple[IndicatorDef, ...]:
     """
     window = _window(default=20)
     smoothing = _window_named(name="smoothing", default=14)
-    mult = _float_param(name="mult", minimum=0.1, maximum=10.0, step=0.01, default=2.0)
 
     items = (
         IndicatorDef(
@@ -73,41 +72,12 @@ def defs() -> tuple[IndicatorDef, ...]:
             output=OutputSpec(names=("aroon_up", "aroon_down", "aroon_osc")),
         ),
         IndicatorDef(
-            indicator_id=IndicatorId("trend.chandelier_exit"),
-            title="Chandelier Exit",
-            inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
-            params=(window, mult),
-            axes=("window", "mult"),
-            output=OutputSpec(names=("chandelier_long", "chandelier_short")),
-        ),
-        IndicatorDef(
             indicator_id=IndicatorId("trend.donchian"),
             title="Donchian Channel",
             inputs=(InputSeries.HIGH, InputSeries.LOW),
             params=(window,),
             axes=("window",),
             output=OutputSpec(names=("donchian_upper", "donchian_lower", "donchian_mid")),
-        ),
-        IndicatorDef(
-            indicator_id=IndicatorId("trend.ichimoku"),
-            title="Ichimoku Cloud",
-            inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
-            params=(
-                _window_named(name="conversion_window", default=9),
-                _window_named(name="base_window", default=26),
-                _window_named(name="span_b_window", default=52),
-                _window_named(name="displacement", default=26),
-            ),
-            axes=("conversion_window", "base_window", "span_b_window", "displacement"),
-            output=OutputSpec(names=("conversion", "base", "span_a", "span_b", "lagging")),
-        ),
-        IndicatorDef(
-            indicator_id=IndicatorId("trend.keltner"),
-            title="Keltner Channel",
-            inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
-            params=(window, mult),
-            axes=("window", "mult"),
-            output=OutputSpec(names=("middle", "upper", "lower")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.linreg_slope"),
@@ -146,14 +116,6 @@ def defs() -> tuple[IndicatorDef, ...]:
             ),
             axes=("accel_max", "accel_start", "accel_step"),
             output=OutputSpec(names=("psar", "psar_dir")),
-        ),
-        IndicatorDef(
-            indicator_id=IndicatorId("trend.supertrend"),
-            title="SuperTrend",
-            inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE),
-            params=(window, mult),
-            axes=("window", "mult"),
-            output=OutputSpec(names=("supertrend", "supertrend_dir")),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("trend.vortex"),

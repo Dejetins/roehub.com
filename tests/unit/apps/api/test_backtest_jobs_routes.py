@@ -16,6 +16,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobErrorPayload,
     BacktestJobTopVariant,
 )
+from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import PaidLevel, UserId
@@ -425,6 +426,60 @@ def test_get_backtest_job_status_maps_not_found_to_404_payload() -> None:
             "message": "Backtest job not found",
             "details": {
                 "job_id": "00000000-0000-0000-0000-000000000913",
+            },
+        }
+    }
+
+
+def test_post_backtest_jobs_maps_runtime_contract_validation_error() -> None:
+    """
+    Verify jobs create route maps R1 runtime-contract violations to canonical 422 payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Create use-case raises `BacktestValidationError` with deterministic items.
+    Raises:
+        AssertionError: If status code or payload deviates from canonical validation contract.
+    Side Effects:
+        None.
+    """
+    client, _ = _build_client(
+        create_use_case=_CreateUseCaseFake(
+            error=BacktestValidationError(
+                "Backtest request violates runtime defaults contract",
+                errors=(
+                    {
+                        "path": "body.template.indicator_grids[0].indicator_id",
+                        "code": "unsupported_value",
+                        "message": "indicator_id 'momentum.macd' is not supported",
+                    },
+                ),
+            )
+        )
+    )
+
+    response = client.post(
+        "/backtests/jobs",
+        json=_template_payload(),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "validation_error",
+            "message": "Backtest request violates runtime defaults contract",
+            "details": {
+                "errors": [
+                    {
+                        "path": "body.template.indicator_grids[0].indicator_id",
+                        "code": "unsupported_value",
+                        "message": "indicator_id 'momentum.macd' is not supported",
+                    }
+                ]
             },
         }
     }

@@ -51,8 +51,8 @@ owner: indicators
 Наблюдаемые масштабы сеток по defaults (`configs/prod/indicators.yaml`):
 
 - `ma.sma`: `1176` variants (`source=6 x window=196`)
-- `trend.ichimoku`: `376614` variants
-- `momentum.stoch_rsi`: `6652368` variants
+- `momentum.trix`: `12528` variants
+- `trend.adx`: `5336` variants
 
 Микро-бенч для осевых экспансий (порядок величин):
 
@@ -203,9 +203,9 @@ for variant_index in nb.prange(variants):
 Сначала покрываем самые тяжелые по памяти/времени paths:
 
 - `trend.psar`
-- `volatility.bbands*`
-- `momentum.stoch_rsi` и `momentum.macd/ppo`
-- `volume.vwap_deviation`
+- `volatility.hv`
+- `momentum.trix` и `momentum.stoch`
+- `trend.adx`
 
 ### Файлы (пункт 4)
 

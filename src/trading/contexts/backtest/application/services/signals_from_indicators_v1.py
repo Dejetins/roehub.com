@@ -256,12 +256,9 @@ def _build_signal_rule_registry_v1() -> dict[str, SignalRuleSpecV1]:
         "ma.zlema": rule_compare_price,
         "momentum.cci": rule_threshold_band,
         "momentum.fisher": rule_sign,
-        "momentum.macd": rule_sign,
-        "momentum.ppo": rule_sign,
         "momentum.roc": rule_sign,
         "momentum.rsi": rule_threshold_band,
         "momentum.stoch": rule_threshold_band,
-        "momentum.stoch_rsi": rule_threshold_band,
         "momentum.trix": rule_sign,
         "momentum.williams_r": rule_threshold_band,
         "structure.candle_stats": SignalRuleSpecV1(
@@ -280,22 +277,15 @@ def _build_signal_rule_registry_v1() -> dict[str, SignalRuleSpecV1]:
         "structure.zscore": rule_threshold_band,
         "trend.adx": rule_delta_sign,
         "trend.aroon": rule_threshold_band,
-        "trend.chandelier_exit": rule_compare_price,
         "trend.donchian": rule_compare_price,
-        "trend.ichimoku": rule_compare_price,
-        "trend.keltner": rule_compare_price,
         "trend.linreg_slope": rule_sign,
         "trend.psar": rule_compare_price,
-        "trend.supertrend": rule_compare_price,
         "trend.vortex": SignalRuleSpecV1(
             rule_family=_RULE_THRESHOLD_CENTERED,
             required_signal_params=("abs_threshold",),
             threshold_center=1.0,
         ),
         "volatility.atr": rule_delta_sign,
-        "volatility.bbands": rule_compare_price,
-        "volatility.bbands_bandwidth": rule_delta_sign,
-        "volatility.bbands_percent_b": rule_threshold_band,
         "volatility.hv": rule_delta_sign,
         "volatility.stddev": rule_delta_sign,
         "volatility.tr": rule_delta_sign,
@@ -306,10 +296,6 @@ def _build_signal_rule_registry_v1() -> dict[str, SignalRuleSpecV1]:
         "volume.obv": rule_delta_sign,
         "volume.volume_sma": rule_compare_volume,
         "volume.vwap": rule_compare_price,
-        "volume.vwap_deviation": SignalRuleSpecV1(
-            rule_family=_RULE_COMPARE_PRICE_TO_OUTPUT,
-            invert_price_comparison=True,
-        ),
     }
     return dict(sorted(entries.items(), key=lambda item: item[0]))
 

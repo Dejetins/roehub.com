@@ -49,6 +49,76 @@ class _DummyDefaultsProvider:
     Dummy defaults provider class exposing `from_environ` constructor API.
     """
 
+    def compute_defaults(self, *, indicator_id: str):
+        """
+        Return no compute defaults for router-composition wiring tests.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            None: No compute defaults are needed in these tests.
+        Assumptions:
+            Router-composition tests do not execute staged grid planning.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = indicator_id
+        return None
+
+    def signal_param_defaults(self, *, indicator_id: str):
+        """
+        Return empty signal defaults mapping for router-composition wiring tests.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            dict[str, object]: Empty defaults mapping.
+        Assumptions:
+            Runtime defaults response does not read signal defaults.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = indicator_id
+        return {}
+
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return deterministic supported indicator catalog for wiring tests.
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Static supported indicator ids.
+        Assumptions:
+            Router-composition tests only need deterministic launch catalog values.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return ("ma.sma",)
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Return deterministic source catalog for one indicator id.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            tuple[str, ...]: Static source values for supported indicator ids.
+        Assumptions:
+            Unsupported ids can return an empty tuple in these tests.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return ("close", "hlc3") if indicator_id.strip().lower() == "ma.sma" else ()
+
     @classmethod
     def from_environ(cls, *, environ):
         """
@@ -57,7 +127,7 @@ class _DummyDefaultsProvider:
         Args:
             environ: Environment mapping.
         Returns:
-            object: Opaque fixture object.
+            _DummyDefaultsProvider: Fixture provider instance.
         Assumptions:
             build_backtest_router only needs a truthy provider object.
         Raises:
@@ -66,7 +136,7 @@ class _DummyDefaultsProvider:
             None.
         """
         _ = environ
-        return object()
+        return cls()
 
 
 class _DummyStrategyReader:

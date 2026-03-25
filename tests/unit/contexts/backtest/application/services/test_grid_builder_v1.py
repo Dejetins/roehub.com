@@ -198,6 +198,43 @@ class _DefaultsProvider:
         """
         return self._signal_defaults.get(indicator_id, {})
 
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return deterministic supported indicator catalog for staged-grid tests.
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Sorted supported indicator ids.
+        Assumptions:
+            Fake provider support catalog is the union of compute and signal defaults keys.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return tuple(sorted(set(self._compute_defaults) | set(self._signal_defaults)))
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Return deterministic allowed source values for one indicator id.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            tuple[str, ...]: Explicit source defaults or empty tuple.
+        Assumptions:
+            Missing compute defaults imply no configurable source axis in this fake.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        grid = self._compute_defaults.get(indicator_id)
+        if grid is None or grid.source is None:
+            return ()
+        return tuple(str(value) for value in grid.source.materialize())
+
 
 def test_grid_builder_v1_enumerates_stage_a_deterministically() -> None:
     """

@@ -136,32 +136,23 @@ _TIER_B_MIXED_IDS = frozenset(
     (
         "ma.vwma",
         "momentum.cci",
-        "momentum.macd",
-        "momentum.ppo",
         "momentum.roc",
         "momentum.rsi",
         "momentum.stoch",
-        "momentum.stoch_rsi",
         "momentum.trix",
         "momentum.williams_r",
         "structure.distance_to_ma_norm",
         "structure.percent_rank",
         "structure.zscore",
         "trend.adx",
-        "trend.keltner",
         "trend.psar",
-        "trend.supertrend",
         "trend.vortex",
         "volume.vwap",
-        "volume.vwap_deviation",
     )
 )
 _TIER_C_FLOAT64_IDS = frozenset(
     (
         "trend.linreg_slope",
-        "volatility.bbands",
-        "volatility.bbands_bandwidth",
-        "volatility.bbands_percent_b",
         "volatility.hv",
         "volatility.stddev",
         "volatility.variance",
@@ -1273,46 +1264,6 @@ def _compute_volatility_variant_matrix(
                 )
             return out
 
-        if indicator_id in {
-            "volatility.bbands",
-            "volatility.bbands_bandwidth",
-            "volatility.bbands_percent_b",
-        }:
-            windows_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
-            )
-            mults_f64 = np.ascontiguousarray(
-                np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
-            )
-            for source_name, variant_indexes in source_groups:
-                source_variants = _build_group_source_matrix(
-                    source=_require_series(
-                        available_series=available_series,
-                        name=source_name,
-                    ),
-                    variants=int(variant_indexes.shape[0]),
-                    t_size=t_size,
-                )
-                group_values = compute_volatility_grid_f32(
-                    indicator_id=indicator_id,
-                    source_variants=source_variants,
-                    windows=_slice_variant_vector(
-                        values=windows_i64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    mults=_slice_variant_vector(
-                        values=mults_f64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    precision=precision,
-                )
-                _scatter_group_values(
-                    destination=out,
-                    variant_indexes=variant_indexes,
-                    group_values=group_values,
-                    t_size=t_size,
-                )
-            return out
     except ValueError as error:
         raise GridValidationError(str(error)) from error
 
@@ -1476,57 +1427,6 @@ def _compute_momentum_variant_matrix(
         variants = len(variant_source_labels)
         out = np.empty((variants, t_size), dtype=np.float32, order="C")
 
-        if indicator_id == "momentum.stoch_rsi":
-            rsi_windows_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="rsi_window"), dtype=np.int64)
-            )
-            k_windows_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="k_window"), dtype=np.int64)
-            )
-            smoothings_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="smoothing"), dtype=np.int64)
-            )
-            d_windows_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="d_window"), dtype=np.int64)
-            )
-            for source_name, variant_indexes in source_groups:
-                source_variants = _build_group_source_matrix(
-                    source=_require_series(
-                        available_series=available_series,
-                        name=source_name,
-                    ),
-                    variants=int(variant_indexes.shape[0]),
-                    t_size=t_size,
-                )
-                group_values = compute_momentum_grid_f32(
-                    indicator_id=indicator_id,
-                    source_variants=source_variants,
-                    rsi_windows=_slice_variant_vector(
-                        values=rsi_windows_i64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    k_windows=_slice_variant_vector(
-                        values=k_windows_i64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    smoothings=_slice_variant_vector(
-                        values=smoothings_i64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    d_windows=_slice_variant_vector(
-                        values=d_windows_i64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    precision=precision,
-                )
-                _scatter_group_values(
-                    destination=out,
-                    variant_indexes=variant_indexes,
-                    group_values=group_values,
-                    t_size=t_size,
-                )
-            return out
-
         if indicator_id == "momentum.trix":
             windows_i64 = np.ascontiguousarray(
                 np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
@@ -1567,58 +1467,6 @@ def _compute_momentum_variant_matrix(
                 )
             return out
 
-        if indicator_id in {"momentum.ppo", "momentum.macd"}:
-            fast_windows_i64 = np.ascontiguousarray(
-                np.asarray(
-                    _variant_int_values(axes=axes, axis_name="fast_window"),
-                    dtype=np.int64,
-                )
-            )
-            slow_windows_i64 = np.ascontiguousarray(
-                np.asarray(
-                    _variant_int_values(axes=axes, axis_name="slow_window"),
-                    dtype=np.int64,
-                )
-            )
-            signal_windows_i64 = np.ascontiguousarray(
-                np.asarray(
-                    _variant_int_values(axes=axes, axis_name="signal_window"),
-                    dtype=np.int64,
-                )
-            )
-            for source_name, variant_indexes in source_groups:
-                source_variants = _build_group_source_matrix(
-                    source=_require_series(
-                        available_series=available_series,
-                        name=source_name,
-                    ),
-                    variants=int(variant_indexes.shape[0]),
-                    t_size=t_size,
-                )
-                group_values = compute_momentum_grid_f32(
-                    indicator_id=indicator_id,
-                    source_variants=source_variants,
-                    fast_windows=_slice_variant_vector(
-                        values=fast_windows_i64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    slow_windows=_slice_variant_vector(
-                        values=slow_windows_i64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    signal_windows=_slice_variant_vector(
-                        values=signal_windows_i64,
-                        variant_indexes=variant_indexes,
-                    ),
-                    precision=precision,
-                )
-                _scatter_group_values(
-                    destination=out,
-                    variant_indexes=variant_indexes,
-                    group_values=group_values,
-                    t_size=t_size,
-                )
-            return out
     except ValueError as error:
         raise GridValidationError(str(error)) from error
 
@@ -1769,23 +1617,6 @@ def _compute_trend_variant_matrix(
                 precision=precision,
             )
 
-        if indicator_id == "trend.chandelier_exit":
-            windows_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
-            )
-            mults_f64 = np.ascontiguousarray(
-                np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
-            )
-            return compute_trend_grid_f32(
-                indicator_id=indicator_id,
-                high=high,
-                low=low,
-                close=close,
-                windows=windows_i64,
-                mults=mults_f64,
-                precision=precision,
-            )
-
         if indicator_id == "trend.donchian":
             windows_i64 = np.ascontiguousarray(
                 np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
@@ -1796,60 +1627,6 @@ def _compute_trend_variant_matrix(
                 low=low,
                 close=close,
                 windows=windows_i64,
-                precision=precision,
-            )
-
-        if indicator_id == "trend.ichimoku":
-            conversion_windows_i64 = np.ascontiguousarray(
-                np.asarray(
-                    _variant_int_values(axes=axes, axis_name="conversion_window"),
-                    dtype=np.int64,
-                )
-            )
-            base_windows_i64 = np.ascontiguousarray(
-                np.asarray(
-                    _variant_int_values(axes=axes, axis_name="base_window"),
-                    dtype=np.int64,
-                )
-            )
-            span_b_windows_i64 = np.ascontiguousarray(
-                np.asarray(
-                    _variant_int_values(axes=axes, axis_name="span_b_window"),
-                    dtype=np.int64,
-                )
-            )
-            displacements_i64 = np.ascontiguousarray(
-                np.asarray(
-                    _variant_int_values(axes=axes, axis_name="displacement"),
-                    dtype=np.int64,
-                )
-            )
-            return compute_trend_grid_f32(
-                indicator_id=indicator_id,
-                high=high,
-                low=low,
-                close=close,
-                conversion_windows=conversion_windows_i64,
-                base_windows=base_windows_i64,
-                span_b_windows=span_b_windows_i64,
-                displacements=displacements_i64,
-                precision=precision,
-            )
-
-        if indicator_id in {"trend.keltner", "trend.supertrend"}:
-            windows_i64 = np.ascontiguousarray(
-                np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
-            )
-            mults_f64 = np.ascontiguousarray(
-                np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
-            )
-            return compute_trend_grid_f32(
-                indicator_id=indicator_id,
-                high=high,
-                low=low,
-                close=close,
-                windows=windows_i64,
-                mults=mults_f64,
                 precision=precision,
             )
 
@@ -1972,20 +1749,6 @@ def _compute_volume_variant_matrix(
                 precision=precision,
             )
 
-        if indicator_id == "volume.vwap_deviation":
-            mults_f64 = np.ascontiguousarray(
-                np.asarray(_variant_float_values(axes=axes, axis_name="mult"), dtype=np.float64)
-            )
-            return compute_volume_grid_f32(
-                indicator_id=indicator_id,
-                high=high,
-                low=low,
-                close=close,
-                volume=volume,
-                windows=windows_i64,
-                mults=mults_f64,
-                precision=precision,
-            )
     except ValueError as error:
         raise GridValidationError(str(error)) from error
 

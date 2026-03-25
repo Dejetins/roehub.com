@@ -16,6 +16,10 @@ from .errors import (
     map_backtest_exception,
     validation_error,
 )
+from .request_runtime_contract_v1 import (
+    validate_signal_overrides_default_only,
+    validate_template_runtime_contract,
+)
 from .run_backtest import RunBacktestUseCase
 from .run_backtest_job_runner_v1 import (
     BacktestJobRunReportV1,
@@ -41,5 +45,7 @@ __all__ = [
     "backtest_forbidden",
     "backtest_not_found",
     "map_backtest_exception",
+    "validate_signal_overrides_default_only",
+    "validate_template_runtime_contract",
     "validation_error",
 ]

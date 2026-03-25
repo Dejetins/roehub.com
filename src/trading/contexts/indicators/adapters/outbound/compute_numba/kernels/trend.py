@@ -20,13 +20,9 @@ from ._common import PRECISION_MODE_FLOAT64, SUPPORTED_PRECISION_MODES, is_nan
 _SUPPORTED_TREND_IDS = {
     "trend.adx",
     "trend.aroon",
-    "trend.chandelier_exit",
     "trend.donchian",
-    "trend.ichimoku",
-    "trend.keltner",
     "trend.linreg_slope",
     "trend.psar",
-    "trend.supertrend",
     "trend.vortex",
 }
 
@@ -1715,95 +1711,10 @@ def compute_trend_grid_f32(
         out_f64 = _aroon_variants_f64(high_f64, low_f64, windows_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    if normalized_id == "trend.chandelier_exit":
-        windows_i64 = _prepare_int_variants(name="windows", values=windows)
-        mults_f64 = _prepare_float_variants(
-            name="mults",
-            values=mults,
-            expected_size=windows_i64.shape[0],
-        )
-        if np.any(mults_f64 <= 0.0):
-            raise ValueError("mults must contain only positive values")
-        out_f64 = _chandelier_variants_f64(
-            high_f64,
-            low_f64,
-            close_f64,
-            windows_i64,
-            mults_f64,
-        )
-        return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
     if normalized_id == "trend.donchian":
         windows_i64 = _prepare_int_variants(name="windows", values=windows)
         out_f64 = _donchian_variants_f64(high_f64, low_f64, windows_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
-    if normalized_id == "trend.ichimoku":
-        conversion_i64 = _prepare_int_variants(
-            name="conversion_windows",
-            values=conversion_windows,
-        )
-        base_i64 = _prepare_int_variants(
-            name="base_windows",
-            values=base_windows,
-            expected_size=conversion_i64.shape[0],
-        )
-        span_b_i64 = _prepare_int_variants(
-            name="span_b_windows",
-            values=span_b_windows,
-            expected_size=conversion_i64.shape[0],
-        )
-        _ = span_b_i64
-        displacements_i64 = _prepare_int_variants(
-            name="displacements",
-            values=displacements,
-            expected_size=conversion_i64.shape[0],
-        )
-        out_f64 = _ichimoku_variants_f64(
-            high_f64,
-            low_f64,
-            conversion_i64,
-            base_i64,
-            displacements_i64,
-        )
-        return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
-    if normalized_id == "trend.keltner":
-        windows_i64 = _prepare_int_variants(name="windows", values=windows)
-        mults_f64 = _prepare_float_variants(
-            name="mults",
-            values=mults,
-            expected_size=windows_i64.shape[0],
-        )
-        if np.any(mults_f64 <= 0.0):
-            raise ValueError("mults must contain only positive values")
-        out_f64 = _keltner_variants_f64(
-            high_f64,
-            low_f64,
-            close_f64,
-            windows_i64,
-            mults_f64,
-        )
-        return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
-    if normalized_id == "trend.supertrend":
-        windows_i64 = _prepare_int_variants(name="windows", values=windows)
-        mults_f64 = _prepare_float_variants(
-            name="mults",
-            values=mults,
-            expected_size=windows_i64.shape[0],
-        )
-        if np.any(mults_f64 <= 0.0):
-            raise ValueError("mults must contain only positive values")
-        out_f64 = _supertrend_variants_f64(
-            high_f64,
-            low_f64,
-            close_f64,
-            windows_i64,
-            mults_f64,
-        )
-        return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
     if normalized_id == "trend.vortex":
         windows_i64 = _prepare_int_variants(name="windows", values=windows)
         out_f64 = _vortex_variants_f64(

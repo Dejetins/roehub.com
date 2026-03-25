@@ -32,7 +32,7 @@ def test_yaml_backtest_grid_defaults_provider_reads_compute_and_signal_defaults(
             "    inputs:\n"
             "      source:\n"
             "        mode: explicit\n"
-            "        values: [close]\n"
+            "        values: [hlc3, close]\n"
             "    params:\n"
             "      window:\n"
             "        mode: range\n"
@@ -55,12 +55,15 @@ def test_yaml_backtest_grid_defaults_provider_reads_compute_and_signal_defaults(
     assert compute_defaults is not None
     assert compute_defaults.indicator_id.value == "ma.sma"
     assert compute_defaults.source is not None
-    assert compute_defaults.source.materialize() == ("close",)
+    assert compute_defaults.source.materialize() == ("hlc3", "close")
     assert compute_defaults.params["window"].materialize() == (10, 20, 30)
 
     signal_defaults = provider.signal_param_defaults(indicator_id="ma.sma")
     assert tuple(signal_defaults.keys()) == ("cross_up",)
     assert signal_defaults["cross_up"].materialize() == (0.4, 0.6)
+    assert provider.supported_indicator_ids() == ("ma.sma",)
+    assert provider.allowed_source_values(indicator_id="ma.sma") == ("close", "hlc3")
+    assert provider.allowed_source_values(indicator_id="volume.obv") == ()
 
 
 def test_yaml_backtest_grid_defaults_provider_rejects_invalid_axis_mode(tmp_path: Path) -> None:

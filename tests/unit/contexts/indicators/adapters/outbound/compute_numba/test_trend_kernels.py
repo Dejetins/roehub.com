@@ -189,8 +189,6 @@ def test_numba_trend_kernels_match_numpy_oracle_with_nan_holes() -> None:
 
     windows_i64 = np.asarray([7, 14, 21, 34], dtype=np.int64)
     smoothings_i64 = np.asarray([5, 7, 9, 11], dtype=np.int64)
-    mults_f64 = np.asarray([1.5, 2.0, 2.5, 3.0], dtype=np.float64)
-
     cases: tuple[tuple[str, dict[str, Any]], ...] = (
         (
             "trend.adx",
@@ -212,44 +210,12 @@ def test_numba_trend_kernels_match_numpy_oracle_with_nan_holes() -> None:
             },
         ),
         (
-            "trend.chandelier_exit",
-            {
-                "high": source_map["high"],
-                "low": source_map["low"],
-                "close": source_map["close"],
-                "windows": windows_i64,
-                "mults": mults_f64,
-            },
-        ),
-        (
             "trend.donchian",
             {
                 "high": source_map["high"],
                 "low": source_map["low"],
                 "close": source_map["close"],
                 "windows": windows_i64,
-            },
-        ),
-        (
-            "trend.ichimoku",
-            {
-                "high": source_map["high"],
-                "low": source_map["low"],
-                "close": source_map["close"],
-                "conversion_windows": np.asarray([9, 12, 15], dtype=np.int64),
-                "base_windows": np.asarray([26, 30, 34], dtype=np.int64),
-                "span_b_windows": np.asarray([52, 60, 68], dtype=np.int64),
-                "displacements": np.asarray([26, 30, 34], dtype=np.int64),
-            },
-        ),
-        (
-            "trend.keltner",
-            {
-                "high": source_map["high"],
-                "low": source_map["low"],
-                "close": source_map["close"],
-                "windows": windows_i64,
-                "mults": mults_f64,
             },
         ),
         (
@@ -267,16 +233,6 @@ def test_numba_trend_kernels_match_numpy_oracle_with_nan_holes() -> None:
                 "accel_starts": np.asarray([0.01, 0.02, 0.03], dtype=np.float64),
                 "accel_steps": np.asarray([0.01, 0.02, 0.03], dtype=np.float64),
                 "accel_maxes": np.asarray([0.2, 0.3, 0.4], dtype=np.float64),
-            },
-        ),
-        (
-            "trend.supertrend",
-            {
-                "high": source_map["high"],
-                "low": source_map["low"],
-                "close": source_map["close"],
-                "windows": windows_i64,
-                "mults": mults_f64,
             },
         ),
         (
@@ -306,9 +262,9 @@ def test_numba_trend_kernels_match_numpy_oracle_with_nan_holes() -> None:
         )
 
 
-def test_trend_directional_kernels_reset_state_on_nan_holes() -> None:
+def test_trend_psar_kernel_resets_state_on_nan_holes() -> None:
     """
-    Verify PSAR/SuperTrend do not carry direction state across NaN holes.
+    Verify PSAR does not carry direction state across NaN holes.
 
     Args:
         None.
@@ -323,7 +279,6 @@ def test_trend_directional_kernels_reset_state_on_nan_holes() -> None:
     """
     high = np.asarray([10.0, 11.0, 12.0, 11.0, np.nan, 13.0, 14.0], dtype=np.float32)
     low = np.asarray([9.0, 10.0, 11.0, 10.0, np.nan, 12.0, 13.0], dtype=np.float32)
-    close = np.asarray([9.5, 10.5, 11.5, 10.5, np.nan, 12.5, 13.5], dtype=np.float32)
 
     psar = compute_trend_grid_numba_f32(
         indicator_id="trend.psar",
@@ -333,20 +288,10 @@ def test_trend_directional_kernels_reset_state_on_nan_holes() -> None:
         accel_steps=np.asarray([0.02], dtype=np.float64),
         accel_maxes=np.asarray([0.2], dtype=np.float64),
     )
-    supertrend = compute_trend_grid_numba_f32(
-        indicator_id="trend.supertrend",
-        high=high,
-        low=low,
-        close=close,
-        windows=np.asarray([3], dtype=np.int64),
-        mults=np.asarray([2.0], dtype=np.float64),
-    )
-
-    for output in (psar, supertrend):
-        assert output.dtype == np.float32
-        assert output.flags["C_CONTIGUOUS"]
-        assert np.isnan(output[0, 4])
-        assert not np.isnan(output[0, 5])
+    assert psar.dtype == np.float32
+    assert psar.flags["C_CONTIGUOUS"]
+    assert np.isnan(psar[0, 4])
+    assert not np.isnan(psar[0, 5])
 
 
 def test_numba_engine_preserves_trend_axis_order_and_matches_oracle(tmp_path: Path) -> None:

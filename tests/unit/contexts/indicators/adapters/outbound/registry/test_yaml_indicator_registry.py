@@ -103,29 +103,26 @@ def test_merged_registry_contains_new_baseline_indicators(tmp_path: Path) -> Non
     yaml_text = """
 schema_version: 1
 defaults:
-  momentum.macd:
+  momentum.trix:
     inputs:
       source:
         mode: explicit
         values: ["close", "hlc3"]
     params:
-      fast_window:
+      window:
         mode: explicit
-        values: [12]
+        values: [15]
       signal_window:
         mode: explicit
         values: [9]
-      slow_window:
-        mode: explicit
-        values: [26]
 """
     config_path = _write_defaults_yaml(tmp_path=tmp_path, content=yaml_text)
     registry = YamlIndicatorRegistry.from_yaml(defs=all_defs(), config_path=config_path)
 
     merged_by_id = {item.indicator_id: item for item in registry.list_merged()}
-    assert "momentum.macd" in merged_by_id
+    assert "momentum.trix" in merged_by_id
 
-    macd = merged_by_id["momentum.macd"]
-    assert macd.group == "momentum"
-    assert [axis.name for axis in macd.inputs] == ["source"]
-    assert [param.name for param in macd.params] == ["fast_window", "signal_window", "slow_window"]
+    trix = merged_by_id["momentum.trix"]
+    assert trix.group == "momentum"
+    assert [axis.name for axis in trix.inputs] == ["source"]
+    assert [param.name for param in trix.params] == ["signal_window", "window"]

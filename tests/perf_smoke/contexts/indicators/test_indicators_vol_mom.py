@@ -78,7 +78,7 @@ def _candles(*, t_size: int) -> CandleArrays:
 
 def test_indicators_volatility_momentum_perf_smoke(tmp_path: Path) -> None:
     """
-    Run perf-smoke for ATR/RSI/MACD and assert guard-safe successful completion.
+    Run perf-smoke for ATR/RSI/TRIX and assert guard-safe successful completion.
 
     Args:
         tmp_path: pytest temporary path fixture.
@@ -132,10 +132,9 @@ def test_indicators_volatility_momentum_perf_smoke(tmp_path: Path) -> None:
             layout_preference=Layout.TIME_MAJOR,
         ),
         GridSpec(
-            indicator_id=IndicatorId("momentum.macd"),
+            indicator_id=IndicatorId("momentum.trix"),
             params={
-                "fast_window": ExplicitValuesSpec(name="fast_window", values=(8, 12, 16)),
-                "slow_window": ExplicitValuesSpec(name="slow_window", values=(20, 26, 34)),
+                "window": ExplicitValuesSpec(name="window", values=(8, 12, 16)),
                 "signal_window": ExplicitValuesSpec(name="signal_window", values=(5, 9)),
             },
             source=ExplicitValuesSpec(
@@ -168,4 +167,4 @@ def test_indicators_volatility_momentum_perf_smoke(tmp_path: Path) -> None:
 
     assert elapsed_by_id["volatility.atr"] > 0.0
     assert elapsed_by_id["momentum.rsi"] > 0.0
-    assert elapsed_by_id["momentum.macd"] > 0.0
+    assert elapsed_by_id["momentum.trix"] > 0.0

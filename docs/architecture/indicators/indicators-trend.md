@@ -16,26 +16,18 @@
 
 - `trend.adx`
 - `trend.aroon`
-- `trend.chandelier_exit`
 - `trend.donchian`
-- `trend.ichimoku`
-- `trend.keltner`
 - `trend.linreg_slope`
 - `trend.psar`
-- `trend.supertrend`
 - `trend.vortex`
 
 ### IDs with defaults in configs/prod/indicators.yaml
 
 - `trend.adx`
 - `trend.aroon`
-- `trend.chandelier_exit`
 - `trend.donchian`
-- `trend.ichimoku`
-- `trend.keltner`
 - `trend.linreg_slope`
 - `trend.psar`
-- `trend.supertrend`
 - `trend.vortex`
 
 ### Diff between formula and prod defaults
@@ -60,15 +52,14 @@
 
 ## Group-specific gotchas
 
-- Multi-output индикаторы (`adx`, `ichimoku`, `donchian`, `keltner`, `chandelier_exit`) в v1 публично возвращают только primary output.
-- `psar` и `supertrend` stateful: на NaN-gap выполняется reset состояния/направления.
-- `ichimoku` использует `shift` с `displacement`; неправильная трактовка знака ломает согласование с formula spec.
+- Multi-output индикаторы (`adx`, `donchian`) в v1 публично возвращают только primary output.
+- `psar` остаётся stateful: на NaN-gap выполняется reset состояния/направления.
 - `linreg_slope` чувствителен к warmup и NaN внутри окна: отсутствие полного окна даёт `NaN`, это ожидаемо.
 
 ## How this group is validated
 
 - Сравнение Numba vs NumPy oracle по детерминированной variant индексации и NaN policy.
-- Отдельная проверка stateful reset semantics для `psar` и `supertrend`.
+- Отдельная проверка stateful reset semantics для `psar`.
 
 ## Change checklist for this group
 

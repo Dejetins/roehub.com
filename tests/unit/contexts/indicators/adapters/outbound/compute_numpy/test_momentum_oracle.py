@@ -67,16 +67,16 @@ def test_numpy_oracle_rsi_resets_state_on_nan_holes() -> None:
     assert out[0, 5] == 100.0
 
 
-def test_numpy_oracle_stateful_momentum_indicators_reset_on_nan_holes() -> None:
+def test_numpy_oracle_trix_resets_state_on_nan_holes() -> None:
     """
-    Verify TRIX, MACD, and PPO outputs do not carry state across NaN holes.
+    Verify TRIX output does not carry EMA-chain state across NaN holes.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        EMA-based chains emit NaN at hole indices and restart from next valid segment.
+        EMA-based chain emits NaN at hole indices and restarts from next valid segment.
     Raises:
         AssertionError: If reset-on-NaN behavior regresses.
     Side Effects:
@@ -91,26 +91,7 @@ def test_numpy_oracle_stateful_momentum_indicators_reset_on_nan_holes() -> None:
         windows=np.asarray([5], dtype=np.int64),
         signal_windows=np.asarray([3], dtype=np.int64),
     )
-    macd = compute_momentum_grid_f32(
-        indicator_id="momentum.macd",
-        source_variants=source_variants,
-        fast_windows=np.asarray([3], dtype=np.int64),
-        slow_windows=np.asarray([5], dtype=np.int64),
-        signal_windows=np.asarray([2], dtype=np.int64),
-    )
-    ppo = compute_momentum_grid_f32(
-        indicator_id="momentum.ppo",
-        source_variants=source_variants,
-        fast_windows=np.asarray([3], dtype=np.int64),
-        slow_windows=np.asarray([5], dtype=np.int64),
-        signal_windows=np.asarray([2], dtype=np.int64),
-    )
-
-    for out in (trix, macd, ppo):
-        assert out.dtype == np.float32
-        assert out.flags["C_CONTIGUOUS"]
-        assert np.isnan(out[0, 3])
-
+    assert trix.dtype == np.float32
+    assert trix.flags["C_CONTIGUOUS"]
+    assert np.isnan(trix[0, 3])
     assert np.isnan(trix[0, 4])
-    assert macd[0, 4] == 0.0
-    assert ppo[0, 4] == 0.0

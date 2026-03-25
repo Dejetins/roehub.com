@@ -13,9 +13,10 @@
 - Historical scope kept here:
   - current browser prefill defaults already loaded on API startup,
   - legacy `top_k_*` fields required for backward compatibility.
-- R0 freeze addition:
-  - endpoint now publishes additive `contracts.*` fields for target-v2 semantics,
-  - current request/response/runtime behavior is not broken or silently renamed.
+- R1 additive contract:
+  - endpoint publishes additive `contracts.*` fields for target-v2 semantics,
+  - request TF restrictions and `signals.v1.params = default-only` are enforced in backend,
+  - launch form can be driven from backend indicator/source catalog without YAML parsing in browser.
 
 ## Цель
 
@@ -104,7 +105,12 @@
     "launch": {
       "execution_mode": "auto",
       "auto_preflight_enabled": true,
-      "auto_fallback_to_background_enabled": true
+      "auto_fallback_to_background_enabled": true,
+      "supported_indicator_ids": ["ma.sma", "momentum.trix"],
+      "source_values_by_indicator_id": {
+        "ma.sma": ["close", "hlc3"],
+        "momentum.trix": ["close", "hlc3", "ohlc4"]
+      }
     }
   }
 }
@@ -136,11 +142,15 @@
 - `contracts.launch.execution_mode` <- `backtest.contracts.launch.execution_mode`
 - `contracts.launch.auto_preflight_enabled` <- `backtest.contracts.launch.auto_preflight_enabled`
 - `contracts.launch.auto_fallback_to_background_enabled` <- `backtest.contracts.launch.auto_fallback_to_background_enabled`
+- `contracts.launch.supported_indicator_ids` <- ordered ids from `configs/<env>/indicators.yaml`
+- `contracts.launch.source_values_by_indicator_id` <- ordered `inputs.source` values per supported indicator
 
 Детерминизм:
 
 - `fee_pct_default_by_market_id` сериализуется в key-sorted порядке по market id.
 - массивы `contracts.*` сериализуются в YAML-defined order; порядок является частью frozen contract surface.
+- `contracts.launch.supported_indicator_ids` сериализуется в детерминированном `indicator_id` порядке.
+- `contracts.launch.source_values_by_indicator_id` сериализует ключи в том же порядке, значения `source` — в детерминированном literal order.
 - Payload содержит только non-secret значения, нужные для browser prefill/validation hints.
 
 ## Migration note: `top_k` vs `top_n`
@@ -158,7 +168,9 @@
   - префилл ranking selectors (`primary_metric`, `secondary_metric`);
   - обновление `execution.fee_pct` при смене market, пока поле не стало user-dirty;
   - подсказка по cap `jobs.top_k_persisted_default`;
-  - чтение frozen target-v2 literals из `contracts.*` без изменения текущего v1 request shape.
+  - чтение frozen target-v2 literals из `contracts.*` без изменения текущего v1 request shape;
+  - построение indicator/source selectors из `contracts.launch.supported_indicator_ids` и
+    `contracts.launch.source_values_by_indicator_id`.
 
 ## Связанные файлы
 

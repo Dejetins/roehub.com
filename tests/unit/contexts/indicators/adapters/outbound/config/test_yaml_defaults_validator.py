@@ -177,16 +177,15 @@ def test_yaml_validation_rejects_step_mismatch(tmp_path: Path) -> None:
     yaml_text = """
 schema_version: 1
 defaults:
-  volatility.bbands:
-    inputs:
-      source:
-        mode: explicit
-        values: ["close"]
+  trend.psar:
     params:
-      window:
+      accel_start:
         mode: explicit
-        values: [20]
-      mult:
+        values: [0.02]
+      accel_step:
+        mode: explicit
+        values: [0.02]
+      accel_max:
         mode: range
         start: 1.0
         stop_incl: 3.0
@@ -196,7 +195,7 @@ defaults:
     with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
         _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
 
-    assert "defaults.volatility.bbands.params.mult.step" in str(exc_info.value)
+    assert "defaults.trend.psar.params.accel_max.step" in str(exc_info.value)
 
 
 def test_yaml_validation_rejects_enum_value_not_allowed(tmp_path: Path) -> None:
@@ -306,7 +305,7 @@ def test_yaml_validation_rejects_float_range_start_alignment(tmp_path: Path) -> 
     Returns:
         None.
     Assumptions:
-        `volatility.bbands.mult` uses hard_min=0.1 and hard_step=0.01.
+        `trend.psar.accel_max` uses hard_min=0.01 and hard_step=0.01.
     Raises:
         AssertionError: If expected alignment error is not raised.
     Side Effects:
@@ -315,16 +314,15 @@ def test_yaml_validation_rejects_float_range_start_alignment(tmp_path: Path) -> 
     yaml_text = """
 schema_version: 1
 defaults:
-  volatility.bbands:
-    inputs:
-      source:
-        mode: explicit
-        values: ["close"]
+  trend.psar:
     params:
-      window:
+      accel_start:
         mode: explicit
-        values: [20]
-      mult:
+        values: [0.02]
+      accel_step:
+        mode: explicit
+        values: [0.02]
+      accel_max:
         mode: range
         start: 0.105
         stop_incl: 0.205
@@ -333,7 +331,7 @@ defaults:
     with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
         _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
 
-    assert "defaults.volatility.bbands.params.mult.start" in str(exc_info.value)
+    assert "defaults.trend.psar.params.accel_max.start" in str(exc_info.value)
 
 
 def test_yaml_validation_rejects_float_range_stop_alignment(tmp_path: Path) -> None:
@@ -345,7 +343,7 @@ def test_yaml_validation_rejects_float_range_stop_alignment(tmp_path: Path) -> N
     Returns:
         None.
     Assumptions:
-        `volatility.bbands.mult` uses hard_min=0.1 and hard_step=0.01.
+        `trend.psar.accel_max` uses hard_min=0.01 and hard_step=0.01.
     Raises:
         AssertionError: If expected alignment error is not raised.
     Side Effects:
@@ -354,16 +352,15 @@ def test_yaml_validation_rejects_float_range_stop_alignment(tmp_path: Path) -> N
     yaml_text = """
 schema_version: 1
 defaults:
-  volatility.bbands:
-    inputs:
-      source:
-        mode: explicit
-        values: ["close"]
+  trend.psar:
     params:
-      window:
+      accel_start:
         mode: explicit
-        values: [20]
-      mult:
+        values: [0.02]
+      accel_step:
+        mode: explicit
+        values: [0.02]
+      accel_max:
         mode: range
         start: 0.10
         stop_incl: 0.205
@@ -372,7 +369,7 @@ defaults:
     with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
         _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
 
-    assert "defaults.volatility.bbands.params.mult.stop_incl" in str(exc_info.value)
+    assert "defaults.trend.psar.params.accel_max.stop_incl" in str(exc_info.value)
 
 
 def test_yaml_validation_rejects_float_explicit_value_alignment(tmp_path: Path) -> None:
@@ -384,7 +381,7 @@ def test_yaml_validation_rejects_float_explicit_value_alignment(tmp_path: Path) 
     Returns:
         None.
     Assumptions:
-        `trend.keltner.mult` uses hard_min=0.1 and hard_step=0.01.
+        `trend.psar.accel_max` uses hard_min=0.01 and hard_step=0.01.
     Raises:
         AssertionError: If expected alignment error is not raised.
     Side Effects:
@@ -393,19 +390,22 @@ def test_yaml_validation_rejects_float_explicit_value_alignment(tmp_path: Path) 
     yaml_text = """
 schema_version: 1
 defaults:
-  trend.keltner:
+  trend.psar:
     params:
-      window:
+      accel_start:
         mode: explicit
-        values: [20]
-      mult:
+        values: [0.02]
+      accel_step:
+        mode: explicit
+        values: [0.02]
+      accel_max:
         mode: explicit
         values: [1.005]
 """
     with pytest.raises(IndicatorDefaultsValidationError) as exc_info:
         _validate_from_text(tmp_path=tmp_path, yaml_text=yaml_text)
 
-    assert "defaults.trend.keltner.params.mult.values[0]" in str(exc_info.value)
+    assert "defaults.trend.psar.params.accel_max.values[0]" in str(exc_info.value)
 
 
 def test_yaml_validation_accepts_new_indicator_ids_from_expanded_baseline(
@@ -428,21 +428,18 @@ def test_yaml_validation_accepts_new_indicator_ids_from_expanded_baseline(
     yaml_text = """
 schema_version: 1
 defaults:
-  momentum.macd:
+  momentum.trix:
     inputs:
       source:
         mode: explicit
         values: ["close"]
     params:
-      fast_window:
-        mode: explicit
-        values: [12]
       signal_window:
         mode: explicit
         values: [9]
-      slow_window:
+      window:
         mode: explicit
-        values: [26]
+        values: [15]
   structure.distance_to_ma_norm:
     inputs:
       source:
@@ -463,11 +460,8 @@ defaults:
       accel_step:
         mode: explicit
         values: [0.02]
-  volume.vwap_deviation:
+  volume.vwap:
     params:
-      mult:
-        mode: explicit
-        values: [2.0]
       window:
         mode: explicit
         values: [20]

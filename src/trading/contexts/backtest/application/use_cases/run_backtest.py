@@ -40,6 +40,10 @@ from trading.contexts.backtest.application.services.numba_runtime_v1 import (
 )
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.application.use_cases.errors import map_backtest_exception
+from trading.contexts.backtest.application.use_cases.request_runtime_contract_v1 import (
+    validate_signal_overrides_default_only,
+    validate_template_runtime_contract,
+)
 from trading.contexts.backtest.domain.errors import (
     BacktestForbiddenError,
     BacktestNotFoundError,
@@ -133,6 +137,8 @@ class RunBacktestUseCase:
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
         max_numba_threads: int = _DEFAULT_MAX_NUMBA_THREADS,
         eager_top_reports_enabled: bool = False,
+        allowed_request_timeframes: tuple[str, ...] | None = None,
+        forbidden_request_timeframes: tuple[str, ...] | None = None,
     ) -> None:
         """
         Initialize staged backtest use-case dependencies and runtime defaults.
@@ -176,6 +182,10 @@ class RunBacktestUseCase:
                 Runtime CPU knob for backtest runs mapped to maximum Numba threads.
             eager_top_reports_enabled:
                 Feature flag for legacy eager report payloads in `POST /api/backtests`.
+            allowed_request_timeframes:
+                Optional runtime contract list for supported request timeframes.
+            forbidden_request_timeframes:
+                Optional runtime contract list for explicitly forbidden request timeframes.
         Returns:
             None.
         Assumptions:
@@ -251,6 +261,12 @@ class RunBacktestUseCase:
         self._max_compute_bytes_total = max_compute_bytes_total
         self._max_numba_threads = max_numba_threads
         self._eager_top_reports_enabled = eager_top_reports_enabled
+        self._allowed_request_timeframes = _normalize_timeframe_literals(
+            values=allowed_request_timeframes
+        )
+        self._forbidden_request_timeframes = _normalize_timeframe_literals(
+            values=forbidden_request_timeframes
+        )
 
     def execute(
         self,
@@ -479,6 +495,22 @@ class RunBacktestUseCase:
                 snapshot=snapshot,
                 current_user=current_user,
             )
+            validate_template_runtime_contract(
+                template=base_template,
+                defaults_provider=self._defaults_provider,
+                allowed_request_timeframes=self._allowed_request_timeframes,
+                forbidden_request_timeframes=self._forbidden_request_timeframes,
+                root_path="saved_strategy",
+            )
+            validate_signal_overrides_default_only(
+                signal_grids=(
+                    request.overrides.signal_grids
+                    if request.overrides is not None and request.overrides.signal_grids is not None
+                    else {}
+                ),
+                defaults_provider=self._defaults_provider,
+                root_path="body.overrides.signal_grids",
+            )
             template = self._apply_saved_overrides(
                 base_template=base_template,
                 overrides=request.overrides,
@@ -498,6 +530,13 @@ class RunBacktestUseCase:
             raise BacktestValidationError(
                 "RunBacktestRequest.template is required for template mode"
             )
+        validate_template_runtime_contract(
+            template=request.template,
+            defaults_provider=self._defaults_provider,
+            allowed_request_timeframes=self._allowed_request_timeframes,
+            forbidden_request_timeframes=self._forbidden_request_timeframes,
+            root_path="body.template",
+        )
 
         return _ResolvedRunContext(
             mode="template",
@@ -923,3 +962,36 @@ def _normalize_fee_defaults(
     if len(normalized) == 0:
         raise ValueError("fee_pct_default_by_market_id must be non-empty")
     return MappingProxyType(normalized)
+
+
+def _normalize_timeframe_literals(
+    *,
+    values: tuple[str, ...] | None,
+) -> tuple[str, ...]:
+    """
+    Normalize optional runtime timeframe-contract literals with stable first-seen order.
+
+    Args:
+        values: Optional tuple of raw timeframe literals.
+    Returns:
+        tuple[str, ...]: Normalized deduplicated lowercase timeframe literals.
+    Assumptions:
+        Caller owns semantic validation of timeframe values beyond normalization.
+    Raises:
+        ValueError: If one timeframe literal is blank.
+    Side Effects:
+        None.
+    """
+    if values is None:
+        return ()
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        value = str(raw_value).strip().lower()
+        if not value:
+            raise ValueError("request timeframe literals must be non-empty")
+        if value in seen:
+            continue
+        seen.add(value)
+        normalized.append(value)
+    return tuple(normalized)

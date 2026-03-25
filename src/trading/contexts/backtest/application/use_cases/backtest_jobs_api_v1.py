@@ -9,6 +9,7 @@ from uuid import UUID, uuid4
 
 from trading.contexts.backtest.application.dto import RunBacktestRequest, RunBacktestTemplate
 from trading.contexts.backtest.application.ports import (
+    BacktestGridDefaultsProvider,
     BacktestJobListQuery,
     BacktestJobRepository,
     BacktestJobResultsRepository,
@@ -30,6 +31,10 @@ from trading.contexts.backtest.domain.errors import (
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor, ExecutionParamsV1
 
 from .errors import backtest_job_forbidden, backtest_job_not_found, validation_error
+from .request_runtime_contract_v1 import (
+    validate_signal_overrides_default_only,
+    validate_template_runtime_contract,
+)
 
 NowProvider = Callable[[], datetime]
 JobIdFactory = Callable[[], UUID]
@@ -146,6 +151,9 @@ class CreateBacktestJobUseCase:
         slippage_pct_default: float,
         fee_pct_default_by_market_id: Mapping[int, float],
         backtest_runtime_config_hash: str,
+        defaults_provider: BacktestGridDefaultsProvider | None = None,
+        allowed_request_timeframes: tuple[str, ...] | None = None,
+        forbidden_request_timeframes: tuple[str, ...] | None = None,
         now_provider: NowProvider | None = None,
         job_id_factory: JobIdFactory | None = None,
     ) -> None:
@@ -167,6 +175,11 @@ class CreateBacktestJobUseCase:
             slippage_pct_default: Runtime default for slippage percent.
             fee_pct_default_by_market_id: Runtime default fee mapping by market id.
             backtest_runtime_config_hash: Precomputed result-affecting runtime hash.
+            defaults_provider: Optional runtime defaults provider for R1 launch validation.
+            allowed_request_timeframes:
+                Optional runtime contract list for supported request timeframes.
+            forbidden_request_timeframes:
+                Optional runtime contract list for explicitly forbidden request timeframes.
             now_provider: Optional UTC clock provider.
             job_id_factory: Optional deterministic job-id factory for tests.
         Returns:
@@ -223,6 +236,13 @@ class CreateBacktestJobUseCase:
             values=fee_pct_default_by_market_id
         )
         self._backtest_runtime_config_hash = backtest_runtime_config_hash.strip().lower()
+        self._defaults_provider = defaults_provider
+        self._allowed_request_timeframes = _normalize_timeframe_literals(
+            values=allowed_request_timeframes
+        )
+        self._forbidden_request_timeframes = _normalize_timeframe_literals(
+            values=forbidden_request_timeframes
+        )
         self._now = now_provider or _utc_now
         self._job_id_factory = job_id_factory or uuid4
 
@@ -389,6 +409,13 @@ class CreateBacktestJobUseCase:
                 raise BacktestValidationError(
                     "RunBacktestRequest.template is required for template mode"
                 )
+            validate_template_runtime_contract(
+                template=run_request.template,
+                defaults_provider=self._defaults_provider,
+                allowed_request_timeframes=self._allowed_request_timeframes,
+                forbidden_request_timeframes=self._forbidden_request_timeframes,
+                root_path="body.template",
+            )
             return _ResolvedJobCreationContext(
                 mode="template",
                 template=run_request.template,
@@ -405,6 +432,25 @@ class CreateBacktestJobUseCase:
             strategy_id=run_request.strategy_id,
             snapshot=snapshot,
             current_user=current_user,
+        )
+        validate_template_runtime_contract(
+            template=base_template,
+            defaults_provider=self._defaults_provider,
+            allowed_request_timeframes=self._allowed_request_timeframes,
+            forbidden_request_timeframes=self._forbidden_request_timeframes,
+            root_path="saved_strategy",
+        )
+        validate_signal_overrides_default_only(
+            signal_grids=(
+                run_request.overrides.signal_grids
+                if (
+                    run_request.overrides is not None
+                    and run_request.overrides.signal_grids is not None
+                )
+                else {}
+            ),
+            defaults_provider=self._defaults_provider,
+            root_path="body.overrides.signal_grids",
         )
         resolved_template = _apply_saved_overrides(
             base_template=base_template,
@@ -1281,6 +1327,39 @@ def _normalize_fee_defaults(*, values: Mapping[int, float]) -> Mapping[int, floa
     if len(normalized) == 0:
         raise ValueError("fee_pct_default_by_market_id must be non-empty")
     return MappingProxyType(normalized)
+
+
+def _normalize_timeframe_literals(
+    *,
+    values: tuple[str, ...] | None,
+) -> tuple[str, ...]:
+    """
+    Normalize optional runtime timeframe-contract literals with stable first-seen order.
+
+    Args:
+        values: Optional tuple of raw timeframe literals.
+    Returns:
+        tuple[str, ...]: Normalized deduplicated lowercase timeframe literals.
+    Assumptions:
+        Caller owns semantic validation of timeframe values beyond normalization.
+    Raises:
+        ValueError: If one timeframe literal is blank.
+    Side Effects:
+        None.
+    """
+    if values is None:
+        return ()
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        value = str(raw_value).strip().lower()
+        if not value:
+            raise ValueError("request timeframe literals must be non-empty")
+        if value in seen:
+            continue
+        seen.add(value)
+        normalized.append(value)
+    return tuple(normalized)
 
 
 

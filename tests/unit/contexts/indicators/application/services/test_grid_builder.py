@@ -199,7 +199,7 @@ def test_grid_builder_materializes_float_range_with_inclusive_formula() -> None:
     Returns:
         None.
     Assumptions:
-        `trend.chandelier_exit.mult` supports float range with hard step `0.01`.
+        `trend.psar.accel_max` supports float range with hard step `0.01`.
     Raises:
         AssertionError: If materialized range does not match deterministic sequence.
     Side Effects:
@@ -207,17 +207,25 @@ def test_grid_builder_materializes_float_range_with_inclusive_formula() -> None:
     """
     builder = _builder()
     grid = GridSpec(
-        indicator_id=IndicatorId("trend.chandelier_exit"),
+        indicator_id=IndicatorId("trend.psar"),
         params={
-            "window": ExplicitValuesSpec(name="window", values=(22,)),
-            "mult": RangeValuesSpec(name="mult", start=1.0, stop_inclusive=1.04, step=0.02),
+            "accel_max": RangeValuesSpec(
+                name="accel_max",
+                start=0.2,
+                stop_inclusive=0.24,
+                step=0.02,
+            ),
+            "accel_start": ExplicitValuesSpec(name="accel_start", values=(0.02,)),
+            "accel_step": ExplicitValuesSpec(name="accel_step", values=(0.02,)),
         },
     )
 
     materialized = builder.materialize_indicator(grid=grid)
-    mult_axis = next(axis for axis in materialized.axes if axis.name == "mult")
+    accel_max_axis = next(axis for axis in materialized.axes if axis.name == "accel_max")
 
-    assert tuple(float(value) for value in mult_axis.values) == pytest.approx((1.0, 1.02, 1.04))
+    assert tuple(float(value) for value in accel_max_axis.values) == pytest.approx(
+        (0.2, 0.22, 0.24)
+    )
     assert materialized.variants == 3
 
 

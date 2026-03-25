@@ -20,6 +20,9 @@
   - sync/background mode becomes one launch flow with `execution_mode`,
   - `top_n_default` / `top_n_max` become frozen target terms,
   - request TF target contract excludes `1m` and `5m`.
+- R1 practical contract:
+  - indicator/source selectors are driven by backend runtime defaults,
+  - request-level `signal_grids` must follow `signals.v1.params = default-only`.
 
 ## Цель
 
@@ -72,9 +75,16 @@
 UI собирает `POST /api/backtests` request с `template` блоком:
 
 - instrument selection: `market_id`/`symbol` через `/api/market-data/*`
-- timeframe
+- timeframe (только из backend contract `15m|30m|1h|2h|4h|6h|8h|1d|2d|3d`)
 - `indicator_grids[]` (compute axes)
-- optional advanced: execution/risk_grid/signal_grids/direction/sizing/top_k/preselect/top_trades_n/warmup_bars + ranking (`primary_metric`, `secondary_metric`)
+- optional advanced: execution/risk_grid/direction/sizing/top_k/preselect/top_trades_n/warmup_bars + ranking (`primary_metric`, `secondary_metric`)
+
+Индикаторы и `inputs.source` UI берёт из `GET /api/backtests/runtime-defaults`:
+
+- `contracts.launch.supported_indicator_ids`
+- `contracts.launch.source_values_by_indicator_id`
+
+`signal_grids` UI не должен материализовать как редактируемую сетку: R1 backend принимает только defaults-equivalent values.
 
 Обязательный preflight:
 

@@ -884,7 +884,7 @@ def test_precision_policy_dispatch_maps_tier_a_b_c_and_fallback() -> None:
         == PRECISION_MODE_FLOAT32
     )
     assert (
-        numba_engine._precision_mode_for_indicator(indicator_id="momentum.macd")
+        numba_engine._precision_mode_for_indicator(indicator_id="momentum.trix")
         == PRECISION_MODE_MIXED
     )
     assert (

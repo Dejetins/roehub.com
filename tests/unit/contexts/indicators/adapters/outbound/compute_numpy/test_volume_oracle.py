@@ -62,36 +62,28 @@ def test_numpy_oracle_vwap_returns_nan_when_window_volume_sum_is_zero() -> None:
     np.testing.assert_allclose(out[0, :], expected, rtol=0.0, atol=0.0, equal_nan=True)
 
 
-def test_numpy_oracle_vwap_deviation_primary_output_depends_on_mult() -> None:
+def test_numpy_oracle_volume_sma_applies_window_warmup() -> None:
     """
-    Verify vwap_deviation primary output (`vwap_upper`) depends on multiplier axis.
+    Verify volume SMA output follows rolling-window warmup policy.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Primary output in v1 is upper band and must differ for different multipliers.
+        Volume SMA is undefined until the first full rolling window is available.
     Raises:
         AssertionError: If multiplier axis does not affect output values.
     Side Effects:
         None.
     """
-    t_size = 120
-    base = np.linspace(100.0, 110.0, t_size, dtype=np.float32)
-
     out = compute_volume_grid_f32(
-        indicator_id="volume.vwap_deviation",
-        high=base + np.float32(0.8),
-        low=base - np.float32(0.8),
-        close=base,
-        volume=np.linspace(10.0, 20.0, t_size, dtype=np.float32),
-        windows=np.asarray([20, 20], dtype=np.int64),
-        mults=np.asarray([1.0, 3.0], dtype=np.float64),
+        indicator_id="volume.volume_sma",
+        volume=np.asarray([10.0, 20.0, 30.0, 40.0], dtype=np.float32),
+        windows=np.asarray([3], dtype=np.int64),
     )
 
     assert out.dtype == np.float32
     assert out.flags["C_CONTIGUOUS"]
-    valid = np.where(np.isfinite(out[0, :]) & np.isfinite(out[1, :]))[0]
-    assert valid.size > 0
-    assert np.any(np.abs(out[0, valid] - out[1, valid]) > 1e-6)
+    expected = np.asarray([np.nan, np.nan, 20.0, 30.0], dtype=np.float32)
+    np.testing.assert_allclose(out[0, :], expected, rtol=1e-6, atol=1e-6, equal_nan=True)

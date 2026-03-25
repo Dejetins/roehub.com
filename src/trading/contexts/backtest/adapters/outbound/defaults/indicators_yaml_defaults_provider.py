@@ -38,6 +38,8 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
 
     compute_defaults_by_indicator_id: Mapping[str, GridSpec]
     signal_defaults_by_indicator_id: Mapping[str, Mapping[str, GridParamSpec]]
+    supported_indicator_ids_catalog: tuple[str, ...]
+    source_values_by_indicator_id: Mapping[str, tuple[str, ...]]
 
     def __post_init__(self) -> None:
         """
@@ -83,6 +85,40 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
                 normalized_params[param_name] = params[raw_param_name]
             normalized_signal[indicator_id] = MappingProxyType(normalized_params)
 
+        normalized_supported_ids: list[str] = []
+        seen_indicator_ids: set[str] = set()
+        for raw_indicator_id in self.supported_indicator_ids_catalog:
+            indicator_id = str(raw_indicator_id).strip().lower()
+            if not indicator_id:
+                raise ValueError("supported indicator ids must be non-empty")
+            if indicator_id in seen_indicator_ids:
+                raise ValueError(f"duplicate supported indicator_id: {indicator_id}")
+            seen_indicator_ids.add(indicator_id)
+            normalized_supported_ids.append(indicator_id)
+
+        normalized_sources: dict[str, tuple[str, ...]] = {}
+        for raw_indicator_id in sorted(
+            self.source_values_by_indicator_id.keys(),
+            key=lambda key: str(key).strip().lower(),
+        ):
+            indicator_id = str(raw_indicator_id).strip().lower()
+            if not indicator_id:
+                raise ValueError("source-values indicator_id keys must be non-empty")
+            raw_values = self.source_values_by_indicator_id[raw_indicator_id]
+            normalized_values: list[str] = []
+            seen_values: set[str] = set()
+            for raw_value in sorted(raw_values, key=lambda value: str(value).strip().lower()):
+                value = str(raw_value).strip().lower()
+                if not value:
+                    raise ValueError(
+                        f"source-values for indicator_id {indicator_id!r} must be non-empty"
+                    )
+                if value in seen_values:
+                    continue
+                seen_values.add(value)
+                normalized_values.append(value)
+            normalized_sources[indicator_id] = tuple(normalized_values)
+
         object.__setattr__(
             self,
             "compute_defaults_by_indicator_id",
@@ -92,6 +128,16 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
             self,
             "signal_defaults_by_indicator_id",
             MappingProxyType(normalized_signal),
+        )
+        object.__setattr__(
+            self,
+            "supported_indicator_ids_catalog",
+            tuple(normalized_supported_ids),
+        )
+        object.__setattr__(
+            self,
+            "source_values_by_indicator_id",
+            MappingProxyType(normalized_sources),
         )
 
     @classmethod
@@ -149,6 +195,8 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
         )
         compute_defaults: dict[str, GridSpec] = {}
         signal_defaults: dict[str, Mapping[str, GridParamSpec]] = {}
+        supported_indicator_ids: list[str] = []
+        source_values_by_indicator_id: dict[str, tuple[str, ...]] = {}
         for raw_indicator_id in sorted(
             defaults_payload.keys(),
             key=lambda key: str(key).strip().lower(),
@@ -159,6 +207,11 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
             indicator_payload_raw = defaults_payload[raw_indicator_id]
             if not isinstance(indicator_payload_raw, Mapping):
                 raise ValueError(f"defaults.{indicator_id} must be mapping")
+            supported_indicator_ids.append(indicator_id)
+            source_values_by_indicator_id[indicator_id] = _source_values(
+                indicator_id=indicator_id,
+                indicator_payload=indicator_payload_raw,
+            )
 
             compute_grid = _compute_defaults_grid(
                 indicator_id=indicator_id,
@@ -177,6 +230,8 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
         return cls(
             compute_defaults_by_indicator_id=compute_defaults,
             signal_defaults_by_indicator_id=signal_defaults,
+            supported_indicator_ids_catalog=tuple(supported_indicator_ids),
+            source_values_by_indicator_id=source_values_by_indicator_id,
         )
 
     def compute_defaults(self, *, indicator_id: str) -> GridSpec | None:
@@ -218,6 +273,43 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
         if not normalized_indicator_id:
             raise ValueError("signal_param_defaults requires non-empty indicator_id")
         return self.signal_defaults_by_indicator_id.get(normalized_indicator_id, {})
+
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return deterministic ordered catalog of runtime-supported indicator ids.
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Stable ordered indicator ids from `configs/<env>/indicators.yaml`.
+        Assumptions:
+            Supported ids are loaded once at startup and remain immutable afterwards.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self.supported_indicator_ids_catalog
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Return deterministic allowed `inputs.source` values for one indicator id.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            tuple[str, ...]: Stable ordered source literals, empty when source is not configurable.
+        Assumptions:
+            Indicator lookup is case-insensitive after normalization.
+        Raises:
+            ValueError: If indicator id is blank.
+        Side Effects:
+            None.
+        """
+        normalized_indicator_id = indicator_id.strip().lower()
+        if not normalized_indicator_id:
+            raise ValueError("allowed_source_values requires non-empty indicator_id")
+        return self.source_values_by_indicator_id.get(normalized_indicator_id, ())
 
 
 def _resolve_indicators_config_path(*, environ: Mapping[str, str]) -> Path:
@@ -366,6 +458,58 @@ def _signal_defaults(
             field_path=f"defaults.{indicator_id}.signals.v1.params.{param_name}",
         )
     return MappingProxyType(signal_params)
+
+
+def _source_values(
+    *,
+    indicator_id: str,
+    indicator_payload: Mapping[str, Any],
+) -> tuple[str, ...]:
+    """
+    Parse deterministic `inputs.source` values catalog for one indicator id.
+
+    Args:
+        indicator_id: Indicator identifier.
+        indicator_payload: One defaults block from YAML payload.
+    Returns:
+        tuple[str, ...]: Stable source literals, empty when indicator has no source axis.
+    Assumptions:
+        `inputs.source` is modeled as explicit string literals in indicators defaults YAML.
+    Raises:
+        ValueError: If `inputs.source` contains non-string or blank values.
+    Side Effects:
+        None.
+    """
+    inputs_payload = _optional_mapping(
+        payload=indicator_payload,
+        key="inputs",
+        field_path=f"defaults.{indicator_id}.inputs",
+    )
+    if "source" not in inputs_payload:
+        return ()
+
+    source_spec = _grid_param_spec_from_node(
+        name="source",
+        node=inputs_payload["source"],
+        field_path=f"defaults.{indicator_id}.inputs.source",
+    )
+    values: list[str] = []
+    seen_values: set[str] = set()
+    for raw_value in source_spec.materialize():
+        if not isinstance(raw_value, str):
+            raise ValueError(
+                f"defaults.{indicator_id}.inputs.source values must be strings"
+            )
+        value = raw_value.strip().lower()
+        if not value:
+            raise ValueError(
+                f"defaults.{indicator_id}.inputs.source values must be non-empty"
+            )
+        if value in seen_values:
+            continue
+        seen_values.add(value)
+        values.append(value)
+    return tuple(values)
 
 
 def _grid_param_spec_from_node(

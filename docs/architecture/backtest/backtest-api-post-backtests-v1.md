@@ -13,7 +13,7 @@
   - current `POST /backtests` sync behavior,
   - legacy `top_k_*` naming and response fields,
   - current manual split between sync and jobs endpoints.
-- R0 target freeze, not yet enforced as breaking API change:
+- R1 target contract, enforced in backend validation:
   - allowed request TF: `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `1d`, `2d`, `3d`;
   - forbidden request TF in target contract: `1m`, `5m`;
   - `signals.v1.params` are `default-only`;
@@ -79,12 +79,14 @@ Request v1 не содержит поля `mode`. Режим определяе�
 - соответствует контракту BKT-EPIC-01 (use-case request DTO),
 - снижает риск расхождений между API и application.
 
-### 2) Saved mode overrides включают signal params grid (2B)
+### 2) Signal params остаются в request shape, но работают как `default-only`
 
-В saved mode UI может передать overrides, включая signal params grid (оси `defaults.<indicator_id>.signals.v1.params.*`):
+В template/saved mode поле `signal_grids` остаётся частью публичного request shape, но R1
+фиксирует backend contract:
 
-- это позволяет “подкрутить” пороги сигналов поверх сохранённой стратегии,
-- при этом compute-параметры индикаторов (выбранные в сохранённой стратегии) остаются фиксированными, если явно не разрешим расширение в будущем.
+- `signals.v1.params` берутся из `configs/<env>/indicators.yaml`;
+- request-level non-default overrides детерминированно отклоняются;
+- практический UI flow: omit `signal_grids` и использовать runtime defaults как source of truth.
 
 ### 3) Typed API blocks -> canonical internal mappings
 
@@ -193,16 +195,16 @@ Saved mode:
   - `direction_mode?`, `sizing_mode?`
   - `execution?`
   - `risk_grid?`
-  - `signal_grids?`
+  - `signal_grids?` (shape preserved, non-default values rejected by `signals.v1.params=default-only`)
 
 Ad-hoc mode:
 
 - `template`:
   - `instrument_id: {market_id, symbol}`
-  - `timeframe`
+  - `timeframe` (`15m|30m|1h|2h|4h|6h|8h|1d|2d|3d`; `1m`/`5m` rejected)
   - `indicator_grids[]` (grid specs)
   - `direction_mode?`, `sizing_mode?`
-  - `execution?`, `risk_grid?`, `signal_grids?`
+  - `execution?`, `risk_grid?`, `signal_grids?` (`default-only`; omission uses server defaults)
 
 Axis spec shape (reused across grid specs):
 

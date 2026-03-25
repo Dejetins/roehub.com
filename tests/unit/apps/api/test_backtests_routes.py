@@ -29,6 +29,7 @@ from trading.contexts.backtest.application.dto import (
 )
 from trading.contexts.backtest.application.ports import BacktestStrategySnapshot
 from trading.contexts.backtest.domain.entities import TradeV1
+from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
@@ -120,6 +121,103 @@ class _StaticStrategyReader:
         """
         _ = strategy_id
         return self.snapshot
+
+
+class _RuntimeDefaultsProvider:
+    """
+    Minimal defaults-provider fake exposing deterministic launch catalog values.
+    """
+
+    def compute_defaults(self, *, indicator_id: str) -> GridSpec | None:
+        """
+        Return compute defaults for supported indicators used in route tests.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            GridSpec | None: Minimal compute defaults payload for supported indicators.
+        Assumptions:
+            Runtime-defaults route currently needs only supported ids and source catalogs.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        normalized_id = indicator_id.strip().lower()
+        if normalized_id == "ma.sma":
+            return GridSpec(
+                indicator_id=IndicatorId("ma.sma"),
+                source=ExplicitValuesSpec(name="source", values=("close", "hlc3")),
+                params={"window": ExplicitValuesSpec(name="window", values=(20,))},
+            )
+        if normalized_id == "momentum.trix":
+            return GridSpec(
+                indicator_id=IndicatorId("momentum.trix"),
+                source=ExplicitValuesSpec(name="source", values=("close", "hlc3", "ohlc4")),
+                params={
+                    "signal_window": ExplicitValuesSpec(name="signal_window", values=(9,)),
+                    "window": ExplicitValuesSpec(name="window", values=(15,)),
+                },
+            )
+        return None
+
+    def signal_param_defaults(self, *, indicator_id: str) -> dict[str, ExplicitValuesSpec]:
+        """
+        Return deterministic signal defaults mapping for supported indicators.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            dict[str, ExplicitValuesSpec]: Signal defaults mapping or empty mapping.
+        Assumptions:
+            Route tests do not inspect signal defaults directly.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if indicator_id.strip().lower() != "ma.sma":
+            return {}
+        return {"cross_up": ExplicitValuesSpec(name="cross_up", values=(0.5,))}
+
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return deterministic supported indicator ids for runtime-defaults contract tests.
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Sorted supported indicator ids.
+        Assumptions:
+            Launch catalog must be stable across repeated calls.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return ("ma.sma", "momentum.trix")
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Return deterministic allowed `inputs.source` catalog for one indicator id.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            tuple[str, ...]: Stable source literal tuple, empty when not applicable.
+        Assumptions:
+            Values are already sorted in contract order.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        normalized_id = indicator_id.strip().lower()
+        if normalized_id == "ma.sma":
+            return ("close", "hlc3")
+        if normalized_id == "momentum.trix":
+            return ("close", "hlc3", "ohlc4")
+        return ()
 
 
 class _FakeRunBacktestUseCase:
@@ -311,7 +409,8 @@ def _runtime_defaults_response() -> BacktestRuntimeDefaultsResponse:
                 snapshot_seconds=30,
                 snapshot_variants_step=1000,
             ),
-        )
+        ),
+        defaults_provider=_RuntimeDefaultsProvider(),
     )
 
 
@@ -420,6 +519,11 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                 "execution_mode": "auto",
                 "auto_preflight_enabled": True,
                 "auto_fallback_to_background_enabled": True,
+                "supported_indicator_ids": ["ma.sma", "momentum.trix"],
+                "source_values_by_indicator_id": {
+                    "ma.sma": ["close", "hlc3"],
+                    "momentum.trix": ["close", "hlc3", "ohlc4"],
+                },
             },
         },
     }
@@ -674,6 +778,66 @@ def test_post_backtests_maps_saved_mode_not_found_error() -> None:
             "code": "not_found",
             "message": "Backtest strategy was not found",
             "details": {"strategy_id": "00000000-0000-0000-0000-000000000123"},
+        }
+    }
+
+
+def test_post_backtests_maps_runtime_contract_validation_error() -> None:
+    """
+    Verify sync route maps R1 runtime-contract violations to canonical 422 payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Backtest use-case raises `BacktestValidationError` with deterministic items.
+    Raises:
+        AssertionError: If status code or payload deviates from canonical validation contract.
+    Side Effects:
+        None.
+    """
+    client = _build_client(
+        use_case=_FakeRunBacktestUseCase(
+            error=BacktestValidationError(
+                "Backtest request violates runtime defaults contract",
+                errors=(
+                    {
+                        "path": "body.template.timeframe",
+                        "code": "unsupported_value",
+                        "message": "timeframe must be one of: 15m, 30m, 1h",
+                    },
+                ),
+            )
+        )
+    )
+
+    response = client.post(
+        "/backtests",
+        json={
+            "time_range": {
+                "start": "2026-02-16T00:00:00Z",
+                "end": "2026-02-16T01:00:00Z",
+            },
+            "template": _template_payload(),
+        },
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "validation_error",
+            "message": "Backtest request violates runtime defaults contract",
+            "details": {
+                "errors": [
+                    {
+                        "path": "body.template.timeframe",
+                        "code": "unsupported_value",
+                        "message": "timeframe must be one of: 15m, 30m, 1h",
+                    }
+                ]
+            },
         }
     }
 

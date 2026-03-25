@@ -27,6 +27,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobStageAShortlist,
     BacktestJobTopVariant,
 )
+from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
@@ -334,6 +335,89 @@ class _FakeStrategyReader:
         return self.snapshot
 
 
+class _RuntimeContractDefaultsProvider:
+    """
+    Minimal defaults-provider fake for jobs create-use-case runtime-contract tests.
+    """
+
+    def compute_defaults(self, *, indicator_id: str) -> GridSpec | None:
+        """
+        Return compute defaults for supported indicators used in create-flow tests.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            GridSpec | None: Defaults grid for supported indicators or `None`.
+        Assumptions:
+            Create flow needs only support catalog and signal defaults for validation.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        normalized_id = indicator_id.strip().lower()
+        if normalized_id != "ma.sma":
+            return None
+        return GridSpec(
+            indicator_id=IndicatorId("ma.sma"),
+            source=ExplicitValuesSpec(name="source", values=("close",)),
+            params={"window": ExplicitValuesSpec(name="window", values=(20,))},
+        )
+
+    def signal_param_defaults(self, *, indicator_id: str) -> Mapping[str, ExplicitValuesSpec]:
+        """
+        Return deterministic signal defaults mapping for supported indicators.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            Mapping[str, ExplicitValuesSpec]: Signal defaults mapping or empty mapping.
+        Assumptions:
+            `ma.sma.cross_up=0.5` is the default-only signal contract for tests.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if indicator_id.strip().lower() != "ma.sma":
+            return {}
+        return {"cross_up": ExplicitValuesSpec(name="cross_up", values=(0.5,))}
+
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return deterministic supported indicator ids for create-flow validation tests.
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Supported indicator id tuple.
+        Assumptions:
+            Removed ids must be absent from this catalog.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return ("ma.sma",)
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Return deterministic source catalog for one supported indicator.
+
+        Args:
+            indicator_id: Requested indicator identifier.
+        Returns:
+            tuple[str, ...]: Allowed source literals or empty tuple.
+        Assumptions:
+            Source catalog is not directly inspected in create-flow tests.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return ("close",) if indicator_id.strip().lower() == "ma.sma" else ()
+
+
 
 def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -> None:
     """
@@ -587,6 +671,154 @@ def test_create_backtest_job_use_case_rejects_active_quota_exceeded() -> None:
             }
         ]
     }
+
+
+def test_create_backtest_job_use_case_rejects_removed_indicator_id() -> None:
+    """
+    Verify create flow rejects removed indicator ids via shared R1 runtime contract.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Runtime defaults catalog is the authoritative list of supported indicator ids.
+    Raises:
+        AssertionError: If removed ids are not rejected with deterministic validation details.
+    Side Effects:
+        None.
+    """
+    use_case = CreateBacktestJobUseCase(
+        job_repository=_FakeJobRepository(active_total=0),
+        strategy_reader=_FakeStrategyReader(snapshot=None),
+        top_k_persisted_default=10,
+        max_active_jobs_per_user=3,
+        warmup_bars_default=200,
+        top_k_default=10,
+        preselect_default=20000,
+        top_trades_n_default=3,
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+        fee_pct_default_by_market_id={1: 0.075},
+        backtest_runtime_config_hash="f" * 64,
+        defaults_provider=_RuntimeContractDefaultsProvider(),
+        allowed_request_timeframes=("1m",),
+    )
+
+    with pytest.raises(BacktestValidationError) as error_info:
+        use_case.execute(
+            command=CreateBacktestJobCommand(
+                run_request=RunBacktestRequest(
+                    time_range=_time_range(),
+                    template=RunBacktestTemplate(
+                        instrument_id=InstrumentId(
+                            market_id=MarketId(1),
+                            symbol=Symbol("BTCUSDT"),
+                        ),
+                        timeframe=Timeframe("1m"),
+                        indicator_grids=(
+                            GridSpec(
+                                indicator_id=IndicatorId("momentum.macd"),
+                                params={
+                                    "fast_window": ExplicitValuesSpec(
+                                        name="fast_window",
+                                        values=(12,),
+                                    ),
+                                },
+                            ),
+                        ),
+                    ),
+                ),
+                request_payload=_template_request_payload(),
+            ),
+            current_user=CurrentUser(
+                user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
+            ),
+        )
+
+    assert error_info.value.errors == (
+        {
+            "path": "body.template.indicator_grids[0].indicator_id",
+            "code": "unsupported_value",
+            "message": "indicator_id 'momentum.macd' is not supported",
+        },
+    )
+
+
+def test_create_backtest_job_use_case_rejects_default_only_signal_override() -> None:
+    """
+    Verify create flow rejects request-level signal params that differ from server defaults.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `signals.v1.params` is enforced as `default-only` in template mode.
+    Raises:
+        AssertionError: If non-default signal overrides are not rejected deterministically.
+    Side Effects:
+        None.
+    """
+    use_case = CreateBacktestJobUseCase(
+        job_repository=_FakeJobRepository(active_total=0),
+        strategy_reader=_FakeStrategyReader(snapshot=None),
+        top_k_persisted_default=10,
+        max_active_jobs_per_user=3,
+        warmup_bars_default=200,
+        top_k_default=10,
+        preselect_default=20000,
+        top_trades_n_default=3,
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+        fee_pct_default_by_market_id={1: 0.075},
+        backtest_runtime_config_hash="f" * 64,
+        defaults_provider=_RuntimeContractDefaultsProvider(),
+        allowed_request_timeframes=("1m",),
+    )
+
+    with pytest.raises(BacktestValidationError) as error_info:
+        use_case.execute(
+            command=CreateBacktestJobCommand(
+                run_request=RunBacktestRequest(
+                    time_range=_time_range(),
+                    template=RunBacktestTemplate(
+                        instrument_id=InstrumentId(
+                            market_id=MarketId(1),
+                            symbol=Symbol("BTCUSDT"),
+                        ),
+                        timeframe=Timeframe("1m"),
+                        indicator_grids=(
+                            GridSpec(
+                                indicator_id=IndicatorId("ma.sma"),
+                                params={"window": ExplicitValuesSpec(name="window", values=(20,))},
+                            ),
+                        ),
+                        signal_grids={
+                            "ma.sma": {
+                                "cross_up": ExplicitValuesSpec(name="cross_up", values=(0.6,))
+                            }
+                        },
+                    ),
+                ),
+                request_payload=_template_request_payload(),
+            ),
+            current_user=CurrentUser(
+                user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
+            ),
+        )
+
+    assert error_info.value.errors == (
+        {
+            "path": "body.template.signal_grids.ma.sma.cross_up",
+            "code": "forbidden_override",
+            "message": "signals.v1.params is default-only",
+        },
+    )
 
 
 

@@ -63,30 +63,6 @@ def defs() -> tuple[IndicatorDef, ...]:
             output=OutputSpec(names=("fisher", "trigger")),
         ),
         IndicatorDef(
-            indicator_id=IndicatorId("momentum.macd"),
-            title="MACD",
-            inputs=_SOURCE_INPUTS,
-            params=(
-                _window_named(name="fast_window", default=12),
-                _window_named(name="slow_window", default=26),
-                _window_named(name="signal_window", default=9),
-            ),
-            axes=("fast_window", "signal_window", "slow_window", "source"),
-            output=OutputSpec(names=("macd", "signal", "hist")),
-        ),
-        IndicatorDef(
-            indicator_id=IndicatorId("momentum.ppo"),
-            title="Percentage Price Oscillator",
-            inputs=_SOURCE_INPUTS,
-            params=(
-                _window_named(name="fast_window", default=12),
-                _window_named(name="slow_window", default=26),
-                _window_named(name="signal_window", default=9),
-            ),
-            axes=("fast_window", "signal_window", "slow_window", "source"),
-            output=OutputSpec(names=("ppo", "signal", "hist")),
-        ),
-        IndicatorDef(
             indicator_id=IndicatorId("momentum.roc"),
             title="Rate of Change",
             inputs=_SOURCE_INPUTS,
@@ -112,19 +88,6 @@ def defs() -> tuple[IndicatorDef, ...]:
                 _window_named(name="smoothing", default=3),
             ),
             axes=("d_window", "k_window", "smoothing"),
-            output=OutputSpec(names=("k", "d")),
-        ),
-        IndicatorDef(
-            indicator_id=IndicatorId("momentum.stoch_rsi"),
-            title="Stochastic RSI",
-            inputs=_SOURCE_INPUTS,
-            params=(
-                _window_named(name="d_window", default=3),
-                _window_named(name="k_window", default=14),
-                _window_named(name="rsi_window", default=14),
-                _window_named(name="smoothing", default=3),
-            ),
-            axes=("d_window", "k_window", "rsi_window", "smoothing", "source"),
             output=OutputSpec(names=("k", "d")),
         ),
         IndicatorDef(

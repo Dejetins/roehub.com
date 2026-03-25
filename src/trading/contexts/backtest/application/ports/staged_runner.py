@@ -128,6 +128,59 @@ class BacktestGridDefaultsProvider(Protocol):
         """
         ...
 
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return deterministic ordered catalog of backtest-supported indicator ids.
+
+        Docs:
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/defaults/
+            indicators_yaml_defaults_provider.py
+          - apps/api/dto/backtest_runtime_defaults.py
+          - configs/prod/indicators.yaml
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Stable ordered indicator ids loaded from runtime defaults config.
+        Assumptions:
+            Returned ids represent the authoritative R1 runtime support surface.
+        Raises:
+            ValueError: If adapter cannot normalize supported indicator ids deterministically.
+        Side Effects:
+            May read in-memory/defaults configuration state.
+        """
+        ...
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Return deterministic allowed `inputs.source` values for one indicator id.
+
+        Docs:
+          - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/defaults/
+            indicators_yaml_defaults_provider.py
+          - apps/api/dto/backtest_runtime_defaults.py
+          - configs/prod/indicators.yaml
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            tuple[str, ...]: Stable ordered allowed source literals, empty when indicator has no
+                configurable source axis.
+        Assumptions:
+            Indicator lookup is case-insensitive after normalization.
+        Raises:
+            ValueError: If indicator id is blank.
+        Side Effects:
+            May read in-memory/defaults configuration state.
+        """
+        ...
+
 
 class BacktestStagedVariantScorer(Protocol):
     """

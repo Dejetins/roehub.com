@@ -143,8 +143,6 @@ def test_numba_volume_kernels_match_numpy_oracle_with_nan_holes() -> None:
     candles = _candles_with_holes(t_size=640)
 
     windows_i64 = np.asarray([5, 14, 28, 42], dtype=np.int64)
-    mults_f64 = np.asarray([1.5, 2.0, 2.5, 3.0], dtype=np.float64)
-
     cases: tuple[tuple[str, dict[str, Any]], ...] = (
         (
             "volume.ad_line",
@@ -199,17 +197,6 @@ def test_numba_volume_kernels_match_numpy_oracle_with_nan_holes() -> None:
                 "windows": windows_i64,
             },
         ),
-        (
-            "volume.vwap_deviation",
-            {
-                "high": candles.high,
-                "low": candles.low,
-                "close": candles.close,
-                "volume": candles.volume,
-                "windows": windows_i64,
-                "mults": mults_f64,
-            },
-        ),
     )
 
     for indicator_id, kwargs in cases:
@@ -228,39 +215,6 @@ def test_numba_volume_kernels_match_numpy_oracle_with_nan_holes() -> None:
         )
 
 
-def test_volume_vwap_deviation_uses_mult_axis_in_primary_output() -> None:
-    """
-    Verify vwap_deviation primary output changes with mult axis in v1 mapping.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Primary output for `volume.vwap_deviation` is `vwap_upper` and must depend on `mult`.
-    Raises:
-        AssertionError: If mult axis does not affect computed primary output.
-    Side Effects:
-        None.
-    """
-    candles = _candles_with_holes(t_size=220)
-
-    out = compute_volume_grid_numba_f32(
-        indicator_id="volume.vwap_deviation",
-        high=candles.high,
-        low=candles.low,
-        close=candles.close,
-        volume=candles.volume,
-        windows=np.asarray([20, 20], dtype=np.int64),
-        mults=np.asarray([1.0, 3.0], dtype=np.float64),
-    )
-
-    assert out.shape[0] == 2
-    valid = np.where(np.isfinite(out[0, :]) & np.isfinite(out[1, :]))[0]
-    assert valid.size > 0
-    assert np.any(np.abs(out[0, valid] - out[1, valid]) > 1e-6)
-
-
 def test_numba_engine_preserves_volume_axis_order_and_supports_all_ids(
     tmp_path: Path,
 ) -> None:
@@ -272,7 +226,7 @@ def test_numba_engine_preserves_volume_axis_order_and_supports_all_ids(
     Returns:
         None.
     Assumptions:
-        Axis order for `volume.vwap_deviation` follows definition axes: mult, window.
+        Volume indicators keep deterministic single-axis ordering from explicit values.
     Raises:
         AssertionError: If tensor contracts or axis ordering are violated.
     Side Effects:
@@ -313,11 +267,8 @@ def test_numba_engine_preserves_volume_axis_order_and_supports_all_ids(
             layout_preference=Layout.TIME_MAJOR,
         ),
         GridSpec(
-            indicator_id=IndicatorId("volume.vwap_deviation"),
-            params={
-                "mult": ExplicitValuesSpec(name="mult", values=(2.0, 1.5)),
-                "window": ExplicitValuesSpec(name="window", values=(20, 10)),
-            },
+            indicator_id=IndicatorId("volume.vwap"),
+            params={"window": ExplicitValuesSpec(name="window", values=(20, 10))},
             layout_preference=Layout.TIME_MAJOR,
         ),
     )
@@ -336,8 +287,6 @@ def test_numba_engine_preserves_volume_axis_order_and_supports_all_ids(
         assert tensor.values.shape[0] == candles.ts_open.shape[0]
         assert tensor.values.shape[1] == tensor.meta.variants
 
-        if grid.indicator_id.value == "volume.vwap_deviation":
-            assert tensor.axes[0].name == "mult"
-            assert tensor.axes[0].values_float == (2.0, 1.5)
-            assert tensor.axes[1].name == "window"
-            assert tensor.axes[1].values_int == (20, 10)
+        if grid.indicator_id.value == "volume.vwap":
+            assert tensor.axes[0].name == "window"
+            assert tensor.axes[0].values_int == tuple(grid.params["window"].materialize())

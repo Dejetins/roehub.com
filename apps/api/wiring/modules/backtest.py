@@ -171,9 +171,12 @@ def build_backtest_router(
         ),
         max_numba_threads=runtime_config.cpu.max_numba_threads,
         eager_top_reports_enabled=runtime_config.reporting.eager_top_reports_enabled,
+        allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
+        forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
     )
     runtime_defaults_response = build_backtest_runtime_defaults_response(
-        config=runtime_config
+        config=runtime_config,
+        defaults_provider=defaults_provider,
     )
     backtests_router = build_backtests_router(
         run_use_case=run_use_case,
@@ -205,6 +208,9 @@ def build_backtest_router(
         slippage_pct_default=runtime_config.execution.slippage_pct_default,
         fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
         backtest_runtime_config_hash=backtest_runtime_config_hash,
+        defaults_provider=defaults_provider,
+        allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
+        forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
     )
     jobs_router = build_backtest_jobs_router(
         create_use_case=create_use_case,

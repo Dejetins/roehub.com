@@ -19,9 +19,6 @@ _SUPPORTED_VOLATILITY_IDS = {
     "volatility.stddev",
     "volatility.variance",
     "volatility.hv",
-    "volatility.bbands",
-    "volatility.bbands_bandwidth",
-    "volatility.bbands_percent_b",
 }
 
 
@@ -190,87 +187,6 @@ def compute_volatility_grid_f32(
                 else:
                     hv[time_index] = (math.sqrt(value) * annualization_root) * 100.0
             out_f64[variant_index, :] = hv
-        return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
-    if normalized_id in {
-        "volatility.bbands",
-        "volatility.bbands_bandwidth",
-        "volatility.bbands_percent_b",
-    }:
-        windows_i64 = _prepare_int_variants(
-            name="windows",
-            values=windows,
-            expected_size=variants,
-        )
-        mults_f64 = _prepare_float_variants(
-            name="mults",
-            values=mults,
-            expected_size=variants,
-        )
-        out_f64 = np.empty((variants, t_size), dtype=np.float64)
-        for variant_index in range(variants):
-            series = source_f64[variant_index, :]
-            window = int(windows_i64[variant_index])
-            mult = float(mults_f64[variant_index])
-
-            middle = _rolling_mean_series_f64(source=series, window=window)
-            variance = _rolling_variance_series_f64(source=series, window=window)
-            sigma = np.empty(t_size, dtype=np.float64)
-            upper = np.empty(t_size, dtype=np.float64)
-            lower = np.empty(t_size, dtype=np.float64)
-
-            for time_index in range(t_size):
-                variance_value = float(variance[time_index])
-                middle_value = float(middle[time_index])
-                if math.isnan(variance_value) or math.isnan(middle_value):
-                    sigma[time_index] = np.nan
-                    upper[time_index] = np.nan
-                    lower[time_index] = np.nan
-                    continue
-                sigma_value = math.sqrt(variance_value)
-                sigma[time_index] = sigma_value
-                upper[time_index] = middle_value + (mult * sigma_value)
-                lower[time_index] = middle_value - (mult * sigma_value)
-
-            if normalized_id == "volatility.bbands":
-                out_f64[variant_index, :] = middle
-                continue
-
-            if normalized_id == "volatility.bbands_bandwidth":
-                bandwidth = np.empty(t_size, dtype=np.float64)
-                for time_index in range(t_size):
-                    middle_value = float(middle[time_index])
-                    upper_value = float(upper[time_index])
-                    lower_value = float(lower[time_index])
-                    if (
-                        math.isnan(middle_value)
-                        or math.isnan(upper_value)
-                        or math.isnan(lower_value)
-                        or middle_value == 0.0
-                    ):
-                        bandwidth[time_index] = np.nan
-                    else:
-                        bandwidth[time_index] = (upper_value - lower_value) / middle_value
-                out_f64[variant_index, :] = bandwidth
-                continue
-
-            percent_b = np.empty(t_size, dtype=np.float64)
-            for time_index in range(t_size):
-                source_value = float(series[time_index])
-                upper_value = float(upper[time_index])
-                lower_value = float(lower[time_index])
-                denominator = upper_value - lower_value
-                if (
-                    math.isnan(source_value)
-                    or math.isnan(upper_value)
-                    or math.isnan(lower_value)
-                    or denominator == 0.0
-                ):
-                    percent_b[time_index] = np.nan
-                else:
-                    percent_b[time_index] = (source_value - lower_value) / denominator
-            out_f64[variant_index, :] = percent_b
-
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
     raise ValueError(f"unsupported volatility indicator_id: {indicator_id!r}")

@@ -21,9 +21,6 @@ _SUPPORTED_MOMENTUM_IDS = {
     "momentum.trix",
     "momentum.fisher",
     "momentum.stoch",
-    "momentum.stoch_rsi",
-    "momentum.ppo",
-    "momentum.macd",
 }
 
 
@@ -279,107 +276,14 @@ def compute_momentum_grid_f32(
             )
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    if normalized_id == "momentum.stoch_rsi":
-        source_f64 = _prepare_source_variants(values=source_variants)
-        variants = source_f64.shape[0]
-        t_size = source_f64.shape[1]
-        rsi_windows_i64 = _prepare_int_variants(
-            name="rsi_windows",
-            values=rsi_windows,
-            expected_size=variants,
-        )
-        k_windows_i64 = _prepare_int_variants(
-            name="k_windows",
-            values=k_windows,
-            expected_size=variants,
-        )
-        smoothings_i64 = _prepare_int_variants(
-            name="smoothings",
-            values=smoothings,
-            expected_size=variants,
-        )
-        d_windows_i64 = _prepare_int_variants(
-            name="d_windows",
-            values=d_windows,
-            expected_size=variants,
-        )
-        out_f64 = np.empty((variants, t_size), dtype=np.float64)
-        for variant_index in range(variants):
-            rsi_series = _rsi_series_f64(
-                source=source_f64[variant_index, :],
-                window=int(rsi_windows_i64[variant_index]),
-            )
-            hh = _rolling_max_series_f64(
-                source=rsi_series,
-                window=int(k_windows_i64[variant_index]),
-            )
-            ll = _rolling_min_series_f64(
-                source=rsi_series,
-                window=int(k_windows_i64[variant_index]),
-            )
-            k_raw = np.empty(t_size, dtype=np.float64)
-            for time_index in range(t_size):
-                rsi_value = float(rsi_series[time_index])
-                hh_value = float(hh[time_index])
-                ll_value = float(ll[time_index])
-                denominator = hh_value - ll_value
-                if (
-                    math.isnan(rsi_value)
-                    or math.isnan(hh_value)
-                    or math.isnan(ll_value)
-                    or denominator == 0.0
-                ):
-                    k_raw[time_index] = np.nan
-                else:
-                    k_raw[time_index] = 100.0 * ((rsi_value - ll_value) / denominator)
-            k = _rolling_mean_series_f64(source=k_raw, window=int(smoothings_i64[variant_index]))
-            _ = _rolling_mean_series_f64(source=k, window=int(d_windows_i64[variant_index]))
-            out_f64[variant_index, :] = k
-        return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
-    if normalized_id in {"momentum.trix", "momentum.ppo", "momentum.macd"}:
+    if normalized_id == "momentum.trix":
         source_f64 = _prepare_source_variants(values=source_variants)
         variants = source_f64.shape[0]
         t_size = source_f64.shape[1]
         out_f64 = np.empty((variants, t_size), dtype=np.float64)
-
-        if normalized_id == "momentum.trix":
-            windows_i64 = _prepare_int_variants(
-                name="windows",
-                values=windows,
-                expected_size=variants,
-            )
-            signal_windows_i64 = _prepare_int_variants(
-                name="signal_windows",
-                values=signal_windows,
-                expected_size=variants,
-            )
-            for variant_index in range(variants):
-                source_row = source_f64[variant_index, :]
-                ema1 = _ema_series_f64(source=source_row, window=int(windows_i64[variant_index]))
-                ema2 = _ema_series_f64(source=ema1, window=int(windows_i64[variant_index]))
-                ema3 = _ema_series_f64(source=ema2, window=int(windows_i64[variant_index]))
-                trix = np.empty(t_size, dtype=np.float64)
-                trix[0] = np.nan
-                for time_index in range(1, t_size):
-                    current = float(ema3[time_index])
-                    previous = float(ema3[time_index - 1])
-                    if math.isnan(current) or math.isnan(previous) or previous == 0.0:
-                        trix[time_index] = np.nan
-                    else:
-                        trix[time_index] = 100.0 * ((current / previous) - 1.0)
-                _ = _ema_series_f64(source=trix, window=int(signal_windows_i64[variant_index]))
-                out_f64[variant_index, :] = trix
-            return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
-        fast_windows_i64 = _prepare_int_variants(
-            name="fast_windows",
-            values=fast_windows,
-            expected_size=variants,
-        )
-        slow_windows_i64 = _prepare_int_variants(
-            name="slow_windows",
-            values=slow_windows,
+        windows_i64 = _prepare_int_variants(
+            name="windows",
+            values=windows,
             expected_size=variants,
         )
         signal_windows_i64 = _prepare_int_variants(
@@ -389,24 +293,20 @@ def compute_momentum_grid_f32(
         )
         for variant_index in range(variants):
             source_row = source_f64[variant_index, :]
-            fast = _ema_series_f64(source=source_row, window=int(fast_windows_i64[variant_index]))
-            slow = _ema_series_f64(source=source_row, window=int(slow_windows_i64[variant_index]))
-            main = np.empty(t_size, dtype=np.float64)
-            for time_index in range(t_size):
-                fast_value = float(fast[time_index])
-                slow_value = float(slow[time_index])
-                if math.isnan(fast_value) or math.isnan(slow_value):
-                    main[time_index] = np.nan
-                    continue
-                if normalized_id == "momentum.macd":
-                    main[time_index] = fast_value - slow_value
-                    continue
-                if slow_value == 0.0:
-                    main[time_index] = np.nan
+            ema1 = _ema_series_f64(source=source_row, window=int(windows_i64[variant_index]))
+            ema2 = _ema_series_f64(source=ema1, window=int(windows_i64[variant_index]))
+            ema3 = _ema_series_f64(source=ema2, window=int(windows_i64[variant_index]))
+            trix = np.empty(t_size, dtype=np.float64)
+            trix[0] = np.nan
+            for time_index in range(1, t_size):
+                current = float(ema3[time_index])
+                previous = float(ema3[time_index - 1])
+                if math.isnan(current) or math.isnan(previous) or previous == 0.0:
+                    trix[time_index] = np.nan
                 else:
-                    main[time_index] = 100.0 * ((fast_value - slow_value) / slow_value)
-            _ = _ema_series_f64(source=main, window=int(signal_windows_i64[variant_index]))
-            out_f64[variant_index, :] = main
+                    trix[time_index] = 100.0 * ((current / previous) - 1.0)
+            _ = _ema_series_f64(source=trix, window=int(signal_windows_i64[variant_index]))
+            out_f64[variant_index, :] = trix
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
     raise ValueError(f"unsupported momentum indicator_id: {indicator_id!r}")

@@ -187,7 +187,6 @@ def test_numba_volatility_kernels_match_numpy_oracle_with_nan_holes() -> None:
         )
     )
     windows_i64 = np.asarray([5, 14, 31, 55], dtype=np.int64)
-    mults_f64 = np.asarray([1.5, 2.0, 2.5, 3.0], dtype=np.float64)
     annualizations_i64 = np.asarray([252, 365, 252, 365], dtype=np.int64)
 
     cases: tuple[tuple[str, dict[str, Any]], ...] = (
@@ -228,30 +227,6 @@ def test_numba_volatility_kernels_match_numpy_oracle_with_nan_holes() -> None:
                 "source_variants": source_variants,
                 "windows": windows_i64,
                 "annualizations": annualizations_i64,
-            },
-        ),
-        (
-            "volatility.bbands",
-            {
-                "source_variants": source_variants,
-                "windows": windows_i64,
-                "mults": mults_f64,
-            },
-        ),
-        (
-            "volatility.bbands_bandwidth",
-            {
-                "source_variants": source_variants,
-                "windows": windows_i64,
-                "mults": mults_f64,
-            },
-        ),
-        (
-            "volatility.bbands_percent_b",
-            {
-                "source_variants": source_variants,
-                "windows": windows_i64,
-                "mults": mults_f64,
             },
         ),
     )
@@ -324,33 +299,6 @@ def test_numba_engine_supports_all_volatility_indicators(tmp_path: Path) -> None
             params={
                 "window": ExplicitValuesSpec(name="window", values=(10,)),
                 "annualization": ExplicitValuesSpec(name="annualization", values=(252, 365)),
-            },
-            source=ExplicitValuesSpec(name="source", values=("close",)),
-            layout_preference=Layout.TIME_MAJOR,
-        ),
-        GridSpec(
-            indicator_id=IndicatorId("volatility.bbands"),
-            params={
-                "window": ExplicitValuesSpec(name="window", values=(20,)),
-                "mult": ExplicitValuesSpec(name="mult", values=(1.5, 2.0)),
-            },
-            source=ExplicitValuesSpec(name="source", values=("close", "hlc3")),
-            layout_preference=Layout.TIME_MAJOR,
-        ),
-        GridSpec(
-            indicator_id=IndicatorId("volatility.bbands_bandwidth"),
-            params={
-                "window": ExplicitValuesSpec(name="window", values=(20,)),
-                "mult": ExplicitValuesSpec(name="mult", values=(1.5, 2.0)),
-            },
-            source=ExplicitValuesSpec(name="source", values=("close",)),
-            layout_preference=Layout.TIME_MAJOR,
-        ),
-        GridSpec(
-            indicator_id=IndicatorId("volatility.bbands_percent_b"),
-            params={
-                "window": ExplicitValuesSpec(name="window", values=(20,)),
-                "mult": ExplicitValuesSpec(name="mult", values=(1.5, 2.0)),
             },
             source=ExplicitValuesSpec(name="source", values=("close",)),
             layout_preference=Layout.TIME_MAJOR,

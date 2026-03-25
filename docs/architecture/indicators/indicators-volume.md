@@ -20,7 +20,6 @@
 - `volume.obv`
 - `volume.volume_sma`
 - `volume.vwap`
-- `volume.vwap_deviation`
 
 ### IDs with defaults in configs/prod/indicators.yaml
 
@@ -30,7 +29,6 @@
 - `volume.obv`
 - `volume.volume_sma`
 - `volume.vwap`
-- `volume.vwap_deviation`
 
 ### Diff between formula and prod defaults
 
@@ -55,8 +53,7 @@
 ## Group-specific gotchas
 
 - Кумулятивные цепочки (`ad_line`, `obv`) сбрасывают состояние на NaN-gap.
-- `cmf`, `vwap`, `vwap_deviation` зависят от `sum(volume)`; при нуле получают `NaN`.
-- `vwap_deviation` по v1 возвращает primary output (`vwap_upper`), хотя формула содержит несколько выходов.
+- `cmf` и `vwap` зависят от `sum(volume)`; при нуле получают `NaN`.
 - Все расчёты чувствительны к синхронности OHLCV: рассинхрон массива сразу проявляется NaN propagation.
 
 ## How this group is validated

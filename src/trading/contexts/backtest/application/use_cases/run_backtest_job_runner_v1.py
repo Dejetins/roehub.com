@@ -51,6 +51,10 @@ from trading.contexts.backtest.application.services.staged_core_runner_v1 import
     BacktestStageBTaskV1,
     BacktestStagedCoreRunnerV1,
 )
+from trading.contexts.backtest.application.use_cases.request_runtime_contract_v1 import (
+    validate_signal_overrides_default_only,
+    validate_template_runtime_contract,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobErrorPayload,
@@ -198,6 +202,8 @@ class RunBacktestJobRunnerV1:
         snapshot_variants_step: int | None = None,
         stage_batch_size: int = 256,
         max_numba_threads: int = _DEFAULT_MAX_NUMBA_THREADS,
+        allowed_request_timeframes: tuple[str, ...] | None = None,
+        forbidden_request_timeframes: tuple[str, ...] | None = None,
         now_provider: Callable[[], datetime] | None = None,
     ) -> None:
         """
@@ -240,6 +246,10 @@ class RunBacktestJobRunnerV1:
             stage_batch_size: Batch boundary size for cancel/progress checks.
             max_numba_threads:
                 Runtime CPU knob for jobs mapped to maximum Numba threads.
+            allowed_request_timeframes:
+                Optional runtime contract list for supported request timeframes.
+            forbidden_request_timeframes:
+                Optional runtime contract list for explicitly forbidden request timeframes.
             now_provider: Optional UTC-aware current time provider for deterministic tests.
         Returns:
             None.
@@ -338,6 +348,12 @@ class RunBacktestJobRunnerV1:
         )
         self._stage_batch_size = stage_batch_size
         self._max_numba_threads = max_numba_threads
+        self._allowed_request_timeframes = _normalize_timeframe_literals(
+            values=allowed_request_timeframes
+        )
+        self._forbidden_request_timeframes = _normalize_timeframe_literals(
+            values=forbidden_request_timeframes
+        )
         self._now = now_provider or _utc_now
 
     def process_claimed_job(
@@ -518,6 +534,31 @@ class RunBacktestJobRunnerV1:
         """
         request = self._request_decoder.decode(payload=job.request_json)
         template = self._resolve_template(job=job, request=request)
+        if request.strategy_id is not None:
+            validate_template_runtime_contract(
+                template=template,
+                defaults_provider=self._defaults_provider,
+                allowed_request_timeframes=self._allowed_request_timeframes,
+                forbidden_request_timeframes=self._forbidden_request_timeframes,
+                root_path="saved_strategy",
+            )
+            validate_signal_overrides_default_only(
+                signal_grids=(
+                    request.overrides.signal_grids
+                    if request.overrides is not None and request.overrides.signal_grids is not None
+                    else {}
+                ),
+                defaults_provider=self._defaults_provider,
+                root_path="request.overrides.signal_grids",
+            )
+        else:
+            validate_template_runtime_contract(
+                template=template,
+                defaults_provider=self._defaults_provider,
+                allowed_request_timeframes=self._allowed_request_timeframes,
+                forbidden_request_timeframes=self._forbidden_request_timeframes,
+                root_path="request.template",
+            )
         warmup_bars = self._resolve_positive_override(
             value=request.warmup_bars,
             default=self._warmup_bars_default,
@@ -1379,6 +1420,39 @@ def _normalize_fee_defaults(*, values: Mapping[int, float] | None) -> Mapping[in
     if len(normalized) == 0:
         raise ValueError("fee defaults mapping must be non-empty")
     return normalized
+
+
+def _normalize_timeframe_literals(
+    *,
+    values: tuple[str, ...] | None,
+) -> tuple[str, ...]:
+    """
+    Normalize optional runtime timeframe-contract literals with stable first-seen order.
+
+    Args:
+        values: Optional tuple of raw timeframe literals.
+    Returns:
+        tuple[str, ...]: Normalized deduplicated lowercase timeframe literals.
+    Assumptions:
+        Caller owns semantic validation of timeframe values beyond normalization.
+    Raises:
+        ValueError: If one timeframe literal is blank.
+    Side Effects:
+        None.
+    """
+    if values is None:
+        return ()
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        value = str(raw_value).strip().lower()
+        if not value:
+            raise ValueError("request timeframe literals must be non-empty")
+        if value in seen:
+            continue
+        seen.add(value)
+        normalized.append(value)
+    return tuple(normalized)
 
 
 def _utc_now() -> datetime:

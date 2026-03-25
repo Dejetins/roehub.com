@@ -21,7 +21,6 @@ _SUPPORTED_VOLUME_IDS = {
     "volume.obv",
     "volume.volume_sma",
     "volume.vwap",
-    "volume.vwap_deviation",
 }
 
 
@@ -958,23 +957,7 @@ def compute_volume_grid_f32(
         out_f64 = _vwap_variants_f64(high_f64, low_f64, close_f64, volume_f64, windows_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    mults_f64 = _prepare_float_variants(
-        name="mults",
-        values=mults,
-        expected_size=windows_i64.shape[0],
-    )
-    if np.any(mults_f64 <= 0.0):
-        raise ValueError("mults must contain only positive values")
-
-    out_f64 = _vwap_deviation_variants_f64(
-        high_f64,
-        low_f64,
-        close_f64,
-        volume_f64,
-        windows_i64,
-        mults_f64,
-    )
-    return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
+    raise ValueError(f"unsupported volume indicator_id: {indicator_id!r}")
 
 
 def _prepare_series(*, name: str, values: np.ndarray | None) -> np.ndarray:

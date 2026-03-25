@@ -70,32 +70,34 @@ def test_numpy_oracle_atr_resets_state_on_nan_holes() -> None:
     np.testing.assert_allclose(out[0, :], expected, rtol=1e-6, atol=1e-6, equal_nan=True)
 
 
-def test_numpy_oracle_bbands_bandwidth_returns_nan_when_middle_is_zero() -> None:
+def test_numpy_oracle_hv_returns_nan_when_source_is_non_positive() -> None:
     """
-    Verify Bollinger bandwidth oracle returns NaN when middle line equals zero.
+    Verify HV oracle returns NaN when log-return input contains non-positive values.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Bandwidth is `(upper - lower) / middle` and must be NaN when middle is zero.
+        Historical volatility uses log returns and requires strictly positive source values.
     Raises:
         AssertionError: If zero-denominator policy regresses.
     Side Effects:
         None.
     """
-    source = np.zeros(8, dtype=np.float32)
+    source = np.asarray([100.0, 101.0, 0.0, 103.0, 104.0], dtype=np.float32)
     source_variants = np.ascontiguousarray(source.reshape(1, source.shape[0]))
-    windows = np.asarray([3], dtype=np.int64)
-    mults = np.asarray([2.0], dtype=np.float64)
+    windows = np.asarray([2], dtype=np.int64)
+    annualizations = np.asarray([365], dtype=np.int64)
 
     out = compute_volatility_grid_f32(
-        indicator_id="volatility.bbands_bandwidth",
+        indicator_id="volatility.hv",
         source_variants=source_variants,
         windows=windows,
-        mults=mults,
+        annualizations=annualizations,
     )
 
-    expected = np.asarray([np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan])
-    np.testing.assert_allclose(out[0, :], expected, rtol=0.0, atol=0.0, equal_nan=True)
+    assert np.isnan(out[0, 0])
+    assert np.isnan(out[0, 1])
+    assert np.isnan(out[0, 2])
+    assert np.isnan(out[0, 3])

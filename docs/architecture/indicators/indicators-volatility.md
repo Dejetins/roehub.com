@@ -15,9 +15,6 @@
 ### IDs in docs/architecture/indicators/indicators_formula.yaml
 
 - `volatility.atr`
-- `volatility.bbands`
-- `volatility.bbands_bandwidth`
-- `volatility.bbands_percent_b`
 - `volatility.hv`
 - `volatility.stddev`
 - `volatility.tr`
@@ -26,9 +23,6 @@
 ### IDs with defaults in configs/prod/indicators.yaml
 
 - `volatility.atr`
-- `volatility.bbands`
-- `volatility.bbands_bandwidth`
-- `volatility.bbands_percent_b`
 - `volatility.hv`
 - `volatility.stddev`
 - `volatility.tr`
@@ -58,7 +52,6 @@
 
 - `volatility.tr` использует fallback на `high-low`, если `prev_close` недоступен (NaN на границе).
 - `volatility.atr` сглаживает TR через RMA и reset-on-NaN, что может давать повторный warmup после NaN-hole.
-- `volatility.bbands_bandwidth` и `volatility.bbands_percent_b` отдают `NaN` при нулевом знаменателе.
 - `volatility.hv` требует положительные значения входа для log-return; `source<=0` приводит к `NaN`.
 
 ## How this group is validated

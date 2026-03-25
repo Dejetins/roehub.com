@@ -44,7 +44,6 @@ def defs() -> tuple[IndicatorDef, ...]:
         None.
     """
     window = _window(default=20)
-    mult = _float_param(name="mult", minimum=0.1, maximum=10.0, step=0.01, default=2.0)
 
     items = (
         IndicatorDef(
@@ -54,30 +53,6 @@ def defs() -> tuple[IndicatorDef, ...]:
             params=(window,),
             axes=("window",),
             output=OutputSpec(names=("atr",)),
-        ),
-        IndicatorDef(
-            indicator_id=IndicatorId("volatility.bbands"),
-            title="Bollinger Bands",
-            inputs=_SOURCE_INPUTS,
-            params=(window, mult),
-            axes=("mult", "source", "window"),
-            output=OutputSpec(names=("basis", "upper", "lower")),
-        ),
-        IndicatorDef(
-            indicator_id=IndicatorId("volatility.bbands_bandwidth"),
-            title="Bollinger Bandwidth",
-            inputs=_SOURCE_INPUTS,
-            params=(window, mult),
-            axes=("mult", "source", "window"),
-            output=OutputSpec(names=("bandwidth",)),
-        ),
-        IndicatorDef(
-            indicator_id=IndicatorId("volatility.bbands_percent_b"),
-            title="Bollinger Percent B",
-            inputs=_SOURCE_INPUTS,
-            params=(window, mult),
-            axes=("mult", "source", "window"),
-            output=OutputSpec(names=("percent_b",)),
         ),
         IndicatorDef(
             indicator_id=IndicatorId("volatility.hv"),
@@ -155,42 +130,6 @@ def _window_named(*, name: str, default: int) -> ParamDef:
         hard_min=2,
         hard_max=2_000,
         step=1,
-        default=default,
-    )
-
-
-def _float_param(
-    *,
-    name: str,
-    minimum: float,
-    maximum: float,
-    step: float,
-    default: float,
-) -> ParamDef:
-    """
-    Build floating parameter definition for volatility indicators.
-
-    Args:
-        name: Parameter name.
-        minimum: Inclusive hard lower bound.
-        maximum: Inclusive hard upper bound.
-        step: Hard grid step.
-        default: Recommended default value.
-    Returns:
-        ParamDef: Float parameter definition.
-    Assumptions:
-        Bounds and step are chosen for sensible volatility tuning.
-    Raises:
-        ValueError: If ParamDef invariants are violated.
-    Side Effects:
-        None.
-    """
-    return ParamDef(
-        name=name,
-        kind=ParamKind.FLOAT,
-        hard_min=minimum,
-        hard_max=maximum,
-        step=step,
         default=default,
     )
 

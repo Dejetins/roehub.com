@@ -24,9 +24,6 @@ _SUPPORTED_MOMENTUM_IDS = {
     "momentum.trix",
     "momentum.fisher",
     "momentum.stoch",
-    "momentum.stoch_rsi",
-    "momentum.ppo",
-    "momentum.macd",
 }
 
 
@@ -1084,38 +1081,6 @@ def compute_momentum_grid_f32(
         )
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    if normalized_id == "momentum.stoch_rsi":
-        source_f64 = _prepare_source_variants(values=source_variants, dtype=core_dtype)
-        variants = source_f64.shape[0]
-        rsi_windows_i64 = _prepare_int_variants(
-            name="rsi_windows",
-            values=rsi_windows,
-            expected_size=variants,
-        )
-        k_windows_i64 = _prepare_int_variants(
-            name="k_windows",
-            values=k_windows,
-            expected_size=variants,
-        )
-        smoothings_i64 = _prepare_int_variants(
-            name="smoothings",
-            values=smoothings,
-            expected_size=variants,
-        )
-        d_windows_i64 = _prepare_int_variants(
-            name="d_windows",
-            values=d_windows,
-            expected_size=variants,
-        )
-        out_f64 = _stoch_rsi_variants_f64(
-            source_f64,
-            rsi_windows_i64,
-            k_windows_i64,
-            smoothings_i64,
-            d_windows_i64,
-        )
-        return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
-
     if normalized_id == "momentum.trix":
         source_f64 = _prepare_source_variants(values=source_variants, dtype=core_dtype)
         variants = source_f64.shape[0]
@@ -1132,31 +1097,7 @@ def compute_momentum_grid_f32(
         out_f64 = _trix_variants_f64(source_f64, windows_i64, signal_windows_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    source_f64 = _prepare_source_variants(values=source_variants, dtype=core_dtype)
-    variants = source_f64.shape[0]
-    fast_windows_i64 = _prepare_int_variants(
-        name="fast_windows",
-        values=fast_windows,
-        expected_size=variants,
-    )
-    slow_windows_i64 = _prepare_int_variants(
-        name="slow_windows",
-        values=slow_windows,
-        expected_size=variants,
-    )
-    signal_windows_i64 = _prepare_int_variants(
-        name="signal_windows",
-        values=signal_windows,
-        expected_size=variants,
-    )
-    out_f64 = _macd_or_ppo_variants_f64(
-        source_f64,
-        fast_windows_i64,
-        slow_windows_i64,
-        signal_windows_i64,
-        normalized_id == "momentum.ppo",
-    )
-    return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
+    raise ValueError(f"unsupported momentum indicator_id: {indicator_id!r}")
 
 
 def _validate_precision_mode(*, precision: str) -> None:

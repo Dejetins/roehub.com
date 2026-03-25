@@ -93,23 +93,6 @@ def defs() -> tuple[IndicatorDef, ...]:
             axes=("window",),
             output=OutputSpec(names=("vwap",)),
         ),
-        IndicatorDef(
-            indicator_id=IndicatorId("volume.vwap_deviation"),
-            title="Rolling VWAP Deviation Bands",
-            inputs=(InputSeries.HIGH, InputSeries.LOW, InputSeries.CLOSE, InputSeries.VOLUME),
-            params=(
-                _float_param(
-                    name="mult",
-                    minimum=0.1,
-                    maximum=10.0,
-                    step=0.01,
-                    default=2.0,
-                ),
-                window,
-            ),
-            axes=("mult", "window"),
-            output=OutputSpec(names=("vwap", "vwap_upper", "vwap_lower", "vwap_stdev")),
-        ),
     )
     return _sorted_defs(items)
 
@@ -135,42 +118,6 @@ def _window(*, default: int) -> ParamDef:
         hard_min=2,
         hard_max=2_000,
         step=1,
-        default=default,
-    )
-
-
-def _float_param(
-    *,
-    name: str,
-    minimum: float,
-    maximum: float,
-    step: float,
-    default: float,
-) -> ParamDef:
-    """
-    Build floating parameter definition for volume indicators.
-
-    Args:
-        name: Parameter name.
-        minimum: Inclusive hard lower bound.
-        maximum: Inclusive hard upper bound.
-        step: Hard grid step.
-        default: Recommended default value.
-    Returns:
-        ParamDef: Float parameter definition.
-    Assumptions:
-        Bounds and step are chosen for deviation-band tuning.
-    Raises:
-        ValueError: If ParamDef invariants are violated.
-    Side Effects:
-        None.
-    """
-    return ParamDef(
-        name=name,
-        kind=ParamKind.FLOAT,
-        hard_min=minimum,
-        hard_max=maximum,
-        step=step,
         default=default,
     )
 

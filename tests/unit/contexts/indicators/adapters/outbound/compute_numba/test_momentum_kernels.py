@@ -189,13 +189,6 @@ def test_numba_momentum_kernels_match_numpy_oracle_with_nan_holes() -> None:
 
     windows_i64 = np.asarray([5, 14, 21, 34], dtype=np.int64)
     signal_windows_i64 = np.asarray([3, 5, 7, 9], dtype=np.int64)
-    fast_windows_i64 = np.asarray([6, 8, 10, 12], dtype=np.int64)
-    slow_windows_i64 = np.asarray([20, 22, 26, 30], dtype=np.int64)
-    rsi_windows_i64 = np.asarray([7, 14, 21, 28], dtype=np.int64)
-    k_windows_i64 = np.asarray([5, 8, 10, 12], dtype=np.int64)
-    smoothings_i64 = np.asarray([3, 3, 4, 4], dtype=np.int64)
-    d_windows_i64 = np.asarray([3, 4, 4, 5], dtype=np.int64)
-
     cases: tuple[tuple[str, dict[str, Any]], ...] = (
         (
             "momentum.rsi",
@@ -254,34 +247,6 @@ def test_numba_momentum_kernels_match_numpy_oracle_with_nan_holes() -> None:
                 "k_windows": np.asarray([14, 20, 30], dtype=np.int64),
                 "smoothings": np.asarray([3, 4, 5], dtype=np.int64),
                 "d_windows": np.asarray([3, 3, 4], dtype=np.int64),
-            },
-        ),
-        (
-            "momentum.stoch_rsi",
-            {
-                "source_variants": source_variants,
-                "rsi_windows": rsi_windows_i64,
-                "k_windows": k_windows_i64,
-                "smoothings": smoothings_i64,
-                "d_windows": d_windows_i64,
-            },
-        ),
-        (
-            "momentum.ppo",
-            {
-                "source_variants": source_variants,
-                "fast_windows": fast_windows_i64,
-                "slow_windows": slow_windows_i64,
-                "signal_windows": signal_windows_i64,
-            },
-        ),
-        (
-            "momentum.macd",
-            {
-                "source_variants": source_variants,
-                "fast_windows": fast_windows_i64,
-                "slow_windows": slow_windows_i64,
-                "signal_windows": signal_windows_i64,
             },
         ),
     )
@@ -372,37 +337,6 @@ def test_numba_engine_supports_all_momentum_indicators(tmp_path: Path) -> None:
             },
             layout_preference=Layout.TIME_MAJOR,
         ),
-        GridSpec(
-            indicator_id=IndicatorId("momentum.stoch_rsi"),
-            params={
-                "rsi_window": ExplicitValuesSpec(name="rsi_window", values=(14,)),
-                "k_window": ExplicitValuesSpec(name="k_window", values=(14,)),
-                "smoothing": ExplicitValuesSpec(name="smoothing", values=(3,)),
-                "d_window": ExplicitValuesSpec(name="d_window", values=(3,)),
-            },
-            source=ExplicitValuesSpec(name="source", values=("close",)),
-            layout_preference=Layout.TIME_MAJOR,
-        ),
-        GridSpec(
-            indicator_id=IndicatorId("momentum.ppo"),
-            params={
-                "fast_window": ExplicitValuesSpec(name="fast_window", values=(8, 12)),
-                "slow_window": ExplicitValuesSpec(name="slow_window", values=(21,)),
-                "signal_window": ExplicitValuesSpec(name="signal_window", values=(5,)),
-            },
-            source=ExplicitValuesSpec(name="source", values=("close",)),
-            layout_preference=Layout.TIME_MAJOR,
-        ),
-        GridSpec(
-            indicator_id=IndicatorId("momentum.macd"),
-            params={
-                "fast_window": ExplicitValuesSpec(name="fast_window", values=(8, 12)),
-                "slow_window": ExplicitValuesSpec(name="slow_window", values=(21,)),
-                "signal_window": ExplicitValuesSpec(name="signal_window", values=(5,)),
-            },
-            source=ExplicitValuesSpec(name="source", values=("close",)),
-            layout_preference=Layout.TIME_MAJOR,
-        ),
     )
 
     for grid in grids:
@@ -420,9 +354,9 @@ def test_numba_engine_supports_all_momentum_indicators(tmp_path: Path) -> None:
         assert tensor.values.shape[1] == tensor.meta.variants
 
 
-def test_momentum_macd_mixed_precision_keeps_near_zero_signal_stability() -> None:
+def test_momentum_trix_mixed_precision_keeps_near_zero_signal_stability() -> None:
     """
-    Verify mixed precision MACD path preserves sign stability versus float64 baseline.
+    Verify mixed precision TRIX path preserves sign stability versus float64 baseline.
 
     Docs: docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md
     Related:
@@ -451,23 +385,20 @@ def test_momentum_macd_mixed_precision_keeps_near_zero_signal_stability() -> Non
     source_variants = np.ascontiguousarray(np.stack((base_close, alt_close), axis=0))
     source_variants[:, np.asarray([37, 511, 1207], dtype=np.int64)] = np.nan
 
-    fast_windows = np.asarray([8, 12], dtype=np.int64)
-    slow_windows = np.asarray([21, 26], dtype=np.int64)
+    windows = np.asarray([15, 21], dtype=np.int64)
     signal_windows = np.asarray([5, 9], dtype=np.int64)
 
     baseline = compute_momentum_grid_numba_f32(
-        indicator_id="momentum.macd",
+        indicator_id="momentum.trix",
         source_variants=source_variants,
-        fast_windows=fast_windows,
-        slow_windows=slow_windows,
+        windows=windows,
         signal_windows=signal_windows,
         precision="float64",
     )
     mixed = compute_momentum_grid_numba_f32(
-        indicator_id="momentum.macd",
+        indicator_id="momentum.trix",
         source_variants=source_variants,
-        fast_windows=fast_windows,
-        slow_windows=slow_windows,
+        windows=windows,
         signal_windows=signal_windows,
         precision="mixed",
     )

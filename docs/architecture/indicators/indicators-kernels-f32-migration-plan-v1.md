@@ -98,9 +98,9 @@ TO-BE:
 
 - `ma.vwma`
 - `momentum.rsi`, `momentum.roc`, `momentum.cci`, `momentum.williams_r`, `momentum.stoch`
-- `momentum.trix`, `momentum.stoch_rsi`, `momentum.macd`, `momentum.ppo`
-- `trend.adx`, `trend.vortex`, `trend.supertrend`, `trend.psar`, `trend.keltner`
-- `volume.vwap`, `volume.vwap_deviation`
+- `momentum.trix`
+- `trend.adx`, `trend.vortex`, `trend.psar`
+- `volume.vwap`
 - `structure.zscore`, `structure.percent_rank`, `structure.distance_to_ma_norm`
 
 ### Tier C - оставляем float64 core на v1
@@ -108,9 +108,6 @@ TO-BE:
 - `volatility.variance`
 - `volatility.stddev`
 - `volatility.hv`
-- `volatility.bbands`
-- `volatility.bbands_bandwidth`
-- `volatility.bbands_percent_b`
 - `trend.linreg_slope`
 - `volume.obv`, `volume.ad_line`, `volume.cmf`, `volume.mfi`
 

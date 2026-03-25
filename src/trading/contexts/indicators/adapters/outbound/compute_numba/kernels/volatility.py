@@ -22,9 +22,6 @@ _SUPPORTED_VOLATILITY_IDS = {
     "volatility.stddev",
     "volatility.variance",
     "volatility.hv",
-    "volatility.bbands",
-    "volatility.bbands_bandwidth",
-    "volatility.bbands_percent_b",
 }
 
 
@@ -551,24 +548,7 @@ def compute_volatility_grid_f32(
         out_f64 = _hv_variants_f64(source_f64, windows_i64, annualizations_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    windows_i64 = _prepare_int_variants(
-        name="windows",
-        values=windows,
-        expected_size=variants,
-    )
-    mults_f64 = _prepare_float_variants(
-        name="mults",
-        values=mults,
-        expected_size=variants,
-    )
-    mode = 0
-    if normalized_id == "volatility.bbands_bandwidth":
-        mode = 1
-    elif normalized_id == "volatility.bbands_percent_b":
-        mode = 2
-
-    out_f64 = _bbands_variants_f64(source_f64, windows_i64, mults_f64, mode)
-    return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
+    raise ValueError(f"unsupported volatility indicator_id: {indicator_id!r}")
 
 
 def _validate_precision_mode(*, precision: str) -> None:

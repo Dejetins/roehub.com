@@ -412,6 +412,8 @@ def build_backtest_job_runner_app(
         snapshot_seconds=runtime_config.jobs.snapshot_seconds,
         snapshot_variants_step=runtime_config.jobs.snapshot_variants_step,
         max_numba_threads=runtime_config.cpu.max_numba_threads,
+        allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
+        forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
     )
     return BacktestJobRunnerApp(
         claim_poll_seconds=runtime_config.jobs.claim_poll_seconds,

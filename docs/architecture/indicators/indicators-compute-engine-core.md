@@ -73,13 +73,6 @@
 Целевые индикаторы phase 4:
 
 - `trend.psar`
-- `volatility.bbands`
-- `volatility.bbands_bandwidth`
-- `volatility.bbands_percent_b`
-- `momentum.stoch_rsi`
-- `momentum.macd`
-- `momentum.ppo`
-- `volume.vwap_deviation`
 
 ### Precision policy (phase 5)
 

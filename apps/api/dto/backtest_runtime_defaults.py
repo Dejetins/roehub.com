@@ -13,6 +13,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 
 from trading.contexts.backtest.adapters.outbound import BacktestRuntimeConfig
+from trading.contexts.backtest.application.ports import BacktestGridDefaultsProvider
 
 
 class BacktestRuntimeExecutionDefaultsResponse(BaseModel):
@@ -177,6 +178,8 @@ class BacktestRuntimeLaunchContractResponse(BaseModel):
     execution_mode: str
     auto_preflight_enabled: bool
     auto_fallback_to_background_enabled: bool
+    supported_indicator_ids: list[str]
+    source_values_by_indicator_id: dict[str, list[str]]
 
 
 class BacktestRuntimeContractsResponse(BaseModel):
@@ -232,6 +235,7 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
 def build_backtest_runtime_defaults_response(
     *,
     config: BacktestRuntimeConfig,
+    defaults_provider: BacktestGridDefaultsProvider | None = None,
 ) -> BacktestRuntimeDefaultsResponse:
     """
     Convert loaded runtime config into deterministic non-secret browser defaults payload.
@@ -248,6 +252,7 @@ def build_backtest_runtime_defaults_response(
 
     Args:
         config: Parsed startup-validated runtime config.
+        defaults_provider: Optional startup-validated indicators defaults provider/catalog.
     Returns:
         BacktestRuntimeDefaultsResponse: Deterministic response DTO for
             `/backtests/runtime-defaults`.
@@ -262,6 +267,17 @@ def build_backtest_runtime_defaults_response(
         str(market_id): config.execution.fee_pct_default_by_market_id[market_id]
         for market_id in sorted(config.execution.fee_pct_default_by_market_id.keys())
     }
+    supported_indicator_ids = (
+        list(defaults_provider.supported_indicator_ids()) if defaults_provider is not None else []
+    )
+    source_values_by_indicator_id = (
+        {
+            indicator_id: list(defaults_provider.allowed_source_values(indicator_id=indicator_id))
+            for indicator_id in supported_indicator_ids
+        }
+        if defaults_provider is not None
+        else {}
+    )
     return BacktestRuntimeDefaultsResponse(
         warmup_bars_default=config.warmup_bars_default,
         top_k_default=config.top_k_default,
@@ -305,6 +321,8 @@ def build_backtest_runtime_defaults_response(
                 auto_fallback_to_background_enabled=(
                     config.contracts.auto_fallback_to_background_enabled
                 ),
+                supported_indicator_ids=supported_indicator_ids,
+                source_values_by_indicator_id=source_values_by_indicator_id,
             ),
         ),
     )

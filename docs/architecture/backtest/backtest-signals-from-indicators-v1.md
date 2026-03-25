@@ -202,13 +202,9 @@ Rule family: `compare_price_to_output`.
 
 - `trend.adx`: `delta_sign(primary)` (использует `long_delta_periods/short_delta_periods`).
 - `trend.aroon` (primary `aroon_osc`): `threshold_band(primary)` с параметрами `long_threshold/short_threshold` (int, step=1).
-- `trend.chandelier_exit` (primary `chandelier_long`): `compare_price_to_output`.
 - `trend.donchian` (primary `donchian_mid`): `compare_price_to_output`.
-- `trend.ichimoku` (primary `span_a`): `compare_price_to_output`.
-- `trend.keltner` (primary `middle`): `compare_price_to_output`.
 - `trend.linreg_slope` (primary `slope`): `sign(primary)` (LONG if >0, SHORT if <0).
 - `trend.psar` (primary `psar`): `compare_price_to_output`.
-- `trend.supertrend` (primary `supertrend`): `compare_price_to_output`.
 - `trend.vortex` (primary `vi_plus`): `threshold_centered(primary, center=1.0)` с параметром `abs_threshold` (float, step из YAML),
   - LONG если `primary > 1.0 + abs_threshold`
   - SHORT если `primary < 1.0 - abs_threshold`
@@ -220,9 +216,6 @@ Rule family: `compare_price_to_output`.
 - `volatility.stddev`: `delta_sign(primary)`.
 - `volatility.variance`: `delta_sign(primary)`.
 - `volatility.hv`: `delta_sign(primary)`.
-- `volatility.bbands` (primary `basis`): `compare_price_to_output`.
-- `volatility.bbands_bandwidth`: `delta_sign(primary)`.
-- `volatility.bbands_percent_b`: `threshold_band(primary)` с float параметрами `long_threshold/short_threshold`.
 
 ### Momentum (`momentum.*`)
 
@@ -233,9 +226,6 @@ Rule family: `compare_price_to_output`.
 - `momentum.trix`: `sign(primary)`.
 - `momentum.fisher` (primary fisher): `sign(primary)`.
 - `momentum.stoch` (primary K): `threshold_band(primary)`.
-- `momentum.stoch_rsi` (primary K): `threshold_band(primary)`.
-- `momentum.macd` (primary macd line): `sign(primary)`.
-- `momentum.ppo` (primary ppo line): `sign(primary)`.
 
 ### Volume (`volume.*`)
 
@@ -247,9 +237,6 @@ Rule family: `compare_price_to_output`.
   - LONG если `volume > primary`
   - SHORT если `volume < primary`
 - `volume.vwap`: `compare_price_to_output`.
-- `volume.vwap_deviation` (primary `vwap_upper`, mean-reversion v1):
-  - LONG если `close < primary`
-  - SHORT если `close > primary`
 
 ### Structure (`structure.*`)
 

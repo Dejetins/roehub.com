@@ -54,9 +54,6 @@
 * `volatility.stddev`
 * `volatility.variance`
 * `volatility.hv` (c `annualization`)
-* `volatility.bbands`
-* `volatility.bbands_bandwidth`
-* `volatility.bbands_percent_b`
 
 **Momentum**
 
@@ -69,9 +66,6 @@
 * multi-param:
 
   * `momentum.stoch`
-  * `momentum.stoch_rsi`
-  * `momentum.ppo`
-  * `momentum.macd`
 
 **Также входит**
 
@@ -142,13 +136,6 @@
 
 Phase 4 покрывает следующие индикаторы:
 
-* `volatility.bbands`
-* `volatility.bbands_bandwidth`
-* `volatility.bbands_percent_b`
-* `momentum.stoch_rsi`
-* `momentum.macd`
-* `momentum.ppo`
-
 ### 4) NaN policy (фикс v1, единая для EPIC-07)
 
 Compute **не делает импутацию**. NaN holes из CandleFeed должны корректно “просачиваться” в outputs.
@@ -161,7 +148,7 @@ Compute **не делает импутацию**. NaN holes из CandleFeed до
 * деление на 0 → NaN (детерминированно)
 
 **B) Stateful EMA-like части (reset-on-NaN)**
-Примеры: RSI (через RMA), TRIX (EMA×3), MACD/PPO (EMA fast/slow + signal)
+Примеры: RSI (через RMA), TRIX (EMA×3)
 
 * до первого валидного `x[t]` → NaN
 * при первом валидном `x[t]`: seed `y[t] = x[t]`
@@ -186,10 +173,9 @@ Compute **не делает импутацию**. NaN holes из CandleFeed до
 
 - `Tier B` (`mixed precision`) для momentum:
   `momentum.rsi`, `momentum.roc`, `momentum.cci`, `momentum.williams_r`,
-  `momentum.stoch`, `momentum.trix`, `momentum.stoch_rsi`, `momentum.macd`, `momentum.ppo`.
+  `momentum.stoch`, `momentum.trix`.
 - `Tier C` (`float64` core) для volatility:
-  `volatility.variance`, `volatility.stddev`, `volatility.hv`,
-  `volatility.bbands`, `volatility.bbands_bandwidth`, `volatility.bbands_percent_b`.
+  `volatility.variance`, `volatility.stddev`, `volatility.hv`.
 
 Даже при mixed/internal float64 путях внешний контракт остаётся неизменным:
 `IndicatorTensor.values` всегда `float32`.
@@ -290,53 +276,6 @@ Inputs:
 * warmup на returns: первые значения NaN по определению (минимум 1 лаг + окно)
 
 Output: `hv`.
-
-#### 6) `volatility.bbands(window, mult, source)`
-
-Params:
-
-* `window: int` (range 5..120 step 1)
-* `mult: float` (range 0.5..4.0 step 0.01)
-
-Inputs:
-
-* `source` ∈ explicit
-
-Семантика (v1):
-
-* `middle = SMA(source, window)`
-* `sigma = stddev(source, window)`
-* `upper = middle + mult*sigma`
-* `lower = middle - mult*sigma`
-* warmup/NaN: как rolling
-
-Outputs: ожидаются как минимум `middle`, `upper`, `lower` (точные ключи — по formula yaml).
-
-#### 7) `volatility.bbands_bandwidth(window, mult, source)`
-
-Params/Inputs: как bbands.
-
-Семантика (v1):
-
-* рассчитывает базовые bbands,
-* `bandwidth = (upper - lower) / middle`
-* если `middle == 0` или NaN → NaN
-
-Output: `bandwidth` (точное имя — по formula yaml).
-
-#### 8) `volatility.bbands_percent_b(window, mult, source)`
-
-Params/Inputs: как bbands.
-
-Семантика (v1):
-
-* рассчитывает базовые bbands,
-* `percent_b = (source - lower) / (upper - lower)`
-* если `(upper-lower)==0` или NaN → NaN
-
-Output: `percent_b` (точное имя — по formula yaml).
-
-> Примечание: реализация может (и должна) переиспользовать общий bbands-core и лишь выбирать output.
 
 ---
 
@@ -481,75 +420,6 @@ Inputs: `high`, `low`, `close`.
 
 Outputs: `k`, `d`.
 
-#### 8) `momentum.stoch_rsi(rsi_window, k_window, smoothing, d_window, source)`
-
-Params:
-
-* `rsi_window: int` (range 3..120 step 1)
-* `k_window: int` (range 5..120 step 1)
-* `smoothing: int` (range 2..10 step 1)
-* `d_window: int` (range 2..10 step 1)
-
-Inputs:
-
-* `source` ∈ explicit
-
-Семантика (v1):
-
-* `rsi = RSI(source, rsi_window)` (см. выше)
-* `hh = max(rsi over k_window)`
-* `ll = min(rsi over k_window)`
-* `k_raw = 100 * (rsi - ll) / (hh - ll)` (denom==0 → NaN)
-* `k = SMA(k_raw, smoothing)`
-* `d = SMA(k, d_window)`
-* warmup/NaN: rolling policy + reset semantics у RSI
-
-Outputs: `k`, `d`.
-
-#### 9) `momentum.ppo(fast_window, slow_window, signal_window, source)`
-
-Params:
-
-* `fast_window: int` (range 4..24 step 1)
-* `slow_window: int` (range 8..50 step 1)
-* `signal_window: int` (range 3..20 step 1)
-
-Inputs:
-
-* `source` ∈ explicit
-
-Семантика (v1, EMA reset-on-NaN):
-
-* `fast = EMA(source, fast_window)`
-* `slow = EMA(source, slow_window)`
-* `ppo = 100 * (fast - slow) / slow` (если slow==0 → NaN)
-* `signal = EMA(ppo, signal_window)`
-* `hist = ppo - signal`
-
-Outputs: `ppo`, `signal`, `hist`.
-
-#### 10) `momentum.macd(fast_window, slow_window, signal_window, source)`
-
-Params:
-
-* `fast_window: int` (range 4..24 step 1)
-* `slow_window: int` (range 8..50 step 1)
-* `signal_window: int` (range 3..20 step 1)
-
-Inputs:
-
-* `source` ∈ explicit
-
-Семантика (v1, EMA reset-on-NaN):
-
-* `fast = EMA(source, fast_window)`
-* `slow = EMA(source, slow_window)`
-* `macd = fast - slow`
-* `signal = EMA(macd, signal_window)`
-* `hist = macd - signal`
-
-Outputs: `macd`, `signal`, `hist`.
-
 ---
 
 ## Execution pipeline (compute v1)
@@ -640,7 +510,7 @@ Endpoint уже существует (EPIC-06). EPIC-07 расширяет на�
 
 1. `volatility.atr` (grid по window 5..120)
 2. `momentum.rsi` (grid по window 3..120 × sources)
-3. `momentum.macd` или `volatility.bbands` (multi-param или multi-output)
+3. `momentum.trix` или `momentum.stoch` (multi-param или stateful)
 
 Путь:
 
