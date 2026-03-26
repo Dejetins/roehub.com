@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from itertools import product
 from pathlib import Path
-from typing import Iterator, cast
+from typing import Iterator, Mapping, cast
 
 import numpy as np
 import pytest
@@ -11,6 +13,7 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     ArtifactPrecomputeFixtureV2,
     build_artifact_precompute_fixture_v2,
 )
+from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
 )
@@ -21,9 +24,27 @@ from trading.contexts.backtest.application.services import (
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
+    ArtifactSignalValidationSpecV2,
     ArtifactSlotPublishErrorV2,
+    BacktestArtifactManifestValidatorV2,
     BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
+    BacktestSignalRulesEngineV2,
+)
+from trading.contexts.indicators.adapters.outbound.registry import YamlIndicatorRegistry
+from trading.contexts.indicators.application.dto import (
+    ComputeRequest,
+    EstimateResult,
+    IndicatorTensor,
+    TensorMeta,
+)
+from trading.contexts.indicators.application.services import GridBuilder
+from trading.contexts.indicators.domain.definitions import all_defs
+from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId, Layout
+from trading.contexts.indicators.domain.specifications import (
+    ExplicitValuesSpec,
+    GridParamSpec,
+    GridSpec,
 )
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.shared_kernel.primitives import (
@@ -39,6 +60,238 @@ from trading.shared_kernel.primitives import (
 _BASE_TIME_UTC = datetime(2026, 3, 26, 0, 0, tzinfo=timezone.utc)
 _FULL_BUILD_DAYS_V2 = 3
 _FULL_BUILD_MINUTES_V2 = _FULL_BUILD_DAYS_V2 * 24 * 60
+
+
+@dataclass(frozen=True, slots=True)
+class _PrecomputeSignalDefaultsProvider:
+    """
+    Defaults-provider wrapper overriding only compute grids for small R4-02 test matrices.
+
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+
+    delegate: YamlBacktestGridDefaultsProvider
+    overrides: Mapping[str, GridSpec]
+
+    def compute_defaults(self, *, indicator_id: str) -> GridSpec | None:
+        """
+        Resolve compute defaults with explicit small-grid overrides for selected indicators.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            GridSpec | None: Overridden small grid or the delegate-provided defaults.
+        Assumptions:
+            Only a tiny R4-02 subset is overridden; all other indicators keep canonical defaults.
+        Raises:
+            ValueError: Propagated from the delegate or `GridSpec` normalization.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/ports/staged_runner.py
+        """
+        normalized_indicator_id = indicator_id.strip().lower()
+        override = self.overrides.get(normalized_indicator_id)
+        if override is not None:
+            return override
+        return self.delegate.compute_defaults(indicator_id=normalized_indicator_id)
+
+    def signal_param_defaults(self, *, indicator_id: str) -> Mapping[str, GridParamSpec]:
+        """
+        Delegate signal-parameter defaults to the canonical YAML provider.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            Mapping[str, object]: Canonical default-only signal params mapping.
+        Assumptions:
+            R4-02 tests intentionally preserve the authoritative signal default semantics.
+        Raises:
+            ValueError: Propagated from the delegate provider.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/defaults/
+            indicators_yaml_defaults_provider.py
+        """
+        return self.delegate.signal_param_defaults(indicator_id=indicator_id)
+
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return the canonical full supported-indicator catalog for engine startup validation.
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Canonical full supported indicator catalog.
+        Assumptions:
+            Startup fail-fast validation must still see the real production/test catalog.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+        """
+        return self.delegate.supported_indicator_ids()
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Delegate allowed-source catalog lookups to the canonical YAML provider.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            tuple[str, ...]: Canonical allowed `inputs.source` literals.
+        Assumptions:
+            Source validation should remain aligned with runtime defaults.
+        Raises:
+            ValueError: Propagated from the delegate provider.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+        """
+        return self.delegate.allowed_source_values(indicator_id=indicator_id)
+
+
+@dataclass(frozen=True, slots=True)
+class _DeterministicSignalCompute:
+    """
+    Small deterministic compute adapter producing variant-major tensors for R4-02 tests.
+
+    Docs:
+      - docs/architecture/indicators/indicators-overview.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+
+    grid_builder: GridBuilder
+
+    def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
+        """
+        Estimate variant count using the shared grid-builder materialization order.
+
+        Args:
+            grid: Indicator grid to estimate.
+            max_variants_guard: Upper bound for allowed variants.
+        Returns:
+            EstimateResult: Deterministic estimate snapshot.
+        Assumptions:
+            Tests use the same grid materialization path for estimate and compute.
+        Raises:
+            ValueError: If the estimate would exceed the explicit variants guard.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md
+        Related:
+          - src/trading/contexts/indicators/application/dto/estimate_result.py
+        """
+        materialized = self.grid_builder.materialize_indicator(grid=grid)
+        if materialized.variants > max_variants_guard:
+            raise ValueError(
+                "variants exceed guard: "
+                f"variants={materialized.variants}, max_variants_guard={max_variants_guard}"
+            )
+        return EstimateResult(
+            indicator_id=grid.indicator_id,
+            axes=tuple(_axis_def_from_materialized_axis_v2(axis) for axis in materialized.axes),
+            variants=materialized.variants,
+            max_variants_guard=max_variants_guard,
+        )
+
+    def compute(self, req: ComputeRequest) -> IndicatorTensor:
+        """
+        Materialize a deterministic variant-major tensor matching grid-builder row order.
+
+        Args:
+            req: Compute request with candles and the explicit grid.
+        Returns:
+            IndicatorTensor: Variant-major float32 tensor with small synthetic outputs.
+        Assumptions:
+            Only MA indicators are used in these R4-02 runner tests.
+        Raises:
+            ValueError: If one source series cannot be resolved or the guard is exceeded.
+        Side Effects:
+            Allocates one small in-memory tensor.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/indicators/indicators-overview.md
+        Related:
+          - src/trading/contexts/indicators/application/dto/indicator_tensor.py
+        """
+        materialized = self.grid_builder.materialize_indicator(grid=req.grid)
+        if materialized.variants > req.max_variants_guard:
+            raise ValueError(
+                "variants exceed guard: "
+                f"variants={materialized.variants}, max_variants_guard={req.max_variants_guard}"
+            )
+        bar_count = int(req.candles.close.shape[0])
+        values = np.empty((materialized.variants, bar_count), dtype=np.float32)
+        axes = tuple(_axis_def_from_materialized_axis_v2(axis) for axis in materialized.axes)
+        axis_values = tuple(axis.values for axis in materialized.axes)
+        ordered_rows = product(*axis_values) if len(axis_values) > 0 else ((),)
+        for row_index, value_row in enumerate(ordered_rows):
+            source_name = "close"
+            for axis, value in zip(materialized.axes, value_row):
+                if axis.name == "source":
+                    source_name = str(value)
+            base_series = _source_series_for_compute_v2(
+                candles=req.candles,
+                source_name=source_name,
+            )
+            mode = row_index % 3
+            if mode == 0:
+                values[row_index, :] = np.ascontiguousarray(base_series - np.float32(1.0))
+            elif mode == 1:
+                values[row_index, :] = np.ascontiguousarray(base_series)
+            else:
+                values[row_index, :] = np.ascontiguousarray(base_series + np.float32(1.0))
+        return IndicatorTensor(
+            indicator_id=req.grid.indicator_id,
+            layout=Layout.VARIANT_MAJOR,
+            axes=axes,
+            values=values,
+            meta=TensorMeta(t=bar_count, variants=materialized.variants),
+        )
+
+    def warmup(self) -> None:
+        """
+        No-op warmup required by the compute protocol in these unit tests.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Synthetic compute has no caches or JIT state to initialize.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/indicators/indicators-overview.md
+        Related:
+          - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
+        """
+        return None
 
 
 class _FakeCanonicalCandleReader:
@@ -140,6 +393,164 @@ class _ZeroBlockingRepositoryV2:
         """
         del market_id, symbol, artifact_slot, artifact_manifest_hash
         return 0
+
+
+def _build_signal_test_defaults_provider_v2() -> _PrecomputeSignalDefaultsProvider:
+    """
+    Build a small-grid defaults provider wrapper for deterministic R4-02 runner tests.
+
+    Args:
+        None.
+    Returns:
+        _PrecomputeSignalDefaultsProvider: Wrapper with small MA override grids.
+    Assumptions:
+        Prod defaults carry the full source catalog required by the v2 signal-rules engine.
+    Raises:
+        FileNotFoundError: If `configs/prod/indicators.yaml` is unavailable.
+    Side Effects:
+        Reads the repository-local prod defaults YAML.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - configs/prod/indicators.yaml
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+    """
+    delegate = YamlBacktestGridDefaultsProvider.from_yaml(
+        config_path=Path("configs/prod/indicators.yaml")
+    )
+    small_axes = {
+        "source": ExplicitValuesSpec(name="source", values=("close", "open")),
+        "window": ExplicitValuesSpec(name="window", values=(5, 10, 15)),
+    }
+    overrides = {
+        indicator_id: GridSpec(
+            indicator_id=IndicatorId(indicator_id),
+            params={"window": small_axes["window"]},
+            source=small_axes["source"],
+        )
+        for indicator_id in ("ma.ema", "ma.sma")
+    }
+    return _PrecomputeSignalDefaultsProvider(delegate=delegate, overrides=overrides)
+
+
+def _signal_grid_builder_v2() -> GridBuilder:
+    """
+    Build the shared grid builder used by small deterministic signal export tests.
+
+    Args:
+        None.
+    Returns:
+        GridBuilder: Grid builder backed by the repository-local test indicator registry.
+    Assumptions:
+        Hard indicator defs plus `configs/test/indicators.yaml` validate successfully.
+    Raises:
+        FileNotFoundError: If the test indicator config is missing.
+        ValueError: If the registry cannot be built deterministically.
+    Side Effects:
+        Reads the repository-local indicator defaults YAML.
+    Docs:
+      - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/indicators/adapters/outbound/registry/yaml_indicator_registry.py
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+    """
+    registry = YamlIndicatorRegistry.from_yaml(
+        defs=all_defs(),
+        config_path=Path("configs/test/indicators.yaml"),
+    )
+    return GridBuilder(registry=registry)
+
+
+def _axis_def_from_materialized_axis_v2(axis: object) -> AxisDef:
+    """
+    Convert one materialized grid axis into the explicit `AxisDef` tensor metadata contract.
+
+    Args:
+        axis: Materialized axis returned by `GridBuilder.materialize_indicator`.
+    Returns:
+        AxisDef: Explicit tensor metadata axis.
+    Assumptions:
+        Materialized axis values are homogeneous by type for these test grids.
+    Raises:
+        ValueError: If the axis values contain unsupported scalar types.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/indicators/indicators-application-ports-walking-skeleton-v1.md
+    Related:
+      - src/trading/contexts/indicators/domain/entities/axis_def.py
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+    """
+    axis_name = cast(str, getattr(axis, "name"))
+    values = tuple(cast(tuple[object, ...], getattr(axis, "values")))
+    if len(values) == 0:
+        raise ValueError("materialized axis requires non-empty values")
+    if all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+        return AxisDef(name=axis_name, values_int=tuple(cast(int, value) for value in values))
+    if all(isinstance(value, float) for value in values):
+        return AxisDef(name=axis_name, values_float=tuple(cast(float, value) for value in values))
+    if all(isinstance(value, str) for value in values):
+        return AxisDef(name=axis_name, values_enum=tuple(cast(str, value) for value in values))
+    raise ValueError(f"unsupported materialized axis values for {axis_name!r}: {values!r}")
+
+
+def _source_series_for_compute_v2(*, candles: object, source_name: str) -> np.ndarray:
+    """
+    Resolve one deterministic source series for the synthetic compute adapter.
+
+    Args:
+        candles: Candle-arrays payload passed into the synthetic compute adapter.
+        source_name: Requested source literal.
+    Returns:
+        np.ndarray: Float32 bar-aligned source series.
+    Assumptions:
+        Tests use only standard price-derived source literals supported by MA indicators.
+    Raises:
+        ValueError: If the requested source literal is unsupported.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/indicators/indicators-overview.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/candle_arrays.py
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+    normalized_source = source_name.strip().lower()
+    candle_arrays = cast("object", candles)
+    if normalized_source == "close":
+        return np.ascontiguousarray(cast(np.ndarray, getattr(candle_arrays, "close")))
+    if normalized_source == "open":
+        return np.ascontiguousarray(cast(np.ndarray, getattr(candle_arrays, "open")))
+    if normalized_source == "high":
+        return np.ascontiguousarray(cast(np.ndarray, getattr(candle_arrays, "high")))
+    if normalized_source == "low":
+        return np.ascontiguousarray(cast(np.ndarray, getattr(candle_arrays, "low")))
+    if normalized_source == "hlc3":
+        return np.ascontiguousarray(
+            (
+                cast(np.ndarray, getattr(candle_arrays, "high"))
+                + cast(np.ndarray, getattr(candle_arrays, "low"))
+                + cast(np.ndarray, getattr(candle_arrays, "close"))
+            )
+            / np.float32(3.0),
+            dtype=np.float32,
+        )
+    if normalized_source == "ohlc4":
+        return np.ascontiguousarray(
+            (
+                cast(np.ndarray, getattr(candle_arrays, "open"))
+                + cast(np.ndarray, getattr(candle_arrays, "high"))
+                + cast(np.ndarray, getattr(candle_arrays, "low"))
+                + cast(np.ndarray, getattr(candle_arrays, "close"))
+            )
+            / np.float32(4.0),
+            dtype=np.float32,
+        )
+    raise ValueError(f"unsupported synthetic source literal: {normalized_source!r}")
 
 
 def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_export(
@@ -562,6 +973,134 @@ def test_backtest_artifact_precompute_runner_v2_is_byte_stable_for_identical_inp
     second_bytes = _read_export_bytes_v2(second_result)
 
     assert first_bytes == second_bytes
+
+
+def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_and_root_catalog(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify R4-02 writes strict per-target signal artifacts and populates the root catalog.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Signal targets are explicitly enabled both for precompute and for full validation.
+    Raises:
+        AssertionError: If signal matrices, manifests, root catalog, or validator output drift.
+    Side Effects:
+        Writes signal artifacts under the inactive slot in `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    signal_targets = (("15m", "ma.ema"), ("1h", "ma.sma"))
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+
+    result = runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    )
+    root_manifest = fixture.loader.load_slot_manifest(fixture.coordinates, fixture.inactive_slot)
+    ema_manifest = fixture.loader.load_signal_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "15m",
+        "ma.ema",
+    )
+    sma_manifest = fixture.loader.load_signal_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "1h",
+        "ma.sma",
+    )
+    ema_matrix = np.load(
+        fixture.loader.resolve_signal_paths(
+            fixture.coordinates,
+            fixture.inactive_slot,
+            "15m",
+            "ma.ema",
+        ).signals,
+        allow_pickle=False,
+    )
+    sma_matrix = np.load(
+        fixture.loader.resolve_signal_paths(
+            fixture.coordinates,
+            fixture.inactive_slot,
+            "1h",
+            "ma.sma",
+        ).signals,
+        allow_pickle=False,
+    )
+    validator = BacktestArtifactManifestValidatorV2(artifact_loader=fixture.loader)
+    validation_result = validator.validate_slot(
+        coordinates=fixture.coordinates,
+        slot=fixture.inactive_slot,
+        validation_spec=fixture.runtime_config.to_validation_spec(),
+        expected_asof_date="2026-03-26",
+        expected_slot_generation=5,
+    )
+
+    assert result.slot == fixture.inactive_slot
+    assert result.slot_generation == 5
+    assert fixture.runtime_settings.signal_artifacts == (
+        ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema"),
+        ArtifactSignalValidationSpecV2(timeframe="1h", indicator_id="ma.sma"),
+    )
+    assert root_manifest.signals.supported_timeframes == ("15m", "1h")
+    assert root_manifest.signals.supported_indicator_ids == ("ma.ema", "ma.sma")
+    assert tuple(
+        (entry.timeframe, entry.indicator_id, entry.manifest_path)
+        for entry in root_manifest.signals.manifests
+    ) == (
+        ("15m", "ma.ema", "signals/15m/ma.ema/manifest.yaml"),
+        ("1h", "ma.sma", "signals/1h/ma.sma/manifest.yaml"),
+    )
+    assert ema_manifest.rows_count == 6
+    assert ema_manifest.timeline.bar_count == 288
+    assert ema_manifest.signals.dtype == "int8"
+    assert ema_manifest.signals.shape == (6, 288)
+    assert ema_manifest.signals.axis_order == ("variant", "time")
+    assert dict(ema_manifest.grid.signals_v1_params_defaults) == {}
+    assert sma_manifest.rows_count == 6
+    assert sma_manifest.timeline.bar_count == 72
+    assert sma_manifest.signals.dtype == "int8"
+    assert sma_manifest.signals.shape == (6, 72)
+    assert sma_manifest.signals.axis_order == ("variant", "time")
+    assert dict(sma_manifest.grid.signals_v1_params_defaults) == {}
+    assert ema_matrix.dtype == np.int8
+    assert sma_matrix.dtype == np.int8
+    assert ema_matrix.shape == (6, 288)
+    assert sma_matrix.shape == (6, 72)
+    assert set(np.unique(ema_matrix).tolist()) <= {-1, 0, 1}
+    assert set(np.unique(sma_matrix).tolist()) <= {-1, 0, 1}
+    assert len(validation_result.signal_manifests) == 2
+    assert validation_result.hit_times_manifest is None
+    assert validation_result.diagnostics == ()
 
 
 def test_backtest_artifact_precompute_runner_v2_rejects_non_monotonic_source_timestamps(

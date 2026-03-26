@@ -2497,6 +2497,8 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     price_tail_bars_1m: int
     mapping_tail_bars_1m: int
     config_sha256: str
+    signal_artifacts: tuple[ArtifactSignalValidationSpecV2, ...] = ()
+    max_signal_rows_per_artifact: int = 1_000_000
 
     def __post_init__(self) -> None:
         """
@@ -2512,7 +2514,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
         Raises:
             ValueError: If the tail lookback or config hash violates strict publish contracts.
         Side Effects:
-            None.
+            Replaces explicit signal targets with deterministic canonical ordering.
         Docs:
           - docs/architecture/backtest/backtest-precompute-runner-v2.md
           - docs/architecture/backtest/backtest-artifact-store-v2.md
@@ -2533,6 +2535,16 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             self,
             "config_sha256",
             validate_current_pointer_manifest_sha256_v2(self.config_sha256),
+        )
+        object.__setattr__(
+            self,
+            "signal_artifacts",
+            _sorted_signal_validation_specs_v2(self.signal_artifacts),
+        )
+        object.__setattr__(
+            self,
+            "max_signal_rows_per_artifact",
+            validate_positive_manifest_int_v2(self.max_signal_rows_per_artifact),
         )
 
 

@@ -10,7 +10,7 @@
 - Jobs worker: `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
 - Artifact store v2 layout/publish/pinning/validator/config contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
-- Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices, R3-03 `mappings/<tf>` и R3-04 publish-ready prices+mappings stage: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices, R3-03 `mappings/<tf>`, R3-04 publish-ready prices+mappings stage и R4-02 real `signals/<tf>/<indicator_id>` artifacts: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Signal rules catalog and R4-01 semantic source-of-truth: `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
 - Artifact rebuild/publish runbook: `docs/runbooks/backtest-artifacts-rebuild.md`
 
@@ -28,8 +28,11 @@
   из `backtest_artifacts.validation_plan` и фиксирует `signal_artifacts=[]`,
   `require_hit_times_manifest=false`.
 - R4-01 добавляет explicit v2 signal-rules engine contract с `inputs.source` semantics и
-  `signals.v1.params = default-only`, но ещё не materialize'ит `signals.i8.npy`.
-- Полный publish с `signals/hit_times` по-прежнему blocked до соответствующих later-stage epics.
+  `signals.v1.params = default-only`.
+- R4-02 materialize'ит real `signals/<tf>/<indicator_id>/signals.i8.npy`, strict per-indicator
+  manifests и root `signals.*` catalog для explicit configured targets.
+- Полный publish с `hit_times` по-прежнему blocked до R5; R4-03 signal tail-update и R4-04
+  runtime `source` integration остаются later-stage epics.
 
 ## Проверка согласованности
 

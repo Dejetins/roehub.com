@@ -1,4 +1,4 @@
-# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03 / R2-04)
+# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03 / R2-04 / R4-02)
 
 Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в
 `artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning, config-driven validation
@@ -120,14 +120,23 @@ R3-01 / R3-02 / R3-03 exception boundary:
 - если использовать полный validation plan, такой slot по-прежнему не должен публиковаться, пока
   later-stage plan требует real `signals/hit_times`.
 
-R4-01 clarification:
+R4-01 / R4-02 clarification:
 
-- наличие explicit signal-rules engine contract ещё не означает наличие signal artifacts;
-- rebuild/publish sequence после R4-01 всё ещё не должна ожидать
-  `signals/<tf>/<indicator_id>/signals.i8.npy`;
+- наличие explicit signal-rules engine contract само по себе ещё не гарантирует publish-ready
+  `signals`, но после R4-02 rebuild обязан materialize'ить real signal artifacts для explicit
+  targets из `validation_plan.signal_artifacts`;
+- rebuild/publish sequence после R4-02 должна ожидать:
+  - `signals/<tf>/<indicator_id>/signals.i8.npy`
+  - `signals/<tf>/<indicator_id>/manifest.yaml`
+  - real root `signals.supported_timeframes`
+  - real root `signals.supported_indicator_ids`
+  - real root `signals.manifests`
 - `signals.v1.params` для signal engine остаются `default-only`, поэтому signal-param grid
   expansion вручную не включается;
-- переход к real signal manifests и `signals.i8.npy` остаётся отдельной процедурой R4-02.
+- signal matrices обязаны использовать `dtype=int8`, `shape=[V, T_tf]`,
+  `axis_order=[variant, time]`, value set `{-1,0,1}`;
+- R4-03 signal tail-update logic и R4-04 runtime `source` integration остаются вне текущей
+  operational-процедуры.
 
 Минимально ожидаемые пути:
 
@@ -153,6 +162,10 @@ R4-01 clarification:
 - `dtype`, `shape`, `axis_order` совпадают с manifest contracts;
 - `open_time` / `close_time` monotonic;
 - signal value set ограничен `{-1,0,1}`;
+- `signals.supported_timeframes` и `signals.supported_indicator_ids` совпадают с
+  `signals.manifests`;
+- `signals.manifests` ordered deterministically by `(timeframe, indicator_id)`;
+- `signals/<tf>/<indicator_id>.timeline` совпадает с root `prices/<tf>.coverage`;
 - mapping bounds валидны относительно `1m`;
 - `prices/1m.open_time[bar_open_1m_idx] == prices/<tf>.open_time`;
 - `prices/1m.close_time[bar_close_1m_idx] == prices/<tf>.close_time`;
@@ -178,6 +191,8 @@ R4-01 clarification:
 - rebuild обязан валидировать epoch-aligned bucket boundaries и full-bucket coverage для rolled TF;
 - rebuild обязан валидировать mapping monotonicity, bounds и strict price correspondence;
 - publish разрешён для R3-04 только если explicit stage spec ограничен `prices+mappings`;
+- publish после R4-02 может включать real `signals`, но `require_hit_times_manifest` всё ещё
+  должен оставаться `false` до R5, если `hit_times/1m` не materialized;
 - publish остаётся запрещённым, если active validation plan still expects later-stage artifacts.
 
 Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.

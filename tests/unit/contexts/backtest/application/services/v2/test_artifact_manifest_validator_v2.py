@@ -194,3 +194,46 @@ def test_backtest_artifact_manifest_validator_v2_orders_multiple_diagnostics_det
         "signal_values_out_of_set",
         "hit_times_table_not_monotone",
     )
+
+
+def test_backtest_artifact_manifest_validator_v2_rejects_signal_manifest_reference_hash_drift(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify validator reports root-catalog drift when one signal manifest hash no longer matches.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Signal manifest file remains valid while only the root reference hash is corrupted.
+    Raises:
+        AssertionError: If hash drift is not reported with the documented diagnostic code.
+    Side Effects:
+        Creates and mutates a synthetic artifact tree under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+      - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
+    """
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    root_manifest_path = store.builder.slot_manifest_path(store.coordinates, store.inactive_slot)
+    payload = yaml.safe_load(root_manifest_path.read_text(encoding="utf-8"))
+    payload["signals"]["manifests"][0]["manifest_sha256"] = "0" * 64
+    root_manifest_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    validator = BacktestArtifactManifestValidatorV2(artifact_loader=store.loader)
+
+    result = validator.validate_slot(
+        coordinates=store.coordinates,
+        slot=store.inactive_slot,
+        validation_spec=store.validation_spec,
+        expected_asof_date="2026-03-26",
+        expected_slot_generation=5,
+    )
+
+    assert tuple(diagnostic.code for diagnostic in result.diagnostics) == (
+        "signal_manifest_reference_hash_mismatch",
+    )

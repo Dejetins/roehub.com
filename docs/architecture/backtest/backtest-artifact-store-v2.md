@@ -1,6 +1,6 @@
-# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04 / R3-03 / R3-04)
+# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04 / R3-03 / R3-04 / R4-02)
 
-Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`
+Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`, `Milestone R3 / EPIC R3-03 + R3-04`, `Milestone R4 / EPIC R4-02`
 
 Документ фиксирует:
 
@@ -9,6 +9,8 @@
 - R2-03: strict manifest schemas, fail-fast slot validators, fixed runtime metadata from manifests.
 - R2-04: strict `configs/<env>/backtest_artifacts.yaml` contract для artifact root,
   validation plan, hit-times grid и publish/runtime boundary.
+- R3-03 / R3-04: real `mappings/<tf>` families и stage-scoped publish validation.
+- R4-02: real `signals/<tf>/<indicator_id>` families и root `signals.*` catalog metadata.
 
 Основные источники:
 
@@ -186,7 +188,7 @@ artifacts/backtest/v2/
   - `prices/2d/*`
   - `prices/3d/*`
 - `mappings[]` в root manifest остаётся пустым до R3-03;
-- `signals` в root manifest остаётся explicit empty catalog до R4;
+- `signals` в root manifest остаётся explicit empty catalog до R4-02;
 - `hit_times` в root manifest остаётся explicit fixed-path reference
   `hit_times/1m/manifest.yaml`, но до R5 может использовать placeholder
   `manifest_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"`.
@@ -236,21 +238,25 @@ validated files перед publish.
 
 На этом этапе placeholders сохраняются только для:
 
-- `signals` root catalog до R4;
+- `signals` root catalog до R4-02;
 - `hit_times/1m/manifest.yaml` reference до R5.
 
-## R4-01 stage boundary
+## R4-01 / R4-02 stage boundary
 
-R4-01 вводит explicit signal-rules engine contract, но не меняет artifact tree и не
-materialize'ит `signals.i8.npy`.
+R4-01 вводит explicit signal-rules engine contract.
+R4-02 materialize'ит real signal artifacts и переводит reserved `signals/` paths в active store
+contract для explicit configured targets.
 
-Следовательно, после R4-01 по-прежнему верно:
+Следовательно, после R4-02 верно:
 
-- `signals/` directory layout остаётся reserved path contract;
-- `signals/<tf>/<indicator_id>/signals.i8.npy` ещё не обязан существовать;
-- `signals/<tf>/<indicator_id>/manifest.yaml` ещё не обязан существовать;
-- root `manifest.yaml` сохраняет explicit empty signal catalog;
-- per-indicator signal manifests и runtime-facing signal catalog появляются только в R4-02.
+- `signals/<tf>/<indicator_id>/signals.i8.npy` обязан существовать для каждого target из
+  `backtest_artifacts.validation_plan.signal_artifacts`;
+- `signals/<tf>/<indicator_id>/manifest.yaml` обязан существовать для каждого такого target;
+- root `manifest.yaml` обязан хранить real `signals.supported_timeframes`,
+  `signals.supported_indicator_ids` и `signals.manifests`;
+- placeholders сохраняются только для `hit_times/1m` до R5;
+- R4-03 signal tail-update logic и R4-04 runtime `source` integration остаются later-stage
+  epics.
 
 ## R3-04 prices+mappings publish-ready boundary
 
@@ -264,7 +270,8 @@ publish использует explicit stage validation spec:
 
 Для этого stage остаются допустимыми и ожидаемыми:
 
-- `signals` как explicit empty catalog до R4;
+- `signals` как explicit empty catalog только если publish использует explicit
+  prices+mappings stage spec с `signal_artifacts = ()`;
 - `hit_times/1m/manifest.yaml` как explicit fixed-path placeholder reference до R5.
 
 Это не relax full strict contract:
@@ -483,6 +490,13 @@ Per-indicator `signals/<tf>/<indicator_id>/manifest.yaml` обязан соде�
   - `variant_keys_sha256`
   - `signals_v1.params defaults`
 - `provenance`.
+
+Root `signals` section после R4-02 дополнительно обязан:
+
+- перечислять `supported_timeframes` в canonical timeframe order;
+- перечислять `supported_indicator_ids` в lexical order;
+- перечислять `manifests` в порядке `(timeframe, indicator_id)`;
+- хранить только explicit configured targets without filesystem discovery.
 
 ### `hit_times/1m/manifest.yaml`
 

@@ -13,6 +13,7 @@ from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_TIMEFRAMES_V2,
+    ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotValidationSpecV2,
     ordered_artifact_slots_v2,
@@ -651,6 +652,44 @@ class BacktestArtifactsRuntimeConfig:
           - docs/runbooks/backtest-artifacts-rebuild.md
         """
         return self.validation_plan.to_prices_mappings_publish_validation_spec()
+
+    def to_precompute_runtime_settings(
+        self,
+        *,
+        config_sha256: str,
+    ) -> ArtifactPrecomputeRuntimeSettingsV2:
+        """
+        Translate strict artifact config into service-layer precompute runtime settings.
+
+        Args:
+            config_sha256: Deterministic hash of this normalized config payload.
+        Returns:
+            ArtifactPrecomputeRuntimeSettingsV2: Minimal immutable settings for runner wiring.
+        Assumptions:
+            Signal artifacts remain explicit config-driven targets even while R4-03 tail updates
+            are still out of scope.
+        Raises:
+            ValueError: If nested lookback, signal-target, or budget contracts are invalid.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        return ArtifactPrecomputeRuntimeSettingsV2(
+            price_tail_bars_1m=self.lookback_policy.price_tail_bars_1m,
+            mapping_tail_bars_1m=self.lookback_policy.mapping_tail_bars_1m,
+            config_sha256=config_sha256,
+            signal_artifacts=tuple(
+                item.to_validation_spec() for item in self.validation_plan.signal_artifacts
+            ),
+            max_signal_rows_per_artifact=(
+                self.validation_budgets.max_signal_rows_per_artifact
+            ),
+        )
 
 
 def resolve_backtest_artifacts_config_path(

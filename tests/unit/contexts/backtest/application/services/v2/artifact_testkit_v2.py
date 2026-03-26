@@ -213,6 +213,7 @@ def build_artifact_precompute_fixture_v2(
     price_tail_bars_1m: int = 2,
     mapping_tail_bars_1m: int = 10,
     validation_signal_artifacts: tuple[tuple[str, str], ...] = (),
+    precompute_signal_artifacts: tuple[tuple[str, str], ...] = (),
     require_hit_times_manifest: bool = False,
 ) -> ArtifactPrecomputeFixtureV2:
     """
@@ -227,6 +228,8 @@ def build_artifact_precompute_fixture_v2(
             bars.
         validation_signal_artifacts: Explicit `(timeframe, indicator_id)` targets written into
             `backtest_artifacts.validation_plan.signal_artifacts`.
+        precompute_signal_artifacts: Explicit `(timeframe, indicator_id)` targets enabled for
+            real R4-02 signal materialization by the runner.
         require_hit_times_manifest: Whether the generated runtime config should require real
             `hit_times/1m/manifest.yaml` during whole-slot validation.
     Returns:
@@ -317,6 +320,16 @@ def build_artifact_precompute_fixture_v2(
             price_tail_bars_1m=runtime_config.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=runtime_config.lookback_policy.mapping_tail_bars_1m,
             config_sha256=build_backtest_artifacts_runtime_config_hash(config=runtime_config),
+            signal_artifacts=tuple(
+                ArtifactSignalValidationSpecV2(
+                    timeframe=timeframe,
+                    indicator_id=indicator_id,
+                )
+                for timeframe, indicator_id in precompute_signal_artifacts
+            ),
+            max_signal_rows_per_artifact=(
+                runtime_config.validation_budgets.max_signal_rows_per_artifact
+            ),
         ),
         builder=builder,
         loader=loader,
@@ -571,7 +584,7 @@ def _write_slot_payloads(
         "grid": {
             "variant_key_version": 1,
             "variant_keys_sha256": "d" * 64,
-            "signals_v1_params_defaults": {"source": "close"},
+            "signals_v1_params_defaults": {},
         },
         "provenance": _provenance_payload(),
     }
@@ -963,7 +976,7 @@ def _provenance_payload() -> dict[str, Any]:
     """
     return {
         "generator": "backtest-precompute-runner-v2",
-        "generator_version": "r2-03",
+        "generator_version": "r4-02",
         "generated_at_utc": "2026-03-26T03:00:00Z",
         "config_sha256": "a" * 64,
         "inputs_sha256": "b" * 64,

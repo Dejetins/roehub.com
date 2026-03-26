@@ -9,6 +9,7 @@ from trading.contexts.backtest.adapters.outbound.config import (
     load_backtest_artifacts_runtime_config,
     resolve_backtest_artifacts_config_path,
 )
+from trading.contexts.backtest.application.services import ArtifactSignalValidationSpecV2
 
 _VALID_BACKTEST_ARTIFACTS_CONFIG = """
 version: 1
@@ -360,6 +361,42 @@ def test_load_backtest_artifacts_runtime_config_derives_prices_mappings_publish_
     assert stage_spec.mapping_timeframes == config.validation_plan.mapping_timeframes
     assert stage_spec.signal_artifacts == ()
     assert stage_spec.require_hit_times_manifest is False
+
+
+def test_load_backtest_artifacts_runtime_config_derives_precompute_runtime_settings(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify config translation exposes explicit R4-02 signal targets to the precompute runner.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Runner runtime settings are a strict subset of the normalized artifact config contract.
+    Raises:
+        AssertionError: If signal targets, lookback budgets, or guards drift during translation.
+    Side Effects:
+        Writes one temporary YAML file.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    config_path = _write_backtest_artifacts_config(tmp_path, body=_VALID_BACKTEST_ARTIFACTS_CONFIG)
+    config = load_backtest_artifacts_runtime_config(config_path)
+    settings = config.to_precompute_runtime_settings(config_sha256="a" * 64)
+
+    assert settings.price_tail_bars_1m == 100
+    assert settings.mapping_tail_bars_1m == 200
+    assert settings.signal_artifacts == (
+        ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema"),
+        ArtifactSignalValidationSpecV2(timeframe="1h", indicator_id="ma.sma"),
+    )
+    assert settings.max_signal_rows_per_artifact == 3000
 
 
 def test_load_backtest_artifacts_runtime_config_rejects_duplicate_yaml_keys(

@@ -330,6 +330,53 @@ def test_yaml_backtest_artifact_loader_v2_avoids_directory_scanning(
     )
 
 
+def test_yaml_backtest_artifact_loader_v2_loads_all_root_listed_signal_manifests_without_scanning(
+    monkeypatch: pytest.MonkeyPatch,
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify every root-manifest-listed signal manifest loads from explicit paths without scanning.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+    Returns:
+        None.
+    Assumptions:
+        Root manifest already provides the canonical signal manifest catalog for runtime loading.
+    Raises:
+        AssertionError: If one listed signal manifest cannot be loaded explicitly.
+    Side Effects:
+        Temporarily replaces scanning helpers on `Path`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    store = synthetic_artifact_store_v2
+    loader = store.loader
+    root_manifest = loader.load_slot_manifest(store.coordinates, store.active_slot)
+    slot_root = store.builder.slot_root(store.coordinates, store.active_slot)
+    monkeypatch.setattr(Path, "iterdir", _forbid_directory_scan)
+    monkeypatch.setattr(Path, "glob", _forbid_directory_scan)
+    monkeypatch.setattr(Path, "rglob", _forbid_directory_scan)
+    monkeypatch.setattr(Path, "walk", _forbid_directory_scan)
+
+    loaded = tuple(
+        loader.load_signal_manifest_from_path(
+            slot_root / entry.manifest_path,
+            slot=store.active_slot,
+        )
+        for entry in root_manifest.signals.manifests
+    )
+
+    assert tuple((manifest.timeframe, manifest.indicator_id) for manifest in loaded) == tuple(
+        (entry.timeframe, entry.indicator_id) for entry in root_manifest.signals.manifests
+    )
+
+
 def test_yaml_backtest_artifact_loader_v2_loads_runner_generated_rollup_manifest(
     tmp_path: Path,
 ) -> None:

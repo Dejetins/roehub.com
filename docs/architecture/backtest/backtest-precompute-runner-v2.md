@@ -1,6 +1,6 @@
-# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04)
+# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04 / R4-01 / R4-02)
 
-Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`
+Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`, `Milestone R4 / EPIC R4-01 + R4-02`
 
 Документ фиксирует контракт precompute/publish слоя, который:
 
@@ -50,23 +50,25 @@ Precompute runner v2 обязан:
   - `timeline` coverage
 - завершать publish только после whole-slot validation.
 
-### R4-01 signal-rules engine boundary
+### R4-01 / R4-02 signal boundary
 
-На этапе R4-01 precompute layer получает explicit signal-rules engine contract, но ещё не
-materialize'ит signal artifacts.
+На этапе R4-01 precompute layer получил explicit signal-rules engine contract.
+На этапе R4-02 этот contract стал source-of-truth для real signal artifact materialization.
 
 Это означает:
 
-- indicator outputs уже могут быть детерминированно преобразованы в compact `int8` signals
-  `{-1,0,1}`;
-- `inputs.source` должен трактоваться явно для семейств, где rule family сравнивает price с
-  indicator output;
+- indicator outputs детерминированно преобразуются в compact `int8` signals `{-1,0,1}`;
+- `inputs.source` трактуется явно для rule families, где price сравнивается с indicator output;
 - `signals.v1.params` остаются strictly `default-only` и берутся только из
   `configs/<env>/indicators.yaml`;
-- runner по-прежнему не обязан писать:
+- для каждого explicit target из `backtest_artifacts.validation_plan.signal_artifacts`
+  runner обязан писать:
   - `signals/<tf>/<indicator_id>/signals.i8.npy`
   - `signals/<tf>/<indicator_id>/manifest.yaml`
-- handoff на real signal artifact materialization переносится в R4-02.
+- root manifest обязан публиковать real `signals.supported_timeframes`,
+  `signals.supported_indicator_ids` и `signals.manifests`;
+- R4-03 tail-update logic для `signals/*` и R4-04 propagation `source` в runtime payloads
+  остаются отдельными later-stage epics.
 
 ### R3-01 / R3-02 prices stage
 
@@ -140,6 +142,8 @@ Root manifest обязан фиксировать:
 - `slot`, `slot_generation`, `asof_date`;
 - `prices[]` с metadata для `open_time`, `close_time`, `ohlcv`;
 - `mappings[]` с metadata для `bar_open_1m_idx`, `bar_close_1m_idx`;
+- `signals.supported_timeframes`;
+- `signals.supported_indicator_ids`;
 - `signals.manifests[]` с `manifest_path` и `manifest_sha256`;
 - `hit_times.manifest_path` и `manifest_sha256`;
 - `signal_encoding`:
@@ -148,12 +152,12 @@ Root manifest обязан фиксировать:
   - `value_set: [-1, 0, 1]`
 - `provenance`.
 
-R3-01 / R3-02 placeholder strategy до materialization следующих stage:
+R3-01 / R3-02 / R3-03 placeholder strategy до materialization следующих stage:
 
 - `prices[]` содержит свежие strict sections для `1m` и всех allowed request TF;
 - `mappings[]` может оставаться пустым до R3-03;
 - `signals` фиксируется как explicit empty catalog
-  (`supported_timeframes=[]`, `supported_indicator_ids=[]`, `manifests=[]`) до R4;
+  (`supported_timeframes=[]`, `supported_indicator_ids=[]`, `manifests=[]`) до R4-02;
 - `hit_times` обязан оставаться explicit fixed-path reference
   `hit_times/1m/manifest.yaml`, но до R5 допускается placeholder
   `manifest_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"`;
@@ -185,27 +189,32 @@ R3-03 mapping contract:
   - `prices/1m.open_time[bar_open_1m_idx] == prices/<tf>.open_time`
   - `prices/1m.close_time[bar_close_1m_idx] == prices/<tf>.close_time`
 
-R4-01 keeps the root-manifest signal placeholder unchanged:
+R4-02 replaces the root-manifest signal placeholder for explicit configured targets:
 
-- `signals.supported_timeframes: []`
-- `signals.supported_indicator_ids: []`
-- `signals.manifests: []`
-
-Появление explicit signal-rules engine contract само по себе не делает slot publish-ready с
-signals. Root manifest начинает ссылаться на real signal manifests только в R4-02.
+- `signals.supported_timeframes` must equal the deduplicated ordered timeframes from
+  `signals.manifests`;
+- `signals.supported_indicator_ids` must equal the lexical ordered indicator ids from
+  `signals.manifests`;
+- `signals.manifests` must be ordered deterministically by timeframe contract then
+  `indicator_id`;
+- root manifest still keeps `hit_times/1m` as an explicit placeholder reference until R5.
 
 ### Per-indicator signal manifest
 
 Каждый `signals/<tf>/<indicator_id>/manifest.yaml` обязан фиксировать:
 
 - `indicator_id`, `timeframe`;
-- `signals.path`, `dtype`, `shape`, `axis_order`, `sha256`;
-- `rows_count`;
-- `timeline` coverage;
+- `signals.path = signals/<tf>/<indicator_id>/signals.i8.npy`;
+- `signals.dtype = int8`;
+- `signals.shape = [V, T_tf]`;
+- `signals.axis_order = [variant, time]`;
+- `signals.sha256`;
+- `rows_count = V`;
+- `timeline` coverage, совпадающий с root `prices/<tf>.coverage`;
 - `signal_value_set: [-1, 0, 1]`;
 - `grid.variant_key_version: 1`;
 - `grid.variant_keys_sha256`;
-- `grid.signals_v1_params_defaults`;
+- `grid.signals_v1_params_defaults` из strict `signals.v1.params = default-only`;
 - `provenance`.
 
 ### `hit_times/1m/manifest.yaml`
@@ -255,6 +264,7 @@ Whole-slot validator обязан идти в фиксированном пор�
   - signal value set `{-1,0,1}`
   - `shape=[V,T_tf]`
   - timeline equality с root price coverage
+  - deterministic root catalog ordering and hash/path correspondence
 - hit_times:
   - `tp/sl` grids strictly increasing
   - tables bounded by sentinel
@@ -270,9 +280,10 @@ config-driven:
 - `signal_artifacts = ()`;
 - `require_hit_times_manifest = false`.
 
-Если использовать полный validation spec, который всё ещё требует `signals` или real
-`hit_times`, whole-slot validation обязана fail-fast и pointer switch не выполняется до
-соответствующих later epics.
+После R4-02 full validation spec уже может требовать real `signals` и успешно проходить, если
+root catalog и per-indicator manifests materialized для explicit configured targets.
+`hit_times` по-прежнему остаётся blocking family до R5, поэтому без real `hit_times/1m`
+publish всё ещё обязан использовать `require_hit_times_manifest = false`.
 
 Runner обязан работать только в порядке:
 

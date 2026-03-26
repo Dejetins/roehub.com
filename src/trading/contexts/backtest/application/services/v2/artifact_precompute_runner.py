@@ -1,4 +1,4 @@
-"""Deterministic R3-03 price and mapping materialization into the inactive artifact slot."""
+"""Deterministic R3-03/R4-02 artifact materialization into the inactive slot."""
 
 from __future__ import annotations
 
@@ -8,12 +8,26 @@ import os
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from itertools import product
 from pathlib import Path
 from typing import Any, Mapping
 
 import numpy as np
 import yaml
 
+from trading.contexts.backtest.application.ports import BacktestGridDefaultsProvider
+from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
+    indicator_primary_output_series_from_tensor_v1,
+)
+from trading.contexts.indicators.application.dto import CandleArrays, ComputeRequest
+from trading.contexts.indicators.application.dto.variant_key import (
+    IndicatorVariantSelection,
+    build_variant_key_v1,
+)
+from trading.contexts.indicators.application.ports.compute import IndicatorCompute
+from trading.contexts.indicators.application.services import GridBuilder
+from trading.contexts.indicators.domain.entities import IndicatorId, Layout
+from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
 from trading.shared_kernel.primitives import (
@@ -40,6 +54,8 @@ from .contracts import (
     ARTIFACT_TIME_AXIS_ORDER_V2,
     HIT_TIMES_DIRECTORY_LITERAL_V2,
     HIT_TIMES_TIMEFRAME_LITERAL_V2,
+    SIGNAL_ARTIFACT_MANIFEST_KIND_V2,
+    SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
     ArtifactArrayMetadataV2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
@@ -55,17 +71,24 @@ from .contracts import (
     ArtifactSignalCatalogEntryV2,
     ArtifactSignalCatalogV2,
     ArtifactSignalEncodingContractV2,
+    ArtifactSignalGridContractV2,
+    ArtifactSignalManifestDocumentV2,
+    ArtifactSignalPathsV2,
+    ArtifactSignalValidationSpecV2,
     ArtifactTimelineCoverageV2,
     BacktestArtifactLoaderV2,
+    SignalRuleEvaluationRequestV2,
     artifact_market_id_from_coordinates_v2,
     inactive_artifact_slot_v2,
+    validate_artifact_slot_v2,
 )
+from .signal_rules_engine_v2 import BacktestSignalRulesEngineV2
 
 _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2 = "1m"
 _CANONICAL_CANDLE_SOURCE_LITERAL_V2 = "market_data.canonical_candles_1m"
 _PRECOMPUTE_GENERATOR_LITERAL_V2 = "backtest-artifact-precompute-runner-v2"
-_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r3-03"
+_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r4-02"
 _ONE_MINUTE_MILLIS_V2 = 60 * 1000
 _ROLLED_PRICE_TIMEFRAME_LITERALS_V2 = tuple(
     timeframe
@@ -144,9 +167,42 @@ class _RootManifestScaffoldV2:
 
 
 @dataclass(frozen=True, slots=True)
+class _SignalVariantRowV2:
+    """
+    Internal immutable row descriptor for one exported signal-variant selection.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/indicators/application/dto/variant_key.py
+    """
+
+    inputs_source: str | None
+    variant_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class _SignalArtifactBuildResultV2:
+    """
+    Internal immutable output of one full R4-02 signal materialization pass.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    catalog: ArtifactSignalCatalogV2
+    manifests: tuple[ArtifactSignalManifestDocumentV2, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestArtifactPrecomputeRunnerV2:
     """
-    Materialize canonical `1m` plus rolled request-timeframe price arrays for EPIC R3-02.
+    Materialize canonical prices, mappings, and optional R4-02 signal artifacts.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -159,6 +215,10 @@ class BacktestArtifactPrecomputeRunnerV2:
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2
     artifact_loader: BacktestArtifactLoaderV2
     canonical_candle_reader: CanonicalCandleReader
+    defaults_provider: BacktestGridDefaultsProvider | None = None
+    signal_rules_engine: BacktestSignalRulesEngineV2 | None = None
+    indicator_compute: IndicatorCompute | None = None
+    indicator_grid_builder: GridBuilder | None = None
 
     def __post_init__(self) -> None:
         """
@@ -188,6 +248,28 @@ class BacktestArtifactPrecomputeRunnerV2:
         if self.canonical_candle_reader is None:  # type: ignore[truthy-bool]
             raise ValueError(
                 "BacktestArtifactPrecomputeRunnerV2.canonical_candle_reader is required"
+            )
+        signal_dependencies = (
+            self.defaults_provider,
+            self.signal_rules_engine,
+            self.indicator_compute,
+            self.indicator_grid_builder,
+        )
+        if any(dependency is not None for dependency in signal_dependencies) and any(
+            dependency is None for dependency in signal_dependencies
+        ):
+            raise ValueError(
+                "BacktestArtifactPrecomputeRunnerV2 signal materialization requires "
+                "defaults_provider, signal_rules_engine, indicator_compute, and "
+                "indicator_grid_builder together"
+            )
+        if len(self.runtime_settings.signal_artifacts) > 0 and any(
+            dependency is None for dependency in signal_dependencies
+        ):
+            raise ValueError(
+                "BacktestArtifactPrecomputeRunnerV2 signal_artifacts require "
+                "defaults_provider, signal_rules_engine, indicator_compute, and "
+                "indicator_grid_builder"
             )
 
     def export_canonical_price_1m(
@@ -306,18 +388,48 @@ class BacktestArtifactPrecomputeRunnerV2:
             mapping_tail_bars_1m=self.runtime_settings.mapping_tail_bars_1m,
         )
         scaffold = _build_root_manifest_scaffold_v2(existing_manifest=existing_manifest)
+        price_manifest_by_timeframe = {
+            section.timeframe: section
+            for section in (one_minute_manifest, *rolled_price_manifests)
+        }
+        signal_build_result = _materialize_signal_artifacts_v2(
+            artifact_loader=self.artifact_loader,
+            coordinates=request.coordinates,
+            slot=inactive_slot,
+            slot_root=slot_root,
+            request=request,
+            slot_generation=target_slot_generation,
+            runtime_settings=self.runtime_settings,
+            signal_targets=self.runtime_settings.signal_artifacts,
+            price_manifest_by_timeframe=price_manifest_by_timeframe,
+            defaults_provider=self.defaults_provider,
+            signal_rules_engine=self.signal_rules_engine,
+            indicator_compute=self.indicator_compute,
+            indicator_grid_builder=self.indicator_grid_builder,
+        )
+        root_signals = (
+            scaffold.signals if signal_build_result is None else signal_build_result.catalog
+        )
+        effective_scaffold = _RootManifestScaffoldV2(
+            preserved_prices=scaffold.preserved_prices,
+            mappings=scaffold.mappings,
+            signals=root_signals,
+            hit_times=scaffold.hit_times,
+            signal_encoding=scaffold.signal_encoding,
+        )
         provenance = _build_root_manifest_provenance_v2(
             runtime_settings=self.runtime_settings,
             request=request,
             arrays=materialized_arrays,
             rolled_sections=rolled_price_manifests,
             mapping_sections=mapping_manifests,
+            signal_entries=root_signals.manifests,
         )
         root_manifest_payload = _build_root_manifest_payload_v2(
             request=request,
             slot=inactive_slot,
             slot_generation=target_slot_generation,
-            root_scaffold=scaffold,
+            root_scaffold=effective_scaffold,
             price_manifests=(one_minute_manifest, *rolled_price_manifests),
             mapping_manifests=mapping_manifests,
             provenance=provenance,
@@ -339,6 +451,733 @@ class BacktestArtifactPrecomputeRunnerV2:
             ),
             rewritten_tail_bars=int(tail_arrays.open_time.shape[0]),
         )
+
+
+def _materialize_signal_artifacts_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_root: Path,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_targets: tuple[ArtifactSignalValidationSpecV2, ...],
+    price_manifest_by_timeframe: Mapping[str, ArtifactPriceTimeframeManifestV2],
+    defaults_provider: BacktestGridDefaultsProvider | None,
+    signal_rules_engine: BacktestSignalRulesEngineV2 | None,
+    indicator_compute: IndicatorCompute | None,
+    indicator_grid_builder: GridBuilder | None,
+) -> _SignalArtifactBuildResultV2 | None:
+    """
+    Materialize all configured R4-02 signal artifacts for the current inactive slot.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader used to resolve signal and price paths.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Inactive slot literal receiving the signal artifacts.
+        slot_root: Absolute inactive-slot root directory.
+        request: Explicit export request carrying slot identity and timestamps.
+        runtime_settings: Strict runner runtime settings with signal target and guard budgets.
+        signal_targets: Canonically ordered `(timeframe, indicator_id)` signal targets.
+        price_manifest_by_timeframe: Fresh materialized price sections keyed by timeframe.
+        defaults_provider: Runtime defaults provider for compute grids and signal defaults.
+        signal_rules_engine: Startup-validated signal rules engine.
+        indicator_compute: Indicator compute port used for tensor materialization.
+        indicator_grid_builder: Grid builder used for deterministic variant ordering.
+    Returns:
+        _SignalArtifactBuildResultV2 | None: Real signal catalog/manifests when targets are
+            configured, otherwise `None`.
+    Assumptions:
+        R4-02 owns only explicitly configured signal targets and must not discover directories.
+    Raises:
+        ValueError: If one signal dependency is missing, one target lacks a price manifest, or one
+            materialized signal artifact violates the strict contract.
+        OSError: If writing signal arrays or manifests fails.
+    Side Effects:
+        Writes `signals/<tf>/<indicator_id>/signals.i8.npy` and `manifest.yaml` files.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if len(signal_targets) == 0:
+        return None
+    if (
+        defaults_provider is None
+        or signal_rules_engine is None
+        or indicator_compute is None
+        or indicator_grid_builder is None
+    ):
+        raise ValueError(
+            "R4-02 signal materialization requires defaults_provider, "
+            "signal_rules_engine, indicator_compute, and indicator_grid_builder"
+        )
+
+    manifests: list[ArtifactSignalManifestDocumentV2] = []
+    catalog_entries: list[ArtifactSignalCatalogEntryV2] = []
+    for signal_target in signal_targets:
+        price_manifest = price_manifest_by_timeframe.get(signal_target.timeframe)
+        if price_manifest is None:
+            raise ValueError(
+                "signal target requires materialized prices for timeframe "
+                f"{signal_target.timeframe!r}"
+            )
+        signal_manifest = _materialize_signal_artifact_v2(
+            artifact_loader=artifact_loader,
+            coordinates=coordinates,
+            slot=slot,
+            slot_root=slot_root,
+            request=request,
+            slot_generation=slot_generation,
+            runtime_settings=runtime_settings,
+            signal_target=signal_target,
+            price_manifest=price_manifest,
+            defaults_provider=defaults_provider,
+            signal_rules_engine=signal_rules_engine,
+            indicator_compute=indicator_compute,
+            indicator_grid_builder=indicator_grid_builder,
+        )
+        manifests.append(signal_manifest)
+        catalog_entries.append(
+            ArtifactSignalCatalogEntryV2(
+                timeframe=signal_manifest.timeframe,
+                indicator_id=signal_manifest.indicator_id,
+                manifest_path=_slot_relative_path_v2(
+                    slot_root=slot_root,
+                    absolute_path=signal_manifest.path,
+                ),
+                manifest_sha256=_file_sha256_hex_v2(signal_manifest.path),
+            )
+        )
+    return _SignalArtifactBuildResultV2(
+        catalog=ArtifactSignalCatalogV2(
+            supported_timeframes=tuple(entry.timeframe for entry in catalog_entries),
+            supported_indicator_ids=tuple(entry.indicator_id for entry in catalog_entries),
+            manifests=tuple(catalog_entries),
+        ),
+        manifests=tuple(manifests),
+    )
+
+
+def _materialize_signal_artifact_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_root: Path,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+    price_manifest: ArtifactPriceTimeframeManifestV2,
+    defaults_provider: BacktestGridDefaultsProvider,
+    signal_rules_engine: BacktestSignalRulesEngineV2,
+    indicator_compute: IndicatorCompute,
+    indicator_grid_builder: GridBuilder,
+) -> ArtifactSignalManifestDocumentV2:
+    """
+    Materialize one strict per-timeframe/per-indicator signal artifact family.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader used to resolve fixed output paths.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Inactive slot literal receiving the signal artifact.
+        slot_root: Absolute inactive-slot root directory.
+        request: Explicit export request carrying root identity and timestamps.
+        runtime_settings: Strict runtime settings with signal guard budgets.
+        signal_target: Explicit `(timeframe, indicator_id)` materialization target.
+        price_manifest: Fresh materialized price section for the same timeframe.
+        defaults_provider: Runtime defaults provider for compute grids and signal defaults.
+        signal_rules_engine: Startup-validated signal rules engine.
+        indicator_compute: Indicator compute port used for primary/dependency tensors.
+        indicator_grid_builder: Grid builder used for deterministic variant ordering.
+    Returns:
+        ArtifactSignalManifestDocumentV2: Typed strict signal manifest describing the written
+            artifact family.
+    Assumptions:
+        Signal rows reuse v1 variant-key semantics and the fixed `[variant, time]` matrix layout.
+    Raises:
+        ValueError: If defaults, tensor shapes, value sets, or dependency alignment drift.
+        OSError: If writing the signal matrix or manifest fails.
+    Side Effects:
+        Loads price arrays for the target timeframe and writes signal files under the slot root.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    price_arrays = _load_materialized_price_arrays_v2(
+        artifact_loader=artifact_loader,
+        coordinates=coordinates,
+        slot=slot,
+        timeframe=signal_target.timeframe,
+        manifest_section=price_manifest,
+        location_prefix=(
+            "materialized prices for signal export "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}"
+        ),
+    )
+    candles = _candle_arrays_from_price_arrays_v2(
+        coordinates=coordinates,
+        timeframe=signal_target.timeframe,
+        arrays=price_arrays,
+    )
+    defaults_grid = defaults_provider.compute_defaults(indicator_id=signal_target.indicator_id)
+    if defaults_grid is None:
+        raise ValueError(
+            "signal target requires compute defaults for indicator_id "
+            f"{signal_target.indicator_id!r}"
+        )
+    compute_grid = _grid_with_layout_v2(
+        grid=defaults_grid,
+        indicator_id=signal_target.indicator_id,
+        layout=Layout.VARIANT_MAJOR,
+    )
+    materialized_grid = indicator_grid_builder.materialize_indicator(grid=compute_grid)
+    primary_tensor = indicator_compute.compute(
+        ComputeRequest(
+            candles=candles,
+            grid=compute_grid,
+            max_variants_guard=runtime_settings.max_signal_rows_per_artifact,
+        )
+    )
+    signal_rows = _build_signal_variant_rows_v2(
+        coordinates=coordinates,
+        timeframe=signal_target.timeframe,
+        materialized_grid=materialized_grid,
+    )
+    if len(signal_rows) != primary_tensor.meta.variants:
+        raise ValueError(
+            "signal variant ordering drift detected for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; "
+            f"grid rows={len(signal_rows)!r}, tensor variants={primary_tensor.meta.variants!r}"
+        )
+    dependency_tensors = _compute_signal_dependency_tensors_v2(
+        candles=candles,
+        compute_grid=compute_grid,
+        indicator_id=signal_target.indicator_id,
+        indicator_compute=indicator_compute,
+        max_signal_rows_per_artifact=runtime_settings.max_signal_rows_per_artifact,
+        signal_rules_engine=signal_rules_engine,
+        expected_variants=primary_tensor.meta.variants,
+        expected_t=primary_tensor.meta.t,
+    )
+    signal_matrix, signal_params_defaults = _evaluate_signal_matrix_v2(
+        candles=candles,
+        indicator_id=signal_target.indicator_id,
+        primary_tensor=primary_tensor,
+        dependency_tensors=dependency_tensors,
+        signal_rows=signal_rows,
+        signal_rules_engine=signal_rules_engine,
+    )
+    signal_paths = artifact_loader.resolve_signal_paths(
+        coordinates,
+        slot,
+        signal_target.timeframe,
+        signal_target.indicator_id,
+    )
+    _write_npy_atomically_v2(path=signal_paths.signals, array=signal_matrix)
+    signal_manifest = _build_signal_manifest_v2(
+        coordinates=coordinates,
+        slot=slot,
+        slot_root=slot_root,
+        request=request,
+        slot_generation=slot_generation,
+        runtime_settings=runtime_settings,
+        signal_target=signal_target,
+        signal_paths=signal_paths,
+        signal_matrix=signal_matrix,
+        timeline=_timeline_coverage_from_arrays_v2(arrays=price_arrays),
+        price_manifest=price_manifest,
+        signal_rows=signal_rows,
+        signal_params_defaults=signal_params_defaults,
+        signal_rules_engine=signal_rules_engine,
+    )
+    _write_yaml_atomically_v2(
+        path=signal_paths.manifest,
+        payload=_serialize_signal_manifest_v2(signal_manifest),
+    )
+    return signal_manifest
+
+
+def _candle_arrays_from_price_arrays_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    timeframe: str,
+    arrays: _CanonicalPriceArraysV2,
+) -> CandleArrays:
+    """
+    Convert one materialized `prices/<tf>` family into `CandleArrays` for indicator compute.
+
+    Args:
+        coordinates: Artifact coordinates selecting one symbol root.
+        timeframe: Price timeframe literal represented by the arrays.
+        arrays: Strict price arrays already validated and loaded from disk.
+    Returns:
+        CandleArrays: Dense OHLCV arrays aligned to the target timeframe timeline.
+    Assumptions:
+        Price arrays already satisfy strict dtype/shape/timeline invariants before conversion.
+    Raises:
+        ValueError: If `CandleArrays` construction detects one alignment drift.
+    Side Effects:
+        Allocates contiguous float32 column vectors for indicator compute.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/candle_arrays.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    return CandleArrays(
+        market_id=MarketId(artifact_market_id_from_coordinates_v2(coordinates)),
+        symbol=Symbol(coordinates.symbol),
+        time_range=TimeRange(
+            start=_epoch_millis_to_utc_timestamp_v2(int(arrays.open_time[0])),
+            end=_epoch_millis_to_utc_timestamp_v2(int(arrays.close_time[-1])),
+        ),
+        timeframe=Timeframe(timeframe),
+        ts_open=np.ascontiguousarray(arrays.open_time, dtype=np.int64),
+        open=np.ascontiguousarray(arrays.ohlcv[:, 0], dtype=np.float32),
+        high=np.ascontiguousarray(arrays.ohlcv[:, 1], dtype=np.float32),
+        low=np.ascontiguousarray(arrays.ohlcv[:, 2], dtype=np.float32),
+        close=np.ascontiguousarray(arrays.ohlcv[:, 3], dtype=np.float32),
+        volume=np.ascontiguousarray(arrays.ohlcv[:, 4], dtype=np.float32),
+    )
+
+
+def _grid_with_layout_v2(
+    *,
+    grid: GridSpec,
+    indicator_id: str,
+    layout: Layout,
+) -> GridSpec:
+    """
+    Clone one defaults grid with explicit indicator id and layout preference.
+
+    Args:
+        grid: Source compute defaults grid.
+        indicator_id: Indicator identifier to assign to the cloned grid.
+        layout: Explicit tensor layout preference for compute.
+    Returns:
+        GridSpec: Cloned grid preserving params/source while replacing id/layout.
+    Assumptions:
+        R4-02 signal export always requests `variant_major` tensors for direct `[V, T]` writes.
+    Raises:
+        ValueError: If the cloned indicator id or grid payload is invalid.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/indicators/domain/specifications/grid_spec.py
+      - src/trading/contexts/indicators/domain/entities/layout.py
+    """
+    return GridSpec(
+        indicator_id=IndicatorId(indicator_id),
+        params=grid.params,
+        source=grid.source,
+        layout_preference=layout,
+    )
+
+
+def _build_signal_variant_rows_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    timeframe: str,
+    materialized_grid: Any,
+) -> tuple[_SignalVariantRowV2, ...]:
+    """
+    Build deterministic signal row descriptors matching the compute tensor variant order.
+
+    Args:
+        coordinates: Artifact coordinates used for v1 variant-key identity.
+        timeframe: Signal timeframe literal.
+        materialized_grid: Materialized indicator grid returned by `GridBuilder`.
+    Returns:
+        tuple[_SignalVariantRowV2, ...]: Ordered signal-row descriptors for `[V, T_tf]` export.
+    Assumptions:
+        Variant flattening order matches axis cartesian-product order with the last axis varying
+        fastest, consistent with compute tensor materialization.
+    Raises:
+        ValueError: If variant-key construction fails for one explicit row.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/variant_key.py
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+    """
+    instrument_id = str(_instrument_id_from_coordinates_v2(coordinates))
+    axis_values = tuple(axis.values for axis in materialized_grid.axes)
+    ordered_value_rows = product(*axis_values) if len(axis_values) > 0 else ((),)
+    rows: list[_SignalVariantRowV2] = []
+    for value_row in ordered_value_rows:
+        inputs: dict[str, int | float | str] = {}
+        params: dict[str, int | float | str] = {}
+        resolved_source: str | None = None
+        for axis, value in zip(materialized_grid.axes, value_row):
+            if axis.name == "source":
+                resolved_source = str(value)
+                inputs["source"] = resolved_source
+                continue
+            params[axis.name] = value
+        rows.append(
+            _SignalVariantRowV2(
+                inputs_source=resolved_source,
+                variant_key=build_variant_key_v1(
+                    instrument_id=instrument_id,
+                    timeframe=timeframe,
+                    indicators=(
+                        IndicatorVariantSelection(
+                            indicator_id=materialized_grid.indicator_id,
+                            inputs=inputs,
+                            params=params,
+                        ),
+                    ),
+                ),
+            )
+        )
+    return tuple(rows)
+
+
+def _compute_signal_dependency_tensors_v2(
+    *,
+    candles: CandleArrays,
+    compute_grid: GridSpec,
+    indicator_id: str,
+    indicator_compute: IndicatorCompute,
+    max_signal_rows_per_artifact: int,
+    signal_rules_engine: BacktestSignalRulesEngineV2,
+    expected_variants: int,
+    expected_t: int,
+) -> Mapping[str, Any]:
+    """
+    Compute dependency tensors required by one signal rule family.
+
+    Args:
+        candles: Dense candle arrays aligned to the target signal timeframe.
+        compute_grid: Primary indicator grid used for the target indicator.
+        indicator_id: Primary indicator identifier.
+        indicator_compute: Indicator compute port used for dependency tensors.
+        max_signal_rows_per_artifact: Strict compute guard for dependency grids.
+        signal_rules_engine: Explicit signal rules engine used to resolve dependency ids.
+        expected_variants: Expected variant count shared with the primary tensor.
+        expected_t: Expected timeline length shared with the primary tensor.
+    Returns:
+        Mapping[str, Any]: Dependency tensors keyed by dependency indicator id.
+    Assumptions:
+        Wrapper dependencies reuse the same parameterization and row ordering as the primary grid.
+    Raises:
+        ValueError: If one dependency tensor drifts in variant count or timeline length.
+    Side Effects:
+        Computes additional indicator tensors for composite signal rule families.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
+    """
+    dependency_tensors: dict[str, Any] = {}
+    dependency_ids = signal_rules_engine.rule_spec(
+        indicator_id=indicator_id
+    ).required_dependency_ids
+    for dependency_id in dependency_ids:
+        dependency_grid = _grid_with_layout_v2(
+            grid=compute_grid,
+            indicator_id=dependency_id,
+            layout=Layout.VARIANT_MAJOR,
+        )
+        tensor = indicator_compute.compute(
+            ComputeRequest(
+                candles=candles,
+                grid=dependency_grid,
+                max_variants_guard=max_signal_rows_per_artifact,
+            )
+        )
+        if tensor.meta.variants != expected_variants:
+            raise ValueError(
+                "signal dependency variants must match primary grid for "
+                f"{indicator_id!r}; dependency {dependency_id!r} produced "
+                f"{tensor.meta.variants!r}, expected {expected_variants!r}"
+            )
+        if tensor.meta.t != expected_t:
+            raise ValueError(
+                "signal dependency timeline length must match primary grid for "
+                f"{indicator_id!r}; dependency {dependency_id!r} produced "
+                f"{tensor.meta.t!r}, expected {expected_t!r}"
+            )
+        dependency_tensors[dependency_id] = tensor
+    return dependency_tensors
+
+
+def _evaluate_signal_matrix_v2(
+    *,
+    candles: CandleArrays,
+    indicator_id: str,
+    primary_tensor: Any,
+    dependency_tensors: Mapping[str, Any],
+    signal_rows: tuple[_SignalVariantRowV2, ...],
+    signal_rules_engine: BacktestSignalRulesEngineV2,
+) -> tuple[np.ndarray, Mapping[str, Any]]:
+    """
+    Evaluate compact `int8` signals for every row in the exported signal matrix.
+
+    Args:
+        candles: Dense candle arrays aligned to the target signal timeframe.
+        indicator_id: Primary indicator identifier.
+        primary_tensor: Computed primary indicator tensor.
+        dependency_tensors: Dependency tensors keyed by indicator id.
+        signal_rows: Ordered row descriptors matching tensor variant order.
+        signal_rules_engine: Explicit signal rules engine preserving R4-01 semantics.
+    Returns:
+        tuple[np.ndarray, Mapping[str, Any]]: Export-ready signal matrix and the resolved
+            `signals.v1.params` default mapping serialized into the manifest grid section.
+    Assumptions:
+        Every row uses the same `signals.v1.params` defaults under the default-only contract.
+    Raises:
+        ValueError: If one evaluated series shape or value set violates the strict matrix
+            contract.
+    Side Effects:
+        Allocates one contiguous `int8` matrix in memory.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+    """
+    row_count = int(primary_tensor.meta.variants)
+    time_count = int(primary_tensor.meta.t)
+    signal_matrix = np.empty((row_count, time_count), dtype=np.int8)
+    resolved_signal_params_defaults: Mapping[str, Any] | None = None
+    for row_index, signal_row in enumerate(signal_rows):
+        dependency_outputs = {
+            dependency_id: indicator_primary_output_series_from_tensor_v1(
+                tensor=dependency_tensor,
+                variant_index=row_index,
+            )
+            for dependency_id, dependency_tensor in dependency_tensors.items()
+        }
+        evaluation_result = signal_rules_engine.evaluate(
+            request=SignalRuleEvaluationRequestV2(
+                indicator_id=indicator_id,
+                candles=candles,
+                primary_output=indicator_primary_output_series_from_tensor_v1(
+                    tensor=primary_tensor,
+                    variant_index=row_index,
+                ),
+                inputs_source=signal_row.inputs_source,
+                signal_params={},
+                dependency_outputs=dependency_outputs,
+            )
+        )
+        signal_matrix[row_index, :] = evaluation_result.signal_codes
+        if resolved_signal_params_defaults is None:
+            resolved_signal_params_defaults = evaluation_result.signal_params
+    _validate_signal_matrix_v2(
+        signal_matrix=signal_matrix,
+        expected_shape=(row_count, time_count),
+        label=f"signals[{indicator_id}]",
+    )
+    return signal_matrix, dict(resolved_signal_params_defaults or {})
+
+
+def _validate_signal_matrix_v2(
+    *,
+    signal_matrix: np.ndarray,
+    expected_shape: tuple[int, int],
+    label: str,
+) -> None:
+    """
+    Validate strict R4-02 signal matrix dtype, shape, and encoded value-set invariants.
+
+    Args:
+        signal_matrix: Candidate compact signal matrix.
+        expected_shape: Expected `[V, T_tf]` shape.
+        label: Stable human-readable label used in fail-fast diagnostics.
+    Returns:
+        None.
+    Assumptions:
+        Signal matrices are stored only as `int8` with the fixed `{-1,0,1}` encoding.
+    Raises:
+        ValueError: If dtype, shape, dimensionality, or encoded values drift from the contract.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    if signal_matrix.dtype.name != ARTIFACT_SIGNAL_DTYPE_LITERAL_V2:
+        raise ValueError(
+            f"{label} dtype must be {ARTIFACT_SIGNAL_DTYPE_LITERAL_V2}; "
+            f"got {signal_matrix.dtype.name!r}"
+        )
+    if signal_matrix.ndim != 2:
+        raise ValueError(f"{label} shape must be [V, T_tf]; got {signal_matrix.shape!r}")
+    if signal_matrix.shape != expected_shape:
+        raise ValueError(f"{label} shape must be {expected_shape!r}; got {signal_matrix.shape!r}")
+    invalid_mask = (
+        (signal_matrix != ARTIFACT_SIGNAL_VALUE_SET_V2[0])
+        & (signal_matrix != ARTIFACT_SIGNAL_VALUE_SET_V2[1])
+        & (signal_matrix != ARTIFACT_SIGNAL_VALUE_SET_V2[2])
+    )
+    if np.any(invalid_mask):
+        raise ValueError(f"{label} values must be exactly {ARTIFACT_SIGNAL_VALUE_SET_V2!r}")
+
+
+def _build_signal_manifest_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_root: Path,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+    signal_paths: ArtifactSignalPathsV2,
+    signal_matrix: np.ndarray,
+    timeline: ArtifactTimelineCoverageV2,
+    price_manifest: ArtifactPriceTimeframeManifestV2,
+    signal_rows: tuple[_SignalVariantRowV2, ...],
+    signal_params_defaults: Mapping[str, Any],
+    signal_rules_engine: BacktestSignalRulesEngineV2,
+) -> ArtifactSignalManifestDocumentV2:
+    """
+    Build the strict typed per-indicator signal manifest for one freshly written matrix.
+
+    Args:
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Inactive slot literal receiving the manifest.
+        slot_root: Absolute inactive-slot root directory.
+        request: Explicit export request carrying root identity and timestamps.
+        runtime_settings: Strict runtime settings contributing config hash and guards.
+        signal_target: Explicit `(timeframe, indicator_id)` materialization target.
+        signal_paths: Fixed signal file paths under the inactive slot.
+        signal_matrix: Freshly written compact signal matrix.
+        timeline: Timeline coverage matching the target `prices/<tf>` manifest.
+        price_manifest: Fresh target timeframe price section used for provenance hashing.
+        signal_rows: Ordered signal row descriptors used for `variant_keys_sha256`.
+        signal_params_defaults: Resolved `signals.v1.params` default mapping.
+        signal_rules_engine: Explicit signal rules engine used to capture dependency metadata.
+    Returns:
+        ArtifactSignalManifestDocumentV2: Typed strict signal manifest.
+    Assumptions:
+        The signal file already exists on disk and is ready for `sha256` hashing.
+    Raises:
+        ValueError: If one manifest field violates the strict typed contract.
+        OSError: If one written signal file cannot be hashed.
+    Side Effects:
+        Reads the freshly written signal matrix file to compute its manifest hash.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    validated_slot = validate_artifact_slot_v2(slot)
+    signal_metadata = ArtifactArrayMetadataV2(
+        path=_slot_relative_path_v2(slot_root=slot_root, absolute_path=signal_paths.signals),
+        dtype=signal_matrix.dtype.name,
+        shape=tuple(int(value) for value in signal_matrix.shape),
+        axis_order=ARTIFACT_SIGNAL_AXIS_ORDER_V2,
+        sha256=_file_sha256_hex_v2(signal_paths.signals),
+    )
+    grid_contract = ArtifactSignalGridContractV2(
+        variant_key_version=1,
+        variant_keys_sha256=_variant_keys_sha256_v2(signal_rows=signal_rows),
+        signals_v1_params_defaults=signal_params_defaults,
+    )
+    provenance = _build_signal_manifest_provenance_v2(
+        coordinates=coordinates,
+        request=request,
+        slot_generation=slot_generation,
+        runtime_settings=runtime_settings,
+        signal_target=signal_target,
+        price_manifest=price_manifest,
+        grid_contract=grid_contract,
+        timeline=timeline,
+        signal_rules_engine=signal_rules_engine,
+        signal_params_defaults=signal_params_defaults,
+    )
+    payload = {
+        "schema_version": SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+        "manifest_kind": SIGNAL_ARTIFACT_MANIFEST_KIND_V2,
+        "slot": validated_slot,
+        "slot_generation": slot_generation,
+        "asof_date": request.asof_date,
+        "indicator_id": signal_target.indicator_id,
+        "timeframe": signal_target.timeframe,
+        "signals": _serialize_array_metadata_v2(signal_metadata),
+        "rows_count": int(signal_matrix.shape[0]),
+        "timeline": _serialize_timeline_coverage_v2(timeline),
+        "signal_value_set": [int(value) for value in ARTIFACT_SIGNAL_VALUE_SET_V2],
+        "grid": _serialize_signal_grid_contract_v2(grid_contract),
+        "provenance": _serialize_provenance_v2(provenance),
+    }
+    return ArtifactSignalManifestDocumentV2(
+        path=signal_paths.manifest,
+        raw_payload=payload,
+        slot=validated_slot,
+        schema_version=SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+        manifest_kind=SIGNAL_ARTIFACT_MANIFEST_KIND_V2,
+        slot_generation=slot_generation,
+        asof_date=request.asof_date,
+        indicator_id=signal_target.indicator_id,
+        timeframe=signal_target.timeframe,
+        signals=signal_metadata,
+        rows_count=int(signal_matrix.shape[0]),
+        timeline=timeline,
+        signal_value_set=ARTIFACT_SIGNAL_VALUE_SET_V2,
+        grid=grid_contract,
+        provenance=provenance,
+    )
+
+
+def _variant_keys_sha256_v2(
+    *,
+    signal_rows: tuple[_SignalVariantRowV2, ...],
+) -> str:
+    """
+    Hash the ordered variant-key catalog used by one signal matrix.
+
+    Args:
+        signal_rows: Ordered signal row descriptors for the matrix.
+    Returns:
+        str: Lowercase SHA-256 digest of the ordered variant-key list.
+    Assumptions:
+        Runtime row addressing depends only on variant-key order, not on manifest formatting.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/variant_key.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    canonical_json = json.dumps(
+        [row.variant_key for row in signal_rows],
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
 def _load_existing_inactive_manifest_v2(
@@ -2243,6 +3082,145 @@ def _default_signal_encoding_contract_v2() -> ArtifactSignalEncodingContractV2:
     )
 
 
+def _build_signal_manifest_provenance_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+    price_manifest: ArtifactPriceTimeframeManifestV2,
+    grid_contract: ArtifactSignalGridContractV2,
+    timeline: ArtifactTimelineCoverageV2,
+    signal_rules_engine: BacktestSignalRulesEngineV2,
+    signal_params_defaults: Mapping[str, Any],
+) -> ArtifactManifestProvenanceV2:
+    """
+    Build deterministic provenance for one strict per-indicator signal manifest.
+
+    Args:
+        coordinates: Artifact coordinates selecting one symbol root.
+        request: Explicit export request identity.
+        slot_generation: Target inactive-slot generation assigned to the build.
+        runtime_settings: Strict runtime settings contributing the config hash.
+        signal_target: Explicit `(timeframe, indicator_id)` materialization target.
+        price_manifest: Fresh target timeframe price section used as source-of-truth timeline.
+        grid_contract: Strict grid metadata carrying `variant_keys_sha256`.
+        timeline: Timeline coverage serialized into the signal manifest.
+        signal_rules_engine: Explicit rules engine used to resolve dependency metadata.
+        signal_params_defaults: Resolved default-only signal parameter mapping.
+    Returns:
+        ArtifactManifestProvenanceV2: Strict signal-manifest provenance payload.
+    Assumptions:
+        Per-manifest provenance hashes source identity and row-order metadata, not YAML bytes.
+    Raises:
+        TypeError: If provenance hashing encounters an unsupported JSON payload.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return ArtifactManifestProvenanceV2(
+        generator=_PRECOMPUTE_GENERATOR_LITERAL_V2,
+        generator_version=_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2,
+        generated_at_utc=request.generated_at_utc,
+        config_sha256=runtime_settings.config_sha256,
+        inputs_sha256=_build_signal_manifest_inputs_sha256_v2(
+            coordinates=coordinates,
+            request=request,
+            slot_generation=slot_generation,
+            signal_target=signal_target,
+            price_manifest=price_manifest,
+            grid_contract=grid_contract,
+            timeline=timeline,
+            required_dependency_ids=signal_rules_engine.rule_spec(
+                indicator_id=signal_target.indicator_id
+            ).required_dependency_ids,
+            signal_params_defaults=signal_params_defaults,
+        ),
+    )
+
+
+def _build_signal_manifest_inputs_sha256_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    signal_target: ArtifactSignalValidationSpecV2,
+    price_manifest: ArtifactPriceTimeframeManifestV2,
+    grid_contract: ArtifactSignalGridContractV2,
+    timeline: ArtifactTimelineCoverageV2,
+    required_dependency_ids: tuple[str, ...],
+    signal_params_defaults: Mapping[str, Any],
+) -> str:
+    """
+    Hash normalized signal-manifest source identity into deterministic provenance.
+
+    Args:
+        coordinates: Artifact coordinates selecting one symbol root.
+        request: Explicit export request identity.
+        slot_generation: Target inactive-slot generation assigned to the build.
+        signal_target: Explicit `(timeframe, indicator_id)` materialization target.
+        price_manifest: Fresh source price section for the target timeframe.
+        grid_contract: Strict grid metadata carrying the ordered variant-key hash.
+        timeline: Timeline coverage serialized into the signal manifest.
+        required_dependency_ids: Dependency indicator ids required by the rule family.
+        signal_params_defaults: Resolved default-only signal parameter mapping.
+    Returns:
+        str: Lowercase SHA-256 hex digest.
+    Assumptions:
+        The hash tracks source identity and row ordering rather than manifest serialization bytes.
+    Raises:
+        TypeError: If canonical JSON serialization receives an unsupported payload.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    canonical_payload = json.dumps(
+        {
+            "coordinates": {
+                "exchange": coordinates.exchange,
+                "market_type": coordinates.market_type,
+                "symbol": coordinates.symbol,
+            },
+            "time_range": {
+                "start": _utc_timestamp_to_epoch_millis_v2(request.time_range.start),
+                "end": _utc_timestamp_to_epoch_millis_v2(request.time_range.end),
+            },
+            "slot_generation": slot_generation,
+            "asof_date": request.asof_date,
+            "timeframe": signal_target.timeframe,
+            "indicator_id": signal_target.indicator_id,
+            "required_dependency_ids": required_dependency_ids,
+            "price_manifest_sha256": {
+                "open_time": price_manifest.open_time.sha256,
+                "close_time": price_manifest.close_time.sha256,
+                "ohlcv": price_manifest.ohlcv.sha256,
+            },
+            "timeline": _serialize_timeline_coverage_v2(timeline),
+            "grid": {
+                "variant_key_version": grid_contract.variant_key_version,
+                "variant_keys_sha256": grid_contract.variant_keys_sha256,
+            },
+            "signals_v1_params_defaults": signal_params_defaults,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+
+
 def _build_root_manifest_provenance_v2(
     *,
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
@@ -2250,6 +3228,7 @@ def _build_root_manifest_provenance_v2(
     arrays: _CanonicalPriceArraysV2,
     rolled_sections: tuple[ArtifactPriceTimeframeManifestV2, ...],
     mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
+    signal_entries: tuple[ArtifactSignalCatalogEntryV2, ...] = (),
 ) -> ArtifactManifestProvenanceV2:
     """
     Build deterministic root-manifest provenance for canonical prices, rolled prices, and
@@ -2261,6 +3240,8 @@ def _build_root_manifest_provenance_v2(
         arrays: Final merged canonical `1m` arrays written into the inactive slot.
         rolled_sections: Rolled price-manifest sections emitted during the same R3-03 build.
         mapping_sections: Mapping-manifest sections emitted during the same R3-03 build.
+        signal_entries: Signal catalog entries emitted during the same build when R4-02 is
+            enabled.
     Returns:
         ArtifactManifestProvenanceV2: Strict provenance payload for the root manifest.
     Assumptions:
@@ -2286,6 +3267,7 @@ def _build_root_manifest_provenance_v2(
             arrays=arrays,
             rolled_sections=rolled_sections,
             mapping_sections=mapping_sections,
+            signal_entries=signal_entries,
             price_lookback_bars=runtime_settings.price_tail_bars_1m,
             mapping_lookback_bars=runtime_settings.mapping_tail_bars_1m,
         ),
@@ -2298,6 +3280,7 @@ def _build_inputs_sha256_v2(
     arrays: _CanonicalPriceArraysV2,
     rolled_sections: tuple[ArtifactPriceTimeframeManifestV2, ...],
     mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
+    signal_entries: tuple[ArtifactSignalCatalogEntryV2, ...],
     price_lookback_bars: int,
     mapping_lookback_bars: int,
 ) -> str:
@@ -2309,6 +3292,7 @@ def _build_inputs_sha256_v2(
         arrays: Final merged canonical `1m` arrays emitted by the runner.
         rolled_sections: Rolled price-manifest sections emitted by the same build.
         mapping_sections: Mapping-manifest sections emitted by the same build.
+        signal_entries: Signal catalog entries emitted by the same build.
         price_lookback_bars: Effective `lookback_policy.price_tail_bars_1m` used for the build.
         mapping_lookback_bars: Effective `lookback_policy.mapping_tail_bars_1m` used for the
             build.
@@ -2345,6 +3329,9 @@ def _build_inputs_sha256_v2(
             "lookback_policy.mapping_tail_bars_1m": mapping_lookback_bars,
             "rolled_price_timeframes": rolled_timeframes,
             "mapping_timeframes": tuple(section.timeframe for section in mapping_sections),
+            "signal_targets": tuple(
+                (entry.timeframe, entry.indicator_id) for entry in signal_entries
+            ),
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -2381,6 +3368,11 @@ def _build_inputs_sha256_v2(
                 ).encode("ascii")
             )
             digest.update(metadata.sha256.encode("ascii"))
+    for entry in signal_entries:
+        digest.update(entry.timeframe.encode("ascii"))
+        digest.update(entry.indicator_id.encode("ascii"))
+        digest.update(entry.manifest_path.encode("utf-8"))
+        digest.update(entry.manifest_sha256.encode("ascii"))
     return digest.hexdigest()
 
 
@@ -2662,6 +3654,76 @@ def _serialize_signal_catalog_entry_v2(
         "indicator_id": entry.indicator_id,
         "manifest_path": entry.manifest_path,
         "manifest_sha256": entry.manifest_sha256,
+    }
+
+
+def _serialize_signal_manifest_v2(
+    manifest: ArtifactSignalManifestDocumentV2,
+) -> dict[str, Any]:
+    """
+    Serialize one typed strict signal manifest into deterministic YAML-ready payload order.
+
+    Args:
+        manifest: Typed strict signal manifest.
+    Returns:
+        dict[str, Any]: YAML-ready signal manifest payload.
+    Assumptions:
+        Manifest fields are already validated and use canonical slot-relative path literals.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return {
+        "schema_version": manifest.schema_version,
+        "manifest_kind": manifest.manifest_kind,
+        "slot": manifest.slot,
+        "slot_generation": manifest.slot_generation,
+        "asof_date": manifest.asof_date,
+        "indicator_id": manifest.indicator_id,
+        "timeframe": manifest.timeframe,
+        "signals": _serialize_array_metadata_v2(manifest.signals),
+        "rows_count": manifest.rows_count,
+        "timeline": _serialize_timeline_coverage_v2(manifest.timeline),
+        "signal_value_set": [int(value) for value in manifest.signal_value_set],
+        "grid": _serialize_signal_grid_contract_v2(manifest.grid),
+        "provenance": _serialize_provenance_v2(manifest.provenance),
+    }
+
+
+def _serialize_signal_grid_contract_v2(
+    grid: ArtifactSignalGridContractV2,
+) -> dict[str, Any]:
+    """
+    Serialize typed signal-grid metadata into deterministic YAML-ready payload order.
+
+    Args:
+        grid: Typed signal-grid metadata carried by a strict signal manifest.
+    Returns:
+        dict[str, Any]: YAML-ready signal-grid payload.
+    Assumptions:
+        `signals_v1_params_defaults` is already an immutable canonical mapping.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    return {
+        "variant_key_version": grid.variant_key_version,
+        "variant_keys_sha256": grid.variant_keys_sha256,
+        "signals_v1_params_defaults": dict(grid.signals_v1_params_defaults),
     }
 
 
