@@ -8,6 +8,7 @@ from trading.contexts.backtest.adapters.outbound.config import (
     build_backtest_runtime_config_hash,
     load_backtest_runtime_config,
     resolve_backtest_config_path,
+    resolve_backtest_env_name,
 )
 
 _DEFAULT_JOBS_BLOCK = """
@@ -372,6 +373,25 @@ def test_resolve_backtest_config_path_rejects_invalid_env_name() -> None:
     """
     with pytest.raises(ValueError, match="ROEHUB_ENV"):
         resolve_backtest_config_path(environ={"ROEHUB_ENV": "stage"})
+
+
+def test_resolve_backtest_env_name_normalizes_and_defaults() -> None:
+    """
+    Verify shared env resolver normalizes case/whitespace and defaults to `dev`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Artifact and runtime config path helpers share the same env-name contract.
+    Raises:
+        AssertionError: If normalized/default env value is incorrect.
+    Side Effects:
+        None.
+    """
+    assert resolve_backtest_env_name(environ={}) == "dev"
+    assert resolve_backtest_env_name(environ={"ROEHUB_ENV": " PROD "}) == "prod"
 
 
 

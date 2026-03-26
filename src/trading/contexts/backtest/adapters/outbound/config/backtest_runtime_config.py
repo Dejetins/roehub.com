@@ -644,7 +644,7 @@ def resolve_backtest_config_path(
     if override_path:
         return Path(override_path)
 
-    env_name = _resolve_env_name(environ=environ)
+    env_name = resolve_backtest_env_name(environ=environ)
     return Path("configs") / env_name / "backtest.yaml"
 
 
@@ -964,6 +964,31 @@ def _resolve_env_name(*, environ: Mapping[str, str]) -> str:
             f"{_ENV_NAME_KEY} must be one of {_ALLOWED_ENVS}, got {raw_env_name!r}"
         )
     return raw_env_name
+
+
+def resolve_backtest_env_name(*, environ: Mapping[str, str]) -> str:
+    """
+    Resolve normalized Backtest environment name for config-path helpers.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+
+    Args:
+        environ: Runtime environment mapping.
+    Returns:
+        str: One of `dev`, `prod`, or `test`.
+    Assumptions:
+        Missing `ROEHUB_ENV` defaults to `dev`.
+    Raises:
+        ValueError: If runtime env value is unsupported.
+    Side Effects:
+        None.
+    """
+    return _resolve_env_name(environ=environ)
 
 
 

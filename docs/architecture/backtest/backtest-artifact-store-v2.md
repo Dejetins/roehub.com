@@ -1,16 +1,14 @@
-# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03)
+# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04)
 
-Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03`
+Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`
 
 Документ фиксирует:
 
 - R2-01: deterministic layout/path contract для `artifacts/backtest/v2`;
 - R2-02: strict `current.yaml` contract, publish sequence `build inactive slot -> validate whole slot -> atomically switch current.yaml`, slot pinning и publish guard.
 - R2-03: strict manifest schemas, fail-fast slot validators, fixed runtime metadata from manifests.
-
-Что не входит в этот документ:
-
-- R2-04: `configs/<env>/backtest_artifacts.yaml` loader/validator contract.
+- R2-04: strict `configs/<env>/backtest_artifacts.yaml` contract для artifact root,
+  validation plan, hit-times grid и publish/runtime boundary.
 
 Основные источники:
 
@@ -37,6 +35,46 @@ artifacts/backtest/v2
 ```text
 artifacts/backtest/v2/<exchange>/<market_type>/<symbol>/
 ```
+
+## Artifact Runtime Config Contract (R2-04)
+
+Artifact pipeline configuration больше не живёт в `configs/<env>/backtest.yaml`.
+
+Источник правды для artifact runtime/precompute settings:
+
+- `configs/dev/backtest_artifacts.yaml`
+- `configs/test/backtest_artifacts.yaml`
+- `configs/prod/backtest_artifacts.yaml`
+
+Path resolution precedence:
+
+1. `ROEHUB_BACKTEST_ARTIFACTS_CONFIG`
+2. `configs/<ROEHUB_ENV>/backtest_artifacts.yaml`
+
+Strict top-level contract:
+
+- `version`
+- `backtest_artifacts`
+
+Strict `backtest_artifacts` sections:
+
+- `artifact_root`
+- `validation_plan`
+- `hit_times_grid`
+- `slot_policy`
+- `publish_schedule`
+- `lookback_policy`
+- `validation_budgets`
+
+R2-04 guarantees:
+
+- `artifact_root` becomes source-of-truth root for `BacktestArtifactPathBuilderV2`;
+- publish validation plan is translated from frozen config into
+  `ArtifactSlotValidationSpecV2`;
+- missing keys, extra keys, duplicate YAML keys, duplicate sequence items and invalid literals
+  are rejected fail-fast with stable diagnostics;
+- config ordering is canonicalized deterministically for timeframes, signal targets, hit-times
+  grids and slot list.
 
 ## Каноническое дерево
 

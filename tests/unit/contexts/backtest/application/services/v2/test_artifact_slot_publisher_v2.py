@@ -12,6 +12,9 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
 )
+from trading.contexts.backtest.adapters.outbound.config import (
+    load_backtest_artifacts_runtime_config,
+)
 from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services import (
     ArtifactSlotPublishErrorV2,
@@ -76,6 +79,59 @@ class _FakeJobRepository:
         return self.blocked_total
 
 
+def _write_matching_artifact_runtime_config(tmp_path: Path) -> Path:
+    """
+    Write strict artifact config YAML whose validation plan matches synthetic store fixtures.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        Path: Written artifact config path.
+    Assumptions:
+        Synthetic store exposes prices `1m/15m`, mappings `15m`, one `ma.ema` signal, and
+        hit-times manifest.
+    Raises:
+        OSError: If write operation fails.
+    Side Effects:
+        Creates one temp YAML file.
+    """
+    config_path = tmp_path / "backtest_artifacts.yaml"
+    config_path.write_text(
+        """
+version: 1
+backtest_artifacts:
+  artifact_root: artifacts/backtest/v2
+  validation_plan:
+    price_timeframes: [15m, 1m]
+    mapping_timeframes: [15m]
+    signal_artifacts:
+      - timeframe: 15m
+        indicator_id: ma.ema
+    require_hit_times_manifest: true
+  hit_times_grid:
+    tp_levels_pct: [2.0, 1.0]
+    sl_levels_pct: [1.0, 2.0]
+  slot_policy:
+    slots: [slot_b, slot_a]
+  publish_schedule:
+    full_rebuild_hour_utc: 2
+    full_rebuild_minute_utc: 0
+  lookback_policy:
+    price_tail_bars_1m: 100
+    mapping_tail_bars_1m: 100
+    signal_tail_bars_1m: 100
+    hit_times_tail_bars_1m: 100
+  validation_budgets:
+    max_price_bars_per_timeframe: 1000
+    max_mapping_rows_per_timeframe: 1000
+    max_signal_rows_per_artifact: 1000
+    max_hit_times_cells: 10000
+""".strip(),
+        encoding="utf-8",
+    )
+    return config_path
+
+
 def test_backtest_artifact_slot_publisher_v2_switches_current_yaml_after_strict_validation(
     tmp_path: Path,
 ) -> None:
@@ -99,6 +155,9 @@ def test_backtest_artifact_slot_publisher_v2_switches_current_yaml_after_strict_
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
     store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    validation_spec = load_backtest_artifacts_runtime_config(
+        _write_matching_artifact_runtime_config(tmp_path)
+    ).to_validation_spec()
     repository = _FakeJobRepository(blocked_total=0)
     publisher = BacktestArtifactSlotPublisherV2(
         artifact_loader=store.loader,
@@ -110,7 +169,7 @@ def test_backtest_artifact_slot_publisher_v2_switches_current_yaml_after_strict_
     precheck = publisher.precheck_publish(store.coordinates)
     result = publisher.publish(
         precheck=precheck,
-        validation_spec=store.validation_spec,
+        validation_spec=validation_spec,
         asof_date="2026-03-26",
     )
 
@@ -160,6 +219,9 @@ def test_backtest_artifact_slot_publisher_v2_blocks_publish_when_inactive_slot_i
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
     store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    validation_spec = load_backtest_artifacts_runtime_config(
+        _write_matching_artifact_runtime_config(tmp_path)
+    ).to_validation_spec()
     publisher = BacktestArtifactSlotPublisherV2(
         artifact_loader=store.loader,
         current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=store.builder),
@@ -173,7 +235,7 @@ def test_backtest_artifact_slot_publisher_v2_blocks_publish_when_inactive_slot_i
     with pytest.raises(ArtifactSlotPublishErrorV2, match="slot_b"):
         publisher.publish(
             precheck=precheck,
-            validation_spec=store.validation_spec,
+            validation_spec=validation_spec,
             asof_date="2026-03-26",
         )
 
@@ -204,6 +266,9 @@ def test_backtest_artifact_slot_publisher_v2_rejects_missing_strict_artifact_fil
         tmp_path=tmp_path,
         omit_inactive_files=("prices/1m/ohlcv.f32.npy",),
     )
+    validation_spec = load_backtest_artifacts_runtime_config(
+        _write_matching_artifact_runtime_config(tmp_path)
+    ).to_validation_spec()
     publisher = BacktestArtifactSlotPublisherV2(
         artifact_loader=store.loader,
         current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=store.builder),
@@ -215,7 +280,7 @@ def test_backtest_artifact_slot_publisher_v2_rejects_missing_strict_artifact_fil
     with pytest.raises(ArtifactSlotPublishErrorV2) as error_info:
         publisher.publish(
             precheck=precheck,
-            validation_spec=store.validation_spec,
+            validation_spec=validation_spec,
             asof_date="2026-03-26",
         )
 

@@ -9,8 +9,8 @@
 - Jobs API: `docs/architecture/backtest/backtest-jobs-api-v1.md`
 - Jobs worker: `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
-- Artifact store v2 layout/publish/pinning/validator contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
-- Precompute runner v2 manifest/validator contract: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- Artifact store v2 layout/publish/pinning/validator/config contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- Precompute runner v2 manifest/validator/config-driven publish contract: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Artifact rebuild/publish runbook: `docs/runbooks/backtest-artifacts-rebuild.md`
 
 ## Актуальная политика rollout
@@ -21,6 +21,8 @@
 - Детальные отчёты (`rows/table_md/trades`) загружаются по explicit `variant-report`.
 - Runtime flag `backtest.reporting.eager_top_reports_enabled` оставлен для legacy sync fallback;
   целевой режим v1: lazy-only (`false`).
+- Artifact pipeline settings живут отдельно в `configs/<env>/backtest_artifacts.yaml`; runtime
+  request defaults остаются в `configs/<env>/backtest.yaml`.
 
 ## Проверка согласованности
 

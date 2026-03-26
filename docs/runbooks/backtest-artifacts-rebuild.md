@@ -1,6 +1,8 @@
-# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03)
+# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03 / R2-04)
 
-Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в `artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning, publish guard и strict manifest validation.
+Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в
+`artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning, config-driven validation
+plan и strict manifest validation.
 
 Основные документы:
 
@@ -10,14 +12,41 @@
 
 ## Предусловия
 
+- artifact pipeline contract загружен из strict `configs/<env>/backtest_artifacts.yaml`;
 - symbol root уже существует и содержит `current.yaml`, `slot_a/`, `slot_b/`;
 - опубликованный active slot не мутируется in place;
-- у оператора есть explicit validation plan для `prices`, `signals`, `mappings`, `hit_times`;
+- у оператора есть explicit validation plan для `prices`, `signals`, `mappings`, `hit_times`,
+  полученный из `backtest_artifacts.validation_plan`;
 - background jobs пишут pin metadata:
   - `artifact_slot`
   - `artifact_slot_generation`
   - `artifact_manifest_hash`
   - `artifact_asof_date`
+
+## Artifact Config Source Of Truth
+
+Path resolution precedence:
+
+1. `ROEHUB_BACKTEST_ARTIFACTS_CONFIG`
+2. `configs/<ROEHUB_ENV>/backtest_artifacts.yaml`
+
+Обязательные секции config contract:
+
+- `artifact_root`
+- `validation_plan`
+- `hit_times_grid`
+- `slot_policy`
+- `publish_schedule`
+- `lookback_policy`
+- `validation_budgets`
+
+Fail-fast loader обязан reject'ить:
+
+- missing/extra keys;
+- duplicate YAML keys;
+- invalid timeframe / slot / indicator literals;
+- duplicate sequence items;
+- non-positive lookbacks / validation budgets.
 
 ## Обязательная publish sequence
 
@@ -65,6 +94,7 @@
 ## Шаг 3. build inactive slot
 
 - пересобрать только inactive slot;
+- использовать `artifact_root` из `backtest_artifacts.yaml`, а не default literal в коде;
 - писать файлы по explicit deterministic paths;
 - не использовать directory scanning как способ discover'ить содержимое;
 - не изменять active slot contents.
@@ -95,6 +125,8 @@
 - signal value set ограничен `{-1,0,1}`;
 - mapping bounds валидны относительно `1m`;
 - hit-time monotonicity выполняется;
+- validation plan берётся из `backtest_artifacts.validation_plan` и переводится в
+  `ArtifactSlotValidationSpecV2`;
 - validation идёт только по явным path targets/timeframes/indicator ids;
 - hidden scanning / best-effort discovery не допускаются.
 

@@ -1,6 +1,6 @@
-# Backtest Precompute Runner V2 (R2-03)
+# Backtest Precompute Runner V2 (R2-03 / R2-04)
 
-Статус: `Milestone R2 / EPIC R2-03`
+Статус: `Milestone R2 / EPIC R2-03 + R2-04`
 
 Документ фиксирует контракт precompute/publish слоя, который:
 
@@ -15,6 +15,21 @@
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+
+## Config Inputs (R2-04)
+
+Precompute/publish слой читает strict `configs/<env>/backtest_artifacts.yaml` contract.
+
+Из него берутся:
+
+- `artifact_root` для path builder / loader wiring;
+- `validation_plan` для config-driven `ArtifactSlotValidationSpecV2`;
+- `hit_times_grid` как source-of-truth TP/SL levels contract;
+- `slot_policy`, `publish_schedule`, `lookback_policy`, `validation_budgets` как fail-fast
+  validated pipeline settings.
+
+R2-04 intentionally keeps these settings отдельно от `configs/<env>/backtest.yaml`, чтобы
+runtime request defaults и artifact pipeline knobs не смешивались в одном контракте.
 
 ## Область ответственности
 
@@ -132,7 +147,8 @@ Runner обязан работать только в порядке:
 1. resolve `current.yaml`;
 2. precheck inactive slot pin guard;
 3. rebuild inactive slot;
-4. validate whole slot по strict manifests;
+4. validate whole slot по strict manifests и validation plan, полученному из
+   `backtest_artifacts.validation_plan`;
 5. atomically switch `current.yaml`.
 
 Если validation вернула хотя бы одну error diagnostic:

@@ -1819,8 +1819,8 @@ class ArtifactSignalValidationSpecV2:
         Returns:
             None.
         Assumptions:
-            Signal validation targets remain explicit because R2-04 config loading is not part of
-            this milestone.
+            Signal validation targets remain explicit even when they are translated from
+            `backtest_artifacts.validation_plan.signal_artifacts`.
         Raises:
             ValueError: If timeframe or indicator id violates the deterministic path contract.
         Side Effects:
@@ -1838,7 +1838,7 @@ class ArtifactSignalValidationSpecV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactSlotValidationSpecV2:
     """
-    Explicit validation plan for an already-built inactive slot in R2-02 publish flow.
+    Explicit validation plan for an already-built inactive slot in R2 publish flow.
 
     Docs:
       - docs/architecture/backtest/backtest-artifact-store-v2.md
@@ -1862,7 +1862,8 @@ class ArtifactSlotValidationSpecV2:
         Returns:
             None.
         Assumptions:
-            Validation order must stay stable regardless of caller tuple ordering.
+            Validation order must stay stable regardless of caller tuple ordering or
+            R2-04 config author ordering.
         Raises:
             ValueError: If one timeframe or signal artifact violates the path contract.
         Side Effects:

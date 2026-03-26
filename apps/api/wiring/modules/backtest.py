@@ -18,13 +18,16 @@ from apps.api.routes import build_backtest_jobs_router, build_backtests_router
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest.adapters.outbound import (
     BacktestArtifactPathBuilderV2,
+    BacktestArtifactsRuntimeConfig,
     PostgresBacktestJobRepository,
     PostgresBacktestJobResultsRepository,
     PsycopgBacktestPostgresGateway,
     StrategyRepositoryBacktestStrategyReader,
     YamlBacktestGridDefaultsProvider,
     build_backtest_runtime_config_hash,
+    load_backtest_artifacts_runtime_config,
     load_backtest_runtime_config,
+    resolve_backtest_artifacts_config_path,
     resolve_backtest_config_path,
 )
 from trading.contexts.backtest.application.services import YamlBacktestArtifactLoaderV2
@@ -123,7 +126,8 @@ def build_backtest_router(
         Defaults/provider/config are validated on startup (fail-fast).
     Raises:
         ValueError: If required runtime dependencies are invalid or missing.
-        FileNotFoundError: If `backtest.yaml` or `indicators.yaml` cannot be resolved.
+        FileNotFoundError: If `backtest.yaml`, `backtest_artifacts.yaml`, or `indicators.yaml`
+            cannot be resolved.
     Side Effects:
         Reads runtime YAML files and configures storage/candle-feed adapters.
     """
@@ -135,12 +139,11 @@ def build_backtest_router(
     runtime_settings = _resolve_backtest_runtime_settings(environ=environ)
     runtime_config_path = resolve_backtest_config_path(environ=environ)
     runtime_config = load_backtest_runtime_config(runtime_config_path)
+    artifact_runtime_config = _load_backtest_artifacts_runtime_config(environ=environ)
     backtest_runtime_config_hash = build_backtest_runtime_config_hash(config=runtime_config)
 
     if runtime_config.jobs.enabled and not runtime_settings.strategy_postgres_dsn:
-        raise ValueError(
-            f"{_STRATEGY_PG_DSN_KEY} is required when backtest.jobs.enabled is true"
-        )
+        raise ValueError(f"{_STRATEGY_PG_DSN_KEY} is required when backtest.jobs.enabled is true")
 
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     strategy_repository = _build_strategy_repository(settings=runtime_settings)
@@ -195,7 +198,9 @@ def build_backtest_router(
     job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)
     results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
     artifact_loader = YamlBacktestArtifactLoaderV2(
-        path_resolver=BacktestArtifactPathBuilderV2()
+        path_resolver=BacktestArtifactPathBuilderV2(
+            root=artifact_runtime_config.artifact_root_path()
+        )
     )
 
     create_use_case = CreateBacktestJobUseCase(
@@ -232,6 +237,36 @@ def build_backtest_router(
     )
     backtests_router.include_router(jobs_router)
     return backtests_router
+
+
+def _load_backtest_artifacts_runtime_config(
+    *,
+    environ: Mapping[str, str],
+) -> BacktestArtifactsRuntimeConfig:
+    """
+    Resolve and fail-fast load strict artifact pipeline config for backtest wiring.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - apps/api/wiring/modules/backtest.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+
+    Args:
+        environ: Runtime environment mapping.
+    Returns:
+        BacktestArtifactsRuntimeConfig: Parsed strict artifact pipeline config.
+    Assumptions:
+        Startup must validate artifact root and validation-plan contracts before jobs wiring.
+    Raises:
+        FileNotFoundError: If `backtest_artifacts.yaml` cannot be resolved.
+        ValueError: If the artifact config payload is invalid.
+    Side Effects:
+        Reads one UTF-8 YAML file from filesystem.
+    """
+    config_path = resolve_backtest_artifacts_config_path(environ=environ)
+    return load_backtest_artifacts_runtime_config(config_path)
 
 
 def _resolve_backtest_runtime_settings(*, environ: Mapping[str, str]) -> BacktestRuntimeSettings:
@@ -326,9 +361,7 @@ def _resolve_fail_fast(*, environ: Mapping[str, str], env_name: str) -> bool:
         return True
     if normalized in {"0", "false", "no", "off"}:
         return False
-    raise ValueError(
-        f"{_BACKTEST_FAIL_FAST_KEY} must be boolean-like value, got {raw_value!r}"
-    )
+    raise ValueError(f"{_BACKTEST_FAIL_FAST_KEY} must be boolean-like value, got {raw_value!r}")
 
 
 def _build_strategy_repository(*, settings: BacktestRuntimeSettings) -> StrategyRepository:
@@ -390,9 +423,7 @@ def _build_jobs_gateway(*, settings: BacktestRuntimeSettings) -> PsycopgBacktest
         None.
     """
     if not settings.strategy_postgres_dsn:
-        raise ValueError(
-            f"{_STRATEGY_PG_DSN_KEY} is required when backtest.jobs.enabled is true"
-        )
+        raise ValueError(f"{_STRATEGY_PG_DSN_KEY} is required when backtest.jobs.enabled is true")
     return PsycopgBacktestPostgresGateway(dsn=settings.strategy_postgres_dsn)
 
 

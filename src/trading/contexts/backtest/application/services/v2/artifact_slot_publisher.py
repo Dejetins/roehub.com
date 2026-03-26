@@ -195,7 +195,8 @@ class BacktestArtifactSlotPublisherV2:
 
         Args:
             precheck: Publish readiness snapshot resolved before build/switch.
-            validation_spec: Explicit path-validation plan for the built inactive slot.
+            validation_spec: Explicit path-validation plan for the built inactive slot,
+                typically translated from `backtest_artifacts.validation_plan`.
             expected_asof_date: Optional strict `YYYY-MM-DD` literal expected from manifests.
         Returns:
             ArtifactSlotValidationResultV2: Validated slot manifest identity and plan snapshot.
@@ -244,7 +245,8 @@ class BacktestArtifactSlotPublisherV2:
 
         Args:
             precheck: Publish readiness snapshot resolved before build/switch.
-            validation_spec: Explicit validation plan for the rebuilt inactive slot.
+            validation_spec: Explicit validation plan for the rebuilt inactive slot,
+                typically translated from `backtest_artifacts.validation_plan`.
             asof_date: Strict `YYYY-MM-DD` literal for the newly published slot identity.
         Returns:
             ArtifactPublishResultV2: Structured previous/new pointer identity payload.

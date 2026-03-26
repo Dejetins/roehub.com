@@ -162,6 +162,45 @@ class _DummyStrategyReader:
         self.repository = repository
 
 
+class _DummyArtifactsRuntimeConfig:
+    """
+    Dummy artifact runtime config exposing only `artifact_root_path()` for wiring tests.
+    """
+
+    def __init__(self, *, artifact_root: Path) -> None:
+        """
+        Store deterministic artifact root used by path-builder assertions.
+
+        Args:
+            artifact_root: Filesystem root returned by `artifact_root_path()`.
+        Returns:
+            None.
+        Assumptions:
+            Wiring tests only need artifact root and not the full config surface.
+        Raises:
+            None.
+        Side Effects:
+            Stores root on instance for later access.
+        """
+        self._artifact_root = artifact_root
+
+    def artifact_root_path(self) -> Path:
+        """
+        Return deterministic artifact root path for builder composition tests.
+
+        Args:
+            None.
+        Returns:
+            Path: Configured artifact store root.
+        Assumptions:
+            Router wiring treats this as the source-of-truth root literal.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self._artifact_root
+
 
 def _paths_from_router(*, router: APIRouter) -> set[str]:
     """
@@ -321,6 +360,13 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
     )
     monkeypatch.setattr(
         backtest_module,
+        "_load_backtest_artifacts_runtime_config",
+        lambda *, environ: _DummyArtifactsRuntimeConfig(
+            artifact_root=Path("artifacts/backtest/v2")
+        ),
+    )
+    monkeypatch.setattr(
+        backtest_module,
         "build_backtest_runtime_config_hash",
         lambda *, config: "f" * 64,
     )
@@ -389,6 +435,13 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         backtest_module,
         "load_backtest_runtime_config",
         lambda _path: runtime_config,
+    )
+    monkeypatch.setattr(
+        backtest_module,
+        "_load_backtest_artifacts_runtime_config",
+        lambda *, environ: _DummyArtifactsRuntimeConfig(
+            artifact_root=Path("artifacts/backtest/v2")
+        ),
     )
     monkeypatch.setattr(
         backtest_module,
@@ -513,6 +566,117 @@ def test_build_backtest_router_mounts_jobs_routes_when_toggle_enabled(monkeypatc
 
     assert "/backtests/ping" in paths
     assert "/backtests/jobs/ping" in paths
+
+
+def test_build_backtest_router_uses_artifact_root_from_artifact_config(monkeypatch) -> None:
+    """
+    Verify jobs wiring builds artifact path resolver from strict artifact config root.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Backtest jobs mode composes artifact loader only after artifact config is loaded.
+    Raises:
+        AssertionError: If configured artifact root is not passed into the path builder.
+    Side Effects:
+        None.
+    """
+    captured_builder_root: Path | None = None
+    runtime_config = _runtime_config(jobs_enabled=True)
+
+    monkeypatch.setattr(
+        backtest_module,
+        "resolve_backtest_config_path",
+        lambda *, environ: Path("configs/test/backtest.yaml"),
+    )
+    monkeypatch.setattr(
+        backtest_module,
+        "load_backtest_runtime_config",
+        lambda _path: runtime_config,
+    )
+    monkeypatch.setattr(
+        backtest_module,
+        "_load_backtest_artifacts_runtime_config",
+        lambda *, environ: _DummyArtifactsRuntimeConfig(
+            artifact_root=Path("custom/artifacts/backtest/v2")
+        ),
+    )
+    monkeypatch.setattr(
+        backtest_module,
+        "build_backtest_runtime_config_hash",
+        lambda *, config: "f" * 64,
+    )
+    monkeypatch.setattr(backtest_module, "YamlBacktestGridDefaultsProvider", _DummyDefaultsProvider)
+    monkeypatch.setattr(backtest_module, "_build_strategy_repository", lambda *, settings: object())
+    monkeypatch.setattr(
+        backtest_module,
+        "StrategyRepositoryBacktestStrategyReader",
+        _DummyStrategyReader,
+    )
+    monkeypatch.setattr(backtest_module, "_build_backtest_candle_feed", lambda *, environ: object())
+    monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _DummyFactory)
+    monkeypatch.setattr(
+        backtest_module,
+        "build_backtests_router",
+        lambda **kwargs: _build_ping_router(path="/backtests/ping"),
+    )
+    monkeypatch.setattr(backtest_module, "_build_jobs_gateway", lambda *, settings: object())
+    monkeypatch.setattr(backtest_module, "PostgresBacktestJobRepository", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "PostgresBacktestJobResultsRepository", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "CreateBacktestJobUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "GetBacktestJobStatusUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "GetBacktestJobTopUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "ListBacktestJobsUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "CancelBacktestJobUseCase", _DummyFactory)
+    monkeypatch.setattr(
+        backtest_module,
+        "build_backtest_jobs_router",
+        lambda **kwargs: _build_ping_router(path="/backtests/jobs/ping"),
+    )
+
+    class _CapturePathBuilder:
+        """
+        Capture path-builder root used during artifact loader composition.
+        """
+
+        def __init__(self, *, root: Path) -> None:
+            """
+            Store path-builder root for deterministic assertions.
+
+            Args:
+                root: Artifact root path injected by wiring module.
+            Returns:
+                None.
+            Assumptions:
+                Wiring passes `root` as a keyword argument when composing jobs loader.
+            Raises:
+                None.
+            Side Effects:
+                Stores captured root in enclosing test scope.
+            """
+            nonlocal captured_builder_root
+            captured_builder_root = root
+
+    monkeypatch.setattr(backtest_module, "BacktestArtifactPathBuilderV2", _CapturePathBuilder)
+    monkeypatch.setattr(
+        backtest_module,
+        "YamlBacktestArtifactLoaderV2",
+        lambda *, path_resolver: _DummyFactory(path_resolver=path_resolver),
+    )
+
+    router = backtest_module.build_backtest_router(
+        environ={"STRATEGY_PG_DSN": "postgresql://user:pass@localhost:5432/roehub"},
+        current_user_dependency=cast(
+            RequireCurrentUserDependency,
+            lambda _request: None,
+        ),
+        indicator_compute=cast(IndicatorCompute, SimpleNamespace()),
+    )
+
+    assert "/backtests/jobs/ping" in _paths_from_router(router=router)
+    assert captured_builder_root == Path("custom/artifacts/backtest/v2")
 
 
 
