@@ -163,6 +163,24 @@ artifacts/backtest/v2/
 | Hit times | `<slot>/hit_times/1m/short_tp.u32.npy` |
 | Hit times | `<slot>/hit_times/1m/short_sl.u32.npy` |
 
+## R3-01 stage boundary
+
+До R3-04/R4/R5 store contract уже требует strict root `manifest.yaml`, но R3-01 materializes only
+canonical `prices/1m`.
+
+На этом этапе допустимо и ожидаемо:
+
+- `prices/1m/*` присутствуют как real artifact files с strict metadata;
+- `mappings[]` в root manifest остаётся пустым до R3-03;
+- `signals` в root manifest остаётся explicit empty catalog до R4;
+- `hit_times` в root manifest остаётся explicit fixed-path reference
+  `hit_times/1m/manifest.yaml`, но до R5 может использовать placeholder
+  `manifest_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"`.
+
+Это не relax schema.
+Это explicit stage placeholder contract, который later epics обязаны заменить на real manifests и
+validated files перед publish.
+
 ## Fixed literals and ordering
 
 Слоты фиксированы и упорядочены:

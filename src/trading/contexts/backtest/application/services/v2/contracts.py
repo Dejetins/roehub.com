@@ -9,6 +9,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable, Literal, Mapping, Protocol
 
+from trading.shared_kernel.primitives import TimeRange
+
 ARTIFACT_STORE_V2_ROOT_LITERAL = "artifacts/backtest/v2"
 CURRENT_ARTIFACT_POINTER_FILENAME_V2 = "current.yaml"
 ARTIFACT_MANIFEST_FILENAME_V2 = "manifest.yaml"
@@ -51,6 +53,7 @@ ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2: tuple[str, str] = ("time", "field")
 ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2: tuple[str, ...] = ("level",)
 ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2: tuple[str, str] = ("level", "time")
 ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2 = "non_decreasing_by_level"
+ARTIFACT_PLACEHOLDER_SHA256_V2 = "0" * 64
 SUPPORTED_CURRENT_ARTIFACT_POINTER_SCHEMA_VERSIONS_V2: tuple[int, ...] = (
     CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
 )
@@ -1963,6 +1966,188 @@ class ArtifactPublishResultV2:
     published_pointer: ArtifactCurrentPointerV2
     precheck: ArtifactPublishPrecheckV2
     validation: ArtifactSlotValidationResultV2
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactCanonicalPriceExportRequestV2:
+    """
+    Explicit request DTO for canonical `1m` price export into the inactive artifact slot.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/shared_kernel/primitives/time_range.py
+    """
+
+    coordinates: ArtifactCoordinatesV2
+    time_range: TimeRange
+    asof_date: str
+    generated_at_utc: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate stable request identity fields for deterministic canonical `1m` export.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Request scope is one symbol root and one source `TimeRange [start, end)`.
+        Raises:
+            ValueError: If coordinates, as-of date, or generated timestamp violate strict
+                artifact contracts.
+        Side Effects:
+            Normalizes validated date and timestamp literals.
+        Docs:
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        if self.coordinates is None:  # type: ignore[truthy-bool]
+            raise ValueError("ArtifactCanonicalPriceExportRequestV2.coordinates is required")
+        if self.time_range is None:  # type: ignore[truthy-bool]
+            raise ValueError("ArtifactCanonicalPriceExportRequestV2.time_range is required")
+        object.__setattr__(
+            self,
+            "asof_date",
+            validate_current_pointer_asof_date_v2(self.asof_date),
+        )
+        object.__setattr__(
+            self,
+            "generated_at_utc",
+            validate_current_pointer_published_at_utc_v2(self.generated_at_utc),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactCanonicalPriceExportResultV2:
+    """
+    Structured result payload for R3-01 canonical `1m` export into the inactive slot.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    coordinates: ArtifactCoordinatesV2
+    slot: ArtifactSlotLiteralV2
+    slot_generation: int
+    asof_date: str
+    manifest_path: Path
+    manifest_sha256: str
+    price_paths: ArtifactPricePathsV2
+    coverage: ArtifactTimelineCoverageV2
+    source_time_range: TimeRange
+    source_candle_count: int
+    reused_prefix_bars: int
+    rewritten_tail_bars: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate immutable export result fields exposed by the precompute runner.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Result references already-written artifacts under the deterministic inactive slot.
+        Raises:
+            ValueError: If slot identity, slot generation, or count fields are invalid.
+        Side Effects:
+            Normalizes strict slot and date/hash literals.
+        Docs:
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
+        object.__setattr__(
+            self,
+            "slot_generation",
+            validate_current_pointer_slot_generation_v2(self.slot_generation),
+        )
+        object.__setattr__(
+            self,
+            "asof_date",
+            validate_current_pointer_asof_date_v2(self.asof_date),
+        )
+        object.__setattr__(
+            self,
+            "manifest_sha256",
+            validate_current_pointer_manifest_sha256_v2(self.manifest_sha256),
+        )
+        object.__setattr__(
+            self,
+            "source_candle_count",
+            validate_positive_manifest_int_v2(self.source_candle_count),
+        )
+        object.__setattr__(
+            self,
+            "reused_prefix_bars",
+            validate_non_negative_manifest_int_v2(self.reused_prefix_bars),
+        )
+        object.__setattr__(
+            self,
+            "rewritten_tail_bars",
+            validate_positive_manifest_int_v2(self.rewritten_tail_bars),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPrecomputeRuntimeSettingsV2:
+    """
+    Minimal service-layer runtime settings required by R3-01 precompute orchestration.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+    """
+
+    price_tail_bars_1m: int
+    config_sha256: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate strict precompute settings derived from artifact runtime config.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Adapter/wiring code translates full runtime config into this minimal service DTO.
+        Raises:
+            ValueError: If the tail lookback or config hash violates strict publish contracts.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        object.__setattr__(
+            self,
+            "price_tail_bars_1m",
+            validate_positive_manifest_int_v2(self.price_tail_bars_1m),
+        )
+        object.__setattr__(
+            self,
+            "config_sha256",
+            validate_current_pointer_manifest_sha256_v2(self.config_sha256),
+        )
 
 
 class BacktestArtifactPathResolverV2(Protocol):

@@ -9,12 +9,19 @@ import numpy as np
 import yaml
 
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import BacktestArtifactPathBuilderV2
+from trading.contexts.backtest.adapters.outbound.config import (
+    BacktestArtifactsRuntimeConfig,
+    build_backtest_artifacts_runtime_config_hash,
+    load_backtest_artifacts_runtime_config,
+)
 from trading.contexts.backtest.application.services import (
     ArtifactCoordinatesV2,
+    ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotLiteralV2,
     ArtifactSlotValidationSpecV2,
     YamlBacktestArtifactLoaderV2,
+    inactive_artifact_slot_v2,
 )
 
 
@@ -35,6 +42,29 @@ class SyntheticArtifactStoreV2:
     loader: YamlBacktestArtifactLoaderV2
     coordinates: ArtifactCoordinatesV2
     validation_spec: ArtifactSlotValidationSpecV2
+    active_slot: ArtifactSlotLiteralV2
+    inactive_slot: ArtifactSlotLiteralV2
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPrecomputeFixtureV2:
+    """
+    Minimal R3-01 fixture with strict config, pointer file, and explicit artifact paths.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    config_path: Path
+    runtime_config: BacktestArtifactsRuntimeConfig
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2
+    builder: BacktestArtifactPathBuilderV2
+    loader: YamlBacktestArtifactLoaderV2
+    coordinates: ArtifactCoordinatesV2
     active_slot: ArtifactSlotLiteralV2
     inactive_slot: ArtifactSlotLiteralV2
 
@@ -170,6 +200,111 @@ def build_synthetic_artifact_store_v2(
         loader=loader,
         coordinates=coordinates,
         validation_spec=validation_spec,
+        active_slot=active_slot,
+        inactive_slot=inactive_slot,
+    )
+
+
+def build_artifact_precompute_fixture_v2(
+    *,
+    tmp_path: Path,
+    active_slot: ArtifactSlotLiteralV2 = "slot_a",
+    current_slot_generation: int = 4,
+    price_tail_bars_1m: int = 2,
+) -> ArtifactPrecomputeFixtureV2:
+    """
+    Build a minimal strict R3-01 fixture with config and `current.yaml` only.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+        active_slot: Active slot literal referenced by `current.yaml`.
+        current_slot_generation: Current published slot generation.
+        price_tail_bars_1m: Strict positive `prices/1m` tail reread budget.
+    Returns:
+        ArtifactPrecomputeFixtureV2: Strict config/loader/path fixture for R3-01 runner tests.
+    Assumptions:
+        Runner tests own inactive-slot contents and start without prebuilt `prices/1m` files.
+    Raises:
+        OSError: If config or pointer files cannot be written.
+    Side Effects:
+        Creates strict config YAML and `current.yaml` under `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    builder = BacktestArtifactPathBuilderV2(root=tmp_path / "artifacts" / "backtest" / "v2")
+    loader = YamlBacktestArtifactLoaderV2(path_resolver=builder)
+    coordinates = ArtifactCoordinatesV2(
+        exchange="binance",
+        market_type="spot",
+        symbol="BTCUSDT",
+    )
+    inactive_slot = inactive_artifact_slot_v2(active_slot)
+    current_pointer_payload = {
+        "schema_version": 1,
+        "active_slot": active_slot,
+        "slot_generation": current_slot_generation,
+        "asof_date": "2026-03-25",
+        "manifest_sha256": "0" * 64,
+        "published_at_utc": "2026-03-25T02:00:00Z",
+    }
+    _write_yaml(builder.current_pointer_path(coordinates), current_pointer_payload)
+    config_path = tmp_path / "backtest_artifacts.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "version": 1,
+                "backtest_artifacts": {
+                    "artifact_root": str(builder.root),
+                    "validation_plan": {
+                        "price_timeframes": ["1m"],
+                        "mapping_timeframes": ["15m"],
+                        "signal_artifacts": [],
+                        "require_hit_times_manifest": False,
+                    },
+                    "hit_times_grid": {
+                        "tp_levels_pct": [1.0],
+                        "sl_levels_pct": [1.0],
+                    },
+                    "slot_policy": {"slots": ["slot_a", "slot_b"]},
+                    "publish_schedule": {
+                        "full_rebuild_hour_utc": 2,
+                        "full_rebuild_minute_utc": 0,
+                    },
+                    "lookback_policy": {
+                        "price_tail_bars_1m": price_tail_bars_1m,
+                        "mapping_tail_bars_1m": 10,
+                        "signal_tail_bars_1m": 10,
+                        "hit_times_tail_bars_1m": 10,
+                    },
+                    "validation_budgets": {
+                        "max_price_bars_per_timeframe": 1000000,
+                        "max_mapping_rows_per_timeframe": 1000000,
+                        "max_signal_rows_per_artifact": 1000000,
+                        "max_hit_times_cells": 1000000,
+                    },
+                },
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    runtime_config = load_backtest_artifacts_runtime_config(config_path)
+    return ArtifactPrecomputeFixtureV2(
+        config_path=config_path,
+        runtime_config=runtime_config,
+        runtime_settings=ArtifactPrecomputeRuntimeSettingsV2(
+            price_tail_bars_1m=runtime_config.lookback_policy.price_tail_bars_1m,
+            config_sha256=build_backtest_artifacts_runtime_config_hash(
+                config=runtime_config
+            ),
+        ),
+        builder=builder,
+        loader=loader,
+        coordinates=coordinates,
         active_slot=active_slot,
         inactive_slot=inactive_slot,
     )

@@ -10,7 +10,7 @@
 - Jobs worker: `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
 - Artifact store v2 layout/publish/pinning/validator/config contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
-- Precompute runner v2 manifest/validator/config-driven publish contract: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export и placeholder stage boundary: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Artifact rebuild/publish runbook: `docs/runbooks/backtest-artifacts-rebuild.md`
 
 ## Актуальная политика rollout
@@ -23,6 +23,8 @@
   целевой режим v1: lazy-only (`false`).
 - Artifact pipeline settings живут отдельно в `configs/<env>/backtest_artifacts.yaml`; runtime
   request defaults остаются в `configs/<env>/backtest.yaml`.
+- R3-01 rebuild-only stage может материализовать только `prices/1m` в inactive slot; publish
+  остаётся blocked до появления real `mappings/signals/hit_times`.
 
 ## Проверка согласованности
 

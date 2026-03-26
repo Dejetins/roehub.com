@@ -1,6 +1,6 @@
-# Backtest Precompute Runner V2 (R2-03 / R2-04)
+# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01)
 
-Статус: `Milestone R2 / EPIC R2-03 + R2-04`
+Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01`
 
 Документ фиксирует контракт precompute/publish слоя, который:
 
@@ -50,6 +50,31 @@ Precompute runner v2 обязан:
   - `timeline` coverage
 - завершать publish только после whole-slot validation.
 
+### R3-01 canonical `1m` export
+
+На этапе R3-01 precompute runner получает отдельную обязанность:
+
+- материализовать canonical source-of-truth export только для `prices/1m/*` в inactive slot;
+- писать:
+  - `prices/1m/open_time.i64.npy`
+  - `prices/1m/close_time.i64.npy`
+  - `prices/1m/ohlcv.f32.npy`
+- использовать source table `market_data.canonical_candles_1m` через existing
+  `CanonicalCandleReader` contract;
+- поддерживать deterministic tail update по
+  `backtest_artifacts.lookback_policy.price_tail_bars_1m`;
+- никогда не мутировать active slot in place.
+
+Tail update semantics для R3-01:
+
+- если inactive slot ещё не содержит valid `prices/1m`, выполняется full build по заданному
+  `TimeRange [start, end)`;
+- если `prices/1m` уже существует в inactive slot, runner переиспользует prefix внутри requested
+  range и reread'ит только tail overlap длиной `price_tail_bars_1m`;
+- merge policy фиксирована как `prefix + reread_tail`, без best-effort dedup/coercion;
+- identical source candles + identical config/request должны давать byte-stable `.npy` и
+  `manifest.yaml`.
+
 Precompute runner v2 не должен:
 
 - мутировать active slot in place;
@@ -74,6 +99,18 @@ Root manifest обязан фиксировать:
   - `axis_order: [variant, time]`
   - `value_set: [-1, 0, 1]`
 - `provenance`.
+
+R3-01 placeholder strategy до materialization следующих stage:
+
+- `prices[]` содержит свежий strict section для `1m` и может сохранять уже существующие non-`1m`
+  sections, если они были подготовлены в том же inactive slot более поздним stage;
+- `mappings[]` может оставаться пустым до R3-03;
+- `signals` фиксируется как explicit empty catalog
+  (`supported_timeframes=[]`, `supported_indicator_ids=[]`, `manifests=[]`) до R4;
+- `hit_times` обязан оставаться explicit fixed-path reference
+  `hit_times/1m/manifest.yaml`, но до R5 допускается placeholder
+  `manifest_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"`;
+- `signal_encoding` остаётся fixed even when `signals.manifests` is empty.
 
 ### Per-indicator signal manifest
 
@@ -141,6 +178,10 @@ Whole-slot validator обязан идти в фиксированном пор�
   - hit-time monotonicity by level.
 
 ## Publish interaction
+
+R3-01 сам по себе не делает slot publish-ready.
+Если `validation_plan` всё ещё требует `mappings`, `signals` или real `hit_times`, whole-slot
+validation обязана fail-fast и pointer switch не выполняется до соответствующих later epics.
 
 Runner обязан работать только в порядке:
 

@@ -99,6 +99,19 @@ Fail-fast loader обязан reject'ить:
 - не использовать directory scanning как способ discover'ить содержимое;
 - не изменять active slot contents.
 
+R3-01 exception boundary:
+
+- до R3-04/R4/R5 rebuild может materialize only `prices/1m/*`;
+- в таком случае root `manifest.yaml` всё равно остаётся strict:
+  - `mappings: []`
+  - `signals.supported_timeframes: []`
+  - `signals.supported_indicator_ids: []`
+  - `signals.manifests: []`
+  - `hit_times.manifest_path: "hit_times/1m/manifest.yaml"`
+  - `hit_times.manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"`
+- такой slot считается rebuild-only stage artifact и не должен публиковаться, пока validation plan
+  требует real `mappings/signals/hit_times`.
+
 Минимально ожидаемые пути:
 
 - `<slot>/manifest.yaml`
@@ -129,6 +142,12 @@ Fail-fast loader обязан reject'ить:
   `ArtifactSlotValidationSpecV2`;
 - validation идёт только по явным path targets/timeframes/indicator ids;
 - hidden scanning / best-effort discovery не допускаются.
+
+Для R3-01 rebuild-only stage оператор должен явно понимать:
+
+- `prices/1m` можно пересобирать и tail-update'ить по
+  `lookback_policy.price_tail_bars_1m` без pointer switch;
+- publish остаётся запрещённым, если active validation plan still expects later-stage artifacts.
 
 Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.
 
