@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from itertools import product
 from pathlib import Path
@@ -172,7 +172,7 @@ class _PrecomputeSignalDefaultsProvider:
 @dataclass(frozen=True, slots=True)
 class _DeterministicSignalCompute:
     """
-    Small deterministic compute adapter producing variant-major tensors for R4-02 tests.
+    Small deterministic compute adapter producing rolling-mean tensors for signal tests.
 
     Docs:
       - docs/architecture/indicators/indicators-overview.md
@@ -183,6 +183,7 @@ class _DeterministicSignalCompute:
     """
 
     grid_builder: GridBuilder
+    time_lengths: list[int] = field(default_factory=list, compare=False)
 
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
@@ -219,18 +220,19 @@ class _DeterministicSignalCompute:
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:
         """
-        Materialize a deterministic variant-major tensor matching grid-builder row order.
+        Materialize a deterministic variant-major tensor using source-specific rolling means.
 
         Args:
             req: Compute request with candles and the explicit grid.
         Returns:
-            IndicatorTensor: Variant-major float32 tensor with small synthetic outputs.
+            IndicatorTensor: Variant-major float32 tensor with deterministic rolling-mean outputs.
         Assumptions:
-            Only MA indicators are used in these R4-02 runner tests.
+            Test grids use only `source` and `window` axes, so finite-window outputs are enough
+            for bounded tail-rebuild assertions.
         Raises:
             ValueError: If one source series cannot be resolved or the guard is exceeded.
         Side Effects:
-            Allocates one small in-memory tensor.
+            Allocates one small in-memory tensor and records requested timeline lengths.
         Docs:
           - docs/architecture/backtest/backtest-precompute-runner-v2.md
           - docs/architecture/indicators/indicators-overview.md
@@ -242,28 +244,29 @@ class _DeterministicSignalCompute:
             raise ValueError(
                 "variants exceed guard: "
                 f"variants={materialized.variants}, max_variants_guard={req.max_variants_guard}"
-            )
+        )
         bar_count = int(req.candles.close.shape[0])
+        self.time_lengths.append(bar_count)
         values = np.empty((materialized.variants, bar_count), dtype=np.float32)
         axes = tuple(_axis_def_from_materialized_axis_v2(axis) for axis in materialized.axes)
         axis_values = tuple(axis.values for axis in materialized.axes)
         ordered_rows = product(*axis_values) if len(axis_values) > 0 else ((),)
         for row_index, value_row in enumerate(ordered_rows):
             source_name = "close"
+            window = 1
             for axis, value in zip(materialized.axes, value_row):
                 if axis.name == "source":
                     source_name = str(value)
+                if axis.name == "window":
+                    window = int(value)
             base_series = _source_series_for_compute_v2(
                 candles=req.candles,
                 source_name=source_name,
             )
-            mode = row_index % 3
-            if mode == 0:
-                values[row_index, :] = np.ascontiguousarray(base_series - np.float32(1.0))
-            elif mode == 1:
-                values[row_index, :] = np.ascontiguousarray(base_series)
-            else:
-                values[row_index, :] = np.ascontiguousarray(base_series + np.float32(1.0))
+            values[row_index, :] = _rolling_mean_series_for_compute_v2(
+                source=base_series,
+                window=window,
+            )
         return IndicatorTensor(
             indicator_id=req.grid.indicator_id,
             layout=Layout.VARIANT_MAJOR,
@@ -549,8 +552,45 @@ def _source_series_for_compute_v2(*, candles: object, source_name: str) -> np.nd
             )
             / np.float32(4.0),
             dtype=np.float32,
-        )
+    )
     raise ValueError(f"unsupported synthetic source literal: {normalized_source!r}")
+
+
+def _rolling_mean_series_for_compute_v2(*, source: np.ndarray, window: int) -> np.ndarray:
+    """
+    Build one deterministic float32 rolling-mean series with warmup `NaN`s.
+
+    Args:
+        source: One-dimensional float32 source series.
+        window: Positive rolling window size.
+    Returns:
+        np.ndarray: Float32 rolling-mean vector with `NaN` before full-window coverage.
+    Assumptions:
+        Test compute mirrors finite-window warmup semantics closely enough for tail-rebuild
+        assertions without invoking the production indicator engine.
+    Raises:
+        ValueError: If `window` is non-positive or `source` is not one-dimensional.
+    Side Effects:
+        Allocates one output vector.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+    if window <= 0:
+        raise ValueError(f"window must be > 0, got {window!r}")
+    if source.ndim != 1:
+        raise ValueError(f"source must be 1D, got {source.shape!r}")
+    output = np.full(source.shape[0], np.float32(np.nan), dtype=np.float32)
+    if source.shape[0] < window:
+        return output
+    cumulative = np.cumsum(np.asarray(source, dtype=np.float64))
+    for index in range(window - 1, source.shape[0]):
+        start = index + 1 - window
+        window_sum = cumulative[index] - (0.0 if start == 0 else cumulative[start - 1])
+        output[index] = np.float32(window_sum / float(window))
+    return output
 
 
 def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_export(
@@ -999,7 +1039,7 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
-    signal_targets = (("15m", "ma.ema"), ("1h", "ma.sma"))
+    signal_targets = (("15m", "ma.ema"), ("15m", "ma.sma"), ("1h", "ma.sma"))
     fixture = build_artifact_precompute_fixture_v2(
         tmp_path=tmp_path,
         price_tail_bars_1m=2,
@@ -1032,7 +1072,13 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
         "15m",
         "ma.ema",
     )
-    sma_manifest = fixture.loader.load_signal_manifest(
+    fifteen_minute_sma_manifest = fixture.loader.load_signal_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "15m",
+        "ma.sma",
+    )
+    one_hour_sma_manifest = fixture.loader.load_signal_manifest(
         fixture.coordinates,
         fixture.inactive_slot,
         "1h",
@@ -1047,7 +1093,16 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
         ).signals,
         allow_pickle=False,
     )
-    sma_matrix = np.load(
+    fifteen_minute_sma_matrix = np.load(
+        fixture.loader.resolve_signal_paths(
+            fixture.coordinates,
+            fixture.inactive_slot,
+            "15m",
+            "ma.sma",
+        ).signals,
+        allow_pickle=False,
+    )
+    one_hour_sma_matrix = np.load(
         fixture.loader.resolve_signal_paths(
             fixture.coordinates,
             fixture.inactive_slot,
@@ -1069,6 +1124,7 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
     assert result.slot_generation == 5
     assert fixture.runtime_settings.signal_artifacts == (
         ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema"),
+        ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.sma"),
         ArtifactSignalValidationSpecV2(timeframe="1h", indicator_id="ma.sma"),
     )
     assert root_manifest.signals.supported_timeframes == ("15m", "1h")
@@ -1078,6 +1134,7 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
         for entry in root_manifest.signals.manifests
     ) == (
         ("15m", "ma.ema", "signals/15m/ma.ema/manifest.yaml"),
+        ("15m", "ma.sma", "signals/15m/ma.sma/manifest.yaml"),
         ("1h", "ma.sma", "signals/1h/ma.sma/manifest.yaml"),
     )
     assert ema_manifest.rows_count == 6
@@ -1086,21 +1143,295 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
     assert ema_manifest.signals.shape == (6, 288)
     assert ema_manifest.signals.axis_order == ("variant", "time")
     assert dict(ema_manifest.grid.signals_v1_params_defaults) == {}
-    assert sma_manifest.rows_count == 6
-    assert sma_manifest.timeline.bar_count == 72
-    assert sma_manifest.signals.dtype == "int8"
-    assert sma_manifest.signals.shape == (6, 72)
-    assert sma_manifest.signals.axis_order == ("variant", "time")
-    assert dict(sma_manifest.grid.signals_v1_params_defaults) == {}
+    assert fifteen_minute_sma_manifest.rows_count == 6
+    assert fifteen_minute_sma_manifest.timeline.bar_count == 288
+    assert fifteen_minute_sma_manifest.signals.dtype == "int8"
+    assert fifteen_minute_sma_manifest.signals.shape == (6, 288)
+    assert fifteen_minute_sma_manifest.signals.axis_order == ("variant", "time")
+    assert dict(fifteen_minute_sma_manifest.grid.signals_v1_params_defaults) == {}
+    assert one_hour_sma_manifest.rows_count == 6
+    assert one_hour_sma_manifest.timeline.bar_count == 72
+    assert one_hour_sma_manifest.signals.dtype == "int8"
+    assert one_hour_sma_manifest.signals.shape == (6, 72)
+    assert one_hour_sma_manifest.signals.axis_order == ("variant", "time")
+    assert dict(one_hour_sma_manifest.grid.signals_v1_params_defaults) == {}
     assert ema_matrix.dtype == np.int8
-    assert sma_matrix.dtype == np.int8
+    assert fifteen_minute_sma_matrix.dtype == np.int8
+    assert one_hour_sma_matrix.dtype == np.int8
     assert ema_matrix.shape == (6, 288)
-    assert sma_matrix.shape == (6, 72)
+    assert fifteen_minute_sma_matrix.shape == (6, 288)
+    assert one_hour_sma_matrix.shape == (6, 72)
     assert set(np.unique(ema_matrix).tolist()) <= {-1, 0, 1}
-    assert set(np.unique(sma_matrix).tolist()) <= {-1, 0, 1}
-    assert len(validation_result.signal_manifests) == 2
+    assert set(np.unique(fifteen_minute_sma_matrix).tolist()) <= {-1, 0, 1}
+    assert set(np.unique(one_hour_sma_matrix).tolist()) <= {-1, 0, 1}
+    assert len(validation_result.signal_manifests) == 3
     assert validation_result.hit_times_manifest is None
     assert validation_result.diagnostics == ()
+
+
+def test_backtest_artifact_precompute_runner_v2_reuses_signal_prefix_and_rebuilds_tail(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify R4-03 keeps the unchanged signal prefix and rebuilds only the bounded tail window.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Existing inactive-slot signal artifacts are valid and the second run updates only the last
+        30 canonical `1m` bars.
+    Raises:
+        AssertionError: If compute stays full-history, prefix columns drift, or validation fails.
+    Side Effects:
+        Rewrites signal artifacts under the inactive slot in `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    signal_targets = (("15m", "ma.ema"),)
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    request = _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+
+    initial_compute = _DeterministicSignalCompute(grid_builder=grid_builder)
+    initial_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=initial_compute,
+        indicator_grid_builder=grid_builder,
+    )
+    initial_runner.export_canonical_price_1m(request)
+    initial_matrix = _load_signal_matrix_v2(
+        fixture=fixture,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+
+    updated_compute = _DeterministicSignalCompute(grid_builder=grid_builder)
+    updated_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(
+                bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2 - 30, _FULL_BUILD_MINUTES_V2)),
+                price_offset=-1000.0,
+            )
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=updated_compute,
+        indicator_grid_builder=grid_builder,
+    )
+    updated_runner.export_canonical_price_1m(request)
+    updated_matrix = _load_signal_matrix_v2(
+        fixture=fixture,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+    validation_result = BacktestArtifactManifestValidatorV2(
+        artifact_loader=fixture.loader
+    ).validate_slot(
+        coordinates=fixture.coordinates,
+        slot=fixture.inactive_slot,
+        validation_spec=fixture.runtime_config.to_validation_spec(),
+        expected_asof_date="2026-03-26",
+        expected_slot_generation=5,
+    )
+
+    assert initial_compute.time_lengths == [288]
+    assert len(updated_compute.time_lengths) == 1
+    assert 2 <= updated_compute.time_lengths[0] < initial_compute.time_lengths[0]
+    np.testing.assert_array_equal(updated_matrix[:, :-2], initial_matrix[:, :-2])
+    assert not np.array_equal(updated_matrix[:, -2:], initial_matrix[:, -2:])
+    assert validation_result.diagnostics == ()
+
+
+def test_backtest_artifact_precompute_runner_v2_signal_tail_rebuild_is_byte_stable_for_identical_inputs(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Verify identical R4-03 signal inputs produce byte-stable manifests and `signals.i8.npy`.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Finite-window test compute plus identical source data should keep the rebuilt tail exactly
+        equal to the original full-build result.
+    Raises:
+        AssertionError: If repeated signal export changes bytes or unexpectedly recomputes the
+            full signal timeline.
+    Side Effects:
+        Rewrites signal artifacts under the inactive slot in `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    signal_targets = (("15m", "ma.ema"),)
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    request = _request_v2(
+        fixture=fixture,
+        end_minute=_FULL_BUILD_MINUTES_V2,
+        asof_date="2026-03-26",
+        generated_at_utc="2026-03-26T03:00:00Z",
+    )
+
+    first_compute = _DeterministicSignalCompute(grid_builder=grid_builder)
+    first_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=first_compute,
+        indicator_grid_builder=grid_builder,
+    )
+    first_runner.export_canonical_price_1m(request)
+    first_bytes = _read_signal_export_bytes_v2(
+        fixture=fixture,
+        signal_targets=signal_targets,
+    )
+
+    second_compute = _DeterministicSignalCompute(grid_builder=grid_builder)
+    second_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(
+                bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2 - 30, _FULL_BUILD_MINUTES_V2))
+            )
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=second_compute,
+        indicator_grid_builder=grid_builder,
+    )
+    second_runner.export_canonical_price_1m(request)
+    second_bytes = _read_signal_export_bytes_v2(
+        fixture=fixture,
+        signal_targets=signal_targets,
+    )
+
+    assert first_compute.time_lengths == [288]
+    assert len(second_compute.time_lengths) == 1
+    assert 2 <= second_compute.time_lengths[0] < first_compute.time_lengths[0]
+    assert first_bytes == second_bytes
+
+
+def test_backtest_artifact_precompute_runner_v2_rejects_drifted_existing_signal_artifact(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify R4-03 fails fast when an existing reusable signal file drifts from its manifest hash.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Missing files may trigger a full rebuild, but existing-file hash drift must stop the run.
+    Raises:
+        AssertionError: If drift is silently ignored or converted into a best-effort rebuild.
+    Side Effects:
+        Mutates one existing signal file in the inactive slot under `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    signal_targets = (("15m", "ma.ema"),)
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    request = _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    initial_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+    initial_runner.export_canonical_price_1m(request)
+
+    signal_paths = fixture.loader.resolve_signal_paths(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "15m",
+        "ma.ema",
+    )
+    corrupted_matrix = np.load(signal_paths.signals, allow_pickle=False)
+    corrupted_matrix[0, -1] = np.int8(-1)
+    with signal_paths.signals.open("wb") as handle:
+        np.save(handle, corrupted_matrix, allow_pickle=False)
+
+    updated_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(
+                bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2 - 30, _FULL_BUILD_MINUTES_V2))
+            )
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+
+    with pytest.raises(ValueError, match="manifest sha256 must match actual file"):
+        updated_runner.export_canonical_price_1m(request)
 
 
 def test_backtest_artifact_precompute_runner_v2_rejects_non_monotonic_source_timestamps(
@@ -1324,6 +1655,85 @@ def test_backtest_artifact_precompute_runner_v2_full_validation_spec_still_rejec
     assert error_info.value.diagnostics[0].code == "root_manifest_signal_targets_mismatch"
     assert current_pointer.active_slot == fixture.active_slot
     assert current_pointer.slot_generation == 4
+
+
+def _load_signal_matrix_v2(
+    *,
+    fixture: ArtifactPrecomputeFixtureV2,
+    timeframe: str,
+    indicator_id: str,
+) -> np.ndarray:
+    """
+    Load one strict `signals/<tf>/<indicator_id>/signals.i8.npy` matrix for assertions.
+
+    Args:
+        fixture: Minimal strict precompute fixture.
+        timeframe: Signal timeframe literal.
+        indicator_id: Signal indicator identifier.
+    Returns:
+        np.ndarray: Loaded compact `int8` signal matrix with shape `[V, T_tf]`.
+    Assumptions:
+        The caller already materialized the target signal artifact into the inactive slot.
+    Raises:
+        FileNotFoundError: If the deterministic signal path is missing.
+        ValueError: If numpy cannot load the stored `.npy` payload.
+    Side Effects:
+        Reads one signal matrix from disk.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    return np.load(
+        fixture.loader.resolve_signal_paths(
+            fixture.coordinates,
+            fixture.inactive_slot,
+            timeframe,
+            indicator_id,
+        ).signals,
+        allow_pickle=False,
+    )
+
+
+def _read_signal_export_bytes_v2(
+    *,
+    fixture: ArtifactPrecomputeFixtureV2,
+    signal_targets: tuple[tuple[str, str], ...],
+) -> tuple[bytes, ...]:
+    """
+    Read deterministic per-target signal manifest bytes and signal matrix bytes.
+
+    Args:
+        fixture: Minimal strict precompute fixture.
+        signal_targets: Explicit ordered `(timeframe, indicator_id)` signal targets.
+    Returns:
+        tuple[bytes, ...]: Stable byte snapshots for per-target signal files.
+    Assumptions:
+        Identical rebuild inputs with fixed `generated_at_utc` should keep emitted file bytes
+        unchanged across repeated runs.
+    Raises:
+        FileNotFoundError: If one emitted file is missing.
+        OSError: If one file cannot be read.
+    Side Effects:
+        Reads manifest and `.npy` files from disk.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    snapshots: list[bytes] = []
+    for timeframe, indicator_id in signal_targets:
+        signal_paths = fixture.loader.resolve_signal_paths(
+            fixture.coordinates,
+            fixture.inactive_slot,
+            timeframe,
+            indicator_id,
+        )
+        snapshots.append(signal_paths.manifest.read_bytes())
+        snapshots.append(signal_paths.signals.read_bytes())
+    return tuple(snapshots)
 
 
 def _request_v2(

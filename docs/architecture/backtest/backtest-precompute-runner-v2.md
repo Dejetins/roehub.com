@@ -1,6 +1,6 @@
-# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04 / R4-01 / R4-02)
+# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04 / R4-01 / R4-02 / R4-03)
 
-Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`, `Milestone R4 / EPIC R4-01 + R4-02`
+Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`, `Milestone R4 / EPIC R4-01 + R4-02 + R4-03`
 
 Документ фиксирует контракт precompute/publish слоя, который:
 
@@ -50,7 +50,7 @@ Precompute runner v2 обязан:
   - `timeline` coverage
 - завершать publish только после whole-slot validation.
 
-### R4-01 / R4-02 signal boundary
+### R4-01 / R4-02 / R4-03 signal boundary
 
 На этапе R4-01 precompute layer получил explicit signal-rules engine contract.
 На этапе R4-02 этот contract стал source-of-truth для real signal artifact materialization.
@@ -67,8 +67,18 @@ Precompute runner v2 обязан:
   - `signals/<tf>/<indicator_id>/manifest.yaml`
 - root manifest обязан публиковать real `signals.supported_timeframes`,
   `signals.supported_indicator_ids` и `signals.manifests`;
-- R4-03 tail-update logic для `signals/*` и R4-04 propagation `source` в runtime payloads
-  остаются отдельными later-stage epics.
+- после R4-03 rebuild обязан выводить bounded per-target signal window из
+  `lookback_policy.signal_tail_bars_1m`, а затем materialize'ить только
+  `prefix + rebuilt_tail` по time axis;
+- prefix reuse разрешён только при strict reuse-check:
+  - target уже перечислен в root `signals.manifests`
+  - existing `manifest.yaml` и `signals.i8.npy` существуют
+  - `rows_count`, `timeline`, `variant_key_version`, `variant_keys_sha256`,
+    `signals.v1.params = default-only` и file `sha256` не дрейфуют
+- missing target files могут переводить target в deterministic full rebuild, но manifest/data
+  drift при reuse attempt обязан fail-fast с stable diagnostics;
+- R4-04 propagation `source` в runtime payloads и R5 hit-times materialization остаются
+  отдельными later-stage epics.
 
 ### R3-01 / R3-02 prices stage
 
@@ -116,6 +126,37 @@ Tail update semantics для R3-01 / R3-02 / R3-03:
 - merge policy фиксирована как `prefix + rebuilt_tail`, без best-effort dedup/coercion;
 - identical source candles + identical config/request должны давать byte-stable `.npy` и
   `manifest.yaml`.
+
+### R4-03 signal tail-update semantics
+
+Signal rebuild для explicit configured targets обязан быть локальным и deterministic:
+
+- source-of-truth для bounded signal tail rebuild:
+  - `lookback_policy.signal_tail_bars_1m`
+  - target timeframe duration
+  - finite compute context, выведенный из materialized grid axes
+  - finite lag/default-only context из `signals.v1.params`
+- effective tail window считается в target bars и используется только для explicit configured
+  `(timeframe, indicator_id)` targets;
+- compute window строится локально внутри precompute runner internals без filesystem discovery;
+- merge policy фиксирована как `prefix + rebuilt_tail`, без hidden dedup/coercion;
+- merged matrix обязана оставаться strict:
+  - `dtype: int8`
+  - `shape: [V, T_tf]`
+  - `axis_order: [variant, time]`
+  - value set `{-1,0,1}`
+- per-indicator manifest после merge обязан обновлять:
+  - `rows_count`
+  - `timeline`
+  - `signals.sha256`
+  - provenance inputs с `lookback_policy.signal_tail_bars_1m`,
+    `effective_target_tail_bars` и `rebuild_strategy = prefix + rebuilt_tail`
+- root `signals` catalog обязан оставаться deterministic:
+  - `signals.supported_timeframes` deduplicated in canonical timeframe order
+  - `signals.supported_indicator_ids` in lexical order
+  - `signals.manifests` ordered by `(timeframe, indicator_id)`
+- identical source candles + identical config/request + identical generated timestamp должны
+  давать byte-stable `signals/<tf>/<indicator_id>/signals.i8.npy` и related manifests.
 
 Rollup contract для R3-02:
 
@@ -197,6 +238,8 @@ R4-02 replaces the root-manifest signal placeholder for explicit configured targ
   `signals.manifests`;
 - `signals.manifests` must be ordered deterministically by timeframe contract then
   `indicator_id`;
+- `signals.manifests` remains explicit configured-target metadata; directory scanning is not a
+  supported source of truth;
 - root manifest still keeps `hit_times/1m` as an explicit placeholder reference until R5.
 
 ### Per-indicator signal manifest
@@ -216,6 +259,12 @@ R4-02 replaces the root-manifest signal placeholder for explicit configured targ
 - `grid.variant_keys_sha256`;
 - `grid.signals_v1_params_defaults` из strict `signals.v1.params = default-only`;
 - `provenance`.
+
+R4-03 provenance additions for per-indicator signal manifests:
+
+- `inputs_sha256` must include `lookback_policy.signal_tail_bars_1m`;
+- `inputs_sha256` must include the effective target tail budget derived for the target;
+- `inputs_sha256` must include `rebuild_strategy = prefix + rebuilt_tail`.
 
 ### `hit_times/1m/manifest.yaml`
 

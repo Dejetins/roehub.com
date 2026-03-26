@@ -1,4 +1,4 @@
-# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03 / R2-04 / R4-02)
+# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03 / R2-04 / R4-02 / R4-03)
 
 Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в
 `artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning, config-driven validation
@@ -120,7 +120,7 @@ R3-01 / R3-02 / R3-03 exception boundary:
 - если использовать полный validation plan, такой slot по-прежнему не должен публиковаться, пока
   later-stage plan требует real `signals/hit_times`.
 
-R4-01 / R4-02 clarification:
+R4-01 / R4-02 / R4-03 clarification:
 
 - наличие explicit signal-rules engine contract само по себе ещё не гарантирует publish-ready
   `signals`, но после R4-02 rebuild обязан materialize'ить real signal artifacts для explicit
@@ -135,8 +135,16 @@ R4-01 / R4-02 clarification:
   expansion вручную не включается;
 - signal matrices обязаны использовать `dtype=int8`, `shape=[V, T_tf]`,
   `axis_order=[variant, time]`, value set `{-1,0,1}`;
-- R4-03 signal tail-update logic и R4-04 runtime `source` integration остаются вне текущей
-  operational-процедуры.
+- после R4-03 rebuild обязан:
+  - брать bounded signal window из `lookback_policy.signal_tail_bars_1m`
+  - вычислять effective target tail budget детерминированно для каждого explicit
+    `(timeframe, indicator_id)` target
+  - сохранять unchanged prefix и rewrite'ить только overlapping tail как
+    `prefix + rebuilt_tail`
+- missing existing signal target files могут переводить target в deterministic full rebuild, но
+  drift в existing manifest/data при reuse attempt обязан останавливать rebuild fail-fast;
+- R4-04 runtime `source` integration остаётся вне текущей operational-процедуры, а R5 всё ещё
+  требуется для materialized `hit_times`.
 
 Минимально ожидаемые пути:
 
@@ -193,6 +201,13 @@ R4-01 / R4-02 clarification:
 - publish разрешён для R3-04 только если explicit stage spec ограничен `prices+mappings`;
 - publish после R4-02 может включать real `signals`, но `require_hit_times_manifest` всё ещё
   должен оставаться `false` до R5, если `hit_times/1m` не materialized;
+- signal tail rebuild bounded by `lookback_policy.signal_tail_bars_1m`, но operator всё равно
+  обязан проверять final merged contracts:
+  - `rows_count`
+  - `timeline`
+  - `signals.manifests`
+  - `signals/<tf>/<indicator_id>/signals.i8.npy`
+  - `signals/<tf>/<indicator_id>/manifest.yaml`
 - publish остаётся запрещённым, если active validation plan still expects later-stage artifacts.
 
 Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.

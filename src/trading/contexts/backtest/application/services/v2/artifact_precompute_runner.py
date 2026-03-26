@@ -50,6 +50,7 @@ from .contracts import (
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_AXIS_ORDER_V2,
     ARTIFACT_SIGNAL_DTYPE_LITERAL_V2,
+    ARTIFACT_SIGNAL_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_VALUE_SET_V2,
     ARTIFACT_TIME_AXIS_ORDER_V2,
     HIT_TIMES_DIRECTORY_LITERAL_V2,
@@ -88,7 +89,7 @@ _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2 = "1m"
 _CANONICAL_CANDLE_SOURCE_LITERAL_V2 = "market_data.canonical_candles_1m"
 _PRECOMPUTE_GENERATOR_LITERAL_V2 = "backtest-artifact-precompute-runner-v2"
-_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r4-02"
+_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r4-03"
 _ONE_MINUTE_MILLIS_V2 = 60 * 1000
 _ROLLED_PRICE_TIMEFRAME_LITERALS_V2 = tuple(
     timeframe
@@ -197,6 +198,42 @@ class _SignalArtifactBuildResultV2:
 
     catalog: ArtifactSignalCatalogV2
     manifests: tuple[ArtifactSignalManifestDocumentV2, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _ExistingSignalArtifactV2:
+    """
+    Internal immutable snapshot of one existing inactive-slot signal family eligible for reuse.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+
+    catalog_entry: ArtifactSignalCatalogEntryV2
+    manifest: ArtifactSignalManifestDocumentV2
+    signal_matrix: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class _SignalArtifactTailPlanV2:
+    """
+    Internal deterministic plan for signal prefix reuse and bounded tail rebuild.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    prefix_matrix: np.ndarray | None
+    compute_start_idx: int
+    trim_prefix_bars: int
+    effective_tail_bars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -397,6 +434,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             coordinates=request.coordinates,
             slot=inactive_slot,
             slot_root=slot_root,
+            existing_manifest=existing_manifest,
             request=request,
             slot_generation=target_slot_generation,
             runtime_settings=self.runtime_settings,
@@ -459,6 +497,7 @@ def _materialize_signal_artifacts_v2(
     coordinates: ArtifactCoordinatesV2,
     slot: str,
     slot_root: Path,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
     request: ArtifactCanonicalPriceExportRequestV2,
     slot_generation: int,
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
@@ -477,6 +516,7 @@ def _materialize_signal_artifacts_v2(
         coordinates: Artifact coordinates selecting one symbol root.
         slot: Inactive slot literal receiving the signal artifacts.
         slot_root: Absolute inactive-slot root directory.
+        existing_manifest: Previously materialized inactive-slot root manifest, when present.
         request: Explicit export request carrying slot identity and timestamps.
         runtime_settings: Strict runner runtime settings with signal target and guard budgets.
         signal_targets: Canonically ordered `(timeframe, indicator_id)` signal targets.
@@ -531,6 +571,7 @@ def _materialize_signal_artifacts_v2(
             coordinates=coordinates,
             slot=slot,
             slot_root=slot_root,
+            existing_manifest=existing_manifest,
             request=request,
             slot_generation=slot_generation,
             runtime_settings=runtime_settings,
@@ -553,11 +594,24 @@ def _materialize_signal_artifacts_v2(
                 manifest_sha256=_file_sha256_hex_v2(signal_manifest.path),
             )
         )
+    timeframe_order = {
+        literal: index for index, literal in enumerate(ARTIFACT_SIGNAL_TIMEFRAMES_V2)
+    }
+    ordered_catalog_entries = tuple(
+        sorted(
+            catalog_entries,
+            key=lambda entry: (timeframe_order[entry.timeframe], entry.indicator_id),
+        )
+    )
     return _SignalArtifactBuildResultV2(
         catalog=ArtifactSignalCatalogV2(
-            supported_timeframes=tuple(entry.timeframe for entry in catalog_entries),
-            supported_indicator_ids=tuple(entry.indicator_id for entry in catalog_entries),
-            manifests=tuple(catalog_entries),
+            supported_timeframes=tuple(
+                dict.fromkeys(entry.timeframe for entry in ordered_catalog_entries)
+            ),
+            supported_indicator_ids=tuple(
+                sorted({entry.indicator_id for entry in ordered_catalog_entries})
+            ),
+            manifests=ordered_catalog_entries,
         ),
         manifests=tuple(manifests),
     )
@@ -569,6 +623,7 @@ def _materialize_signal_artifact_v2(
     coordinates: ArtifactCoordinatesV2,
     slot: str,
     slot_root: Path,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
     request: ArtifactCanonicalPriceExportRequestV2,
     slot_generation: int,
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
@@ -587,6 +642,7 @@ def _materialize_signal_artifact_v2(
         coordinates: Artifact coordinates selecting one symbol root.
         slot: Inactive slot literal receiving the signal artifact.
         slot_root: Absolute inactive-slot root directory.
+        existing_manifest: Previously materialized inactive-slot root manifest, when present.
         request: Explicit export request carrying root identity and timestamps.
         runtime_settings: Strict runtime settings with signal guard budgets.
         signal_target: Explicit `(timeframe, indicator_id)` materialization target.
@@ -624,11 +680,6 @@ def _materialize_signal_artifact_v2(
             f"{signal_target.timeframe}:{signal_target.indicator_id}"
         ),
     )
-    candles = _candle_arrays_from_price_arrays_v2(
-        coordinates=coordinates,
-        timeframe=signal_target.timeframe,
-        arrays=price_arrays,
-    )
     defaults_grid = defaults_provider.compute_defaults(indicator_id=signal_target.indicator_id)
     if defaults_grid is None:
         raise ValueError(
@@ -641,17 +692,52 @@ def _materialize_signal_artifact_v2(
         layout=Layout.VARIANT_MAJOR,
     )
     materialized_grid = indicator_grid_builder.materialize_indicator(grid=compute_grid)
+    signal_rows = _build_signal_variant_rows_v2(
+        coordinates=coordinates,
+        timeframe=signal_target.timeframe,
+        materialized_grid=materialized_grid,
+    )
+    signal_variant_keys_sha256 = _variant_keys_sha256_v2(signal_rows=signal_rows)
+    effective_tail_bars = _effective_signal_tail_bars_v2(
+        timeframe=signal_target.timeframe,
+        runtime_settings=runtime_settings,
+    )
+    rebuild_context_bars = _signal_rebuild_context_bars_v2(
+        materialized_grid=materialized_grid,
+        defaults_provider=defaults_provider,
+        indicator_id=signal_target.indicator_id,
+    )
+    existing_signal_artifact = _load_existing_signal_artifact_v2(
+        artifact_loader=artifact_loader,
+        coordinates=coordinates,
+        slot=slot,
+        existing_manifest=existing_manifest,
+        signal_target=signal_target,
+        expected_variant_keys_sha256=signal_variant_keys_sha256,
+        expected_row_count=len(signal_rows),
+    )
+    signal_tail_plan = _build_signal_tail_plan_v2(
+        price_arrays=price_arrays,
+        existing_signal_artifact=existing_signal_artifact,
+        effective_tail_bars=effective_tail_bars,
+        rebuild_context_bars=rebuild_context_bars,
+    )
+    signal_tail_price_arrays = _slice_canonical_price_arrays_v2(
+        arrays=price_arrays,
+        start_idx=signal_tail_plan.compute_start_idx,
+        end_idx=int(price_arrays.open_time.shape[0]),
+    )
+    candles = _candle_arrays_from_price_arrays_v2(
+        coordinates=coordinates,
+        timeframe=signal_target.timeframe,
+        arrays=signal_tail_price_arrays,
+    )
     primary_tensor = indicator_compute.compute(
         ComputeRequest(
             candles=candles,
             grid=compute_grid,
             max_variants_guard=runtime_settings.max_signal_rows_per_artifact,
         )
-    )
-    signal_rows = _build_signal_variant_rows_v2(
-        coordinates=coordinates,
-        timeframe=signal_target.timeframe,
-        materialized_grid=materialized_grid,
     )
     if len(signal_rows) != primary_tensor.meta.variants:
         raise ValueError(
@@ -669,13 +755,33 @@ def _materialize_signal_artifact_v2(
         expected_variants=primary_tensor.meta.variants,
         expected_t=primary_tensor.meta.t,
     )
-    signal_matrix, signal_params_defaults = _evaluate_signal_matrix_v2(
+    rebuilt_compute_window, signal_params_defaults = _evaluate_signal_matrix_v2(
         candles=candles,
         indicator_id=signal_target.indicator_id,
         primary_tensor=primary_tensor,
         dependency_tensors=dependency_tensors,
         signal_rows=signal_rows,
         signal_rules_engine=signal_rules_engine,
+    )
+    rebuilt_tail = _slice_signal_matrix_v2(
+        signal_matrix=rebuilt_compute_window,
+        start_idx=signal_tail_plan.trim_prefix_bars,
+        end_idx=int(rebuilt_compute_window.shape[1]),
+    )
+    if existing_signal_artifact is not None:
+        _validate_existing_signal_defaults_for_reuse_v2(
+            existing_signal_artifact=existing_signal_artifact,
+            signal_target=signal_target,
+            signal_params_defaults=signal_params_defaults,
+        )
+    signal_matrix = _merge_signal_matrices_v2(
+        prefix_matrix=signal_tail_plan.prefix_matrix,
+        rebuilt_tail=rebuilt_tail,
+    )
+    _validate_signal_matrix_v2(
+        signal_matrix=signal_matrix,
+        expected_shape=(len(signal_rows), int(price_arrays.open_time.shape[0])),
+        label=f"signals[{signal_target.timeframe}:{signal_target.indicator_id}]",
     )
     signal_paths = artifact_loader.resolve_signal_paths(
         coordinates,
@@ -699,6 +805,7 @@ def _materialize_signal_artifact_v2(
         signal_rows=signal_rows,
         signal_params_defaults=signal_params_defaults,
         signal_rules_engine=signal_rules_engine,
+        effective_tail_bars=signal_tail_plan.effective_tail_bars,
     )
     _write_yaml_atomically_v2(
         path=signal_paths.manifest,
@@ -1055,6 +1162,7 @@ def _build_signal_manifest_v2(
     signal_rows: tuple[_SignalVariantRowV2, ...],
     signal_params_defaults: Mapping[str, Any],
     signal_rules_engine: BacktestSignalRulesEngineV2,
+    effective_tail_bars: int,
 ) -> ArtifactSignalManifestDocumentV2:
     """
     Build the strict typed per-indicator signal manifest for one freshly written matrix.
@@ -1073,6 +1181,7 @@ def _build_signal_manifest_v2(
         signal_rows: Ordered signal row descriptors used for `variant_keys_sha256`.
         signal_params_defaults: Resolved `signals.v1.params` default mapping.
         signal_rules_engine: Explicit signal rules engine used to capture dependency metadata.
+        effective_tail_bars: Effective target-timeframe tail window used for rebuild planning.
     Returns:
         ArtifactSignalManifestDocumentV2: Typed strict signal manifest.
     Assumptions:
@@ -1113,6 +1222,7 @@ def _build_signal_manifest_v2(
         timeline=timeline,
         signal_rules_engine=signal_rules_engine,
         signal_params_defaults=signal_params_defaults,
+        effective_tail_bars=effective_tail_bars,
     )
     payload = {
         "schema_version": SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
@@ -1178,6 +1288,545 @@ def _variant_keys_sha256_v2(
         ensure_ascii=True,
     )
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+
+def _effective_signal_tail_bars_v2(
+    *,
+    timeframe: str,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+) -> int:
+    """
+    Derive the bounded signal tail window for one `(timeframe, indicator_id)` target.
+
+    Args:
+        timeframe: Target signal timeframe literal.
+        runtime_settings: Strict runtime settings carrying `signal_tail_bars_1m`.
+    Returns:
+        int: Effective target-timeframe tail length in bars.
+    Assumptions:
+        Tail planning rewrites only the bounded overlap derived from
+        `lookback_policy.signal_tail_bars_1m`.
+    Raises:
+        ValueError: If the timeframe literal is invalid.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    return max(
+        1,
+        _signal_target_tail_bars_from_1m_v2(
+            timeframe=timeframe,
+            signal_tail_bars_1m=runtime_settings.signal_tail_bars_1m,
+        ),
+    )
+
+
+def _signal_rebuild_context_bars_v2(
+    *,
+    materialized_grid: Any,
+    defaults_provider: BacktestGridDefaultsProvider,
+    indicator_id: str,
+) -> int:
+    """
+    Derive conservative leading-history bars required to compute a bounded signal tail.
+
+    Args:
+        materialized_grid: Materialized compute grid for the target indicator.
+        defaults_provider: Runtime defaults provider exposing `signals.v1.params`.
+        indicator_id: Target indicator identifier.
+    Returns:
+        int: Conservative leading-history budget in target-timeframe bars.
+    Assumptions:
+        Warmup/lag history is used only to seed deterministic tail recomputation and must not
+        expand the final rewritten tail segment by itself.
+    Raises:
+        ValueError: If signal defaults cannot be materialized deterministically.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+    """
+    return (
+        _signal_compute_context_bars_v2(materialized_grid=materialized_grid)
+        + _signal_param_context_bars_v2(
+            signal_param_specs=defaults_provider.signal_param_defaults(
+                indicator_id=indicator_id
+            )
+        )
+    )
+
+
+def _signal_target_tail_bars_from_1m_v2(
+    *,
+    timeframe: str,
+    signal_tail_bars_1m: int,
+) -> int:
+    """
+    Convert configured `signal_tail_bars_1m` into the target-timeframe bar budget.
+
+    Args:
+        timeframe: Target signal timeframe literal.
+        signal_tail_bars_1m: Configured tail budget expressed in `1m` bars.
+    Returns:
+        int: Ceil-divided target-timeframe tail length with minimum `1`.
+    Assumptions:
+        Signal tail policy is configured in `1m` bars so all target timeframes share one source
+        of truth.
+    Raises:
+        ValueError: If the timeframe literal is unsupported.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+      - src/trading/shared_kernel/primitives/timeframe.py
+    """
+    target_duration_millis = _timeframe_duration_millis_v2(Timeframe(timeframe))
+    requested_duration_millis = signal_tail_bars_1m * _ONE_MINUTE_MILLIS_V2
+    return max(
+        1,
+        int((requested_duration_millis + target_duration_millis - 1) // target_duration_millis),
+    )
+
+
+def _signal_compute_context_bars_v2(*, materialized_grid: Any) -> int:
+    """
+    Estimate conservative compute-history bars from integer-valued materialized grid axes.
+
+    Args:
+        materialized_grid: Materialized indicator grid returned by `GridBuilder`.
+    Returns:
+        int: Conservative history budget in target-timeframe bars.
+    Assumptions:
+        Positive integer axes such as `window`, `left`, `right`, or `signal_window` dominate the
+        finite warmup/lag semantics for bounded signal rebuild planning.
+    Raises:
+        ValueError: If one axis exposes an invalid empty value sequence.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    total_context_bars = 0
+    for axis in getattr(materialized_grid, "axes"):
+        axis_name = str(getattr(axis, "name")).strip().lower()
+        if axis_name == "source":
+            continue
+        integer_values = tuple(
+            abs(int(value))
+            for value in getattr(axis, "values")
+            if isinstance(value, int) and not isinstance(value, bool)
+        )
+        if len(integer_values) == 0:
+            continue
+        total_context_bars += max(integer_values)
+    return total_context_bars
+
+
+def _signal_param_context_bars_v2(
+    *,
+    signal_param_specs: Mapping[str, Any],
+) -> int:
+    """
+    Estimate conservative lag bars contributed by default-only `signals.v1.params`.
+
+    Args:
+        signal_param_specs: Default-only signal parameter specs keyed by param name.
+    Returns:
+        int: Conservative lag budget in target-timeframe bars.
+    Assumptions:
+        Only integer-valued params such as delta periods contribute directly to bar-history
+        planning, while thresholds remain lag-free.
+    Raises:
+        ValueError: If one provided spec cannot materialize deterministically.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+      - src/trading/contexts/indicators/domain/specifications/grid_param_spec.py
+    """
+    total_context_bars = 0
+    for spec in signal_param_specs.values():
+        integer_values = tuple(
+            abs(int(value))
+            for value in spec.materialize()
+            if isinstance(value, int) and not isinstance(value, bool)
+        )
+        if len(integer_values) == 0:
+            continue
+        total_context_bars += max(integer_values)
+    return total_context_bars
+
+
+def _select_signal_catalog_entry_v2(
+    *,
+    catalog: ArtifactSignalCatalogV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+) -> ArtifactSignalCatalogEntryV2 | None:
+    """
+    Select one existing root-catalog entry for the requested signal target.
+
+    Args:
+        catalog: Existing root-manifest signal catalog.
+        signal_target: Explicit `(timeframe, indicator_id)` signal target.
+    Returns:
+        ArtifactSignalCatalogEntryV2 | None: Matching catalog entry when present.
+    Assumptions:
+        Root manifests keep at most one entry per `(timeframe, indicator_id)` identity.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    for entry in catalog.manifests:
+        if (
+            entry.timeframe == signal_target.timeframe
+            and entry.indicator_id == signal_target.indicator_id
+        ):
+            return entry
+    return None
+
+
+def _load_existing_signal_artifact_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
+    signal_target: ArtifactSignalValidationSpecV2,
+    expected_variant_keys_sha256: str,
+    expected_row_count: int,
+) -> _ExistingSignalArtifactV2 | None:
+    """
+    Load one existing inactive-slot signal family when it is safe to reuse for tail rebuild.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Candidate inactive slot literal.
+        existing_manifest: Previously materialized inactive-slot root manifest, when present.
+        signal_target: Explicit `(timeframe, indicator_id)` signal target.
+        expected_variant_keys_sha256: Current deterministic row-order hash for the target.
+        expected_row_count: Current deterministic row count for the target.
+    Returns:
+        _ExistingSignalArtifactV2 | None: Existing signal payload when safely reusable, otherwise
+            `None`.
+    Assumptions:
+        Missing existing target files may trigger a deterministic full build, while manifest/data
+        drift during a reuse attempt must fail fast.
+    Raises:
+        ValueError: If existing root/signal metadata drifts from strict reuse contracts.
+        FileNotFoundError: Propagated only after manifest existence prechecks pass and actual data
+            drift is detected.
+    Side Effects:
+        Reads existing manifest and signal matrix from disk when the target is present.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if existing_manifest is None:
+        return None
+    existing_entry = _select_signal_catalog_entry_v2(
+        catalog=existing_manifest.signals,
+        signal_target=signal_target,
+    )
+    if existing_entry is None:
+        return None
+    signal_paths = artifact_loader.resolve_signal_paths(
+        coordinates,
+        slot,
+        signal_target.timeframe,
+        signal_target.indicator_id,
+    )
+    expected_manifest_path = _slot_relative_path_v2(
+        slot_root=signal_paths.manifest.parents[3],
+        absolute_path=signal_paths.manifest,
+    )
+    if existing_entry.manifest_path != expected_manifest_path:
+        raise ValueError(
+            "existing signal catalog manifest_path must match deterministic path for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{existing_entry.manifest_path!r}, expected {expected_manifest_path!r}"
+        )
+    if not signal_paths.manifest.is_file() or not signal_paths.signals.is_file():
+        return None
+    actual_manifest_sha256 = _file_sha256_hex_v2(signal_paths.manifest)
+    if existing_entry.manifest_sha256 != actual_manifest_sha256:
+        raise ValueError(
+            "existing signal catalog manifest_sha256 must match actual file for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{existing_entry.manifest_sha256!r}, expected {actual_manifest_sha256!r}"
+        )
+    signal_manifest = artifact_loader.load_signal_manifest(
+        coordinates,
+        slot,
+        signal_target.timeframe,
+        signal_target.indicator_id,
+    )
+    signal_matrix = np.ascontiguousarray(
+        _load_validated_array_v2(
+            metadata=signal_manifest.signals,
+            expected_path=signal_paths.signals,
+            slot_root=signal_paths.signals.parents[3],
+            expected_dtype=ARTIFACT_SIGNAL_DTYPE_LITERAL_V2,
+            expected_axis_order=ARTIFACT_SIGNAL_AXIS_ORDER_V2,
+            expected_shape=(signal_manifest.rows_count, signal_manifest.timeline.bar_count),
+            location=f"existing signals[{signal_target.timeframe}:{signal_target.indicator_id}]",
+        ),
+        dtype=np.int8,
+    )
+    _validate_signal_matrix_v2(
+        signal_matrix=signal_matrix,
+        expected_shape=(signal_manifest.rows_count, signal_manifest.timeline.bar_count),
+        label=f"existing signals[{signal_target.timeframe}:{signal_target.indicator_id}]",
+    )
+    if signal_manifest.slot_generation != existing_manifest.slot_generation:
+        raise ValueError(
+            "existing signal manifest slot_generation must match root manifest for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.slot_generation!r}, expected "
+            f"{existing_manifest.slot_generation!r}"
+        )
+    if signal_manifest.asof_date != existing_manifest.asof_date:
+        raise ValueError(
+            "existing signal manifest asof_date must match root manifest for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.asof_date!r}, expected {existing_manifest.asof_date!r}"
+        )
+    if signal_manifest.grid.variant_keys_sha256 != expected_variant_keys_sha256:
+        raise ValueError(
+            "existing signal manifest grid.variant_keys_sha256 must match current row order for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.grid.variant_keys_sha256!r}, expected "
+            f"{expected_variant_keys_sha256!r}"
+        )
+    if signal_manifest.rows_count != expected_row_count:
+        raise ValueError(
+            "existing signal manifest rows_count must match current grid rows for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.rows_count!r}, expected {expected_row_count!r}"
+        )
+    return _ExistingSignalArtifactV2(
+        catalog_entry=existing_entry,
+        manifest=signal_manifest,
+        signal_matrix=signal_matrix,
+    )
+
+
+def _build_signal_tail_plan_v2(
+    *,
+    price_arrays: _CanonicalPriceArraysV2,
+    existing_signal_artifact: _ExistingSignalArtifactV2 | None,
+    effective_tail_bars: int,
+    rebuild_context_bars: int,
+) -> _SignalArtifactTailPlanV2:
+    """
+    Build deterministic prefix reuse bounds for one signal artifact tail rebuild.
+
+    Args:
+        price_arrays: Fresh materialized target-timeframe price arrays.
+        existing_signal_artifact: Existing inactive-slot signal family, when safely reusable.
+        effective_tail_bars: Derived target-timeframe tail length in bars.
+        rebuild_context_bars: Additional leading-history bars required for deterministic compute.
+    Returns:
+        _SignalArtifactTailPlanV2: Prefix slice and compute-start index for `prefix + rebuilt_tail`.
+    Assumptions:
+        Prefix reuse is allowed only when the existing signal timeline shares the same leading
+        timeline start and there are enough overlapping bars left after the rebuilt tail window.
+    Raises:
+        ValueError: If derived slice indexes are inconsistent.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    current_timeline = _timeline_coverage_from_arrays_v2(arrays=price_arrays)
+    current_bar_count = current_timeline.bar_count
+    bounded_tail_bars = min(current_bar_count, effective_tail_bars)
+    if existing_signal_artifact is None:
+        return _SignalArtifactTailPlanV2(
+            prefix_matrix=None,
+            compute_start_idx=0,
+            trim_prefix_bars=0,
+            effective_tail_bars=bounded_tail_bars,
+        )
+    existing_timeline = existing_signal_artifact.manifest.timeline
+    if (
+        existing_timeline.open_time_start != current_timeline.open_time_start
+        or existing_timeline.close_time_start != current_timeline.close_time_start
+    ):
+        return _SignalArtifactTailPlanV2(
+            prefix_matrix=None,
+            compute_start_idx=0,
+            trim_prefix_bars=0,
+            effective_tail_bars=bounded_tail_bars,
+        )
+    overlapping_bar_count = min(current_bar_count, existing_timeline.bar_count)
+    if overlapping_bar_count <= bounded_tail_bars:
+        return _SignalArtifactTailPlanV2(
+            prefix_matrix=None,
+            compute_start_idx=0,
+            trim_prefix_bars=0,
+            effective_tail_bars=bounded_tail_bars,
+        )
+    prefix_bar_count = overlapping_bar_count - bounded_tail_bars
+    compute_start_idx = max(0, prefix_bar_count - rebuild_context_bars)
+    return _SignalArtifactTailPlanV2(
+        prefix_matrix=_slice_signal_matrix_v2(
+            signal_matrix=existing_signal_artifact.signal_matrix,
+            start_idx=0,
+            end_idx=prefix_bar_count,
+        ),
+        compute_start_idx=compute_start_idx,
+        trim_prefix_bars=prefix_bar_count - compute_start_idx,
+        effective_tail_bars=bounded_tail_bars,
+    )
+
+
+def _slice_signal_matrix_v2(
+    *,
+    signal_matrix: np.ndarray,
+    start_idx: int,
+    end_idx: int,
+) -> np.ndarray:
+    """
+    Slice one `[V, T_tf]` signal matrix on the time axis into a contiguous sub-matrix.
+
+    Args:
+        signal_matrix: Source signal matrix.
+        start_idx: Inclusive time-axis slice start.
+        end_idx: Exclusive time-axis slice end.
+    Returns:
+        np.ndarray: Contiguous `int8` signal sub-matrix.
+    Assumptions:
+        Callers already validate that row order remains unchanged across reuse attempts.
+    Raises:
+        ValueError: If slice indexes are negative or inconsistent.
+    Side Effects:
+        Allocates one contiguous array.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if start_idx < 0:
+        raise ValueError(f"signal slice start_idx must be >= 0; got {start_idx!r}")
+    if end_idx < start_idx:
+        raise ValueError(
+            f"signal slice end_idx must be >= start_idx; got {end_idx!r} and {start_idx!r}"
+        )
+    return np.ascontiguousarray(signal_matrix[:, start_idx:end_idx], dtype=np.int8)
+
+
+def _merge_signal_matrices_v2(
+    *,
+    prefix_matrix: np.ndarray | None,
+    rebuilt_tail: np.ndarray,
+) -> np.ndarray:
+    """
+    Merge one reused signal prefix with a freshly rebuilt tail matrix.
+
+    Args:
+        prefix_matrix: Existing unchanged prefix matrix, or `None` for full rebuild.
+        rebuilt_tail: Freshly rebuilt signal tail matrix.
+    Returns:
+        np.ndarray: Contiguous merged `[V, T_tf]` matrix.
+    Assumptions:
+        Prefix and rebuilt tail share identical row ordering and dtype contracts.
+    Raises:
+        ValueError: If row counts differ across prefix and rebuilt tail.
+    Side Effects:
+        Allocates one contiguous merged matrix when prefix is present.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if prefix_matrix is None or int(prefix_matrix.shape[1]) == 0:
+        return rebuilt_tail
+    if prefix_matrix.shape[0] != rebuilt_tail.shape[0]:
+        raise ValueError(
+            "signal prefix row count must match rebuilt tail row count; got "
+            f"{prefix_matrix.shape[0]!r} and {rebuilt_tail.shape[0]!r}"
+        )
+    return np.ascontiguousarray(
+        np.concatenate((prefix_matrix, rebuilt_tail), axis=1),
+        dtype=np.int8,
+    )
+
+
+def _validate_existing_signal_defaults_for_reuse_v2(
+    *,
+    existing_signal_artifact: _ExistingSignalArtifactV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+    signal_params_defaults: Mapping[str, Any],
+) -> None:
+    """
+    Validate default-only signal params remain identical across signal prefix reuse attempts.
+
+    Args:
+        existing_signal_artifact: Existing inactive-slot signal family selected for reuse.
+        signal_target: Explicit `(timeframe, indicator_id)` signal target.
+        signal_params_defaults: Freshly resolved default-only signal params for the rebuild.
+    Returns:
+        None.
+    Assumptions:
+        Reusing an existing prefix is safe only when `signals.v1.params` remain `default-only`
+        and byte-for-byte identical at the manifest contract level.
+    Raises:
+        ValueError: If existing manifest defaults drift from the current resolved defaults.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if dict(existing_signal_artifact.manifest.grid.signals_v1_params_defaults) != dict(
+        signal_params_defaults
+    ):
+        raise ValueError(
+            "existing signal manifest grid.signals_v1_params_defaults must match current "
+            f"default-only params for {signal_target.timeframe}:{signal_target.indicator_id}"
+        )
 
 
 def _load_existing_inactive_manifest_v2(
@@ -3094,6 +3743,7 @@ def _build_signal_manifest_provenance_v2(
     timeline: ArtifactTimelineCoverageV2,
     signal_rules_engine: BacktestSignalRulesEngineV2,
     signal_params_defaults: Mapping[str, Any],
+    effective_tail_bars: int,
 ) -> ArtifactManifestProvenanceV2:
     """
     Build deterministic provenance for one strict per-indicator signal manifest.
@@ -3109,6 +3759,7 @@ def _build_signal_manifest_provenance_v2(
         timeline: Timeline coverage serialized into the signal manifest.
         signal_rules_engine: Explicit rules engine used to resolve dependency metadata.
         signal_params_defaults: Resolved default-only signal parameter mapping.
+        effective_tail_bars: Effective target-timeframe tail window used for the rebuild.
     Returns:
         ArtifactManifestProvenanceV2: Strict signal-manifest provenance payload.
     Assumptions:
@@ -3142,6 +3793,8 @@ def _build_signal_manifest_provenance_v2(
                 indicator_id=signal_target.indicator_id
             ).required_dependency_ids,
             signal_params_defaults=signal_params_defaults,
+            signal_tail_bars_1m=runtime_settings.signal_tail_bars_1m,
+            effective_tail_bars=effective_tail_bars,
         ),
     )
 
@@ -3157,6 +3810,8 @@ def _build_signal_manifest_inputs_sha256_v2(
     timeline: ArtifactTimelineCoverageV2,
     required_dependency_ids: tuple[str, ...],
     signal_params_defaults: Mapping[str, Any],
+    signal_tail_bars_1m: int,
+    effective_tail_bars: int,
 ) -> str:
     """
     Hash normalized signal-manifest source identity into deterministic provenance.
@@ -3171,6 +3826,8 @@ def _build_signal_manifest_inputs_sha256_v2(
         timeline: Timeline coverage serialized into the signal manifest.
         required_dependency_ids: Dependency indicator ids required by the rule family.
         signal_params_defaults: Resolved default-only signal parameter mapping.
+        signal_tail_bars_1m: Configured signal tail budget expressed in `1m` bars.
+        effective_tail_bars: Effective target-timeframe tail window used for the rebuild.
     Returns:
         str: Lowercase SHA-256 hex digest.
     Assumptions:
@@ -3201,6 +3858,9 @@ def _build_signal_manifest_inputs_sha256_v2(
             "asof_date": request.asof_date,
             "timeframe": signal_target.timeframe,
             "indicator_id": signal_target.indicator_id,
+            "lookback_policy.signal_tail_bars_1m": signal_tail_bars_1m,
+            "effective_target_tail_bars": effective_tail_bars,
+            "rebuild_strategy": "prefix + rebuilt_tail",
             "required_dependency_ids": required_dependency_ids,
             "price_manifest_sha256": {
                 "open_time": price_manifest.open_time.sha256,
@@ -3270,6 +3930,7 @@ def _build_root_manifest_provenance_v2(
             signal_entries=signal_entries,
             price_lookback_bars=runtime_settings.price_tail_bars_1m,
             mapping_lookback_bars=runtime_settings.mapping_tail_bars_1m,
+            signal_lookback_bars=runtime_settings.signal_tail_bars_1m,
         ),
     )
 
@@ -3283,6 +3944,7 @@ def _build_inputs_sha256_v2(
     signal_entries: tuple[ArtifactSignalCatalogEntryV2, ...],
     price_lookback_bars: int,
     mapping_lookback_bars: int,
+    signal_lookback_bars: int,
 ) -> str:
     """
     Hash normalized export identity and emitted arrays into deterministic provenance.
@@ -3295,6 +3957,8 @@ def _build_inputs_sha256_v2(
         signal_entries: Signal catalog entries emitted by the same build.
         price_lookback_bars: Effective `lookback_policy.price_tail_bars_1m` used for the build.
         mapping_lookback_bars: Effective `lookback_policy.mapping_tail_bars_1m` used for the
+            build.
+        signal_lookback_bars: Effective `lookback_policy.signal_tail_bars_1m` used for the
             build.
     Returns:
         str: Lowercase SHA-256 hex digest.
@@ -3327,6 +3991,7 @@ def _build_inputs_sha256_v2(
             "asof_date": request.asof_date,
             "lookback_policy.price_tail_bars_1m": price_lookback_bars,
             "lookback_policy.mapping_tail_bars_1m": mapping_lookback_bars,
+            "lookback_policy.signal_tail_bars_1m": signal_lookback_bars,
             "rolled_price_timeframes": rolled_timeframes,
             "mapping_timeframes": tuple(section.timeframe for section in mapping_sections),
             "signal_targets": tuple(
@@ -3993,6 +4658,7 @@ def _load_validated_array_v2(
     *,
     metadata: ArtifactArrayMetadataV2,
     expected_path: Path,
+    slot_root: Path | None = None,
     expected_dtype: str,
     expected_axis_order: tuple[str, ...],
     expected_shape: tuple[int, ...] | None,
@@ -4004,6 +4670,8 @@ def _load_validated_array_v2(
     Args:
         metadata: Strict array metadata from the existing root manifest.
         expected_path: Explicit deterministic artifact path for the array.
+        slot_root: Explicit slot root used to validate manifest-relative paths when the artifact
+            depth differs across families.
         expected_dtype: Required dtype literal for the array family.
         expected_axis_order: Required axis-order literal for the array family.
         expected_shape: Optional required array shape when known ahead of time.
@@ -4024,8 +4692,9 @@ def _load_validated_array_v2(
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
-    if metadata.path != expected_path.relative_to(expected_path.parents[2]).as_posix():
-        expected_relative_path = expected_path.relative_to(expected_path.parents[2]).as_posix()
+    resolved_slot_root = expected_path.parents[2] if slot_root is None else slot_root
+    if metadata.path != expected_path.relative_to(resolved_slot_root).as_posix():
+        expected_relative_path = expected_path.relative_to(resolved_slot_root).as_posix()
         raise ValueError(
             f"{location} manifest path must be {expected_relative_path!r}; "
             f"got {metadata.path!r}"

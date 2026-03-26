@@ -212,6 +212,7 @@ def build_artifact_precompute_fixture_v2(
     current_slot_generation: int = 4,
     price_tail_bars_1m: int = 2,
     mapping_tail_bars_1m: int = 10,
+    signal_tail_bars_1m: int = 10,
     validation_signal_artifacts: tuple[tuple[str, str], ...] = (),
     precompute_signal_artifacts: tuple[tuple[str, str], ...] = (),
     require_hit_times_manifest: bool = False,
@@ -226,6 +227,8 @@ def build_artifact_precompute_fixture_v2(
         price_tail_bars_1m: Strict positive `prices/1m` tail reread budget.
         mapping_tail_bars_1m: Strict positive `mappings/<tf>` tail rebuild budget in `1m`
             bars.
+        signal_tail_bars_1m: Strict positive `signals/<tf>/<indicator_id>` tail rebuild budget
+            expressed in `1m` bars.
         validation_signal_artifacts: Explicit `(timeframe, indicator_id)` targets written into
             `backtest_artifacts.validation_plan.signal_artifacts`.
         precompute_signal_artifacts: Explicit `(timeframe, indicator_id)` targets enabled for
@@ -297,7 +300,7 @@ def build_artifact_precompute_fixture_v2(
                     "lookback_policy": {
                         "price_tail_bars_1m": price_tail_bars_1m,
                         "mapping_tail_bars_1m": mapping_tail_bars_1m,
-                        "signal_tail_bars_1m": 10,
+                        "signal_tail_bars_1m": signal_tail_bars_1m,
                         "hit_times_tail_bars_1m": 10,
                     },
                     "validation_budgets": {
@@ -319,6 +322,7 @@ def build_artifact_precompute_fixture_v2(
         runtime_settings=ArtifactPrecomputeRuntimeSettingsV2(
             price_tail_bars_1m=runtime_config.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=runtime_config.lookback_policy.mapping_tail_bars_1m,
+            signal_tail_bars_1m=runtime_config.lookback_policy.signal_tail_bars_1m,
             config_sha256=build_backtest_artifacts_runtime_config_hash(config=runtime_config),
             signal_artifacts=tuple(
                 ArtifactSignalValidationSpecV2(

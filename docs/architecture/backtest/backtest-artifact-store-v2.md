@@ -1,6 +1,6 @@
-# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04 / R3-03 / R3-04 / R4-02)
+# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04 / R3-03 / R3-04 / R4-02 / R4-03)
 
-Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`, `Milestone R3 / EPIC R3-03 + R3-04`, `Milestone R4 / EPIC R4-02`
+Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`, `Milestone R3 / EPIC R3-03 + R3-04`, `Milestone R4 / EPIC R4-02 + R4-03`
 
 Документ фиксирует:
 
@@ -11,6 +11,8 @@
   validation plan, hit-times grid и publish/runtime boundary.
 - R3-03 / R3-04: real `mappings/<tf>` families и stage-scoped publish validation.
 - R4-02: real `signals/<tf>/<indicator_id>` families и root `signals.*` catalog metadata.
+- R4-03: deterministic bounded tail rebuild for explicit per-target signal artifacts without
+  full-history recompute on daily rebuilds.
 
 Основные источники:
 
@@ -241,7 +243,7 @@ validated files перед publish.
 - `signals` root catalog до R4-02;
 - `hit_times/1m/manifest.yaml` reference до R5.
 
-## R4-01 / R4-02 stage boundary
+## R4-01 / R4-02 / R4-03 stage boundary
 
 R4-01 вводит explicit signal-rules engine contract.
 R4-02 materialize'ит real signal artifacts и переводит reserved `signals/` paths в active store
@@ -254,9 +256,15 @@ contract для explicit configured targets.
 - `signals/<tf>/<indicator_id>/manifest.yaml` обязан существовать для каждого такого target;
 - root `manifest.yaml` обязан хранить real `signals.supported_timeframes`,
   `signals.supported_indicator_ids` и `signals.manifests`;
+- после R4-03 existing inactive-slot `signals/<tf>/<indicator_id>` могут переиспользовать только
+  unchanged prefix и обязаны rewrite'ить overlapping tail как `prefix + rebuilt_tail`;
+- bounded tail policy для `signals/<tf>/<indicator_id>` derives from
+  `lookback_policy.signal_tail_bars_1m` plus deterministic warmup/lag context;
+- missing existing signal target files могут переводить target в deterministic full rebuild, но
+  drift в `manifest.yaml`, `rows_count`, `timeline`, `variant_key_version`,
+  `variant_keys_sha256`, `signals.v1.params` или file `sha256` обязан fail-fast'ить rebuild;
 - placeholders сохраняются только для `hit_times/1m` до R5;
-- R4-03 signal tail-update logic и R4-04 runtime `source` integration остаются later-stage
-  epics.
+- R4-04 runtime `source` integration остаётся later-stage epic.
 
 ## R3-04 prices+mappings publish-ready boundary
 
@@ -488,8 +496,16 @@ Per-indicator `signals/<tf>/<indicator_id>/manifest.yaml` обязан соде�
 - `grid`:
   - `variant_key_version: 1`
   - `variant_keys_sha256`
-  - `signals_v1.params defaults`
+  - `signals.v1.params defaults (default-only)`
 - `provenance`.
+
+После R4-03 этот manifest дополнительно фиксирует тот факт, что итоговая матрица получена через
+bounded rebuild:
+
+- stored matrix остаётся `signals/<tf>/<indicator_id>/signals.i8.npy`;
+- `rows_count` и `timeline` обязаны описывать уже merged final matrix, а не только rebuilt tail;
+- provenance должен различать `lookback_policy.signal_tail_bars_1m`,
+  effective target tail budget и `rebuild_strategy = prefix + rebuilt_tail`.
 
 Root `signals` section после R4-02 дополнительно обязан:
 
@@ -497,6 +513,12 @@ Root `signals` section после R4-02 дополнительно обязан:
 - перечислять `supported_indicator_ids` в lexical order;
 - перечислять `manifests` в порядке `(timeframe, indicator_id)`;
 - хранить только explicit configured targets without filesystem discovery.
+
+После R4-03 root `signals` section остаётся publish-compatible:
+
+- `signals.supported_timeframes` выводится из manifest entries после deduplication;
+- `signals.supported_indicator_ids` выводится детерминированно и не зависит от scan order;
+- `signals.manifests` обновляет `manifest_sha256` после tail merge и per-target manifest rewrite.
 
 ### `hit_times/1m/manifest.yaml`
 

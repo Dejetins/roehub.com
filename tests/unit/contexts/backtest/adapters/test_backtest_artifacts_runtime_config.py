@@ -127,8 +127,38 @@ def test_load_backtest_artifacts_runtime_config_reads_yaml_values() -> None:
     assert config.publish_schedule.full_rebuild_hour_utc == 2
     assert config.publish_schedule.full_rebuild_minute_utc == 0
     assert config.lookback_policy.price_tail_bars_1m == 20000
+    assert config.lookback_policy.signal_tail_bars_1m == 20000
     assert config.validation_budgets.max_hit_times_cells == 50000000
     assert config.to_validation_spec().price_timeframes == config.validation_plan.price_timeframes
+
+
+def test_backtest_artifacts_runtime_config_to_precompute_runtime_settings_includes_signal_tail(
+) -> None:
+    """
+    Verify service-layer precompute settings carry explicit signal tail lookback from YAML.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R4-03 runner wiring must receive `lookback_policy.signal_tail_bars_1m` without hidden
+        defaults.
+    Raises:
+        AssertionError: If the translated service DTO drops or changes the configured lookback.
+    Side Effects:
+        None.
+    """
+    config = load_backtest_artifacts_runtime_config(Path("configs/dev/backtest_artifacts.yaml"))
+
+    runtime_settings = config.to_precompute_runtime_settings(
+        config_sha256=build_backtest_artifacts_runtime_config_hash(config=config)
+    )
+
+    assert runtime_settings.price_tail_bars_1m == 20000
+    assert runtime_settings.mapping_tail_bars_1m == 20000
+    assert runtime_settings.signal_tail_bars_1m == 20000
+    assert runtime_settings.max_signal_rows_per_artifact == 5000000
 
 
 def test_resolve_backtest_artifacts_config_path_precedence() -> None:

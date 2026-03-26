@@ -666,8 +666,8 @@ class BacktestArtifactsRuntimeConfig:
         Returns:
             ArtifactPrecomputeRuntimeSettingsV2: Minimal immutable settings for runner wiring.
         Assumptions:
-            Signal artifacts remain explicit config-driven targets even while R4-03 tail updates
-            are still out of scope.
+            Signal artifacts remain explicit config-driven targets and R4-03 tail lookback
+            settings are forwarded without hidden defaults.
         Raises:
             ValueError: If nested lookback, signal-target, or budget contracts are invalid.
         Side Effects:
@@ -682,6 +682,7 @@ class BacktestArtifactsRuntimeConfig:
         return ArtifactPrecomputeRuntimeSettingsV2(
             price_tail_bars_1m=self.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=self.lookback_policy.mapping_tail_bars_1m,
+            signal_tail_bars_1m=self.lookback_policy.signal_tail_bars_1m,
             config_sha256=config_sha256,
             signal_artifacts=tuple(
                 item.to_validation_spec() for item in self.validation_plan.signal_artifacts
