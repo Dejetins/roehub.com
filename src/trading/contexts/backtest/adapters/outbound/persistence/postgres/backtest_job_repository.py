@@ -14,7 +14,9 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobRepository,
 )
 from trading.contexts.backtest.domain.entities import (
+    BacktestArtifactSlotLiteral,
     BacktestJob,
+    BacktestJobArtifactPin,
     BacktestJobErrorPayload,
     BacktestJobMode,
     BacktestJobStage,
@@ -40,6 +42,10 @@ _BACKTEST_JOB_SELECT_COLUMNS = """
     spec_payload_json,
     engine_params_hash,
     backtest_runtime_config_hash,
+    artifact_slot,
+    artifact_slot_generation,
+    artifact_manifest_hash,
+    artifact_asof_date,
     stage,
     processed_units,
     total_units,
@@ -129,6 +135,10 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             spec_payload_json,
             engine_params_hash,
             backtest_runtime_config_hash,
+            artifact_slot,
+            artifact_slot_generation,
+            artifact_manifest_hash,
+            artifact_asof_date,
             stage,
             processed_units,
             total_units,
@@ -158,6 +168,10 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             %(spec_payload_json)s::jsonb,
             %(engine_params_hash)s,
             %(backtest_runtime_config_hash)s,
+            %(artifact_slot)s,
+            %(artifact_slot_generation)s,
+            %(artifact_manifest_hash)s,
+            %(artifact_asof_date)s,
             %(stage)s,
             %(processed_units)s,
             %(total_units)s,
@@ -193,6 +207,18 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 else None,
                 "engine_params_hash": job.engine_params_hash,
                 "backtest_runtime_config_hash": job.backtest_runtime_config_hash,
+                "artifact_slot": job.artifact_pin.artifact_slot
+                if job.artifact_pin is not None
+                else None,
+                "artifact_slot_generation": job.artifact_pin.artifact_slot_generation
+                if job.artifact_pin is not None
+                else None,
+                "artifact_manifest_hash": job.artifact_pin.artifact_manifest_hash
+                if job.artifact_pin is not None
+                else None,
+                "artifact_asof_date": job.artifact_pin.artifact_asof_date
+                if job.artifact_pin is not None
+                else None,
                 "stage": job.stage,
                 "processed_units": job.processed_units,
                 "total_units": job.total_units,
@@ -392,6 +418,71 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 "PostgresBacktestJobRepository.count_active_for_user invalid count row"
             ) from error
 
+    def count_active_for_artifact_manifest(
+        self,
+        *,
+        market_id: int,
+        symbol: str,
+        artifact_slot: str,
+        artifact_manifest_hash: str,
+    ) -> int:
+        """
+        Count active jobs pinning one previously published inactive-slot manifest identity.
+
+        Args:
+            market_id: Canonical market id for the symbol-root being published.
+            symbol: Instrument symbol pinned by the active jobs.
+            artifact_slot: Candidate inactive slot literal.
+            artifact_manifest_hash: SHA-256 of the inactive slot `manifest.yaml`.
+        Returns:
+            int: Number of active jobs blocking rebuild/publish of this slot content.
+        Assumptions:
+            Template-mode jobs keep `instrument_id` in `request_json.template`, while saved-mode
+            jobs keep it in `spec_payload_json`.
+        Raises:
+            BacktestStorageError: If count row is missing or invalid.
+        Side Effects:
+            Executes one SQL aggregate select.
+        """
+        sql = f"""
+        SELECT
+            COUNT(*) AS active_total
+        FROM {self._jobs_table}
+        WHERE state IN ('queued', 'running')
+          AND artifact_slot = %(artifact_slot)s
+          AND artifact_manifest_hash = %(artifact_manifest_hash)s
+          AND (
+                (
+                    request_json -> 'template' -> 'instrument_id' ->> 'market_id'
+                )::integer = %(market_id)s
+                AND request_json -> 'template' -> 'instrument_id' ->> 'symbol' = %(symbol)s
+              OR (
+                    spec_payload_json -> 'instrument_id' ->> 'market_id'
+                )::integer = %(market_id)s
+                AND spec_payload_json -> 'instrument_id' ->> 'symbol' = %(symbol)s
+          )
+        """
+        row = self._gateway.fetch_one(
+            query=sql,
+            parameters={
+                "market_id": market_id,
+                "symbol": symbol,
+                "artifact_slot": artifact_slot,
+                "artifact_manifest_hash": artifact_manifest_hash,
+            },
+        )
+        if row is None:
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.count_active_for_artifact_manifest returned no row"
+            )
+        try:
+            return int(row["active_total"])
+        except Exception as error:  # noqa: BLE001
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.count_active_for_artifact_manifest "
+                "invalid count row"
+            ) from error
+
 
 def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
     """
@@ -440,6 +531,7 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
             field_name="spec_payload_json",
             required=False,
         )
+        artifact_pin = _parse_artifact_pin(row=row)
         return BacktestJob(
             job_id=UUID(str(row["job_id"])),
             user_id=UserId.from_string(str(row["user_id"])),
@@ -456,6 +548,7 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
             spec_payload_json=spec_payload,
             engine_params_hash=str(row["engine_params_hash"]),
             backtest_runtime_config_hash=str(row["backtest_runtime_config_hash"]),
+            artifact_pin=artifact_pin,
             stage=_parse_job_stage(value=row["stage"]),
             processed_units=int(row["processed_units"]),
             total_units=int(row["total_units"]),
@@ -470,6 +563,41 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
         )
     except Exception as error:  # noqa: BLE001
         raise BacktestStorageError("PostgresBacktestJobRepository cannot map job row") from error
+
+
+def _parse_artifact_pin(*, row: Mapping[str, Any]) -> BacktestJobArtifactPin | None:
+    """
+    Parse nullable artifact pin columns into immutable domain pin metadata.
+
+    Args:
+        row: SQL row mapping from `backtest_jobs`.
+    Returns:
+        BacktestJobArtifactPin | None: Parsed pin metadata or `None` when all fields are null.
+    Assumptions:
+        Artifact pin columns are additive and follow all-or-none nullability contract.
+    Raises:
+        BacktestStorageError: If partial nullable fields or invalid scalar values are present.
+    Side Effects:
+        None.
+    """
+    raw_slot = row.get("artifact_slot")
+    raw_generation = row.get("artifact_slot_generation")
+    raw_manifest_hash = row.get("artifact_manifest_hash")
+    raw_asof_date = row.get("artifact_asof_date")
+    if all(item is None for item in (raw_slot, raw_generation, raw_manifest_hash, raw_asof_date)):
+        return None
+    if any(item is None for item in (raw_slot, raw_generation, raw_manifest_hash, raw_asof_date)):
+        raise BacktestStorageError("backtest_jobs artifact pin columns must be all null or all set")
+    assert raw_generation is not None
+    assert raw_slot is not None
+    assert raw_manifest_hash is not None
+    assert raw_asof_date is not None
+    return BacktestJobArtifactPin(
+        artifact_slot=cast(BacktestArtifactSlotLiteral, str(raw_slot)),
+        artifact_slot_generation=int(raw_generation),
+        artifact_manifest_hash=str(raw_manifest_hash),
+        artifact_asof_date=str(raw_asof_date),
+    )
 
 
 def _parse_json_object(

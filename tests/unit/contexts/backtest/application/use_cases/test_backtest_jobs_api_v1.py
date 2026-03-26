@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Mapping
+from pathlib import Path
+from typing import Any, Mapping, cast
 from uuid import UUID
 
 import pytest
@@ -13,6 +14,12 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListQuery,
     BacktestStrategySnapshot,
     CurrentUser,
+)
+from trading.contexts.backtest.application.services import (
+    ArtifactCoordinatesV2,
+    ArtifactCurrentPointerV2,
+    ArtifactSlotLiteralV2,
+    BacktestArtifactLoaderV2,
 )
 from trading.contexts.backtest.application.use_cases import (
     CancelBacktestJobUseCase,
@@ -188,6 +195,85 @@ class _FakeJobRepository:
         """
         _ = user_id
         return self.active_total
+
+    def count_active_for_artifact_manifest(
+        self,
+        *,
+        market_id: int,
+        symbol: str,
+        artifact_slot: str,
+        artifact_manifest_hash: str,
+    ) -> int:
+        """
+        Return deterministic zero blocking pins for create-use-case tests.
+
+        Args:
+            market_id: Requested market id.
+            symbol: Requested symbol.
+            artifact_slot: Candidate slot literal.
+            artifact_manifest_hash: Candidate manifest hash.
+        Returns:
+            int: Always `0` for these unit tests.
+        Assumptions:
+            Create-use-case tests do not exercise publish guard repository queries.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = market_id, symbol, artifact_slot, artifact_manifest_hash
+        return 0
+
+
+class _FakeArtifactLoader:
+    """
+    Deterministic fake loader returning a fixed strict `current.yaml` payload.
+    """
+
+    def __init__(
+        self,
+        *,
+        pointer: ArtifactCurrentPointerV2 | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        """
+        Initialize fake loader with one optional pointer or raised error.
+
+        Args:
+            pointer: Optional strict pointer payload returned on reads.
+            error: Optional exception raised instead of returning a pointer.
+        Returns:
+            None.
+        Assumptions:
+            Create-use-case tests need only `load_current_pointer(...)`.
+        Raises:
+            None.
+        Side Effects:
+            Stores last requested coordinates for assertions.
+        """
+        self._pointer = pointer or _artifact_pointer(slot="slot_a", generation=7)
+        self._error = error
+        self.last_coordinates: ArtifactCoordinatesV2 | None = None
+
+    def load_current_pointer(self, coordinates: ArtifactCoordinatesV2) -> ArtifactCurrentPointerV2:
+        """
+        Return a fixed strict pointer payload for the requested coordinates.
+
+        Args:
+            coordinates: Requested artifact coordinates.
+        Returns:
+            ArtifactCurrentPointerV2: Fixed strict pointer payload.
+        Assumptions:
+            Other loader methods are not needed in create-use-case unit tests.
+        Raises:
+            Exception: Propagates configured loader failure.
+        Side Effects:
+            Records last requested coordinates.
+        """
+        self.last_coordinates = coordinates
+        if self._error is not None:
+            raise self._error
+        return self._pointer
 
 
 class _FakeResultsRepository:
@@ -435,6 +521,7 @@ def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -
         None.
     """
     repository = _FakeJobRepository(active_total=0)
+    artifact_loader = _FakeArtifactLoader()
     use_case = CreateBacktestJobUseCase(
         job_repository=repository,
         strategy_reader=_FakeStrategyReader(snapshot=None),
@@ -450,6 +537,7 @@ def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -
         slippage_pct_default=0.01,
         fee_pct_default_by_market_id={1: 0.075},
         backtest_runtime_config_hash="c" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, artifact_loader),
         now_provider=lambda: datetime(2026, 2, 23, 12, 0, tzinfo=timezone.utc),
         job_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000901"),
     )
@@ -488,6 +576,14 @@ def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -
     assert len(created.request_hash) == 64
     assert len(created.engine_params_hash) == 64
     assert created.backtest_runtime_config_hash == "c" * 64
+    assert created.artifact_pin is not None
+    assert created.artifact_pin.artifact_slot == "slot_a"
+    assert created.artifact_pin.artifact_slot_generation == 7
+    assert artifact_loader.last_coordinates == ArtifactCoordinatesV2(
+        exchange="binance",
+        market_type="spot",
+        symbol="BTCUSDT",
+    )
 
 
 
@@ -510,6 +606,7 @@ def test_create_backtest_job_use_case_saved_mode_persists_spec_hash_and_snapshot
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
     )
     repository = _FakeJobRepository(active_total=0)
+    artifact_loader = _FakeArtifactLoader(pointer=_artifact_pointer(slot="slot_b", generation=9))
     use_case = CreateBacktestJobUseCase(
         job_repository=repository,
         strategy_reader=_FakeStrategyReader(snapshot=strategy_snapshot),
@@ -525,6 +622,7 @@ def test_create_backtest_job_use_case_saved_mode_persists_spec_hash_and_snapshot
         slippage_pct_default=0.01,
         fee_pct_default_by_market_id={1: 0.075},
         backtest_runtime_config_hash="d" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, artifact_loader),
         now_provider=lambda: datetime(2026, 2, 23, 12, 1, tzinfo=timezone.utc),
         job_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000902"),
     )
@@ -555,7 +653,71 @@ def test_create_backtest_job_use_case_saved_mode_persists_spec_hash_and_snapshot
     assert created.spec_payload_json == strategy_snapshot.spec_payload
     assert created.request_json["strategy_id"] == str(strategy_id)
     assert created.request_json["overrides"]["execution"]["fee_pct"] == 0.075
+    assert created.artifact_pin is not None
+    assert created.artifact_pin.artifact_slot == "slot_b"
+    assert created.artifact_pin.artifact_manifest_hash == "a" * 64
 
+
+def test_create_backtest_job_use_case_rejects_missing_current_yaml_for_pinning() -> None:
+    """
+    Verify create flow fails fast when requested instrument has no published `current.yaml`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Background job reproducibility requires strict artifact pin metadata at create time.
+    Raises:
+        AssertionError: If missing pointer is not mapped to deterministic validation error.
+    Side Effects:
+        None.
+    """
+    use_case = CreateBacktestJobUseCase(
+        job_repository=_FakeJobRepository(active_total=0),
+        strategy_reader=_FakeStrategyReader(snapshot=None),
+        top_k_persisted_default=300,
+        max_active_jobs_per_user=3,
+        warmup_bars_default=200,
+        top_k_default=300,
+        preselect_default=20000,
+        top_trades_n_default=3,
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+        fee_pct_default_by_market_id={1: 0.075},
+        backtest_runtime_config_hash="d" * 64,
+        artifact_loader=cast(
+            BacktestArtifactLoaderV2,
+            _FakeArtifactLoader(error=FileNotFoundError("missing current.yaml")),
+        ),
+    )
+
+    with pytest.raises(RoehubError) as error_info:
+        use_case.execute(
+            command=CreateBacktestJobCommand(
+                run_request=RunBacktestRequest(
+                    time_range=_time_range(),
+                    template=_template(),
+                ),
+                request_payload=_template_request_payload(),
+            ),
+            current_user=CurrentUser(
+                user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
+            ),
+        )
+
+    assert error_info.value.code == "validation_error"
+    assert error_info.value.details == {
+        "errors": [
+            {
+                "path": "body.template.instrument_id",
+                "code": "artifact_unavailable",
+                "message": "missing current.yaml for binance:spot:BTCUSDT",
+            }
+        ]
+    }
 
 
 def test_create_backtest_job_use_case_rejects_top_k_above_persisted_cap() -> None:
@@ -588,6 +750,7 @@ def test_create_backtest_job_use_case_rejects_top_k_above_persisted_cap() -> Non
         slippage_pct_default=0.01,
         fee_pct_default_by_market_id={1: 0.075},
         backtest_runtime_config_hash="e" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, _FakeArtifactLoader()),
     )
 
     with pytest.raises(RoehubError) as error_info:
@@ -648,6 +811,7 @@ def test_create_backtest_job_use_case_rejects_active_quota_exceeded() -> None:
         slippage_pct_default=0.01,
         fee_pct_default_by_market_id={1: 0.075},
         backtest_runtime_config_hash="f" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, _FakeArtifactLoader()),
     )
 
     with pytest.raises(RoehubError) as error_info:
@@ -703,6 +867,7 @@ def test_create_backtest_job_use_case_rejects_removed_indicator_id() -> None:
         slippage_pct_default=0.01,
         fee_pct_default_by_market_id={1: 0.075},
         backtest_runtime_config_hash="f" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, _FakeArtifactLoader()),
         defaults_provider=_RuntimeContractDefaultsProvider(),
         allowed_request_timeframes=("1m",),
     )
@@ -777,6 +942,7 @@ def test_create_backtest_job_use_case_rejects_default_only_signal_override() -> 
         slippage_pct_default=0.01,
         fee_pct_default_by_market_id={1: 0.075},
         backtest_runtime_config_hash="f" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, _FakeArtifactLoader()),
         defaults_provider=_RuntimeContractDefaultsProvider(),
         allowed_request_timeframes=("1m",),
     )
@@ -1029,6 +1195,45 @@ def _template_request_payload() -> Mapping[str, Any]:
         },
     }
 
+
+def _artifact_pointer(
+    *,
+    slot: ArtifactSlotLiteralV2,
+    generation: int,
+) -> ArtifactCurrentPointerV2:
+    """
+    Build deterministic strict `current.yaml` payload fixture for artifact pinning tests.
+
+    Args:
+        slot: Active slot literal.
+        generation: Positive slot generation.
+    Returns:
+        ArtifactCurrentPointerV2: Strict pointer payload fixture.
+    Assumptions:
+        Fixture hash/date/timestamp literals follow the R2-02 strict pointer contract.
+    Raises:
+        ValueError: If one fixture field violates strict pointer invariants.
+    Side Effects:
+        None.
+    """
+    payload = {
+        "schema_version": 1,
+        "active_slot": slot,
+        "slot_generation": generation,
+        "asof_date": "2026-03-24",
+        "manifest_sha256": "a" * 64,
+        "published_at_utc": "2026-03-24T02:00:00Z",
+    }
+    return ArtifactCurrentPointerV2(
+        path=Path("/tmp/artifacts/backtest/v2/binance/spot/BTCUSDT/current.yaml"),
+        active_slot=slot,
+        raw_payload=payload,
+        schema_version=1,
+        slot_generation=generation,
+        asof_date="2026-03-24",
+        manifest_sha256="a" * 64,
+        published_at_utc="2026-03-24T02:00:00Z",
+    )
 
 
 def _queued_job(*, job_id: UUID, user_id: UserId) -> BacktestJob:

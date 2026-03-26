@@ -1,5 +1,7 @@
 from .backtest_job import (
+    BacktestArtifactSlotLiteral,
     BacktestJob,
+    BacktestJobArtifactPin,
     BacktestJobErrorPayload,
     BacktestJobMode,
     BacktestJobStage,
@@ -26,7 +28,9 @@ from .execution_v1 import (
 
 __all__ = [
     "AccountStateV1",
+    "BacktestArtifactSlotLiteral",
     "BacktestJob",
+    "BacktestJobArtifactPin",
     "BacktestJobErrorPayload",
     "BacktestJobMode",
     "BacktestJobStage",

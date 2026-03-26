@@ -17,8 +17,13 @@ from trading.contexts.backtest.application.ports import (
     BacktestStrategySnapshot,
     CurrentUser,
 )
+from trading.contexts.backtest.application.services.v2 import (
+    BacktestArtifactLoaderV2,
+    artifact_coordinates_from_market_id_v2,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
+    BacktestJobArtifactPin,
     BacktestJobMode,
     BacktestJobState,
     BacktestJobTopVariant,
@@ -151,6 +156,7 @@ class CreateBacktestJobUseCase:
         slippage_pct_default: float,
         fee_pct_default_by_market_id: Mapping[int, float],
         backtest_runtime_config_hash: str,
+        artifact_loader: BacktestArtifactLoaderV2,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         allowed_request_timeframes: tuple[str, ...] | None = None,
         forbidden_request_timeframes: tuple[str, ...] | None = None,
@@ -175,6 +181,7 @@ class CreateBacktestJobUseCase:
             slippage_pct_default: Runtime default for slippage percent.
             fee_pct_default_by_market_id: Runtime default fee mapping by market id.
             backtest_runtime_config_hash: Precomputed result-affecting runtime hash.
+            artifact_loader: Strict artifact pointer loader used to pin current slot metadata.
             defaults_provider: Optional runtime defaults provider for R1 launch validation.
             allowed_request_timeframes:
                 Optional runtime contract list for supported request timeframes.
@@ -195,6 +202,8 @@ class CreateBacktestJobUseCase:
             raise ValueError("CreateBacktestJobUseCase requires job_repository")
         if strategy_reader is None:  # type: ignore[truthy-bool]
             raise ValueError("CreateBacktestJobUseCase requires strategy_reader")
+        if artifact_loader is None:  # type: ignore[truthy-bool]
+            raise ValueError("CreateBacktestJobUseCase requires artifact_loader")
         if top_k_persisted_default <= 0:
             raise ValueError("top_k_persisted_default must be > 0")
         if max_active_jobs_per_user <= 0:
@@ -236,6 +245,7 @@ class CreateBacktestJobUseCase:
             values=fee_pct_default_by_market_id
         )
         self._backtest_runtime_config_hash = backtest_runtime_config_hash.strip().lower()
+        self._artifact_loader = artifact_loader
         self._defaults_provider = defaults_provider
         self._allowed_request_timeframes = _normalize_timeframe_literals(
             values=allowed_request_timeframes
@@ -307,6 +317,10 @@ class CreateBacktestJobUseCase:
             resolved=resolved,
             effective_execution_payload=effective_execution_payload,
         )
+        artifact_pin = self._resolve_artifact_pin(
+            template=resolved.template,
+            mode=resolved.mode,
+        )
 
         job = BacktestJob.create_queued(
             job_id=self._job_id_factory(),
@@ -325,6 +339,7 @@ class CreateBacktestJobUseCase:
                 }
             ),
             backtest_runtime_config_hash=self._backtest_runtime_config_hash,
+            artifact_pin=artifact_pin,
         )
         return self._job_repository.create(job=job)
 
@@ -612,6 +627,84 @@ class CreateBacktestJobUseCase:
             normalized_payload["strategy_id"] = str(run_request.strategy_id)
         normalized_payload.pop("template", None)
         return MappingProxyType(normalized_payload)
+
+    def _resolve_artifact_pin(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        mode: BacktestJobMode,
+    ) -> BacktestJobArtifactPin:
+        """
+        Resolve immutable artifact-slot pin metadata from strict `current.yaml` at job creation.
+
+        Args:
+            template: Resolved template carrying the canonical `(market_id, symbol)` instrument.
+            mode: Job mode used only for deterministic validation error path selection.
+        Returns:
+            BacktestJobArtifactPin: Strict artifact pin metadata persisted with the new job.
+        Assumptions:
+            Background job reproducibility requires pinning the currently active artifact slot
+            before the job enters `queued`.
+        Raises:
+            RoehubError: Deterministic `validation_error` when artifacts are unavailable or the
+                pointer contract is invalid for the requested instrument.
+        Side Effects:
+            Reads `current.yaml` for the resolved artifact symbol root.
+        """
+        error_path = "body.template.instrument_id" if mode == "template" else "body.strategy_id"
+        symbol_literal = str(template.instrument_id.symbol)
+        market_id = template.instrument_id.market_id.value
+        try:
+            coordinates = artifact_coordinates_from_market_id_v2(
+                market_id=market_id,
+                symbol=symbol_literal,
+            )
+        except ValueError as error:
+            raise validation_error(
+                message="Backtest jobs request market_id is not supported by artifact store",
+                errors=(
+                    {
+                        "path": error_path,
+                        "code": "unsupported_value",
+                        "message": str(error),
+                    },
+                ),
+            ) from error
+
+        try:
+            current_pointer = self._artifact_loader.load_current_pointer(coordinates)
+        except FileNotFoundError as error:
+            raise validation_error(
+                message="Published backtest artifacts are unavailable for requested instrument",
+                errors=(
+                    {
+                        "path": error_path,
+                        "code": "artifact_unavailable",
+                        "message": (
+                            "missing current.yaml for "
+                            f"{coordinates.exchange}:{coordinates.market_type}:{coordinates.symbol}"
+                        ),
+                    },
+                ),
+            ) from error
+        except ValueError as error:
+            raise validation_error(
+                message="Published backtest artifacts violate strict current.yaml contract",
+                errors=(
+                    {
+                        "path": error_path,
+                        "code": "artifact_contract_invalid",
+                        "message": str(error),
+                    },
+                ),
+            ) from error
+
+        return BacktestJobArtifactPin(
+            artifact_slot=current_pointer.active_slot,
+            artifact_slot_generation=current_pointer.slot_generation,
+            artifact_manifest_hash=current_pointer.manifest_sha256,
+            artifact_asof_date=current_pointer.asof_date,
+        )
 
 
 class GetBacktestJobStatusUseCase:

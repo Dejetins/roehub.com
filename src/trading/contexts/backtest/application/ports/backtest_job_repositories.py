@@ -185,6 +185,34 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
+    def count_active_for_artifact_manifest(
+        self,
+        *,
+        market_id: int,
+        symbol: str,
+        artifact_slot: str,
+        artifact_manifest_hash: str,
+    ) -> int:
+        """
+        Count active jobs pinning one previously published inactive-slot manifest identity.
+
+        Args:
+            market_id: Canonical market id for the symbol-root being published.
+            symbol: Instrument symbol pinned by the active jobs.
+            artifact_slot: Candidate inactive slot literal.
+            artifact_manifest_hash: SHA-256 of the inactive slot `manifest.yaml`.
+        Returns:
+            int: Number of active jobs blocking rebuild/publish of this slot content.
+        Assumptions:
+            Active background jobs are `queued + running`, and saved/template requests store
+            `(market_id, symbol)` in `request_json` or `spec_payload_json`.
+        Raises:
+            ValueError: If storage read fails.
+        Side Effects:
+            Reads aggregate count from `backtest_jobs` table.
+        """
+        ...
+
 
 class BacktestJobLeaseRepository(Protocol):
     """

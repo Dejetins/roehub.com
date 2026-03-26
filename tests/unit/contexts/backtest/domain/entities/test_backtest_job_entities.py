@@ -7,6 +7,7 @@ import pytest
 
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
+    BacktestJobArtifactPin,
     BacktestJobErrorPayload,
 )
 from trading.contexts.backtest.domain.errors import (
@@ -146,6 +147,54 @@ def test_backtest_job_claim_sets_running_state_and_lease_fields() -> None:
     assert claimed.heartbeat_at == claimed_at
     assert claimed.attempt == 1
 
+
+def test_backtest_job_preserves_artifact_pin_across_claim_and_finish() -> None:
+    """
+    Verify immutable artifact pin metadata survives state transitions for active jobs.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Reproducibility requires slot identity to remain fixed once pinned at creation time.
+    Raises:
+        AssertionError: If claim/finish transitions mutate artifact pin metadata.
+    Side Effects:
+        None.
+    """
+    now = datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc)
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000950"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"),
+        mode="template",
+        created_at=now,
+        request_json={"mode": "template"},
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=9,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-24",
+        ),
+    )
+
+    claimed = queued.claim(
+        changed_at=now + timedelta(seconds=1),
+        locked_by="worker-a-123",
+        lease_expires_at=now + timedelta(seconds=61),
+    )
+    finished = claimed.finish(
+        next_state="succeeded",
+        changed_at=now + timedelta(seconds=5),
+    )
+
+    assert claimed.artifact_pin == queued.artifact_pin
+    assert finished.artifact_pin == queued.artifact_pin
 
 
 def test_backtest_job_rejects_lease_fields_outside_running_state() -> None:

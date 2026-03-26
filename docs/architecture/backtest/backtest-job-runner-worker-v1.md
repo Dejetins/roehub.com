@@ -106,6 +106,9 @@ Source-of-truth payload:
 
 - worker читает только `job.request_json` (+ `spec_payload_json` для saved, если нужно для построения effective template),
 - worker не зависит от текущего состояния saved strategy в strategy storage.
+- worker использует pinned artifact identity из `job.artifact_slot`, `job.artifact_slot_generation`,
+  `job.artifact_manifest_hash`, `job.artifact_asof_date`, а не повторно читает живой `current.yaml`
+  для уже созданной job.
 
 #### 3.1 Stage A (streaming shortlist)
 
@@ -221,11 +224,23 @@ Cancel best-effort:
 ## Детерминизм и инварианты
 
 - Один и тот же `request_json` + `engine_params_hash` + `backtest_runtime_config_hash` -> один и тот же итоговый ordering persisted top rows.
+- Один и тот же `request_json` + pinned artifact identity
+  (`artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`, `artifact_asof_date`)
+  -> один и тот же dataset contract для queued/running job attempt.
 - Stage A tie-break фиксирован: `base_variant_key ASC`.
 - Stage B tie-break фиксирован: `variant_key ASC`.
 - Snapshot replace policy фиксирована: full replace (delete+insert contract) через results repository.
 - Jobs `/top` остаётся summary-only для всех состояний, включая `succeeded`.
 - Все timestamps и hash literals остаются UTC/sha256 contracts из EPIC-09.
+
+## R2-02 pinning interaction
+
+R2-02 добавляет внешний publish safety contract между worker/jobs и artifact store:
+
+- create flow pin'ит current artifact identity до перехода job в `queued`;
+- пока job в `queued|running`, эта identity считается активной и может блокировать publish/rebuild inactive slot;
+- после terminal state (`succeeded|failed|cancelled`) job больше не участвует в publish guard;
+- worker не имеет права менять pinned slot identity по ходу attempt, даже если `current.yaml` успел переключиться.
 
 ## Observability
 

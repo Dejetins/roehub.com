@@ -17,6 +17,7 @@ from apps.api.dto import build_backtest_runtime_defaults_response
 from apps.api.routes import build_backtest_jobs_router, build_backtests_router
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest.adapters.outbound import (
+    BacktestArtifactPathBuilderV2,
     PostgresBacktestJobRepository,
     PostgresBacktestJobResultsRepository,
     PsycopgBacktestPostgresGateway,
@@ -26,6 +27,7 @@ from trading.contexts.backtest.adapters.outbound import (
     load_backtest_runtime_config,
     resolve_backtest_config_path,
 )
+from trading.contexts.backtest.application.services import YamlBacktestArtifactLoaderV2
 from trading.contexts.backtest.application.use_cases import (
     CancelBacktestJobUseCase,
     CreateBacktestJobUseCase,
@@ -192,6 +194,9 @@ def build_backtest_router(
     jobs_gateway = _build_jobs_gateway(settings=runtime_settings)
     job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)
     results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
+    artifact_loader = YamlBacktestArtifactLoaderV2(
+        path_resolver=BacktestArtifactPathBuilderV2()
+    )
 
     create_use_case = CreateBacktestJobUseCase(
         job_repository=job_repository,
@@ -208,6 +213,7 @@ def build_backtest_router(
         slippage_pct_default=runtime_config.execution.slippage_pct_default,
         fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
         backtest_runtime_config_hash=backtest_runtime_config_hash,
+        artifact_loader=artifact_loader,
         defaults_provider=defaults_provider,
         allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,

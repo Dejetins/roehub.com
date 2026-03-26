@@ -746,6 +746,35 @@ class _FakeJobRepository:
             return self._scripted_get_results.pop(0)
         return self._default_job
 
+    def count_active_for_artifact_manifest(
+        self,
+        *,
+        market_id: int,
+        symbol: str,
+        artifact_slot: str,
+        artifact_manifest_hash: str,
+    ) -> int:
+        """
+        Return deterministic zero blocking pins for worker cancel-polling tests.
+
+        Args:
+            market_id: Requested market id.
+            symbol: Requested symbol.
+            artifact_slot: Candidate slot literal.
+            artifact_manifest_hash: Candidate manifest hash.
+        Returns:
+            int: Always `0` because worker tests do not exercise publish guard queries.
+        Assumptions:
+            Worker job-repository fake is used only for `get(...)` cancel checks in this test
+            module.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = market_id, symbol, artifact_slot, artifact_manifest_hash
+        return 0
+
 
 class _FakeLeaseRepository:
     """

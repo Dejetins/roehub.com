@@ -72,6 +72,10 @@
   - `spec_payload_json jsonb null` (обязателен для `mode=saved`)
   - `engine_params_hash text not null` (sha256 hex)
   - `backtest_runtime_config_hash text not null` (sha256 hex)
+  - `artifact_slot text null`
+  - `artifact_slot_generation int null`
+  - `artifact_manifest_hash text null`
+  - `artifact_asof_date text null`
 - progress:
   - `stage text not null` (`stage_a|stage_b|finalizing`)
   - `processed_units int not null default 0`
@@ -98,11 +102,20 @@
   - saved/template consistency:
     - `mode='saved' -> spec_hash is not null and spec_payload_json is not null`
     - `mode='template' -> spec_hash is null and spec_payload_json is null`
+  - artifact pin consistency:
+    - `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`,
+      `artifact_asof_date` либо заданы вместе, либо все `NULL`
+    - `artifact_slot in ('slot_a', 'slot_b')`
+    - `artifact_slot_generation > 0`
+    - `artifact_manifest_hash` соответствует sha256 hex
+    - `artifact_asof_date` соответствует `YYYY-MM-DD`
 - indexes:
   - list: `(user_id, state, created_at desc, job_id desc)`
   - queue claim FIFO: `(state, created_at asc, job_id asc)`
   - reclaim: `(state, lease_expires_at asc, created_at asc, job_id asc)`
   - active quota helper (partial): `(user_id)` where `state in ('queued','running')`
+  - active artifact pin helper (partial): `(artifact_slot, artifact_manifest_hash)`
+    where `state in ('queued','running')`
 
 #### 1.2 `backtest_job_top_variants`
 
@@ -174,6 +187,7 @@
 1. `BacktestJobRepository`
    - create/get/list/cancel
    - count active (`queued + running`) для quota check
+   - count active pinned runs for one inactive-slot publish guard
 
 2. `BacktestJobLeaseRepository`
    - claim next job (queued first, plus reclaim expired running)
@@ -245,6 +259,22 @@ Validation policy:
 - Retention/cleanup старых jobs и результатов.
 - Generic jobs framework для других bounded contexts.
 - Точный Stage B cursor-checkpoint (v1 допускает restart attempt).
+
+## R2-02 additive contract
+
+R2-02 не ломает jobs API/storage contract, а расширяет его pin metadata для artifact reproducibility.
+
+Правила:
+
+- create-time job обязан зафиксировать текущую artifact identity из strict `current.yaml`;
+- pin metadata пишется в `backtest_jobs` одновременно с `request_hash/spec_hash/engine_params_hash`;
+- queued/running job хранит immutable:
+  - `artifact_slot`
+  - `artifact_slot_generation`
+  - `artifact_manifest_hash`
+  - `artifact_asof_date`
+- publish guard читает active jobs и блокирует rebuild/publish inactive slot, если найден хотя бы один active pin на ту же inactive identity;
+- все изменения additive и backward-compatible для существующих API/imports.
 
 ## Ключевые решения
 

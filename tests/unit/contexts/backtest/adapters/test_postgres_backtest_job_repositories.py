@@ -12,6 +12,7 @@ from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
 from trading.contexts.backtest.application.ports import BacktestJobListQuery
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
+    BacktestJobArtifactPin,
     BacktestJobErrorPayload,
     BacktestJobStageAShortlist,
     BacktestJobTopVariant,
@@ -232,6 +233,12 @@ def test_job_repository_create_serializes_mappingproxy_request_payload() -> None
         request_hash="a" * 64,
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=9,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-24",
+        ),
         stage="stage_a",
         processed_units=0,
         total_units=0,
@@ -240,8 +247,46 @@ def test_job_repository_create_serializes_mappingproxy_request_payload() -> None
     created = repository.create(job=job)
 
     assert created.job_id == job.job_id
+    assert created.artifact_pin is not None
     assert len(gateway.fetch_one_parameters) == 1
     assert isinstance(gateway.fetch_one_parameters[0]["request_json"], str)
+    assert gateway.fetch_one_parameters[0]["artifact_slot"] == "slot_b"
+    assert gateway.fetch_one_parameters[0]["artifact_slot_generation"] == 9
+    assert gateway.fetch_one_parameters[0]["artifact_manifest_hash"] == "d" * 64
+
+
+def test_job_repository_count_active_for_artifact_manifest_uses_pin_and_instrument_filters(
+) -> None:
+    """
+    Verify publish-guard count SQL filters active jobs by pinned slot/hash and instrument.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Template-mode jobs read instrument identity from `request_json`, saved-mode jobs from
+        `spec_payload_json`.
+    Raises:
+        AssertionError: If SQL shape misses pin or instrument predicates.
+    Side Effects:
+        None.
+    """
+    gateway = _FakeGateway(fetch_one_results=[{"active_total": 2}])
+    repository = PostgresBacktestJobRepository(gateway=gateway)
+
+    blocked_total = repository.count_active_for_artifact_manifest(
+        market_id=1,
+        symbol="BTCUSDT",
+        artifact_slot="slot_b",
+        artifact_manifest_hash="d" * 64,
+    )
+
+    assert blocked_total == 2
+    assert "artifact_slot = %(artifact_slot)s" in gateway.fetch_one_queries[0]
+    assert "artifact_manifest_hash = %(artifact_manifest_hash)s" in gateway.fetch_one_queries[0]
+    assert "request_json -> 'template' -> 'instrument_id'" in gateway.fetch_one_queries[0]
+    assert "spec_payload_json -> 'instrument_id'" in gateway.fetch_one_queries[0]
 
 
 def test_lease_repository_heartbeat_uses_active_lease_owner_predicate() -> None:
@@ -441,6 +486,10 @@ def _build_job_row(*, state: str) -> Mapping[str, Any]:
         "spec_payload_json": None,
         "engine_params_hash": "b" * 64,
         "backtest_runtime_config_hash": "c" * 64,
+        "artifact_slot": "slot_b",
+        "artifact_slot_generation": 9,
+        "artifact_manifest_hash": "d" * 64,
+        "artifact_asof_date": "2026-03-24",
         "stage": (
             "stage_b" if state == "running" else "finalizing" if state == "succeeded" else "stage_a"
         ),

@@ -1,4 +1,8 @@
 from .acl import StrategyRepositoryBacktestStrategyReader
+from .artifacts_fs import (
+    AtomicArtifactCurrentPointerWriterV2,
+    BacktestArtifactPathBuilderV2,
+)
 from .config import (
     BacktestCpuRuntimeConfig,
     BacktestExecutionRuntimeConfig,
@@ -23,6 +27,8 @@ from .persistence import (
 )
 
 __all__ = [
+    "AtomicArtifactCurrentPointerWriterV2",
+    "BacktestArtifactPathBuilderV2",
     "BacktestPostgresGateway",
     "StrategyRepositoryBacktestStrategyReader",
     "BacktestCpuRuntimeConfig",

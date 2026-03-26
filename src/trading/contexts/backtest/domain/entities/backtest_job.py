@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from types import MappingProxyType
 from typing import Any, Literal, Mapping, Sequence, cast
 from uuid import UUID
@@ -16,6 +16,7 @@ from trading.shared_kernel.primitives import UserId
 BacktestJobMode = Literal["saved", "template"]
 BacktestJobState = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 BacktestJobStage = Literal["stage_a", "stage_b", "finalizing"]
+BacktestArtifactSlotLiteral = Literal["slot_a", "slot_b"]
 
 _ACTIVE_JOB_STATES: frozenset[str] = frozenset({"queued", "running"})
 _TERMINAL_JOB_STATES: frozenset[str] = frozenset({"succeeded", "failed", "cancelled"})
@@ -31,6 +32,7 @@ _STAGE_ORDER: dict[str, int] = {
     "stage_b": 1,
     "finalizing": 2,
 }
+_ALLOWED_ARTIFACT_SLOTS: frozenset[str] = frozenset({"slot_a", "slot_b"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,6 +116,82 @@ class BacktestJobErrorPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestJobArtifactPin:
+    """
+    Immutable artifact-slot identity pinned to one queued/running Backtest job attempt.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_repository.py
+      - alembic/versions/20260326_0004_backtest_job_artifact_pin_v1.py
+    """
+
+    artifact_slot: BacktestArtifactSlotLiteral
+    artifact_slot_generation: int
+    artifact_manifest_hash: str
+    artifact_asof_date: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate strict artifact-slot pin metadata persisted for reproducible background runs.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Pin metadata is captured once at job creation and must remain immutable afterward.
+        Raises:
+            BacktestJobTransitionError: If slot, generation, hash, or date literal is invalid.
+        Side Effects:
+            Normalizes slot/hash literals to canonical lowercase forms.
+        """
+        if not isinstance(self.artifact_slot, str):
+            raise BacktestJobTransitionError(
+                "BacktestJobArtifactPin.artifact_slot must be 'slot_a' or 'slot_b'"
+            )
+        if not isinstance(self.artifact_manifest_hash, str):
+            raise BacktestJobTransitionError(
+                "BacktestJobArtifactPin.artifact_manifest_hash must be 64 lowercase hex chars"
+            )
+        if not isinstance(self.artifact_asof_date, str):
+            raise BacktestJobTransitionError(
+                "BacktestJobArtifactPin.artifact_asof_date must be YYYY-MM-DD"
+            )
+        normalized_slot = self.artifact_slot.strip().lower()
+        if normalized_slot not in _ALLOWED_ARTIFACT_SLOTS:
+            raise BacktestJobTransitionError(
+                "BacktestJobArtifactPin.artifact_slot must be 'slot_a' or 'slot_b'"
+            )
+        if self.artifact_slot_generation <= 0:
+            raise BacktestJobTransitionError(
+                "BacktestJobArtifactPin.artifact_slot_generation must be > 0"
+            )
+        _ensure_sha256_hex(
+            name="artifact_manifest_hash",
+            value=self.artifact_manifest_hash,
+        )
+        _ensure_strict_date_literal(
+            name="artifact_asof_date",
+            value=self.artifact_asof_date,
+        )
+        object.__setattr__(
+            self,
+            "artifact_slot",
+            cast(BacktestArtifactSlotLiteral, normalized_slot),
+        )
+        object.__setattr__(
+            self,
+            "artifact_manifest_hash",
+            self.artifact_manifest_hash.strip().lower(),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestJob:
     """
     Immutable Backtest job aggregate with deterministic lifecycle and lease invariants.
@@ -143,6 +221,7 @@ class BacktestJob:
     spec_payload_json: Mapping[str, Any] | None = None
     engine_params_hash: str = ""
     backtest_runtime_config_hash: str = ""
+    artifact_pin: BacktestJobArtifactPin | None = None
     stage: BacktestJobStage = "stage_a"
     processed_units: int = 0
     total_units: int = 0
@@ -310,6 +389,17 @@ class BacktestJob:
             name="backtest_runtime_config_hash",
             value=self.backtest_runtime_config_hash,
         )
+        if self.artifact_pin is not None:
+            object.__setattr__(
+                self,
+                "artifact_pin",
+                BacktestJobArtifactPin(
+                    artifact_slot=self.artifact_pin.artifact_slot,
+                    artifact_slot_generation=self.artifact_pin.artifact_slot_generation,
+                    artifact_manifest_hash=self.artifact_pin.artifact_manifest_hash,
+                    artifact_asof_date=self.artifact_pin.artifact_asof_date,
+                ),
+            )
         if self.spec_hash is not None:
             _ensure_sha256_hex(name="spec_hash", value=self.spec_hash)
             object.__setattr__(self, "spec_hash", self.spec_hash.strip().lower())
@@ -351,6 +441,7 @@ class BacktestJob:
         spec_payload_json: Mapping[str, Any] | None,
         engine_params_hash: str,
         backtest_runtime_config_hash: str,
+        artifact_pin: BacktestJobArtifactPin | None = None,
     ) -> BacktestJob:
         """
         Build initial queued job snapshot with deterministic defaults.
@@ -366,6 +457,7 @@ class BacktestJob:
             spec_payload_json: Saved strategy payload snapshot for saved mode.
             engine_params_hash: Effective execution settings hash.
             backtest_runtime_config_hash: Runtime result-affecting hash.
+            artifact_pin: Optional strict artifact-slot identity pinned at job creation time.
         Returns:
             BacktestJob: New queued job aggregate.
         Assumptions:
@@ -391,6 +483,7 @@ class BacktestJob:
             spec_payload_json=spec_payload_json,
             engine_params_hash=engine_params_hash,
             backtest_runtime_config_hash=backtest_runtime_config_hash,
+            artifact_pin=artifact_pin,
             stage="stage_a",
             processed_units=0,
             total_units=0,
@@ -498,6 +591,7 @@ class BacktestJob:
             spec_payload_json=self.spec_payload_json,
             engine_params_hash=self.engine_params_hash,
             backtest_runtime_config_hash=self.backtest_runtime_config_hash,
+            artifact_pin=self.artifact_pin,
             stage=self.stage,
             processed_units=self.processed_units,
             total_units=self.total_units,
@@ -569,6 +663,7 @@ class BacktestJob:
             spec_payload_json=self.spec_payload_json,
             engine_params_hash=self.engine_params_hash,
             backtest_runtime_config_hash=self.backtest_runtime_config_hash,
+            artifact_pin=self.artifact_pin,
             stage=self.stage,
             processed_units=self.processed_units,
             total_units=self.total_units,
@@ -653,6 +748,7 @@ class BacktestJob:
             spec_payload_json=self.spec_payload_json,
             engine_params_hash=self.engine_params_hash,
             backtest_runtime_config_hash=self.backtest_runtime_config_hash,
+            artifact_pin=self.artifact_pin,
             stage=stage,
             processed_units=processed_units,
             total_units=total_units,
@@ -704,6 +800,7 @@ class BacktestJob:
                 spec_payload_json=self.spec_payload_json,
                 engine_params_hash=self.engine_params_hash,
                 backtest_runtime_config_hash=self.backtest_runtime_config_hash,
+                artifact_pin=self.artifact_pin,
                 stage=self.stage,
                 processed_units=self.processed_units,
                 total_units=self.total_units,
@@ -734,6 +831,7 @@ class BacktestJob:
                 spec_payload_json=self.spec_payload_json,
                 engine_params_hash=self.engine_params_hash,
                 backtest_runtime_config_hash=self.backtest_runtime_config_hash,
+                artifact_pin=self.artifact_pin,
                 stage=self.stage,
                 processed_units=self.processed_units,
                 total_units=self.total_units,
@@ -823,6 +921,7 @@ class BacktestJob:
             spec_payload_json=self.spec_payload_json,
             engine_params_hash=self.engine_params_hash,
             backtest_runtime_config_hash=self.backtest_runtime_config_hash,
+            artifact_pin=self.artifact_pin,
             stage=next_stage,
             processed_units=self.processed_units,
             total_units=self.total_units,
@@ -946,6 +1045,30 @@ def _ensure_sha256_hex(*, name: str, value: str) -> None:
         raise BacktestJobTransitionError(f"{name} must be 64 lowercase hex chars")
 
 
+def _ensure_strict_date_literal(*, name: str, value: str) -> None:
+    """
+    Validate one strict `YYYY-MM-DD` literal used in persisted artifact pin metadata.
+
+    Args:
+        name: Field name for deterministic error messages.
+        value: Candidate date literal.
+    Returns:
+        None.
+    Assumptions:
+        Persisted artifact pin metadata keeps date literals in canonical string form.
+    Raises:
+        BacktestJobTransitionError: If the date literal is blank or not valid ISO date.
+    Side Effects:
+        None.
+    """
+    normalized = value.strip()
+    if len(normalized) != 10:
+        raise BacktestJobTransitionError(f"{name} must be YYYY-MM-DD")
+    try:
+        date.fromisoformat(normalized)
+    except ValueError as error:
+        raise BacktestJobTransitionError(f"{name} must be YYYY-MM-DD") from error
+
 
 def _normalize_json_object(*, value: Mapping[str, Any]) -> dict[str, Any]:
     """
@@ -1006,7 +1129,9 @@ def _normalize_json_value(*, value: Any) -> Any:
 
 
 __all__ = [
+    "BacktestArtifactSlotLiteral",
     "BacktestJob",
+    "BacktestJobArtifactPin",
     "BacktestJobErrorPayload",
     "BacktestJobMode",
     "BacktestJobStage",
