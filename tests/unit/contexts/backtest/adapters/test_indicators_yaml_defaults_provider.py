@@ -5,6 +5,9 @@ from pathlib import Path
 import pytest
 
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
+from trading.contexts.backtest.application.services.v2 import (
+    supported_indicator_ids_for_signal_rules_v2,
+)
 
 
 def test_yaml_backtest_grid_defaults_provider_reads_compute_and_signal_defaults(
@@ -98,3 +101,34 @@ def test_yaml_backtest_grid_defaults_provider_rejects_invalid_axis_mode(tmp_path
 
     with pytest.raises(ValueError, match="mode"):
         YamlBacktestGridDefaultsProvider.from_yaml(config_path=config_path)
+
+
+def test_yaml_defaults_provider_matches_v2_signal_catalog_for_all_target_envs() -> None:
+    """
+    Verify env-specific defaults catalogs stay aligned with the explicit R4-01 v2 signal registry.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `dev`, `test`, and `prod` indicator defaults expose the same supported signal catalog.
+    Raises:
+        AssertionError: If one env drifts from the explicit v2 signal registry.
+    Side Effects:
+        Reads repository-local config files.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/test/indicators.yaml
+      - configs/prod/indicators.yaml
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+    """
+    expected_indicator_ids = supported_indicator_ids_for_signal_rules_v2()
+    for env_name in ("dev", "test", "prod"):
+        provider = YamlBacktestGridDefaultsProvider.from_yaml(
+            config_path=Path(f"configs/{env_name}/indicators.yaml")
+        )
+        assert provider.supported_indicator_ids() == expected_indicator_ids

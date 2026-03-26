@@ -9,6 +9,7 @@
 - [Backtest v1 — Grid Builder + Staged Runner + Sync Guards (BKT-EPIC-04)](docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md)
 - [Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04 / R3-03 / R3-04)](docs/architecture/backtest/backtest-artifact-store-v2.md)
 - [Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04)](docs/architecture/backtest/backtest-precompute-runner-v2.md)
+- [Backtest v1 — Signals-from-indicators (v1) + AND aggregation (BKT-EPIC-03)](docs/architecture/backtest/backtest-signals-from-indicators-v1.md)
 - [Market Data — Application Ports (Walking Skeleton v1)](docs/architecture/market_data/market-data-application-ports.md)
 - [Strategy — Milestone 3 Epics](docs/architecture/strategy/strategy-milestone-3-epics-v1.md)
 - [Shared Kernel — Primitives](docs/architecture/shared-kernel-primitives.md)

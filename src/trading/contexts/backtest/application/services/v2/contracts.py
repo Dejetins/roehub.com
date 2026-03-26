@@ -1,14 +1,17 @@
-"""Contracts for deterministic backtest artifact store v2 layout (R2-01)."""
+"""Contracts for deterministic backtest artifact store and signal rules v2."""
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Callable, Literal, Mapping, Protocol
+from typing import Any, Callable, Literal, Mapping, Protocol, cast
 
+import numpy as np
+
+from trading.contexts.indicators.application.dto import CandleArrays
 from trading.shared_kernel.primitives import TimeRange
 
 ARTIFACT_STORE_V2_ROOT_LITERAL = "artifacts/backtest/v2"
@@ -154,6 +157,290 @@ ARTIFACT_SIGNAL_TIMEFRAMES_V2: tuple[str, ...] = (
 )
 ARTIFACT_MAPPING_TIMEFRAMES_V2: tuple[str, ...] = ARTIFACT_SIGNAL_TIMEFRAMES_V2
 ARTIFACT_HIT_TIMES_TIMEFRAMES_V2: tuple[str, ...] = (HIT_TIMES_TIMEFRAME_LITERAL_V2,)
+
+type SignalRuleFamilyLiteralV2 = Literal[
+    "compare_price_to_output",
+    "threshold_band",
+    "sign",
+    "delta_sign",
+    "compare_volume_to_output",
+    "candle_body_direction",
+    "pivot_events",
+    "threshold_centered",
+]
+type SignalSourceLiteralV2 = Literal[
+    "close",
+    "open",
+    "high",
+    "low",
+    "hl2",
+    "hlc3",
+    "ohlc4",
+]
+type SignalRuleScalarV2 = int | float | str | bool | None
+
+SIGNALS_V1_PARAMS_PATH_LITERAL_V2 = "signals.v1.params"
+SIGNALS_V1_PARAMS_POLICY_LITERAL_V2 = "default-only"
+SIGNAL_CODE_NEUTRAL_V2 = 0
+SIGNAL_CODE_LONG_V2 = 1
+SIGNAL_CODE_SHORT_V2 = -1
+SIGNAL_CODE_DTYPE_LITERAL_V2 = "int8"
+SIGNAL_CODE_VALUE_SET_V2: tuple[int, int, int] = (
+    SIGNAL_CODE_SHORT_V2,
+    SIGNAL_CODE_NEUTRAL_V2,
+    SIGNAL_CODE_LONG_V2,
+)
+SUPPORTED_SIGNAL_RULE_FAMILIES_V2: tuple[SignalRuleFamilyLiteralV2, ...] = (
+    "compare_price_to_output",
+    "threshold_band",
+    "sign",
+    "delta_sign",
+    "compare_volume_to_output",
+    "candle_body_direction",
+    "pivot_events",
+    "threshold_centered",
+)
+SUPPORTED_SIGNAL_INPUT_SOURCES_V2: tuple[SignalSourceLiteralV2, ...] = (
+    "close",
+    "open",
+    "high",
+    "low",
+    "hl2",
+    "hlc3",
+    "ohlc4",
+)
+
+
+def validate_signal_rule_family_v2(value: str) -> SignalRuleFamilyLiteralV2:
+    """
+    Validate one signal-rule family literal used by the v2 rules engine contract.
+
+    Args:
+        value: Candidate rule-family literal.
+    Returns:
+        SignalRuleFamilyLiteralV2: Canonical lower-case family literal.
+    Assumptions:
+        Rule-family set is fixed by R4-01 and must stay explicit.
+    Raises:
+        ValueError: If the literal is blank or outside the supported family set.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - docs/architecture/indicators/indicators_formula.yaml
+    """
+    normalized = value.strip().lower()
+    if normalized not in SUPPORTED_SIGNAL_RULE_FAMILIES_V2:
+        raise ValueError(
+            "signal rule family must be one of "
+            f"{SUPPORTED_SIGNAL_RULE_FAMILIES_V2}, got {value!r}"
+        )
+    return cast(SignalRuleFamilyLiteralV2, normalized)
+
+
+def validate_signal_input_source_v2(value: str) -> SignalSourceLiteralV2:
+    """
+    Validate one `inputs.source` literal used by the v2 signal-rules engine.
+
+    Args:
+        value: Candidate `inputs.source` literal.
+    Returns:
+        SignalSourceLiteralV2: Canonical lower-case source literal.
+    Assumptions:
+        Source-axis semantics are limited to explicit candle-derived literals.
+    Raises:
+        ValueError: If the source literal is blank or unsupported.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - configs/prod/indicators.yaml
+    """
+    normalized = value.strip().lower()
+    if normalized not in SUPPORTED_SIGNAL_INPUT_SOURCES_V2:
+        raise ValueError(
+            "inputs.source must be one of "
+            f"{SUPPORTED_SIGNAL_INPUT_SOURCES_V2}, got {value!r}"
+        )
+    return cast(SignalSourceLiteralV2, normalized)
+
+
+def _normalize_non_empty_literal_tuple_v2(
+    *,
+    values: tuple[str, ...],
+    field_name: str,
+) -> tuple[str, ...]:
+    """
+    Normalize and deterministically sort one tuple of non-empty string literals.
+
+    Args:
+        values: Candidate string tuple.
+        field_name: Field label used in deterministic error messages.
+    Returns:
+        tuple[str, ...]: Lower-case unique tuple sorted lexicographically.
+    Assumptions:
+        String literals are small metadata tuples and deterministic sorting is acceptable.
+    Raises:
+        ValueError: If one literal is blank after normalization.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+    """
+    normalized: set[str] = set()
+    for raw_value in values:
+        literal = raw_value.strip().lower()
+        if not literal:
+            raise ValueError(f"{field_name} must not contain blank values")
+        normalized.add(literal)
+    return tuple(sorted(normalized))
+
+
+@dataclass(frozen=True, slots=True)
+class SignalRuleSpecV2:
+    """
+    Explicit v2-aligned rule binding for one supported backtest indicator id.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - docs/architecture/indicators/indicators_formula.yaml
+      - configs/prod/indicators.yaml
+    """
+
+    indicator_id: str
+    rule_family: SignalRuleFamilyLiteralV2
+    required_signal_params: tuple[str, ...] = ()
+    required_dependency_ids: tuple[str, ...] = ()
+    uses_inputs_source: bool = False
+    threshold_center: float | None = None
+    candle_body_min_param_name: str | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate stable v2 rule-spec invariants for one indicator binding.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Rule metadata is constructed once at import/startup time and stays immutable.
+        Raises:
+            ValueError: If the indicator id, rule family, or parameter metadata is invalid.
+        Side Effects:
+            Normalizes identifier and tuple fields into canonical lower-case ordering.
+        Docs:
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+          - configs/prod/indicators.yaml
+        """
+        normalized_indicator_id = validate_indicator_id_v2(self.indicator_id)
+        object.__setattr__(self, "indicator_id", normalized_indicator_id)
+        object.__setattr__(
+            self,
+            "rule_family",
+            validate_signal_rule_family_v2(self.rule_family),
+        )
+        object.__setattr__(
+            self,
+            "required_signal_params",
+            _normalize_non_empty_literal_tuple_v2(
+                values=self.required_signal_params,
+                field_name="required_signal_params",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "required_dependency_ids",
+            _normalize_non_empty_literal_tuple_v2(
+                values=self.required_dependency_ids,
+                field_name="required_dependency_ids",
+            ),
+        )
+        if self.threshold_center is not None and not np.isfinite(self.threshold_center):
+            raise ValueError("SignalRuleSpecV2.threshold_center must be finite when provided")
+        if self.candle_body_min_param_name is None:
+            return
+        normalized_min_param_name = self.candle_body_min_param_name.strip().lower()
+        if not normalized_min_param_name:
+            raise ValueError(
+                "SignalRuleSpecV2.candle_body_min_param_name must be non-empty when provided"
+            )
+        object.__setattr__(
+            self,
+            "candle_body_min_param_name",
+            normalized_min_param_name,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SignalRuleEvaluationRequestV2:
+    """
+    Typed pure-input envelope for one v2 signal-rules evaluation call.
+
+    `signal_params` mirrors `signals.v1.params` and remains `default-only` in R4-01.
+    `inputs_source` models explicit `inputs.source` semantics for indicators that carry a source
+    axis in defaults/config or in compare-price rule evaluation.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py
+      - configs/prod/indicators.yaml
+    """
+
+    indicator_id: str
+    candles: CandleArrays
+    primary_output: np.ndarray
+    inputs_source: str | None = None
+    signal_params: Mapping[str, SignalRuleScalarV2] = field(default_factory=dict)
+    dependency_outputs: Mapping[str, np.ndarray] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class SignalRuleEvaluationResultV2:
+    """
+    Typed deterministic result of one v2 signal-rules evaluation call.
+
+    `signal_codes` always uses compact `int8` encoding with `NEUTRAL = 0`, `LONG = 1`,
+    `SHORT = -1`, and the value set `{-1,0,1}`.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    """
+
+    indicator_id: str
+    rule_family: SignalRuleFamilyLiteralV2
+    inputs_source: str | None
+    signal_params: Mapping[str, SignalRuleScalarV2]
+    signal_codes: np.ndarray
 
 
 def ordered_artifact_slots_v2() -> tuple[ArtifactSlotLiteralV2, ...]:

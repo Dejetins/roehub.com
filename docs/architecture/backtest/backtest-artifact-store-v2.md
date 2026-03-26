@@ -239,6 +239,19 @@ validated files перед publish.
 - `signals` root catalog до R4;
 - `hit_times/1m/manifest.yaml` reference до R5.
 
+## R4-01 stage boundary
+
+R4-01 вводит explicit signal-rules engine contract, но не меняет artifact tree и не
+materialize'ит `signals.i8.npy`.
+
+Следовательно, после R4-01 по-прежнему верно:
+
+- `signals/` directory layout остаётся reserved path contract;
+- `signals/<tf>/<indicator_id>/signals.i8.npy` ещё не обязан существовать;
+- `signals/<tf>/<indicator_id>/manifest.yaml` ещё не обязан существовать;
+- root `manifest.yaml` сохраняет explicit empty signal catalog;
+- per-indicator signal manifests и runtime-facing signal catalog появляются только в R4-02.
+
 ## R3-04 prices+mappings publish-ready boundary
 
 После R3-04 slot с strict `prices[]` и non-empty `mappings[]` может считаться publish-ready, если

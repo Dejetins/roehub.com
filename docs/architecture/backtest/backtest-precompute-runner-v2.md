@@ -50,6 +50,24 @@ Precompute runner v2 обязан:
   - `timeline` coverage
 - завершать publish только после whole-slot validation.
 
+### R4-01 signal-rules engine boundary
+
+На этапе R4-01 precompute layer получает explicit signal-rules engine contract, но ещё не
+materialize'ит signal artifacts.
+
+Это означает:
+
+- indicator outputs уже могут быть детерминированно преобразованы в compact `int8` signals
+  `{-1,0,1}`;
+- `inputs.source` должен трактоваться явно для семейств, где rule family сравнивает price с
+  indicator output;
+- `signals.v1.params` остаются strictly `default-only` и берутся только из
+  `configs/<env>/indicators.yaml`;
+- runner по-прежнему не обязан писать:
+  - `signals/<tf>/<indicator_id>/signals.i8.npy`
+  - `signals/<tf>/<indicator_id>/manifest.yaml`
+- handoff на real signal artifact materialization переносится в R4-02.
+
 ### R3-01 / R3-02 prices stage
 
 На этапах R3-01 / R3-02 precompute runner получает отдельную обязанность:
@@ -166,6 +184,15 @@ R3-03 mapping contract:
   - `bar_open_1m_idx <= bar_close_1m_idx`
   - `prices/1m.open_time[bar_open_1m_idx] == prices/<tf>.open_time`
   - `prices/1m.close_time[bar_close_1m_idx] == prices/<tf>.close_time`
+
+R4-01 keeps the root-manifest signal placeholder unchanged:
+
+- `signals.supported_timeframes: []`
+- `signals.supported_indicator_ids: []`
+- `signals.manifests: []`
+
+Появление explicit signal-rules engine contract само по себе не делает slot publish-ready с
+signals. Root manifest начинает ссылаться на real signal manifests только в R4-02.
 
 ### Per-indicator signal manifest
 

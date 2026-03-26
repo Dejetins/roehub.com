@@ -120,6 +120,15 @@ R3-01 / R3-02 / R3-03 exception boundary:
 - если использовать полный validation plan, такой slot по-прежнему не должен публиковаться, пока
   later-stage plan требует real `signals/hit_times`.
 
+R4-01 clarification:
+
+- наличие explicit signal-rules engine contract ещё не означает наличие signal artifacts;
+- rebuild/publish sequence после R4-01 всё ещё не должна ожидать
+  `signals/<tf>/<indicator_id>/signals.i8.npy`;
+- `signals.v1.params` для signal engine остаются `default-only`, поэтому signal-param grid
+  expansion вручную не включается;
+- переход к real signal manifests и `signals.i8.npy` остаётся отдельной процедурой R4-02.
+
 Минимально ожидаемые пути:
 
 - `<slot>/manifest.yaml`

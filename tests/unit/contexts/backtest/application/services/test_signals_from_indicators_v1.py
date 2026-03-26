@@ -23,6 +23,7 @@ from trading.contexts.backtest.application.services import (
     list_signal_rule_registry_v1,
     supported_indicator_ids_for_signals_v1,
 )
+from trading.contexts.backtest.application.services.v2 import list_signal_rule_registry_v2
 from trading.contexts.backtest.domain.value_objects import IndicatorSignalsV1, SignalV1
 from trading.contexts.indicators.application.dto import CandleArrays, IndicatorTensor, TensorMeta
 from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId, Layout
@@ -105,6 +106,31 @@ def test_signal_registry_covers_all_prod_indicator_ids() -> None:
         if indicator_id not in supported_ids
     )
     assert missing == []
+
+
+def test_signal_registry_v1_matches_v2_contract_projection() -> None:
+    """
+    Verify the historical v1 signal registry stays aligned with the explicit v2 projection.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R4-01 reuses the frozen v1 rule catalog and must not drift semantically.
+    Raises:
+        AssertionError: If v1 and v2 registry projections diverge.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py
+    """
+    assert list_signal_rule_registry_v1() == list_signal_rule_registry_v2()
 
 
 def test_compare_price_to_output_uses_selected_source_and_nan_is_neutral() -> None:
