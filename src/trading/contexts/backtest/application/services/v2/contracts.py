@@ -25,7 +25,32 @@ OPEN_TIME_FILENAME_V2 = "open_time.i64.npy"
 CLOSE_TIME_FILENAME_V2 = "close_time.i64.npy"
 OHLCV_FILENAME_V2 = "ohlcv.f32.npy"
 SIGNALS_FILENAME_V2 = "signals.i8.npy"
+TP_VALUES_FILENAME_V2 = "tp_values.f32.npy"
+SL_VALUES_FILENAME_V2 = "sl_values.f32.npy"
+LONG_TP_FILENAME_V2 = "long_tp.u32.npy"
+LONG_SL_FILENAME_V2 = "long_sl.u32.npy"
+SHORT_TP_FILENAME_V2 = "short_tp.u32.npy"
+SHORT_SL_FILENAME_V2 = "short_sl.u32.npy"
 CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2 = 1
+ROOT_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
+SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
+HIT_TIMES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
+ROOT_ARTIFACT_MANIFEST_KIND_V2 = "slot_root"
+SIGNAL_ARTIFACT_MANIFEST_KIND_V2 = "signal"
+HIT_TIMES_ARTIFACT_MANIFEST_KIND_V2 = "hit_times_1m"
+ARTIFACT_SIGNAL_DTYPE_LITERAL_V2 = "int8"
+ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2 = "int64"
+ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2 = "float32"
+ARTIFACT_MAPPING_DTYPE_LITERAL_V2 = "uint32"
+ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2 = "float32"
+ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2 = "uint32"
+ARTIFACT_SIGNAL_VALUE_SET_V2: tuple[int, int, int] = (-1, 0, 1)
+ARTIFACT_SIGNAL_AXIS_ORDER_V2: tuple[str, str] = ("variant", "time")
+ARTIFACT_TIME_AXIS_ORDER_V2: tuple[str, ...] = ("time",)
+ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2: tuple[str, str] = ("time", "field")
+ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2: tuple[str, ...] = ("level",)
+ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2: tuple[str, str] = ("level", "time")
+ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2 = "non_decreasing_by_level"
 SUPPORTED_CURRENT_ARTIFACT_POINTER_SCHEMA_VERSIONS_V2: tuple[int, ...] = (
     CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
 )
@@ -36,6 +61,49 @@ CURRENT_ARTIFACT_POINTER_REQUIRED_KEYS_V2: tuple[str, ...] = (
     "asof_date",
     "manifest_sha256",
     "published_at_utc",
+)
+ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2: tuple[str, ...] = (
+    "schema_version",
+    "manifest_kind",
+    "slot",
+    "slot_generation",
+    "asof_date",
+    "identity",
+    "prices",
+    "mappings",
+    "signals",
+    "hit_times",
+    "signal_encoding",
+    "provenance",
+)
+SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2: tuple[str, ...] = (
+    "schema_version",
+    "manifest_kind",
+    "slot",
+    "slot_generation",
+    "asof_date",
+    "indicator_id",
+    "timeframe",
+    "signals",
+    "rows_count",
+    "timeline",
+    "signal_value_set",
+    "grid",
+    "provenance",
+)
+HIT_TIMES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2: tuple[str, ...] = (
+    "schema_version",
+    "manifest_kind",
+    "slot",
+    "slot_generation",
+    "asof_date",
+    "timeframe",
+    "timeline_bar_count",
+    "sentinel_index",
+    "tp_values",
+    "sl_values",
+    "tables",
+    "provenance",
 )
 SUPPORTED_ARTIFACT_MARKETS_BY_ID_V2: Mapping[int, tuple[str, str]] = MappingProxyType(
     {
@@ -683,6 +751,610 @@ class ArtifactMappingPathsV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactHitTimesPathsV2:
+    """
+    Explicit paths for the fixed `hit_times/1m/` artifact directory.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
+    """
+
+    manifest: Path
+    tp_values: Path
+    sl_values: Path
+    long_tp: Path
+    long_sl: Path
+    short_tp: Path
+    short_sl: Path
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactArrayMetadataV2:
+    """
+    Strict metadata contract for one artifact array referenced from a manifest.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    path: str
+    dtype: str
+    shape: tuple[int, ...]
+    axis_order: tuple[str, ...]
+    sha256: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate immutable array metadata used by strict manifest contracts.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Paths are stored as slot-relative literals and shapes are explicit positive integers.
+        Raises:
+            ValueError: If path, dtype, shape, axis order, or hash fields are malformed.
+        Side Effects:
+            Normalizes metadata fields to validated canonical literals.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(self, "path", validate_relative_artifact_path_v2(self.path))
+        object.__setattr__(self, "dtype", validate_artifact_dtype_literal_v2(self.dtype))
+        object.__setattr__(self, "shape", validate_artifact_shape_v2(self.shape))
+        object.__setattr__(
+            self,
+            "axis_order",
+            validate_artifact_axis_order_v2(self.axis_order),
+        )
+        object.__setattr__(
+            self,
+            "sha256",
+            validate_current_pointer_manifest_sha256_v2(self.sha256),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactTimelineCoverageV2:
+    """
+    Fixed timeline coverage metadata reused by price and signal manifests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    bar_count: int
+    open_time_start: int
+    open_time_end: int
+    close_time_start: int
+    close_time_end: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate timeline coverage scalars against monotone positive-count expectations.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Coverage is written from already-materialized numeric timelines without coercion.
+        Raises:
+            ValueError: If counts are non-positive or time boundary literals are not integers.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(self, "bar_count", validate_positive_manifest_int_v2(self.bar_count))
+        object.__setattr__(
+            self,
+            "open_time_start",
+            validate_manifest_integer_literal_v2(
+                self.open_time_start,
+                field_name="timeline.open_time_start",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "open_time_end",
+            validate_manifest_integer_literal_v2(
+                self.open_time_end,
+                field_name="timeline.open_time_end",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "close_time_start",
+            validate_manifest_integer_literal_v2(
+                self.close_time_start,
+                field_name="timeline.close_time_start",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "close_time_end",
+            validate_manifest_integer_literal_v2(
+                self.close_time_end,
+                field_name="timeline.close_time_end",
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPriceTimeframeManifestV2:
+    """
+    Strict root-manifest section for one `prices/<tf>/` artifact family.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    timeframe: str
+    open_time: ArtifactArrayMetadataV2
+    close_time: ArtifactArrayMetadataV2
+    ohlcv: ArtifactArrayMetadataV2
+    coverage: ArtifactTimelineCoverageV2
+
+    def __post_init__(self) -> None:
+        """
+        Validate one strict price-manifest timeframe section.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Price manifests exist only for supported artifact price timeframes.
+        Raises:
+            ValueError: If the timeframe literal violates the fixed artifact contract.
+        Side Effects:
+            Normalizes the stored timeframe literal.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(self, "timeframe", validate_price_timeframe_v2(self.timeframe))
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactMappingTimeframeManifestV2:
+    """
+    Strict root-manifest section for one `mappings/<tf>/` artifact family.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    timeframe: str
+    bar_open_1m_idx: ArtifactArrayMetadataV2
+    bar_close_1m_idx: ArtifactArrayMetadataV2
+
+    def __post_init__(self) -> None:
+        """
+        Validate one strict mapping-manifest timeframe section.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Mapping artifacts exist only for supported request timeframes.
+        Raises:
+            ValueError: If the timeframe literal violates the fixed artifact contract.
+        Side Effects:
+            Normalizes the stored timeframe literal.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(self, "timeframe", validate_mapping_timeframe_v2(self.timeframe))
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalCatalogEntryV2:
+    """
+    Root-manifest reference to one strict per-indicator signal manifest.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    timeframe: str
+    indicator_id: str
+    manifest_path: str
+    manifest_sha256: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate one root-manifest signal reference entry.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Signal manifest references stay slot-relative and deterministic.
+        Raises:
+            ValueError: If timeframe, indicator id, relative path, or hash are invalid.
+        Side Effects:
+            Normalizes stored literals to canonical validated values.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(self, "timeframe", validate_signal_timeframe_v2(self.timeframe))
+        object.__setattr__(self, "indicator_id", validate_indicator_id_v2(self.indicator_id))
+        object.__setattr__(
+            self,
+            "manifest_path",
+            validate_relative_artifact_path_v2(self.manifest_path),
+        )
+        object.__setattr__(
+            self,
+            "manifest_sha256",
+            validate_current_pointer_manifest_sha256_v2(self.manifest_sha256),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalCatalogV2:
+    """
+    Root-manifest catalog of signal manifests and supported signal dimensions.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    supported_timeframes: tuple[str, ...]
+    supported_indicator_ids: tuple[str, ...]
+    manifests: tuple[ArtifactSignalCatalogEntryV2, ...]
+
+    def __post_init__(self) -> None:
+        """
+        Validate catalog ordering and supported literal sets for signal manifests.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Signal manifest catalogs are serialized in deterministic order without duplicates.
+        Raises:
+            ValueError: If one timeframe, indicator id, or manifest entry is duplicated.
+        Side Effects:
+            Replaces tuples with deterministic canonical ordering.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(
+            self,
+            "supported_timeframes",
+            _sorted_unique_timeframes_v2(
+                values=self.supported_timeframes,
+                allowed_literals=ARTIFACT_SIGNAL_TIMEFRAMES_V2,
+                field_name="signals.supported_timeframes",
+                validator=validate_signal_timeframe_v2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "supported_indicator_ids",
+            _sorted_unique_indicator_ids_v2(
+                values=self.supported_indicator_ids,
+                field_name="signals.supported_indicator_ids",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "manifests",
+            _sorted_signal_catalog_entries_v2(self.manifests),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactHitTimesReferenceV2:
+    """
+    Root-manifest reference to the strict `hit_times/1m/manifest.yaml` document.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    timeframe: str
+    manifest_path: str
+    manifest_sha256: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate the root-manifest hit-times reference entry.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            R2 fixes hit-times to a single `1m` manifest path.
+        Raises:
+            ValueError: If timeframe, relative path, or hash are invalid.
+        Side Effects:
+            Normalizes stored literals to canonical validated values.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(self, "timeframe", validate_hit_times_timeframe_v2(self.timeframe))
+        object.__setattr__(
+            self,
+            "manifest_path",
+            validate_relative_artifact_path_v2(self.manifest_path),
+        )
+        object.__setattr__(
+            self,
+            "manifest_sha256",
+            validate_current_pointer_manifest_sha256_v2(self.manifest_sha256),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalEncodingContractV2:
+    """
+    Root-manifest runtime contract for signal dtype, axis order, and allowed values.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    dtype: str
+    axis_order: tuple[str, ...]
+    value_set: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        """
+        Validate the fixed runtime signal-encoding contract read from root manifest.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Engine v2 stores signals as `int8` with deterministic `[variant, time]` layout.
+        Raises:
+            ValueError: If dtype, axis order, or signal value set violate the fixed contract.
+        Side Effects:
+            Normalizes stored values to canonical tuples.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(self, "dtype", validate_artifact_dtype_literal_v2(self.dtype))
+        object.__setattr__(
+            self,
+            "axis_order",
+            validate_artifact_axis_order_v2(self.axis_order),
+        )
+        object.__setattr__(
+            self,
+            "value_set",
+            validate_signal_value_set_v2(self.value_set),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactManifestProvenanceV2:
+    """
+    Strict provenance payload carried by root/signal/hit-times manifests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    generator: str
+    generator_version: str
+    generated_at_utc: str
+    config_sha256: str
+    inputs_sha256: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate provenance fields that identify the manifest producer and source inputs.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Provenance fields are immutable publish metadata and must remain explicit.
+        Raises:
+            ValueError: If generator literals are empty or hash/timestamp literals are invalid.
+        Side Effects:
+            Normalizes stored literals to validated canonical values.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(
+            self,
+            "generator",
+            validate_manifest_text_literal_v2(self.generator, field_name="provenance.generator"),
+        )
+        object.__setattr__(
+            self,
+            "generator_version",
+            validate_manifest_text_literal_v2(
+                self.generator_version,
+                field_name="provenance.generator_version",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "generated_at_utc",
+            validate_current_pointer_published_at_utc_v2(self.generated_at_utc),
+        )
+        object.__setattr__(
+            self,
+            "config_sha256",
+            validate_current_pointer_manifest_sha256_v2(self.config_sha256),
+        )
+        object.__setattr__(
+            self,
+            "inputs_sha256",
+            validate_current_pointer_manifest_sha256_v2(self.inputs_sha256),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalGridContractV2:
+    """
+    Strict metadata describing deterministic signal-row ordering and defaults.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    variant_key_version: int
+    variant_keys_sha256: str
+    signals_v1_params_defaults: Mapping[str, Any]
+
+    def __post_init__(self) -> None:
+        """
+        Validate grid metadata carried by strict per-indicator signal manifests.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Variant key semantics stay aligned with v1 and defaults are serialized as a mapping.
+        Raises:
+            ValueError: If variant-key version, hash, or defaults payload are invalid.
+        Side Effects:
+            Freezes the defaults mapping into a deterministic read-only payload.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(
+            self,
+            "variant_key_version",
+            validate_positive_manifest_int_v2(self.variant_key_version),
+        )
+        object.__setattr__(
+            self,
+            "variant_keys_sha256",
+            validate_current_pointer_manifest_sha256_v2(self.variant_keys_sha256),
+        )
+        object.__setattr__(
+            self,
+            "signals_v1_params_defaults",
+            freeze_artifact_payload_mapping_v2(self.signals_v1_params_defaults),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactHitTimesTableManifestV2:
+    """
+    Strict metadata contract for one hit-times lookup table.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    array: ArtifactArrayMetadataV2
+    monotonicity: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate hit-times table metadata and declared monotonicity contract.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            All runtime hit-times tables use the same non-decreasing-by-level invariant.
+        Raises:
+            ValueError: If monotonicity literal is unsupported.
+        Side Effects:
+            Normalizes the monotonicity literal.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(
+            self,
+            "monotonicity",
+            validate_hit_times_monotonicity_literal_v2(self.monotonicity),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactCurrentPointerV2:
     """
     Parsed strict `current.yaml` payload with the typed identity fields required by R2-02.
@@ -780,43 +1452,345 @@ class ArtifactCurrentPointerV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactManifestDocumentV2:
     """
-    Parsed slot-level `manifest.yaml` document returned by explicit-path loaders.
+    Parsed strict root `manifest.yaml` document returned by explicit-path loaders.
 
     Docs:
       - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
 
     path: Path
     raw_payload: Mapping[str, Any]
-    slot: ArtifactSlotLiteralV2 | None = None
+    slot: ArtifactSlotLiteralV2
+    schema_version: int
+    manifest_kind: str
+    slot_generation: int
+    asof_date: str
+    identity: ArtifactCoordinatesV2
+    prices: tuple[ArtifactPriceTimeframeManifestV2, ...]
+    mappings: tuple[ArtifactMappingTimeframeManifestV2, ...]
+    signals: ArtifactSignalCatalogV2
+    hit_times: ArtifactHitTimesReferenceV2
+    signal_encoding: ArtifactSignalEncodingContractV2
+    provenance: ArtifactManifestProvenanceV2
 
     def __post_init__(self) -> None:
         """
-        Re-validate the optional slot and freeze the raw manifest payload.
+        Re-validate the strict root-manifest contract and freeze raw payload ordering.
 
         Args:
             None.
         Returns:
             None.
         Assumptions:
-            Manifest schema validation beyond mapping shape is deferred to later milestones.
+            Root manifests contain only the fixed R2-03 schema and explicit runtime metadata.
         Raises:
-            ValueError: If the optional slot literal or payload shape violates the contract.
+            ValueError: If root-manifest slot, version, kind, keys, or payload shape are invalid.
         Side Effects:
-            Replaces `raw_payload` with a stable read-only mapping.
+            Normalizes validated literals and freezes `raw_payload`.
         Docs:
           - docs/architecture/backtest/backtest-artifact-store-v2.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
         """
-        if self.slot is not None:
-            object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
+        _validate_exact_mapping_keys_v2(
+            payload=self.raw_payload,
+            required_keys=ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            path=self.path,
+        )
+        object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
+        object.__setattr__(
+            self,
+            "schema_version",
+            validate_manifest_schema_version_v2(
+                self.schema_version,
+                field_name="root manifest schema_version",
+                expected_schema_version=ROOT_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "manifest_kind",
+            validate_manifest_kind_v2(
+                self.manifest_kind,
+                expected_kind=ROOT_ARTIFACT_MANIFEST_KIND_V2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "slot_generation",
+            validate_positive_manifest_int_v2(self.slot_generation),
+        )
+        object.__setattr__(
+            self,
+            "asof_date",
+            validate_current_pointer_asof_date_v2(self.asof_date),
+        )
         object.__setattr__(
             self, "raw_payload", freeze_artifact_payload_mapping_v2(self.raw_payload)
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalManifestDocumentV2:
+    """
+    Parsed strict per-indicator signal `manifest.yaml` document.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    path: Path
+    raw_payload: Mapping[str, Any]
+    slot: ArtifactSlotLiteralV2
+    schema_version: int
+    manifest_kind: str
+    slot_generation: int
+    asof_date: str
+    indicator_id: str
+    timeframe: str
+    signals: ArtifactArrayMetadataV2
+    rows_count: int
+    timeline: ArtifactTimelineCoverageV2
+    signal_value_set: tuple[int, ...]
+    grid: ArtifactSignalGridContractV2
+    provenance: ArtifactManifestProvenanceV2
+
+    def __post_init__(self) -> None:
+        """
+        Re-validate the strict signal-manifest contract and freeze raw payload ordering.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Signal manifests carry fully fixed runtime metadata and no unsupported drift.
+        Raises:
+            ValueError: If signal-manifest keys or typed identity fields are invalid.
+        Side Effects:
+            Normalizes validated literals and freezes `raw_payload`.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        _validate_exact_mapping_keys_v2(
+            payload=self.raw_payload,
+            required_keys=SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            path=self.path,
+        )
+        object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
+        object.__setattr__(
+            self,
+            "schema_version",
+            validate_manifest_schema_version_v2(
+                self.schema_version,
+                field_name="signal manifest schema_version",
+                expected_schema_version=SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "manifest_kind",
+            validate_manifest_kind_v2(
+                self.manifest_kind,
+                expected_kind=SIGNAL_ARTIFACT_MANIFEST_KIND_V2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "slot_generation",
+            validate_positive_manifest_int_v2(self.slot_generation),
+        )
+        object.__setattr__(
+            self,
+            "asof_date",
+            validate_current_pointer_asof_date_v2(self.asof_date),
+        )
+        object.__setattr__(self, "indicator_id", validate_indicator_id_v2(self.indicator_id))
+        object.__setattr__(self, "timeframe", validate_signal_timeframe_v2(self.timeframe))
+        object.__setattr__(
+            self,
+            "rows_count",
+            validate_positive_manifest_int_v2(self.rows_count),
+        )
+        object.__setattr__(
+            self,
+            "signal_value_set",
+            validate_signal_value_set_v2(self.signal_value_set),
+        )
+        object.__setattr__(
+            self, "raw_payload", freeze_artifact_payload_mapping_v2(self.raw_payload)
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactHitTimesManifestDocumentV2:
+    """
+    Parsed strict `hit_times/1m/manifest.yaml` document.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    path: Path
+    raw_payload: Mapping[str, Any]
+    slot: ArtifactSlotLiteralV2
+    schema_version: int
+    manifest_kind: str
+    slot_generation: int
+    asof_date: str
+    timeframe: str
+    timeline_bar_count: int
+    sentinel_index: int
+    tp_values: ArtifactArrayMetadataV2
+    sl_values: ArtifactArrayMetadataV2
+    long_tp: ArtifactHitTimesTableManifestV2
+    long_sl: ArtifactHitTimesTableManifestV2
+    short_tp: ArtifactHitTimesTableManifestV2
+    short_sl: ArtifactHitTimesTableManifestV2
+    provenance: ArtifactManifestProvenanceV2
+
+    def __post_init__(self) -> None:
+        """
+        Re-validate the strict hit-times-manifest contract and freeze raw payload ordering.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Hit-times manifests define a single fixed `1m` runtime contract.
+        Raises:
+            ValueError: If hit-times-manifest keys or typed identity fields are invalid.
+        Side Effects:
+            Normalizes validated literals and freezes `raw_payload`.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        _validate_exact_mapping_keys_v2(
+            payload=self.raw_payload,
+            required_keys=HIT_TIMES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            path=self.path,
+        )
+        object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
+        object.__setattr__(
+            self,
+            "schema_version",
+            validate_manifest_schema_version_v2(
+                self.schema_version,
+                field_name="hit_times manifest schema_version",
+                expected_schema_version=HIT_TIMES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "manifest_kind",
+            validate_manifest_kind_v2(
+                self.manifest_kind,
+                expected_kind=HIT_TIMES_ARTIFACT_MANIFEST_KIND_V2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "slot_generation",
+            validate_positive_manifest_int_v2(self.slot_generation),
+        )
+        object.__setattr__(
+            self,
+            "asof_date",
+            validate_current_pointer_asof_date_v2(self.asof_date),
+        )
+        object.__setattr__(self, "timeframe", validate_hit_times_timeframe_v2(self.timeframe))
+        object.__setattr__(
+            self,
+            "timeline_bar_count",
+            validate_positive_manifest_int_v2(self.timeline_bar_count),
+        )
+        object.__setattr__(
+            self,
+            "sentinel_index",
+            validate_non_negative_manifest_int_v2(self.sentinel_index),
+        )
+        object.__setattr__(
+            self, "raw_payload", freeze_artifact_payload_mapping_v2(self.raw_payload)
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactValidationDiagnosticV2:
+    """
+    Stable structured validation error emitted by strict manifest validators.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+    """
+
+    code: str
+    message: str
+    location: str
+    manifest_path: Path
+    artifact_path: Path | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate stable diagnostic fields used by publish guard and operator logs.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Codes and locations remain short deterministic literals.
+        Raises:
+            ValueError: If code, message, or location are empty.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+        """
+        object.__setattr__(
+            self,
+            "code",
+            validate_manifest_text_literal_v2(self.code, field_name="diagnostic.code"),
+        )
+        object.__setattr__(
+            self,
+            "message",
+            validate_manifest_text_literal_v2(self.message, field_name="diagnostic.message"),
+        )
+        object.__setattr__(
+            self,
+            "location",
+            validate_manifest_text_literal_v2(self.location, field_name="diagnostic.location"),
         )
 
 
@@ -963,9 +1937,12 @@ class ArtifactSlotValidationResultV2:
     """
 
     slot: ArtifactSlotLiteralV2
-    slot_manifest: ArtifactManifestDocumentV2
-    manifest_sha256: str
+    slot_manifest: ArtifactManifestDocumentV2 | None
+    signal_manifests: tuple[ArtifactSignalManifestDocumentV2, ...]
+    hit_times_manifest: ArtifactHitTimesManifestDocumentV2 | None
+    manifest_sha256: str | None
     validation_spec: ArtifactSlotValidationSpecV2
+    diagnostics: tuple[ArtifactValidationDiagnosticV2, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1051,6 +2028,14 @@ class BacktestArtifactPathResolverV2(Protocol):
         """Resolve the fixed `hit_times/1m/manifest.yaml` path."""
         ...
 
+    def hit_times_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+    ) -> ArtifactHitTimesPathsV2:
+        """Resolve explicit hit-times artifact paths without touching disk."""
+        ...
+
 
 class BacktestArtifactLoaderV2(Protocol):
     """
@@ -1083,9 +2068,45 @@ class BacktestArtifactLoaderV2(Protocol):
         self,
         path: Path,
         *,
-        slot: ArtifactSlotLiteralV2 | None = None,
+        slot: ArtifactSlotLiteralV2,
     ) -> ArtifactManifestDocumentV2:
         """Read one slot `manifest.yaml` document from an explicit path."""
+        ...
+
+    def load_signal_manifest(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalManifestDocumentV2:
+        """Read one per-indicator signal manifest by deterministic coordinates."""
+        ...
+
+    def load_signal_manifest_from_path(
+        self,
+        path: Path,
+        *,
+        slot: ArtifactSlotLiteralV2,
+    ) -> ArtifactSignalManifestDocumentV2:
+        """Read one per-indicator signal manifest from an explicit path."""
+        ...
+
+    def load_hit_times_manifest(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+    ) -> ArtifactHitTimesManifestDocumentV2:
+        """Read the fixed `hit_times/1m/manifest.yaml` by deterministic coordinates."""
+        ...
+
+    def load_hit_times_manifest_from_path(
+        self,
+        path: Path,
+        *,
+        slot: ArtifactSlotLiteralV2,
+    ) -> ArtifactHitTimesManifestDocumentV2:
+        """Read one `hit_times/1m/manifest.yaml` document from an explicit path."""
         ...
 
     def load_active_slot_manifest(
@@ -1135,6 +2156,14 @@ class BacktestArtifactLoaderV2(Protocol):
         self, coordinates: ArtifactCoordinatesV2, slot: str
     ) -> Path:
         """Resolve the `hit_times/1m/manifest.yaml` path without touching disk."""
+        ...
+
+    def resolve_hit_times_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+    ) -> ArtifactHitTimesPathsV2:
+        """Resolve hit-times artifact paths without touching disk."""
         ...
 
 
@@ -1273,6 +2302,519 @@ def _sorted_unique_timeframes_v2(
     for allowed_literal in allowed_literals:
         if allowed_literal in seen:
             ordered_values.append(allowed_literal)
+    return tuple(ordered_values)
+
+
+def validate_manifest_schema_version_v2(
+    schema_version: int,
+    *,
+    field_name: str,
+    expected_schema_version: int,
+) -> int:
+    """
+    Validate one strict manifest schema version against a fixed explicit literal.
+
+    Args:
+        schema_version: Candidate schema version scalar.
+        field_name: Stable field label used in deterministic error messages.
+        expected_schema_version: Single supported schema version for this manifest type.
+    Returns:
+        int: Validated schema version literal.
+    Assumptions:
+        R2-03 forbids dynamic schema discovery and supports one explicit version per manifest type.
+    Raises:
+        ValueError: If the schema version is not the expected integer literal.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    if isinstance(schema_version, bool) or not isinstance(schema_version, int):
+        raise ValueError(f"{field_name} must be int")
+    if schema_version != expected_schema_version:
+        raise ValueError(
+            f"{field_name} must be {expected_schema_version}; got {schema_version!r}"
+        )
+    return schema_version
+
+
+def validate_manifest_kind_v2(kind: str, *, expected_kind: str) -> str:
+    """
+    Validate one strict manifest-kind literal against the fixed contract.
+
+    Args:
+        kind: Candidate manifest kind literal.
+        expected_kind: Single supported literal for the manifest type.
+    Returns:
+        str: Validated manifest kind literal.
+    Assumptions:
+        Manifest type is explicit and must never be inferred dynamically from payload shape.
+    Raises:
+        ValueError: If the manifest kind differs from the expected literal.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    validate_manifest_text_literal_v2(kind, field_name="manifest_kind")
+    if kind != expected_kind:
+        raise ValueError(f"manifest_kind must be {expected_kind!r}; got {kind!r}")
+    return kind
+
+
+def validate_manifest_text_literal_v2(value: str, *, field_name: str) -> str:
+    """
+    Validate one non-empty manifest text literal without implicit normalization.
+
+    Args:
+        value: Candidate text literal.
+        field_name: Stable field label used in deterministic error messages.
+    Returns:
+        str: Original validated text literal.
+    Assumptions:
+        Strict manifest contracts reject empty/whitespace-only text fields.
+    Raises:
+        ValueError: If the text literal is empty or contains only whitespace.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"{field_name} must be str")
+    if value.strip() == "":
+        raise ValueError(f"{field_name} must be non-empty")
+    return value
+
+
+def validate_manifest_integer_literal_v2(value: int, *, field_name: str) -> int:
+    """
+    Validate one manifest integer literal without coercion.
+
+    Args:
+        value: Candidate integer scalar.
+        field_name: Stable field label used in deterministic error messages.
+    Returns:
+        int: Original validated integer.
+    Assumptions:
+        Manifest numeric fields are already materialized as integers before serialization.
+    Raises:
+        ValueError: If the value is not an integer literal.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{field_name} must be int")
+    return value
+
+
+def validate_positive_manifest_int_v2(value: int) -> int:
+    """
+    Validate one manifest integer field as strictly positive.
+
+    Args:
+        value: Candidate integer scalar.
+    Returns:
+        int: Validated positive integer.
+    Assumptions:
+        Counts and slot generations in strict manifests are positive integers.
+    Raises:
+        ValueError: If the value is not a positive integer.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    validated_value = validate_manifest_integer_literal_v2(value, field_name="manifest integer")
+    if validated_value <= 0:
+        raise ValueError("manifest integer must be > 0")
+    return validated_value
+
+
+def validate_non_negative_manifest_int_v2(value: int) -> int:
+    """
+    Validate one manifest integer field as zero-or-positive.
+
+    Args:
+        value: Candidate integer scalar.
+    Returns:
+        int: Validated non-negative integer.
+    Assumptions:
+        Sentinel indexes may equal zero for degenerate test fixtures but never be negative.
+    Raises:
+        ValueError: If the value is negative or not an integer.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    validated_value = validate_manifest_integer_literal_v2(value, field_name="manifest integer")
+    if validated_value < 0:
+        raise ValueError("manifest integer must be >= 0")
+    return validated_value
+
+
+def validate_relative_artifact_path_v2(path_literal: str) -> str:
+    """
+    Validate one slot-relative artifact path literal stored inside strict manifests.
+
+    Args:
+        path_literal: Candidate slot-relative path string.
+    Returns:
+        str: Original validated relative path literal.
+    Assumptions:
+        Manifest paths are serialized relative to the slot root and must not require cleanup.
+    Raises:
+        ValueError: If the path is empty, absolute, or contains traversal segments.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    validated_literal = validate_manifest_text_literal_v2(
+        path_literal,
+        field_name="manifest path",
+    )
+    if validated_literal.startswith("/") or validated_literal.startswith("\\"):
+        raise ValueError("manifest path must be slot-relative")
+    if "\\" in validated_literal or "\x00" in validated_literal:
+        raise ValueError("manifest path must not contain backslashes or NUL")
+    parts = tuple(part for part in Path(validated_literal).parts if part not in {"", "."})
+    if len(parts) == 0:
+        raise ValueError("manifest path must not be empty")
+    for part in parts:
+        if part == "..":
+            raise ValueError("manifest path must not contain '..'")
+        _validate_safe_path_token_v2(token=part, field_name="manifest path segment")
+    return "/".join(parts)
+
+
+def validate_artifact_dtype_literal_v2(dtype_literal: str) -> str:
+    """
+    Validate one explicit dtype literal used by strict manifest array metadata.
+
+    Args:
+        dtype_literal: Candidate dtype literal.
+    Returns:
+        str: Validated dtype literal.
+    Assumptions:
+        R2-03 uses a fixed small set of explicit numeric dtype literals.
+    Raises:
+        ValueError: If the dtype literal is not supported by manifest contracts.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    allowed_dtypes = (
+        ARTIFACT_SIGNAL_DTYPE_LITERAL_V2,
+        ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2,
+        ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2,
+        ARTIFACT_MAPPING_DTYPE_LITERAL_V2,
+        ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
+        ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+    )
+    validate_manifest_text_literal_v2(dtype_literal, field_name="array dtype")
+    _validate_allowed_literal_v2(
+        value=dtype_literal,
+        field_name="array dtype",
+        allowed_literals=allowed_dtypes,
+    )
+    return dtype_literal
+
+
+def validate_artifact_shape_v2(shape: tuple[int, ...]) -> tuple[int, ...]:
+    """
+    Validate one explicit shape tuple used by strict manifest array metadata.
+
+    Args:
+        shape: Candidate shape tuple.
+    Returns:
+        tuple[int, ...]: Validated shape tuple with strictly positive dimensions.
+    Assumptions:
+        Published artifact arrays are non-empty and declare every dimension explicitly.
+    Raises:
+        ValueError: If shape is not a non-empty tuple of positive integers.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if not isinstance(shape, tuple):
+        raise ValueError("array shape must be tuple")
+    if len(shape) == 0:
+        raise ValueError("array shape must not be empty")
+    validated_dimensions: list[int] = []
+    for index, value in enumerate(shape):
+        dimension = validate_manifest_integer_literal_v2(value, field_name=f"shape[{index}]")
+        if dimension <= 0:
+            raise ValueError(f"shape[{index}] must be > 0")
+        validated_dimensions.append(dimension)
+    return tuple(validated_dimensions)
+
+
+def validate_artifact_axis_order_v2(axis_order: tuple[str, ...]) -> tuple[str, ...]:
+    """
+    Validate one explicit axis-order tuple used by strict manifest array metadata.
+
+    Args:
+        axis_order: Candidate axis-order tuple.
+    Returns:
+        tuple[str, ...]: Validated axis-order tuple without duplicates.
+    Assumptions:
+        Axis-order literals are explicit and deterministic for every artifact family.
+    Raises:
+        ValueError: If axis order is empty, non-string, or contains duplicates.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if not isinstance(axis_order, tuple):
+        raise ValueError("array axis_order must be tuple")
+    if len(axis_order) == 0:
+        raise ValueError("array axis_order must not be empty")
+    seen: set[str] = set()
+    validated_axes: list[str] = []
+    for axis in axis_order:
+        validated_axis = validate_manifest_text_literal_v2(axis, field_name="axis_order value")
+        if validated_axis in seen:
+            raise ValueError(f"array axis_order contains duplicate {validated_axis!r}")
+        seen.add(validated_axis)
+        validated_axes.append(validated_axis)
+    return tuple(validated_axes)
+
+
+def validate_signal_value_set_v2(value_set: tuple[int, ...]) -> tuple[int, int, int]:
+    """
+    Validate the fixed signal value set contract `{-1, 0, 1}`.
+
+    Args:
+        value_set: Candidate ordered signal value tuple.
+    Returns:
+        tuple[int, int, int]: Validated canonical signal value set.
+    Assumptions:
+        Engine v2 stores signals only as `SHORT=-1`, `NEUTRAL=0`, `LONG=1`.
+    Raises:
+        ValueError: If the value set differs from the fixed ordered contract.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if not isinstance(value_set, tuple):
+        raise ValueError("signal value set must be tuple")
+    validated_values: list[int] = []
+    for index, value in enumerate(value_set):
+        validated_values.append(
+            validate_manifest_integer_literal_v2(value, field_name=f"signal_value_set[{index}]")
+        )
+    validated_tuple = tuple(validated_values)
+    if validated_tuple != ARTIFACT_SIGNAL_VALUE_SET_V2:
+        raise ValueError(
+            "signal value set must be exactly "
+            f"{ARTIFACT_SIGNAL_VALUE_SET_V2}; got {validated_tuple!r}"
+        )
+    return ARTIFACT_SIGNAL_VALUE_SET_V2
+
+
+def validate_hit_times_monotonicity_literal_v2(monotonicity: str) -> str:
+    """
+    Validate the declared monotonicity literal for hit-times lookup tables.
+
+    Args:
+        monotonicity: Candidate monotonicity literal.
+    Returns:
+        str: Validated monotonicity literal.
+    Assumptions:
+        R2-03 supports one explicit hit-times monotonicity contract.
+    Raises:
+        ValueError: If the monotonicity literal is unsupported.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    validate_manifest_text_literal_v2(monotonicity, field_name="hit_times monotonicity")
+    if monotonicity != ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2:
+        raise ValueError(
+            "hit_times monotonicity must be "
+            f"{ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2!r}; got {monotonicity!r}"
+        )
+    return monotonicity
+
+
+def _validate_exact_mapping_keys_v2(
+    *,
+    payload: Mapping[str, Any],
+    required_keys: tuple[str, ...],
+    path: Path,
+) -> None:
+    """
+    Validate that one manifest payload contains exactly the required keys and no drift.
+
+    Args:
+        payload: Parsed YAML mapping payload.
+        required_keys: Canonical ordered required key tuple.
+        path: Source manifest path used in deterministic error messages.
+    Returns:
+        None.
+    Assumptions:
+        Strict manifest schemas reject both missing keys and unsupported extra keys.
+    Raises:
+        ValueError: If payload keys differ from the fixed schema.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    raw_keys = tuple(sorted(payload.keys()))
+    expected_keys = tuple(sorted(required_keys))
+    if raw_keys != expected_keys:
+        missing_keys = tuple(key for key in required_keys if key not in payload)
+        extra_keys = tuple(key for key in raw_keys if key not in required_keys)
+        details: list[str] = []
+        if len(missing_keys) > 0:
+            details.append(f"missing keys {missing_keys}")
+        if len(extra_keys) > 0:
+            details.append(f"unexpected keys {extra_keys}")
+        raise ValueError(
+            f"{path} must contain exactly keys {required_keys}"
+            + (f"; {'; '.join(details)}" if len(details) > 0 else "")
+        )
+
+
+def _sorted_unique_indicator_ids_v2(
+    *,
+    values: tuple[str, ...],
+    field_name: str,
+) -> tuple[str, ...]:
+    """
+    Validate and deterministically order an indicator-id tuple.
+
+    Args:
+        values: Candidate indicator-id tuple.
+        field_name: Stable field label used in deterministic error messages.
+    Returns:
+        tuple[str, ...]: Lexicographically ordered unique validated indicator ids.
+    Assumptions:
+        Indicator-id ordering must be stable regardless of serialization order in YAML.
+    Raises:
+        ValueError: If one indicator id is invalid or duplicated.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    seen: set[str] = set()
+    validated_values: list[str] = []
+    for raw_value in values:
+        validated_value = validate_indicator_id_v2(raw_value)
+        if validated_value in seen:
+            raise ValueError(
+                f"artifact validation field '{field_name}' contains duplicate "
+                f"{validated_value!r}"
+            )
+        seen.add(validated_value)
+        validated_values.append(validated_value)
+    return tuple(sorted(validated_values))
+
+
+def _sorted_signal_catalog_entries_v2(
+    values: tuple[ArtifactSignalCatalogEntryV2, ...],
+) -> tuple[ArtifactSignalCatalogEntryV2, ...]:
+    """
+    Validate and deterministically order root-manifest signal catalog entries.
+
+    Args:
+        values: Candidate signal catalog entry tuple.
+    Returns:
+        tuple[ArtifactSignalCatalogEntryV2, ...]: Canonically ordered unique catalog entries.
+    Assumptions:
+        Catalog ordering is deterministic by timeframe contract and indicator id.
+    Raises:
+        ValueError: If one `(timeframe, indicator_id)` pair is duplicated.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    seen: set[tuple[str, str]] = set()
+    validated_values: list[ArtifactSignalCatalogEntryV2] = []
+    for item in values:
+        validated_item = ArtifactSignalCatalogEntryV2(
+            timeframe=item.timeframe,
+            indicator_id=item.indicator_id,
+            manifest_path=item.manifest_path,
+            manifest_sha256=item.manifest_sha256,
+        )
+        identity = (validated_item.timeframe, validated_item.indicator_id)
+        if identity in seen:
+            raise ValueError(
+                "root manifest field 'signals.manifests' contains duplicate "
+                f"{identity!r}"
+            )
+        seen.add(identity)
+        validated_values.append(validated_item)
+
+    timeframe_order = {
+        literal: index for index, literal in enumerate(ARTIFACT_SIGNAL_TIMEFRAMES_V2)
+    }
+    ordered_values = sorted(
+        validated_values,
+        key=lambda item: (timeframe_order[item.timeframe], item.indicator_id),
+    )
     return tuple(ordered_values)
 
 

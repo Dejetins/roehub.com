@@ -1,15 +1,15 @@
-# Backtest Artifact Store V2 (R2-01 / R2-02)
+# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03)
 
-Статус: `Milestone R2 / EPIC R2-01 + R2-02`
+Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03`
 
 Документ фиксирует:
 
 - R2-01: deterministic layout/path contract для `artifacts/backtest/v2`;
 - R2-02: strict `current.yaml` contract, publish sequence `build inactive slot -> validate whole slot -> atomically switch current.yaml`, slot pinning и publish guard.
+- R2-03: strict manifest schemas, fail-fast slot validators, fixed runtime metadata from manifests.
 
 Что не входит в этот документ:
 
-- R2-03: manifest schema/hash/dtype/shape validators;
 - R2-04: `configs/<env>/backtest_artifacts.yaml` loader/validator contract.
 
 Основные источники:
@@ -93,6 +93,12 @@ artifacts/backtest/v2/
           hit_times/
             1m/
               manifest.yaml
+              tp_values.f32.npy
+              sl_values.f32.npy
+              long_tp.u32.npy
+              long_sl.u32.npy
+              short_tp.u32.npy
+              short_sl.u32.npy
         slot_b/
           ...
 ```
@@ -112,6 +118,12 @@ artifacts/backtest/v2/
 | Mappings | `<slot>/mappings/<tf>/bar_open_1m_idx.u32.npy` |
 | Mappings | `<slot>/mappings/<tf>/bar_close_1m_idx.u32.npy` |
 | Hit times | `<slot>/hit_times/1m/manifest.yaml` |
+| Hit times | `<slot>/hit_times/1m/tp_values.f32.npy` |
+| Hit times | `<slot>/hit_times/1m/sl_values.f32.npy` |
+| Hit times | `<slot>/hit_times/1m/long_tp.u32.npy` |
+| Hit times | `<slot>/hit_times/1m/long_sl.u32.npy` |
+| Hit times | `<slot>/hit_times/1m/short_tp.u32.npy` |
+| Hit times | `<slot>/hit_times/1m/short_sl.u32.npy` |
 
 ## Fixed literals and ordering
 
@@ -257,6 +269,113 @@ Pin metadata фиксируется при create-time из strict `current.yaml
 - безопасный rebuild/publish допускается только когда blocking active run count = `0`.
 
 Это правило нужно именно перед шагом `build inactive slot`, потому что rebuild inactive slot иначе затрёт dataset, который уже pinned запущенной job.
+
+## Strict manifest schemas (R2-03)
+
+R2-03 добавляет три фиксированных строгих schema contract:
+
+- root slot `manifest.yaml`;
+- per-indicator `signals/<tf>/<indicator_id>/manifest.yaml`;
+- `hit_times/1m/manifest.yaml`.
+
+Все manifest contracts используют:
+
+- explicit `schema_version` и `manifest_kind`;
+- exact required keys, extra keys запрещены;
+- explicit `dtype`, `shape`, `axis_order`, `sha256`, `provenance`;
+- explicit `slot_generation` и `asof_date`;
+- slot-relative deterministic `path` literals;
+- fail-fast validation без best-effort coercion.
+
+### Root `manifest.yaml`
+
+Root manifest обязан содержать:
+
+- `identity` (`exchange`, `market_type`, `symbol`);
+- `slot`, `slot_generation`, `asof_date`;
+- список `prices` с metadata для `open_time`, `close_time`, `ohlcv`;
+- список `mappings` с metadata для `bar_open_1m_idx`, `bar_close_1m_idx`;
+- `signals`:
+  - `supported_timeframes`
+  - `supported_indicator_ids`
+  - `manifests[]` c `timeframe`, `indicator_id`, `manifest_path`, `manifest_sha256`
+- `hit_times` c `manifest_path`, `manifest_sha256`;
+- `signal_encoding` c fixed contract:
+  - `dtype: int8`
+  - `axis_order: [variant, time]`
+  - `value_set: [-1, 0, 1]`
+- `provenance`.
+
+Канонический shape section для price arrays:
+
+- `open_time`: `dtype=int64`, `shape=[T_tf]`, `axis_order=[time]`
+- `close_time`: `dtype=int64`, `shape=[T_tf]`, `axis_order=[time]`
+- `ohlcv`: `dtype=float32`, `shape=[T_tf, 5]`, `axis_order=[time, field]`
+
+### Per-indicator signal manifest
+
+Per-indicator `signals/<tf>/<indicator_id>/manifest.yaml` обязан содержать:
+
+- `indicator_id`, `timeframe`, `slot`, `slot_generation`, `asof_date`;
+- `signals` metadata:
+  - `path: signals/<tf>/<indicator_id>/signals.i8.npy`
+  - `dtype: int8`
+  - `shape: [V, T_tf]`
+  - `axis_order: [variant, time]`
+  - `sha256`
+- `rows_count`;
+- `timeline` coverage;
+- `signal_value_set: [-1, 0, 1]`;
+- `grid`:
+  - `variant_key_version: 1`
+  - `variant_keys_sha256`
+  - `signals_v1.params defaults`
+- `provenance`.
+
+### `hit_times/1m/manifest.yaml`
+
+`hit_times/1m/manifest.yaml` обязан содержать:
+
+- `timeframe: 1m`, `slot`, `slot_generation`, `asof_date`;
+- `timeline_bar_count`;
+- `sentinel_index` (равен `timeline_bar_count`);
+- `tp_values` и `sl_values`:
+  - `dtype: float32`
+  - `shape: [N_levels]`
+  - `axis_order: [level]`
+  - `sha256`
+- `tables.long_tp|long_sl|short_tp|short_sl`:
+  - `dtype: uint32`
+  - `shape: [N_levels, T_1m]`
+  - `axis_order: [level, time]`
+  - `sha256`
+  - `monotonicity: non_decreasing_by_level`
+- `provenance`.
+
+## Slot-wide validator contract (R2-03)
+
+Перед `current.yaml` switch publish validator обязан детерминированно проверить весь inactive slot:
+
+- root/signal/hit-times manifests читаются только по explicit paths;
+- strict schema version / manifest kind / required keys;
+- `sha256` каждого referenced file;
+- `dtype` contract;
+- `shape` contract;
+- `axis_order` contract;
+- monotonic `open_time` и `close_time`;
+- signal value set `{-1,0,1}`;
+- mapping bounds относительно `1m` timeline;
+- hit-time monotonicity;
+- `provenance` field presence/format.
+
+Диагностики должны быть:
+
+- structured;
+- deterministic by artifact order;
+- stable for the same invalid slot contents.
+
+Runtime hot path не делает эти проверки повторно.
+Runtime читает fixed metadata из manifests и не recompute'ит schema facts на месте.
 
 ## Кодовый контракт
 

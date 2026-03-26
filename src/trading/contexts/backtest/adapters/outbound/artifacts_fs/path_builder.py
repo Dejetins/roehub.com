@@ -14,13 +14,20 @@ from trading.contexts.backtest.application.services.v2.contracts import (
     CURRENT_ARTIFACT_POINTER_FILENAME_V2,
     HIT_TIMES_DIRECTORY_LITERAL_V2,
     HIT_TIMES_TIMEFRAME_LITERAL_V2,
+    LONG_SL_FILENAME_V2,
+    LONG_TP_FILENAME_V2,
     MAPPINGS_DIRECTORY_LITERAL_V2,
     OHLCV_FILENAME_V2,
     OPEN_TIME_FILENAME_V2,
     PRICES_DIRECTORY_LITERAL_V2,
+    SHORT_SL_FILENAME_V2,
+    SHORT_TP_FILENAME_V2,
     SIGNALS_DIRECTORY_LITERAL_V2,
     SIGNALS_FILENAME_V2,
+    SL_VALUES_FILENAME_V2,
+    TP_VALUES_FILENAME_V2,
     ArtifactCoordinatesV2,
+    ArtifactHitTimesPathsV2,
     ArtifactMappingPathsV2,
     ArtifactPricePathsV2,
     ArtifactSignalPathsV2,
@@ -306,6 +313,46 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             / HIT_TIMES_DIRECTORY_LITERAL_V2
             / validate_hit_times_timeframe_v2(HIT_TIMES_TIMEFRAME_LITERAL_V2)
             / ARTIFACT_MANIFEST_FILENAME_V2
+        )
+
+    def hit_times_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+    ) -> ArtifactHitTimesPathsV2:
+        """
+        Resolve explicit paths for the fixed `hit_times/1m/` artifact family.
+
+        Args:
+            coordinates: Validated artifact coordinates.
+            slot: Candidate slot literal.
+        Returns:
+            ArtifactHitTimesPathsV2: Deterministic path set for hit-times artifacts.
+        Assumptions:
+            R2-03 keeps hit-times files under one fixed `hit_times/1m/` directory.
+        Raises:
+            ValueError: If coordinates or slot are invalid.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+        """
+        hit_times_directory = (
+            self.slot_root(coordinates, slot)
+            / HIT_TIMES_DIRECTORY_LITERAL_V2
+            / validate_hit_times_timeframe_v2(HIT_TIMES_TIMEFRAME_LITERAL_V2)
+        )
+        return ArtifactHitTimesPathsV2(
+            manifest=hit_times_directory / ARTIFACT_MANIFEST_FILENAME_V2,
+            tp_values=hit_times_directory / TP_VALUES_FILENAME_V2,
+            sl_values=hit_times_directory / SL_VALUES_FILENAME_V2,
+            long_tp=hit_times_directory / LONG_TP_FILENAME_V2,
+            long_sl=hit_times_directory / LONG_SL_FILENAME_V2,
+            short_tp=hit_times_directory / SHORT_TP_FILENAME_V2,
+            short_sl=hit_times_directory / SHORT_SL_FILENAME_V2,
         )
 
     def _timeframe_directory(

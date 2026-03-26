@@ -1,6 +1,6 @@
-# Runbook — Backtest Artifacts Rebuild / Publish (R2-02)
+# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03)
 
-Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в `artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning и publish guard.
+Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в `artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning, publish guard и strict manifest validation.
 
 Основные документы:
 
@@ -85,12 +85,20 @@
 
 Перед switch нужно explicit проверить весь inactive slot:
 
-- `manifest.yaml` существует и читается;
-- все expected `prices/*`, `signals/*`, `mappings/*`, `hit_times/*` присутствуют;
+- root `manifest.yaml` schema валиден;
+- `signals/<tf>/<indicator_id>/manifest.yaml` schema валидны;
+- `hit_times/1m/manifest.yaml` schema валиден;
+- все referenced `prices/*`, `signals/*`, `mappings/*`, `hit_times/*` присутствуют;
+- `sha256` совпадает с содержимым файлов;
+- `dtype`, `shape`, `axis_order` совпадают с manifest contracts;
+- `open_time` / `close_time` monotonic;
+- signal value set ограничен `{-1,0,1}`;
+- mapping bounds валидны относительно `1m`;
+- hit-time monotonicity выполняется;
 - validation идёт только по явным path targets/timeframes/indicator ids;
 - hidden scanning / best-effort discovery не допускаются.
 
-Если любой required path отсутствует, publish останавливается без изменения `current.yaml`.
+Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.
 
 ## Шаг 5. atomically switch current.yaml
 
@@ -116,8 +124,13 @@ published_at_utc: "2026-03-26T03:04:05Z"
 ## Что считается ошибкой
 
 - missing/extra field в `current.yaml`;
+- missing/extra field в root/signal/hit-times manifests;
 - unsupported `schema_version`;
 - invalid `active_slot`, `slot_generation`, `asof_date`, `manifest_sha256`, `published_at_utc`;
+- invalid `dtype`, `shape`, `axis_order`, `sha256`, `provenance`;
+- invalid signal value set `{-1,0,1}`;
+- invalid mapping bounds;
+- invalid hit-time monotonicity;
 - попытка rebuild inactive slot при active pin;
 - missing explicit validation path;
 - любой non-atomic pointer write.

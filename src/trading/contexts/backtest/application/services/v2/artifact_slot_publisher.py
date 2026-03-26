@@ -10,6 +10,7 @@ from typing import Callable
 
 from trading.contexts.backtest.application.ports import BacktestJobRepository
 
+from .artifact_manifest_validator import BacktestArtifactManifestValidatorV2
 from .contracts import (
     CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
     ArtifactCoordinatesV2,
@@ -18,6 +19,7 @@ from .contracts import (
     ArtifactPublishResultV2,
     ArtifactSlotValidationResultV2,
     ArtifactSlotValidationSpecV2,
+    ArtifactValidationDiagnosticV2,
     BacktestArtifactCurrentPointerWriterV2,
     BacktestArtifactLoaderV2,
     artifact_market_id_from_coordinates_v2,
@@ -64,13 +66,20 @@ class ArtifactSlotPublishErrorV2(Exception):
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
     """
 
-    def __init__(self, *, code: str, message: str) -> None:
+    def __init__(
+        self,
+        *,
+        code: str,
+        message: str,
+        diagnostics: tuple[ArtifactValidationDiagnosticV2, ...] = (),
+    ) -> None:
         """
         Store deterministic publish failure code and message.
 
         Args:
             code: Stable machine-readable error code.
             message: Stable human-readable failure message.
+            diagnostics: Optional structured validation diagnostics attached to the error.
         Returns:
             None.
         Assumptions:
@@ -87,6 +96,7 @@ class ArtifactSlotPublishErrorV2(Exception):
         """
         super().__init__(message)
         self.code = code
+        self.diagnostics = diagnostics
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,6 +188,7 @@ class BacktestArtifactSlotPublisherV2:
         *,
         precheck: ArtifactPublishPrecheckV2,
         validation_spec: ArtifactSlotValidationSpecV2,
+        expected_asof_date: str | None = None,
     ) -> ArtifactSlotValidationResultV2:
         """
         Validate an already-built inactive slot through explicit deterministic paths only.
@@ -185,6 +196,7 @@ class BacktestArtifactSlotPublisherV2:
         Args:
             precheck: Publish readiness snapshot resolved before build/switch.
             validation_spec: Explicit path-validation plan for the built inactive slot.
+            expected_asof_date: Optional strict `YYYY-MM-DD` literal expected from manifests.
         Returns:
             ArtifactSlotValidationResultV2: Validated slot manifest identity and plan snapshot.
         Assumptions:
@@ -203,56 +215,22 @@ class BacktestArtifactSlotPublisherV2:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
         self._ensure_precheck_ready(precheck)
-
-        slot_manifest = self.artifact_loader.load_slot_manifest(
-            precheck.coordinates,
-            precheck.inactive_slot,
-        )
-        for timeframe in validation_spec.price_timeframes:
-            price_paths = self.artifact_loader.resolve_price_paths(
-                precheck.coordinates,
-                precheck.inactive_slot,
-                timeframe,
-            )
-            _require_existing_path_v2(price_paths.open_time, "price open_time")
-            _require_existing_path_v2(price_paths.close_time, "price close_time")
-            _require_existing_path_v2(price_paths.ohlcv, "price ohlcv")
-
-        for timeframe in validation_spec.mapping_timeframes:
-            mapping_paths = self.artifact_loader.resolve_mapping_paths(
-                precheck.coordinates,
-                precheck.inactive_slot,
-                timeframe,
-            )
-            _require_existing_path_v2(mapping_paths.bar_open_1m_idx, "mapping bar_open_1m_idx")
-            _require_existing_path_v2(
-                mapping_paths.bar_close_1m_idx,
-                "mapping bar_close_1m_idx",
-            )
-
-        for signal_artifact in validation_spec.signal_artifacts:
-            signal_paths = self.artifact_loader.resolve_signal_paths(
-                precheck.coordinates,
-                precheck.inactive_slot,
-                signal_artifact.timeframe,
-                signal_artifact.indicator_id,
-            )
-            _require_existing_path_v2(signal_paths.manifest, "signal manifest")
-            _require_existing_path_v2(signal_paths.signals, "signal payload")
-
-        if validation_spec.require_hit_times_manifest:
-            hit_times_manifest_path = self.artifact_loader.resolve_hit_times_manifest_path(
-                precheck.coordinates,
-                precheck.inactive_slot,
-            )
-            _require_existing_path_v2(hit_times_manifest_path, "hit_times manifest")
-
-        return ArtifactSlotValidationResultV2(
+        validator = BacktestArtifactManifestValidatorV2(artifact_loader=self.artifact_loader)
+        validation = validator.validate_slot(
+            coordinates=precheck.coordinates,
             slot=precheck.inactive_slot,
-            slot_manifest=slot_manifest,
-            manifest_sha256=_file_sha256_hex_v2(slot_manifest.path),
             validation_spec=validation_spec,
+            expected_asof_date=expected_asof_date,
+            expected_slot_generation=precheck.current_pointer.slot_generation + 1,
         )
+        if len(validation.diagnostics) > 0:
+            first_diagnostic = validation.diagnostics[0]
+            raise ArtifactSlotPublishErrorV2(
+                code="slot_validation_failed",
+                message=first_diagnostic.message,
+                diagnostics=validation.diagnostics,
+            )
+        return validation
 
     def publish(
         self,
@@ -289,7 +267,14 @@ class BacktestArtifactSlotPublisherV2:
         validation = self.validate_inactive_slot(
             precheck=precheck,
             validation_spec=validation_spec,
+            expected_asof_date=validated_asof_date,
         )
+        if validation.manifest_sha256 is None:
+            raise ArtifactSlotPublishErrorV2(
+                code="slot_validation_failed",
+                message="slot validation did not produce manifest_sha256",
+                diagnostics=validation.diagnostics,
+            )
         published_at_utc = _utc_now_literal_v2(self.now_provider())
         next_slot_generation = precheck.current_pointer.slot_generation + 1
         raw_pointer_payload = {

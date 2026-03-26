@@ -9,7 +9,8 @@
 - Jobs API: `docs/architecture/backtest/backtest-jobs-api-v1.md`
 - Jobs worker: `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
-- Artifact store v2 layout/publish/pinning contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- Artifact store v2 layout/publish/pinning/validator contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- Precompute runner v2 manifest/validator contract: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Artifact rebuild/publish runbook: `docs/runbooks/backtest-artifacts-rebuild.md`
 
 ## Актуальная политика rollout

@@ -1,0 +1,1128 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from hashlib import sha256
+from pathlib import Path
+from typing import Any, Mapping
+
+import numpy as np
+import yaml
+
+from trading.contexts.backtest.adapters.outbound.artifacts_fs import BacktestArtifactPathBuilderV2
+from trading.contexts.backtest.application.services import (
+    ArtifactCoordinatesV2,
+    ArtifactSignalValidationSpecV2,
+    ArtifactSlotLiteralV2,
+    ArtifactSlotValidationSpecV2,
+    YamlBacktestArtifactLoaderV2,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class SyntheticArtifactStoreV2:
+    """
+    Synthetic artifact store fixture with deterministic strict manifests and `.npy` payloads.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py
+    """
+
+    builder: BacktestArtifactPathBuilderV2
+    loader: YamlBacktestArtifactLoaderV2
+    coordinates: ArtifactCoordinatesV2
+    validation_spec: ArtifactSlotValidationSpecV2
+    active_slot: ArtifactSlotLiteralV2
+    inactive_slot: ArtifactSlotLiteralV2
+
+
+def build_synthetic_artifact_store_v2(
+    *,
+    tmp_path: Path,
+    active_slot: ArtifactSlotLiteralV2 = "slot_a",
+    current_slot_generation: int = 4,
+    inactive_slot_generation: int = 5,
+    inactive_signal_values: np.ndarray | None = None,
+    inactive_mapping_open_idx: np.ndarray | None = None,
+    inactive_mapping_close_idx: np.ndarray | None = None,
+    inactive_long_tp: np.ndarray | None = None,
+    inactive_long_sl: np.ndarray | None = None,
+    inactive_short_tp: np.ndarray | None = None,
+    inactive_short_sl: np.ndarray | None = None,
+    omit_inactive_files: tuple[str, ...] = (),
+) -> SyntheticArtifactStoreV2:
+    """
+    Build a deterministic two-slot artifact tree with strict R2-03 manifests under `tmp_path`.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+        active_slot: Slot literal referenced by `current.yaml`.
+        current_slot_generation: Current published slot generation.
+        inactive_slot_generation: Slot generation written into the inactive slot manifests.
+        inactive_signal_values: Optional override for the inactive signal matrix.
+        inactive_mapping_open_idx: Optional override for inactive `bar_open_1m_idx`.
+        inactive_mapping_close_idx: Optional override for inactive `bar_close_1m_idx`.
+        inactive_long_tp: Optional override for inactive `long_tp`.
+        inactive_long_sl: Optional override for inactive `long_sl`.
+        inactive_short_tp: Optional override for inactive `short_tp`.
+        inactive_short_sl: Optional override for inactive `short_sl`.
+        omit_inactive_files: Optional tuple of slot-relative paths to skip for the inactive slot.
+    Returns:
+        SyntheticArtifactStoreV2: Builder, loader, coordinates, validation spec, and slot ids.
+    Assumptions:
+        Tests need a valid strict artifact store by default and mutate only the inactive slot.
+    Raises:
+        OSError: If one synthetic artifact file cannot be written.
+    Side Effects:
+        Creates a deterministic artifact tree under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_yaml_backtest_artifact_loader_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py
+    """
+    builder = BacktestArtifactPathBuilderV2(root=tmp_path / "artifacts" / "backtest" / "v2")
+    loader = YamlBacktestArtifactLoaderV2(path_resolver=builder)
+    coordinates = ArtifactCoordinatesV2(
+        exchange="binance",
+        market_type="spot",
+        symbol="BTCUSDT",
+    )
+    inactive_slot: ArtifactSlotLiteralV2 = "slot_b" if active_slot == "slot_a" else "slot_a"
+    validation_spec = ArtifactSlotValidationSpecV2(
+        price_timeframes=("1m", "15m"),
+        mapping_timeframes=("15m",),
+        signal_artifacts=(
+            ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema"),
+        ),
+        require_hit_times_manifest=True,
+    )
+
+    _write_slot_payloads(
+        builder=builder,
+        coordinates=coordinates,
+        slot=active_slot,
+        slot_generation=current_slot_generation,
+        asof_date="2026-03-25",
+        signal_values=_default_signal_values(),
+        mapping_open_idx=_default_mapping_open_idx(),
+        mapping_close_idx=_default_mapping_close_idx(),
+        long_tp=_default_long_tp(),
+        long_sl=_default_long_sl(),
+        short_tp=_default_short_tp(),
+        short_sl=_default_short_sl(),
+        omit_files=(),
+    )
+    _write_slot_payloads(
+        builder=builder,
+        coordinates=coordinates,
+        slot=inactive_slot,
+        slot_generation=inactive_slot_generation,
+        asof_date="2026-03-26",
+        signal_values=(
+            inactive_signal_values.copy()
+            if inactive_signal_values is not None
+            else _default_signal_values()
+        ),
+        mapping_open_idx=(
+            inactive_mapping_open_idx.copy()
+            if inactive_mapping_open_idx is not None
+            else _default_mapping_open_idx()
+        ),
+        mapping_close_idx=(
+            inactive_mapping_close_idx.copy()
+            if inactive_mapping_close_idx is not None
+            else _default_mapping_close_idx()
+        ),
+        long_tp=inactive_long_tp.copy() if inactive_long_tp is not None else _default_long_tp(),
+        long_sl=inactive_long_sl.copy() if inactive_long_sl is not None else _default_long_sl(),
+        short_tp=(
+            inactive_short_tp.copy() if inactive_short_tp is not None else _default_short_tp()
+        ),
+        short_sl=(
+            inactive_short_sl.copy() if inactive_short_sl is not None else _default_short_sl()
+        ),
+        omit_files=omit_inactive_files,
+    )
+
+    current_pointer_payload = {
+        "schema_version": 1,
+        "active_slot": active_slot,
+        "slot_generation": current_slot_generation,
+        "asof_date": "2026-03-25",
+        "manifest_sha256": _file_sha256_hex_v2(
+            builder.slot_manifest_path(coordinates, active_slot)
+        ),
+        "published_at_utc": "2026-03-25T02:00:00Z",
+    }
+    _write_yaml(
+        builder.current_pointer_path(coordinates),
+        current_pointer_payload,
+    )
+
+    return SyntheticArtifactStoreV2(
+        builder=builder,
+        loader=loader,
+        coordinates=coordinates,
+        validation_spec=validation_spec,
+        active_slot=active_slot,
+        inactive_slot=inactive_slot,
+    )
+
+
+def _write_slot_payloads(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    slot_generation: int,
+    asof_date: str,
+    signal_values: np.ndarray,
+    mapping_open_idx: np.ndarray,
+    mapping_close_idx: np.ndarray,
+    long_tp: np.ndarray,
+    long_sl: np.ndarray,
+    short_tp: np.ndarray,
+    short_sl: np.ndarray,
+    omit_files: tuple[str, ...],
+) -> None:
+    """
+    Write one complete slot payload with strict manifests and artifact files.
+
+    Args:
+        builder: Deterministic artifact path builder.
+        coordinates: Artifact coordinates under test.
+        slot: Slot literal to populate.
+        slot_generation: Slot generation written into manifests.
+        asof_date: As-of date literal written into manifests.
+        signal_values: Signal matrix for `signals/15m/ma.ema/signals.i8.npy`.
+        mapping_open_idx: Mapping open indexes for `mappings/15m/bar_open_1m_idx.u32.npy`.
+        mapping_close_idx: Mapping close indexes for `mappings/15m/bar_close_1m_idx.u32.npy`.
+        long_tp: Hit-times `long_tp`.
+        long_sl: Hit-times `long_sl`.
+        short_tp: Hit-times `short_tp`.
+        short_sl: Hit-times `short_sl`.
+        omit_files: Optional tuple of slot-relative file paths to skip.
+    Returns:
+        None.
+    Assumptions:
+        Helper writes files first, then signal/hit manifests, then root manifest for hash linking.
+    Raises:
+        OSError: If one file cannot be written.
+    Side Effects:
+        Creates files and manifests under one slot root.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    one_minute_open_time = np.array([1000, 2000, 3000, 4000], dtype=np.int64)
+    one_minute_close_time = np.array([1599, 2599, 3599, 4599], dtype=np.int64)
+    one_minute_ohlcv = np.array(
+        [
+            [1.0, 1.1, 0.9, 1.05, 10.0],
+            [1.05, 1.15, 1.0, 1.1, 12.0],
+            [1.1, 1.2, 1.05, 1.15, 9.0],
+            [1.15, 1.25, 1.1, 1.2, 11.0],
+        ],
+        dtype=np.float32,
+    )
+    fifteen_minute_open_time = np.array([1000, 3000], dtype=np.int64)
+    fifteen_minute_close_time = np.array([2599, 4599], dtype=np.int64)
+    fifteen_minute_ohlcv = np.array(
+        [
+            [1.0, 1.15, 0.9, 1.1, 22.0],
+            [1.1, 1.25, 1.05, 1.2, 20.0],
+        ],
+        dtype=np.float32,
+    )
+    tp_values = np.array([0.01, 0.02], dtype=np.float32)
+    sl_values = np.array([0.01, 0.02], dtype=np.float32)
+
+    price_1m_paths = builder.price_paths(coordinates, slot, "1m")
+    price_15m_paths = builder.price_paths(coordinates, slot, "15m")
+    mapping_paths = builder.mapping_paths(coordinates, slot, "15m")
+    signal_paths = builder.signal_paths(coordinates, slot, "15m", "ma.ema")
+    hit_times_paths = builder.hit_times_paths(coordinates, slot)
+
+    _write_npy_if_needed(
+        price_1m_paths.open_time,
+        one_minute_open_time,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            price_1m_paths.open_time,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        price_1m_paths.close_time,
+        one_minute_close_time,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            price_1m_paths.close_time,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        price_1m_paths.ohlcv,
+        one_minute_ohlcv,
+        slot_relative_path=_slot_relative_path(builder, coordinates, slot, price_1m_paths.ohlcv),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        price_15m_paths.open_time,
+        fifteen_minute_open_time,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            price_15m_paths.open_time,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        price_15m_paths.close_time,
+        fifteen_minute_close_time,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            price_15m_paths.close_time,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        price_15m_paths.ohlcv,
+        fifteen_minute_ohlcv,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            price_15m_paths.ohlcv,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        mapping_paths.bar_open_1m_idx,
+        mapping_open_idx,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            mapping_paths.bar_open_1m_idx,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        mapping_paths.bar_close_1m_idx,
+        mapping_close_idx,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            mapping_paths.bar_close_1m_idx,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        signal_paths.signals,
+        signal_values,
+        slot_relative_path=_slot_relative_path(builder, coordinates, slot, signal_paths.signals),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        hit_times_paths.tp_values,
+        tp_values,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            hit_times_paths.tp_values,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        hit_times_paths.sl_values,
+        sl_values,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            hit_times_paths.sl_values,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        hit_times_paths.long_tp,
+        long_tp,
+        slot_relative_path=_slot_relative_path(builder, coordinates, slot, hit_times_paths.long_tp),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        hit_times_paths.long_sl,
+        long_sl,
+        slot_relative_path=_slot_relative_path(builder, coordinates, slot, hit_times_paths.long_sl),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        hit_times_paths.short_tp,
+        short_tp,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            hit_times_paths.short_tp,
+        ),
+        omit_files=omit_files,
+    )
+    _write_npy_if_needed(
+        hit_times_paths.short_sl,
+        short_sl,
+        slot_relative_path=_slot_relative_path(
+            builder,
+            coordinates,
+            slot,
+            hit_times_paths.short_sl,
+        ),
+        omit_files=omit_files,
+    )
+
+    signal_manifest_payload = {
+        "schema_version": 1,
+        "manifest_kind": "signal",
+        "slot": slot,
+        "slot_generation": slot_generation,
+        "asof_date": asof_date,
+        "indicator_id": "ma.ema",
+        "timeframe": "15m",
+        "signals": _array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=signal_paths.signals,
+        ),
+        "rows_count": int(signal_values.shape[0]),
+        "timeline": _timeline_payload(
+            open_time=fifteen_minute_open_time,
+            close_time=fifteen_minute_close_time,
+        ),
+        "signal_value_set": [-1, 0, 1],
+        "grid": {
+            "variant_key_version": 1,
+            "variant_keys_sha256": "d" * 64,
+            "signals_v1_params_defaults": {"source": "close"},
+        },
+        "provenance": _provenance_payload(),
+    }
+    if _slot_relative_path(builder, coordinates, slot, signal_paths.manifest) not in omit_files:
+        _write_yaml(signal_paths.manifest, signal_manifest_payload)
+
+    hit_times_manifest_payload = {
+        "schema_version": 1,
+        "manifest_kind": "hit_times_1m",
+        "slot": slot,
+        "slot_generation": slot_generation,
+        "asof_date": asof_date,
+        "timeframe": "1m",
+        "timeline_bar_count": int(one_minute_open_time.shape[0]),
+        "sentinel_index": int(one_minute_open_time.shape[0]),
+        "tp_values": _level_array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=hit_times_paths.tp_values,
+        ),
+        "sl_values": _level_array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=hit_times_paths.sl_values,
+        ),
+        "tables": {
+            "long_tp": _hit_times_table_payload(
+                builder=builder,
+                coordinates=coordinates,
+                slot=slot,
+                absolute_path=hit_times_paths.long_tp,
+            ),
+            "long_sl": _hit_times_table_payload(
+                builder=builder,
+                coordinates=coordinates,
+                slot=slot,
+                absolute_path=hit_times_paths.long_sl,
+            ),
+            "short_tp": _hit_times_table_payload(
+                builder=builder,
+                coordinates=coordinates,
+                slot=slot,
+                absolute_path=hit_times_paths.short_tp,
+            ),
+            "short_sl": _hit_times_table_payload(
+                builder=builder,
+                coordinates=coordinates,
+                slot=slot,
+                absolute_path=hit_times_paths.short_sl,
+            ),
+        },
+        "provenance": _provenance_payload(),
+    }
+    if _slot_relative_path(builder, coordinates, slot, hit_times_paths.manifest) not in omit_files:
+        _write_yaml(hit_times_paths.manifest, hit_times_manifest_payload)
+
+    root_manifest_payload = {
+        "schema_version": 1,
+        "manifest_kind": "slot_root",
+        "slot": slot,
+        "slot_generation": slot_generation,
+        "asof_date": asof_date,
+        "identity": {
+            "exchange": coordinates.exchange,
+            "market_type": coordinates.market_type,
+            "symbol": coordinates.symbol,
+        },
+        "prices": [
+            _price_manifest_payload(
+                builder=builder,
+                coordinates=coordinates,
+                slot=slot,
+                timeframe="1m",
+                open_time_path=price_1m_paths.open_time,
+                close_time_path=price_1m_paths.close_time,
+                ohlcv_path=price_1m_paths.ohlcv,
+                open_time=one_minute_open_time,
+                close_time=one_minute_close_time,
+            ),
+            _price_manifest_payload(
+                builder=builder,
+                coordinates=coordinates,
+                slot=slot,
+                timeframe="15m",
+                open_time_path=price_15m_paths.open_time,
+                close_time_path=price_15m_paths.close_time,
+                ohlcv_path=price_15m_paths.ohlcv,
+                open_time=fifteen_minute_open_time,
+                close_time=fifteen_minute_close_time,
+            ),
+        ],
+        "mappings": [
+            {
+                "timeframe": "15m",
+                "bar_open_1m_idx": _array_metadata_payload(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    absolute_path=mapping_paths.bar_open_1m_idx,
+                ),
+                "bar_close_1m_idx": _array_metadata_payload(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    absolute_path=mapping_paths.bar_close_1m_idx,
+                ),
+            }
+        ],
+        "signals": {
+            "supported_timeframes": ["15m"],
+            "supported_indicator_ids": ["ma.ema"],
+            "manifests": [
+                {
+                    "timeframe": "15m",
+                    "indicator_id": "ma.ema",
+                    "manifest_path": _slot_relative_path(
+                        builder,
+                        coordinates,
+                        slot,
+                        signal_paths.manifest,
+                    ),
+                    "manifest_sha256": _file_sha256_hex_v2(signal_paths.manifest),
+                }
+            ],
+        },
+        "hit_times": {
+            "timeframe": "1m",
+            "manifest_path": _slot_relative_path(
+                builder,
+                coordinates,
+                slot,
+                hit_times_paths.manifest,
+            ),
+            "manifest_sha256": _file_sha256_hex_v2(hit_times_paths.manifest),
+        },
+        "signal_encoding": {
+            "dtype": "int8",
+            "axis_order": ["variant", "time"],
+            "value_set": [-1, 0, 1],
+        },
+        "provenance": _provenance_payload(),
+    }
+    root_manifest_relative_path = _slot_relative_path(
+        builder,
+        coordinates,
+        slot,
+        builder.slot_manifest_path(coordinates, slot),
+    )
+    if root_manifest_relative_path not in omit_files:
+        _write_yaml(builder.slot_manifest_path(coordinates, slot), root_manifest_payload)
+
+    for omitted_relative_path in omit_files:
+        omitted_path = builder.slot_root(coordinates, slot) / omitted_relative_path
+        if omitted_path.exists():
+            omitted_path.unlink()
+
+
+def _price_manifest_payload(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    timeframe: str,
+    open_time_path: Path,
+    close_time_path: Path,
+    ohlcv_path: Path,
+    open_time: np.ndarray,
+    close_time: np.ndarray,
+) -> dict[str, Any]:
+    """
+    Build one strict root-manifest price section payload.
+
+    Args:
+        builder: Deterministic artifact path builder.
+        coordinates: Artifact coordinates under test.
+        slot: Slot literal being serialized.
+        timeframe: Price timeframe literal.
+        open_time_path: Absolute `open_time` path.
+        close_time_path: Absolute `close_time` path.
+        ohlcv_path: Absolute `ohlcv` path.
+        open_time: Materialized open-time array.
+        close_time: Materialized close-time array.
+    Returns:
+        dict[str, Any]: Strict root-manifest price section payload.
+    Assumptions:
+        OHLCV arrays always use shape `(T, 5)` in this synthetic fixture.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return {
+        "timeframe": timeframe,
+        "open_time": _array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=open_time_path,
+        ),
+        "close_time": _array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=close_time_path,
+        ),
+        "ohlcv": _array_metadata_payload(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            absolute_path=ohlcv_path,
+        ),
+        "coverage": _timeline_payload(open_time=open_time, close_time=close_time),
+    }
+
+
+def _array_metadata_payload(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    absolute_path: Path,
+) -> dict[str, Any]:
+    """
+    Build one strict array metadata payload from an existing `.npy` file.
+
+    Args:
+        builder: Deterministic artifact path builder.
+        coordinates: Artifact coordinates under test.
+        slot: Slot literal being serialized.
+        absolute_path: Absolute `.npy` path.
+    Returns:
+        dict[str, Any]: Strict array metadata payload.
+    Assumptions:
+        Arrays were already written to disk before metadata generation.
+    Raises:
+        FileNotFoundError: If the file does not exist.
+    Side Effects:
+        Reads the `.npy` file from disk to derive dtype and shape.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    array = np.load(absolute_path, mmap_mode="r", allow_pickle=False)
+    return {
+        "path": _slot_relative_path(builder, coordinates, slot, absolute_path),
+        "dtype": array.dtype.name,
+        "shape": [int(value) for value in array.shape],
+        "axis_order": _axis_order_for_shape(array.shape),
+        "sha256": _file_sha256_hex_v2(absolute_path),
+    }
+
+
+def _hit_times_table_payload(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    absolute_path: Path,
+) -> dict[str, Any]:
+    """
+    Build one strict hit-times table metadata payload from an existing `.npy` file.
+
+    Args:
+        builder: Deterministic artifact path builder.
+        coordinates: Artifact coordinates under test.
+        slot: Slot literal being serialized.
+        absolute_path: Absolute hit-times table path.
+    Returns:
+        dict[str, Any]: Strict hit-times table payload.
+    Assumptions:
+        Table arrays were already written to disk before metadata generation.
+    Raises:
+        FileNotFoundError: If the file does not exist.
+    Side Effects:
+        Reads the `.npy` file from disk to derive dtype and shape.
+    Docs:
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    payload = _array_metadata_payload(
+        builder=builder,
+        coordinates=coordinates,
+        slot=slot,
+        absolute_path=absolute_path,
+    )
+    payload["monotonicity"] = "non_decreasing_by_level"
+    return payload
+
+
+def _level_array_metadata_payload(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    absolute_path: Path,
+) -> dict[str, Any]:
+    """
+    Build strict metadata payload for one hit-times level grid array.
+
+    Args:
+        builder: Deterministic artifact path builder.
+        coordinates: Artifact coordinates under test.
+        slot: Slot literal being serialized.
+        absolute_path: Absolute grid-array path.
+    Returns:
+        dict[str, Any]: Strict array metadata payload with `axis_order=['level']`.
+    Assumptions:
+        TP/SL level arrays are one-dimensional and use the `level` axis contract.
+    Raises:
+        FileNotFoundError: If the file does not exist.
+    Side Effects:
+        Reads the `.npy` file from disk to derive dtype and shape.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    payload = _array_metadata_payload(
+        builder=builder,
+        coordinates=coordinates,
+        slot=slot,
+        absolute_path=absolute_path,
+    )
+    payload["axis_order"] = ["level"]
+    return payload
+
+
+def _timeline_payload(*, open_time: np.ndarray, close_time: np.ndarray) -> dict[str, Any]:
+    """
+    Build strict timeline coverage payload from paired open/close arrays.
+
+    Args:
+        open_time: Open-time integer array.
+        close_time: Close-time integer array.
+    Returns:
+        dict[str, Any]: Strict timeline coverage payload.
+    Assumptions:
+        Arrays are non-empty and aligned by row count.
+    Raises:
+        IndexError: If one array is empty.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return {
+        "bar_count": int(open_time.shape[0]),
+        "open_time_start": int(open_time[0]),
+        "open_time_end": int(open_time[-1]),
+        "close_time_start": int(close_time[0]),
+        "close_time_end": int(close_time[-1]),
+    }
+
+
+def _provenance_payload() -> dict[str, Any]:
+    """
+    Build a deterministic provenance payload used by all synthetic manifests.
+
+    Args:
+        None.
+    Returns:
+        dict[str, Any]: Strict provenance payload.
+    Assumptions:
+        Synthetic tests need stable non-empty provenance and hash literals only.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return {
+        "generator": "backtest-precompute-runner-v2",
+        "generator_version": "r2-03",
+        "generated_at_utc": "2026-03-26T03:00:00Z",
+        "config_sha256": "a" * 64,
+        "inputs_sha256": "b" * 64,
+    }
+
+
+def _write_yaml(path: Path, payload: Mapping[str, Any]) -> None:
+    """
+    Write one YAML payload with deterministic field order.
+
+    Args:
+        path: Target file path.
+        payload: YAML payload to serialize.
+    Returns:
+        None.
+    Assumptions:
+        Callers already prepared a deterministic key order in the input mapping.
+    Raises:
+        OSError: If the file cannot be written.
+    Side Effects:
+        Creates parent directories and writes UTF-8 YAML to disk.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _write_npy_if_needed(
+    path: Path,
+    array: np.ndarray,
+    *,
+    slot_relative_path: str,
+    omit_files: tuple[str, ...],
+) -> None:
+    """
+    Write one `.npy` file unless the caller requested to omit that exact relative path.
+
+    Args:
+        path: Target `.npy` path.
+        array: Array payload to serialize.
+        slot_relative_path: Slot-relative path literal used for omit matching.
+        omit_files: Tuple of slot-relative paths to skip.
+    Returns:
+        None.
+    Assumptions:
+        Missing-file tests omit only inactive-slot files after metadata generation design time.
+    Raises:
+        OSError: If the file cannot be written.
+    Side Effects:
+        Creates parent directories and writes `.npy` bytes to disk.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("wb") as file_handle:
+        np.save(file_handle, array, allow_pickle=False)
+
+
+def _slot_relative_path(
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: ArtifactSlotLiteralV2,
+    absolute_path: Path,
+) -> str:
+    """
+    Convert one absolute slot-local path into the canonical slot-relative literal.
+
+    Args:
+        builder: Deterministic artifact path builder.
+        coordinates: Artifact coordinates under test.
+        slot: Slot literal being serialized.
+        absolute_path: Absolute file path under the slot root.
+    Returns:
+        str: POSIX-style slot-relative path literal.
+    Assumptions:
+        All synthetic artifact paths live strictly under the slot root.
+    Raises:
+        ValueError: If the path is outside the slot root.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return absolute_path.relative_to(builder.slot_root(coordinates, slot)).as_posix()
+
+
+def _axis_order_for_shape(shape: tuple[int, ...]) -> list[str]:
+    """
+    Infer the deterministic axis-order literal used by the synthetic strict manifests.
+
+    Args:
+        shape: Array shape tuple.
+    Returns:
+        list[str]: Canonical axis-order literal list for the array family.
+    Assumptions:
+        Synthetic fixture uses only the fixed artifact families needed by R2-03 tests.
+    Raises:
+        ValueError: If shape does not match one of the supported artifact families.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    if shape == (4,) or shape == (2,):
+        return ["time"]
+    if shape == (4, 5) or shape == (2, 5):
+        return ["time", "field"]
+    if shape == (2, 2):
+        return ["variant", "time"]
+    if shape == (2, 4):
+        return ["level", "time"]
+    raise ValueError(f"unsupported synthetic shape for axis order inference: {shape!r}")
+
+
+def _file_sha256_hex_v2(path: Path) -> str:
+    """
+    Compute a lowercase SHA-256 hex digest for one file.
+
+    Args:
+        path: Existing file path to hash.
+    Returns:
+        str: Lowercase SHA-256 hex digest.
+    Assumptions:
+        Synthetic tests use file hashes to mirror strict publish-time manifest contracts.
+    Raises:
+        OSError: If the file cannot be read.
+    Side Effects:
+        Reads the file from disk in binary mode.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    digest = sha256()
+    with path.open("rb") as file_handle:
+        for chunk in iter(lambda: file_handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _default_signal_values() -> np.ndarray:
+    """
+    Return the default valid synthetic signal matrix.
+
+    Args:
+        None.
+    Returns:
+        np.ndarray: Valid `int8` signal matrix with values from `{-1,0,1}`.
+    Assumptions:
+        Tests need a small deterministic `[variant, time]` signal fixture.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return np.array([[-1, 0], [1, 0]], dtype=np.int8)
+
+
+def _default_mapping_open_idx() -> np.ndarray:
+    """
+    Return the default valid synthetic mapping-open array.
+
+    Args:
+        None.
+    Returns:
+        np.ndarray: Valid monotone `uint32` open-index mapping array.
+    Assumptions:
+        Default mappings align `15m` bars to the four-bar synthetic `1m` timeline.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return np.array([0, 2], dtype=np.uint32)
+
+
+def _default_mapping_close_idx() -> np.ndarray:
+    """
+    Return the default valid synthetic mapping-close array.
+
+    Args:
+        None.
+    Returns:
+        np.ndarray: Valid monotone `uint32` close-index mapping array.
+    Assumptions:
+        Default mappings align `15m` bars to the four-bar synthetic `1m` timeline.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return np.array([1, 3], dtype=np.uint32)
+
+
+def _default_long_tp() -> np.ndarray:
+    """
+    Return the default valid synthetic `long_tp` hit-times table.
+
+    Args:
+        None.
+    Returns:
+        np.ndarray: Valid monotone `uint32` hit-times table.
+    Assumptions:
+        Table values stay within the four-bar sentinel contract.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return np.array([[1, 2, 4, 4], [1, 3, 4, 4]], dtype=np.uint32)
+
+
+def _default_long_sl() -> np.ndarray:
+    """
+    Return the default valid synthetic `long_sl` hit-times table.
+
+    Args:
+        None.
+    Returns:
+        np.ndarray: Valid monotone `uint32` hit-times table.
+    Assumptions:
+        Table values stay within the four-bar sentinel contract.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return np.array([[1, 2, 4, 4], [2, 3, 4, 4]], dtype=np.uint32)
+
+
+def _default_short_tp() -> np.ndarray:
+    """
+    Return the default valid synthetic `short_tp` hit-times table.
+
+    Args:
+        None.
+    Returns:
+        np.ndarray: Valid monotone `uint32` hit-times table.
+    Assumptions:
+        Table values stay within the four-bar sentinel contract.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return np.array([[1, 2, 4, 4], [2, 3, 4, 4]], dtype=np.uint32)
+
+
+def _default_short_sl() -> np.ndarray:
+    """
+    Return the default valid synthetic `short_sl` hit-times table.
+
+    Args:
+        None.
+    Returns:
+        np.ndarray: Valid monotone `uint32` hit-times table.
+    Assumptions:
+        Table values stay within the four-bar sentinel contract.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
+    """
+    return np.array([[1, 2, 4, 4], [1, 3, 4, 4]], dtype=np.uint32)
