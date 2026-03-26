@@ -112,8 +112,13 @@ R3-01 / R3-02 / R3-03 exception boundary:
   - `signals.manifests: []`
   - `hit_times.manifest_path: "hit_times/1m/manifest.yaml"`
   - `hit_times.manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"`
-- такой slot считается rebuild-only stage artifact и не должен публиковаться, пока validation plan
-  требует real `mappings/signals/hit_times`.
+- после R3-04 такой slot можно публиковать только через explicit prices+mappings stage spec:
+  - `price_timeframes` из `backtest_artifacts.validation_plan`
+  - `mapping_timeframes` из `backtest_artifacts.validation_plan`
+  - `signal_artifacts: []`
+  - `require_hit_times_manifest: false`
+- если использовать полный validation plan, такой slot по-прежнему не должен публиковаться, пока
+  later-stage plan требует real `signals/hit_times`.
 
 Минимально ожидаемые пути:
 
@@ -145,6 +150,9 @@ R3-01 / R3-02 / R3-03 exception boundary:
 - hit-time monotonicity выполняется;
 - validation plan берётся из `backtest_artifacts.validation_plan` и переводится в
   `ArtifactSlotValidationSpecV2`;
+- для R3-04 prices+mappings stage validation spec выводится явно из того же
+  `backtest_artifacts.validation_plan`, но с
+  `signal_artifacts=[]` и `require_hit_times_manifest=false`;
 - validation идёт только по явным path targets/timeframes/indicator ids;
 - hidden scanning / best-effort discovery не допускаются.
 
@@ -160,6 +168,7 @@ R3-01 / R3-02 / R3-03 exception boundary:
 - mapping tail rebuild bounded by `lookback_policy.mapping_tail_bars_1m`;
 - rebuild обязан валидировать epoch-aligned bucket boundaries и full-bucket coverage для rolled TF;
 - rebuild обязан валидировать mapping monotonicity, bounds и strict price correspondence;
+- publish разрешён для R3-04 только если explicit stage spec ограничен `prices+mappings`;
 - publish остаётся запрещённым, если active validation plan still expects later-stage artifacts.
 
 Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.

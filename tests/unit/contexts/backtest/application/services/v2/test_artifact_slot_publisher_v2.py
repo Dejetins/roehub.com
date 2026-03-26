@@ -17,9 +17,14 @@ from trading.contexts.backtest.adapters.outbound.config import (
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services import (
+    ArtifactCanonicalPriceExportRequestV2,
+    ArtifactCoordinatesV2,
     ArtifactSlotPublishErrorV2,
+    ArtifactSlotValidationSpecV2,
+    BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
 )
+from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
 
 class _FakeJobRepository:
@@ -77,6 +82,56 @@ class _FakeJobRepository:
             "artifact_manifest_hash": artifact_manifest_hash,
         }
         return self.blocked_total
+
+
+class _NeverCalledPrecomputeRunner:
+    """
+    Fake precompute runner used to assert publish precheck fails before any rebuild starts.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize the fake runner with a deterministic call flag.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Tests only need to know whether `export_canonical_price_1m(...)` was reached.
+        Raises:
+            None.
+        Side Effects:
+            Stores `called=False` in memory.
+        """
+        self.called = False
+
+    def export_canonical_price_1m(
+        self,
+        request: ArtifactCanonicalPriceExportRequestV2,
+    ) -> None:
+        """
+        Fail immediately because this fake runner must never be invoked in the guarded tests.
+
+        Args:
+            request: R3-04 build request that would have been forwarded to the real runner.
+        Returns:
+            None.
+        Assumptions:
+            Publisher precheck or stage-spec validation should stop the flow before any build.
+        Raises:
+            AssertionError: Always, because reaching this method means the guard order regressed.
+        Side Effects:
+            Sets `called=True` for assertions.
+        Docs:
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+        """
+        del request
+        self.called = True
+        raise AssertionError("precompute runner must not be called in this test")
 
 
 def _write_matching_artifact_runtime_config(tmp_path: Path) -> Path:
@@ -289,3 +344,125 @@ def test_backtest_artifact_slot_publisher_v2_rejects_missing_strict_artifact_fil
     assert len(error.diagnostics) > 0
     assert error.diagnostics[0].code == "artifact_file_missing"
     assert error.diagnostics[0].location == "prices[1m].ohlcv"
+
+
+def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_rejects_full_spec(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify the R3-04 stage API rejects validation specs that still require `signals/hit_times`.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Prices+mappings publish flow must keep stage scope explicit and must not infer it from
+        slot contents.
+    Raises:
+        AssertionError: If the fake runner is called or the stage API accepts a full spec.
+    Side Effects:
+        Creates temporary artifact files under `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+    """
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    runner = _NeverCalledPrecomputeRunner()
+    publisher = BacktestArtifactSlotPublisherV2(
+        artifact_loader=store.loader,
+        current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=store.builder),
+        job_repository=cast(BacktestJobRepository, _FakeJobRepository(blocked_total=0)),
+    )
+
+    with pytest.raises(ValueError, match="signal_artifacts=\\(\\)"):
+        publisher.build_publish_prices_mappings_slot(
+            request=_prices_mappings_request_v2(store.coordinates),
+            precompute_runner=cast(BacktestArtifactPrecomputeRunnerV2, runner),
+            validation_spec=store.validation_spec,
+        )
+
+    assert runner.called is False
+
+
+def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_stops_on_pinned_precheck(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Verify the R3-04 stage flow runs `precheck_publish` before attempting to build inactive slot.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Synthetic store already has an inactive-slot manifest, so the pin guard can detect
+        `inactive_slot_pinned`.
+    Raises:
+        AssertionError: If the fake runner is called or the stable error code changes.
+    Side Effects:
+        Creates temporary artifact files under `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+    """
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    runner = _NeverCalledPrecomputeRunner()
+    publisher = BacktestArtifactSlotPublisherV2(
+        artifact_loader=store.loader,
+        current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=store.builder),
+        job_repository=cast(BacktestJobRepository, _FakeJobRepository(blocked_total=2)),
+    )
+
+    with pytest.raises(ArtifactSlotPublishErrorV2) as error_info:
+        publisher.build_publish_prices_mappings_slot(
+            request=_prices_mappings_request_v2(store.coordinates),
+            precompute_runner=cast(BacktestArtifactPrecomputeRunnerV2, runner),
+            validation_spec=ArtifactSlotValidationSpecV2(
+                price_timeframes=("1m", "15m"),
+                mapping_timeframes=("15m",),
+                signal_artifacts=(),
+                require_hit_times_manifest=False,
+            ),
+        )
+
+    assert error_info.value.code == "inactive_slot_pinned"
+    assert runner.called is False
+
+
+def _prices_mappings_request_v2(
+    coordinates: ArtifactCoordinatesV2,
+) -> ArtifactCanonicalPriceExportRequestV2:
+    """
+    Build one deterministic R3-04 build request used by publisher-only unit tests.
+
+    Args:
+        coordinates: Artifact coordinates accepted by `ArtifactCanonicalPriceExportRequestV2`.
+    Returns:
+        ArtifactCanonicalPriceExportRequestV2: Deterministic request with a stable UTC range.
+    Assumptions:
+        Publisher-only tests never reach the real runner, so the concrete range contents do not
+        matter beyond satisfying strict request validation.
+    Raises:
+        ValueError: If the supplied coordinates violate strict artifact contracts.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return ArtifactCanonicalPriceExportRequestV2(
+        coordinates=coordinates,
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 3, 23, 0, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 3, 26, 0, 0, tzinfo=timezone.utc)),
+        ),
+        asof_date="2026-03-26",
+        generated_at_utc="2026-03-26T03:04:05Z",
+    )

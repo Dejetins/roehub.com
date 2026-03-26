@@ -1,6 +1,6 @@
-# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02)
+# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04)
 
-Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02`
+Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`
 
 Документ фиксирует контракт precompute/publish слоя, который:
 
@@ -236,17 +236,32 @@ Whole-slot validator обязан идти в фиксированном пор�
 ## Publish interaction
 
 R3-01 / R3-02 / R3-03 сами по себе не делают slot publish-ready.
-Если `validation_plan` всё ещё требует `signals` или real `hit_times`, whole-slot validation
-обязана fail-fast и pointer switch не выполняется до соответствующих later epics.
+R3-04 делает publish-ready только stage `prices + mappings`, если validation scope выбран явно и
+config-driven:
+
+- `price_timeframes` и `mapping_timeframes` берутся из `backtest_artifacts.validation_plan`;
+- `signal_artifacts = ()`;
+- `require_hit_times_manifest = false`.
+
+Если использовать полный validation spec, который всё ещё требует `signals` или real
+`hit_times`, whole-slot validation обязана fail-fast и pointer switch не выполняется до
+соответствующих later epics.
 
 Runner обязан работать только в порядке:
 
 1. resolve `current.yaml`;
 2. precheck inactive slot pin guard;
 3. rebuild inactive slot;
-4. validate whole slot по strict manifests и validation plan, полученному из
+4. validate whole slot по strict manifests и explicit validation spec, полученному из
    `backtest_artifacts.validation_plan`;
 5. atomically switch `current.yaml`.
+
+Для R3-04 рекомендуется отдельный config-driven derivation:
+
+- взять `price_timeframes` из `validation_plan`;
+- взять `mapping_timeframes` из `validation_plan`;
+- принудительно выставить `signal_artifacts = ()`;
+- принудительно выставить `require_hit_times_manifest = false`.
 
 Если validation вернула хотя бы одну error diagnostic:
 

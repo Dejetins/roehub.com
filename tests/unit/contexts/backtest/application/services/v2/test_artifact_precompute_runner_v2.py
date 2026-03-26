@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, cast
 
 import numpy as np
 import pytest
@@ -11,13 +11,19 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     ArtifactPrecomputeFixtureV2,
     build_artifact_precompute_fixture_v2,
 )
+from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
+    AtomicArtifactCurrentPointerWriterV2,
+)
+from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PLACEHOLDER_SHA256_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
+    ArtifactSlotPublishErrorV2,
     BacktestArtifactPrecomputeRunnerV2,
+    BacktestArtifactSlotPublisherV2,
 )
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.shared_kernel.primitives import (
@@ -94,6 +100,46 @@ class _FakeCanonicalCandleReader:
                 if time_range.start.value <= row.candle.ts_open.value < time_range.end.value
             )
         )
+
+
+class _ZeroBlockingRepositoryV2:
+    """
+    Fake job repository returning zero blocking pins for the R3-04 publish integration tests.
+    """
+
+    def count_active_for_artifact_manifest(
+        self,
+        *,
+        market_id: int,
+        symbol: str,
+        artifact_slot: str,
+        artifact_manifest_hash: str,
+    ) -> int:
+        """
+        Return zero blocking jobs for the explicit inactive-slot pin query.
+
+        Args:
+            market_id: Canonical market id for the symbol under publish.
+            symbol: Instrument symbol under publish.
+            artifact_slot: Candidate inactive slot literal.
+            artifact_manifest_hash: SHA-256 hash of the inactive slot root manifest.
+        Returns:
+            int: Always `0`.
+        Assumptions:
+            Integration tests here focus on successful publish and later-stage validation
+            failures, not on pin-guard rejection.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+        """
+        del market_id, symbol, artifact_slot, artifact_manifest_hash
+        return 0
 
 
 def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_export(
@@ -190,10 +236,9 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     assert np.all(close_time > open_time)
     assert tuple(item.timeframe for item in manifest.prices) == ARTIFACT_PRICE_TIMEFRAMES_V2
     assert tuple(item.timeframe for item in manifest.mappings) == ARTIFACT_MAPPING_TIMEFRAMES_V2
-    assert (
-        {item.timeframe: item.coverage.bar_count for item in manifest.prices}
-        == expected_bar_counts
-    )
+    assert {
+        item.timeframe: item.coverage.bar_count for item in manifest.prices
+    } == expected_bar_counts
     assert manifest.signals.supported_timeframes == ()
     assert manifest.signals.supported_indicator_ids == ()
     assert manifest.signals.manifests == ()
@@ -542,9 +587,7 @@ def test_backtest_artifact_precompute_runner_v2_rejects_non_monotonic_source_tim
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
     fixture = build_artifact_precompute_fixture_v2(tmp_path=tmp_path, price_tail_bars_1m=2)
-    reader = _FakeCanonicalCandleReader(
-        rows=_build_canonical_rows_v2(bar_indexes=(0, 1, 1, 2))
-    )
+    reader = _FakeCanonicalCandleReader(rows=_build_canonical_rows_v2(bar_indexes=(0, 1, 1, 2)))
     runner = BacktestArtifactPrecomputeRunnerV2(
         runtime_settings=fixture.runtime_settings,
         artifact_loader=fixture.loader,
@@ -603,6 +646,145 @@ def test_backtest_artifact_precompute_runner_v2_rejects_non_aligned_rollup_sourc
 
     with pytest.raises(ValueError, match="epoch-aligned to 1m bucket boundaries"):
         runner.export_canonical_price_1m(_request_v2(fixture=fixture, end_minute=2))
+
+
+def test_backtest_artifact_precompute_runner_v2_build_publish_prices_mappings_flow_switches_pointer_in_stable_order(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Verify R3-04 runs `precheck -> build inactive slot -> validate -> atomically switch
+    current.yaml` with deterministic pointer payload ordering.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Source-of-truth runtime config still contains later-stage validation targets, while the
+        R3-04 flow derives an explicit prices+mappings validation spec from that config.
+    Raises:
+        AssertionError: If the published pointer payload or build/publish result identity drifts.
+    Side Effects:
+        Builds and publishes one inactive slot under `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=(("15m", "ma.ema"),),
+        require_hit_times_manifest=True,
+    )
+    reader = _FakeCanonicalCandleReader(
+        rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+    )
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=reader,
+    )
+    publisher = BacktestArtifactSlotPublisherV2(
+        artifact_loader=fixture.loader,
+        current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=fixture.builder),
+        job_repository=cast(BacktestJobRepository, _ZeroBlockingRepositoryV2()),
+        now_provider=lambda: datetime(2026, 3, 26, 3, 4, 5, tzinfo=timezone.utc),
+    )
+
+    result = publisher.build_publish_prices_mappings_slot(
+        request=_request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2),
+        precompute_runner=runner,
+        validation_spec=fixture.runtime_config.to_prices_mappings_publish_validation_spec(),
+    )
+
+    assert len(reader.calls) == 1
+    assert result.precheck.ready is True
+    assert result.build_result.slot == fixture.inactive_slot
+    assert result.build_result.slot_generation == 5
+    assert result.publish_result.published_pointer.active_slot == fixture.inactive_slot
+    assert result.publish_result.published_pointer.slot_generation == 5
+    assert result.publish_result.validation.signal_manifests == ()
+    assert result.publish_result.validation.hit_times_manifest is None
+    assert result.validation_spec.signal_artifacts == ()
+    assert result.validation_spec.require_hit_times_manifest is False
+    assert (
+        result.publish_result.published_pointer.manifest_sha256
+        == result.build_result.manifest_sha256
+    )
+    assert _pointer_lines_v2(fixture.builder.current_pointer_path(fixture.coordinates)) == (
+        "schema_version: 1",
+        f"active_slot: {fixture.inactive_slot}",
+        "slot_generation: 5",
+        'asof_date: "2026-03-26"',
+        f'manifest_sha256: "{result.build_result.manifest_sha256}"',
+        'published_at_utc: "2026-03-26T03:04:05Z"',
+    )
+
+
+def test_backtest_artifact_precompute_runner_v2_full_validation_spec_still_rejects_missing_signals_and_hit_times(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Verify later-stage full validation still fails deterministically for a runner-built R3-04 slot.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        R3-04 writes only `prices + mappings`, while the full validation plan still expects real
+        `signals` and `hit_times` families.
+    Raises:
+        AssertionError: If publish unexpectedly switches `current.yaml` or diagnostics drift.
+    Side Effects:
+        Builds one inactive slot under `tmp_path` without publishing it.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=(("15m", "ma.ema"),),
+        require_hit_times_manifest=True,
+    )
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+    )
+    publisher = BacktestArtifactSlotPublisherV2(
+        artifact_loader=fixture.loader,
+        current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=fixture.builder),
+        job_repository=cast(BacktestJobRepository, _ZeroBlockingRepositoryV2()),
+    )
+
+    runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    )
+    precheck = publisher.precheck_publish(fixture.coordinates)
+
+    with pytest.raises(ArtifactSlotPublishErrorV2) as error_info:
+        publisher.publish(
+            precheck=precheck,
+            validation_spec=fixture.runtime_config.to_validation_spec(),
+            asof_date="2026-03-26",
+        )
+
+    current_pointer = fixture.loader.load_current_pointer(fixture.coordinates)
+
+    assert error_info.value.code == "slot_validation_failed"
+    assert error_info.value.diagnostics[0].code == "root_manifest_signal_targets_mismatch"
+    assert current_pointer.active_slot == fixture.active_slot
+    assert current_pointer.slot_generation == 4
 
 
 def _request_v2(
@@ -918,6 +1100,31 @@ def _epoch_ms_for_minute_v2(minute: int) -> int:
       - src/trading/shared_kernel/primitives/utc_timestamp.py
     """
     return int((_BASE_TIME_UTC + timedelta(minutes=minute)).timestamp() * 1000)
+
+
+def _pointer_lines_v2(path: Path) -> tuple[str, ...]:
+    """
+    Read the strict `current.yaml` payload as raw lines for ordering assertions.
+
+    Args:
+        path: Absolute pointer path written by the atomic current-pointer writer.
+    Returns:
+        tuple[str, ...]: Non-empty YAML lines in on-disk order without trailing newlines.
+    Assumptions:
+        R3-04 keeps serialized field order stable as
+        `schema_version -> active_slot -> slot_generation -> asof_date -> manifest_sha256 ->
+        published_at_utc`.
+    Raises:
+        OSError: If `current.yaml` cannot be read.
+    Side Effects:
+        Reads one UTF-8 file from disk.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
+    """
+    return tuple(line for line in path.read_text(encoding="utf-8").splitlines() if line != "")
 
 
 def _load_price_arrays_v2(

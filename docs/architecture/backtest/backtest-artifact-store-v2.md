@@ -1,4 +1,4 @@
-# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04)
+# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04 / R3-03 / R3-04)
 
 Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`
 
@@ -165,7 +165,7 @@ artifacts/backtest/v2/
 
 ## R3-01 / R3-02 stage boundary
 
-До R3-04/R4/R5 store contract уже требует strict root `manifest.yaml`, но цены materialize'ятся
+До R3-03/R3-04/R4/R5 store contract уже требует strict root `manifest.yaml`, но цены materialize'ятся
 поэтапно:
 
 - R3-01 materializes canonical `prices/1m`;
@@ -238,6 +238,29 @@ validated files перед publish.
 
 - `signals` root catalog до R4;
 - `hit_times/1m/manifest.yaml` reference до R5.
+
+## R3-04 prices+mappings publish-ready boundary
+
+После R3-04 slot с strict `prices[]` и non-empty `mappings[]` может считаться publish-ready, если
+publish использует explicit stage validation spec:
+
+- `price_timeframes` берутся из `backtest_artifacts.validation_plan`;
+- `mapping_timeframes` берутся из `backtest_artifacts.validation_plan`;
+- `signal_artifacts = ()`;
+- `require_hit_times_manifest = false`.
+
+Для этого stage остаются допустимыми и ожидаемыми:
+
+- `signals` как explicit empty catalog до R4;
+- `hit_times/1m/manifest.yaml` как explicit fixed-path placeholder reference до R5.
+
+Это не relax full strict contract:
+
+- root `manifest.yaml` остаётся source-of-truth для validation и `manifest_sha256` в
+  `current.yaml`;
+- полный validation spec по-прежнему обязан fail-fast, если `signals` или real `hit_times`
+  отсутствуют;
+- later epics не должны выводить validation scope из факта наличия файлов на диске.
 
 ## Fixed literals and ordering
 
@@ -347,6 +370,8 @@ Publish всегда работает только через два фикси�
 - inactive slot определяется только как противоположный `active_slot`;
 - publish не делает hidden scanning;
 - validation получает explicit deterministic paths/timeframes/indicator ids;
+- R3-04 prices+mappings publish использует только explicit stage spec c
+  `signal_artifacts = ()` и `require_hit_times_manifest = false`;
 - pointer payload сериализуется в фиксированном порядке:
   - `schema_version`
   - `active_slot`

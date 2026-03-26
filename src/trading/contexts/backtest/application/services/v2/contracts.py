@@ -118,9 +118,7 @@ SUPPORTED_ARTIFACT_MARKETS_BY_ID_V2: Mapping[int, tuple[str, str]] = MappingProx
 )
 
 _STRICT_DATE_LITERAL_PATTERN_V2 = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_STRICT_UTC_TIMESTAMP_LITERAL_PATTERN_V2 = re.compile(
-    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"
-)
+_STRICT_UTC_TIMESTAMP_LITERAL_PATTERN_V2 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 _SHA256_HEX_PATTERN_V2 = re.compile(r"^[0-9a-f]{64}$")
 
 type ArtifactSlotLiteralV2 = Literal["slot_a", "slot_b"]
@@ -403,9 +401,7 @@ def validate_current_pointer_manifest_sha256_v2(manifest_sha256: str) -> str:
     if not isinstance(manifest_sha256, str):
         raise ValueError("current.yaml field 'manifest_sha256' must be str")
     if _SHA256_HEX_PATTERN_V2.fullmatch(manifest_sha256) is None:
-        raise ValueError(
-            "current.yaml field 'manifest_sha256' must be 64 lowercase hex chars"
-        )
+        raise ValueError("current.yaml field 'manifest_sha256' must be 64 lowercase hex chars")
     return manifest_sha256
 
 
@@ -433,9 +429,7 @@ def validate_current_pointer_published_at_utc_v2(published_at_utc: str) -> str:
     if not isinstance(published_at_utc, str):
         raise ValueError("current.yaml field 'published_at_utc' must be str")
     if _STRICT_UTC_TIMESTAMP_LITERAL_PATTERN_V2.fullmatch(published_at_utc) is None:
-        raise ValueError(
-            "current.yaml field 'published_at_utc' must be YYYY-MM-DDTHH:MM:SSZ"
-        )
+        raise ValueError("current.yaml field 'published_at_utc' must be YYYY-MM-DDTHH:MM:SSZ")
     parsed = datetime.fromisoformat(published_at_utc.replace("Z", "+00:00"))
     if parsed.utcoffset() != timezone.utc.utcoffset(parsed):
         raise ValueError("current.yaml field 'published_at_utc' must be UTC")
@@ -1407,9 +1401,7 @@ class ArtifactCurrentPointerV2:
                 if key not in self.raw_payload
             )
             extra_keys = tuple(
-                key
-                for key in raw_keys
-                if key not in CURRENT_ARTIFACT_POINTER_REQUIRED_KEYS_V2
+                key for key in raw_keys if key not in CURRENT_ARTIFACT_POINTER_REQUIRED_KEYS_V2
             )
             details: list[str] = []
             if len(missing_keys) > 0:
@@ -2104,6 +2096,105 @@ class ArtifactCanonicalPriceExportResultV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactPricesMappingsPublishResultV2:
+    """
+    Structured R3-04 flow result for `precheck -> build inactive slot -> validate -> publish`.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+    """
+
+    validation_spec: ArtifactSlotValidationSpecV2
+    precheck: ArtifactPublishPrecheckV2
+    build_result: ArtifactCanonicalPriceExportResultV2
+    publish_result: ArtifactPublishResultV2
+
+    def __post_init__(self) -> None:
+        """
+        Validate that R3-04 stage artifacts and published pointer identities stay aligned.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            R3-04 publishes only the inactive slot rebuilt by the immediately preceding
+            `prices + mappings` build and uses the same root `manifest.yaml` hash for
+            `current.yaml`.
+        Raises:
+            ValueError: If the precheck, build result, and published pointer disagree on slot,
+                generation, `asof_date`, coordinates, or manifest hash.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        """
+        if self.validation_spec.signal_artifacts != ():
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2.validation_spec must keep "
+                "signal_artifacts=() for the R3-04 prices+mappings stage"
+            )
+        if self.validation_spec.require_hit_times_manifest:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2.validation_spec must keep "
+                "require_hit_times_manifest=False for the R3-04 prices+mappings stage"
+            )
+        if self.precheck.coordinates != self.build_result.coordinates:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2 precheck/build coordinates must match; "
+                f"got {self.precheck.coordinates!r} and {self.build_result.coordinates!r}"
+            )
+        if self.publish_result.coordinates != self.build_result.coordinates:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2 build/publish coordinates must match; "
+                f"got {self.build_result.coordinates!r} and {self.publish_result.coordinates!r}"
+            )
+        if self.precheck != self.publish_result.precheck:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2.publish_result.precheck must equal the "
+                "recorded R3-04 precheck snapshot"
+            )
+        if self.precheck.inactive_slot != self.build_result.slot:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2 build_result.slot must match the "
+                f"prechecked inactive slot; got {self.build_result.slot!r}, expected "
+                f"{self.precheck.inactive_slot!r}"
+            )
+        published_pointer = self.publish_result.published_pointer
+        if self.build_result.slot != published_pointer.active_slot:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2 published pointer must activate the "
+                f"rebuilt slot; got {published_pointer.active_slot!r}, expected "
+                f"{self.build_result.slot!r}"
+            )
+        if self.build_result.slot_generation != published_pointer.slot_generation:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2 slot_generation must match between "
+                f"build result and published pointer; got {self.build_result.slot_generation!r} "
+                f"and {published_pointer.slot_generation!r}"
+            )
+        if self.build_result.asof_date != published_pointer.asof_date:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2 asof_date must match between build "
+                f"result and published pointer; got {self.build_result.asof_date!r} and "
+                f"{published_pointer.asof_date!r}"
+            )
+        if self.build_result.manifest_sha256 != published_pointer.manifest_sha256:
+            raise ValueError(
+                "ArtifactPricesMappingsPublishResultV2 manifest_sha256 must match between build "
+                "result and published pointer"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactPrecomputeRuntimeSettingsV2:
     """
     Minimal service-layer runtime settings required by R3-03 precompute orchestration.
@@ -2529,9 +2620,7 @@ def validate_manifest_schema_version_v2(
     if isinstance(schema_version, bool) or not isinstance(schema_version, int):
         raise ValueError(f"{field_name} must be int")
     if schema_version != expected_schema_version:
-        raise ValueError(
-            f"{field_name} must be {expected_schema_version}; got {schema_version!r}"
-        )
+        raise ValueError(f"{field_name} must be {expected_schema_version}; got {schema_version!r}")
     return schema_version
 
 
@@ -2996,8 +3085,7 @@ def _sorted_signal_catalog_entries_v2(
         identity = (validated_item.timeframe, validated_item.indicator_id)
         if identity in seen:
             raise ValueError(
-                "root manifest field 'signals.manifests' contains duplicate "
-                f"{identity!r}"
+                "root manifest field 'signals.manifests' contains duplicate " f"{identity!r}"
             )
         seen.add(identity)
         validated_values.append(validated_item)
@@ -3044,8 +3132,7 @@ def _sorted_signal_validation_specs_v2(
         identity = (validated_item.timeframe, validated_item.indicator_id)
         if identity in seen:
             raise ValueError(
-                "artifact validation field 'signal_artifacts' contains duplicate "
-                f"{identity!r}"
+                "artifact validation field 'signal_artifacts' contains duplicate " f"{identity!r}"
             )
         seen.add(identity)
         validated_values.append(validated_item)

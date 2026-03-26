@@ -11,10 +11,13 @@ from typing import Callable
 from trading.contexts.backtest.application.ports import BacktestJobRepository
 
 from .artifact_manifest_validator import BacktestArtifactManifestValidatorV2
+from .artifact_precompute_runner import BacktestArtifactPrecomputeRunnerV2
 from .contracts import (
     CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
+    ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
     ArtifactCurrentPointerV2,
+    ArtifactPricesMappingsPublishResultV2,
     ArtifactPublishPrecheckV2,
     ArtifactPublishResultV2,
     ArtifactSlotValidationResultV2,
@@ -181,6 +184,68 @@ class BacktestArtifactSlotPublisherV2:
             inactive_manifest_hash=inactive_manifest_hash,
             blocking_active_run_count=0,
             ready=True,
+        )
+
+    def build_publish_prices_mappings_slot(
+        self,
+        *,
+        request: ArtifactCanonicalPriceExportRequestV2,
+        precompute_runner: BacktestArtifactPrecomputeRunnerV2,
+        validation_spec: ArtifactSlotValidationSpecV2,
+    ) -> ArtifactPricesMappingsPublishResultV2:
+        """
+        Execute `precheck -> build inactive slot -> validate whole slot -> atomically switch
+        current.yaml` for the R3-04 `prices + mappings` stage.
+
+        Args:
+            request: Explicit `prices/1m` export request whose inactive slot becomes publish
+                candidate.
+            precompute_runner: Deterministic inactive-slot builder for `prices/<tf>` and
+                `mappings/<tf>`.
+            validation_spec: Explicit R3-04 prices+mappings validation scope derived from
+                source-of-truth artifact config.
+        Returns:
+            ArtifactPricesMappingsPublishResultV2: Combined precheck/build/publish result for the
+                published prices+mappings slot.
+        Assumptions:
+            This orchestration entrypoint is stage-specific and therefore requires
+            `signal_artifacts=()` plus `require_hit_times_manifest=false`.
+        Raises:
+            ArtifactSlotPublishErrorV2: If precheck blocks the inactive slot or strict validation
+                fails before the `current.yaml` switch.
+            ValueError: If dependencies are missing or the supplied validation spec is not an
+                explicit prices+mappings stage spec.
+            FileNotFoundError: If `current.yaml` or the built root manifest is missing.
+            OSError: If one artifact write or atomic pointer switch fails.
+        Side Effects:
+            Reads `current.yaml`, rebuilds the inactive slot, validates the root manifest, and
+            replaces `current.yaml` atomically on success.
+        Docs:
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        """
+        if precompute_runner is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestArtifactSlotPublisherV2.build_publish_prices_mappings_slot requires "
+                "precompute_runner"
+            )
+        stage_validation_spec = _ensure_prices_mappings_publish_validation_spec_v2(validation_spec)
+        precheck = self.precheck_publish(request.coordinates)
+        self._ensure_precheck_ready(precheck)
+        build_result = precompute_runner.export_canonical_price_1m(request)
+        publish_result = self.publish(
+            precheck=precheck,
+            validation_spec=stage_validation_spec,
+            asof_date=request.asof_date,
+        )
+        return ArtifactPricesMappingsPublishResultV2(
+            validation_spec=stage_validation_spec,
+            precheck=precheck,
+            build_result=build_result,
+            publish_result=publish_result,
         )
 
     def validate_inactive_slot(
@@ -363,6 +428,43 @@ def _require_existing_path_v2(path: Path, label: str) -> None:
             code="artifact_slot_validation_failed",
             message=f"missing explicit artifact path for {label}: {path}",
         )
+
+
+def _ensure_prices_mappings_publish_validation_spec_v2(
+    validation_spec: ArtifactSlotValidationSpecV2,
+) -> ArtifactSlotValidationSpecV2:
+    """
+    Enforce the explicit R3-04 validation boundary for the `prices + mappings` publish stage.
+
+    Args:
+        validation_spec: Candidate whole-slot validation spec supplied by the caller.
+    Returns:
+        ArtifactSlotValidationSpecV2: The original validated stage spec.
+    Assumptions:
+        R3-04 may validate full `prices/<tf>` and `mappings/<tf>` coverage, but must keep
+        `signal_artifacts=()` and `require_hit_times_manifest=false` explicit instead of
+        inferring stage scope from file presence.
+    Raises:
+        ValueError: If the spec still requires signal artifacts or a real hit-times manifest.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    """
+    if validation_spec.signal_artifacts != ():
+        raise ValueError(
+            "prices+mappings publish validation spec must set signal_artifacts=() explicitly"
+        )
+    if validation_spec.require_hit_times_manifest:
+        raise ValueError(
+            "prices+mappings publish validation spec must set "
+            "require_hit_times_manifest=False explicitly"
+        )
+    return validation_spec
 
 
 def _file_sha256_hex_v2(path: Path) -> str:

@@ -10,7 +10,7 @@
 - Jobs worker: `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
 - Artifact store v2 layout/publish/pinning/validator/config contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
-- Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices и placeholder stage boundary: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices, R3-03 `mappings/<tf>` и R3-04 publish-ready prices+mappings stage: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Artifact rebuild/publish runbook: `docs/runbooks/backtest-artifacts-rebuild.md`
 
 ## Актуальная политика rollout
@@ -23,8 +23,10 @@
   целевой режим v1: lazy-only (`false`).
 - Artifact pipeline settings живут отдельно в `configs/<env>/backtest_artifacts.yaml`; runtime
   request defaults остаются в `configs/<env>/backtest.yaml`.
-- R3-01 / R3-02 rebuild-only stage может материализовать `prices/1m` и rolled `prices/<tf>` в
-  inactive slot; publish остаётся blocked до появления real `mappings/signals/hit_times`.
+- R3-04 может publish'ить validated slot с `prices+mappings`, если validation spec явно выведен
+  из `backtest_artifacts.validation_plan` и фиксирует `signal_artifacts=[]`,
+  `require_hit_times_manifest=false`.
+- Полный publish с `signals/hit_times` по-прежнему blocked до соответствующих later-stage epics.
 
 ## Проверка согласованности
 

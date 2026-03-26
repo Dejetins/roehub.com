@@ -258,10 +258,40 @@ class BacktestArtifactValidationPlanRuntimeConfig:
         return ArtifactSlotValidationSpecV2(
             price_timeframes=self.price_timeframes,
             mapping_timeframes=self.mapping_timeframes,
-            signal_artifacts=tuple(
-                item.to_validation_spec() for item in self.signal_artifacts
-            ),
+            signal_artifacts=tuple(item.to_validation_spec() for item in self.signal_artifacts),
             require_hit_times_manifest=self.require_hit_times_manifest,
+        )
+
+    def to_prices_mappings_publish_validation_spec(self) -> ArtifactSlotValidationSpecV2:
+        """
+        Derive the explicit R3-04 publish spec for the `prices + mappings` stage.
+
+        Args:
+            None.
+        Returns:
+            ArtifactSlotValidationSpecV2: Config-driven validation scope for
+                `build inactive slot -> validate whole slot -> atomically switch current.yaml`
+                without `signals` or real `hit_times`.
+        Assumptions:
+            R3-04 keeps price and mapping timeframes from `validation_plan`, while
+            `signal_artifacts=()` and `require_hit_times_manifest=false` remain explicit stage
+            boundaries until later epics materialize those families.
+        Raises:
+            ValueError: If stored timeframe literals became invalid before translation.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        """
+        return ArtifactSlotValidationSpecV2(
+            price_timeframes=self.price_timeframes,
+            mapping_timeframes=self.mapping_timeframes,
+            signal_artifacts=(),
+            require_hit_times_manifest=False,
         )
 
 
@@ -598,6 +628,30 @@ class BacktestArtifactsRuntimeConfig:
         """
         return self.validation_plan.to_validation_spec()
 
+    def to_prices_mappings_publish_validation_spec(self) -> ArtifactSlotValidationSpecV2:
+        """
+        Derive the explicit R3-04 publish spec for the `prices + mappings` stage.
+
+        Args:
+            None.
+        Returns:
+            ArtifactSlotValidationSpecV2: Config-driven prices+mappings publish validation scope.
+        Assumptions:
+            Adapter wiring should derive this stage spec from the same source-of-truth config that
+            also drives the full later-stage validation plan.
+        Raises:
+            ValueError: If nested validation-plan translation fails.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        """
+        return self.validation_plan.to_prices_mappings_publish_validation_spec()
+
 
 def resolve_backtest_artifacts_config_path(
     *,
@@ -813,21 +867,15 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
         validation_budgets=BacktestArtifactValidationBudgetsRuntimeConfig(
             max_price_bars_per_timeframe=_require_int(
                 value=validation_budgets_map.get("max_price_bars_per_timeframe"),
-                field_path=(
-                    "backtest_artifacts.validation_budgets.max_price_bars_per_timeframe"
-                ),
+                field_path=("backtest_artifacts.validation_budgets.max_price_bars_per_timeframe"),
             ),
             max_mapping_rows_per_timeframe=_require_int(
                 value=validation_budgets_map.get("max_mapping_rows_per_timeframe"),
-                field_path=(
-                    "backtest_artifacts.validation_budgets.max_mapping_rows_per_timeframe"
-                ),
+                field_path=("backtest_artifacts.validation_budgets.max_mapping_rows_per_timeframe"),
             ),
             max_signal_rows_per_artifact=_require_int(
                 value=validation_budgets_map.get("max_signal_rows_per_artifact"),
-                field_path=(
-                    "backtest_artifacts.validation_budgets.max_signal_rows_per_artifact"
-                ),
+                field_path=("backtest_artifacts.validation_budgets.max_signal_rows_per_artifact"),
             ),
             max_hit_times_cells=_require_int(
                 value=validation_budgets_map.get("max_hit_times_cells"),
@@ -1165,9 +1213,7 @@ def _require_str_sequence(*, value: Any, field_path: str) -> tuple[str, ...]:
         raise ValueError(f"{field_path} must be sequence")
     normalized_values: list[str] = []
     for index, item in enumerate(value):
-        normalized_values.append(
-            _require_str(value=item, field_path=f"{field_path}[{index}]")
-        )
+        normalized_values.append(_require_str(value=item, field_path=f"{field_path}[{index}]"))
     return tuple(normalized_values)
 
 
@@ -1371,9 +1417,7 @@ def _normalize_slot_sequence(
         seen.add(validated_value)
         validated_values.append(validated_value)
     if tuple(sorted(validated_values)) != tuple(sorted(ALLOWED_ARTIFACT_SLOTS_V2)):
-        raise ValueError(
-            f"{field_path} must contain exactly {ordered_artifact_slots_v2()!r}"
-        )
+        raise ValueError(f"{field_path} must contain exactly {ordered_artifact_slots_v2()!r}")
     return ordered_artifact_slots_v2()
 
 

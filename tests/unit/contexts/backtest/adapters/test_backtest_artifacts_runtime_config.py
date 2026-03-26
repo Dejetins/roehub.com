@@ -331,6 +331,37 @@ def test_load_backtest_artifacts_runtime_config_normalizes_equivalent_author_ord
     )
 
 
+def test_load_backtest_artifacts_runtime_config_derives_prices_mappings_publish_spec(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify R3-04 derives an explicit prices+mappings publish spec from the full validation plan.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Source-of-truth config may already contain later-stage `signal_artifacts` and
+        `require_hit_times_manifest=true`, while R3-04 publish keeps those families explicitly
+        out of scope.
+    Raises:
+        AssertionError: If the derived stage spec drops price/mapping targets or keeps later-stage
+            validation requirements enabled.
+    Side Effects:
+        Writes one temporary YAML file.
+    """
+    config_path = _write_backtest_artifacts_config(tmp_path, body=_VALID_BACKTEST_ARTIFACTS_CONFIG)
+
+    config = load_backtest_artifacts_runtime_config(config_path)
+    stage_spec = config.to_prices_mappings_publish_validation_spec()
+
+    assert stage_spec.price_timeframes == config.validation_plan.price_timeframes
+    assert stage_spec.mapping_timeframes == config.validation_plan.mapping_timeframes
+    assert stage_spec.signal_artifacts == ()
+    assert stage_spec.require_hit_times_manifest is False
+
+
 def test_load_backtest_artifacts_runtime_config_rejects_duplicate_yaml_keys(
     tmp_path: Path,
 ) -> None:

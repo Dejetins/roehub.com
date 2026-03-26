@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, cast
 
 import pytest
 
@@ -12,13 +12,18 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     build_artifact_precompute_fixture_v2,
     build_synthetic_artifact_store_v2,
 )
-from trading.contexts.backtest.adapters.outbound import BacktestArtifactPathBuilderV2
+from trading.contexts.backtest.adapters.outbound import (
+    AtomicArtifactCurrentPointerWriterV2,
+    BacktestArtifactPathBuilderV2,
+)
+from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
     BacktestArtifactPrecomputeRunnerV2,
+    BacktestArtifactSlotPublisherV2,
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.market_data.application.dto import CandleWithMeta
@@ -94,6 +99,45 @@ class _PrecomputeCanonicalReaderForLoaderTest:
                 if time_range.start.value <= row.candle.ts_open.value < time_range.end.value
             )
         )
+
+
+class _ZeroBlockingRepositoryForLoaderTest:
+    """
+    Fake job repository returning zero inactive-slot pins for loader+publisher smoke coverage.
+    """
+
+    def count_active_for_artifact_manifest(
+        self,
+        *,
+        market_id: int,
+        symbol: str,
+        artifact_slot: str,
+        artifact_manifest_hash: str,
+    ) -> int:
+        """
+        Return zero blocking jobs for the explicit publish-guard query.
+
+        Args:
+            market_id: Canonical market id for the symbol under publish.
+            symbol: Instrument symbol under publish.
+            artifact_slot: Candidate inactive slot literal.
+            artifact_manifest_hash: SHA-256 hash of the inactive slot root manifest.
+        Returns:
+            int: Always `0`.
+        Assumptions:
+            Loader smoke coverage exercises successful publish flow rather than pin-guard failure.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+        """
+        del market_id, symbol, artifact_slot, artifact_manifest_hash
+        return 0
 
 
 @pytest.fixture()
@@ -196,10 +240,13 @@ def test_yaml_backtest_artifact_loader_v2_reads_current_and_strict_manifests(
     assert explicit_root_manifest.slot_generation == 5
     assert explicit_signal_manifest.indicator_id == "ma.ema"
     assert explicit_hit_times_manifest.sentinel_index == 4
-    assert hit_times_paths.long_tp == store.builder.hit_times_paths(
-        store.coordinates,
-        store.inactive_slot,
-    ).long_tp
+    assert (
+        hit_times_paths.long_tp
+        == store.builder.hit_times_paths(
+            store.coordinates,
+            store.inactive_slot,
+        ).long_tp
+    )
 
 
 def test_yaml_backtest_artifact_loader_v2_avoids_directory_scanning(
@@ -252,22 +299,31 @@ def test_yaml_backtest_artifact_loader_v2_avoids_directory_scanning(
     )
 
     assert manifest.slot == store.active_slot
-    assert price_paths.ohlcv == store.builder.price_paths(
-        store.coordinates,
-        store.active_slot,
-        "1m",
-    ).ohlcv
-    assert signal_paths.signals == store.builder.signal_paths(
-        store.coordinates,
-        store.inactive_slot,
-        "15m",
-        "ma.ema",
-    ).signals
-    assert mapping_paths.bar_close_1m_idx == store.builder.mapping_paths(
-        store.coordinates,
-        store.inactive_slot,
-        "15m",
-    ).bar_close_1m_idx
+    assert (
+        price_paths.ohlcv
+        == store.builder.price_paths(
+            store.coordinates,
+            store.active_slot,
+            "1m",
+        ).ohlcv
+    )
+    assert (
+        signal_paths.signals
+        == store.builder.signal_paths(
+            store.coordinates,
+            store.inactive_slot,
+            "15m",
+            "ma.ema",
+        ).signals
+    )
+    assert (
+        mapping_paths.bar_close_1m_idx
+        == store.builder.mapping_paths(
+            store.coordinates,
+            store.inactive_slot,
+            "15m",
+        ).bar_close_1m_idx
+    )
     assert hit_times_manifest_path == store.builder.hit_times_manifest_path(
         store.coordinates,
         store.inactive_slot,
@@ -329,9 +385,10 @@ def test_yaml_backtest_artifact_loader_v2_loads_runner_generated_rollup_manifest
     assert tuple(item.timeframe for item in manifest.mappings) == ARTIFACT_MAPPING_TIMEFRAMES_V2
     assert manifest.prices[-1].timeframe == "3d"
     assert manifest.prices[-1].coverage.bar_count == 1
-    assert manifest.prices[-1].open_time.path == three_day_paths.open_time.relative_to(
-        three_day_paths.open_time.parents[2]
-    ).as_posix()
+    assert (
+        manifest.prices[-1].open_time.path
+        == three_day_paths.open_time.relative_to(three_day_paths.open_time.parents[2]).as_posix()
+    )
     assert manifest.mappings[0].bar_open_1m_idx.path == (
         fifteen_minute_mapping_paths.bar_open_1m_idx.relative_to(
             fifteen_minute_mapping_paths.bar_open_1m_idx.parents[2]
@@ -373,6 +430,70 @@ def test_yaml_backtest_artifact_loader_v2_rejects_invalid_pointer_shape(tmp_path
 
     with pytest.raises(ValueError, match="active_slot"):
         loader.load_current_pointer(coordinates)
+
+
+def test_yaml_backtest_artifact_loader_v2_reads_runner_built_published_prices_mappings_slot(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader reads the active slot after a successful R3-04 prices+mappings publish.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Publish flow derives an explicit prices+mappings validation spec from a runtime config
+        that still contains later-stage `signals/hit_times` targets.
+    Raises:
+        AssertionError: If loader cannot follow the switched `current.yaml` pointer.
+    Side Effects:
+        Builds and publishes one inactive slot under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=(("15m", "ma.ema"),),
+        require_hit_times_manifest=True,
+    )
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_PrecomputeCanonicalReaderForLoaderTest(
+            rows=_build_loader_canonical_rows_v2(bar_count=_PRECOMPUTE_INTEGRATION_MINUTES_V2)
+        ),
+    )
+    publisher = BacktestArtifactSlotPublisherV2(
+        artifact_loader=fixture.loader,
+        current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=fixture.builder),
+        job_repository=cast(BacktestJobRepository, _ZeroBlockingRepositoryForLoaderTest()),
+        now_provider=lambda: datetime(2026, 3, 26, 3, 4, 5, tzinfo=timezone.utc),
+    )
+
+    publish_result = publisher.build_publish_prices_mappings_slot(
+        request=_loader_request_v2(
+            fixture=fixture,
+            end_minute=_PRECOMPUTE_INTEGRATION_MINUTES_V2,
+        ),
+        precompute_runner=runner,
+        validation_spec=fixture.runtime_config.to_prices_mappings_publish_validation_spec(),
+    )
+    current = fixture.loader.load_current_pointer(fixture.coordinates)
+    active_manifest = fixture.loader.load_active_slot_manifest(fixture.coordinates)
+
+    assert current.active_slot == fixture.inactive_slot
+    assert current.manifest_sha256 == publish_result.build_result.manifest_sha256
+    assert active_manifest.path == publish_result.build_result.manifest_path
+    assert tuple(item.timeframe for item in active_manifest.prices) == ARTIFACT_PRICE_TIMEFRAMES_V2
+    assert (
+        tuple(item.timeframe for item in active_manifest.mappings) == ARTIFACT_MAPPING_TIMEFRAMES_V2
+    )
 
 
 @pytest.mark.parametrize(

@@ -129,9 +129,7 @@ def build_synthetic_artifact_store_v2(
     validation_spec = ArtifactSlotValidationSpecV2(
         price_timeframes=("1m", "15m"),
         mapping_timeframes=("15m",),
-        signal_artifacts=(
-            ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema"),
-        ),
+        signal_artifacts=(ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema"),),
         require_hit_times_manifest=True,
     )
 
@@ -214,6 +212,8 @@ def build_artifact_precompute_fixture_v2(
     current_slot_generation: int = 4,
     price_tail_bars_1m: int = 2,
     mapping_tail_bars_1m: int = 10,
+    validation_signal_artifacts: tuple[tuple[str, str], ...] = (),
+    require_hit_times_manifest: bool = False,
 ) -> ArtifactPrecomputeFixtureV2:
     """
     Build a minimal strict R3-02 fixture with config and `current.yaml` only.
@@ -225,10 +225,16 @@ def build_artifact_precompute_fixture_v2(
         price_tail_bars_1m: Strict positive `prices/1m` tail reread budget.
         mapping_tail_bars_1m: Strict positive `mappings/<tf>` tail rebuild budget in `1m`
             bars.
+        validation_signal_artifacts: Explicit `(timeframe, indicator_id)` targets written into
+            `backtest_artifacts.validation_plan.signal_artifacts`.
+        require_hit_times_manifest: Whether the generated runtime config should require real
+            `hit_times/1m/manifest.yaml` during whole-slot validation.
     Returns:
         ArtifactPrecomputeFixtureV2: Strict config/loader/path fixture for R3-02 runner tests.
     Assumptions:
-        Runner tests own inactive-slot contents and start without prebuilt `prices/<tf>` files.
+        Runner tests own inactive-slot contents and start without prebuilt `prices/<tf>` files,
+        while R3-04 tests may still request a full later-stage validation plan from the same
+        source-of-truth config.
     Raises:
         OSError: If config or pointer files cannot be written.
     Side Effects:
@@ -267,8 +273,14 @@ def build_artifact_precompute_fixture_v2(
                     "validation_plan": {
                         "price_timeframes": list(ARTIFACT_PRICE_TIMEFRAMES_V2),
                         "mapping_timeframes": list(ARTIFACT_MAPPING_TIMEFRAMES_V2),
-                        "signal_artifacts": [],
-                        "require_hit_times_manifest": False,
+                        "signal_artifacts": [
+                            {
+                                "timeframe": timeframe,
+                                "indicator_id": indicator_id,
+                            }
+                            for timeframe, indicator_id in validation_signal_artifacts
+                        ],
+                        "require_hit_times_manifest": require_hit_times_manifest,
                     },
                     "hit_times_grid": {
                         "tp_levels_pct": [1.0],
@@ -304,9 +316,7 @@ def build_artifact_precompute_fixture_v2(
         runtime_settings=ArtifactPrecomputeRuntimeSettingsV2(
             price_tail_bars_1m=runtime_config.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=runtime_config.lookback_policy.mapping_tail_bars_1m,
-            config_sha256=build_backtest_artifacts_runtime_config_hash(
-                config=runtime_config
-            ),
+            config_sha256=build_backtest_artifacts_runtime_config_hash(config=runtime_config),
         ),
         builder=builder,
         loader=loader,
