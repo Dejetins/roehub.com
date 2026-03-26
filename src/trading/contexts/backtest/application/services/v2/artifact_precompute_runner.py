@@ -1,4 +1,4 @@
-"""Deterministic R3-01 canonical `1m` price export into the inactive artifact slot."""
+"""Deterministic R3-02 price materialization into the inactive artifact slot."""
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ from trading.shared_kernel.primitives import (
     InstrumentId,
     MarketId,
     Symbol,
+    Timeframe,
     TimeRange,
     UtcTimestamp,
 )
@@ -30,6 +31,7 @@ from .contracts import (
     ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2,
     ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2,
     ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2,
+    ARTIFACT_PRICE_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_AXIS_ORDER_V2,
     ARTIFACT_SIGNAL_DTYPE_LITERAL_V2,
     ARTIFACT_SIGNAL_VALUE_SET_V2,
@@ -60,13 +62,19 @@ _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2 = "1m"
 _CANONICAL_CANDLE_SOURCE_LITERAL_V2 = "market_data.canonical_candles_1m"
 _PRECOMPUTE_GENERATOR_LITERAL_V2 = "backtest-artifact-precompute-runner-v2"
-_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r3-01"
+_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r3-02"
+_ONE_MINUTE_MILLIS_V2 = 60 * 1000
+_ROLLED_PRICE_TIMEFRAME_LITERALS_V2 = tuple(
+    timeframe
+    for timeframe in ARTIFACT_PRICE_TIMEFRAMES_V2
+    if timeframe != _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2
+)
 
 
 @dataclass(frozen=True, slots=True)
 class _CanonicalPriceArraysV2:
     """
-    Internal immutable container for canonical `1m` open/close/OHLCV arrays.
+    Internal immutable container for `open_time/close_time/ohlcv` price arrays.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -99,7 +107,7 @@ class _CanonicalPriceTailPlanV2:
 @dataclass(frozen=True, slots=True)
 class _RootManifestScaffoldV2:
     """
-    Internal scaffold for root-manifest sections not owned by R3-01 `prices/1m`.
+    Internal scaffold for root-manifest sections not owned by R3-02 price materialization.
 
     Docs:
       - docs/architecture/backtest/backtest-artifact-store-v2.md
@@ -118,7 +126,7 @@ class _RootManifestScaffoldV2:
 @dataclass(frozen=True, slots=True)
 class BacktestArtifactPrecomputeRunnerV2:
     """
-    Materialize canonical `1m` price arrays into the inactive slot for EPIC R3-01.
+    Materialize canonical `1m` plus rolled request-timeframe price arrays for EPIC R3-02.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -167,15 +175,15 @@ class BacktestArtifactPrecomputeRunnerV2:
         request: ArtifactCanonicalPriceExportRequestV2,
     ) -> ArtifactCanonicalPriceExportResultV2:
         """
-        Export canonical `1m` open/close/OHLCV arrays into the deterministic inactive slot.
+        Export canonical `1m` and rolled `prices/<tf>` arrays into the inactive slot.
 
         Args:
             request: Explicit export identity with symbol coordinates and `TimeRange [start, end)`.
         Returns:
             ArtifactCanonicalPriceExportResultV2: Structured write result for the inactive slot.
         Assumptions:
-            R3-01 owns only `prices/1m/*` and root-manifest `1m` coverage; other sections are
-            preserved or replaced with explicit placeholders.
+            Public API stays rooted in canonical `1m`, while R3-02 also materializes every
+            allowed request timeframe under the same root manifest update.
         Raises:
             FileNotFoundError: If strict `current.yaml` is missing for the symbol root.
             ValueError: If existing inactive-slot metadata or source candles violate strict
@@ -237,24 +245,46 @@ class BacktestArtifactPrecomputeRunnerV2:
             arrays=materialized_arrays,
             label="materialized canonical prices/1m",
         )
+        _validate_rollup_source_one_minute_arrays_v2(
+            arrays=materialized_arrays,
+            label="materialized canonical prices/1m",
+        )
         _write_price_arrays_atomically_v2(price_paths=price_paths, arrays=materialized_arrays)
         one_minute_manifest = _build_one_minute_price_manifest_v2(
             slot_root=slot_root,
             price_paths=price_paths,
             arrays=materialized_arrays,
         )
+        rollup_source_arrays = _load_materialized_price_arrays_v2(
+            artifact_loader=self.artifact_loader,
+            coordinates=request.coordinates,
+            slot=inactive_slot,
+            timeframe=_CANONICAL_PRICE_TIMEFRAME_LITERAL_V2,
+            manifest_section=one_minute_manifest,
+            location_prefix="materialized prices[1m] rollup source",
+        )
+        rolled_price_manifests = _materialize_rolled_price_timeframes_v2(
+            artifact_loader=self.artifact_loader,
+            coordinates=request.coordinates,
+            slot=inactive_slot,
+            slot_root=slot_root,
+            existing_manifest=existing_manifest,
+            source_arrays=rollup_source_arrays,
+            source_tail_time_range=tail_plan.source_time_range,
+        )
         scaffold = _build_root_manifest_scaffold_v2(existing_manifest=existing_manifest)
         provenance = _build_root_manifest_provenance_v2(
             runtime_settings=self.runtime_settings,
             request=request,
             arrays=materialized_arrays,
+            rolled_sections=rolled_price_manifests,
         )
         root_manifest_payload = _build_root_manifest_payload_v2(
             request=request,
             slot=inactive_slot,
             slot_generation=target_slot_generation,
             root_scaffold=scaffold,
-            one_minute_manifest=one_minute_manifest,
+            price_manifests=(one_minute_manifest, *rolled_price_manifests),
             provenance=provenance,
         )
         _write_yaml_atomically_v2(path=manifest_path, payload=root_manifest_payload)
@@ -339,59 +369,13 @@ def _load_existing_canonical_price_arrays_v2(
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
-    if existing_manifest is None:
-        return None
-    existing_section = _select_price_manifest_v2(
-        price_sections=existing_manifest.prices,
+    return _load_existing_price_timeframe_arrays_v2(
+        artifact_loader=artifact_loader,
+        coordinates=coordinates,
+        slot=slot,
+        existing_manifest=existing_manifest,
         timeframe=_CANONICAL_PRICE_TIMEFRAME_LITERAL_V2,
     )
-    if existing_section is None:
-        return None
-    price_paths = artifact_loader.resolve_price_paths(
-        coordinates,
-        slot,
-        _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2,
-    )
-    open_time = _load_validated_array_v2(
-        metadata=existing_section.open_time,
-        expected_path=price_paths.open_time,
-        expected_dtype=ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2,
-        expected_axis_order=ARTIFACT_TIME_AXIS_ORDER_V2,
-        expected_shape=None,
-        location="existing prices[1m].open_time",
-    )
-    close_time = _load_validated_array_v2(
-        metadata=existing_section.close_time,
-        expected_path=price_paths.close_time,
-        expected_dtype=ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2,
-        expected_axis_order=ARTIFACT_TIME_AXIS_ORDER_V2,
-        expected_shape=None,
-        location="existing prices[1m].close_time",
-    )
-    ohlcv = _load_validated_array_v2(
-        metadata=existing_section.ohlcv,
-        expected_path=price_paths.ohlcv,
-        expected_dtype=ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2,
-        expected_axis_order=ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2,
-        expected_shape=None,
-        location="existing prices[1m].ohlcv",
-    )
-    arrays = _CanonicalPriceArraysV2(
-        open_time=np.ascontiguousarray(open_time, dtype=np.int64),
-        close_time=np.ascontiguousarray(close_time, dtype=np.int64),
-        ohlcv=np.ascontiguousarray(ohlcv, dtype=np.float32),
-    )
-    _validate_canonical_price_arrays_v2(
-        arrays=arrays,
-        label="existing canonical prices/1m",
-    )
-    expected_coverage = _timeline_coverage_from_arrays_v2(arrays=arrays)
-    if existing_section.coverage != expected_coverage:
-        raise ValueError(
-            "existing prices[1m].coverage must match materialized arrays; "
-            f"got {existing_section.coverage!r}, expected {expected_coverage!r}"
-        )
-    return arrays
 
 
 def _build_tail_plan_v2(
@@ -568,7 +552,7 @@ def _validate_canonical_price_arrays_v2(
     label: str,
 ) -> None:
     """
-    Validate deterministic dtype/shape/timeline invariants for canonical `1m` arrays.
+    Validate deterministic dtype/shape/timeline invariants for materialized price arrays.
 
     Args:
         arrays: Candidate `open_time/close_time/ohlcv` arrays.
@@ -576,7 +560,8 @@ def _validate_canonical_price_arrays_v2(
     Returns:
         None.
     Assumptions:
-        R3-01 stores timestamps separately from OHLCV and uses `volume_base` as the fifth field.
+        Both canonical `1m` and rolled request timeframes store timestamps separately from OHLCV
+        and use `volume_base` as the fifth field.
     Raises:
         ValueError: If dtypes, shapes, or monotonicity invariants are violated.
     Side Effects:
@@ -603,15 +588,11 @@ def _validate_canonical_price_arrays_v2(
             f"got {arrays.ohlcv.dtype.name!r}"
         )
     if len(arrays.open_time.shape) != 1:
-        raise ValueError(f"{label} open_time shape must be [T_1m]; got {arrays.open_time.shape!r}")
+        raise ValueError(f"{label} open_time shape must be [T]; got {arrays.open_time.shape!r}")
     if len(arrays.close_time.shape) != 1:
-        raise ValueError(
-            f"{label} close_time shape must be [T_1m]; got {arrays.close_time.shape!r}"
-        )
+        raise ValueError(f"{label} close_time shape must be [T]; got {arrays.close_time.shape!r}")
     if arrays.ohlcv.ndim != 2 or arrays.ohlcv.shape[1] != 5:
-        raise ValueError(
-            f"{label} ohlcv shape must be [T_1m, 5]; got {arrays.ohlcv.shape!r}"
-        )
+        raise ValueError(f"{label} ohlcv shape must be [T, 5]; got {arrays.ohlcv.shape!r}")
     if arrays.open_time.shape[0] == 0:
         raise ValueError(f"{label} must contain at least one bar")
     if arrays.close_time.shape[0] != arrays.open_time.shape[0]:
@@ -630,6 +611,103 @@ def _validate_canonical_price_arrays_v2(
         raise ValueError(f"{label} must be strictly increasing by close_time")
     if not np.all(arrays.close_time > arrays.open_time):
         raise ValueError(f"{label} must satisfy close_time[i] > open_time[i] for every bar")
+
+
+def _validate_rollup_source_one_minute_arrays_v2(
+    *,
+    arrays: _CanonicalPriceArraysV2,
+    label: str,
+) -> None:
+    """
+    Validate strict rollup-source invariants for canonical `prices/1m` arrays.
+
+    Args:
+        arrays: Candidate canonical `1m` arrays intended to drive derived rollups.
+        label: Stable human-readable label used in fail-fast diagnostics.
+    Returns:
+        None.
+    Assumptions:
+        R3-02 rollup reads only from materialized `prices/1m` and expects exact `1m` bucket
+        boundaries with no overlapping rows.
+    Raises:
+        ValueError: If one timestamp is not `1m`-aligned, if `close_time != open_time + 1m`, or
+            if adjacent rows overlap in time.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    _validate_canonical_price_arrays_v2(arrays=arrays, label=label)
+    source_timeframe = Timeframe(_CANONICAL_PRICE_TIMEFRAME_LITERAL_V2)
+    if not np.all(
+        arrays.open_time
+        == np.asarray(
+            [
+                _bucket_open_epoch_millis_v2(timeframe=source_timeframe, value=int(open_time))
+                for open_time in arrays.open_time
+            ],
+            dtype=np.int64,
+        )
+    ):
+        raise ValueError(f"{label} open_time must be epoch-aligned to 1m bucket boundaries")
+    expected_close = arrays.open_time + np.int64(_ONE_MINUTE_MILLIS_V2)
+    if not np.array_equal(arrays.close_time, expected_close):
+        raise ValueError(f"{label} close_time must equal open_time + 60000 for every 1m bar")
+    if arrays.open_time.shape[0] > 1 and not np.all(arrays.open_time[1:] >= arrays.close_time[:-1]):
+        raise ValueError(f"{label} must not contain overlapping 1m bars")
+
+
+def _validate_rolled_price_arrays_v2(
+    *,
+    arrays: _CanonicalPriceArraysV2,
+    timeframe: str,
+) -> None:
+    """
+    Validate strict dtype, shape, and bucket-boundary invariants for rolled prices.
+
+    Args:
+        arrays: Candidate rolled `open_time/close_time/ohlcv` arrays.
+        timeframe: Target rolled timeframe literal.
+    Returns:
+        None.
+    Assumptions:
+        R3-02 stores timestamps outside `ohlcv` and writes only epoch-aligned full buckets.
+    Raises:
+        ValueError: If arrays violate dtype, shape, monotonicity, or boundary alignment rules.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    label = f"rolled prices[{timeframe}]"
+    _validate_canonical_price_arrays_v2(arrays=arrays, label=label)
+    target_timeframe = Timeframe(timeframe)
+    if not np.all(
+        arrays.open_time
+        == np.asarray(
+            [
+                _bucket_open_epoch_millis_v2(timeframe=target_timeframe, value=int(open_time))
+                for open_time in arrays.open_time
+            ],
+            dtype=np.int64,
+        )
+    ):
+        raise ValueError(
+            f"{label} open_time must be epoch-aligned to {timeframe} bucket boundaries"
+        )
+    expected_close = arrays.open_time + np.int64(_timeframe_duration_millis_v2(target_timeframe))
+    if not np.array_equal(arrays.close_time, expected_close):
+        raise ValueError(f"{label} close_time must equal open_time + {timeframe} duration")
+    if arrays.open_time.shape[0] > 1 and not np.all(arrays.open_time[1:] >= arrays.close_time[:-1]):
+        raise ValueError(f"{label} must not contain overlapping rolled buckets")
 
 
 def _slice_canonical_price_arrays_v2(
@@ -816,8 +894,45 @@ def _build_one_minute_price_manifest_v2(
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
-    return ArtifactPriceTimeframeManifestV2(
+    return _build_price_manifest_v2(
+        slot_root=slot_root,
         timeframe=_CANONICAL_PRICE_TIMEFRAME_LITERAL_V2,
+        price_paths=price_paths,
+        arrays=arrays,
+    )
+
+
+def _build_price_manifest_v2(
+    *,
+    slot_root: Path,
+    timeframe: str,
+    price_paths: ArtifactPricePathsV2,
+    arrays: _CanonicalPriceArraysV2,
+) -> ArtifactPriceTimeframeManifestV2:
+    """
+    Build strict root-manifest metadata for one freshly written `prices/<tf>` family.
+
+    Args:
+        slot_root: Absolute inactive-slot root directory.
+        timeframe: Price timeframe literal addressed by `price_paths`.
+        price_paths: Explicit inactive-slot `prices/<tf>` file paths.
+        arrays: Freshly written strict price arrays for the timeframe.
+    Returns:
+        ArtifactPriceTimeframeManifestV2: Strict `prices/<tf>` manifest section.
+    Assumptions:
+        Files were already atomically written and are ready for `sha256` calculation.
+    Raises:
+        OSError: If one written file cannot be hashed.
+    Side Effects:
+        Reads written `.npy` files to compute `sha256`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return ArtifactPriceTimeframeManifestV2(
+        timeframe=timeframe,
         open_time=ArtifactArrayMetadataV2(
             path=_slot_relative_path_v2(slot_root=slot_root, absolute_path=price_paths.open_time),
             dtype=arrays.open_time.dtype.name,
@@ -843,20 +958,503 @@ def _build_one_minute_price_manifest_v2(
     )
 
 
+def _load_materialized_price_arrays_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    timeframe: str,
+    manifest_section: ArtifactPriceTimeframeManifestV2,
+    location_prefix: str,
+) -> _CanonicalPriceArraysV2:
+    """
+    Load one already-materialized `prices/<tf>` family using strict manifest metadata.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Slot literal containing the price files.
+        timeframe: Price timeframe literal for the section.
+        manifest_section: Typed root-manifest price section referencing the files.
+        location_prefix: Stable diagnostic prefix used in validation errors.
+    Returns:
+        _CanonicalPriceArraysV2: Contiguous validated price arrays loaded from disk.
+    Assumptions:
+        R3-02 rollup must read from materialized `prices/1m` artifacts rather than from source
+        rows directly.
+    Raises:
+        FileNotFoundError: If one expected `.npy` file is missing.
+        ValueError: If strict metadata or actual file contents drift from the manifest section.
+    Side Effects:
+        Reads three `.npy` files from disk.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    price_paths = artifact_loader.resolve_price_paths(coordinates, slot, timeframe)
+    open_time = _load_validated_array_v2(
+        metadata=manifest_section.open_time,
+        expected_path=price_paths.open_time,
+        expected_dtype=ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2,
+        expected_axis_order=ARTIFACT_TIME_AXIS_ORDER_V2,
+        expected_shape=None,
+        location=f"{location_prefix}.open_time",
+    )
+    close_time = _load_validated_array_v2(
+        metadata=manifest_section.close_time,
+        expected_path=price_paths.close_time,
+        expected_dtype=ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2,
+        expected_axis_order=ARTIFACT_TIME_AXIS_ORDER_V2,
+        expected_shape=None,
+        location=f"{location_prefix}.close_time",
+    )
+    ohlcv = _load_validated_array_v2(
+        metadata=manifest_section.ohlcv,
+        expected_path=price_paths.ohlcv,
+        expected_dtype=ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2,
+        expected_axis_order=ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2,
+        expected_shape=None,
+        location=f"{location_prefix}.ohlcv",
+    )
+    arrays = _CanonicalPriceArraysV2(
+        open_time=np.ascontiguousarray(open_time, dtype=np.int64),
+        close_time=np.ascontiguousarray(close_time, dtype=np.int64),
+        ohlcv=np.ascontiguousarray(ohlcv, dtype=np.float32),
+    )
+    if timeframe == _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2:
+        _validate_rollup_source_one_minute_arrays_v2(arrays=arrays, label=location_prefix)
+    else:
+        _validate_rolled_price_arrays_v2(arrays=arrays, timeframe=timeframe)
+    expected_coverage = _timeline_coverage_from_arrays_v2(arrays=arrays)
+    if manifest_section.coverage != expected_coverage:
+        raise ValueError(
+            f"{location_prefix}.coverage must match materialized arrays; got "
+            f"{manifest_section.coverage!r}, expected {expected_coverage!r}"
+        )
+    return arrays
+
+
+def _load_existing_price_timeframe_arrays_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
+    timeframe: str,
+) -> _CanonicalPriceArraysV2 | None:
+    """
+    Load existing inactive-slot `prices/<tf>` arrays when that timeframe is already present.
+
+    Args:
+        artifact_loader: Explicit-path manifest loader.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Candidate inactive slot literal.
+        existing_manifest: Already-loaded inactive-slot root manifest, if any.
+        timeframe: Price timeframe literal to load.
+    Returns:
+        _CanonicalPriceArraysV2 | None: Existing arrays when the timeframe is already materialized.
+    Assumptions:
+        Tail update may reuse a strict prefix only from the current inactive-slot artifact files.
+    Raises:
+        ValueError: If manifest metadata or referenced files violate strict price contracts.
+    Side Effects:
+        Reads existing `.npy` files from the inactive slot when the timeframe is present.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if existing_manifest is None:
+        return None
+    existing_section = _select_price_manifest_v2(
+        price_sections=existing_manifest.prices,
+        timeframe=timeframe,
+    )
+    if existing_section is None:
+        return None
+    return _load_materialized_price_arrays_v2(
+        artifact_loader=artifact_loader,
+        coordinates=coordinates,
+        slot=slot,
+        timeframe=timeframe,
+        manifest_section=existing_section,
+        location_prefix=f"existing prices[{timeframe}]",
+    )
+
+
+def _materialize_rolled_price_timeframes_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_root: Path,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
+    source_arrays: _CanonicalPriceArraysV2,
+    source_tail_time_range: TimeRange,
+) -> tuple[ArtifactPriceTimeframeManifestV2, ...]:
+    """
+    Materialize deterministic rolled price arrays for all allowed request timeframes.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Inactive slot receiving the rolled arrays.
+        slot_root: Absolute inactive-slot root directory.
+        existing_manifest: Existing inactive-slot root manifest when present.
+        source_arrays: Canonical `prices/1m` arrays loaded back from the materialized artifact.
+        source_tail_time_range: Effective canonical source reread window used for the `1m` build.
+    Returns:
+        tuple[ArtifactPriceTimeframeManifestV2, ...]: Canonically ordered rolled price sections.
+    Assumptions:
+        R3-02 owns every request-level timeframe listed in `ARTIFACT_PRICE_TIMEFRAMES_V2`
+        except canonical `1m`.
+    Raises:
+        ValueError: If source arrays, reused prefixes, or rolled outputs violate strict contracts.
+        OSError: If one `.npy` write or hash read fails.
+    Side Effects:
+        Atomically writes `prices/<tf>/*.npy` files for every rolled timeframe.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    rolled_sections: list[ArtifactPriceTimeframeManifestV2] = []
+    for timeframe in _ROLLED_PRICE_TIMEFRAME_LITERALS_V2:
+        existing_arrays = _load_existing_price_timeframe_arrays_v2(
+            artifact_loader=artifact_loader,
+            coordinates=coordinates,
+            slot=slot,
+            existing_manifest=existing_manifest,
+            timeframe=timeframe,
+        )
+        rolled_arrays = _build_rolled_price_arrays_with_tail_update_v2(
+            source_arrays=source_arrays,
+            existing_arrays=existing_arrays,
+            timeframe=timeframe,
+            source_tail_time_range=source_tail_time_range,
+        )
+        price_paths = artifact_loader.resolve_price_paths(coordinates, slot, timeframe)
+        _write_price_arrays_atomically_v2(price_paths=price_paths, arrays=rolled_arrays)
+        rolled_sections.append(
+            _build_price_manifest_v2(
+                slot_root=slot_root,
+                timeframe=timeframe,
+                price_paths=price_paths,
+                arrays=rolled_arrays,
+            )
+        )
+    return tuple(rolled_sections)
+
+
+def _build_rolled_price_arrays_with_tail_update_v2(
+    *,
+    source_arrays: _CanonicalPriceArraysV2,
+    existing_arrays: _CanonicalPriceArraysV2 | None,
+    timeframe: str,
+    source_tail_time_range: TimeRange,
+) -> _CanonicalPriceArraysV2:
+    """
+    Build one rolled timeframe using bounded tail recompute plus deterministic prefix reuse.
+
+    Args:
+        source_arrays: Final canonical `prices/1m` arrays loaded from the artifact slot.
+        existing_arrays: Existing inactive-slot rolled arrays for the timeframe, when present.
+        timeframe: Target rolled timeframe literal.
+        source_tail_time_range: Effective `1m` reread window that may affect derived buckets.
+    Returns:
+        _CanonicalPriceArraysV2: Final rolled arrays for the target timeframe.
+    Assumptions:
+        Every derived bar is a pure function of canonical `1m` buckets aligned by
+        `Timeframe.bucket_open/bucket_close`.
+    Raises:
+        ValueError: If tail slicing, prefix reuse, or rolled arrays violate strict contracts.
+    Side Effects:
+        Allocates contiguous numpy arrays in memory.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+    """
+    if existing_arrays is None:
+        rolled_arrays = _rollup_price_arrays_from_one_minute_v2(
+            source_arrays=source_arrays,
+            timeframe=timeframe,
+            allow_empty=False,
+        )
+        if rolled_arrays is None:
+            raise ValueError(
+                f"rolled prices[{timeframe}] produced no full buckets from prices[1m] source"
+            )
+        return rolled_arrays
+
+    target_timeframe = Timeframe(timeframe)
+    affected_bucket_open_ms = _bucket_open_epoch_millis_v2(
+        timeframe=target_timeframe,
+        value=_utc_timestamp_to_epoch_millis_v2(source_tail_time_range.start),
+    )
+    prefix_end_idx = int(
+        np.searchsorted(existing_arrays.open_time, np.int64(affected_bucket_open_ms), side="left")
+    )
+    prefix = (
+        None
+        if prefix_end_idx <= 0
+        else _slice_canonical_price_arrays_v2(
+            arrays=existing_arrays,
+            start_idx=0,
+            end_idx=prefix_end_idx,
+        )
+    )
+    source_start_idx = int(
+        np.searchsorted(source_arrays.open_time, np.int64(affected_bucket_open_ms), side="left")
+    )
+    tail_source_arrays = _slice_canonical_price_arrays_v2(
+        arrays=source_arrays,
+        start_idx=source_start_idx,
+        end_idx=int(source_arrays.open_time.shape[0]),
+    )
+    tail = _rollup_price_arrays_from_one_minute_v2(
+        source_arrays=tail_source_arrays,
+        timeframe=timeframe,
+        allow_empty=True,
+    )
+    if tail is None:
+        if prefix is None:
+            raise ValueError(
+                f"rolled prices[{timeframe}] produced no full buckets from prices[1m] source"
+            )
+        return prefix
+    return _merge_rolled_price_arrays_v2(prefix=prefix, tail=tail, timeframe=timeframe)
+
+
+def _rollup_price_arrays_from_one_minute_v2(
+    *,
+    source_arrays: _CanonicalPriceArraysV2,
+    timeframe: str,
+    allow_empty: bool,
+) -> _CanonicalPriceArraysV2 | None:
+    """
+    Roll canonical `1m` arrays into strict `prices/<tf>` buckets with full-bucket semantics.
+
+    Args:
+        source_arrays: Canonical `prices/1m` arrays read from the artifact slot.
+        timeframe: Target rolled timeframe literal.
+        allow_empty: Whether returning `None` is allowed when no full buckets are present.
+    Returns:
+        _CanonicalPriceArraysV2 | None: Rolled arrays, or `None` when `allow_empty=True` and the
+            source slice contains no full buckets.
+    Assumptions:
+        R3-02 stores only fully covered epoch-aligned buckets; partial leading or trailing buckets
+        are skipped deterministically instead of being best-effort backfilled.
+    Raises:
+        ValueError: If the `1m` rollup source violates strict alignment or the result is empty
+            while `allow_empty=False`.
+    Side Effects:
+        Allocates contiguous numpy arrays in memory.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+    """
+    if int(source_arrays.open_time.shape[0]) == 0:
+        if allow_empty:
+            return None
+        raise ValueError(f"rolled prices[{timeframe}] source arrays must contain at least one bar")
+    _validate_rollup_source_one_minute_arrays_v2(
+        arrays=source_arrays,
+        label=f"rollup source prices[1m] for {timeframe}",
+    )
+    target_timeframe = Timeframe(timeframe)
+    bucket_bar_count = _timeframe_duration_millis_v2(target_timeframe) // _ONE_MINUTE_MILLIS_V2
+
+    open_values: list[int] = []
+    close_values: list[int] = []
+    ohlcv_values: list[tuple[float, float, float, float, float]] = []
+    bucket_open_ms: int | None = None
+    bucket_start_idx = 0
+
+    for index in range(int(source_arrays.open_time.shape[0])):
+        row_open_ms = int(source_arrays.open_time[index])
+        row_bucket_open_ms = _bucket_open_epoch_millis_v2(
+            timeframe=target_timeframe,
+            value=row_open_ms,
+        )
+        if bucket_open_ms is None:
+            bucket_open_ms = row_bucket_open_ms
+            bucket_start_idx = index
+            continue
+        if row_bucket_open_ms == bucket_open_ms:
+            continue
+        _append_complete_rollup_bucket_v2(
+            source_arrays=source_arrays,
+            timeframe=target_timeframe,
+            bucket_open_ms=bucket_open_ms,
+            bucket_start_idx=bucket_start_idx,
+            bucket_end_idx=index,
+            bucket_bar_count=bucket_bar_count,
+            open_values=open_values,
+            close_values=close_values,
+            ohlcv_values=ohlcv_values,
+        )
+        bucket_open_ms = row_bucket_open_ms
+        bucket_start_idx = index
+
+    if bucket_open_ms is not None:
+        _append_complete_rollup_bucket_v2(
+            source_arrays=source_arrays,
+            timeframe=target_timeframe,
+            bucket_open_ms=bucket_open_ms,
+            bucket_start_idx=bucket_start_idx,
+            bucket_end_idx=int(source_arrays.open_time.shape[0]),
+            bucket_bar_count=bucket_bar_count,
+            open_values=open_values,
+            close_values=close_values,
+            ohlcv_values=ohlcv_values,
+        )
+
+    if len(open_values) == 0:
+        if allow_empty:
+            return None
+        raise ValueError(f"rolled prices[{timeframe}] produced no full buckets from prices[1m]")
+
+    rolled_arrays = _CanonicalPriceArraysV2(
+        open_time=np.ascontiguousarray(np.asarray(open_values, dtype=np.int64), dtype=np.int64),
+        close_time=np.ascontiguousarray(np.asarray(close_values, dtype=np.int64), dtype=np.int64),
+        ohlcv=np.ascontiguousarray(np.asarray(ohlcv_values, dtype=np.float32), dtype=np.float32),
+    )
+    _validate_rolled_price_arrays_v2(arrays=rolled_arrays, timeframe=timeframe)
+    return rolled_arrays
+
+
+def _append_complete_rollup_bucket_v2(
+    *,
+    source_arrays: _CanonicalPriceArraysV2,
+    timeframe: Timeframe,
+    bucket_open_ms: int,
+    bucket_start_idx: int,
+    bucket_end_idx: int,
+    bucket_bar_count: int,
+    open_values: list[int],
+    close_values: list[int],
+    ohlcv_values: list[tuple[float, float, float, float, float]],
+) -> None:
+    """
+    Append one fully covered epoch-aligned bucket into the rolled output buffers.
+
+    Args:
+        source_arrays: Canonical `1m` source arrays.
+        timeframe: Target timeframe primitive used for bucket boundaries.
+        bucket_open_ms: Epoch-millisecond open boundary of the candidate bucket.
+        bucket_start_idx: Inclusive source row index for the bucket slice.
+        bucket_end_idx: Exclusive source row index for the bucket slice.
+        bucket_bar_count: Required number of `1m` bars for a full bucket.
+        open_values: Mutable output buffer for rolled `open_time`.
+        close_values: Mutable output buffer for rolled `close_time`.
+        ohlcv_values: Mutable output buffer for rolled `ohlcv`.
+    Returns:
+        None.
+    Assumptions:
+        Partial buckets are skipped deterministically; only exact complete coverage is stored.
+    Raises:
+        None.
+    Side Effects:
+        Appends to the mutable output buffers when the bucket is complete.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    bucket_open_slice = source_arrays.open_time[bucket_start_idx:bucket_end_idx]
+    if int(bucket_open_slice.shape[0]) != bucket_bar_count:
+        return
+    expected_open = (
+        np.arange(bucket_bar_count, dtype=np.int64) * np.int64(_ONE_MINUTE_MILLIS_V2)
+    ) + np.int64(bucket_open_ms)
+    if not np.array_equal(bucket_open_slice, expected_open):
+        return
+    bucket_ohlcv = source_arrays.ohlcv[bucket_start_idx:bucket_end_idx]
+    open_values.append(bucket_open_ms)
+    close_values.append(bucket_open_ms + _timeframe_duration_millis_v2(timeframe))
+    ohlcv_values.append(
+        (
+            float(bucket_ohlcv[0, 0]),
+            float(np.max(bucket_ohlcv[:, 1])),
+            float(np.min(bucket_ohlcv[:, 2])),
+            float(bucket_ohlcv[-1, 3]),
+            float(np.sum(bucket_ohlcv[:, 4], dtype=np.float64)),
+        )
+    )
+
+
+def _merge_rolled_price_arrays_v2(
+    *,
+    prefix: _CanonicalPriceArraysV2 | None,
+    tail: _CanonicalPriceArraysV2,
+    timeframe: str,
+) -> _CanonicalPriceArraysV2:
+    """
+    Merge reused rolled prefix bars with a freshly rebuilt tail for one timeframe.
+
+    Args:
+        prefix: Existing rolled bars strictly before the affected bucket boundary.
+        tail: Freshly rebuilt rolled bars from the affected boundary onward.
+        timeframe: Target rolled timeframe literal used in validation labels.
+    Returns:
+        _CanonicalPriceArraysV2: Contiguous merged rolled arrays.
+    Assumptions:
+        Prefix bars always end before the first rebuilt tail bucket when prefix is present.
+    Raises:
+        ValueError: If the merged arrays violate strict rolled-price invariants.
+    Side Effects:
+        Allocates merged contiguous arrays.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if prefix is None or int(prefix.open_time.shape[0]) == 0:
+        return tail
+    merged = _CanonicalPriceArraysV2(
+        open_time=np.ascontiguousarray(
+            np.concatenate((prefix.open_time, tail.open_time)),
+            dtype=np.int64,
+        ),
+        close_time=np.ascontiguousarray(
+            np.concatenate((prefix.close_time, tail.close_time)),
+            dtype=np.int64,
+        ),
+        ohlcv=np.ascontiguousarray(np.concatenate((prefix.ohlcv, tail.ohlcv)), dtype=np.float32),
+    )
+    _validate_rolled_price_arrays_v2(arrays=merged, timeframe=timeframe)
+    return merged
+
+
 def _build_root_manifest_scaffold_v2(
     *,
     existing_manifest: ArtifactManifestDocumentV2 | None,
 ) -> _RootManifestScaffoldV2:
     """
-    Build the non-`prices/1m` root-manifest scaffold for R3-01 stage boundaries.
+    Build the non-price root-manifest scaffold for R3-02 stage boundaries.
 
     Args:
         existing_manifest: Existing inactive-slot root manifest when one is already present.
     Returns:
         _RootManifestScaffoldV2: Preserved sections or explicit deterministic placeholders.
     Assumptions:
-        R3-01 must keep root-manifest schema strict even when `mappings/signals/hit_times` are not
-        materialized yet.
+        R3-02 owns all supported `prices/<tf>` sections, while `mappings/signals/hit_times` may
+        still be placeholders or preserved later-stage sections.
     Raises:
         None.
     Side Effects:
@@ -879,7 +1477,7 @@ def _build_root_manifest_scaffold_v2(
         preserved_prices=tuple(
             section
             for section in existing_manifest.prices
-            if section.timeframe != _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2
+            if section.timeframe not in ARTIFACT_PRICE_TIMEFRAMES_V2
         ),
         mappings=existing_manifest.mappings,
         signals=existing_manifest.signals,
@@ -975,19 +1573,21 @@ def _build_root_manifest_provenance_v2(
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
     request: ArtifactCanonicalPriceExportRequestV2,
     arrays: _CanonicalPriceArraysV2,
+    rolled_sections: tuple[ArtifactPriceTimeframeManifestV2, ...],
 ) -> ArtifactManifestProvenanceV2:
     """
-    Build deterministic root-manifest provenance for canonical `1m` export.
+    Build deterministic root-manifest provenance for canonical `1m` plus rolled prices.
 
     Args:
         runtime_config: Strict artifact runtime config used by the precompute runner.
         request: Explicit export request identity.
-        arrays: Final merged canonical arrays written into the inactive slot.
+        arrays: Final merged canonical `1m` arrays written into the inactive slot.
+        rolled_sections: Rolled price-manifest sections emitted during the same R3-02 build.
     Returns:
         ArtifactManifestProvenanceV2: Strict provenance payload for the root manifest.
     Assumptions:
-        At R3-01 `inputs_sha256` identifies the normalized export request plus emitted canonical
-        `1m` arrays derived from `market_data.canonical_candles_1m`.
+        At R3-02 `inputs_sha256` identifies the normalized export request plus emitted price arrays
+        derived from `market_data.canonical_candles_1m`.
     Raises:
         TypeError: If config hashing encounters an unsupported JSON payload.
     Side Effects:
@@ -1006,6 +1606,7 @@ def _build_root_manifest_provenance_v2(
         inputs_sha256=_build_inputs_sha256_v2(
             request=request,
             arrays=arrays,
+            rolled_sections=rolled_sections,
             lookback_bars=runtime_settings.price_tail_bars_1m,
         ),
     )
@@ -1015,6 +1616,7 @@ def _build_inputs_sha256_v2(
     *,
     request: ArtifactCanonicalPriceExportRequestV2,
     arrays: _CanonicalPriceArraysV2,
+    rolled_sections: tuple[ArtifactPriceTimeframeManifestV2, ...],
     lookback_bars: int,
 ) -> str:
     """
@@ -1022,7 +1624,8 @@ def _build_inputs_sha256_v2(
 
     Args:
         request: Explicit export request identity.
-        arrays: Final merged canonical arrays emitted by the runner.
+        arrays: Final merged canonical `1m` arrays emitted by the runner.
+        rolled_sections: Rolled price-manifest sections emitted by the same build.
         lookback_bars: Effective `lookback_policy.price_tail_bars_1m` used for the build.
     Returns:
         str: Lowercase SHA-256 hex digest.
@@ -1039,6 +1642,7 @@ def _build_inputs_sha256_v2(
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
     digest = hashlib.sha256()
+    rolled_timeframes = tuple(section.timeframe for section in rolled_sections)
     normalized_identity = json.dumps(
         {
             "source_table": _CANONICAL_CANDLE_SOURCE_LITERAL_V2,
@@ -1053,6 +1657,7 @@ def _build_inputs_sha256_v2(
             },
             "asof_date": request.asof_date,
             "lookback_policy.price_tail_bars_1m": lookback_bars,
+            "rolled_price_timeframes": rolled_timeframes,
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -1067,6 +1672,17 @@ def _build_inputs_sha256_v2(
             )
         )
         digest.update(np.ascontiguousarray(array).tobytes(order="C"))
+    for section in rolled_sections:
+        digest.update(section.timeframe.encode("ascii"))
+        for metadata in (section.open_time, section.close_time, section.ohlcv):
+            digest.update(metadata.dtype.encode("ascii"))
+            digest.update(
+                json.dumps(
+                    tuple(int(value) for value in metadata.shape),
+                    separators=(",", ":"),
+                ).encode("ascii")
+            )
+            digest.update(metadata.sha256.encode("ascii"))
     return digest.hexdigest()
 
 
@@ -1076,23 +1692,23 @@ def _build_root_manifest_payload_v2(
     slot: str,
     slot_generation: int,
     root_scaffold: _RootManifestScaffoldV2,
-    one_minute_manifest: ArtifactPriceTimeframeManifestV2,
+    price_manifests: tuple[ArtifactPriceTimeframeManifestV2, ...],
     provenance: ArtifactManifestProvenanceV2,
 ) -> dict[str, Any]:
     """
-    Build the strict root `manifest.yaml` payload for R3-01 canonical `1m` export.
+    Build the strict root `manifest.yaml` payload for R3-02 price materialization.
 
     Args:
         request: Explicit export request identity.
         slot: Inactive slot literal receiving the new root manifest.
         slot_generation: Target slot generation reserved for the next publish switch.
         root_scaffold: Preserved or placeholder non-price manifest sections.
-        one_minute_manifest: Fresh strict `prices/1m` section.
+        price_manifests: Fresh strict `prices/<tf>` sections owned by R3-02.
         provenance: Deterministic root-manifest provenance payload.
     Returns:
         dict[str, Any]: Deterministic YAML payload ready for atomic serialization.
     Assumptions:
-        R3-01 updates only the `1m` price base and root coverage while preserving strict schema.
+        R3-02 updates all price sections while preserving strict schema for later stages.
     Raises:
         None.
     Side Effects:
@@ -1105,7 +1721,7 @@ def _build_root_manifest_payload_v2(
     """
     merged_prices = _merge_price_sections_v2(
         preserved_prices=root_scaffold.preserved_prices,
-        one_minute_manifest=one_minute_manifest,
+        price_manifests=price_manifests,
     )
     return {
         "schema_version": 1,
@@ -1132,14 +1748,14 @@ def _build_root_manifest_payload_v2(
 def _merge_price_sections_v2(
     *,
     preserved_prices: tuple[ArtifactPriceTimeframeManifestV2, ...],
-    one_minute_manifest: ArtifactPriceTimeframeManifestV2,
+    price_manifests: tuple[ArtifactPriceTimeframeManifestV2, ...],
 ) -> tuple[ArtifactPriceTimeframeManifestV2, ...]:
     """
-    Merge preserved non-`1m` price sections with the freshly written strict `1m` section.
+    Merge preserved non-owned price sections with the freshly written R3-02 price sections.
 
     Args:
-        preserved_prices: Existing root price sections excluding `1m`.
-        one_minute_manifest: Fresh `prices/1m` manifest section.
+        preserved_prices: Existing root price sections outside the R3-02 ownership scope.
+        price_manifests: Fresh strict price sections written during the current build.
     Returns:
         tuple[ArtifactPriceTimeframeManifestV2, ...]: Canonically ordered root price sections.
     Assumptions:
@@ -1154,9 +1770,14 @@ def _merge_price_sections_v2(
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
-    merged_by_timeframe: dict[str, ArtifactPriceTimeframeManifestV2] = {
-        one_minute_manifest.timeframe: one_minute_manifest
-    }
+    merged_by_timeframe: dict[str, ArtifactPriceTimeframeManifestV2] = {}
+    for section in price_manifests:
+        if section.timeframe in merged_by_timeframe:
+            raise ValueError(
+                "root manifest price sections contain duplicate timeframe "
+                f"{section.timeframe!r}"
+            )
+        merged_by_timeframe[section.timeframe] = section
     for section in preserved_prices:
         if section.timeframe in merged_by_timeframe:
             raise ValueError(
@@ -1165,10 +1786,7 @@ def _merge_price_sections_v2(
             )
         merged_by_timeframe[section.timeframe] = section
     timeframe_order = {
-        literal: index
-        for index, literal in enumerate(
-            ("1m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "1d", "2d", "3d")
-        )
+        literal: index for index, literal in enumerate(ARTIFACT_PRICE_TIMEFRAMES_V2)
     }
     ordered_sections = sorted(
         merged_by_timeframe.values(),
@@ -1681,6 +2299,57 @@ def _file_sha256_hex_v2(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _timeframe_duration_millis_v2(timeframe: Timeframe) -> int:
+    """
+    Convert one shared-kernel timeframe duration into integer epoch milliseconds.
+
+    Args:
+        timeframe: Shared-kernel timeframe primitive.
+    Returns:
+        int: Whole-millisecond duration of the timeframe.
+    Assumptions:
+        Supported artifact timeframes are fixed UTC durations expressible as whole milliseconds.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/shared-kernel-primitives.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    return int(timeframe.duration() // timedelta(milliseconds=1))
+
+
+def _bucket_open_epoch_millis_v2(*, timeframe: Timeframe, value: int) -> int:
+    """
+    Resolve one epoch-millisecond timestamp to its epoch-aligned bucket open boundary.
+
+    Args:
+        timeframe: Target shared-kernel timeframe primitive.
+        value: Epoch milliseconds for the source timestamp.
+    Returns:
+        int: Epoch milliseconds for the bucket-open boundary.
+    Assumptions:
+        Bucket alignment must flow through `Timeframe.bucket_open(...)`, not ad-hoc day math.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/shared-kernel-primitives.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    return _utc_timestamp_to_epoch_millis_v2(
+        timeframe.bucket_open(_epoch_millis_to_utc_timestamp_v2(value))
+    )
 
 
 def _utc_timestamp_to_epoch_millis_v2(value: UtcTimestamp) -> int:

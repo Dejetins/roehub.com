@@ -15,6 +15,7 @@ from trading.contexts.backtest.adapters.outbound.config import (
     load_backtest_artifacts_runtime_config,
 )
 from trading.contexts.backtest.application.services import (
+    ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCoordinatesV2,
     ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactSignalValidationSpecV2,
@@ -49,7 +50,7 @@ class SyntheticArtifactStoreV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactPrecomputeFixtureV2:
     """
-    Minimal R3-01 fixture with strict config, pointer file, and explicit artifact paths.
+    Minimal R3-02 fixture with strict config, pointer file, and explicit artifact paths.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -213,7 +214,7 @@ def build_artifact_precompute_fixture_v2(
     price_tail_bars_1m: int = 2,
 ) -> ArtifactPrecomputeFixtureV2:
     """
-    Build a minimal strict R3-01 fixture with config and `current.yaml` only.
+    Build a minimal strict R3-02 fixture with config and `current.yaml` only.
 
     Args:
         tmp_path: pytest temporary path fixture.
@@ -221,9 +222,9 @@ def build_artifact_precompute_fixture_v2(
         current_slot_generation: Current published slot generation.
         price_tail_bars_1m: Strict positive `prices/1m` tail reread budget.
     Returns:
-        ArtifactPrecomputeFixtureV2: Strict config/loader/path fixture for R3-01 runner tests.
+        ArtifactPrecomputeFixtureV2: Strict config/loader/path fixture for R3-02 runner tests.
     Assumptions:
-        Runner tests own inactive-slot contents and start without prebuilt `prices/1m` files.
+        Runner tests own inactive-slot contents and start without prebuilt `prices/<tf>` files.
     Raises:
         OSError: If config or pointer files cannot be written.
     Side Effects:
@@ -260,7 +261,7 @@ def build_artifact_precompute_fixture_v2(
                 "backtest_artifacts": {
                     "artifact_root": str(builder.root),
                     "validation_plan": {
-                        "price_timeframes": ["1m"],
+                        "price_timeframes": list(ARTIFACT_PRICE_TIMEFRAMES_V2),
                         "mapping_timeframes": ["15m"],
                         "signal_artifacts": [],
                         "require_hit_times_manifest": False,

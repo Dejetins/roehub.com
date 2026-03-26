@@ -1,18 +1,98 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Iterator
 
 import pytest
 
 from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 import (
+    ArtifactPrecomputeFixtureV2,
     SyntheticArtifactStoreV2,
+    build_artifact_precompute_fixture_v2,
     build_synthetic_artifact_store_v2,
 )
 from trading.contexts.backtest.adapters.outbound import BacktestArtifactPathBuilderV2
 from trading.contexts.backtest.application.services import (
+    ARTIFACT_PRICE_TIMEFRAMES_V2,
+    ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
+    BacktestArtifactPrecomputeRunnerV2,
     YamlBacktestArtifactLoaderV2,
 )
+from trading.contexts.market_data.application.dto import CandleWithMeta
+from trading.shared_kernel.primitives import (
+    Candle,
+    CandleMeta,
+    InstrumentId,
+    MarketId,
+    Symbol,
+    TimeRange,
+    UtcTimestamp,
+)
+
+_PRECOMPUTE_BASE_TIME_UTC = datetime(2026, 3, 26, 0, 0, tzinfo=timezone.utc)
+_PRECOMPUTE_INTEGRATION_MINUTES_V2 = 3 * 24 * 60
+
+
+class _PrecomputeCanonicalReaderForLoaderTest:
+    """
+    Deterministic in-memory canonical reader used by loader integration coverage.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_yaml_backtest_artifact_loader_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    def __init__(self, *, rows: tuple[CandleWithMeta, ...]) -> None:
+        """
+        Store deterministic canonical rows for later `read_1m(...)` filtering.
+
+        Args:
+            rows: Full in-memory canonical candle sequence available to the fake reader.
+        Returns:
+            None.
+        Assumptions:
+            Loader integration only needs deterministic source rows, not instrument branching.
+        Raises:
+            None.
+        Side Effects:
+            Stores the rows in memory for later range filtering.
+        """
+        self._rows = rows
+
+    def read_1m(
+        self,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> Iterator[CandleWithMeta]:
+        """
+        Return rows whose `ts_open` belongs to the requested half-open range.
+
+        Args:
+            instrument_id: Ignored shared-kernel identity passed by the production runner.
+            time_range: Source reread window requested by the runner.
+        Returns:
+            Iterator[CandleWithMeta]: Filtered canonical candle iterator.
+        Assumptions:
+            Integration test validates loader compatibility, not instrument dispatch.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        del instrument_id
+        return iter(
+            tuple(
+                row
+                for row in self._rows
+                if time_range.start.value <= row.candle.ts_open.value < time_range.end.value
+            )
+        )
 
 
 @pytest.fixture()
@@ -193,6 +273,59 @@ def test_yaml_backtest_artifact_loader_v2_avoids_directory_scanning(
     )
 
 
+def test_yaml_backtest_artifact_loader_v2_loads_runner_generated_rollup_manifest(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify the loader parses a real R3-02 runner-generated root manifest with all price TFs.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Loader must remain schema-compatible with the root manifest written by the runner.
+    Raises:
+        AssertionError: If the loader cannot parse or order runner-generated rollup metadata.
+    Side Effects:
+        Builds one inactive-slot artifact tree under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(tmp_path=tmp_path, price_tail_bars_1m=2)
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_PrecomputeCanonicalReaderForLoaderTest(
+            rows=_build_loader_canonical_rows_v2(bar_count=_PRECOMPUTE_INTEGRATION_MINUTES_V2)
+        ),
+    )
+
+    runner.export_canonical_price_1m(
+        _loader_request_v2(
+            fixture=fixture,
+            end_minute=_PRECOMPUTE_INTEGRATION_MINUTES_V2,
+        )
+    )
+    manifest = fixture.loader.load_slot_manifest(fixture.coordinates, fixture.inactive_slot)
+    three_day_paths = fixture.loader.resolve_price_paths(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "3d",
+    )
+
+    assert tuple(item.timeframe for item in manifest.prices) == ARTIFACT_PRICE_TIMEFRAMES_V2
+    assert manifest.prices[-1].timeframe == "3d"
+    assert manifest.prices[-1].coverage.bar_count == 1
+    assert manifest.prices[-1].open_time.path == three_day_paths.open_time.relative_to(
+        three_day_paths.open_time.parents[2]
+    ).as_posix()
+
+
 def test_yaml_backtest_artifact_loader_v2_rejects_invalid_pointer_shape(tmp_path: Path) -> None:
     """
     Verify loader fails fast when strict `current.yaml` misses required fields.
@@ -313,6 +446,114 @@ def test_yaml_backtest_artifact_loader_v2_rejects_invalid_strict_pointer_fields(
 
     with pytest.raises(ValueError, match=error_pattern):
         loader.load_current_pointer(coordinates)
+
+
+def _loader_request_v2(
+    *,
+    fixture: ArtifactPrecomputeFixtureV2,
+    end_minute: int,
+) -> ArtifactCanonicalPriceExportRequestV2:
+    """
+    Build one deterministic R3-02 precompute request for loader integration coverage.
+
+    Args:
+        fixture: Strict precompute fixture providing artifact coordinates.
+        end_minute: Exclusive end minute offset relative to `_PRECOMPUTE_BASE_TIME_UTC`.
+    Returns:
+        ArtifactCanonicalPriceExportRequestV2: Explicit runner request DTO.
+    Assumptions:
+        Loader integration uses the same aligned UTC base as the runner unit tests.
+    Raises:
+        ValueError: If request identity violates strict export contracts.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return ArtifactCanonicalPriceExportRequestV2(
+        coordinates=fixture.coordinates,
+        time_range=TimeRange(
+            start=UtcTimestamp(_PRECOMPUTE_BASE_TIME_UTC),
+            end=UtcTimestamp(_PRECOMPUTE_BASE_TIME_UTC + timedelta(minutes=end_minute)),
+        ),
+        asof_date="2026-03-26",
+        generated_at_utc="2026-03-26T03:00:00Z",
+    )
+
+
+def _build_loader_canonical_rows_v2(*, bar_count: int) -> tuple[CandleWithMeta, ...]:
+    """
+    Build deterministic aligned canonical rows for loader integration coverage.
+
+    Args:
+        bar_count: Number of contiguous `1m` bars to build from `_PRECOMPUTE_BASE_TIME_UTC`.
+    Returns:
+        tuple[CandleWithMeta, ...]: Deterministic canonical candle rows.
+    Assumptions:
+        Loader integration needs only stable aligned rows, not complex update scenarios.
+    Raises:
+        ValueError: If one constructed candle violates shared-kernel invariants.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+    Related:
+      - src/trading/contexts/market_data/application/dto/candle_with_meta.py
+    """
+    return tuple(
+        _build_loader_canonical_row_v2(bar_index=bar_index) for bar_index in range(bar_count)
+    )
+
+
+def _build_loader_canonical_row_v2(*, bar_index: int) -> CandleWithMeta:
+    """
+    Build one deterministic aligned canonical `1m` row for loader integration tests.
+
+    Args:
+        bar_index: Minute offset relative to `_PRECOMPUTE_BASE_TIME_UTC`.
+    Returns:
+        CandleWithMeta: Deterministic canonical candle row.
+    Assumptions:
+        The integration test only needs monotonically increasing aligned minute candles.
+    Raises:
+        ValueError: If one constructed candle violates shared-kernel invariants.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+    Related:
+      - src/trading/shared_kernel/primitives/candle.py
+    """
+    ts_open = _PRECOMPUTE_BASE_TIME_UTC + timedelta(minutes=bar_index)
+    ts_close = ts_open + timedelta(minutes=1)
+    base_price = float(bar_index + 1)
+    return CandleWithMeta(
+        candle=Candle(
+            instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+            ts_open=UtcTimestamp(ts_open),
+            ts_close=UtcTimestamp(ts_close),
+            open=base_price,
+            high=base_price + 0.5,
+            low=base_price - 0.25,
+            close=base_price + 0.25,
+            volume_base=10.0 + float(bar_index),
+            volume_quote=None,
+        ),
+        meta=CandleMeta(
+            source="rest",
+            ingested_at=UtcTimestamp(ts_close),
+            ingest_id=None,
+            instrument_key="binance:spot:BTCUSDT",
+            trades_count=1,
+            taker_buy_volume_base=None,
+            taker_buy_volume_quote=None,
+        ),
+    )
 
 
 def _forbid_directory_scan(*_args: object, **_kwargs: object) -> None:

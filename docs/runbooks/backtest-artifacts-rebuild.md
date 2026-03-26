@@ -99,9 +99,10 @@ Fail-fast loader обязан reject'ить:
 - не использовать directory scanning как способ discover'ить содержимое;
 - не изменять active slot contents.
 
-R3-01 exception boundary:
+R3-01 / R3-02 exception boundary:
 
-- до R3-04/R4/R5 rebuild может materialize only `prices/1m/*`;
+- до R3-04/R4/R5 rebuild может materialize `prices/1m/*` и rolled `prices/<tf>/*` для всех
+  allowed request TF;
 - в таком случае root `manifest.yaml` всё равно остаётся strict:
   - `mappings: []`
   - `signals.supported_timeframes: []`
@@ -143,10 +144,13 @@ R3-01 exception boundary:
 - validation идёт только по явным path targets/timeframes/indicator ids;
 - hidden scanning / best-effort discovery не допускаются.
 
-Для R3-01 rebuild-only stage оператор должен явно понимать:
+Для R3-01 / R3-02 rebuild-only stage оператор должен явно понимать:
 
 - `prices/1m` можно пересобирать и tail-update'ить по
   `lookback_policy.price_tail_bars_1m` без pointer switch;
+- rolled `prices/<tf>` пересчитываются из materialized `prices/1m` и переиспользуют unaffected
+  prefix до bucket, в который попадает reread-tail start;
+- rebuild обязан валидировать epoch-aligned bucket boundaries и full-bucket coverage для rolled TF;
 - publish остаётся запрещённым, если active validation plan still expects later-stage artifacts.
 
 Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.

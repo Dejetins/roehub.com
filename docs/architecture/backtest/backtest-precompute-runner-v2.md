@@ -1,6 +1,6 @@
-# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01)
+# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02)
 
-Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01`
+Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02`
 
 Документ фиксирует контракт precompute/publish слоя, который:
 
@@ -50,30 +50,51 @@ Precompute runner v2 обязан:
   - `timeline` coverage
 - завершать publish только после whole-slot validation.
 
-### R3-01 canonical `1m` export
+### R3-01 / R3-02 prices stage
 
-На этапе R3-01 precompute runner получает отдельную обязанность:
+На этапах R3-01 / R3-02 precompute runner получает отдельную обязанность:
 
-- материализовать canonical source-of-truth export только для `prices/1m/*` в inactive slot;
-- писать:
-  - `prices/1m/open_time.i64.npy`
-  - `prices/1m/close_time.i64.npy`
-  - `prices/1m/ohlcv.f32.npy`
-- использовать source table `market_data.canonical_candles_1m` через existing
-  `CanonicalCandleReader` contract;
+- материализовать canonical source-of-truth export для `prices/1m/*` в inactive slot;
+- затем построить из materialized `prices/1m/*` только разрешённые request TF:
+  - `15m`
+  - `30m`
+  - `1h`
+  - `2h`
+  - `4h`
+  - `6h`
+  - `8h`
+  - `1d`
+  - `2d`
+  - `3d`
+- писать для каждого TF:
+  - `prices/<tf>/open_time.i64.npy`
+  - `prices/<tf>/close_time.i64.npy`
+  - `prices/<tf>/ohlcv.f32.npy`
+- использовать source table `market_data.canonical_candles_1m` только для canonical `1m`
+  export через existing `CanonicalCandleReader` contract;
+- строить rollup только из artifact-backed `prices/1m`, без ClickHouse reads на runtime hot path;
 - поддерживать deterministic tail update по
   `backtest_artifacts.lookback_policy.price_tail_bars_1m`;
 - никогда не мутировать active slot in place.
 
-Tail update semantics для R3-01:
+Tail update semantics для R3-01 / R3-02:
 
 - если inactive slot ещё не содержит valid `prices/1m`, выполняется full build по заданному
-  `TimeRange [start, end)`;
+  `TimeRange [start, end)`, затем full rollup для всех allowed request TF;
 - если `prices/1m` уже существует в inactive slot, runner переиспользует prefix внутри requested
   range и reread'ит только tail overlap длиной `price_tail_bars_1m`;
-- merge policy фиксирована как `prefix + reread_tail`, без best-effort dedup/coercion;
+- для rolled `prices/<tf>` prefix reuse считается от bucket, в который попадает reread-tail start;
+- merge policy фиксирована как `prefix + rebuilt_tail`, без best-effort dedup/coercion;
 - identical source candles + identical config/request должны давать byte-stable `.npy` и
   `manifest.yaml`.
+
+Rollup contract для R3-02:
+
+- bucket boundaries считаются только через `Timeframe.bucket_open/bucket_close`;
+- materialize'ятся только fully covered epoch-aligned buckets;
+- partial leading/trailing buckets детерминированно отбрасываются;
+- `open_time` / `close_time` пишутся отдельно от `ohlcv`;
+- root manifest обязан содержать metadata и coverage для `1m` и всех rolled request TF.
 
 Precompute runner v2 не должен:
 
@@ -100,10 +121,9 @@ Root manifest обязан фиксировать:
   - `value_set: [-1, 0, 1]`
 - `provenance`.
 
-R3-01 placeholder strategy до materialization следующих stage:
+R3-01 / R3-02 placeholder strategy до materialization следующих stage:
 
-- `prices[]` содержит свежий strict section для `1m` и может сохранять уже существующие non-`1m`
-  sections, если они были подготовлены в том же inactive slot более поздним stage;
+- `prices[]` содержит свежие strict sections для `1m` и всех allowed request TF;
 - `mappings[]` может оставаться пустым до R3-03;
 - `signals` фиксируется как explicit empty catalog
   (`supported_timeframes=[]`, `supported_indicator_ids=[]`, `manifests=[]`) до R4;
@@ -179,7 +199,7 @@ Whole-slot validator обязан идти в фиксированном пор�
 
 ## Publish interaction
 
-R3-01 сам по себе не делает slot publish-ready.
+R3-01 / R3-02 сами по себе не делают slot publish-ready.
 Если `validation_plan` всё ещё требует `mappings`, `signals` или real `hit_times`, whole-slot
 validation обязана fail-fast и pointer switch не выполняется до соответствующих later epics.
 

@@ -163,14 +163,28 @@ artifacts/backtest/v2/
 | Hit times | `<slot>/hit_times/1m/short_tp.u32.npy` |
 | Hit times | `<slot>/hit_times/1m/short_sl.u32.npy` |
 
-## R3-01 stage boundary
+## R3-01 / R3-02 stage boundary
 
-До R3-04/R4/R5 store contract уже требует strict root `manifest.yaml`, но R3-01 materializes only
-canonical `prices/1m`.
+До R3-04/R4/R5 store contract уже требует strict root `manifest.yaml`, но цены materialize'ятся
+поэтапно:
+
+- R3-01 materializes canonical `prices/1m`;
+- R3-02 materializes `prices/<tf>` для всех allowed request TF из artifact-backed `prices/1m`.
 
 На этом этапе допустимо и ожидаемо:
 
 - `prices/1m/*` присутствуют как real artifact files с strict metadata;
+- после R3-02 присутствуют real artifact files и strict manifest metadata для:
+  - `prices/15m/*`
+  - `prices/30m/*`
+  - `prices/1h/*`
+  - `prices/2h/*`
+  - `prices/4h/*`
+  - `prices/6h/*`
+  - `prices/8h/*`
+  - `prices/1d/*`
+  - `prices/2d/*`
+  - `prices/3d/*`
 - `mappings[]` в root manifest остаётся пустым до R3-03;
 - `signals` в root manifest остаётся explicit empty catalog до R4;
 - `hit_times` в root manifest остаётся explicit fixed-path reference

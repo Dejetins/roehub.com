@@ -9,7 +9,13 @@ def test_timeframe_normalizes_code_and_accepts_supported() -> None:
     assert str(tf) == "1m"
 
     assert Timeframe("5m").code == "5m"
+    assert Timeframe("30m").code == "30m"
     assert Timeframe("1h").code == "1h"
+    assert Timeframe("2h").code == "2h"
+    assert Timeframe("6h").code == "6h"
+    assert Timeframe("8h").code == "8h"
+    assert Timeframe("2d").code == "2d"
+    assert Timeframe("3d").code == "3d"
 
 
 def test_timeframe_rejects_unsupported() -> None:
@@ -34,3 +40,7 @@ def test_timeframe_bucket_alignment_epoch_aligned_utc() -> None:
     tf_1h = Timeframe("1h")
     assert str(tf_1h.bucket_open(ts)) == "2026-02-04T12:00:00.000Z"
     assert str(tf_1h.bucket_close(ts)) == "2026-02-04T13:00:00.000Z"
+
+    tf_3d = Timeframe("3d")
+    assert str(tf_3d.bucket_open(ts)) == "2026-02-03T00:00:00.000Z"
+    assert str(tf_3d.bucket_close(ts)) == "2026-02-06T00:00:00.000Z"

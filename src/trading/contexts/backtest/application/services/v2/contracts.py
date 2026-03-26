@@ -1971,7 +1971,7 @@ class ArtifactPublishResultV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactCanonicalPriceExportRequestV2:
     """
-    Explicit request DTO for canonical `1m` price export into the inactive artifact slot.
+    Explicit request DTO for canonical `1m`-rooted price export into the inactive artifact slot.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -1988,7 +1988,7 @@ class ArtifactCanonicalPriceExportRequestV2:
 
     def __post_init__(self) -> None:
         """
-        Validate stable request identity fields for deterministic canonical `1m` export.
+        Validate stable request identity fields for deterministic R3-02 price export.
 
         Args:
             None.
@@ -2026,7 +2026,7 @@ class ArtifactCanonicalPriceExportRequestV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactCanonicalPriceExportResultV2:
     """
-    Structured result payload for R3-01 canonical `1m` export into the inactive slot.
+    Structured result payload for R3-02 price export into the inactive slot.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -2058,7 +2058,8 @@ class ArtifactCanonicalPriceExportResultV2:
         Returns:
             None.
         Assumptions:
-            Result references already-written artifacts under the deterministic inactive slot.
+            `price_paths` still points to the canonical `prices/1m` family while the root manifest
+            now also references rolled `prices/<tf>` artifacts written in the same build.
         Raises:
             ValueError: If slot identity, slot generation, or count fields are invalid.
         Side Effects:
@@ -2105,7 +2106,7 @@ class ArtifactCanonicalPriceExportResultV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactPrecomputeRuntimeSettingsV2:
     """
-    Minimal service-layer runtime settings required by R3-01 precompute orchestration.
+    Minimal service-layer runtime settings required by R3-02 precompute orchestration.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -2127,7 +2128,8 @@ class ArtifactPrecomputeRuntimeSettingsV2:
         Returns:
             None.
         Assumptions:
-            Adapter/wiring code translates full runtime config into this minimal service DTO.
+            Adapter/wiring code translates the full artifact runtime config into this minimal
+            service DTO for price-stage orchestration.
         Raises:
             ValueError: If the tail lookback or config hash violates strict publish contracts.
         Side Effects:
