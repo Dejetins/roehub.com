@@ -14,6 +14,7 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
 )
 from trading.contexts.backtest.adapters.outbound import BacktestArtifactPathBuilderV2
 from trading.contexts.backtest.application.services import (
+    ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
@@ -277,7 +278,8 @@ def test_yaml_backtest_artifact_loader_v2_loads_runner_generated_rollup_manifest
     tmp_path: Path,
 ) -> None:
     """
-    Verify the loader parses a real R3-02 runner-generated root manifest with all price TFs.
+    Verify the loader parses a real R3-03 runner-generated root manifest with all price and
+    mapping TFs.
 
     Args:
         tmp_path: pytest temporary path fixture.
@@ -317,13 +319,24 @@ def test_yaml_backtest_artifact_loader_v2_loads_runner_generated_rollup_manifest
         fixture.inactive_slot,
         "3d",
     )
+    fifteen_minute_mapping_paths = fixture.loader.resolve_mapping_paths(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "15m",
+    )
 
     assert tuple(item.timeframe for item in manifest.prices) == ARTIFACT_PRICE_TIMEFRAMES_V2
+    assert tuple(item.timeframe for item in manifest.mappings) == ARTIFACT_MAPPING_TIMEFRAMES_V2
     assert manifest.prices[-1].timeframe == "3d"
     assert manifest.prices[-1].coverage.bar_count == 1
     assert manifest.prices[-1].open_time.path == three_day_paths.open_time.relative_to(
         three_day_paths.open_time.parents[2]
     ).as_posix()
+    assert manifest.mappings[0].bar_open_1m_idx.path == (
+        fifteen_minute_mapping_paths.bar_open_1m_idx.relative_to(
+            fifteen_minute_mapping_paths.bar_open_1m_idx.parents[2]
+        ).as_posix()
+    )
 
 
 def test_yaml_backtest_artifact_loader_v2_rejects_invalid_pointer_shape(tmp_path: Path) -> None:

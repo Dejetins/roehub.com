@@ -119,17 +119,18 @@ class BacktestArtifactManifestValidatorV2:
             diagnostics=diagnostics,
         )
 
-        price_by_timeframe = {
-            manifest.timeframe: manifest for manifest in slot_manifest.prices
-        }
+        price_by_timeframe = {manifest.timeframe: manifest for manifest in slot_manifest.prices}
+        price_time_arrays_by_timeframe: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         one_minute_bar_count: int | None = None
         for price_manifest in slot_manifest.prices:
-            self._validate_price_manifest(
+            loaded_time_arrays = self._validate_price_manifest(
                 slot_root=slot_root,
                 slot_manifest_path=slot_manifest.path,
                 price_manifest=price_manifest,
                 diagnostics=diagnostics,
             )
+            if loaded_time_arrays is not None:
+                price_time_arrays_by_timeframe[price_manifest.timeframe] = loaded_time_arrays
             if price_manifest.timeframe == "1m":
                 one_minute_bar_count = price_manifest.coverage.bar_count
 
@@ -141,6 +142,7 @@ class BacktestArtifactManifestValidatorV2:
                 slot_manifest_path=slot_manifest.path,
                 mapping_manifest=mapping_manifest,
                 price_by_timeframe=price_by_timeframe,
+                price_time_arrays_by_timeframe=price_time_arrays_by_timeframe,
                 one_minute_bar_count=one_minute_bar_count,
                 diagnostics=diagnostics,
             )
@@ -364,7 +366,7 @@ class BacktestArtifactManifestValidatorV2:
         slot_manifest_path: Path,
         price_manifest: ArtifactPriceTimeframeManifestV2,
         diagnostics: list[ArtifactValidationDiagnosticV2],
-    ) -> None:
+    ) -> tuple[np.ndarray, np.ndarray] | None:
         """
         Validate one strict `prices/<tf>/` manifest section against array contents.
 
@@ -374,7 +376,8 @@ class BacktestArtifactManifestValidatorV2:
             price_manifest: Typed price-manifest section.
             diagnostics: Mutable diagnostics buffer to extend.
         Returns:
-            None.
+            tuple[np.ndarray, np.ndarray] | None: Loaded `open_time` and `close_time` arrays when
+                both are available for downstream correspondence validation, otherwise `None`.
         Assumptions:
             Price arrays are stored as `.npy` files and are safe to inspect with mmap loading.
         Raises:
@@ -496,6 +499,13 @@ class BacktestArtifactManifestValidatorV2:
                     manifest_path=slot_manifest_path,
                 )
             )
+        if (
+            open_time_array is None
+            or close_time_array is None
+            or open_time_array.shape != close_time_array.shape
+        ):
+            return None
+        return (open_time_array, close_time_array)
 
     def _validate_mapping_manifest(
         self,
@@ -506,6 +516,7 @@ class BacktestArtifactManifestValidatorV2:
         slot_manifest_path: Path,
         mapping_manifest: ArtifactMappingTimeframeManifestV2,
         price_by_timeframe: dict[str, ArtifactPriceTimeframeManifestV2],
+        price_time_arrays_by_timeframe: dict[str, tuple[np.ndarray, np.ndarray]],
         one_minute_bar_count: int | None,
         diagnostics: list[ArtifactValidationDiagnosticV2],
     ) -> None:
@@ -519,6 +530,7 @@ class BacktestArtifactManifestValidatorV2:
             slot_manifest_path: Root manifest path used in diagnostics.
             mapping_manifest: Typed mapping-manifest section.
             price_by_timeframe: Root price sections keyed by timeframe.
+            price_time_arrays_by_timeframe: Loaded root price time arrays keyed by timeframe.
             one_minute_bar_count: Root `1m` timeline length when available.
             diagnostics: Mutable diagnostics buffer to extend.
         Returns:
@@ -635,6 +647,59 @@ class BacktestArtifactManifestValidatorV2:
                         message=(
                             f"mappings[{mapping_manifest.timeframe}] bar_close_1m_idx must stay "
                             f"within [0, {one_minute_bar_count}); mapping bounds contract failed"
+                        ),
+                        location=f"mappings[{mapping_manifest.timeframe}].bar_close_1m_idx",
+                        manifest_path=slot_manifest_path,
+                    )
+                )
+        target_price_arrays = price_time_arrays_by_timeframe.get(mapping_manifest.timeframe)
+        one_minute_price_arrays = price_time_arrays_by_timeframe.get("1m")
+        if (
+            open_idx_array is not None
+            and close_idx_array is not None
+            and target_price_arrays is not None
+            and one_minute_price_arrays is not None
+            and open_idx_array.shape == close_idx_array.shape
+            and open_idx_array.shape == target_price_arrays[0].shape
+            and (
+                one_minute_bar_count is None
+                or (
+                    np.all(open_idx_array < one_minute_bar_count)
+                    and np.all(close_idx_array < one_minute_bar_count)
+                )
+            )
+        ):
+            one_minute_open_time, one_minute_close_time = one_minute_price_arrays
+            target_open_time, target_close_time = target_price_arrays
+            open_index_positions = np.asarray(open_idx_array, dtype=np.intp)
+            close_index_positions = np.asarray(close_idx_array, dtype=np.intp)
+            if not np.array_equal(
+                one_minute_open_time[open_index_positions],
+                target_open_time,
+            ):
+                diagnostics.append(
+                    ArtifactValidationDiagnosticV2(
+                        code="mapping_open_time_correspondence_mismatch",
+                        message=(
+                            f"mappings[{mapping_manifest.timeframe}] must satisfy "
+                            "prices/1m.open_time[bar_open_1m_idx] == "
+                            f"prices[{mapping_manifest.timeframe}].open_time"
+                        ),
+                        location=f"mappings[{mapping_manifest.timeframe}].bar_open_1m_idx",
+                        manifest_path=slot_manifest_path,
+                    )
+                )
+            if not np.array_equal(
+                one_minute_close_time[close_index_positions],
+                target_close_time,
+            ):
+                diagnostics.append(
+                    ArtifactValidationDiagnosticV2(
+                        code="mapping_close_time_correspondence_mismatch",
+                        message=(
+                            f"mappings[{mapping_manifest.timeframe}] must satisfy "
+                            "prices/1m.close_time[bar_close_1m_idx] == "
+                            f"prices[{mapping_manifest.timeframe}].close_time"
                         ),
                         location=f"mappings[{mapping_manifest.timeframe}].bar_close_1m_idx",
                         manifest_path=slot_manifest_path,

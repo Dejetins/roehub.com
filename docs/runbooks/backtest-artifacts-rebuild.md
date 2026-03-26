@@ -99,12 +99,14 @@ Fail-fast loader обязан reject'ить:
 - не использовать directory scanning как способ discover'ить содержимое;
 - не изменять active slot contents.
 
-R3-01 / R3-02 exception boundary:
+R3-01 / R3-02 / R3-03 exception boundary:
 
 - до R3-04/R4/R5 rebuild может materialize `prices/1m/*` и rolled `prices/<tf>/*` для всех
   allowed request TF;
+- после R3-03 rebuild также materialize'ит `mappings/<tf>/bar_open_1m_idx.u32.npy` и
+  `mappings/<tf>/bar_close_1m_idx.u32.npy` для всех allowed request TF;
 - в таком случае root `manifest.yaml` всё равно остаётся strict:
-  - `mappings: []`
+  - `mappings` уже должны содержать real non-empty sections после R3-03;
   - `signals.supported_timeframes: []`
   - `signals.supported_indicator_ids: []`
   - `signals.manifests: []`
@@ -138,19 +140,26 @@ R3-01 / R3-02 exception boundary:
 - `open_time` / `close_time` monotonic;
 - signal value set ограничен `{-1,0,1}`;
 - mapping bounds валидны относительно `1m`;
+- `prices/1m.open_time[bar_open_1m_idx] == prices/<tf>.open_time`;
+- `prices/1m.close_time[bar_close_1m_idx] == prices/<tf>.close_time`;
 - hit-time monotonicity выполняется;
 - validation plan берётся из `backtest_artifacts.validation_plan` и переводится в
   `ArtifactSlotValidationSpecV2`;
 - validation идёт только по явным path targets/timeframes/indicator ids;
 - hidden scanning / best-effort discovery не допускаются.
 
-Для R3-01 / R3-02 rebuild-only stage оператор должен явно понимать:
+Для R3-01 / R3-02 / R3-03 rebuild-only stage оператор должен явно понимать:
 
 - `prices/1m` можно пересобирать и tail-update'ить по
   `lookback_policy.price_tail_bars_1m` без pointer switch;
 - rolled `prices/<tf>` пересчитываются из materialized `prices/1m` и переиспользуют unaffected
   prefix до bucket, в который попадает reread-tail start;
+- `mappings/<tf>` пересчитываются только из materialized `prices/1m` и `prices/<tf>` и
+  переиспользуют unaffected prefix до последнего request-TF бара, чей `close_time` остаётся
+  левее mapping-tail window;
+- mapping tail rebuild bounded by `lookback_policy.mapping_tail_bars_1m`;
 - rebuild обязан валидировать epoch-aligned bucket boundaries и full-bucket coverage для rolled TF;
+- rebuild обязан валидировать mapping monotonicity, bounds и strict price correspondence;
 - publish остаётся запрещённым, если active validation plan still expects later-stage artifacts.
 
 Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.

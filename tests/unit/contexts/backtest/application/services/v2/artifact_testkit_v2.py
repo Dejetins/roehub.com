@@ -15,6 +15,7 @@ from trading.contexts.backtest.adapters.outbound.config import (
     load_backtest_artifacts_runtime_config,
 )
 from trading.contexts.backtest.application.services import (
+    ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCoordinatesV2,
     ArtifactPrecomputeRuntimeSettingsV2,
@@ -212,6 +213,7 @@ def build_artifact_precompute_fixture_v2(
     active_slot: ArtifactSlotLiteralV2 = "slot_a",
     current_slot_generation: int = 4,
     price_tail_bars_1m: int = 2,
+    mapping_tail_bars_1m: int = 10,
 ) -> ArtifactPrecomputeFixtureV2:
     """
     Build a minimal strict R3-02 fixture with config and `current.yaml` only.
@@ -221,6 +223,8 @@ def build_artifact_precompute_fixture_v2(
         active_slot: Active slot literal referenced by `current.yaml`.
         current_slot_generation: Current published slot generation.
         price_tail_bars_1m: Strict positive `prices/1m` tail reread budget.
+        mapping_tail_bars_1m: Strict positive `mappings/<tf>` tail rebuild budget in `1m`
+            bars.
     Returns:
         ArtifactPrecomputeFixtureV2: Strict config/loader/path fixture for R3-02 runner tests.
     Assumptions:
@@ -262,7 +266,7 @@ def build_artifact_precompute_fixture_v2(
                     "artifact_root": str(builder.root),
                     "validation_plan": {
                         "price_timeframes": list(ARTIFACT_PRICE_TIMEFRAMES_V2),
-                        "mapping_timeframes": ["15m"],
+                        "mapping_timeframes": list(ARTIFACT_MAPPING_TIMEFRAMES_V2),
                         "signal_artifacts": [],
                         "require_hit_times_manifest": False,
                     },
@@ -277,7 +281,7 @@ def build_artifact_precompute_fixture_v2(
                     },
                     "lookback_policy": {
                         "price_tail_bars_1m": price_tail_bars_1m,
-                        "mapping_tail_bars_1m": 10,
+                        "mapping_tail_bars_1m": mapping_tail_bars_1m,
                         "signal_tail_bars_1m": 10,
                         "hit_times_tail_bars_1m": 10,
                     },
@@ -299,6 +303,7 @@ def build_artifact_precompute_fixture_v2(
         runtime_config=runtime_config,
         runtime_settings=ArtifactPrecomputeRuntimeSettingsV2(
             price_tail_bars_1m=runtime_config.lookback_policy.price_tail_bars_1m,
+            mapping_tail_bars_1m=runtime_config.lookback_policy.mapping_tail_bars_1m,
             config_sha256=build_backtest_artifacts_runtime_config_hash(
                 config=runtime_config
             ),

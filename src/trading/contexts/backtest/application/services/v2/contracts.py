@@ -2106,7 +2106,7 @@ class ArtifactCanonicalPriceExportResultV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactPrecomputeRuntimeSettingsV2:
     """
-    Minimal service-layer runtime settings required by R3-02 precompute orchestration.
+    Minimal service-layer runtime settings required by R3-03 precompute orchestration.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -2117,6 +2117,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     """
 
     price_tail_bars_1m: int
+    mapping_tail_bars_1m: int
     config_sha256: str
 
     def __post_init__(self) -> None:
@@ -2129,7 +2130,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             None.
         Assumptions:
             Adapter/wiring code translates the full artifact runtime config into this minimal
-            service DTO for price-stage orchestration.
+            service DTO for price+mapping stage orchestration.
         Raises:
             ValueError: If the tail lookback or config hash violates strict publish contracts.
         Side Effects:
@@ -2144,6 +2145,11 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             self,
             "price_tail_bars_1m",
             validate_positive_manifest_int_v2(self.price_tail_bars_1m),
+        )
+        object.__setattr__(
+            self,
+            "mapping_tail_bars_1m",
+            validate_positive_manifest_int_v2(self.mapping_tail_bars_1m),
         )
         object.__setattr__(
             self,

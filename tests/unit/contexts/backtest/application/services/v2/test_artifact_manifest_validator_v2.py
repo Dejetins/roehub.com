@@ -98,6 +98,48 @@ def test_backtest_artifact_manifest_validator_v2_rejects_root_manifest_schema_dr
     assert "unexpected keys" in result.diagnostics[0].message
 
 
+def test_backtest_artifact_manifest_validator_v2_rejects_mapping_price_correspondence_mismatch(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify validator reports a stable diagnostic when mapping indexes no longer match price
+    timelines.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Bounds and monotonicity may still be valid while exact `prices/<tf>` correspondence fails.
+    Raises:
+        AssertionError: If correspondence drift is not reported with the documented error code.
+    Side Effects:
+        Creates and reads a synthetic artifact tree under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    store = build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path,
+        inactive_mapping_open_idx=np.array([1, 2], dtype=np.uint32),
+    )
+    validator = BacktestArtifactManifestValidatorV2(artifact_loader=store.loader)
+
+    result = validator.validate_slot(
+        coordinates=store.coordinates,
+        slot=store.inactive_slot,
+        validation_spec=store.validation_spec,
+        expected_asof_date="2026-03-26",
+        expected_slot_generation=5,
+    )
+
+    assert tuple(diagnostic.code for diagnostic in result.diagnostics) == (
+        "mapping_open_time_correspondence_mismatch",
+    )
+
+
 def test_backtest_artifact_manifest_validator_v2_orders_multiple_diagnostics_deterministically(
     tmp_path: Path,
 ) -> None:

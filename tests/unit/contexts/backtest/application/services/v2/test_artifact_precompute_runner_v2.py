@@ -12,6 +12,7 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     build_artifact_precompute_fixture_v2,
 )
 from trading.contexts.backtest.application.services import (
+    ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PLACEHOLDER_SHA256_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
@@ -140,6 +141,18 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
         fixture=fixture,
         timeframe="1h",
     )
+    fifteen_minute_mapping_open, fifteen_minute_mapping_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="15m",
+    )
+    one_hour_mapping_open, one_hour_mapping_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="1h",
+    )
+    three_day_mapping_open, three_day_mapping_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="3d",
+    )
     three_day_open, three_day_close, three_day_ohlcv = _load_price_arrays_v2(
         fixture=fixture,
         timeframe="3d",
@@ -176,11 +189,11 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     assert ohlcv.shape == (_FULL_BUILD_MINUTES_V2, 5)
     assert np.all(close_time > open_time)
     assert tuple(item.timeframe for item in manifest.prices) == ARTIFACT_PRICE_TIMEFRAMES_V2
+    assert tuple(item.timeframe for item in manifest.mappings) == ARTIFACT_MAPPING_TIMEFRAMES_V2
     assert (
         {item.timeframe: item.coverage.bar_count for item in manifest.prices}
         == expected_bar_counts
     )
-    assert manifest.mappings == ()
     assert manifest.signals.supported_timeframes == ()
     assert manifest.signals.supported_indicator_ids == ()
     assert manifest.signals.manifests == ()
@@ -202,8 +215,30 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
         one_hour_ohlcv[0],
         _expected_bucket_ohlcv_v2(bar_indexes=tuple(range(60))),
     )
+    assert fifteen_minute_mapping_open.dtype == np.uint32
+    assert fifteen_minute_mapping_close.dtype == np.uint32
+    assert fifteen_minute_mapping_open.shape == (288,)
+    assert fifteen_minute_mapping_close.shape == (288,)
+    np.testing.assert_array_equal(
+        fifteen_minute_mapping_open,
+        np.arange(0, _FULL_BUILD_MINUTES_V2, 15, dtype=np.uint32),
+    )
+    np.testing.assert_array_equal(
+        fifteen_minute_mapping_close,
+        np.arange(14, _FULL_BUILD_MINUTES_V2, 15, dtype=np.uint32),
+    )
+    np.testing.assert_array_equal(
+        one_hour_mapping_open,
+        np.arange(0, _FULL_BUILD_MINUTES_V2, 60, dtype=np.uint32),
+    )
+    np.testing.assert_array_equal(
+        one_hour_mapping_close,
+        np.arange(59, _FULL_BUILD_MINUTES_V2, 60, dtype=np.uint32),
+    )
     assert three_day_open.tolist() == [_epoch_ms_for_minute_v2(0)]
     assert three_day_close.tolist() == [_epoch_ms_for_minute_v2(_FULL_BUILD_MINUTES_V2)]
+    assert three_day_mapping_open.tolist() == [0]
+    assert three_day_mapping_close.tolist() == [_FULL_BUILD_MINUTES_V2 - 1]
     np.testing.assert_allclose(
         three_day_ohlcv[0],
         _expected_bucket_ohlcv_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2))),
@@ -323,6 +358,115 @@ def test_backtest_artifact_precompute_runner_v2_uses_deterministic_tail_update(
         ),
     )
     assert initial_one_minute_open.tolist() == open_time.tolist()
+
+
+def test_backtest_artifact_precompute_runner_v2_appends_mapping_tail_deterministically(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify R3-03 reuses existing mapping prefix rows and appends only the rebuilt tail.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Inactive slot already contains a previous strict export and the next request extends the
+        timeline by exactly one additional `1h` window.
+    Raises:
+        AssertionError: If mapping prefix rows change or appended rows use incorrect `1m` indexes.
+    Side Effects:
+        Rewrites inactive-slot price and mapping arrays under `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    initial_end_minute = _FULL_BUILD_MINUTES_V2
+    updated_end_minute = _FULL_BUILD_MINUTES_V2 + 60
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        mapping_tail_bars_1m=10,
+    )
+    initial_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(initial_end_minute)))
+        ),
+    )
+    initial_runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=initial_end_minute)
+    )
+    initial_fifteen_minute_open, initial_fifteen_minute_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="15m",
+    )
+    initial_one_hour_open, initial_one_hour_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="1h",
+    )
+
+    updated_reader = _FakeCanonicalCandleReader(
+        rows=_build_canonical_rows_v2(
+            bar_indexes=tuple(range(initial_end_minute - 2, updated_end_minute))
+        )
+    )
+    updated_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=updated_reader,
+    )
+    updated_runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=updated_end_minute)
+    )
+    updated_fifteen_minute_open, updated_fifteen_minute_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="15m",
+    )
+    updated_one_hour_open, updated_one_hour_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="1h",
+    )
+
+    assert updated_reader.calls[0] == TimeRange(
+        start=UtcTimestamp(_BASE_TIME_UTC + timedelta(minutes=initial_end_minute - 2)),
+        end=UtcTimestamp(_BASE_TIME_UTC + timedelta(minutes=updated_end_minute)),
+    )
+    np.testing.assert_array_equal(
+        updated_fifteen_minute_open[: initial_fifteen_minute_open.shape[0]],
+        initial_fifteen_minute_open,
+    )
+    np.testing.assert_array_equal(
+        updated_fifteen_minute_close[: initial_fifteen_minute_close.shape[0]],
+        initial_fifteen_minute_close,
+    )
+    np.testing.assert_array_equal(
+        updated_one_hour_open[: initial_one_hour_open.shape[0]],
+        initial_one_hour_open,
+    )
+    np.testing.assert_array_equal(
+        updated_one_hour_close[: initial_one_hour_close.shape[0]],
+        initial_one_hour_close,
+    )
+    np.testing.assert_array_equal(
+        updated_fifteen_minute_open[initial_fifteen_minute_open.shape[0] :],
+        np.asarray([4320, 4335, 4350, 4365], dtype=np.uint32),
+    )
+    np.testing.assert_array_equal(
+        updated_fifteen_minute_close[initial_fifteen_minute_close.shape[0] :],
+        np.asarray([4334, 4349, 4364, 4379], dtype=np.uint32),
+    )
+    np.testing.assert_array_equal(
+        updated_one_hour_open[initial_one_hour_open.shape[0] :],
+        np.asarray([4320], dtype=np.uint32),
+    )
+    np.testing.assert_array_equal(
+        updated_one_hour_close[initial_one_hour_close.shape[0] :],
+        np.asarray([4379], dtype=np.uint32),
+    )
 
 
 def test_backtest_artifact_precompute_runner_v2_is_byte_stable_for_identical_inputs(
@@ -813,6 +957,42 @@ def _load_price_arrays_v2(
     )
 
 
+def _load_mapping_arrays_v2(
+    *,
+    fixture: ArtifactPrecomputeFixtureV2,
+    timeframe: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Load one materialized `mappings/<tf>` family from the inactive slot for assertions.
+
+    Args:
+        fixture: Strict precompute fixture with builder and loader.
+        timeframe: Mapping timeframe literal to read.
+    Returns:
+        tuple[np.ndarray, np.ndarray]: `bar_open_1m_idx` and `bar_close_1m_idx` arrays.
+    Assumptions:
+        Runner tests inspect only the inactive slot written by `export_canonical_price_1m(...)`.
+    Raises:
+        FileNotFoundError: If one expected `.npy` file is missing.
+    Side Effects:
+        Reads two `.npy` files from disk.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    paths = fixture.loader.resolve_mapping_paths(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        timeframe,
+    )
+    return (
+        np.load(paths.bar_open_1m_idx, allow_pickle=False),
+        np.load(paths.bar_close_1m_idx, allow_pickle=False),
+    )
+
+
 def _offset_override_value_v2(
     *,
     offset_overrides: dict[int, tuple[float, float]] | None,
@@ -849,12 +1029,13 @@ def _read_export_bytes_v2(
     result: ArtifactCanonicalPriceExportResultV2,
 ) -> tuple[bytes, ...]:
     """
-    Read root-manifest and all materialized `prices/<tf>` bytes for byte-stability assertions.
+    Read root-manifest plus all materialized `prices/<tf>` and `mappings/<tf>` bytes for
+    byte-stability assertions.
 
     Args:
         result: Structured export result returned by the runner.
     Returns:
-        tuple[bytes, ...]: Bytes for root manifest and every `prices/<tf>` artifact file.
+        tuple[bytes, ...]: Bytes for root manifest and every emitted price/mapping artifact file.
     Assumptions:
         Result exposes `manifest_path` and `price_paths` exactly as the production DTO does.
     Raises:
@@ -875,6 +1056,13 @@ def _read_export_bytes_v2(
                 (slot_root / "prices" / timeframe / "open_time.i64.npy").read_bytes(),
                 (slot_root / "prices" / timeframe / "close_time.i64.npy").read_bytes(),
                 (slot_root / "prices" / timeframe / "ohlcv.f32.npy").read_bytes(),
+            )
+        )
+    for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2:
+        payloads.extend(
+            (
+                (slot_root / "mappings" / timeframe / "bar_open_1m_idx.u32.npy").read_bytes(),
+                (slot_root / "mappings" / timeframe / "bar_close_1m_idx.u32.npy").read_bytes(),
             )
         )
     return tuple(payloads)

@@ -195,6 +195,50 @@ artifacts/backtest/v2/
 Это explicit stage placeholder contract, который later epics обязаны заменить на real manifests и
 validated files перед publish.
 
+## R3-03 stage boundary
+
+После R3-03 store contract ожидает:
+
+- real artifact files для каждого allowed request TF:
+  - `mappings/15m/bar_open_1m_idx.u32.npy`
+  - `mappings/15m/bar_close_1m_idx.u32.npy`
+  - `mappings/30m/bar_open_1m_idx.u32.npy`
+  - `mappings/30m/bar_close_1m_idx.u32.npy`
+  - `mappings/1h/bar_open_1m_idx.u32.npy`
+  - `mappings/1h/bar_close_1m_idx.u32.npy`
+  - `mappings/2h/bar_open_1m_idx.u32.npy`
+  - `mappings/2h/bar_close_1m_idx.u32.npy`
+  - `mappings/4h/bar_open_1m_idx.u32.npy`
+  - `mappings/4h/bar_close_1m_idx.u32.npy`
+  - `mappings/6h/bar_open_1m_idx.u32.npy`
+  - `mappings/6h/bar_close_1m_idx.u32.npy`
+  - `mappings/8h/bar_open_1m_idx.u32.npy`
+  - `mappings/8h/bar_close_1m_idx.u32.npy`
+  - `mappings/1d/bar_open_1m_idx.u32.npy`
+  - `mappings/1d/bar_close_1m_idx.u32.npy`
+  - `mappings/2d/bar_open_1m_idx.u32.npy`
+  - `mappings/2d/bar_close_1m_idx.u32.npy`
+  - `mappings/3d/bar_open_1m_idx.u32.npy`
+  - `mappings/3d/bar_close_1m_idx.u32.npy`
+- non-empty `mappings[]` в root manifest с strict metadata:
+  - `path`
+  - `dtype`
+  - `shape`
+  - `axis_order`
+  - `sha256`
+- mapping arrays должны удовлетворять:
+  - `dtype=uint32`
+  - `shape=[T_tf]`
+  - non-decreasing indexes
+  - `bar_open_1m_idx <= bar_close_1m_idx`
+  - bounds within `[0, T_1m)`
+  - exact correspondence с materialized `prices/1m` и `prices/<tf>`
+
+На этом этапе placeholders сохраняются только для:
+
+- `signals` root catalog до R4;
+- `hit_times/1m/manifest.yaml` reference до R5.
+
 ## Fixed literals and ordering
 
 Слоты фиксированы и упорядочены:
@@ -435,6 +479,8 @@ Per-indicator `signals/<tf>/<indicator_id>/manifest.yaml` обязан соде�
 - monotonic `open_time` и `close_time`;
 - signal value set `{-1,0,1}`;
 - mapping bounds относительно `1m` timeline;
+- `prices/1m.open_time[bar_open_1m_idx] == prices/<tf>.open_time`;
+- `prices/1m.close_time[bar_close_1m_idx] == prices/<tf>.close_time`;
 - hit-time monotonicity;
 - `provenance` field presence/format.
 

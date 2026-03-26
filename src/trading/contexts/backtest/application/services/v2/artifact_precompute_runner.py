@@ -1,4 +1,4 @@
-"""Deterministic R3-02 price materialization into the inactive artifact slot."""
+"""Deterministic R3-03 price and mapping materialization into the inactive artifact slot."""
 
 from __future__ import annotations
 
@@ -27,6 +27,8 @@ from trading.shared_kernel.primitives import (
 
 from .contracts import (
     ARTIFACT_MANIFEST_FILENAME_V2,
+    ARTIFACT_MAPPING_DTYPE_LITERAL_V2,
+    ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PLACEHOLDER_SHA256_V2,
     ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2,
     ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2,
@@ -45,6 +47,7 @@ from .contracts import (
     ArtifactHitTimesReferenceV2,
     ArtifactManifestDocumentV2,
     ArtifactManifestProvenanceV2,
+    ArtifactMappingPathsV2,
     ArtifactMappingTimeframeManifestV2,
     ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactPricePathsV2,
@@ -62,7 +65,7 @@ _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2 = "1m"
 _CANONICAL_CANDLE_SOURCE_LITERAL_V2 = "market_data.canonical_candles_1m"
 _PRECOMPUTE_GENERATOR_LITERAL_V2 = "backtest-artifact-precompute-runner-v2"
-_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r3-02"
+_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r3-03"
 _ONE_MINUTE_MILLIS_V2 = 60 * 1000
 _ROLLED_PRICE_TIMEFRAME_LITERALS_V2 = tuple(
     timeframe
@@ -89,6 +92,23 @@ class _CanonicalPriceArraysV2:
 
 
 @dataclass(frozen=True, slots=True)
+class _TimeframeMappingArraysV2:
+    """
+    Internal immutable container for one `tf -> 1m` mapping artifact family.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    bar_open_1m_idx: np.ndarray
+    bar_close_1m_idx: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
 class _CanonicalPriceTailPlanV2:
     """
     Internal deterministic plan describing prefix reuse and source reread bounds.
@@ -107,7 +127,7 @@ class _CanonicalPriceTailPlanV2:
 @dataclass(frozen=True, slots=True)
 class _RootManifestScaffoldV2:
     """
-    Internal scaffold for root-manifest sections not owned by R3-02 price materialization.
+    Internal scaffold for root-manifest sections not owned by R3-03 price/mapping materialization.
 
     Docs:
       - docs/architecture/backtest/backtest-artifact-store-v2.md
@@ -175,22 +195,25 @@ class BacktestArtifactPrecomputeRunnerV2:
         request: ArtifactCanonicalPriceExportRequestV2,
     ) -> ArtifactCanonicalPriceExportResultV2:
         """
-        Export canonical `1m` and rolled `prices/<tf>` arrays into the inactive slot.
+        Export canonical `1m`, rolled `prices/<tf>`, and `tf -> 1m` mappings into the inactive
+        slot.
 
         Args:
             request: Explicit export identity with symbol coordinates and `TimeRange [start, end)`.
         Returns:
             ArtifactCanonicalPriceExportResultV2: Structured write result for the inactive slot.
         Assumptions:
-            Public API stays rooted in canonical `1m`, while R3-02 also materializes every
-            allowed request timeframe under the same root manifest update.
+            Public API stays rooted in canonical `1m`, while R3-03 also materializes every
+            allowed request timeframe plus deterministic `tf -> 1m` mapping arrays under the same
+            root manifest update.
         Raises:
             FileNotFoundError: If strict `current.yaml` is missing for the symbol root.
-            ValueError: If existing inactive-slot metadata or source candles violate strict
-                ordering/dtype/path contracts.
+            ValueError: If existing inactive-slot metadata, source candles, or derived
+                price-to-mapping correspondence violate strict ordering/dtype/path contracts.
             OSError: If one atomic file write fails.
         Side Effects:
-            Reads canonical candles through the port and atomically replaces inactive-slot files.
+            Reads canonical candles through the port and atomically replaces inactive-slot price,
+            mapping, and root-manifest files.
         Docs:
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/backtest/backtest-precompute-runner-v2.md
@@ -272,12 +295,23 @@ class BacktestArtifactPrecomputeRunnerV2:
             source_arrays=rollup_source_arrays,
             source_tail_time_range=tail_plan.source_time_range,
         )
+        mapping_manifests = _materialize_mapping_timeframes_v2(
+            artifact_loader=self.artifact_loader,
+            coordinates=request.coordinates,
+            slot=inactive_slot,
+            slot_root=slot_root,
+            existing_manifest=existing_manifest,
+            one_minute_arrays=rollup_source_arrays,
+            price_manifests=rolled_price_manifests,
+            mapping_tail_bars_1m=self.runtime_settings.mapping_tail_bars_1m,
+        )
         scaffold = _build_root_manifest_scaffold_v2(existing_manifest=existing_manifest)
         provenance = _build_root_manifest_provenance_v2(
             runtime_settings=self.runtime_settings,
             request=request,
             arrays=materialized_arrays,
             rolled_sections=rolled_price_manifests,
+            mapping_sections=mapping_manifests,
         )
         root_manifest_payload = _build_root_manifest_payload_v2(
             request=request,
@@ -285,6 +319,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             slot_generation=target_slot_generation,
             root_scaffold=scaffold,
             price_manifests=(one_minute_manifest, *rolled_price_manifests),
+            mapping_manifests=mapping_manifests,
             provenance=provenance,
         )
         _write_yaml_atomically_v2(path=manifest_path, payload=root_manifest_payload)
@@ -1152,6 +1187,642 @@ def _materialize_rolled_price_timeframes_v2(
     return tuple(rolled_sections)
 
 
+def _select_mapping_manifest_v2(
+    *,
+    mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
+    timeframe: str,
+) -> ArtifactMappingTimeframeManifestV2 | None:
+    """
+    Select one mapping timeframe section from typed root-manifest mapping sections.
+
+    Args:
+        mapping_sections: Typed root-manifest mapping sections.
+        timeframe: Target mapping timeframe literal.
+    Returns:
+        ArtifactMappingTimeframeManifestV2 | None: Matching section when present.
+    Assumptions:
+        Typed root manifests already enforce one mapping section per timeframe.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    for section in mapping_sections:
+        if section.timeframe == timeframe:
+            return section
+    return None
+
+
+def _load_existing_mapping_arrays_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
+    timeframe: str,
+) -> _TimeframeMappingArraysV2 | None:
+    """
+    Load existing inactive-slot `mappings/<tf>` arrays when that timeframe already exists.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Candidate inactive slot literal.
+        existing_manifest: Already-loaded inactive-slot root manifest, if any.
+        timeframe: Mapping timeframe literal to load.
+    Returns:
+        _TimeframeMappingArraysV2 | None: Existing mapping arrays when present in the slot.
+    Assumptions:
+        Mapping tail update may reuse only already-materialized inactive-slot prefixes.
+    Raises:
+        FileNotFoundError: If manifest metadata references a missing mapping file.
+        ValueError: If existing mapping metadata or files violate strict `uint32/time` contracts.
+    Side Effects:
+        Reads existing mapping `.npy` files from the inactive slot when present.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if existing_manifest is None:
+        return None
+    existing_section = _select_mapping_manifest_v2(
+        mapping_sections=existing_manifest.mappings,
+        timeframe=timeframe,
+    )
+    if existing_section is None:
+        return None
+    mapping_paths = artifact_loader.resolve_mapping_paths(coordinates, slot, timeframe)
+    arrays = _TimeframeMappingArraysV2(
+        bar_open_1m_idx=np.ascontiguousarray(
+            _load_validated_array_v2(
+                metadata=existing_section.bar_open_1m_idx,
+                expected_path=mapping_paths.bar_open_1m_idx,
+                expected_dtype=ARTIFACT_MAPPING_DTYPE_LITERAL_V2,
+                expected_axis_order=ARTIFACT_TIME_AXIS_ORDER_V2,
+                expected_shape=None,
+                location=f"existing mappings[{timeframe}].bar_open_1m_idx",
+            ),
+            dtype=np.uint32,
+        ),
+        bar_close_1m_idx=np.ascontiguousarray(
+            _load_validated_array_v2(
+                metadata=existing_section.bar_close_1m_idx,
+                expected_path=mapping_paths.bar_close_1m_idx,
+                expected_dtype=ARTIFACT_MAPPING_DTYPE_LITERAL_V2,
+                expected_axis_order=ARTIFACT_TIME_AXIS_ORDER_V2,
+                expected_shape=None,
+                location=f"existing mappings[{timeframe}].bar_close_1m_idx",
+            ),
+            dtype=np.uint32,
+        ),
+    )
+    _validate_mapping_index_arrays_v2(
+        arrays=arrays,
+        timeframe=timeframe,
+        target_bar_count=None,
+        one_minute_bar_count=None,
+        label=f"existing mappings[{timeframe}]",
+    )
+    return arrays
+
+
+def _materialize_mapping_timeframes_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_root: Path,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
+    one_minute_arrays: _CanonicalPriceArraysV2,
+    price_manifests: tuple[ArtifactPriceTimeframeManifestV2, ...],
+    mapping_tail_bars_1m: int,
+) -> tuple[ArtifactMappingTimeframeManifestV2, ...]:
+    """
+    Materialize deterministic `tf -> 1m` mapping arrays for all allowed request timeframes.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Inactive slot receiving the mapping arrays.
+        slot_root: Absolute inactive-slot root directory.
+        existing_manifest: Existing inactive-slot root manifest when present.
+        one_minute_arrays: Materialized artifact-backed canonical `prices/1m` arrays.
+        price_manifests: Fresh strict `prices/<tf>` manifest sections for allowed request TFs.
+        mapping_tail_bars_1m: Effective `lookback_policy.mapping_tail_bars_1m`.
+    Returns:
+        tuple[ArtifactMappingTimeframeManifestV2, ...]: Canonically ordered mapping sections.
+    Assumptions:
+        Mapping build uses only materialized artifact-backed `prices/1m` plus `prices/<tf>`
+        arrays and never rereads external sources.
+    Raises:
+        ValueError: If price arrays or reused mapping prefixes violate strict mapping contracts.
+        OSError: If one `.npy` write or hash read fails.
+    Side Effects:
+        Atomically writes `mappings/<tf>/*.npy` files for every allowed request timeframe.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    price_by_timeframe = {section.timeframe: section for section in price_manifests}
+    mapping_sections: list[ArtifactMappingTimeframeManifestV2] = []
+    for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2:
+        price_manifest = price_by_timeframe.get(timeframe)
+        if price_manifest is None:
+            raise ValueError(f"materialized prices[{timeframe}] manifest section is required")
+        timeframe_arrays = _load_materialized_price_arrays_v2(
+            artifact_loader=artifact_loader,
+            coordinates=coordinates,
+            slot=slot,
+            timeframe=timeframe,
+            manifest_section=price_manifest,
+            location_prefix=f"materialized prices[{timeframe}] mapping target",
+        )
+        existing_arrays = _load_existing_mapping_arrays_v2(
+            artifact_loader=artifact_loader,
+            coordinates=coordinates,
+            slot=slot,
+            existing_manifest=existing_manifest,
+            timeframe=timeframe,
+        )
+        mapping_arrays = _build_mapping_arrays_with_tail_update_v2(
+            one_minute_arrays=one_minute_arrays,
+            timeframe_arrays=timeframe_arrays,
+            existing_arrays=existing_arrays,
+            timeframe=timeframe,
+            mapping_tail_bars_1m=mapping_tail_bars_1m,
+        )
+        mapping_paths = artifact_loader.resolve_mapping_paths(coordinates, slot, timeframe)
+        _write_mapping_arrays_atomically_v2(mapping_paths=mapping_paths, arrays=mapping_arrays)
+        mapping_sections.append(
+            _build_mapping_manifest_v2(
+                slot_root=slot_root,
+                timeframe=timeframe,
+                mapping_paths=mapping_paths,
+                arrays=mapping_arrays,
+            )
+        )
+    return tuple(mapping_sections)
+
+
+def _build_mapping_arrays_with_tail_update_v2(
+    *,
+    one_minute_arrays: _CanonicalPriceArraysV2,
+    timeframe_arrays: _CanonicalPriceArraysV2,
+    existing_arrays: _TimeframeMappingArraysV2 | None,
+    timeframe: str,
+    mapping_tail_bars_1m: int,
+) -> _TimeframeMappingArraysV2:
+    """
+    Build one `tf -> 1m` mapping family using bounded tail rebuild plus deterministic prefix reuse.
+
+    Args:
+        one_minute_arrays: Materialized artifact-backed `prices/1m` arrays.
+        timeframe_arrays: Materialized artifact-backed `prices/<tf>` arrays.
+        existing_arrays: Existing inactive-slot mapping arrays for the timeframe, when present.
+        timeframe: Target request timeframe literal.
+        mapping_tail_bars_1m: Effective `lookback_policy.mapping_tail_bars_1m`.
+    Returns:
+        _TimeframeMappingArraysV2: Final strict mapping arrays for the timeframe.
+    Assumptions:
+        A request-TF bar is unaffected when its `close_time` stays strictly before the first
+        `1m` bar open included in the rebuilt tail window.
+    Raises:
+        ValueError: If prefix reuse, rebuilt tail, or final correspondence violates strict
+            mapping contracts.
+    Side Effects:
+        Allocates contiguous numpy arrays in memory.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if existing_arrays is None:
+        return _build_mapping_arrays_from_price_timelines_v2(
+            one_minute_arrays=one_minute_arrays,
+            timeframe_arrays=timeframe_arrays,
+            timeframe=timeframe,
+        )
+
+    one_minute_bar_count = int(one_minute_arrays.open_time.shape[0])
+    if one_minute_bar_count <= mapping_tail_bars_1m:
+        return _build_mapping_arrays_from_price_timelines_v2(
+            one_minute_arrays=one_minute_arrays,
+            timeframe_arrays=timeframe_arrays,
+            timeframe=timeframe,
+        )
+
+    affected_one_minute_start_idx = one_minute_bar_count - mapping_tail_bars_1m
+    affected_one_minute_open_ms = int(one_minute_arrays.open_time[affected_one_minute_start_idx])
+    prefix_end_idx = int(
+        np.searchsorted(
+            timeframe_arrays.close_time,
+            np.int64(affected_one_minute_open_ms),
+            side="right",
+        )
+    )
+    prefix_bar_count = min(prefix_end_idx, int(existing_arrays.bar_open_1m_idx.shape[0]))
+    prefix = (
+        None
+        if prefix_bar_count <= 0
+        else _slice_mapping_arrays_v2(
+            arrays=existing_arrays,
+            start_idx=0,
+            end_idx=prefix_bar_count,
+        )
+    )
+    if prefix_bar_count >= int(timeframe_arrays.open_time.shape[0]):
+        if prefix is None:
+            raise ValueError(f"mappings[{timeframe}] prefix reuse produced no rows")
+        _validate_mapping_arrays_v2(
+            arrays=prefix,
+            one_minute_arrays=one_minute_arrays,
+            timeframe_arrays=timeframe_arrays,
+            timeframe=timeframe,
+            label=f"mappings[{timeframe}]",
+        )
+        return prefix
+
+    tail_price_arrays = _slice_canonical_price_arrays_v2(
+        arrays=timeframe_arrays,
+        start_idx=prefix_bar_count,
+        end_idx=int(timeframe_arrays.open_time.shape[0]),
+    )
+    tail = _build_mapping_arrays_from_price_timelines_v2(
+        one_minute_arrays=one_minute_arrays,
+        timeframe_arrays=tail_price_arrays,
+        timeframe=timeframe,
+    )
+    merged = _merge_mapping_arrays_v2(prefix=prefix, tail=tail)
+    _validate_mapping_arrays_v2(
+        arrays=merged,
+        one_minute_arrays=one_minute_arrays,
+        timeframe_arrays=timeframe_arrays,
+        timeframe=timeframe,
+        label=f"mappings[{timeframe}]",
+    )
+    return merged
+
+
+def _build_mapping_arrays_from_price_timelines_v2(
+    *,
+    one_minute_arrays: _CanonicalPriceArraysV2,
+    timeframe_arrays: _CanonicalPriceArraysV2,
+    timeframe: str,
+) -> _TimeframeMappingArraysV2:
+    """
+    Build strict `tf -> 1m` mappings directly from materialized `prices/1m` and `prices/<tf>`.
+
+    Args:
+        one_minute_arrays: Materialized artifact-backed canonical `prices/1m` arrays.
+        timeframe_arrays: Materialized artifact-backed target `prices/<tf>` arrays.
+        timeframe: Target request timeframe literal.
+    Returns:
+        _TimeframeMappingArraysV2: Strict `uint32` mapping arrays with shape `[T_tf]`.
+    Assumptions:
+        `prices/1m.open_time` and `prices/1m.close_time` are strict monotone arrays and
+        `prices/<tf>` was already materialized from the same artifact-backed timeline.
+    Raises:
+        ValueError: If bounds, monotonicity, or timeline correspondence contracts fail.
+    Side Effects:
+        Allocates contiguous numpy arrays in memory.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    arrays = _TimeframeMappingArraysV2(
+        bar_open_1m_idx=np.ascontiguousarray(
+            np.searchsorted(
+                one_minute_arrays.open_time,
+                timeframe_arrays.open_time,
+                side="left",
+            ),
+            dtype=np.uint32,
+        ),
+        bar_close_1m_idx=np.ascontiguousarray(
+            np.searchsorted(
+                one_minute_arrays.close_time,
+                timeframe_arrays.close_time,
+                side="left",
+            ),
+            dtype=np.uint32,
+        ),
+    )
+    _validate_mapping_arrays_v2(
+        arrays=arrays,
+        one_minute_arrays=one_minute_arrays,
+        timeframe_arrays=timeframe_arrays,
+        timeframe=timeframe,
+        label=f"mappings[{timeframe}]",
+    )
+    return arrays
+
+
+def _slice_mapping_arrays_v2(
+    *,
+    arrays: _TimeframeMappingArraysV2,
+    start_idx: int,
+    end_idx: int,
+) -> _TimeframeMappingArraysV2:
+    """
+    Slice one mapping family into a contiguous `[start_idx:end_idx]` view copy.
+
+    Args:
+        arrays: Source mapping arrays.
+        start_idx: Inclusive slice start.
+        end_idx: Exclusive slice end.
+    Returns:
+        _TimeframeMappingArraysV2: Contiguous mapping sub-slice.
+    Assumptions:
+        Callers already computed valid slice bounds against the source arrays.
+    Raises:
+        IndexError: If slice bounds are outside the source arrays.
+    Side Effects:
+        Allocates contiguous numpy arrays.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    return _TimeframeMappingArraysV2(
+        bar_open_1m_idx=np.ascontiguousarray(
+            arrays.bar_open_1m_idx[start_idx:end_idx],
+            dtype=np.uint32,
+        ),
+        bar_close_1m_idx=np.ascontiguousarray(
+            arrays.bar_close_1m_idx[start_idx:end_idx],
+            dtype=np.uint32,
+        ),
+    )
+
+
+def _merge_mapping_arrays_v2(
+    *,
+    prefix: _TimeframeMappingArraysV2 | None,
+    tail: _TimeframeMappingArraysV2,
+) -> _TimeframeMappingArraysV2:
+    """
+    Merge reused mapping prefix rows with a freshly rebuilt tail.
+
+    Args:
+        prefix: Existing mapping rows strictly before the rebuilt tail window.
+        tail: Freshly rebuilt mapping rows from the tail window onward.
+    Returns:
+        _TimeframeMappingArraysV2: Contiguous merged mapping arrays.
+    Assumptions:
+        Prefix rows always end strictly before the rebuilt target-row window when present.
+    Raises:
+        None.
+    Side Effects:
+        Allocates contiguous numpy arrays.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if prefix is None or int(prefix.bar_open_1m_idx.shape[0]) == 0:
+        return tail
+    return _TimeframeMappingArraysV2(
+        bar_open_1m_idx=np.ascontiguousarray(
+            np.concatenate((prefix.bar_open_1m_idx, tail.bar_open_1m_idx)),
+            dtype=np.uint32,
+        ),
+        bar_close_1m_idx=np.ascontiguousarray(
+            np.concatenate((prefix.bar_close_1m_idx, tail.bar_close_1m_idx)),
+            dtype=np.uint32,
+        ),
+    )
+
+
+def _write_mapping_arrays_atomically_v2(
+    *,
+    mapping_paths: ArtifactMappingPathsV2,
+    arrays: _TimeframeMappingArraysV2,
+) -> None:
+    """
+    Atomically replace inactive-slot `mappings/<tf>/*.npy` files with deterministic bytes.
+
+    Args:
+        mapping_paths: Explicit inactive-slot target paths for `bar_open_1m_idx` and
+            `bar_close_1m_idx`.
+        arrays: Strict mapping arrays to serialize.
+    Returns:
+        None.
+    Assumptions:
+        Temp files are written in the same directory so `os.replace` remains atomic.
+    Raises:
+        OSError: If temp-file write or atomic replace fails.
+    Side Effects:
+        Creates parent directories and replaces two `.npy` files under the inactive slot.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    _write_npy_atomically_v2(path=mapping_paths.bar_open_1m_idx, array=arrays.bar_open_1m_idx)
+    _write_npy_atomically_v2(path=mapping_paths.bar_close_1m_idx, array=arrays.bar_close_1m_idx)
+
+
+def _build_mapping_manifest_v2(
+    *,
+    slot_root: Path,
+    timeframe: str,
+    mapping_paths: ArtifactMappingPathsV2,
+    arrays: _TimeframeMappingArraysV2,
+) -> ArtifactMappingTimeframeManifestV2:
+    """
+    Build strict root-manifest metadata for one freshly written `mappings/<tf>` family.
+
+    Args:
+        slot_root: Absolute inactive-slot root directory.
+        timeframe: Mapping timeframe literal addressed by `mapping_paths`.
+        mapping_paths: Explicit inactive-slot mapping file paths.
+        arrays: Freshly written strict mapping arrays for the timeframe.
+    Returns:
+        ArtifactMappingTimeframeManifestV2: Strict `mappings/<tf>` manifest section.
+    Assumptions:
+        Files were already atomically written and are ready for `sha256` calculation.
+    Raises:
+        OSError: If one written file cannot be hashed.
+    Side Effects:
+        Reads written `.npy` files to compute `sha256`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return ArtifactMappingTimeframeManifestV2(
+        timeframe=timeframe,
+        bar_open_1m_idx=ArtifactArrayMetadataV2(
+            path=_slot_relative_path_v2(
+                slot_root=slot_root,
+                absolute_path=mapping_paths.bar_open_1m_idx,
+            ),
+            dtype=arrays.bar_open_1m_idx.dtype.name,
+            shape=tuple(int(value) for value in arrays.bar_open_1m_idx.shape),
+            axis_order=ARTIFACT_TIME_AXIS_ORDER_V2,
+            sha256=_file_sha256_hex_v2(mapping_paths.bar_open_1m_idx),
+        ),
+        bar_close_1m_idx=ArtifactArrayMetadataV2(
+            path=_slot_relative_path_v2(
+                slot_root=slot_root,
+                absolute_path=mapping_paths.bar_close_1m_idx,
+            ),
+            dtype=arrays.bar_close_1m_idx.dtype.name,
+            shape=tuple(int(value) for value in arrays.bar_close_1m_idx.shape),
+            axis_order=ARTIFACT_TIME_AXIS_ORDER_V2,
+            sha256=_file_sha256_hex_v2(mapping_paths.bar_close_1m_idx),
+        ),
+    )
+
+
+def _validate_mapping_index_arrays_v2(
+    *,
+    arrays: _TimeframeMappingArraysV2,
+    timeframe: str,
+    target_bar_count: int | None,
+    one_minute_bar_count: int | None,
+    label: str,
+) -> None:
+    """
+    Validate intrinsic mapping index invariants independent from price correspondence checks.
+
+    Args:
+        arrays: Candidate mapping arrays.
+        timeframe: Target request timeframe literal.
+        target_bar_count: Optional expected number of request-timeframe rows.
+        one_minute_bar_count: Optional `T_1m` upper bound for index validation.
+        label: Stable human-readable label used in fail-fast diagnostics.
+    Returns:
+        None.
+    Assumptions:
+        Every mapping family stores `uint32` non-decreasing indexes with shape `[T_tf]`.
+    Raises:
+        ValueError: If dtype, shape, monotonicity, ordering, or bounds are invalid.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    del timeframe
+    if arrays.bar_open_1m_idx.dtype.name != ARTIFACT_MAPPING_DTYPE_LITERAL_V2:
+        raise ValueError(
+            f"{label}.bar_open_1m_idx dtype must be {ARTIFACT_MAPPING_DTYPE_LITERAL_V2!r}; got "
+            f"{arrays.bar_open_1m_idx.dtype.name!r}"
+        )
+    if arrays.bar_close_1m_idx.dtype.name != ARTIFACT_MAPPING_DTYPE_LITERAL_V2:
+        raise ValueError(
+            f"{label}.bar_close_1m_idx dtype must be {ARTIFACT_MAPPING_DTYPE_LITERAL_V2!r}; got "
+            f"{arrays.bar_close_1m_idx.dtype.name!r}"
+        )
+    if arrays.bar_open_1m_idx.shape != arrays.bar_close_1m_idx.shape:
+        raise ValueError(
+            f"{label} open/close mapping shapes must match; got "
+            f"{arrays.bar_open_1m_idx.shape!r} and {arrays.bar_close_1m_idx.shape!r}"
+        )
+    if target_bar_count is not None and arrays.bar_open_1m_idx.shape != (target_bar_count,):
+        raise ValueError(
+            f"{label} must have shape ({target_bar_count},); got "
+            f"{arrays.bar_open_1m_idx.shape!r}"
+        )
+    if (
+        arrays.bar_open_1m_idx.shape[0] > 1
+        and not np.all(arrays.bar_open_1m_idx[1:] >= arrays.bar_open_1m_idx[:-1])
+    ):
+        raise ValueError(f"{label}.bar_open_1m_idx must be non-decreasing")
+    if (
+        arrays.bar_close_1m_idx.shape[0] > 1
+        and not np.all(arrays.bar_close_1m_idx[1:] >= arrays.bar_close_1m_idx[:-1])
+    ):
+        raise ValueError(f"{label}.bar_close_1m_idx must be non-decreasing")
+    if not np.all(arrays.bar_open_1m_idx <= arrays.bar_close_1m_idx):
+        raise ValueError(f"{label} must satisfy bar_open_1m_idx <= bar_close_1m_idx")
+    if one_minute_bar_count is not None:
+        if not np.all(arrays.bar_open_1m_idx < one_minute_bar_count):
+            raise ValueError(
+                f"{label}.bar_open_1m_idx must stay within [0, {one_minute_bar_count})"
+            )
+        if not np.all(arrays.bar_close_1m_idx < one_minute_bar_count):
+            raise ValueError(
+                f"{label}.bar_close_1m_idx must stay within [0, {one_minute_bar_count})"
+            )
+
+
+def _validate_mapping_arrays_v2(
+    *,
+    arrays: _TimeframeMappingArraysV2,
+    one_minute_arrays: _CanonicalPriceArraysV2,
+    timeframe_arrays: _CanonicalPriceArraysV2,
+    timeframe: str,
+    label: str,
+) -> None:
+    """
+    Validate full mapping contracts including bounds, monotonicity, and price correspondence.
+
+    Args:
+        arrays: Candidate mapping arrays.
+        one_minute_arrays: Materialized artifact-backed canonical `prices/1m` arrays.
+        timeframe_arrays: Materialized artifact-backed target `prices/<tf>` arrays.
+        timeframe: Target request timeframe literal.
+        label: Stable human-readable label used in fail-fast diagnostics.
+    Returns:
+        None.
+    Assumptions:
+        Strict runtime contract requires `prices/1m.open_time[bar_open_1m_idx]` and
+        `prices/1m.close_time[bar_close_1m_idx]` to match `prices/<tf>` exactly.
+    Raises:
+        ValueError: If intrinsic invariants or exact timeline correspondence fail.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    _validate_mapping_index_arrays_v2(
+        arrays=arrays,
+        timeframe=timeframe,
+        target_bar_count=int(timeframe_arrays.open_time.shape[0]),
+        one_minute_bar_count=int(one_minute_arrays.open_time.shape[0]),
+        label=label,
+    )
+    open_indexes = np.asarray(arrays.bar_open_1m_idx, dtype=np.intp)
+    close_indexes = np.asarray(arrays.bar_close_1m_idx, dtype=np.intp)
+    if not np.array_equal(one_minute_arrays.open_time[open_indexes], timeframe_arrays.open_time):
+        raise ValueError(
+            f"{label} open-time correspondence must satisfy "
+            f"prices/1m.open_time[bar_open_1m_idx] == prices[{timeframe}].open_time"
+        )
+    if not np.array_equal(one_minute_arrays.close_time[close_indexes], timeframe_arrays.close_time):
+        raise ValueError(
+            f"{label} close-time correspondence must satisfy "
+            f"prices/1m.close_time[bar_close_1m_idx] == prices[{timeframe}].close_time"
+        )
+
+
 def _build_rolled_price_arrays_with_tail_update_v2(
     *,
     source_arrays: _CanonicalPriceArraysV2,
@@ -1446,15 +2117,15 @@ def _build_root_manifest_scaffold_v2(
     existing_manifest: ArtifactManifestDocumentV2 | None,
 ) -> _RootManifestScaffoldV2:
     """
-    Build the non-price root-manifest scaffold for R3-02 stage boundaries.
+    Build the non-owned root-manifest scaffold for R3-03 stage boundaries.
 
     Args:
         existing_manifest: Existing inactive-slot root manifest when one is already present.
     Returns:
         _RootManifestScaffoldV2: Preserved sections or explicit deterministic placeholders.
     Assumptions:
-        R3-02 owns all supported `prices/<tf>` sections, while `mappings/signals/hit_times` may
-        still be placeholders or preserved later-stage sections.
+        R3-03 owns all supported `prices/<tf>` and `mappings/<tf>` sections, while
+        `signals/hit_times` may still be placeholders or preserved later-stage sections.
     Raises:
         None.
     Side Effects:
@@ -1479,7 +2150,11 @@ def _build_root_manifest_scaffold_v2(
             for section in existing_manifest.prices
             if section.timeframe not in ARTIFACT_PRICE_TIMEFRAMES_V2
         ),
-        mappings=existing_manifest.mappings,
+        mappings=tuple(
+            section
+            for section in existing_manifest.mappings
+            if section.timeframe not in ARTIFACT_MAPPING_TIMEFRAMES_V2
+        ),
         signals=existing_manifest.signals,
         hit_times=existing_manifest.hit_times,
         signal_encoding=existing_manifest.signal_encoding,
@@ -1574,20 +2249,23 @@ def _build_root_manifest_provenance_v2(
     request: ArtifactCanonicalPriceExportRequestV2,
     arrays: _CanonicalPriceArraysV2,
     rolled_sections: tuple[ArtifactPriceTimeframeManifestV2, ...],
+    mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
 ) -> ArtifactManifestProvenanceV2:
     """
-    Build deterministic root-manifest provenance for canonical `1m` plus rolled prices.
+    Build deterministic root-manifest provenance for canonical prices, rolled prices, and
+    `tf -> 1m` mappings.
 
     Args:
-        runtime_config: Strict artifact runtime config used by the precompute runner.
+        runtime_settings: Strict service runtime settings used by the precompute runner.
         request: Explicit export request identity.
         arrays: Final merged canonical `1m` arrays written into the inactive slot.
-        rolled_sections: Rolled price-manifest sections emitted during the same R3-02 build.
+        rolled_sections: Rolled price-manifest sections emitted during the same R3-03 build.
+        mapping_sections: Mapping-manifest sections emitted during the same R3-03 build.
     Returns:
         ArtifactManifestProvenanceV2: Strict provenance payload for the root manifest.
     Assumptions:
-        At R3-02 `inputs_sha256` identifies the normalized export request plus emitted price arrays
-        derived from `market_data.canonical_candles_1m`.
+        At R3-03 `inputs_sha256` identifies the normalized export request plus emitted artifact
+        metadata derived from `market_data.canonical_candles_1m`.
     Raises:
         TypeError: If config hashing encounters an unsupported JSON payload.
     Side Effects:
@@ -1607,7 +2285,9 @@ def _build_root_manifest_provenance_v2(
             request=request,
             arrays=arrays,
             rolled_sections=rolled_sections,
-            lookback_bars=runtime_settings.price_tail_bars_1m,
+            mapping_sections=mapping_sections,
+            price_lookback_bars=runtime_settings.price_tail_bars_1m,
+            mapping_lookback_bars=runtime_settings.mapping_tail_bars_1m,
         ),
     )
 
@@ -1617,7 +2297,9 @@ def _build_inputs_sha256_v2(
     request: ArtifactCanonicalPriceExportRequestV2,
     arrays: _CanonicalPriceArraysV2,
     rolled_sections: tuple[ArtifactPriceTimeframeManifestV2, ...],
-    lookback_bars: int,
+    mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
+    price_lookback_bars: int,
+    mapping_lookback_bars: int,
 ) -> str:
     """
     Hash normalized export identity and emitted arrays into deterministic provenance.
@@ -1626,11 +2308,14 @@ def _build_inputs_sha256_v2(
         request: Explicit export request identity.
         arrays: Final merged canonical `1m` arrays emitted by the runner.
         rolled_sections: Rolled price-manifest sections emitted by the same build.
-        lookback_bars: Effective `lookback_policy.price_tail_bars_1m` used for the build.
+        mapping_sections: Mapping-manifest sections emitted by the same build.
+        price_lookback_bars: Effective `lookback_policy.price_tail_bars_1m` used for the build.
+        mapping_lookback_bars: Effective `lookback_policy.mapping_tail_bars_1m` used for the
+            build.
     Returns:
         str: Lowercase SHA-256 hex digest.
     Assumptions:
-        The hash is an R3-01 input-identity digest, not a runtime validation checksum.
+        The hash is an R3-03 input-identity digest, not a runtime validation checksum.
     Raises:
         None.
     Side Effects:
@@ -1656,8 +2341,10 @@ def _build_inputs_sha256_v2(
                 "end": _utc_timestamp_to_epoch_millis_v2(request.time_range.end),
             },
             "asof_date": request.asof_date,
-            "lookback_policy.price_tail_bars_1m": lookback_bars,
+            "lookback_policy.price_tail_bars_1m": price_lookback_bars,
+            "lookback_policy.mapping_tail_bars_1m": mapping_lookback_bars,
             "rolled_price_timeframes": rolled_timeframes,
+            "mapping_timeframes": tuple(section.timeframe for section in mapping_sections),
         },
         sort_keys=True,
         separators=(",", ":"),
@@ -1683,6 +2370,17 @@ def _build_inputs_sha256_v2(
                 ).encode("ascii")
             )
             digest.update(metadata.sha256.encode("ascii"))
+    for section in mapping_sections:
+        digest.update(section.timeframe.encode("ascii"))
+        for metadata in (section.bar_open_1m_idx, section.bar_close_1m_idx):
+            digest.update(metadata.dtype.encode("ascii"))
+            digest.update(
+                json.dumps(
+                    tuple(int(value) for value in metadata.shape),
+                    separators=(",", ":"),
+                ).encode("ascii")
+            )
+            digest.update(metadata.sha256.encode("ascii"))
     return digest.hexdigest()
 
 
@@ -1693,22 +2391,25 @@ def _build_root_manifest_payload_v2(
     slot_generation: int,
     root_scaffold: _RootManifestScaffoldV2,
     price_manifests: tuple[ArtifactPriceTimeframeManifestV2, ...],
+    mapping_manifests: tuple[ArtifactMappingTimeframeManifestV2, ...],
     provenance: ArtifactManifestProvenanceV2,
 ) -> dict[str, Any]:
     """
-    Build the strict root `manifest.yaml` payload for R3-02 price materialization.
+    Build the strict root `manifest.yaml` payload for R3-03 price and mapping materialization.
 
     Args:
         request: Explicit export request identity.
         slot: Inactive slot literal receiving the new root manifest.
         slot_generation: Target slot generation reserved for the next publish switch.
         root_scaffold: Preserved or placeholder non-price manifest sections.
-        price_manifests: Fresh strict `prices/<tf>` sections owned by R3-02.
+        price_manifests: Fresh strict `prices/<tf>` sections owned by R3-03.
+        mapping_manifests: Fresh strict `mappings/<tf>` sections owned by R3-03.
         provenance: Deterministic root-manifest provenance payload.
     Returns:
         dict[str, Any]: Deterministic YAML payload ready for atomic serialization.
     Assumptions:
-        R3-02 updates all price sections while preserving strict schema for later stages.
+        R3-03 updates all price and mapping sections while preserving strict schema for later
+        stages.
     Raises:
         None.
     Side Effects:
@@ -1723,6 +2424,10 @@ def _build_root_manifest_payload_v2(
         preserved_prices=root_scaffold.preserved_prices,
         price_manifests=price_manifests,
     )
+    merged_mappings = _merge_mapping_sections_v2(
+        preserved_mappings=root_scaffold.mappings,
+        mapping_manifests=mapping_manifests,
+    )
     return {
         "schema_version": 1,
         "manifest_kind": "slot_root",
@@ -1735,9 +2440,7 @@ def _build_root_manifest_payload_v2(
             "symbol": request.coordinates.symbol,
         },
         "prices": [_serialize_price_manifest_v2(section) for section in merged_prices],
-        "mappings": [
-            _serialize_mapping_manifest_v2(section) for section in root_scaffold.mappings
-        ],
+        "mappings": [_serialize_mapping_manifest_v2(section) for section in merged_mappings],
         "signals": _serialize_signal_catalog_v2(root_scaffold.signals),
         "hit_times": _serialize_hit_times_reference_v2(root_scaffold.hit_times),
         "signal_encoding": _serialize_signal_encoding_v2(root_scaffold.signal_encoding),
@@ -1787,6 +2490,56 @@ def _merge_price_sections_v2(
         merged_by_timeframe[section.timeframe] = section
     timeframe_order = {
         literal: index for index, literal in enumerate(ARTIFACT_PRICE_TIMEFRAMES_V2)
+    }
+    ordered_sections = sorted(
+        merged_by_timeframe.values(),
+        key=lambda section: timeframe_order[section.timeframe],
+    )
+    return tuple(ordered_sections)
+
+
+def _merge_mapping_sections_v2(
+    *,
+    preserved_mappings: tuple[ArtifactMappingTimeframeManifestV2, ...],
+    mapping_manifests: tuple[ArtifactMappingTimeframeManifestV2, ...],
+) -> tuple[ArtifactMappingTimeframeManifestV2, ...]:
+    """
+    Merge preserved non-owned mapping sections with freshly written R3-03 mapping sections.
+
+    Args:
+        preserved_mappings: Existing root mapping sections outside the R3-03 ownership scope.
+        mapping_manifests: Fresh strict mapping sections written during the current build.
+    Returns:
+        tuple[ArtifactMappingTimeframeManifestV2, ...]: Canonically ordered root mapping sections.
+    Assumptions:
+        Root manifest ordering must remain deterministic by the fixed mapping timeframe contract.
+    Raises:
+        ValueError: If duplicated timeframe sections are detected.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    merged_by_timeframe: dict[str, ArtifactMappingTimeframeManifestV2] = {}
+    for section in mapping_manifests:
+        if section.timeframe in merged_by_timeframe:
+            raise ValueError(
+                "root manifest mapping sections contain duplicate timeframe "
+                f"{section.timeframe!r}"
+            )
+        merged_by_timeframe[section.timeframe] = section
+    for section in preserved_mappings:
+        if section.timeframe in merged_by_timeframe:
+            raise ValueError(
+                "root manifest mapping sections contain duplicate timeframe "
+                f"{section.timeframe!r}"
+            )
+        merged_by_timeframe[section.timeframe] = section
+    timeframe_order = {
+        literal: index for index, literal in enumerate(ARTIFACT_MAPPING_TIMEFRAMES_V2)
     }
     ordered_sections = sorted(
         merged_by_timeframe.values(),

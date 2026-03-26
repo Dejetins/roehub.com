@@ -75,15 +75,24 @@ Precompute runner v2 обязан:
 - строить rollup только из artifact-backed `prices/1m`, без ClickHouse reads на runtime hot path;
 - поддерживать deterministic tail update по
   `backtest_artifacts.lookback_policy.price_tail_bars_1m`;
+- строить `mappings/<tf>/bar_open_1m_idx.u32.npy` и
+  `mappings/<tf>/bar_close_1m_idx.u32.npy` только из artifact-backed `prices/1m` и
+  `prices/<tf>`;
+- поддерживать deterministic tail update для mappings по
+  `backtest_artifacts.lookback_policy.mapping_tail_bars_1m`;
 - никогда не мутировать active slot in place.
 
-Tail update semantics для R3-01 / R3-02:
+Tail update semantics для R3-01 / R3-02 / R3-03:
 
 - если inactive slot ещё не содержит valid `prices/1m`, выполняется full build по заданному
   `TimeRange [start, end)`, затем full rollup для всех allowed request TF;
 - если `prices/1m` уже существует в inactive slot, runner переиспользует prefix внутри requested
   range и reread'ит только tail overlap длиной `price_tail_bars_1m`;
 - для rolled `prices/<tf>` prefix reuse считается от bucket, в который попадает reread-tail start;
+- для `mappings/<tf>` prefix reuse считается до последнего request-TF бара, чей `close_time`
+  остаётся строго левее первого `1m` bar open, попавшего в mapping-tail window;
+- mapping rebuild обязан сохранять `dtype=uint32`, `shape=[T_tf]`,
+  `bar_open_1m_idx <= bar_close_1m_idx` и exact price correspondence;
 - merge policy фиксирована как `prefix + rebuilt_tail`, без best-effort dedup/coercion;
 - identical source candles + identical config/request должны давать byte-stable `.npy` и
   `manifest.yaml`.
@@ -131,6 +140,32 @@ R3-01 / R3-02 placeholder strategy до materialization следующих stage
   `hit_times/1m/manifest.yaml`, но до R5 допускается placeholder
   `manifest_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"`;
 - `signal_encoding` остаётся fixed even when `signals.manifests` is empty.
+
+R3-03 mapping contract:
+
+- `mappings[]` больше не placeholder и обязан содержать non-empty strict sections для:
+  - `15m`
+  - `30m`
+  - `1h`
+  - `2h`
+  - `4h`
+  - `6h`
+  - `8h`
+  - `1d`
+  - `2d`
+  - `3d`
+- для каждого section обязательны metadata:
+  - `path`
+  - `dtype`
+  - `shape`
+  - `axis_order`
+  - `sha256`
+- validator обязан подтверждать:
+  - bounds within `[0, T_1m)`
+  - monotonicity
+  - `bar_open_1m_idx <= bar_close_1m_idx`
+  - `prices/1m.open_time[bar_open_1m_idx] == prices/<tf>.open_time`
+  - `prices/1m.close_time[bar_close_1m_idx] == prices/<tf>.close_time`
 
 ### Per-indicator signal manifest
 
@@ -188,6 +223,7 @@ Whole-slot validator обязан идти в фиксированном пор�
   - non-decreasing indexes
   - `bar_open_1m_idx <= bar_close_1m_idx`
   - mapping bounds относительно `1m`
+  - exact correspondence с materialized `prices/1m` и `prices/<tf>`
 - signals:
   - signal value set `{-1,0,1}`
   - `shape=[V,T_tf]`
@@ -199,9 +235,9 @@ Whole-slot validator обязан идти в фиксированном пор�
 
 ## Publish interaction
 
-R3-01 / R3-02 сами по себе не делают slot publish-ready.
-Если `validation_plan` всё ещё требует `mappings`, `signals` или real `hit_times`, whole-slot
-validation обязана fail-fast и pointer switch не выполняется до соответствующих later epics.
+R3-01 / R3-02 / R3-03 сами по себе не делают slot publish-ready.
+Если `validation_plan` всё ещё требует `signals` или real `hit_times`, whole-slot validation
+обязана fail-fast и pointer switch не выполняется до соответствующих later epics.
 
 Runner обязан работать только в порядке:
 
