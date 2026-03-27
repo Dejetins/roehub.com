@@ -264,7 +264,9 @@ contract для explicit configured targets.
   drift в `manifest.yaml`, `rows_count`, `timeline`, `variant_key_version`,
   `variant_keys_sha256`, `signals.v1.params` или file `sha256` обязан fail-fast'ить rebuild;
 - placeholders сохраняются только для `hit_times/1m` до R5;
-- R4-04 runtime `source` integration остаётся later-stage epic.
+- R4-04 runtime `source` integration теперь потребляет artifact row-order contract downstream
+  через runtime defaults, persisted jobs payloads и `variant-report`; dedicated history/detail v2
+  docs из roadmap пока отсутствуют в этом репозитории.
 
 ## R3-04 prices+mappings publish-ready boundary
 

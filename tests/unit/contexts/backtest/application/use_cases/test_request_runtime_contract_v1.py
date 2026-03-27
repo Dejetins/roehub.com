@@ -36,13 +36,18 @@ class _RuntimeContractDefaultsProvider:
             None.
         """
         normalized_id = indicator_id.strip().lower()
-        if normalized_id != "ma.sma":
-            return None
-        return GridSpec(
-            indicator_id=IndicatorId("ma.sma"),
-            source=ExplicitValuesSpec(name="source", values=("close",)),
-            params={"window": ExplicitValuesSpec(name="window", values=(20,))},
-        )
+        if normalized_id == "ma.sma":
+            return GridSpec(
+                indicator_id=IndicatorId("ma.sma"),
+                source=ExplicitValuesSpec(name="source", values=("close",)),
+                params={"window": ExplicitValuesSpec(name="window", values=(20,))},
+            )
+        if normalized_id == "volume.obv":
+            return GridSpec(
+                indicator_id=IndicatorId("volume.obv"),
+                params={},
+            )
+        return None
 
     def signal_param_defaults(self, *, indicator_id: str) -> Mapping[str, ExplicitValuesSpec]:
         """
@@ -78,7 +83,7 @@ class _RuntimeContractDefaultsProvider:
         Side Effects:
             None.
         """
-        return ("ma.sma",)
+        return ("ma.sma", "volume.obv")
 
     def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
         """
@@ -95,7 +100,95 @@ class _RuntimeContractDefaultsProvider:
         Side Effects:
             None.
         """
-        return ("close",) if indicator_id.strip().lower() == "ma.sma" else ()
+        normalized_id = indicator_id.strip().lower()
+        if normalized_id == "ma.sma":
+            return ("close",)
+        return ()
+
+
+def test_validate_template_runtime_contract_rejects_unsupported_source_value() -> None:
+    """
+    Verify shared runtime-contract validator rejects explicit unsupported source values early.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `ma.sma` allows only the canonical `close` source in this fake defaults provider.
+    Raises:
+        AssertionError: If invalid source literals are not rejected with stable details.
+    Side Effects:
+        None.
+    """
+    with pytest.raises(BacktestValidationError) as error_info:
+        validate_template_runtime_contract(
+            template=_template(
+                timeframe="15m",
+                indicator_grids=(
+                    GridSpec(
+                        indicator_id=IndicatorId("ma.sma"),
+                        source=ExplicitValuesSpec(name="source", values=("hl2",)),
+                        params={"window": ExplicitValuesSpec(name="window", values=(20,))},
+                    ),
+                ),
+            ),
+            defaults_provider=_RuntimeContractDefaultsProvider(),
+            allowed_request_timeframes=("15m",),
+            forbidden_request_timeframes=("1m", "5m"),
+            root_path="body.template",
+        )
+
+    assert error_info.value.errors == (
+        {
+            "path": "body.template.indicator_grids[0].source",
+            "code": "unsupported_value",
+            "message": "inputs.source must be one of: close",
+        },
+    )
+
+
+def test_validate_template_runtime_contract_rejects_source_for_indicator_without_source_axis(
+) -> None:
+    """
+    Verify shared runtime-contract validator rejects explicit source for no-source indicators.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `volume.obv` is supported by the fake catalog but does not expose configurable source.
+    Raises:
+        AssertionError: If unsupported source-axis usage is not rejected deterministically.
+    Side Effects:
+        None.
+    """
+    with pytest.raises(BacktestValidationError) as error_info:
+        validate_template_runtime_contract(
+            template=_template(
+                timeframe="15m",
+                indicator_grids=(
+                    GridSpec(
+                        indicator_id=IndicatorId("volume.obv"),
+                        source=ExplicitValuesSpec(name="source", values=("close",)),
+                        params={},
+                    ),
+                ),
+            ),
+            defaults_provider=_RuntimeContractDefaultsProvider(),
+            allowed_request_timeframes=("15m",),
+            forbidden_request_timeframes=("1m", "5m"),
+            root_path="body.template",
+        )
+
+    assert error_info.value.errors == (
+        {
+            "path": "body.template.indicator_grids[0].source",
+            "code": "unsupported_value",
+            "message": "indicator_id 'volume.obv' does not support inputs.source",
+        },
+    )
 
 
 def test_validate_template_runtime_contract_rejects_removed_indicator_id() -> None:

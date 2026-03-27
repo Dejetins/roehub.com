@@ -77,8 +77,9 @@ Precompute runner v2 обязан:
     `signals.v1.params = default-only` и file `sha256` не дрейфуют
 - missing target files могут переводить target в deterministic full rebuild, но manifest/data
   drift при reuse attempt обязан fail-fast с stable diagnostics;
-- R4-04 propagation `source` в runtime payloads и R5 hit-times materialization остаются
-  отдельными later-stage epics.
+- R4-04 propagation `source` в runtime payloads теперь закрывается downstream-контрактами:
+  `GET /backtests/runtime-defaults`, persisted jobs `/top` payloads и explicit
+  `variant-report` payloads; R5 hit-times materialization остаётся отдельным later-stage epic.
 
 ### R3-01 / R3-02 prices stage
 

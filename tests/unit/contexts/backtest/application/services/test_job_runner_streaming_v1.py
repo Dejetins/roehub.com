@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from trading.contexts.backtest.application.services import (
     BacktestJobSnapshotCadenceV1,
     BacktestJobTopKBufferV1,
     BacktestJobTopVariantCandidateV1,
+    build_running_snapshot_rows,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 
@@ -191,3 +193,57 @@ def test_top_k_buffer_matches_reference_full_sort_policy_per_insert() -> None:
             )[:limit]
         )
         assert buffer.ranked() == expected
+
+
+def test_build_running_snapshot_rows_preserves_explicit_source_in_payload_json() -> None:
+    """
+    Verify persisted running snapshot rows keep explicit `inputs.source` in variant payloads.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Jobs `/top` summary reads `payload_json` directly from persisted snapshot rows.
+    Raises:
+        AssertionError: If persisted payload drops or mutates explicit source selection.
+    Side Effects:
+        None.
+    """
+    candidate = BacktestJobTopVariantCandidateV1(
+        variant_index=3,
+        variant_key="a" * 64,
+        indicator_variant_key="b" * 64,
+        total_return_pct=12.5,
+        indicator_selections=(
+            IndicatorVariantSelection(
+                indicator_id="ma.sma",
+                inputs={"source": "hlc3"},
+                params={"window": 20},
+            ),
+        ),
+        signal_params={"ma.sma": {"cross_up": 0.5}},
+        risk_params={
+            "sl_enabled": False,
+            "sl_pct": None,
+            "tp_enabled": False,
+            "tp_pct": None,
+        },
+    )
+
+    rows = build_running_snapshot_rows(
+        job_id=UUID("00000000-0000-0000-0000-000000000111"),
+        now=datetime(2026, 2, 23, 12, 0, tzinfo=timezone.utc),
+        ranked_candidates=(candidate,),
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={"fee_pct": 0.1, "fixed_quote": 100.0},
+    )
+
+    assert rows[0].payload_json["indicator_selections"] == [
+        {
+            "indicator_id": "ma.sma",
+            "inputs": {"source": "hlc3"},
+            "params": {"window": 20},
+        }
+    ]

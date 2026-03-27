@@ -33,8 +33,9 @@
   manifests и root `signals.*` catalog для explicit configured targets.
 - R4-03 переводит signal rebuild на deterministic bounded tail-update через
   `lookback_policy.signal_tail_bars_1m` и merge policy `prefix + rebuilt_tail`.
-- Полный publish с `hit_times` по-прежнему blocked до R5; R4-04 runtime `source` integration
-  остаётся later-stage epic.
+- Полный publish с `hit_times` по-прежнему blocked до R5; R4-04 runtime `source` integration в
+  текущем репозитории проходит через runtime defaults, jobs `/top` payloads и explicit
+  `variant-report` payloads, хотя отдельные history/detail v2 docs из roadmap пока отсутствуют.
 
 ## Проверка согласованности
 

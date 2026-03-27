@@ -60,6 +60,13 @@ def validate_template_runtime_contract(
         )
     )
     errors.extend(
+        _source_axis_errors(
+            template=template,
+            defaults_provider=defaults_provider,
+            root_path=root_path,
+        )
+    )
+    errors.extend(
         _signal_grid_errors(
             signal_grids=template.signal_grids or {},
             defaults_provider=defaults_provider,
@@ -252,6 +259,78 @@ def _signal_grid_errors(
                     "message": "signals.v1.params is default-only",
                 }
             )
+    return errors
+
+
+def _source_axis_errors(
+    *,
+    template: RunBacktestTemplate,
+    defaults_provider: BacktestGridDefaultsProvider | None,
+    root_path: str,
+) -> list[dict[str, str]]:
+    """
+    Build deterministic `inputs.source` validation items for explicit template source axes.
+
+    Args:
+        template: Resolved template payload.
+        defaults_provider: Runtime defaults provider exposing allowed per-indicator source catalogs.
+        root_path: Validation root path for emitted items.
+    Returns:
+        list[dict[str, str]]: Deterministic source-axis validation items.
+    Assumptions:
+        Missing explicit source axis is allowed because runtime defaults may still provide the
+        effective source value during later grid merge stages.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+    """
+    if defaults_provider is None:
+        return []
+
+    supported_indicator_ids = set(defaults_provider.supported_indicator_ids())
+    errors: list[dict[str, str]] = []
+    for index, grid in enumerate(template.indicator_grids):
+        indicator_id = grid.indicator_id.value
+        if indicator_id not in supported_indicator_ids or grid.source is None:
+            continue
+
+        path = f"{root_path}.indicator_grids[{index}].source"
+        allowed_source_values = tuple(
+            defaults_provider.allowed_source_values(indicator_id=indicator_id)
+        )
+        if len(allowed_source_values) == 0:
+            errors.append(
+                {
+                    "path": path,
+                    "code": _UNSUPPORTED_VALUE_CODE,
+                    "message": f"indicator_id '{indicator_id}' does not support inputs.source",
+                }
+            )
+            continue
+
+        allowed_literal = ", ".join(allowed_source_values)
+        for raw_value in grid.source.materialize():
+            normalized_value = str(raw_value).strip().lower()
+            if normalized_value in allowed_source_values:
+                continue
+            errors.append(
+                {
+                    "path": path,
+                    "code": _UNSUPPORTED_VALUE_CODE,
+                    "message": f"inputs.source must be one of: {allowed_literal}",
+                }
+            )
+            break
+
     return errors
 
 

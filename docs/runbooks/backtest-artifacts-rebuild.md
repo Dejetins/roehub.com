@@ -143,8 +143,9 @@ R4-01 / R4-02 / R4-03 clarification:
     `prefix + rebuilt_tail`
 - missing existing signal target files могут переводить target в deterministic full rebuild, но
   drift в existing manifest/data при reuse attempt обязан останавливать rebuild fail-fast;
-- R4-04 runtime `source` integration остаётся вне текущей operational-процедуры, а R5 всё ещё
-  требуется для materialized `hit_times`.
+- R4-04 runtime `source` integration downstream уже потребляет этот artifact contract через
+  runtime defaults, jobs `/top` payloads и `variant-report`; текущая operational-процедура всё
+  ещё не покрывает R5 materialized `hit_times`.
 
 Минимально ожидаемые пути:
 

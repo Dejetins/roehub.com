@@ -159,6 +159,11 @@ class _RuntimeDefaultsProvider:
                     "window": ExplicitValuesSpec(name="window", values=(15,)),
                 },
             )
+        if normalized_id == "volume.obv":
+            return GridSpec(
+                indicator_id=IndicatorId("volume.obv"),
+                params={},
+            )
         return None
 
     def signal_param_defaults(self, *, indicator_id: str) -> dict[str, ExplicitValuesSpec]:
@@ -195,7 +200,7 @@ class _RuntimeDefaultsProvider:
         Side Effects:
             None.
         """
-        return ("ma.sma", "momentum.trix")
+        return ("ma.sma", "momentum.trix", "volume.obv")
 
     def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
         """
@@ -519,10 +524,11 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                 "execution_mode": "auto",
                 "auto_preflight_enabled": True,
                 "auto_fallback_to_background_enabled": True,
-                "supported_indicator_ids": ["ma.sma", "momentum.trix"],
+                "supported_indicator_ids": ["ma.sma", "momentum.trix", "volume.obv"],
                 "source_values_by_indicator_id": {
                     "ma.sma": ["close", "hlc3"],
                     "momentum.trix": ["close", "hlc3", "ohlc4"],
+                    "volume.obv": [],
                 },
             },
         },

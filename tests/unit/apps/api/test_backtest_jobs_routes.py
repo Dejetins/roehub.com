@@ -560,6 +560,68 @@ def test_get_backtest_job_top_omits_details_even_for_succeeded_jobs() -> None:
     assert "trades" not in item
 
 
+def test_get_backtest_job_top_preserves_explicit_source_in_summary_payload() -> None:
+    """
+    Verify jobs `/top` summary payload keeps explicit `inputs.source` from persisted rows.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Jobs UI uses `items[*].payload` as the current summary payload for lazy detail loads.
+    Raises:
+        AssertionError: If persisted summary payload drops the explicit source selection.
+    Side Effects:
+        None.
+    """
+    job = _running_job(job_id=UUID("00000000-0000-0000-0000-000000000919"))
+    row = BacktestJobTopVariant(
+        job_id=job.job_id,
+        rank=1,
+        variant_key="c" * 64,
+        indicator_variant_key="d" * 64,
+        variant_index=4,
+        total_return_pct=8.5,
+        payload_json={
+            "indicator_selections": [
+                {
+                    "indicator_id": "ma.sma",
+                    "inputs": {"source": "hlc3"},
+                    "params": {"window": 20},
+                }
+            ],
+            "signal_params": {"ma.sma": {"cross_up": 0.5}},
+            "risk_params": {"sl_enabled": False},
+            "execution_params": {"fee_pct": 0.1},
+            "direction_mode": "long-short",
+            "sizing_mode": "all_in",
+        },
+        report_table_md=None,
+        trades_json=None,
+        updated_at=datetime(2026, 2, 23, 12, 0, tzinfo=timezone.utc),
+    )
+    client, _ = _build_client(
+        top_use_case=_TopUseCaseFake(
+            result=BacktestJobTopReadResult(job=job, rows=(row,)),
+        ),
+    )
+
+    response = client.get(
+        "/backtests/jobs/00000000-0000-0000-0000-000000000919/top?limit=1",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["payload"]["indicator_selections"] == [
+        {
+            "indicator_id": "ma.sma",
+            "inputs": {"source": "hlc3"},
+            "params": {"window": 20},
+        }
+    ]
+
 
 def test_list_backtest_jobs_decodes_cursor_and_returns_next_cursor() -> None:
     """
