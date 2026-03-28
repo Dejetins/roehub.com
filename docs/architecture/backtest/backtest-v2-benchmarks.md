@@ -16,6 +16,16 @@ R0 не внедряет runtime v2, а фиксирует:
 - какие parity fixtures обязательны до cutover;
 - где лежат reproducible inputs и как сохранять измерения.
 
+R6-01 не меняет сам R0 baseline, но добавляет обязательные runtime guardrails для следующих
+milestone-сравнений:
+
+- shared `slot-pinned context` bootstrap для sync/background;
+- отсутствие runtime directory scanning;
+- отсутствие hot-path hash recomputation;
+- explicit mmap loading для `prices/<tf>`, `signals/<tf>/<indicator_id>/signals.i8.npy`,
+  `mappings/<tf>/bar_open_1m_idx.u32.npy`,
+  `mappings/<tf>/bar_close_1m_idx.u32.npy`, `hit_times/1m/manifest.yaml`.
+
 ## Артефакты R0
 
 | EPIC | Артефакты |
@@ -142,6 +152,17 @@ uv run pytest -q \
   tests/unit/apps/api/test_backtests_routes.py
 ```
 
+5. Проверить R6-01 loader/bootstrap guardrails:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_resolver_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_signal_matrix_loader_v2.py \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
+```
+
 Где хранятся outputs:
 - version-controlled fixtures: `tests/perf_smoke/contexts/backtest/fixtures/*.json`
 - executable Stage B golden fixtures:
@@ -162,5 +183,7 @@ uv run pytest -q \
   transfer contract для notebook-derived kernel semantics.
 - R5-03 публикует `r5_stage_b_golden_cases.json` и unit fixture catalog как canonical
   validation baseline для `signal_tf + 1m_risk` golden fixtures.
-- R6-R8 сравнивают `clickhouse_hot_path_calls` и `indicator_compute_calls` против R0 baseline перед cutover.
+- R6-01 фиксирует runtime bootstrap/loaders guardrails без kernel cutover.
+- R6-R8 сравнивают `clickhouse_hot_path_calls` и `indicator_compute_calls` против R0 baseline,
+  сохраняя запрет на runtime scanning и hot-path hash recomputation до cutover.
 - R10 обновляет этот документ уже как post-cutover benchmark ledger, но не меняет задним числом R0 fixtures.

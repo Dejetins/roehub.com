@@ -1,6 +1,6 @@
-# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04 / R3-03 / R3-04 / R4-02 / R4-03)
+# Backtest Artifact Store V2 (R2-01 / R2-02 / R2-03 / R2-04 / R3-03 / R3-04 / R4-02 / R4-03 / R6-01)
 
-Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`, `Milestone R3 / EPIC R3-03 + R3-04`, `Milestone R4 / EPIC R4-02 + R4-03`
+Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`, `Milestone R3 / EPIC R3-03 + R3-04`, `Milestone R4 / EPIC R4-02 + R4-03`, `Milestone R6 / EPIC R6-01`
 
 Документ фиксирует:
 
@@ -13,6 +13,11 @@
 - R4-02: real `signals/<tf>/<indicator_id>` families и root `signals.*` catalog metadata.
 - R4-03: deterministic bounded tail rebuild for explicit per-target signal artifacts without
   full-history recompute on daily rebuilds.
+- R6-01: runtime-side resolver для strict `current.yaml`, shared `slot-pinned context` identity
+  и explicit mmap loaders для `prices/<tf>`, `signals/<tf>/<indicator_id>/signals.i8.npy`,
+  `mappings/<tf>/bar_open_1m_idx.u32.npy`,
+  `mappings/<tf>/bar_close_1m_idx.u32.npy`, `hit_times/1m/manifest.yaml` без runtime scanning и
+  без hot-path `sha256` recomputation.
 
 Основные источники:
 
@@ -353,6 +358,39 @@ Loader работает только по explicit deterministic paths:
 - резолвит пути `prices`, `signals`, `mappings`, `hit_times` напрямую из координат и literals;
 - не использует `os.listdir`, `Path.iterdir`, `glob`, `rglob`, `Path.walk` как обязательный шаг hot path.
 
+## R6-01 runtime consumption boundary
+
+После R6-01 runtime обязан стартовать только через immutable `slot-pinned context`.
+
+Канонический runtime identity shape:
+
+- `artifact_slot`
+- `slot_generation`
+- `artifact_asof_date`
+- `artifact_manifest_hash`
+
+Sync path обязан:
+
+- один раз прочитать strict `current.yaml`;
+- собрать `slot-pinned context` из active slot identity;
+- читать root `manifest.yaml` и family manifests только по explicit paths.
+
+Background path обязан:
+
+- брать persisted `artifact_slot`, `slot_generation`, `artifact_asof_date`,
+  `artifact_manifest_hash` из job pin metadata;
+- reject'ить drift между persisted pin и slot `manifest.yaml`;
+- не переопределять pinned identity, даже если после этого уже сменился `current.yaml`.
+
+Runtime loaders обязаны:
+
+- открывать `.npy` только через `np.load(..., mmap_mode='r')`;
+- всегда передавать `allow_pickle=False`;
+- fail-fast reject'ить drift по `path`, `dtype`, `shape`, `axis_order`, `timeline`,
+  `slot_generation`, `asof_date`;
+- никогда не делать directory scanning как источник truth;
+- не recompute'ить `manifest_sha256` или file `sha256` в hot path.
+
 ## Strict `current.yaml` contract (R2-02)
 
 `current.yaml` обязан содержать ровно эти поля:
@@ -571,14 +609,19 @@ Runtime читает fixed metadata из manifests и не recompute'ит schema
 
 ## Кодовый контракт
 
-R2-01/R2-02 реализованы следующими модулями:
+R2-01/R2-02/R6-01 реализованы следующими модулями:
 
 - `src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py`
 - `src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py`
 - `src/trading/contexts/backtest/application/services/v2/contracts.py`
 - `src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`
+- `src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py`
+- `src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py`
 - `src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py`
 - `src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py`
+- `src/trading/contexts/backtest/application/use_cases/run_backtest.py`
+- `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py`
 - `src/trading/contexts/backtest/domain/entities/backtest_job.py`
 - `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
@@ -589,3 +632,6 @@ Unit-тесты:
 - `tests/unit/contexts/backtest/adapters/outbound/artifacts_fs/test_current_pointer_writer_v2.py`
 - `tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py`
 - `tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py`
+- `tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_resolver_v2.py`
+- `tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py`
+- `tests/unit/contexts/backtest/application/services/v2/test_signal_matrix_loader_v2.py`

@@ -12,11 +12,12 @@ from trading.contexts.backtest.application.dto import (
     RunBacktestTemplate,
 )
 from trading.contexts.backtest.application.services import (
+    ArtifactCoordinatesV2,
     BacktestRiskVariantV1,
     BacktestStageABaseVariant,
 )
 from trading.contexts.backtest.application.use_cases import RunBacktestJobRunnerV1
-from trading.contexts.backtest.domain.entities import BacktestJob, TradeV1
+from trading.contexts.backtest.domain.entities import BacktestJob, BacktestJobArtifactPin, TradeV1
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
@@ -70,6 +71,84 @@ class _FakeRequestDecoder:
         """
         _ = payload
         return self._request
+
+
+@dataclass(frozen=True, slots=True)
+class _FakeSlotPinnedContext:
+    """
+    Minimal slot-pinned context fixture used to assert background bootstrap wiring.
+    """
+
+    coordinates: ArtifactCoordinatesV2
+    artifact_slot: str
+    slot_generation: int
+    artifact_asof_date: str
+    artifact_manifest_hash: str
+
+
+class _RecordingArtifactSlotResolver:
+    """
+    Fake resolver recording background bootstrap calls for slot-pinned context assertions.
+    """
+
+    def __init__(self, *, context: _FakeSlotPinnedContext) -> None:
+        """
+        Initialize resolver fake with one deterministic slot-pinned context fixture.
+
+        Args:
+            context: Slot-pinned context fixture returned for pinned bootstrap calls.
+        Returns:
+            None.
+        Assumptions:
+            Worker use-case tests need only `resolve_pinned_context(...)`.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call logs for later assertions.
+        """
+        self.context = context
+        self.pinned_calls: list[tuple[ArtifactCoordinatesV2, Any]] = []
+
+    def resolve_active_context(self, coordinates: ArtifactCoordinatesV2) -> Any:
+        """
+        Reject unexpected sync bootstrap calls in worker use-case tests.
+
+        Args:
+            coordinates: Ignored coordinates argument.
+        Returns:
+            Any: Never returns because this path is unexpected here.
+        Assumptions:
+            `RunBacktestJobRunnerV1` should only use `resolve_pinned_context(...)`.
+        Raises:
+            AssertionError: Always, to signal unexpected sync bootstrap usage.
+        Side Effects:
+            None.
+        """
+        _ = coordinates
+        raise AssertionError("job runner must not call resolve_active_context")
+
+    def resolve_pinned_context(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        pinned_identity: Any,
+    ) -> _FakeSlotPinnedContext:
+        """
+        Record one background bootstrap call and return the deterministic slot-pinned context.
+
+        Args:
+            coordinates: Requested artifact coordinates for the job template.
+            pinned_identity: Persisted artifact pin converted by the use-case under test.
+        Returns:
+            _FakeSlotPinnedContext: Fixed slot-pinned context fixture.
+        Assumptions:
+            Worker tests do not need real manifest loading to verify bootstrap parity wiring.
+        Raises:
+            None.
+        Side Effects:
+            Appends requested coordinates and persisted pin payload to the in-memory call log.
+        """
+        self.pinned_calls.append((coordinates, pinned_identity))
+        return self.context
 
 
 class _FakeTimelineBuilder:
@@ -1490,6 +1569,81 @@ def test_process_claimed_job_skips_snapshot_replace_when_frontier_signature_unch
     assert len(running_snapshots) == 1
 
 
+def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime() -> None:
+    """
+    Verify background use-case resolves the shared slot-pinned context before runtime work starts.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R6-01 bootstrap is additive here and should not change staged job processing behavior.
+    Raises:
+        AssertionError: If background bootstrap coordinates or persisted pin fields drift.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+    """
+    job = _build_running_job_with_artifact_pin()
+    resolver = _RecordingArtifactSlotResolver(
+        context=_FakeSlotPinnedContext(
+            coordinates=ArtifactCoordinatesV2(
+                exchange="binance",
+                market_type="spot",
+                symbol="BTCUSDT",
+            ),
+            artifact_slot="slot_b",
+            slot_generation=11,
+            artifact_asof_date="2026-03-29",
+            artifact_manifest_hash="d" * 64,
+        )
+    )
+    use_case = _build_use_case(
+        request=_build_request(top_k=5, preselect=2, top_trades_n=1),
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=_FakeResultsRepository(),
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                _build_stage_a_variants()[0].base_variant_key: 3.0,
+                _build_stage_a_variants()[1].base_variant_key: 2.0,
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 45, 0)),
+        artifact_slot_resolver=resolver,
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert len(resolver.pinned_calls) == 1
+    coordinates, pinned_identity = resolver.pinned_calls[0]
+    assert coordinates == ArtifactCoordinatesV2(
+        exchange="binance",
+        market_type="spot",
+        symbol="BTCUSDT",
+    )
+    assert pinned_identity.artifact_slot == "slot_b"
+    assert pinned_identity.slot_generation == 11
+    assert pinned_identity.artifact_asof_date == "2026-03-29"
+    assert pinned_identity.artifact_manifest_hash == "d" * 64
+
+
 def _build_use_case(
     *,
     request: RunBacktestRequest,
@@ -1504,6 +1658,7 @@ def _build_use_case(
     snapshot_variants_step: int | None,
     stage_batch_size: int,
     now_provider: _NowProvider,
+    artifact_slot_resolver: Any | None = None,
 ) -> RunBacktestJobRunnerV1:
     """
     Build job-runner use-case with deterministic fakes for unit tests.
@@ -1521,6 +1676,7 @@ def _build_use_case(
         snapshot_variants_step: Optional variants-step trigger threshold.
         stage_batch_size: Batch boundary size.
         now_provider: Monotonic now-provider fixture.
+        artifact_slot_resolver: Optional shared slot-pinned context resolver test double.
     Returns:
         RunBacktestJobRunnerV1: Prepared use-case instance.
     Assumptions:
@@ -1551,6 +1707,7 @@ def _build_use_case(
         snapshot_variants_step=snapshot_variants_step,
         stage_batch_size=stage_batch_size,
         now_provider=now_provider,
+        artifact_slot_resolver=cast(Any, artifact_slot_resolver),
     )
 
 
@@ -1640,6 +1797,47 @@ def _build_running_job() -> BacktestJob:
         spec_payload_json=None,
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
+    )
+    return queued.claim(
+        changed_at=created_at + timedelta(seconds=5),
+        locked_by="worker-test-1",
+        lease_expires_at=created_at + timedelta(seconds=65),
+    )
+
+
+def _build_running_job_with_artifact_pin() -> BacktestJob:
+    """
+    Build deterministic running Backtest job fixture with persisted artifact pin metadata.
+
+    Args:
+        None.
+    Returns:
+        BacktestJob: Running claimed job fixture with immutable artifact pin metadata.
+    Assumptions:
+        Background bootstrap tests need the same pin shape that job creation persists.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    created_at = _utc(2026, 2, 23, 9, 0, 0)
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000911"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        mode="template",
+        created_at=created_at,
+        request_json={"mode": "template"},
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-29",
+        ),
     )
     return queued.claim(
         changed_at=created_at + timedelta(seconds=5),

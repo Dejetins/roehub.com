@@ -1,13 +1,15 @@
-# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04 / R4-01 / R4-02 / R4-03 / R5-01)
+# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04 / R4-01 / R4-02 / R4-03 / R5-01 / R6-01)
 
-Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`, `Milestone R4 / EPIC R4-01 + R4-02 + R4-03`, `Milestone R5 / EPIC R5-01`
+Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`, `Milestone R4 / EPIC R4-01 + R4-02 + R4-03`, `Milestone R5 / EPIC R5-01`, `Milestone R6 / EPIC R6-01`
 
 Документ фиксирует контракт precompute/publish слоя, который:
 
 - строит inactive slot в `artifacts/backtest/v2`;
 - пишет strict manifests для root / signals / hit_times;
 - выполняет fail-fast validation до switch `current.yaml`;
-- оставляет runtime только fixed metadata reads без schema inference и без hash recomputation.
+- оставляет runtime только fixed metadata reads без schema inference и без hash recomputation;
+- после R6-01 передаёт runtime достаточно metadata для shared `slot-pinned context` bootstrap в
+  sync и background paths без filesystem discovery.
 
 Основные документы:
 
@@ -395,6 +397,18 @@ Runner обязан работать только в порядке:
 - использовать fixed `dtype/shape/axis_order`;
 - выбирать ровно нужные signal manifests и `signals.i8.npy`;
 - читать `hit_times/1m` без recompute metadata.
+
+После R6-01 runtime additionally обязан:
+
+- собирать `slot-pinned context` только из strict `current.yaml` или persisted pin metadata;
+- выравнивать identity fields `artifact_slot`, `slot_generation`, `artifact_asof_date`,
+  `artifact_manifest_hash` между sync и background startup;
+- читать `prices/<tf>`, `signals/<tf>/<indicator_id>/signals.i8.npy`,
+  `mappings/<tf>/bar_open_1m_idx.u32.npy`,
+  `mappings/<tf>/bar_close_1m_idx.u32.npy` и `hit_times/1m/manifest.yaml`
+  только по explicit paths, уже перечисленным в manifests;
+- открывать arrays через `np.load(..., mmap_mode='r')` и `allow_pickle=False`;
+- reject'ить contract drift по `path`, `dtype`, `shape`, `axis_order`, `timeline`.
 
 Runtime не должен:
 

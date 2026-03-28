@@ -4,6 +4,10 @@
 
 ## Основные контракты
 
+- R6-01 runtime-side loader/context layer:
+  `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`,
+  `src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py`,
+  `src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py`
 - Runtime kernels v2 contract for `signal_tf + 1m_risk`, Stage A / Stage B boundaries and
   notebook-derived transfer scope: `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
 - Notebook transfer reference and function-level semantics anchors:
@@ -51,6 +55,14 @@
   - unit fixture catalog `stage_b_golden_fixtures_v2.json`,
   - perf manifest `r5_stage_b_golden_cases.json`,
   - notebook-independent tests `test_stage_b_golden_fixtures_v2.py`.
+- R6-01 фиксирует shared `slot-pinned context` bootstrap:
+  - sync run читает active identity из `current.yaml`,
+  - background run использует persisted `artifact_slot`, `slot_generation`,
+    `artifact_asof_date`, `artifact_manifest_hash`,
+  - runtime loaders читают arrays только по explicit manifest-driven paths через
+    `np.load(..., mmap_mode='r')` и `allow_pickle=False`.
+- R6-01 не включает R6-02 Stage A kernels, R6-03 risk execution kernels, R6-04 ranking/top-N
+  materialization и full runtime cutover.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
   `signal_artifacts=[]` и `require_hit_times_manifest=false`.
 - R4-04 runtime `source` integration в текущем репозитории проходит через runtime defaults, jobs
@@ -61,3 +73,4 @@
 
 - После изменения `.md` файлов запускать:
   - `python -m tools.docs.generate_docs_index`
+  - `python -m tools.docs.generate_docs_index --check`

@@ -30,11 +30,15 @@ from trading.contexts.backtest.application.ports import (
 from trading.contexts.backtest.application.services import (
     STAGE_A_LITERAL,
     STAGE_B_LITERAL,
+    ArtifactPinnedIdentityV2,
+    ArtifactSlotPinnedRuntimeContextV2,
+    BacktestArtifactSlotResolverV2,
     BacktestCandleTimelineBuilder,
     BacktestGridBuilderV1,
     BacktestReportingServiceV1,
     BacktestStageABaseVariant,
     CloseFillBacktestStagedScorerV1,
+    artifact_coordinates_from_market_id_v2,
 )
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobSnapshotCadenceV1,
@@ -149,6 +153,7 @@ class _ResolvedJobRequestContext:
     top_trades_n: int
     persisted_k: int
     ranking: BacktestRankingConfig
+    artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None = None
 
 
 class RunBacktestJobRunnerV1:
@@ -205,6 +210,7 @@ class RunBacktestJobRunnerV1:
         allowed_request_timeframes: tuple[str, ...] | None = None,
         forbidden_request_timeframes: tuple[str, ...] | None = None,
         now_provider: Callable[[], datetime] | None = None,
+        artifact_slot_resolver: BacktestArtifactSlotResolverV2 | None = None,
     ) -> None:
         """
         Initialize claimed-job streaming orchestrator dependencies and runtime policies.
@@ -251,6 +257,9 @@ class RunBacktestJobRunnerV1:
             forbidden_request_timeframes:
                 Optional runtime contract list for explicitly forbidden request timeframes.
             now_provider: Optional UTC-aware current time provider for deterministic tests.
+            artifact_slot_resolver:
+                Optional shared R6-01 slot-pinned context bootstrap used before runtime work
+                starts.
         Returns:
             None.
         Assumptions:
@@ -355,6 +364,7 @@ class RunBacktestJobRunnerV1:
             values=forbidden_request_timeframes
         )
         self._now = now_provider or _utc_now
+        self._artifact_slot_resolver = artifact_slot_resolver
 
     def process_claimed_job(
         self,
@@ -578,6 +588,7 @@ class RunBacktestJobRunnerV1:
         ranking = self._resolve_ranking_config(request=request)
         if top_trades_n > top_k:
             top_trades_n = top_k
+        artifact_context = self._bootstrap_artifact_context(job=job, template=template)
 
         return _ResolvedJobRequestContext(
             request=request,
@@ -588,6 +599,56 @@ class RunBacktestJobRunnerV1:
             top_trades_n=top_trades_n,
             persisted_k=min(top_k, self._top_k_persisted_default),
             ranking=ranking,
+            artifact_context=artifact_context,
+        )
+
+    def _bootstrap_artifact_context(
+        self,
+        *,
+        job: BacktestJob,
+        template: RunBacktestTemplate,
+    ) -> ArtifactSlotPinnedRuntimeContextV2 | None:
+        """
+        Resolve the optional shared R6-01 slot-pinned context before background runtime work.
+
+        Args:
+            job: Claimed running job snapshot that may carry persisted artifact pin metadata.
+            template: Effective validated run template with canonical instrument identity.
+        Returns:
+            ArtifactSlotPinnedRuntimeContextV2 | None: Bootstrapped immutable slot context when
+                resolver wiring and persisted job pin metadata are both available, otherwise
+                `None`.
+        Assumptions:
+            This bootstrap remains additive until the full v2 kernel cutover consumes the returned
+            context directly in Stage A and Stage B runtime code.
+        Raises:
+            ValueError: If pinned artifact coordinates or slot manifest identity violate the
+                shared startup contract.
+        Side Effects:
+            Reads strict slot metadata from disk when resolver wiring is enabled and the job
+            carries artifact pin metadata.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+        """
+        if self._artifact_slot_resolver is None or job.artifact_pin is None:
+            return None
+        coordinates = artifact_coordinates_from_market_id_v2(
+            market_id=template.instrument_id.market_id.value,
+            symbol=str(template.instrument_id.symbol),
+        )
+        pinned_identity = ArtifactPinnedIdentityV2(
+            artifact_slot=job.artifact_pin.artifact_slot,
+            slot_generation=job.artifact_pin.artifact_slot_generation,
+            artifact_asof_date=job.artifact_pin.artifact_asof_date,
+            artifact_manifest_hash=job.artifact_pin.artifact_manifest_hash,
+        )
+        return self._artifact_slot_resolver.resolve_pinned_context(
+            coordinates,
+            pinned_identity,
         )
 
     def _resolve_template(

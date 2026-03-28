@@ -2482,6 +2482,245 @@ class ArtifactPricesMappingsPublishResultV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactPinnedIdentityV2:
+    """
+    Immutable persisted artifact identity used to reopen one published slot deterministically.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+    """
+
+    artifact_slot: ArtifactSlotLiteralV2
+    slot_generation: int
+    artifact_asof_date: str
+    artifact_manifest_hash: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate one persisted slot identity without touching runtime files.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Background runs persist these fields at create time and later reuse them as immutable
+            slot identity without hash recomputation.
+        Raises:
+            ValueError: If slot, generation, date, or manifest hash literals are invalid.
+        Side Effects:
+            Normalizes validated literals to canonical values.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+        """
+        object.__setattr__(self, "artifact_slot", validate_artifact_slot_v2(self.artifact_slot))
+        object.__setattr__(
+            self,
+            "slot_generation",
+            validate_current_pointer_slot_generation_v2(self.slot_generation),
+        )
+        object.__setattr__(
+            self,
+            "artifact_asof_date",
+            validate_current_pointer_asof_date_v2(self.artifact_asof_date),
+        )
+        object.__setattr__(
+            self,
+            "artifact_manifest_hash",
+            validate_current_pointer_manifest_sha256_v2(self.artifact_manifest_hash),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSlotPinnedRuntimeContextV2:
+    """
+    Shared immutable slot-pinned context used at sync and background runtime start.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+    """
+
+    coordinates: ArtifactCoordinatesV2
+    artifact_slot: ArtifactSlotLiteralV2
+    slot_generation: int
+    artifact_asof_date: str
+    artifact_manifest_hash: str
+    slot_root_path: Path
+    slot_manifest_path: Path
+    slot_manifest: ArtifactManifestDocumentV2
+
+    def __post_init__(self) -> None:
+        """
+        Validate that the resolved slot-pinned context stays internally aligned.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Runtime bootstrap must pin slot identity once and then reuse explicit manifest-driven
+            paths without directory scanning or hot-path hash recomputation.
+        Raises:
+            ValueError: If slot identity or explicit manifest/root paths drift from each other.
+        Side Effects:
+            Normalizes validated literals to canonical values.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+          - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+        """
+        object.__setattr__(self, "artifact_slot", validate_artifact_slot_v2(self.artifact_slot))
+        object.__setattr__(
+            self,
+            "slot_generation",
+            validate_current_pointer_slot_generation_v2(self.slot_generation),
+        )
+        object.__setattr__(
+            self,
+            "artifact_asof_date",
+            validate_current_pointer_asof_date_v2(self.artifact_asof_date),
+        )
+        object.__setattr__(
+            self,
+            "artifact_manifest_hash",
+            validate_current_pointer_manifest_sha256_v2(self.artifact_manifest_hash),
+        )
+        if self.slot_manifest_path != self.slot_manifest.path:
+            raise ValueError(
+                "ArtifactSlotPinnedRuntimeContextV2.slot_manifest_path must equal "
+                f"slot_manifest.path; got {self.slot_manifest_path!r} and "
+                f"{self.slot_manifest.path!r}"
+            )
+        if self.slot_root_path != self.slot_manifest.path.parent:
+            raise ValueError(
+                "ArtifactSlotPinnedRuntimeContextV2.slot_root_path must equal "
+                f"slot_manifest.path.parent; got {self.slot_root_path!r} and "
+                f"{self.slot_manifest.path.parent!r}"
+            )
+        if self.slot_manifest.identity != self.coordinates:
+            raise ValueError(
+                "ArtifactSlotPinnedRuntimeContextV2.slot_manifest.identity must match "
+                f"coordinates; got {self.slot_manifest.identity!r}, expected "
+                f"{self.coordinates!r}"
+            )
+        if self.slot_manifest.slot != self.artifact_slot:
+            raise ValueError(
+                "ArtifactSlotPinnedRuntimeContextV2.slot_manifest.slot must match "
+                f"artifact_slot; got {self.slot_manifest.slot!r}, expected "
+                f"{self.artifact_slot!r}"
+            )
+        if self.slot_manifest.slot_generation != self.slot_generation:
+            raise ValueError(
+                "ArtifactSlotPinnedRuntimeContextV2.slot_manifest.slot_generation must match "
+                f"slot_generation; got {self.slot_manifest.slot_generation!r}, expected "
+                f"{self.slot_generation!r}"
+            )
+        if self.slot_manifest.asof_date != self.artifact_asof_date:
+            raise ValueError(
+                "ArtifactSlotPinnedRuntimeContextV2.slot_manifest.asof_date must match "
+                f"artifact_asof_date; got {self.slot_manifest.asof_date!r}, expected "
+                f"{self.artifact_asof_date!r}"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPriceArraysV2:
+    """
+    Memory-mapped price family loaded from one explicit `prices/<tf>` contract.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    timeframe: str
+    manifest: ArtifactPriceTimeframeManifestV2
+    open_time: np.ndarray
+    close_time: np.ndarray
+    ohlcv: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactMappingArraysV2:
+    """
+    Memory-mapped timeframe mapping family loaded from one explicit `mappings/<tf>` contract.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    timeframe: str
+    manifest: ArtifactMappingTimeframeManifestV2
+    bar_open_1m_idx: np.ndarray
+    bar_close_1m_idx: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactHitTimesArraysV2:
+    """
+    Memory-mapped strict `hit_times/1m` arrays reused by future runtime kernels.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    manifest: ArtifactHitTimesManifestDocumentV2
+    tp_values: np.ndarray
+    sl_values: np.ndarray
+    long_tp: np.ndarray
+    long_sl: np.ndarray
+    short_tp: np.ndarray
+    short_sl: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalMatrixV2:
+    """
+    Memory-mapped signal matrix loaded from one explicit `signals/<tf>/<indicator_id>` family.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    timeframe: str
+    indicator_id: str
+    manifest: ArtifactSignalManifestDocumentV2
+    matrix: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactPrecomputeRuntimeSettingsV2:
     """
     Minimal service-layer runtime settings required by R3-03/R4-03/R5-01 precompute orchestration.
@@ -2813,6 +3052,106 @@ class BacktestArtifactLoaderV2(Protocol):
         slot: str,
     ) -> ArtifactHitTimesPathsV2:
         """Resolve hit-times artifact paths without touching disk."""
+        ...
+
+
+class BacktestArtifactSlotResolverV2(Protocol):
+    """
+    Port for shared slot-pinned runtime bootstrap over strict artifact identities.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+    """
+
+    def resolve_active_context(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+    ) -> ArtifactSlotPinnedRuntimeContextV2:
+        """Resolve the active slot-pinned context from strict `current.yaml`."""
+        ...
+
+    def resolve_pinned_context(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        pinned_identity: ArtifactPinnedIdentityV2,
+    ) -> ArtifactSlotPinnedRuntimeContextV2:
+        """Resolve one slot-pinned context from persisted pin metadata only."""
+        ...
+
+
+class BacktestPriceArraysLoaderV2(Protocol):
+    """
+    Port for strict mmap-based price, mapping, and `hit_times/1m` runtime loading.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+    """
+
+    def load_price_arrays(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str,
+    ) -> ArtifactPriceArraysV2:
+        """Load one explicit `prices/<tf>` family via `np.load(..., mmap_mode='r')`."""
+        ...
+
+    def load_mapping_arrays(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str,
+    ) -> ArtifactMappingArraysV2:
+        """Load one explicit `mappings/<tf>` family via `np.load(..., mmap_mode='r')`."""
+        ...
+
+    def load_hit_times_arrays(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+    ) -> ArtifactHitTimesArraysV2:
+        """Load strict `hit_times/1m` arrays via explicit manifest-driven paths."""
+        ...
+
+
+class BacktestSignalMatrixLoaderV2(Protocol):
+    """
+    Port for strict mmap-based signal-matrix loading and deterministic subset row reads.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py
+    """
+
+    def load_signal_matrix(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalMatrixV2:
+        """Load one explicit signal matrix via `np.load(..., mmap_mode='r')`."""
+        ...
+
+    def load_signal_rows(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str,
+        indicator_id: str,
+        row_selection: slice | tuple[int, ...],
+    ) -> np.ndarray:
+        """Load one deterministic subset of signal rows without runtime discovery."""
         ...
 
 

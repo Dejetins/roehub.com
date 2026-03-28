@@ -30,7 +30,10 @@ from trading.contexts.backtest.adapters.outbound import (
     resolve_backtest_artifacts_config_path,
     resolve_backtest_config_path,
 )
-from trading.contexts.backtest.application.services import YamlBacktestArtifactLoaderV2
+from trading.contexts.backtest.application.services import (
+    ArtifactSlotResolverV2,
+    YamlBacktestArtifactLoaderV2,
+)
 from trading.contexts.backtest.application.use_cases import (
     CancelBacktestJobUseCase,
     CreateBacktestJobUseCase,
@@ -149,6 +152,12 @@ def build_backtest_router(
     strategy_repository = _build_strategy_repository(settings=runtime_settings)
     strategy_reader = StrategyRepositoryBacktestStrategyReader(repository=strategy_repository)
     candle_feed = _build_backtest_candle_feed(environ=environ)
+    artifact_loader = YamlBacktestArtifactLoaderV2(
+        path_resolver=BacktestArtifactPathBuilderV2(
+            root=artifact_runtime_config.artifact_root_path()
+        )
+    )
+    artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
 
     run_use_case = RunBacktestUseCase(
         candle_feed=candle_feed,
@@ -178,6 +187,7 @@ def build_backtest_router(
         eager_top_reports_enabled=runtime_config.reporting.eager_top_reports_enabled,
         allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
+        artifact_slot_resolver=artifact_slot_resolver,
     )
     runtime_defaults_response = build_backtest_runtime_defaults_response(
         config=runtime_config,
@@ -197,12 +207,6 @@ def build_backtest_router(
     jobs_gateway = _build_jobs_gateway(settings=runtime_settings)
     job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)
     results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
-    artifact_loader = YamlBacktestArtifactLoaderV2(
-        path_resolver=BacktestArtifactPathBuilderV2(
-            root=artifact_runtime_config.artifact_root_path()
-        )
-    )
-
     create_use_case = CreateBacktestJobUseCase(
         job_repository=job_repository,
         strategy_reader=strategy_reader,

@@ -1,8 +1,8 @@
-# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03 / R2-04 / R4-02 / R4-03)
+# Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03 / R2-04 / R4-02 / R4-03 / R5-01 / R6-01)
 
 Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в
 `artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning, config-driven validation
-plan и strict manifest validation.
+plan, strict manifest validation и R6-01 runtime bootstrap boundary.
 
 Основные документы:
 
@@ -236,6 +236,37 @@ published_at_utc: "2026-03-26T03:04:05Z"
 - записать payload в temp file в той же директории;
 - выполнить atomic rename/replace;
 - не делать partial overwrite существующего `current.yaml`.
+
+## R6-01 runtime bootstrap checks
+
+После publish оператор должен исходить из одного invariants set:
+
+- sync runtime стартует только из active `current.yaml`;
+- background runtime стартует только из persisted pin metadata:
+  - `artifact_slot`
+  - `slot_generation`
+  - `artifact_asof_date`
+  - `artifact_manifest_hash`
+- оба path обязаны сходиться в один `slot-pinned context`;
+- runtime loaders читают только explicit paths из manifests:
+  - `prices/<tf>`
+  - `signals/<tf>/<indicator_id>/signals.i8.npy`
+  - `mappings/<tf>/bar_open_1m_idx.u32.npy`
+  - `mappings/<tf>/bar_close_1m_idx.u32.npy`
+  - `hit_times/1m/manifest.yaml`
+- runtime не должен делать directory scanning и не должен recompute'ить `manifest_sha256` в hot
+  path.
+
+Минимальная verification sequence после изменений в loader/context слое:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_resolver_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_signal_matrix_loader_v2.py \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
+```
 
 ## Что считается ошибкой
 

@@ -18,6 +18,7 @@ from trading.contexts.backtest.application.ports import (
 from trading.contexts.backtest.application.services import (
     ArtifactCoordinatesV2,
     ArtifactCurrentPointerV2,
+    ArtifactPinnedIdentityV2,
     ArtifactSlotLiteralV2,
     BacktestArtifactLoaderV2,
 )
@@ -584,6 +585,74 @@ def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -
         market_type="spot",
         symbol="BTCUSDT",
     )
+
+
+def test_create_backtest_job_use_case_artifact_pin_converts_to_pinned_identity_v2() -> None:
+    """
+    Verify persisted create-time artifact pin fields map losslessly into the R6-01 pin DTO.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Background runtime bootstrap reuses the exact pin fields persisted at job creation time.
+    Raises:
+        AssertionError: If create-time pin fields drift from the new pinned-identity contract.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+    """
+    repository = _FakeJobRepository(active_total=0)
+    artifact_loader = _FakeArtifactLoader(pointer=_artifact_pointer(slot="slot_b", generation=9))
+    use_case = CreateBacktestJobUseCase(
+        job_repository=repository,
+        strategy_reader=_FakeStrategyReader(snapshot=None),
+        top_k_persisted_default=300,
+        max_active_jobs_per_user=3,
+        warmup_bars_default=200,
+        top_k_default=300,
+        preselect_default=20000,
+        top_trades_n_default=3,
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+        fee_pct_default_by_market_id={1: 0.075},
+        backtest_runtime_config_hash="c" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, artifact_loader),
+        now_provider=lambda: datetime(2026, 2, 23, 12, 0, tzinfo=timezone.utc),
+        job_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000912"),
+    )
+
+    created = use_case.execute(
+        command=CreateBacktestJobCommand(
+            run_request=RunBacktestRequest(
+                time_range=_time_range(),
+                template=_template(),
+            ),
+            request_payload=_template_request_payload(),
+        ),
+        current_user=CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")),
+    )
+
+    assert created.artifact_pin is not None
+    pinned_identity = ArtifactPinnedIdentityV2(
+        artifact_slot=created.artifact_pin.artifact_slot,
+        slot_generation=created.artifact_pin.artifact_slot_generation,
+        artifact_asof_date=created.artifact_pin.artifact_asof_date,
+        artifact_manifest_hash=created.artifact_pin.artifact_manifest_hash,
+    )
+
+    assert pinned_identity.artifact_slot == "slot_b"
+    assert pinned_identity.slot_generation == 9
+    assert pinned_identity.artifact_asof_date == "2026-03-24"
+    assert pinned_identity.artifact_manifest_hash == "a" * 64
 
 
 

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Mapping, cast
+from typing import Any, Mapping, cast
 from uuid import UUID
 
 import numpy as np
@@ -14,6 +15,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestVariantScoreDetailsV1,
     CurrentUser,
 )
+from trading.contexts.backtest.application.services import ArtifactCoordinatesV2
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1, TradeV1
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
@@ -38,6 +40,84 @@ from trading.shared_kernel.primitives import (
 
 _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _ONE_MINUTE = timedelta(minutes=1)
+
+
+@dataclass(frozen=True, slots=True)
+class _FakeSlotPinnedContext:
+    """
+    Minimal slot-pinned context fixture used to assert sync bootstrap wiring.
+    """
+
+    coordinates: ArtifactCoordinatesV2
+    artifact_slot: str
+    slot_generation: int
+    artifact_asof_date: str
+    artifact_manifest_hash: str
+
+
+class _RecordingArtifactSlotResolver:
+    """
+    Fake resolver recording sync bootstrap calls for slot-pinned context parity assertions.
+    """
+
+    def __init__(self, *, context: _FakeSlotPinnedContext) -> None:
+        """
+        Initialize resolver fake with one deterministic slot-pinned context fixture.
+
+        Args:
+            context: Slot-pinned context fixture returned for active bootstrap calls.
+        Returns:
+            None.
+        Assumptions:
+            Sync use-case tests need only `resolve_active_context(...)`.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call logs for later assertions.
+        """
+        self.context = context
+        self.active_calls: list[ArtifactCoordinatesV2] = []
+
+    def resolve_active_context(self, coordinates: ArtifactCoordinatesV2) -> _FakeSlotPinnedContext:
+        """
+        Record one sync bootstrap call and return the deterministic slot-pinned context.
+
+        Args:
+            coordinates: Requested artifact coordinates for the sync run template.
+        Returns:
+            _FakeSlotPinnedContext: Fixed slot-pinned context fixture.
+        Assumptions:
+            Sync use-case tests do not need background-pinned bootstrap behavior.
+        Raises:
+            None.
+        Side Effects:
+            Appends requested coordinates to the in-memory call log.
+        """
+        self.active_calls.append(coordinates)
+        return self.context
+
+    def resolve_pinned_context(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        pinned_identity: Any,
+    ) -> Any:
+        """
+        Reject unexpected background bootstrap calls in sync use-case tests.
+
+        Args:
+            coordinates: Ignored coordinates argument.
+            pinned_identity: Ignored persisted pin payload.
+        Returns:
+            Any: Never returns because this path is unexpected here.
+        Assumptions:
+            `RunBacktestUseCase` should only use `resolve_active_context(...)`.
+        Raises:
+            AssertionError: Always, to signal unexpected background bootstrap usage.
+        Side Effects:
+            None.
+        """
+        _ = coordinates, pinned_identity
+        raise AssertionError("sync use-case must not call resolve_pinned_context")
 
 
 class _AlignedOnlyCandleFeed:
@@ -516,6 +596,78 @@ def test_run_backtest_use_case_applies_staged_top_k_limit() -> None:
 
     assert len(response.variants) == 1
     assert response.variants[0].total_return_pct == 25.0
+
+
+def test_run_backtest_use_case_bootstraps_active_slot_pinned_context_before_runtime() -> None:
+    """
+    Verify sync use-case resolves the shared slot-pinned context before runtime work starts.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R6-01 bootstrap is additive here and should not change staged scoring behavior.
+    Raises:
+        AssertionError: If sync bootstrap coordinates or pinned identity fields drift.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+    """
+    resolver = _RecordingArtifactSlotResolver(
+        context=_FakeSlotPinnedContext(
+            coordinates=ArtifactCoordinatesV2(
+                exchange="binance",
+                market_type="spot",
+                symbol="BTCUSDT",
+            ),
+            artifact_slot="slot_a",
+            slot_generation=7,
+            artifact_asof_date="2026-03-29",
+            artifact_manifest_hash="d" * 64,
+        )
+    )
+    use_case = RunBacktestUseCase(
+        candle_feed=_AlignedOnlyCandleFeed(),
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        strategy_reader=_UnusedStrategyReader(),
+        staged_scorer=_DeterministicScorer(),
+        artifact_slot_resolver=cast(Any, resolver),
+    )
+    request = RunBacktestRequest(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+        ),
+        template=_build_template(windows=(20,)),
+        top_k=1,
+        preselect=1,
+    )
+
+    response = use_case.execute(
+        request=request,
+        current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
+    )
+
+    assert response.total_indicator_compute_calls == 1
+    assert resolver.active_calls == (
+        [
+            ArtifactCoordinatesV2(
+                exchange="binance",
+                market_type="spot",
+                symbol="BTCUSDT",
+            )
+        ]
+    )
+    assert resolver.context.artifact_slot == "slot_a"
+    assert resolver.context.slot_generation == 7
+    assert resolver.context.artifact_asof_date == "2026-03-29"
+    assert resolver.context.artifact_manifest_hash == "d" * 64
 
 
 def test_run_backtest_use_case_returns_trades_only_for_configured_top_n() -> None:

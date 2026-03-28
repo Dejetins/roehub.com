@@ -1,12 +1,12 @@
-# Backtest Runtime Kernels V2 (R5-02 contract for `signal_tf + 1m_risk`)
+# Backtest Runtime Kernels V2 (R5-02 contract / R6-01 loader-context boundary for `signal_tf + 1m_risk`)
 
 Этот документ фиксирует канонический production contract для Stage A / Stage B runtime kernels,
 который переносит notebook-derived kernel semantics из
 `tests/notebook_tests/06_backtest_compute.ipynb` в generic runtime boundaries, не меняя shipped
 R5-01 artifact contracts.
 
-Статус: `Milestone R5 / EPIC R5-02`  
-Следующий этап реализации: `Milestone R6`
+Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01`  
+Следующие этапы реализации: `Milestone R6 / EPIC R6-02 + R6-03 + R6-04`
 
 Связанные документы:
 
@@ -26,6 +26,10 @@ R5-01 artifact contracts.
   `notebook-derived kernel semantics` и `not a literal notebook orchestration script`.
 - R5-01 остаётся immutable input boundary: runtime читает только shipped `1m hit-times`,
   `prices/<tf>`, `prices/1m`, `mappings/<tf>` и `signals/<tf>/<indicator_id>`.
+- R6-01 уже реализует runtime-side artifact loading primitives:
+  `artifact_slot_resolver.py`, `price_arrays_loader.py`, `signal_matrix_loader.py`.
+- Sync и background starts теперь обязаны делить один immutable `slot-pinned context` contract,
+  а не расходиться по разным pointer/discovery paths.
 - Документ не вводит новые API payloads, новые request TF или новые persisted storage contracts.
 
 ## Канонический словарь
@@ -57,6 +61,29 @@ R5-01 artifact contracts.
 |---|---|---|
 | Stage A | `prices/<signal_tf>/*`, `signals/<signal_tf>/<indicator_id>/signals.i8.npy`, `mappings/<signal_tf>/bar_close_1m_idx.u32.npy` | `final_signal`, deterministic edges, `compact trade list`, shortlist-ready no-risk summaries |
 | Stage B | Stage A `compact trade list`, `prices/1m/*`, `hit_times/1m/manifest.yaml`, `hit_times/1m/*.npy` | best TP/SL cell, exact replay of best TP/SL cell, final `metrics over compact trades` |
+
+## R6-01 implemented boundary
+
+R6-01 закрывает не kernels, а runtime bootstrap/loaders boundary.
+
+Что уже зафиксировано кодом:
+
+- один `slot-pinned context` с полями `artifact_slot`, `slot_generation`,
+  `artifact_asof_date`, `artifact_manifest_hash`;
+- sync path резолвит active slot из strict `current.yaml`;
+- background path резолвит тот же identity shape из persisted job pin metadata;
+- оба path читают один и тот же root `manifest.yaml` и downstream manifests без directory
+  scanning;
+- arrays открываются только через `np.load(..., mmap_mode='r')` и `allow_pickle=False`;
+- runtime fail-fast reject'ит drift по `path`, `dtype`, `shape`, `axis_order`, `timeline`,
+  `slot_generation`, `asof_date`.
+
+Что остаётся вне scope R6-01:
+
+- Stage A kernels (`signal_aggregator_kernel.py`, `trade_compactor_kernel.py`) из R6-02;
+- Stage B risk execution kernels из R6-03;
+- ranking/top-N runtime materialization из R6-04;
+- full cutover с legacy scorer/execution paths на v2 runtime kernels.
 
 ## Stage A Contract
 

@@ -29,11 +29,14 @@ from trading.contexts.backtest.application.ports import (
 )
 from trading.contexts.backtest.application.services import (
     STAGE_B_LITERAL,
+    ArtifactSlotPinnedRuntimeContextV2,
+    BacktestArtifactSlotResolverV2,
     BacktestCandleTimeline,
     BacktestCandleTimelineBuilder,
     BacktestReportingServiceV1,
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
+    artifact_coordinates_from_market_id_v2,
 )
 from trading.contexts.backtest.application.services.numba_runtime_v1 import (
     apply_backtest_numba_threads,
@@ -92,6 +95,7 @@ class _ResolvedRunContext:
     preselect: int
     top_trades_n: int
     ranking: BacktestRankingConfig
+    artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None = None
 
 
 class RunBacktestUseCase:
@@ -139,6 +143,7 @@ class RunBacktestUseCase:
         eager_top_reports_enabled: bool = False,
         allowed_request_timeframes: tuple[str, ...] | None = None,
         forbidden_request_timeframes: tuple[str, ...] | None = None,
+        artifact_slot_resolver: BacktestArtifactSlotResolverV2 | None = None,
     ) -> None:
         """
         Initialize staged backtest use-case dependencies and runtime defaults.
@@ -186,6 +191,9 @@ class RunBacktestUseCase:
                 Optional runtime contract list for supported request timeframes.
             forbidden_request_timeframes:
                 Optional runtime contract list for explicitly forbidden request timeframes.
+            artifact_slot_resolver:
+                Optional shared R6-01 slot-pinned context bootstrap used before runtime work
+                starts.
         Returns:
             None.
         Assumptions:
@@ -267,6 +275,7 @@ class RunBacktestUseCase:
         self._forbidden_request_timeframes = _normalize_timeframe_literals(
             values=forbidden_request_timeframes
         )
+        self._artifact_slot_resolver = artifact_slot_resolver
 
     def execute(
         self,
@@ -515,6 +524,7 @@ class RunBacktestUseCase:
                 base_template=base_template,
                 overrides=request.overrides,
             )
+            artifact_context = self._bootstrap_artifact_context(template=template)
             return _ResolvedRunContext(
                 mode="saved",
                 strategy_id=request.strategy_id,
@@ -524,6 +534,7 @@ class RunBacktestUseCase:
                 preselect=preselect,
                 top_trades_n=top_trades_n,
                 ranking=ranking,
+                artifact_context=artifact_context,
             )
 
         if request.template is None:  # pragma: no cover - guarded by request DTO invariant
@@ -537,6 +548,7 @@ class RunBacktestUseCase:
             forbidden_request_timeframes=self._forbidden_request_timeframes,
             root_path="body.template",
         )
+        artifact_context = self._bootstrap_artifact_context(template=request.template)
 
         return _ResolvedRunContext(
             mode="template",
@@ -547,7 +559,56 @@ class RunBacktestUseCase:
             preselect=preselect,
             top_trades_n=top_trades_n,
             ranking=ranking,
+            artifact_context=artifact_context,
         )
+
+    def _bootstrap_artifact_context(
+        self,
+        *,
+        template: RunBacktestTemplate,
+    ) -> ArtifactSlotPinnedRuntimeContextV2 | None:
+        """
+        Resolve the optional shared R6-01 slot-pinned context before sync runtime work starts.
+
+        Args:
+            template: Effective validated run template with canonical instrument identity.
+        Returns:
+            ArtifactSlotPinnedRuntimeContextV2 | None: Bootstrapped immutable slot context when
+                resolver wiring is enabled, otherwise `None`.
+        Assumptions:
+            This bootstrap remains additive until the full v2 kernel cutover consumes the returned
+            context directly.
+        Raises:
+            BacktestValidationError: If artifact coordinates, `current.yaml`, or slot manifest are
+                unavailable or violate strict startup contracts.
+        Side Effects:
+            Reads strict artifact metadata from disk when resolver wiring is enabled.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+        """
+        if self._artifact_slot_resolver is None:
+            return None
+        market_id = template.instrument_id.market_id.value
+        symbol_literal = str(template.instrument_id.symbol)
+        try:
+            coordinates = artifact_coordinates_from_market_id_v2(
+                market_id=market_id,
+                symbol=symbol_literal,
+            )
+            return self._artifact_slot_resolver.resolve_active_context(coordinates)
+        except ValueError as error:
+            raise BacktestValidationError(
+                "Published backtest artifacts violate shared slot-pinned context contract: "
+                f"{error}"
+            ) from error
+        except FileNotFoundError as error:
+            raise BacktestValidationError(
+                "Published backtest artifacts are unavailable for requested instrument"
+            ) from error
 
     def _template_from_snapshot(
         self,

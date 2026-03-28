@@ -29,18 +29,25 @@ from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     _clickhouse_client,
 )
 from trading.contexts.backtest.adapters.outbound import (
+    BacktestArtifactPathBuilderV2,
     PostgresBacktestJobLeaseRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestJobResultsRepository,
     PsycopgBacktestPostgresGateway,
     YamlBacktestGridDefaultsProvider,
+    load_backtest_artifacts_runtime_config,
     load_backtest_runtime_config,
+    resolve_backtest_artifacts_config_path,
 )
 from trading.contexts.backtest.application.ports import (
     BacktestJobLeaseRepository,
     BacktestJobRequestDecoder,
 )
-from trading.contexts.backtest.application.services import BacktestCandleTimelineBuilder
+from trading.contexts.backtest.application.services import (
+    ArtifactSlotResolverV2,
+    BacktestCandleTimelineBuilder,
+    YamlBacktestArtifactLoaderV2,
+)
 from trading.contexts.backtest.application.use_cases import (
     BacktestJobRunReportV1,
     RunBacktestJobRunnerV1,
@@ -361,6 +368,9 @@ def build_backtest_job_runner_app(
         raise ValueError("build_backtest_job_runner_app metrics_port must be > 0")
 
     runtime_config = load_backtest_runtime_config(Path(config_path))
+    artifact_runtime_config = load_backtest_artifacts_runtime_config(
+        resolve_backtest_artifacts_config_path(environ=environ)
+    )
     strategy_pg_dsn = environ.get(_STRATEGY_PG_DSN_KEY, "").strip()
     if not strategy_pg_dsn:
         raise ValueError(f"{_STRATEGY_PG_DSN_KEY} is required for backtest job-runner worker")
@@ -384,6 +394,12 @@ def build_backtest_job_runner_app(
     indicator_compute = build_indicators_compute(environ=environ)
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     request_decoder = _ApiBacktestJobRequestDecoderV1()
+    artifact_loader = YamlBacktestArtifactLoaderV2(
+        path_resolver=BacktestArtifactPathBuilderV2(
+            root=artifact_runtime_config.artifact_root_path()
+        )
+    )
+    artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
 
     runner_use_case = RunBacktestJobRunnerV1(
         job_repository=job_repository,
@@ -414,6 +430,7 @@ def build_backtest_job_runner_app(
         max_numba_threads=runtime_config.cpu.max_numba_threads,
         allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
+        artifact_slot_resolver=artifact_slot_resolver,
     )
     return BacktestJobRunnerApp(
         claim_poll_seconds=runtime_config.jobs.claim_poll_seconds,
