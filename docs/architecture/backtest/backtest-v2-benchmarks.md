@@ -4,6 +4,7 @@
 Связанные документы:
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
 
@@ -74,7 +75,16 @@ R0 intentionally не фиксирует machine-specific SLA. Проверяе�
 - Источник: `tests/perf_smoke/contexts/backtest/fixtures/r0_parity_scope.json` -> `stage_b_signal_tf_1m_risk_reference`.
 - Статус: `reference-only` в R0.
 - Назначение: подготовить явную точку сравнения для R5/R6, не обещая parity с legacy close-fill.
-- Reference docs: `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`.
+- Canonical docs:
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+- Scope для будущих golden fixtures:
+  - `signal timeline` / `execution timeline`
+  - `compact trade list`
+  - `1m hit-times`
+  - `fast TP/SL grid search`
+  - `exact replay of best TP/SL cell`
+  - `metrics over compact trades`
 
 ## Deterministic inputs
 
@@ -126,6 +136,8 @@ uv run pytest -q \
 ## Consumers for next milestones
 
 - R1 использует frozen request TF list, `signals.v1.params = default-only` и `top_n_*` contract.
-- R5 использует parity scope manifest как стартовую точку для `signal_tf + 1m_risk` golden fixtures.
+- R5-02 использует `docs/architecture/backtest/backtest-runtime-kernels-v2.md` как canonical
+  transfer contract для notebook-derived kernel semantics.
+- R5-03 использует parity scope manifest как стартовую точку для `signal_tf + 1m_risk` golden fixtures.
 - R6-R8 сравнивают `clickhouse_hot_path_calls` и `indicator_compute_calls` против R0 baseline перед cutover.
 - R10 обновляет этот документ уже как post-cutover benchmark ledger, но не меняет задним числом R0 fixtures.

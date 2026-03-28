@@ -1,9 +1,13 @@
-# Backtest Architecture Docs (v1)
+# Backtest Architecture Docs
 
 Краткий индекс и rollout-заметки для актуального backtest-контракта.
 
 ## Основные контракты
 
+- Runtime kernels v2 contract for `signal_tf + 1m_risk`, Stage A / Stage B boundaries and
+  notebook-derived transfer scope: `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- Notebook transfer reference and function-level semantics anchors:
+  `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - Sync API: `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
 - Reporting metrics/table: `docs/architecture/backtest/backtest-reporting-metrics-table-v1.md`
 - Jobs API: `docs/architecture/backtest/backtest-jobs-api-v1.md`
@@ -35,6 +39,10 @@
   `lookback_policy.signal_tail_bars_1m` и merge policy `prefix + rebuilt_tail`.
 - R5-01 materialize'ит real `hit_times/1m`, поэтому full validation spec уже может требовать
   `require_hit_times_manifest=true` для актуального runner path.
+- R5-02 фиксирует единый contract path:
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md` описывает production kernels,
+  - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md` сохраняет
+    reference-only notebook walkthrough.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
   `signal_artifacts=[]` и `require_hit_times_manifest=false`.
 - R4-04 runtime `source` integration в текущем репозитории проходит через runtime defaults, jobs

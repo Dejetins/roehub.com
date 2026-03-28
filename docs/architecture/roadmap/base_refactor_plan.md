@@ -750,6 +750,7 @@
 
 **Основные документы:**
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 
 ---

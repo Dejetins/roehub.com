@@ -17,8 +17,8 @@
     {
       "scope_id": "stage_b_signal_tf_1m_risk_reference",
       "status": "reference-only",
-      "reference_doc": "docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md",
-      "reference_notebook": "tests/notebook_tests/05_hit_time_grid.ipynb"
+      "reference_doc": "docs/architecture/backtest/backtest-runtime-kernels-v2.md",
+      "reference_notebook": "tests/notebook_tests/06_backtest_compute.ipynb"
     }
   ]
 }

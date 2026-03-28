@@ -1,28 +1,62 @@
-# Алгоритм расчета из `tests/notebook_tests/06_backtest_compute.ipynb` (v2, подробная спецификация)
+# Алгоритм расчета из `tests/notebook_tests/06_backtest_compute.ipynb` (v2, reference semantics)
 
-Документ фиксирует алгоритм ноутбука `tests/notebook_tests/06_backtest_compute.ipynb` как переиспользуемую, воспроизводимую спецификацию.
-Цель ноутбука: быстро оценить большое число стратегий (пары SMA/EMA сигналов), подобрать лучшую TP/SL ячейку для каждой стратегии и посчитать финальные метрики.
+Этот документ сохраняет детальную notebook reference для
+`tests/notebook_tests/06_backtest_compute.ipynb` и привязывает конкретные notebook-функции к
+production transfer contract.
 
-Ключевая идея ускорения: вместо полного «бар-за-баром» re-play на каждой ячейке TP/SL строится компактный trade list, а grid-search делается через монотонные hit-time таблицы и разложение вкладов в difference-буферы (Numba).
+Канонический production entrypoint для R5-02/R6 находится в
+`docs/architecture/backtest/backtest-runtime-kernels-v2.md`.
+Текущий документ нужен как semantics source, notebook anchor и reference-only walkthrough.
 
 ## Status
 
-- Status: algorithm reference for R0 parity baseline, not alternative product architecture.
-- Superseded by for launch/runtime contract decisions:
+- Status: detailed notebook reference for `notebook-derived kernel semantics`.
+- Canonical production transfer contract:
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
-  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - Historical/reference scope kept here:
-  - notebook-derived kernel rules,
-  - parity reference for future `signal_tf + 1m_risk` cutover,
+  - notebook function anchors such as `build_trade_list_for_pair` and `evaluate_trade_factor`,
+  - parity reference for `signal_tf + 1m_risk`,
   - research-time execution examples such as `exec_tf = 5m`.
-- R0 freeze clarification:
-  - `5m` in notebook examples is a reference execution timeline, not an allowed request TF in target contract;
-  - current notebook fallback/recompute branches do not redefine approved launch/runtime/storage semantics.
+- Notebook is a semantics source and `not a literal notebook orchestration script`.
+- `5m` in notebook examples is a reference execution timeline only and not an allowed request TF in
+  runtime policy.
+
+## R5-02 transfer summary
+
+В production contract из notebook переносится только generic kernel path:
+
+1. `signal timeline` aggregation.
+2. `execution timeline` mapping.
+3. `compact trade list`.
+4. `1m hit-times` based risk exits.
+5. `fast TP/SL grid search`.
+6. `exact replay of best TP/SL cell`.
+7. `metrics over compact trades`.
+
+Канонические tie-break rules:
+
+- TP/SL lookup starts at `entry_exec + 1`.
+- `signal exit wins on equal bar`.
+- `SL wins TP tie`.
+
+Явно вне production contract:
+
+- notebook-specific pair filters и staged heuristics;
+- literal notebook file layout и notebook env flags;
+- research tables, plots и ad-hoc orchestration;
+- попытка перенести notebook один-в-один как runtime facade.
 
 ---
 
-## 1. Общие принципы
+## Подробный notebook walkthrough (reference-only)
+
+Ниже остаётся подробная расшифровка notebook cells и функций.
+Она нужна для R5-02/R5-03 parity work, но source-of-truth для runtime boundaries теперь
+находится в `docs/architecture/backtest/backtest-runtime-kernels-v2.md`.
+
+### 1. Общие принципы
 
 1) Детерминизм + fail-fast.
 Алгоритм максимально рано валидирует входы: наличие обязательных OHLC полей, монотонность времени, согласованность размеров, соответствие TP/SL сетки precompute-таблицам, диапазон сигналов `{-1,0,1}`.

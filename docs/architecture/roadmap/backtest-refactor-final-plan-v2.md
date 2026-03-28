@@ -801,6 +801,11 @@ Stage B использует shortlist из Stage A и добавляет risk e
 
 В текущей версии документа ранее не хватало явной фиксации того, какие именно вычислительные принципы и правила SP/SL берутся из ноутбука `06_backtest_compute.ipynb`.
 
+Канонический R5-02 entrypoint для этого transfer scope теперь вынесен в
+`docs/architecture/backtest/backtest-runtime-kernels-v2.md`.
+Эта секция остаётся architecture baseline summary, а детальные notebook anchors живут в
+`docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`.
+
 Ниже фиксируется точный scope переноса.
 
 Из notebook **переносится как обязательный production contract**:
@@ -821,7 +826,8 @@ Stage B использует shortlist из Stage A и добавляет risk e
 4. конкретный формат `prices_and_signals_5m.npy` из research-папки;
 5. исследовательские DataFrame-таблицы и ranking колонок ноутбука как публичный API.
 
-То есть notebook становится для v2 **источником runtime kernel semantics**, а не буквальной orchestration-схемой продукта.
+То есть notebook становится для v2 **источником runtime kernel semantics**, а не literal
+orchestration contract продукта; иначе говоря, это `not a literal notebook orchestration script`.
 
 ### 12.5 Подробный алгоритм, который должен быть перенят из notebook
 

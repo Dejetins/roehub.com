@@ -418,10 +418,10 @@ def test_r0_parity_scope_fixture_manifest_is_complete() -> None:
 
     Docs:
       - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
       - tests/perf_smoke/contexts/backtest/fixtures/r0_parity_scope.json
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
       - docs/architecture/backtest/backtest-api-post-backtests-v1.md
     Args:
         None.
@@ -429,7 +429,8 @@ def test_r0_parity_scope_fixture_manifest_is_complete() -> None:
         None.
     Assumptions:
         R0 parity scope is document-driven and intentionally separates active
-        vs reference-only cases.
+        vs reference-only cases, including the canonical R5-02 runtime-kernel
+        reference path.
     Raises:
         AssertionError: If one required scope entry is missing or misclassified.
     Side Effects:
@@ -437,6 +438,7 @@ def test_r0_parity_scope_fixture_manifest_is_complete() -> None:
     """
     payload = json.loads((_FIXTURES_DIR / "r0_parity_scope.json").read_text(encoding="utf-8"))
     scopes = payload["parity_scopes"]
+    scopes_by_id = {item["scope_id"]: item for item in scopes}
     assert [item["scope_id"] for item in scopes] == [
         "stage_a_no_risk",
         "stage_b_legacy_close_fill",
@@ -447,6 +449,18 @@ def test_r0_parity_scope_fixture_manifest_is_complete() -> None:
         "active",
         "reference-only",
     ]
+    assert scopes_by_id["stage_a_no_risk"]["reference_doc"] == (
+        "docs/architecture/backtest/backtest-signals-from-indicators-v1.md"
+    )
+    assert scopes_by_id["stage_b_legacy_close_fill"]["reference_doc"] == (
+        "docs/architecture/backtest/backtest-api-post-backtests-v1.md"
+    )
+    assert scopes_by_id["stage_b_signal_tf_1m_risk_reference"]["reference_doc"] == (
+        "docs/architecture/backtest/backtest-runtime-kernels-v2.md"
+    )
+    assert scopes_by_id["stage_b_signal_tf_1m_risk_reference"]["reference_notebook"] == (
+        "tests/notebook_tests/06_backtest_compute.ipynb"
+    )
 
 
 def _load_benchmark_scenarios() -> tuple[_R0BenchmarkScenario, ...]:

@@ -12,6 +12,7 @@
 Основные документы:
 
 - `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
@@ -102,6 +103,12 @@ artifact-backed `prices/1m.ohlcv`.
 - root manifest больше не должен публиковать placeholder hash для `hit_times`, если slot построен
   этим R5-01 path;
 - runtime читает `hit_times/1m` только по strict manifest metadata, без recompute и discovery.
+- на этом boundary ответственность precompute слоя заканчивается: `signal timeline`,
+  `execution timeline`, `compact trade list`, `fast TP/SL grid search`,
+  `exact replay of best TP/SL cell` и `metrics over compact trades` описываются отдельно в
+  `docs/architecture/backtest/backtest-runtime-kernels-v2.md`;
+- precompute runner materialize'ит inputs для `signal_tf + 1m_risk`, но не становится notebook
+  orchestration layer.
 
 ### R3-01 / R3-02 prices stage
 
