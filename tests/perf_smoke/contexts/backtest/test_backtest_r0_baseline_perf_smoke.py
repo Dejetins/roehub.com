@@ -6,6 +6,7 @@ import time
 import tracemalloc
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from pathlib import Path
 from typing import TypedDict
 from uuid import UUID
@@ -461,6 +462,70 @@ def test_r0_parity_scope_fixture_manifest_is_complete() -> None:
     assert scopes_by_id["stage_b_signal_tf_1m_risk_reference"]["reference_notebook"] == (
         "tests/notebook_tests/06_backtest_compute.ipynb"
     )
+    assert scopes_by_id["stage_b_signal_tf_1m_risk_reference"]["golden_fixture_manifest"] == (
+        "tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json"
+    )
+
+
+def test_r5_stage_b_golden_fixture_manifest_tracks_contract_fixture_bytes() -> None:
+    """
+    Verify the R5-03 Stage B manifest points to the canonical contract fixture and published SHA.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R5-03 keeps Stage B runtime validation separate from the R0 legacy close-fill baseline,
+        while publishing one deterministic fixture baseline for future R6 kernel checks.
+    Raises:
+        AssertionError: If the contract fixture path, case order, or SHA drift unexpectedly.
+    Side Effects:
+        Reads fixture JSON files from repository.
+    """
+    payload = json.loads(
+        (_FIXTURES_DIR / "r5_stage_b_golden_cases.json").read_text(encoding="utf-8")
+    )
+    assert payload["schema_version"] == 1
+    assert payload["scope_id"] == "stage_b_signal_tf_1m_risk_reference"
+    assert payload["status"] == "validation-baseline"
+    assert payload["semantics"] == "signal_tf + 1m_risk"
+    assert payload["contract_fixture"] == (
+        "tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json"
+    )
+    assert payload["case_order"] == [
+        "entry_mapping_request_tf_to_1m",
+        "earliest_signal_exit_mapping",
+        "tp_sl_earliest_hit",
+        "signal_exit_wins_equal_bar_over_tp_sl_tie",
+        "sl_wins_tp_tie",
+        "exact_best_cell_replay_metrics",
+    ]
+    assert payload["coverage"] == [
+        "signal_tf + 1m_risk",
+        "entry mapping request TF -> 1m",
+        "TP/SL earliest hit",
+        "earliest signal-exit mapping",
+        "signal exit wins on equal bar",
+        "SL wins TP tie",
+        "entry_exec + 1",
+        "exact best-cell replay",
+        "metrics over compact trades",
+        "sentinel_index",
+        "golden fixtures",
+    ]
+    contract_fixture_path = _FIXTURES_DIR.parents[4] / payload["contract_fixture"]
+    assert contract_fixture_path.is_file()
+    assert sha256(contract_fixture_path.read_bytes()).hexdigest() == payload[
+        "contract_fixture_sha256"
+    ]
 
 
 def _load_benchmark_scenarios() -> tuple[_R0BenchmarkScenario, ...]:

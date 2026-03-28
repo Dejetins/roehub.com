@@ -183,4 +183,31 @@ load stage_a_output
 - R5-01 уже shipped и materialize'ит strict `1m hit-times`, на которые обязан опираться этот
   contract.
 - R5-02 фиксирует production transfer semantics и boundaries для R6 implementation.
-- R5-03 остаётся отдельным milestone для golden fixtures и не подменяется этим документом.
+- R5-03 остаётся отдельным milestone для golden fixtures и не подменяет runtime implementation,
+  но теперь публикует executable validation baseline:
+  - unit fixture catalog:
+    `tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json`
+  - perf-smoke reference manifest:
+    `tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json`
+  - executable contract tests:
+    `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py`
+- Эти golden fixtures фиксируют `entry mapping request TF -> 1m`, `TP/SL earliest hit`,
+  `earliest signal-exit mapping`, tie-break rules, `exact best-cell replay` и
+  `metrics over compact trades` без notebook execution в CI.
+
+## R5-03 Verification Baseline
+
+Для будущих R6 kernels canonical verification path теперь такой:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py \
+  tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+```
+
+Важно:
+
+- `tests/perf_smoke/contexts/backtest/fixtures/r0_parity_scope.json` сохраняет
+  `stage_b_signal_tf_1m_risk_reference` как `reference-only` R0 marker;
+- отдельный `r5_stage_b_golden_cases.json` делает change explicit и version-controlled;
+- runtime/API/storage contracts по-прежнему не меняются до R6 cutover.

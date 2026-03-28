@@ -8,6 +8,10 @@
   notebook-derived transfer scope: `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
 - Notebook transfer reference and function-level semantics anchors:
   `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+- R5-03 Stage B golden fixture baseline for `signal_tf + 1m_risk`:
+  `tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json`
+- R5-03 executable fixture tests:
+  `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py`
 - Sync API: `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
 - Reporting metrics/table: `docs/architecture/backtest/backtest-reporting-metrics-table-v1.md`
 - Jobs API: `docs/architecture/backtest/backtest-jobs-api-v1.md`
@@ -43,6 +47,10 @@
   - `docs/architecture/backtest/backtest-runtime-kernels-v2.md` описывает production kernels,
   - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md` сохраняет
     reference-only notebook walkthrough.
+- R5-03 фиксирует executable validation baseline для Stage B semantics через:
+  - unit fixture catalog `stage_b_golden_fixtures_v2.json`,
+  - perf manifest `r5_stage_b_golden_cases.json`,
+  - notebook-independent tests `test_stage_b_golden_fixtures_v2.py`.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
   `signal_artifacts=[]` и `require_hit_times_manifest=false`.
 - R4-04 runtime `source` integration в текущем репозитории проходит через runtime defaults, jobs

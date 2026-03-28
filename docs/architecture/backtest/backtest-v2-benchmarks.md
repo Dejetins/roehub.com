@@ -70,18 +70,31 @@ R0 intentionally не фиксирует machine-specific SLA. Проверяе�
 - Проверяемая область: текущий v1 exact scoring/reporting path как baseline до cutover.
 - Reference docs: `docs/architecture/backtest/backtest-api-post-backtests-v1.md`.
 
-### Future v2 `signal_tf + 1m_risk` reference fixtures
+### R5-03 v2 `signal_tf + 1m_risk` validation baseline
 
 - Источник: `tests/perf_smoke/contexts/backtest/fixtures/r0_parity_scope.json` -> `stage_b_signal_tf_1m_risk_reference`.
-- Статус: `reference-only` в R0.
-- Назначение: подготовить явную точку сравнения для R5/R6, не обещая parity с legacy close-fill.
+- Статус:
+  - `reference-only` в R0 parity scope;
+  - `validation-baseline` в
+    `tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json`.
+- Назначение: дать explicit deterministic baseline для R5/R6, не обещая parity с legacy
+  close-fill.
 - Canonical docs:
   - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
   - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
-- Scope для будущих golden fixtures:
+- Canonical fixtures/tests:
+  - `tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json`
+  - `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py`
+  - `tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json`
+- Scope для locked golden fixtures:
   - `signal timeline` / `execution timeline`
   - `compact trade list`
   - `1m hit-times`
+  - `entry mapping request TF -> 1m`
+  - `TP/SL earliest hit`
+  - `earliest signal-exit mapping`
+  - `signal exit wins on equal bar`
+  - `SL wins TP tie`
   - `fast TP/SL grid search`
   - `exact replay of best TP/SL cell`
   - `metrics over compact trades`
@@ -106,7 +119,14 @@ R0 intentionally не фиксирует machine-specific SLA. Проверяе�
 uv run pytest -q tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
 ```
 
-2. Сохранить measurement snapshot в файл:
+2. Проверить R5-03 executable Stage B baseline:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py
+```
+
+3. Сохранить measurement snapshot в файл:
 
 ```bash
 ROEHUB_R0_BASELINE_PRINT=1 \
@@ -114,7 +134,7 @@ uv run pytest -q -s tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline
 > /tmp/roehub-backtest-r0-baseline.json
 ```
 
-3. Проверить runtime/config freeze и additive runtime-defaults payload:
+4. Проверить runtime/config freeze и additive runtime-defaults payload:
 
 ```bash
 uv run pytest -q \
@@ -124,6 +144,8 @@ uv run pytest -q \
 
 Где хранятся outputs:
 - version-controlled fixtures: `tests/perf_smoke/contexts/backtest/fixtures/*.json`
+- executable Stage B golden fixtures:
+  `tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json`
 - generated measurement snapshot: `/tmp/roehub-backtest-r0-baseline.json`
 - docs index после markdown updates: `docs/INDEX.md`
 
@@ -138,6 +160,7 @@ uv run pytest -q \
 - R1 использует frozen request TF list, `signals.v1.params = default-only` и `top_n_*` contract.
 - R5-02 использует `docs/architecture/backtest/backtest-runtime-kernels-v2.md` как canonical
   transfer contract для notebook-derived kernel semantics.
-- R5-03 использует parity scope manifest как стартовую точку для `signal_tf + 1m_risk` golden fixtures.
+- R5-03 публикует `r5_stage_b_golden_cases.json` и unit fixture catalog как canonical
+  validation baseline для `signal_tf + 1m_risk` golden fixtures.
 - R6-R8 сравнивают `clickhouse_hot_path_calls` и `indicator_compute_calls` против R0 baseline перед cutover.
 - R10 обновляет этот документ уже как post-cutover benchmark ledger, но не меняет задним числом R0 fixtures.

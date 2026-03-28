@@ -56,6 +56,16 @@ production transfer contract.
 Она нужна для R5-02/R5-03 parity work, но source-of-truth для runtime boundaries теперь
 находится в `docs/architecture/backtest/backtest-runtime-kernels-v2.md`.
 
+Начиная с R5-03 machine-verifiable baseline для этой semantics transfer области живёт не в
+ручном сравнении notebook output, а в committed golden fixtures:
+
+- `tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json`
+- `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py`
+- `tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json`
+
+То есть notebook остаётся reference semantics source, а executable regression baseline теперь
+фиксируется через deterministic fixtures и локальные tests без notebook execution в CI.
+
 ### 1. Общие принципы
 
 1) Детерминизм + fail-fast.

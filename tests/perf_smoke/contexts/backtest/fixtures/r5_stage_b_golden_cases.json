@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "milestone_id": "R5",
+  "epic_id": "R5-03",
+  "scope_id": "stage_b_signal_tf_1m_risk_reference",
+  "status": "validation-baseline",
+  "semantics": "signal_tf + 1m_risk",
+  "reference_doc": "docs/architecture/backtest/backtest-runtime-kernels-v2.md",
+  "contract_fixture": "tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json",
+  "contract_fixture_sha256": "06027d02fabc13ce5281cd008b3c5215d1c26f57da62df59283529f9a66ef1b8",
+  "case_order": [
+    "entry_mapping_request_tf_to_1m",
+    "earliest_signal_exit_mapping",
+    "tp_sl_earliest_hit",
+    "signal_exit_wins_equal_bar_over_tp_sl_tie",
+    "sl_wins_tp_tie",
+    "exact_best_cell_replay_metrics"
+  ],
+  "coverage": [
+    "signal_tf + 1m_risk",
+    "entry mapping request TF -> 1m",
+    "TP/SL earliest hit",
+    "earliest signal-exit mapping",
+    "signal exit wins on equal bar",
+    "SL wins TP tie",
+    "entry_exec + 1",
+    "exact best-cell replay",
+    "metrics over compact trades",
+    "sentinel_index",
+    "golden fixtures"
+  ]
+}

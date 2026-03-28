@@ -18,7 +18,8 @@
       "scope_id": "stage_b_signal_tf_1m_risk_reference",
       "status": "reference-only",
       "reference_doc": "docs/architecture/backtest/backtest-runtime-kernels-v2.md",
-      "reference_notebook": "tests/notebook_tests/06_backtest_compute.ipynb"
+      "reference_notebook": "tests/notebook_tests/06_backtest_compute.ipynb",
+      "golden_fixture_manifest": "tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json"
     }
   ]
 }
