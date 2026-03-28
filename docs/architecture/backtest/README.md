@@ -10,7 +10,7 @@
 - Jobs worker: `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
 - Artifact store v2 layout/publish/pinning/validator/config contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
-- Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices, R3-03 `mappings/<tf>`, R3-04 publish-ready prices+mappings stage, R4-02 real `signals/<tf>/<indicator_id>` artifacts и R4-03 bounded `prefix + rebuilt_tail` signal rebuild: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices, R3-03 `mappings/<tf>`, R3-04 publish-ready prices+mappings stage, R4-02 real `signals/<tf>/<indicator_id>` artifacts, R4-03 bounded `prefix + rebuilt_tail` signal rebuild и R5-01 real `hit_times/1m`: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Signal rules catalog and R4-01 semantic source-of-truth: `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
 - Artifact rebuild/publish runbook: `docs/runbooks/backtest-artifacts-rebuild.md`
 
@@ -33,9 +33,13 @@
   manifests и root `signals.*` catalog для explicit configured targets.
 - R4-03 переводит signal rebuild на deterministic bounded tail-update через
   `lookback_policy.signal_tail_bars_1m` и merge policy `prefix + rebuilt_tail`.
-- Полный publish с `hit_times` по-прежнему blocked до R5; R4-04 runtime `source` integration в
-  текущем репозитории проходит через runtime defaults, jobs `/top` payloads и explicit
-  `variant-report` payloads, хотя отдельные history/detail v2 docs из roadmap пока отсутствуют.
+- R5-01 materialize'ит real `hit_times/1m`, поэтому full validation spec уже может требовать
+  `require_hit_times_manifest=true` для актуального runner path.
+- Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
+  `signal_artifacts=[]` и `require_hit_times_manifest=false`.
+- R4-04 runtime `source` integration в текущем репозитории проходит через runtime defaults, jobs
+  `/top` payloads и explicit `variant-report` payloads, хотя отдельные history/detail v2 docs из
+  roadmap пока отсутствуют.
 
 ## Проверка согласованности
 

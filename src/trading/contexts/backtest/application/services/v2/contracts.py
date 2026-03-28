@@ -2484,7 +2484,7 @@ class ArtifactPricesMappingsPublishResultV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactPrecomputeRuntimeSettingsV2:
     """
-    Minimal service-layer runtime settings required by R3-03/R4-03 precompute orchestration.
+    Minimal service-layer runtime settings required by R3-03/R4-03/R5-01 precompute orchestration.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -2497,9 +2497,12 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     price_tail_bars_1m: int
     mapping_tail_bars_1m: int
     signal_tail_bars_1m: int
+    hit_times_tp_levels_pct: tuple[float, ...]
+    hit_times_sl_levels_pct: tuple[float, ...]
     config_sha256: str
     signal_artifacts: tuple[ArtifactSignalValidationSpecV2, ...] = ()
     max_signal_rows_per_artifact: int = 1_000_000
+    max_hit_times_cells: int = 1_000_000
 
     def __post_init__(self) -> None:
         """
@@ -2511,7 +2514,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             None.
         Assumptions:
             Adapter/wiring code translates the full artifact runtime config into this minimal
-            service DTO for price+mapping+signals orchestration.
+            service DTO for price+mapping+signals+hit-times orchestration.
         Raises:
             ValueError: If the tail lookback or config hash violates strict publish contracts.
         Side Effects:
@@ -2539,6 +2542,22 @@ class ArtifactPrecomputeRuntimeSettingsV2:
         )
         object.__setattr__(
             self,
+            "hit_times_tp_levels_pct",
+            _normalize_positive_float_grid_v2(
+                values=self.hit_times_tp_levels_pct,
+                field_name="ArtifactPrecomputeRuntimeSettingsV2.hit_times_tp_levels_pct",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "hit_times_sl_levels_pct",
+            _normalize_positive_float_grid_v2(
+                values=self.hit_times_sl_levels_pct,
+                field_name="ArtifactPrecomputeRuntimeSettingsV2.hit_times_sl_levels_pct",
+            ),
+        )
+        object.__setattr__(
+            self,
             "config_sha256",
             validate_current_pointer_manifest_sha256_v2(self.config_sha256),
         )
@@ -2552,6 +2571,46 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             "max_signal_rows_per_artifact",
             validate_positive_manifest_int_v2(self.max_signal_rows_per_artifact),
         )
+        object.__setattr__(
+            self,
+            "max_hit_times_cells",
+            validate_positive_manifest_int_v2(self.max_hit_times_cells),
+        )
+
+
+def _normalize_positive_float_grid_v2(
+    *,
+    values: tuple[float, ...],
+    field_name: str,
+) -> tuple[float, ...]:
+    """
+    Normalize one positive ascending float grid used by hit-times materialization.
+
+    Args:
+        values: Candidate percentage-grid values.
+        field_name: Stable field label used in fail-fast errors.
+    Returns:
+        tuple[float, ...]: Ascending unique positive float grid.
+    Assumptions:
+        Runtime settings carry human-percent values and must stay deterministic.
+    Raises:
+        ValueError: If the grid is empty, non-positive, or contains duplicates.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+    """
+    if len(values) == 0:
+        raise ValueError(f"{field_name} must contain at least one value")
+    normalized = tuple(sorted(float(value) for value in values))
+    if normalized[0] <= 0.0:
+        raise ValueError(f"{field_name} values must be > 0, got {normalized!r}")
+    if any(left == right for left, right in zip(normalized, normalized[1:])):
+        raise ValueError(f"{field_name} must not contain duplicate values; got {normalized!r}")
+    return normalized
 
 
 class BacktestArtifactPathResolverV2(Protocol):

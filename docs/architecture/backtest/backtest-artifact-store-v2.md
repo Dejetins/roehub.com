@@ -192,12 +192,12 @@ artifacts/backtest/v2/
 - `mappings[]` в root manifest остаётся пустым до R3-03;
 - `signals` в root manifest остаётся explicit empty catalog до R4-02;
 - `hit_times` в root manifest остаётся explicit fixed-path reference
-  `hit_times/1m/manifest.yaml`, но до R5 может использовать placeholder
+  `hit_times/1m/manifest.yaml`, но до R5-01 может использовать placeholder
   `manifest_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"`.
 
 Это не relax schema.
 Это explicit stage placeholder contract, который later epics обязаны заменить на real manifests и
-validated files перед publish.
+validated files перед publish. R5-01 закрывает этот gap для `hit_times/1m`.
 
 ## R3-03 stage boundary
 
@@ -241,7 +241,7 @@ validated files перед publish.
 На этом этапе placeholders сохраняются только для:
 
 - `signals` root catalog до R4-02;
-- `hit_times/1m/manifest.yaml` reference до R5.
+- `hit_times/1m/manifest.yaml` reference до R5-01.
 
 ## R4-01 / R4-02 / R4-03 stage boundary
 
@@ -263,7 +263,7 @@ contract для explicit configured targets.
 - missing existing signal target files могут переводить target в deterministic full rebuild, но
   drift в `manifest.yaml`, `rows_count`, `timeline`, `variant_key_version`,
   `variant_keys_sha256`, `signals.v1.params` или file `sha256` обязан fail-fast'ить rebuild;
-- placeholders сохраняются только для `hit_times/1m` до R5;
+- placeholders сохраняются только для `hit_times/1m` до R5-01;
 - R4-04 runtime `source` integration теперь потребляет artifact row-order contract downstream
   через runtime defaults, persisted jobs payloads и `variant-report`; dedicated history/detail v2
   docs из roadmap пока отсутствуют в этом репозитории.
@@ -282,7 +282,7 @@ publish использует explicit stage validation spec:
 
 - `signals` как explicit empty catalog только если publish использует explicit
   prices+mappings stage spec с `signal_artifacts = ()`;
-- `hit_times/1m/manifest.yaml` как explicit fixed-path placeholder reference до R5.
+- `hit_times/1m/manifest.yaml` как explicit fixed-path placeholder reference до R5-01.
 
 Это не relax full strict contract:
 

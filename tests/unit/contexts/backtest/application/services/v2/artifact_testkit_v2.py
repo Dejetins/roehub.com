@@ -216,6 +216,7 @@ def build_artifact_precompute_fixture_v2(
     validation_signal_artifacts: tuple[tuple[str, str], ...] = (),
     precompute_signal_artifacts: tuple[tuple[str, str], ...] = (),
     require_hit_times_manifest: bool = False,
+    max_hit_times_cells: int = 1_000_000,
 ) -> ArtifactPrecomputeFixtureV2:
     """
     Build a minimal strict R3-02 fixture with config and `current.yaml` only.
@@ -235,6 +236,7 @@ def build_artifact_precompute_fixture_v2(
             real R4-02 signal materialization by the runner.
         require_hit_times_manifest: Whether the generated runtime config should require real
             `hit_times/1m/manifest.yaml` during whole-slot validation.
+        max_hit_times_cells: Strict positive upper bound for materialized hit-times table cells.
     Returns:
         ArtifactPrecomputeFixtureV2: Strict config/loader/path fixture for R3-02 runner tests.
     Assumptions:
@@ -303,14 +305,14 @@ def build_artifact_precompute_fixture_v2(
                         "signal_tail_bars_1m": signal_tail_bars_1m,
                         "hit_times_tail_bars_1m": 10,
                     },
-                    "validation_budgets": {
-                        "max_price_bars_per_timeframe": 1000000,
-                        "max_mapping_rows_per_timeframe": 1000000,
-                        "max_signal_rows_per_artifact": 1000000,
-                        "max_hit_times_cells": 1000000,
+                        "validation_budgets": {
+                            "max_price_bars_per_timeframe": 1000000,
+                            "max_mapping_rows_per_timeframe": 1000000,
+                            "max_signal_rows_per_artifact": 1000000,
+                            "max_hit_times_cells": max_hit_times_cells,
+                        },
                     },
                 },
-            },
             sort_keys=False,
         ),
         encoding="utf-8",
@@ -323,6 +325,8 @@ def build_artifact_precompute_fixture_v2(
             price_tail_bars_1m=runtime_config.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=runtime_config.lookback_policy.mapping_tail_bars_1m,
             signal_tail_bars_1m=runtime_config.lookback_policy.signal_tail_bars_1m,
+            hit_times_tp_levels_pct=runtime_config.hit_times_grid.tp_levels_pct,
+            hit_times_sl_levels_pct=runtime_config.hit_times_grid.sl_levels_pct,
             config_sha256=build_backtest_artifacts_runtime_config_hash(config=runtime_config),
             signal_artifacts=tuple(
                 ArtifactSignalValidationSpecV2(
@@ -334,6 +338,7 @@ def build_artifact_precompute_fixture_v2(
             max_signal_rows_per_artifact=(
                 runtime_config.validation_budgets.max_signal_rows_per_artifact
             ),
+            max_hit_times_cells=runtime_config.validation_budgets.max_hit_times_cells,
         ),
         builder=builder,
         loader=loader,

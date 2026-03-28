@@ -20,7 +20,6 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
 from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
-    ARTIFACT_PLACEHOLDER_SHA256_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
@@ -654,6 +653,13 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
         fixture=fixture,
         timeframe="3d",
     )
+    hit_times_manifest = fixture.loader.load_hit_times_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+    )
+    tp_values, sl_values, long_tp, long_sl, short_tp, short_sl = _load_hit_times_arrays_v2(
+        fixture=fixture,
+    )
     expected_bar_counts = {
         "1m": _FULL_BUILD_MINUTES_V2,
         "15m": 288,
@@ -694,7 +700,31 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     assert manifest.signals.supported_indicator_ids == ()
     assert manifest.signals.manifests == ()
     assert manifest.hit_times.manifest_path == "hit_times/1m/manifest.yaml"
-    assert manifest.hit_times.manifest_sha256 == ARTIFACT_PLACEHOLDER_SHA256_V2
+    assert manifest.hit_times.manifest_sha256 != "0" * 64
+    assert hit_times_manifest.timeline_bar_count == _FULL_BUILD_MINUTES_V2
+    assert hit_times_manifest.sentinel_index == _FULL_BUILD_MINUTES_V2
+    assert tp_values.dtype == np.float32
+    assert sl_values.dtype == np.float32
+    assert long_tp.dtype == np.uint32
+    assert long_sl.dtype == np.uint32
+    assert short_tp.dtype == np.uint32
+    assert short_sl.dtype == np.uint32
+    assert tp_values.shape == (1,)
+    assert sl_values.shape == (1,)
+    assert long_tp.shape == (1, _FULL_BUILD_MINUTES_V2)
+    assert long_sl.shape == (1, _FULL_BUILD_MINUTES_V2)
+    assert short_tp.shape == (1, _FULL_BUILD_MINUTES_V2)
+    assert short_sl.shape == (1, _FULL_BUILD_MINUTES_V2)
+    assert np.all(np.diff(tp_values) > 0)
+    assert np.all(np.diff(sl_values) > 0)
+    assert np.all(long_tp <= _FULL_BUILD_MINUTES_V2)
+    assert np.all(long_sl <= _FULL_BUILD_MINUTES_V2)
+    assert np.all(short_tp <= _FULL_BUILD_MINUTES_V2)
+    assert np.all(short_sl <= _FULL_BUILD_MINUTES_V2)
+    assert np.all(long_tp[1:, :] >= long_tp[:-1, :])
+    assert np.all(long_sl[1:, :] >= long_sl[:-1, :])
+    assert np.all(short_tp[1:, :] >= short_tp[:-1, :])
+    assert np.all(short_sl[1:, :] >= short_sl[:-1, :])
     assert fifteen_minute_open.shape == (288,)
     assert fifteen_minute_close.shape == (288,)
     assert fifteen_minute_ohlcv.shape == (288, 5)
@@ -739,6 +769,64 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
         three_day_ohlcv[0],
         _expected_bucket_ohlcv_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2))),
     )
+
+
+def test_backtest_artifact_precompute_runner_v2_materializes_hit_times_and_full_validation_passes(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify runner-built slots can pass full validation when only `hit_times/1m` is required.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        R5-01 should materialize strict hit-times artifacts even when no signal targets are
+        configured.
+    Raises:
+        AssertionError: If built hit-times artifacts drift or strict validation rejects the slot.
+    Side Effects:
+        Writes hit-times artifacts under the inactive slot in `tmp_path`.
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=(),
+        require_hit_times_manifest=True,
+    )
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+    )
+    validator = BacktestArtifactManifestValidatorV2(artifact_loader=fixture.loader)
+
+    result = runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    )
+    validation_result = validator.validate_slot(
+        coordinates=fixture.coordinates,
+        slot=fixture.inactive_slot,
+        validation_spec=fixture.runtime_config.to_validation_spec(),
+        expected_asof_date="2026-03-26",
+        expected_slot_generation=5,
+    )
+
+    assert result.slot == fixture.inactive_slot
+    assert validation_result.hit_times_manifest is not None
+    assert validation_result.hit_times_manifest.timeline_bar_count == _FULL_BUILD_MINUTES_V2
+    assert validation_result.signal_manifests == ()
+    assert validation_result.diagnostics == ()
 
 
 def test_backtest_artifact_precompute_runner_v2_uses_deterministic_tail_update(
@@ -2149,6 +2237,44 @@ def _load_mapping_arrays_v2(
     )
 
 
+def _load_hit_times_arrays_v2(
+    *,
+    fixture: ArtifactPrecomputeFixtureV2,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Load the materialized strict `hit_times/1m` family from the inactive slot for assertions.
+
+    Args:
+        fixture: Strict precompute fixture with builder and loader.
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+            `tp_values`, `sl_values`, `long_tp`, `long_sl`, `short_tp`, and `short_sl`.
+    Assumptions:
+        Runner tests inspect only the inactive slot written by `export_canonical_price_1m(...)`.
+    Raises:
+        FileNotFoundError: If one expected hit-times artifact file is missing.
+    Side Effects:
+        Reads six `.npy` files from disk.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    paths = fixture.loader.resolve_hit_times_paths(
+        fixture.coordinates,
+        fixture.inactive_slot,
+    )
+    return (
+        np.load(paths.tp_values, allow_pickle=False),
+        np.load(paths.sl_values, allow_pickle=False),
+        np.load(paths.long_tp, allow_pickle=False),
+        np.load(paths.long_sl, allow_pickle=False),
+        np.load(paths.short_tp, allow_pickle=False),
+        np.load(paths.short_sl, allow_pickle=False),
+    )
+
+
 def _offset_override_value_v2(
     *,
     offset_overrides: dict[int, tuple[float, float]] | None,
@@ -2185,13 +2311,12 @@ def _read_export_bytes_v2(
     result: ArtifactCanonicalPriceExportResultV2,
 ) -> tuple[bytes, ...]:
     """
-    Read root-manifest plus all materialized `prices/<tf>` and `mappings/<tf>` bytes for
-    byte-stability assertions.
+    Read root-manifest plus all materialized price, mapping, and hit-times bytes.
 
     Args:
         result: Structured export result returned by the runner.
     Returns:
-        tuple[bytes, ...]: Bytes for root manifest and every emitted price/mapping artifact file.
+        tuple[bytes, ...]: Bytes for root manifest and every emitted artifact file family.
     Assumptions:
         Result exposes `manifest_path` and `price_paths` exactly as the production DTO does.
     Raises:
@@ -2221,4 +2346,15 @@ def _read_export_bytes_v2(
                 (slot_root / "mappings" / timeframe / "bar_close_1m_idx.u32.npy").read_bytes(),
             )
         )
+    payloads.extend(
+        (
+            (slot_root / "hit_times" / "1m" / "manifest.yaml").read_bytes(),
+            (slot_root / "hit_times" / "1m" / "tp_values.f32.npy").read_bytes(),
+            (slot_root / "hit_times" / "1m" / "sl_values.f32.npy").read_bytes(),
+            (slot_root / "hit_times" / "1m" / "long_tp.u32.npy").read_bytes(),
+            (slot_root / "hit_times" / "1m" / "long_sl.u32.npy").read_bytes(),
+            (slot_root / "hit_times" / "1m" / "short_tp.u32.npy").read_bytes(),
+            (slot_root / "hit_times" / "1m" / "short_sl.u32.npy").read_bytes(),
+        )
+    )
     return tuple(payloads)

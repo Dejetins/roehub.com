@@ -144,8 +144,9 @@ R4-01 / R4-02 / R4-03 clarification:
 - missing existing signal target files могут переводить target в deterministic full rebuild, но
   drift в existing manifest/data при reuse attempt обязан останавливать rebuild fail-fast;
 - R4-04 runtime `source` integration downstream уже потребляет этот artifact contract через
-  runtime defaults, jobs `/top` payloads и `variant-report`; текущая operational-процедура всё
-  ещё не покрывает R5 materialized `hit_times`.
+  runtime defaults, jobs `/top` payloads и `variant-report`;
+- R5-01 materialize'ит real `hit_times/1m`, поэтому rebuild теперь должен писать strict
+  hit-times arrays и manifest в inactive slot по тем же deterministic paths.
 
 Минимально ожидаемые пути:
 
@@ -200,8 +201,10 @@ R4-01 / R4-02 / R4-03 clarification:
 - rebuild обязан валидировать epoch-aligned bucket boundaries и full-bucket coverage для rolled TF;
 - rebuild обязан валидировать mapping monotonicity, bounds и strict price correspondence;
 - publish разрешён для R3-04 только если explicit stage spec ограничен `prices+mappings`;
-- publish после R4-02 может включать real `signals`, но `require_hit_times_manifest` всё ещё
-  должен оставаться `false` до R5, если `hit_times/1m` не materialized;
+- publish после R5-01 может включать real `signals` и real `hit_times`, если полный validation
+  plan этого требует;
+- отдельный R3-04 prices+mappings stage helper по-прежнему обязан оставаться explicit и держать
+  `require_hit_times_manifest=false`;
 - signal tail rebuild bounded by `lookback_policy.signal_tail_bars_1m`, но operator всё равно
   обязан проверять final merged contracts:
   - `rows_count`

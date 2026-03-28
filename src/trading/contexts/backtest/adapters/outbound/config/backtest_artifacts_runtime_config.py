@@ -683,6 +683,8 @@ class BacktestArtifactsRuntimeConfig:
             price_tail_bars_1m=self.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=self.lookback_policy.mapping_tail_bars_1m,
             signal_tail_bars_1m=self.lookback_policy.signal_tail_bars_1m,
+            hit_times_tp_levels_pct=self.hit_times_grid.tp_levels_pct,
+            hit_times_sl_levels_pct=self.hit_times_grid.sl_levels_pct,
             config_sha256=config_sha256,
             signal_artifacts=tuple(
                 item.to_validation_spec() for item in self.validation_plan.signal_artifacts
@@ -690,6 +692,7 @@ class BacktestArtifactsRuntimeConfig:
             max_signal_rows_per_artifact=(
                 self.validation_budgets.max_signal_rows_per_artifact
             ),
+            max_hit_times_cells=self.validation_budgets.max_hit_times_cells,
         )
 
 

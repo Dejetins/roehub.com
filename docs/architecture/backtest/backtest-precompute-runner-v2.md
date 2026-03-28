@@ -1,6 +1,6 @@
-# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04 / R4-01 / R4-02 / R4-03)
+# Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04 / R4-01 / R4-02 / R4-03 / R5-01)
 
-Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`, `Milestone R4 / EPIC R4-01 + R4-02 + R4-03`
+Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`, `Milestone R4 / EPIC R4-01 + R4-02 + R4-03`, `Milestone R5 / EPIC R5-01`
 
 Документ фиксирует контракт precompute/publish слоя, который:
 
@@ -79,7 +79,29 @@ Precompute runner v2 обязан:
   drift при reuse attempt обязан fail-fast с stable diagnostics;
 - R4-04 propagation `source` в runtime payloads теперь закрывается downstream-контрактами:
   `GET /backtests/runtime-defaults`, persisted jobs `/top` payloads и explicit
-  `variant-report` payloads; R5 hit-times materialization остаётся отдельным later-stage epic.
+  `variant-report` payloads.
+
+### R5-01 `hit_times/1m` boundary
+
+На этапе R5-01 precompute runner materialize'ит strict `hit_times/1m` family из уже
+artifact-backed `prices/1m.ohlcv`.
+
+Это означает:
+
+- `backtest_artifacts.hit_times_grid` становится source-of-truth для `tp_values` и `sl_values`;
+- runner обязан писать real files:
+  - `hit_times/1m/tp_values.f32.npy`
+  - `hit_times/1m/sl_values.f32.npy`
+  - `hit_times/1m/long_tp.u32.npy`
+  - `hit_times/1m/long_sl.u32.npy`
+  - `hit_times/1m/short_tp.u32.npy`
+  - `hit_times/1m/short_sl.u32.npy`
+  - `hit_times/1m/manifest.yaml`
+- `sentinel_index` обязан равняться `timeline_bar_count`, а таблицы обязаны оставаться
+  bounded-by-sentinel и monotone by level;
+- root manifest больше не должен публиковать placeholder hash для `hit_times`, если slot построен
+  этим R5-01 path;
+- runtime читает `hit_times/1m` только по strict manifest metadata, без recompute и discovery.
 
 ### R3-01 / R3-02 prices stage
 
@@ -201,7 +223,7 @@ R3-01 / R3-02 / R3-03 placeholder strategy до materialization следующи
 - `signals` фиксируется как explicit empty catalog
   (`supported_timeframes=[]`, `supported_indicator_ids=[]`, `manifests=[]`) до R4-02;
 - `hit_times` обязан оставаться explicit fixed-path reference
-  `hit_times/1m/manifest.yaml`, но до R5 допускается placeholder
+  `hit_times/1m/manifest.yaml`, но до R5-01 допускается placeholder
   `manifest_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"`;
 - `signal_encoding` остаётся fixed even when `signals.manifests` is empty.
 
@@ -241,7 +263,7 @@ R4-02 replaces the root-manifest signal placeholder for explicit configured targ
   `indicator_id`;
 - `signals.manifests` remains explicit configured-target metadata; directory scanning is not a
   supported source of truth;
-- root manifest still keeps `hit_times/1m` as an explicit placeholder reference until R5.
+- root manifest keeps `hit_times/1m` as an explicit placeholder reference only until R5-01.
 
 ### Per-indicator signal manifest
 
@@ -332,8 +354,9 @@ config-driven:
 
 После R4-02 full validation spec уже может требовать real `signals` и успешно проходить, если
 root catalog и per-indicator manifests materialized для explicit configured targets.
-`hit_times` по-прежнему остаётся blocking family до R5, поэтому без real `hit_times/1m`
-publish всё ещё обязан использовать `require_hit_times_manifest = false`.
+После R5-01 full validation spec может также требовать real `hit_times/1m`, если slot построен
+через актуальный precompute runner path. Отдельный R3-04 prices+mappings stage helper по-прежнему
+должен оставаться explicit и выставлять `require_hit_times_manifest = false`.
 
 Runner обязан работать только в порядке:
 

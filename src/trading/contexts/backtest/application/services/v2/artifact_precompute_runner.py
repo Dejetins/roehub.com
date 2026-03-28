@@ -1,4 +1,4 @@
-"""Deterministic R3-03/R4-02 artifact materialization into the inactive slot."""
+"""Deterministic R3-03/R4-03/R5-01 artifact materialization into the inactive slot."""
 
 from __future__ import annotations
 
@@ -40,6 +40,11 @@ from trading.shared_kernel.primitives import (
 )
 
 from .contracts import (
+    ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
+    ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
+    ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+    ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+    ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2,
     ARTIFACT_MANIFEST_FILENAME_V2,
     ARTIFACT_MAPPING_DTYPE_LITERAL_V2,
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
@@ -53,6 +58,8 @@ from .contracts import (
     ARTIFACT_SIGNAL_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_VALUE_SET_V2,
     ARTIFACT_TIME_AXIS_ORDER_V2,
+    HIT_TIMES_ARTIFACT_MANIFEST_KIND_V2,
+    HIT_TIMES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
     HIT_TIMES_DIRECTORY_LITERAL_V2,
     HIT_TIMES_TIMEFRAME_LITERAL_V2,
     SIGNAL_ARTIFACT_MANIFEST_KIND_V2,
@@ -61,7 +68,10 @@ from .contracts import (
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
     ArtifactCoordinatesV2,
+    ArtifactHitTimesManifestDocumentV2,
+    ArtifactHitTimesPathsV2,
     ArtifactHitTimesReferenceV2,
+    ArtifactHitTimesTableManifestV2,
     ArtifactManifestDocumentV2,
     ArtifactManifestProvenanceV2,
     ArtifactMappingPathsV2,
@@ -83,13 +93,14 @@ from .contracts import (
     inactive_artifact_slot_v2,
     validate_artifact_slot_v2,
 )
+from .hit_times_compute_v2 import HitTimesArraysV2, materialize_hit_times_from_ohlcv_v2
 from .signal_rules_engine_v2 import BacktestSignalRulesEngineV2
 
 _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2 = "1m"
 _CANONICAL_CANDLE_SOURCE_LITERAL_V2 = "market_data.canonical_candles_1m"
 _PRECOMPUTE_GENERATOR_LITERAL_V2 = "backtest-artifact-precompute-runner-v2"
-_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r4-03"
+_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r5-01"
 _ONE_MINUTE_MILLIS_V2 = 60 * 1000
 _ROLLED_PRICE_TIMEFRAME_LITERALS_V2 = tuple(
     timeframe
@@ -201,6 +212,23 @@ class _SignalArtifactBuildResultV2:
 
 
 @dataclass(frozen=True, slots=True)
+class _HitTimesArtifactBuildResultV2:
+    """
+    Internal immutable output of one strict R5-01 `hit_times/1m` materialization pass.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    manifest: ArtifactHitTimesManifestDocumentV2
+    reference: ArtifactHitTimesReferenceV2
+
+
+@dataclass(frozen=True, slots=True)
 class _ExistingSignalArtifactV2:
     """
     Internal immutable snapshot of one existing inactive-slot signal family eligible for reuse.
@@ -239,7 +267,7 @@ class _SignalArtifactTailPlanV2:
 @dataclass(frozen=True, slots=True)
 class BacktestArtifactPrecomputeRunnerV2:
     """
-    Materialize canonical prices, mappings, and optional R4-02 signal artifacts.
+    Materialize canonical prices, mappings, `hit_times/1m`, and optional signal artifacts.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -314,8 +342,8 @@ class BacktestArtifactPrecomputeRunnerV2:
         request: ArtifactCanonicalPriceExportRequestV2,
     ) -> ArtifactCanonicalPriceExportResultV2:
         """
-        Export canonical `1m`, rolled `prices/<tf>`, and `tf -> 1m` mappings into the inactive
-        slot.
+        Export canonical `1m`, rolled `prices/<tf>`, `tf -> 1m` mappings, and `hit_times/1m`
+        into the inactive slot.
 
         Args:
             request: Explicit export identity with symbol coordinates and `TimeRange [start, end)`.
@@ -323,16 +351,16 @@ class BacktestArtifactPrecomputeRunnerV2:
             ArtifactCanonicalPriceExportResultV2: Structured write result for the inactive slot.
         Assumptions:
             Public API stays rooted in canonical `1m`, while R3-03 also materializes every
-            allowed request timeframe plus deterministic `tf -> 1m` mapping arrays under the same
-            root manifest update.
+            allowed request timeframe, deterministic `tf -> 1m` mapping arrays, and the strict
+            R5-01 `hit_times/1m` family under the same root manifest update.
         Raises:
             FileNotFoundError: If strict `current.yaml` is missing for the symbol root.
             ValueError: If existing inactive-slot metadata, source candles, or derived
-                price-to-mapping correspondence violate strict ordering/dtype/path contracts.
+                artifact contracts violate strict ordering, dtype, path, or hit-times budgets.
             OSError: If one atomic file write fails.
         Side Effects:
             Reads canonical candles through the port and atomically replaces inactive-slot price,
-            mapping, and root-manifest files.
+            mapping, hit-times, and root-manifest files.
         Docs:
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/backtest/backtest-precompute-runner-v2.md
@@ -424,6 +452,17 @@ class BacktestArtifactPrecomputeRunnerV2:
             price_manifests=rolled_price_manifests,
             mapping_tail_bars_1m=self.runtime_settings.mapping_tail_bars_1m,
         )
+        hit_times_build_result = _materialize_hit_times_artifacts_v2(
+            artifact_loader=self.artifact_loader,
+            coordinates=request.coordinates,
+            slot=inactive_slot,
+            slot_root=slot_root,
+            request=request,
+            slot_generation=target_slot_generation,
+            runtime_settings=self.runtime_settings,
+            one_minute_arrays=rollup_source_arrays,
+            one_minute_manifest=one_minute_manifest,
+        )
         scaffold = _build_root_manifest_scaffold_v2(existing_manifest=existing_manifest)
         price_manifest_by_timeframe = {
             section.timeframe: section
@@ -452,7 +491,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             preserved_prices=scaffold.preserved_prices,
             mappings=scaffold.mappings,
             signals=root_signals,
-            hit_times=scaffold.hit_times,
+            hit_times=hit_times_build_result.reference,
             signal_encoding=scaffold.signal_encoding,
         )
         provenance = _build_root_manifest_provenance_v2(
@@ -462,6 +501,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             rolled_sections=rolled_price_manifests,
             mapping_sections=mapping_manifests,
             signal_entries=root_signals.manifests,
+            hit_times_reference=hit_times_build_result.reference,
         )
         root_manifest_payload = _build_root_manifest_payload_v2(
             request=request,
@@ -3182,6 +3222,405 @@ def _build_mapping_manifest_v2(
     )
 
 
+def _materialize_hit_times_artifacts_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_root: Path,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    one_minute_arrays: _CanonicalPriceArraysV2,
+    one_minute_manifest: ArtifactPriceTimeframeManifestV2,
+) -> _HitTimesArtifactBuildResultV2:
+    """
+    Materialize the strict R5-01 `hit_times/1m` artifact family for the inactive slot.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader used to resolve fixed hit-times paths.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Inactive slot literal receiving the hit-times files.
+        slot_root: Absolute inactive-slot root directory.
+        request: Explicit export request carrying slot identity and timestamps.
+        slot_generation: Target inactive-slot generation assigned to the build.
+        runtime_settings: Strict runtime settings carrying hit-times grids and guard budgets.
+        one_minute_arrays: Materialized artifact-backed canonical `prices/1m` arrays.
+        one_minute_manifest: Fresh strict `prices/1m` manifest used for provenance hashing.
+    Returns:
+        _HitTimesArtifactBuildResultV2: Typed manifest plus root-manifest reference payload.
+    Assumptions:
+        Hit-times are derived only from already materialized `prices/1m` artifacts.
+    Raises:
+        ValueError: If computed tables violate the strict contract or exceed configured budgets.
+        OSError: If writing arrays or manifest files fails.
+    Side Effects:
+        Writes `hit_times/1m/*.npy` and `hit_times/1m/manifest.yaml` under the inactive slot.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    hit_times_paths = artifact_loader.resolve_hit_times_paths(coordinates, slot)
+    hit_times_arrays = materialize_hit_times_from_ohlcv_v2(
+        ohlcv=one_minute_arrays.ohlcv,
+        tp_levels_pct=runtime_settings.hit_times_tp_levels_pct,
+        sl_levels_pct=runtime_settings.hit_times_sl_levels_pct,
+        max_hit_times_cells=runtime_settings.max_hit_times_cells,
+    )
+    _write_hit_times_arrays_atomically_v2(
+        hit_times_paths=hit_times_paths,
+        arrays=hit_times_arrays,
+    )
+    manifest = _build_hit_times_manifest_v2(
+        coordinates=coordinates,
+        slot=slot,
+        slot_root=slot_root,
+        request=request,
+        slot_generation=slot_generation,
+        runtime_settings=runtime_settings,
+        one_minute_manifest=one_minute_manifest,
+        hit_times_paths=hit_times_paths,
+        arrays=hit_times_arrays,
+    )
+    _write_yaml_atomically_v2(
+        path=hit_times_paths.manifest,
+        payload=_serialize_hit_times_manifest_v2(manifest),
+    )
+    return _HitTimesArtifactBuildResultV2(
+        manifest=manifest,
+        reference=ArtifactHitTimesReferenceV2(
+            timeframe=manifest.timeframe,
+            manifest_path=_slot_relative_path_v2(
+                slot_root=slot_root,
+                absolute_path=hit_times_paths.manifest,
+            ),
+            manifest_sha256=_file_sha256_hex_v2(hit_times_paths.manifest),
+        ),
+    )
+
+
+def _write_hit_times_arrays_atomically_v2(
+    *,
+    hit_times_paths: ArtifactHitTimesPathsV2,
+    arrays: HitTimesArraysV2,
+) -> None:
+    """
+    Atomically replace inactive-slot `hit_times/1m/*.npy` files with deterministic bytes.
+
+    Args:
+        hit_times_paths: Explicit inactive-slot target paths for the hit-times family.
+        arrays: Strict hit-times arrays to serialize.
+    Returns:
+        None.
+    Assumptions:
+        Temp files are written in the same directory so `os.replace` remains atomic.
+    Raises:
+        OSError: If temp-file write or atomic replace fails.
+    Side Effects:
+        Creates parent directories and replaces all six hit-times `.npy` files.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+    """
+    _write_npy_atomically_v2(path=hit_times_paths.tp_values, array=arrays.tp_values)
+    _write_npy_atomically_v2(path=hit_times_paths.sl_values, array=arrays.sl_values)
+    _write_npy_atomically_v2(path=hit_times_paths.long_tp, array=arrays.long_tp)
+    _write_npy_atomically_v2(path=hit_times_paths.long_sl, array=arrays.long_sl)
+    _write_npy_atomically_v2(path=hit_times_paths.short_tp, array=arrays.short_tp)
+    _write_npy_atomically_v2(path=hit_times_paths.short_sl, array=arrays.short_sl)
+
+
+def _build_hit_times_manifest_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_root: Path,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    one_minute_manifest: ArtifactPriceTimeframeManifestV2,
+    hit_times_paths: ArtifactHitTimesPathsV2,
+    arrays: HitTimesArraysV2,
+) -> ArtifactHitTimesManifestDocumentV2:
+    """
+    Build the strict typed `hit_times/1m/manifest.yaml` document for freshly written arrays.
+
+    Args:
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Inactive slot literal receiving the manifest.
+        slot_root: Absolute inactive-slot root directory.
+        request: Explicit export request carrying root identity and timestamps.
+        slot_generation: Target inactive-slot generation assigned to the build.
+        runtime_settings: Strict runtime settings contributing config hash and hit-times grids.
+        one_minute_manifest: Fresh strict `prices/1m` manifest used for provenance hashing.
+        hit_times_paths: Fixed hit-times file paths under the inactive slot.
+        arrays: Freshly written strict hit-times arrays.
+    Returns:
+        ArtifactHitTimesManifestDocumentV2: Typed strict hit-times manifest.
+    Assumptions:
+        Hit-times files already exist on disk and are ready for `sha256` hashing.
+    Raises:
+        ValueError: If timeline counts drift from `prices/1m` or one metadata field is invalid.
+        OSError: If one written hit-times file cannot be hashed.
+    Side Effects:
+        Reads the freshly written hit-times files to compute manifest hashes.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+    """
+    validated_slot = validate_artifact_slot_v2(slot)
+    timeline_bar_count = int(one_minute_manifest.coverage.bar_count)
+    if arrays.sentinel_index != timeline_bar_count:
+        raise ValueError(
+            "hit-times sentinel_index must equal prices/1m coverage.bar_count; got "
+            f"{arrays.sentinel_index!r}, expected {timeline_bar_count!r}"
+        )
+    table_time_count = int(arrays.long_tp.shape[1])
+    if table_time_count != timeline_bar_count:
+        raise ValueError(
+            "hit-times timeline must match prices/1m coverage.bar_count; got "
+            f"{table_time_count!r}, expected {timeline_bar_count!r}"
+        )
+
+    tp_values = ArtifactArrayMetadataV2(
+        path=_slot_relative_path_v2(slot_root=slot_root, absolute_path=hit_times_paths.tp_values),
+        dtype=ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
+        shape=tuple(int(value) for value in arrays.tp_values.shape),
+        axis_order=ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
+        sha256=_file_sha256_hex_v2(hit_times_paths.tp_values),
+    )
+    sl_values = ArtifactArrayMetadataV2(
+        path=_slot_relative_path_v2(slot_root=slot_root, absolute_path=hit_times_paths.sl_values),
+        dtype=ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
+        shape=tuple(int(value) for value in arrays.sl_values.shape),
+        axis_order=ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
+        sha256=_file_sha256_hex_v2(hit_times_paths.sl_values),
+    )
+    long_tp = ArtifactHitTimesTableManifestV2(
+        array=ArtifactArrayMetadataV2(
+            path=_slot_relative_path_v2(
+                slot_root=slot_root,
+                absolute_path=hit_times_paths.long_tp,
+            ),
+            dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+            shape=tuple(int(value) for value in arrays.long_tp.shape),
+            axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+            sha256=_file_sha256_hex_v2(hit_times_paths.long_tp),
+        ),
+        monotonicity=ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2,
+    )
+    long_sl = ArtifactHitTimesTableManifestV2(
+        array=ArtifactArrayMetadataV2(
+            path=_slot_relative_path_v2(
+                slot_root=slot_root,
+                absolute_path=hit_times_paths.long_sl,
+            ),
+            dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+            shape=tuple(int(value) for value in arrays.long_sl.shape),
+            axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+            sha256=_file_sha256_hex_v2(hit_times_paths.long_sl),
+        ),
+        monotonicity=ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2,
+    )
+    short_tp = ArtifactHitTimesTableManifestV2(
+        array=ArtifactArrayMetadataV2(
+            path=_slot_relative_path_v2(
+                slot_root=slot_root,
+                absolute_path=hit_times_paths.short_tp,
+            ),
+            dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+            shape=tuple(int(value) for value in arrays.short_tp.shape),
+            axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+            sha256=_file_sha256_hex_v2(hit_times_paths.short_tp),
+        ),
+        monotonicity=ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2,
+    )
+    short_sl = ArtifactHitTimesTableManifestV2(
+        array=ArtifactArrayMetadataV2(
+            path=_slot_relative_path_v2(
+                slot_root=slot_root,
+                absolute_path=hit_times_paths.short_sl,
+            ),
+            dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+            shape=tuple(int(value) for value in arrays.short_sl.shape),
+            axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+            sha256=_file_sha256_hex_v2(hit_times_paths.short_sl),
+        ),
+        monotonicity=ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2,
+    )
+    provenance = _build_hit_times_manifest_provenance_v2(
+        coordinates=coordinates,
+        request=request,
+        slot_generation=slot_generation,
+        runtime_settings=runtime_settings,
+        one_minute_manifest=one_minute_manifest,
+        arrays=arrays,
+    )
+    payload = {
+        "schema_version": HIT_TIMES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+        "manifest_kind": HIT_TIMES_ARTIFACT_MANIFEST_KIND_V2,
+        "slot": validated_slot,
+        "slot_generation": slot_generation,
+        "asof_date": request.asof_date,
+        "timeframe": HIT_TIMES_TIMEFRAME_LITERAL_V2,
+        "timeline_bar_count": timeline_bar_count,
+        "sentinel_index": arrays.sentinel_index,
+        "tp_values": _serialize_array_metadata_v2(tp_values),
+        "sl_values": _serialize_array_metadata_v2(sl_values),
+        "tables": {
+            "long_tp": _serialize_hit_times_table_manifest_v2(long_tp),
+            "long_sl": _serialize_hit_times_table_manifest_v2(long_sl),
+            "short_tp": _serialize_hit_times_table_manifest_v2(short_tp),
+            "short_sl": _serialize_hit_times_table_manifest_v2(short_sl),
+        },
+        "provenance": _serialize_provenance_v2(provenance),
+    }
+    return ArtifactHitTimesManifestDocumentV2(
+        path=hit_times_paths.manifest,
+        raw_payload=payload,
+        slot=validated_slot,
+        schema_version=HIT_TIMES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+        manifest_kind=HIT_TIMES_ARTIFACT_MANIFEST_KIND_V2,
+        slot_generation=slot_generation,
+        asof_date=request.asof_date,
+        timeframe=HIT_TIMES_TIMEFRAME_LITERAL_V2,
+        timeline_bar_count=timeline_bar_count,
+        sentinel_index=arrays.sentinel_index,
+        tp_values=tp_values,
+        sl_values=sl_values,
+        long_tp=long_tp,
+        long_sl=long_sl,
+        short_tp=short_tp,
+        short_sl=short_sl,
+        provenance=provenance,
+    )
+
+
+def _build_hit_times_manifest_provenance_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    one_minute_manifest: ArtifactPriceTimeframeManifestV2,
+    arrays: HitTimesArraysV2,
+) -> ArtifactManifestProvenanceV2:
+    """
+    Build deterministic provenance for one strict `hit_times/1m` manifest.
+
+    Args:
+        coordinates: Artifact coordinates selecting one symbol root.
+        request: Explicit export request identity.
+        slot_generation: Target inactive-slot generation assigned to the build.
+        runtime_settings: Strict runtime settings contributing config hash and hit-times grids.
+        one_minute_manifest: Fresh strict `prices/1m` manifest used as source-of-truth identity.
+        arrays: Fresh hit-times arrays whose sentinel/timeline facts must be hashed.
+    Returns:
+        ArtifactManifestProvenanceV2: Strict hit-times-manifest provenance payload.
+    Assumptions:
+        Per-manifest provenance hashes source identity and configured grids, not YAML bytes.
+    Raises:
+        TypeError: If provenance hashing encounters an unsupported JSON payload.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+    """
+    return ArtifactManifestProvenanceV2(
+        generator=_PRECOMPUTE_GENERATOR_LITERAL_V2,
+        generator_version=_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2,
+        generated_at_utc=request.generated_at_utc,
+        config_sha256=runtime_settings.config_sha256,
+        inputs_sha256=_build_hit_times_manifest_inputs_sha256_v2(
+            coordinates=coordinates,
+            request=request,
+            slot_generation=slot_generation,
+            runtime_settings=runtime_settings,
+            one_minute_manifest=one_minute_manifest,
+            arrays=arrays,
+        ),
+    )
+
+
+def _build_hit_times_manifest_inputs_sha256_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    one_minute_manifest: ArtifactPriceTimeframeManifestV2,
+    arrays: HitTimesArraysV2,
+) -> str:
+    """
+    Hash normalized hit-times source identity into deterministic provenance.
+
+    Args:
+        coordinates: Artifact coordinates selecting one symbol root.
+        request: Explicit export request identity.
+        slot_generation: Target inactive-slot generation assigned to the build.
+        runtime_settings: Strict runtime settings carrying hit-times grids and budgets.
+        one_minute_manifest: Fresh strict `prices/1m` manifest used as source-of-truth identity.
+        arrays: Fresh hit-times arrays whose sentinel/timeline facts must be hashed.
+    Returns:
+        str: Lowercase SHA-256 hex digest.
+    Assumptions:
+        The hash tracks source identity and configured grids rather than manifest bytes.
+    Raises:
+        TypeError: If canonical JSON serialization receives an unsupported payload.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    canonical_payload = json.dumps(
+        {
+            "coordinates": {
+                "exchange": coordinates.exchange,
+                "market_type": coordinates.market_type,
+                "symbol": coordinates.symbol,
+            },
+            "time_range": {
+                "start": _utc_timestamp_to_epoch_millis_v2(request.time_range.start),
+                "end": _utc_timestamp_to_epoch_millis_v2(request.time_range.end),
+            },
+            "slot_generation": slot_generation,
+            "asof_date": request.asof_date,
+            "timeframe": HIT_TIMES_TIMEFRAME_LITERAL_V2,
+            "price_manifest_sha256": {
+                "open_time": one_minute_manifest.open_time.sha256,
+                "close_time": one_minute_manifest.close_time.sha256,
+                "ohlcv": one_minute_manifest.ohlcv.sha256,
+            },
+            "hit_times_grid": {
+                "tp_levels_pct": list(runtime_settings.hit_times_tp_levels_pct),
+                "sl_levels_pct": list(runtime_settings.hit_times_sl_levels_pct),
+            },
+            "max_hit_times_cells": runtime_settings.max_hit_times_cells,
+            "timeline_bar_count": int(arrays.long_tp.shape[1]),
+            "sentinel_index": arrays.sentinel_index,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+
+
 def _validate_mapping_index_arrays_v2(
     *,
     arrays: _TimeframeMappingArraysV2,
@@ -3889,10 +4328,10 @@ def _build_root_manifest_provenance_v2(
     rolled_sections: tuple[ArtifactPriceTimeframeManifestV2, ...],
     mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
     signal_entries: tuple[ArtifactSignalCatalogEntryV2, ...] = (),
+    hit_times_reference: ArtifactHitTimesReferenceV2 | None = None,
 ) -> ArtifactManifestProvenanceV2:
     """
-    Build deterministic root-manifest provenance for canonical prices, rolled prices, and
-    `tf -> 1m` mappings.
+    Build deterministic root-manifest provenance for emitted artifact families.
 
     Args:
         runtime_settings: Strict service runtime settings used by the precompute runner.
@@ -3900,13 +4339,15 @@ def _build_root_manifest_provenance_v2(
         arrays: Final merged canonical `1m` arrays written into the inactive slot.
         rolled_sections: Rolled price-manifest sections emitted during the same R3-03 build.
         mapping_sections: Mapping-manifest sections emitted during the same R3-03 build.
-        signal_entries: Signal catalog entries emitted during the same build when R4-02 is
+        signal_entries: Signal catalog entries emitted during the same build when signals are
             enabled.
+        hit_times_reference: Optional strict root hit-times reference emitted during the same
+            build.
     Returns:
         ArtifactManifestProvenanceV2: Strict provenance payload for the root manifest.
     Assumptions:
-        At R3-03 `inputs_sha256` identifies the normalized export request plus emitted artifact
-        metadata derived from `market_data.canonical_candles_1m`.
+        `inputs_sha256` identifies the normalized export request plus emitted artifact metadata
+        derived from `market_data.canonical_candles_1m`.
     Raises:
         TypeError: If config hashing encounters an unsupported JSON payload.
     Side Effects:
@@ -3928,6 +4369,7 @@ def _build_root_manifest_provenance_v2(
             rolled_sections=rolled_sections,
             mapping_sections=mapping_sections,
             signal_entries=signal_entries,
+            hit_times_reference=hit_times_reference,
             price_lookback_bars=runtime_settings.price_tail_bars_1m,
             mapping_lookback_bars=runtime_settings.mapping_tail_bars_1m,
             signal_lookback_bars=runtime_settings.signal_tail_bars_1m,
@@ -3942,6 +4384,7 @@ def _build_inputs_sha256_v2(
     rolled_sections: tuple[ArtifactPriceTimeframeManifestV2, ...],
     mapping_sections: tuple[ArtifactMappingTimeframeManifestV2, ...],
     signal_entries: tuple[ArtifactSignalCatalogEntryV2, ...],
+    hit_times_reference: ArtifactHitTimesReferenceV2 | None,
     price_lookback_bars: int,
     mapping_lookback_bars: int,
     signal_lookback_bars: int,
@@ -3955,6 +4398,7 @@ def _build_inputs_sha256_v2(
         rolled_sections: Rolled price-manifest sections emitted by the same build.
         mapping_sections: Mapping-manifest sections emitted by the same build.
         signal_entries: Signal catalog entries emitted by the same build.
+        hit_times_reference: Optional strict hit-times reference emitted by the same build.
         price_lookback_bars: Effective `lookback_policy.price_tail_bars_1m` used for the build.
         mapping_lookback_bars: Effective `lookback_policy.mapping_tail_bars_1m` used for the
             build.
@@ -3963,7 +4407,7 @@ def _build_inputs_sha256_v2(
     Returns:
         str: Lowercase SHA-256 hex digest.
     Assumptions:
-        The hash is an R3-03 input-identity digest, not a runtime validation checksum.
+        The hash is an emitted-artifact identity digest, not a runtime validation checksum.
     Raises:
         None.
     Side Effects:
@@ -3996,6 +4440,15 @@ def _build_inputs_sha256_v2(
             "mapping_timeframes": tuple(section.timeframe for section in mapping_sections),
             "signal_targets": tuple(
                 (entry.timeframe, entry.indicator_id) for entry in signal_entries
+            ),
+            "hit_times": (
+                None
+                if hit_times_reference is None
+                else {
+                    "timeframe": hit_times_reference.timeframe,
+                    "manifest_path": hit_times_reference.manifest_path,
+                    "manifest_sha256": hit_times_reference.manifest_sha256,
+                }
             ),
         },
         sort_keys=True,
@@ -4038,6 +4491,10 @@ def _build_inputs_sha256_v2(
         digest.update(entry.indicator_id.encode("ascii"))
         digest.update(entry.manifest_path.encode("utf-8"))
         digest.update(entry.manifest_sha256.encode("ascii"))
+    if hit_times_reference is not None:
+        digest.update(hit_times_reference.timeframe.encode("ascii"))
+        digest.update(hit_times_reference.manifest_path.encode("utf-8"))
+        digest.update(hit_times_reference.manifest_sha256.encode("ascii"))
     return digest.hexdigest()
 
 
@@ -4389,6 +4846,77 @@ def _serialize_signal_grid_contract_v2(
         "variant_key_version": grid.variant_key_version,
         "variant_keys_sha256": grid.variant_keys_sha256,
         "signals_v1_params_defaults": dict(grid.signals_v1_params_defaults),
+    }
+
+
+def _serialize_hit_times_table_manifest_v2(
+    table_manifest: ArtifactHitTimesTableManifestV2,
+) -> dict[str, Any]:
+    """
+    Serialize typed hit-times table metadata into deterministic YAML-ready payload order.
+
+    Args:
+        table_manifest: Typed hit-times table manifest payload.
+    Returns:
+        dict[str, Any]: YAML-ready hit-times table payload.
+    Assumptions:
+        Table metadata already uses canonical slot-relative paths and strict monotonicity literal.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    payload = _serialize_array_metadata_v2(table_manifest.array)
+    payload["monotonicity"] = table_manifest.monotonicity
+    return payload
+
+
+def _serialize_hit_times_manifest_v2(
+    manifest: ArtifactHitTimesManifestDocumentV2,
+) -> dict[str, Any]:
+    """
+    Serialize one typed strict hit-times manifest into deterministic YAML-ready payload order.
+
+    Args:
+        manifest: Typed strict hit-times manifest.
+    Returns:
+        dict[str, Any]: YAML-ready hit-times manifest payload.
+    Assumptions:
+        Manifest fields are already validated and use canonical slot-relative path literals.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return {
+        "schema_version": manifest.schema_version,
+        "manifest_kind": manifest.manifest_kind,
+        "slot": manifest.slot,
+        "slot_generation": manifest.slot_generation,
+        "asof_date": manifest.asof_date,
+        "timeframe": manifest.timeframe,
+        "timeline_bar_count": manifest.timeline_bar_count,
+        "sentinel_index": manifest.sentinel_index,
+        "tp_values": _serialize_array_metadata_v2(manifest.tp_values),
+        "sl_values": _serialize_array_metadata_v2(manifest.sl_values),
+        "tables": {
+            "long_tp": _serialize_hit_times_table_manifest_v2(manifest.long_tp),
+            "long_sl": _serialize_hit_times_table_manifest_v2(manifest.long_sl),
+            "short_tp": _serialize_hit_times_table_manifest_v2(manifest.short_tp),
+            "short_sl": _serialize_hit_times_table_manifest_v2(manifest.short_sl),
+        },
+        "provenance": _serialize_provenance_v2(manifest.provenance),
     }
 
 
