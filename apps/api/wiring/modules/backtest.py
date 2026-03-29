@@ -9,7 +9,7 @@ Docs:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping
+from typing import Any, Mapping
 
 from fastapi import APIRouter
 
@@ -51,6 +51,7 @@ from trading.contexts.backtest.application.use_cases import (
     GetBacktestJobTopUseCase,
     GetBacktestRunStatusUseCase,
     GetBacktestRunTopUseCase,
+    LaunchBacktestRunWithAutoFallbackUseCase,
     ListBacktestJobsUseCase,
     ListBacktestRunsUseCase,
     RunBacktestUseCase,
@@ -207,7 +208,7 @@ def build_backtest_router(
     )
     artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
 
-    run_use_case = RunBacktestUseCase(
+    run_use_case_kwargs: dict[str, Any] = dict(
         candle_feed=candle_feed,
         indicator_compute=indicator_compute,
         strategy_reader=strategy_reader,
@@ -223,6 +224,13 @@ def build_backtest_router(
         safe_profit_percent_default=runtime_config.execution.safe_profit_percent_default,
         slippage_pct_default=runtime_config.execution.slippage_pct_default,
         fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
+        max_numba_threads=runtime_config.cpu.max_numba_threads,
+        eager_top_reports_enabled=runtime_config.reporting.eager_top_reports_enabled,
+        allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
+        forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
+        artifact_slot_resolver=artifact_slot_resolver,
+    )
+    sync_run_use_case = RunBacktestUseCase(
         max_variants_per_compute=max(
             1,
             runtime_config.guards.max_variants_per_compute // 2,
@@ -231,18 +239,45 @@ def build_backtest_router(
             1,
             runtime_config.guards.max_compute_bytes_total // 2,
         ),
-        max_numba_threads=runtime_config.cpu.max_numba_threads,
-        eager_top_reports_enabled=runtime_config.reporting.eager_top_reports_enabled,
-        allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
-        forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
-        artifact_slot_resolver=artifact_slot_resolver,
+        **run_use_case_kwargs,
+    )
+    background_preflight_use_case = RunBacktestUseCase(
+        max_variants_per_compute=runtime_config.guards.max_variants_per_compute,
+        max_compute_bytes_total=runtime_config.guards.max_compute_bytes_total,
+        **run_use_case_kwargs,
     )
     jobs_gateway = _build_jobs_gateway(settings=runtime_settings)
     job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)
+    create_use_case = CreateBacktestJobUseCase(
+        job_repository=job_repository,
+        strategy_reader=strategy_reader,
+        top_k_persisted_default=runtime_config.jobs.top_k_persisted_default,
+        max_active_jobs_per_user=runtime_config.jobs.max_active_jobs_per_user,
+        warmup_bars_default=runtime_config.warmup_bars_default,
+        top_k_default=runtime_config.top_k_default,
+        preselect_default=runtime_config.preselect_default,
+        top_trades_n_default=runtime_config.reporting.top_trades_n_default,
+        init_cash_quote_default=runtime_config.execution.init_cash_quote_default,
+        fixed_quote_default=runtime_config.execution.fixed_quote_default,
+        safe_profit_percent_default=runtime_config.execution.safe_profit_percent_default,
+        slippage_pct_default=runtime_config.execution.slippage_pct_default,
+        fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
+        backtest_runtime_config_hash=backtest_runtime_config_hash,
+        artifact_loader=artifact_loader,
+        defaults_provider=defaults_provider,
+        allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
+        forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
+    )
     sync_inline_run_use_case = CreateAndRunBacktestSyncInlineUseCase(
-        run_use_case=run_use_case,
+        run_use_case=sync_run_use_case,
         job_repository=job_repository,
         backtest_runtime_config_hash=backtest_runtime_config_hash,
+        engine_version=runtime_config.contracts.risk_model,
+    )
+    backtests_launch_use_case = LaunchBacktestRunWithAutoFallbackUseCase(
+        sync_inline_use_case=sync_inline_run_use_case,
+        background_preflight_use_case=background_preflight_use_case,
+        background_create_use_case=create_use_case,
         engine_version=runtime_config.contracts.risk_model,
     )
     runtime_defaults_response = build_backtest_runtime_defaults_response(
@@ -250,7 +285,7 @@ def build_backtest_router(
         defaults_provider=defaults_provider,
     )
     backtests_router = build_backtests_router(
-        run_use_case=sync_inline_run_use_case,
+        run_use_case=backtests_launch_use_case,
         strategy_reader=strategy_reader,
         runtime_defaults_response=runtime_defaults_response,
         current_user_dependency=current_user_dependency,
@@ -272,7 +307,7 @@ def build_backtest_router(
         variant_report_use_case=BuildBacktestRunVariantReportUseCase(
             job_repository=job_repository,
             request_decoder=request_decoder,
-            run_use_case=run_use_case,
+            run_use_case=sync_run_use_case,
             artifact_slot_resolver=artifact_slot_resolver,
         ),
         current_user_dependency=current_user_dependency,
@@ -282,26 +317,6 @@ def build_backtest_router(
     if not runtime_config.jobs.enabled:
         return backtests_router
 
-    create_use_case = CreateBacktestJobUseCase(
-        job_repository=job_repository,
-        strategy_reader=strategy_reader,
-        top_k_persisted_default=runtime_config.jobs.top_k_persisted_default,
-        max_active_jobs_per_user=runtime_config.jobs.max_active_jobs_per_user,
-        warmup_bars_default=runtime_config.warmup_bars_default,
-        top_k_default=runtime_config.top_k_default,
-        preselect_default=runtime_config.preselect_default,
-        top_trades_n_default=runtime_config.reporting.top_trades_n_default,
-        init_cash_quote_default=runtime_config.execution.init_cash_quote_default,
-        fixed_quote_default=runtime_config.execution.fixed_quote_default,
-        safe_profit_percent_default=runtime_config.execution.safe_profit_percent_default,
-        slippage_pct_default=runtime_config.execution.slippage_pct_default,
-        fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
-        backtest_runtime_config_hash=backtest_runtime_config_hash,
-        artifact_loader=artifact_loader,
-        defaults_provider=defaults_provider,
-        allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
-        forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
-    )
     jobs_router = build_backtest_jobs_router(
         create_use_case=create_use_case,
         get_status_use_case=GetBacktestJobStatusUseCase(job_repository=job_repository),

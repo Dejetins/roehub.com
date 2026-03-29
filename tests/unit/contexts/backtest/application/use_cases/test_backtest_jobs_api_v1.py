@@ -765,6 +765,60 @@ def test_create_backtest_job_use_case_saved_mode_persists_spec_hash_and_snapshot
     assert created.ranking_secondary_metric is None
 
 
+def test_create_backtest_job_use_case_accepts_background_auto_execution_mode() -> None:
+    """
+    Verify create flow can persist explicit `background_auto` mode for `/backtests` fallback.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Manual jobs endpoint keeps default `background_manual_legacy`; override is explicit only.
+    Raises:
+        AssertionError: If create flow ignores command-level execution mode override.
+    Side Effects:
+        None.
+    """
+    repository = _FakeJobRepository(active_total=0)
+    artifact_loader = _FakeArtifactLoader(pointer=_artifact_pointer(slot="slot_b", generation=9))
+    use_case = CreateBacktestJobUseCase(
+        job_repository=repository,
+        strategy_reader=_FakeStrategyReader(snapshot=None),
+        top_k_persisted_default=300,
+        max_active_jobs_per_user=3,
+        warmup_bars_default=200,
+        top_k_default=300,
+        preselect_default=20000,
+        top_trades_n_default=3,
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+        fee_pct_default_by_market_id={1: 0.075},
+        backtest_runtime_config_hash="e" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, artifact_loader),
+        now_provider=lambda: datetime(2026, 2, 23, 12, 2, tzinfo=timezone.utc),
+        job_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000913"),
+    )
+
+    created = use_case.execute(
+        command=CreateBacktestJobCommand(
+            run_request=RunBacktestRequest(
+                time_range=_time_range(),
+                template=_template(),
+            ),
+            request_payload=_template_request_payload(),
+            execution_mode="background_auto",
+        ),
+        current_user=CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")),
+    )
+
+    assert created.execution_mode == "background_auto"
+    assert repository.last_create_job is not None
+    assert repository.last_create_job.execution_mode == "background_auto"
+
+
 def test_create_backtest_job_use_case_rejects_missing_current_yaml_for_pinning() -> None:
     """
     Verify create flow fails fast when requested instrument has no published `current.yaml`.

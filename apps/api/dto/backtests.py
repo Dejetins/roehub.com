@@ -58,9 +58,9 @@ BacktestAxisScalar = int | float | str
 
 
 @dataclass(frozen=True, slots=True)
-class _PersistedSyncRunMetadata:
+class _PersistedLaunchRunMetadata:
     """
-    Strongly typed persisted sync-inline metadata extracted from application response DTO.
+    Strongly typed persisted launch metadata extracted from application response DTO.
 
     Docs:
       - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -915,7 +915,7 @@ def build_backtests_post_response(
         None.
     """
     variants = response.variants
-    sync_run_metadata = _require_sync_run_metadata(response=response)
+    launch_run_metadata = _require_launch_run_metadata(response=response)
 
     spec_hash: str | None = None
     grid_request_hash: str | None = None
@@ -951,14 +951,14 @@ def build_backtests_post_response(
         top_k=response.top_k,
         preselect=response.preselect,
         top_trades_n=response.top_trades_n,
-        run_id=sync_run_metadata.run_id,
-        state=sync_run_metadata.state,
-        execution_mode=sync_run_metadata.execution_mode,
-        engine_version=sync_run_metadata.engine_version,
-        artifact_slot=sync_run_metadata.artifact_slot,
-        artifact_slot_generation=sync_run_metadata.artifact_slot_generation,
-        artifact_asof_date=sync_run_metadata.artifact_asof_date,
-        artifact_manifest_hash=sync_run_metadata.artifact_manifest_hash,
+        run_id=launch_run_metadata.run_id,
+        state=launch_run_metadata.state,
+        execution_mode=launch_run_metadata.execution_mode,
+        engine_version=launch_run_metadata.engine_version,
+        artifact_slot=launch_run_metadata.artifact_slot,
+        artifact_slot_generation=launch_run_metadata.artifact_slot_generation,
+        artifact_asof_date=launch_run_metadata.artifact_asof_date,
+        artifact_manifest_hash=launch_run_metadata.artifact_manifest_hash,
         spec_hash=spec_hash,
         grid_request_hash=grid_request_hash,
         engine_params_hash=engine_params_hash,
@@ -969,12 +969,12 @@ def build_backtests_post_response(
     )
 
 
-def _require_sync_run_metadata(
+def _require_launch_run_metadata(
     *,
     response: RunBacktestResponse,
-) -> _PersistedSyncRunMetadata:
+) -> _PersistedLaunchRunMetadata:
     """
-    Validate that successful sync `/backtests` response carries persisted run identity metadata.
+    Validate that successful `/backtests` launch response carries persisted run identity metadata.
 
     Docs:
       - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -985,11 +985,11 @@ def _require_sync_run_metadata(
       - apps/api/routes/backtests.py
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
     Args:
-        response: Application-layer sync response DTO.
+        response: Application-layer launch response DTO.
     Returns:
-        _PersistedSyncRunMetadata: Strongly typed persisted sync-inline metadata payload.
+        _PersistedLaunchRunMetadata: Strongly typed persisted launch metadata payload.
     Assumptions:
-        R7-02 cutover makes persisted run identity mandatory for every successful sync launch.
+        Persisted run identity is mandatory for every successful `/backtests` launch branch.
     Raises:
         BacktestValidationError: If one required persisted metadata field is missing.
     Side Effects:
@@ -1006,9 +1006,9 @@ def _require_sync_run_metadata(
         or response.artifact_manifest_hash is None
     ):
         raise BacktestValidationError(
-            "Successful sync /backtests response requires persisted run metadata"
+            "Successful /backtests response requires persisted run metadata"
         )
-    return _PersistedSyncRunMetadata(
+    return _PersistedLaunchRunMetadata(
         run_id=response.run_id,
         state=response.state,
         execution_mode=response.execution_mode,

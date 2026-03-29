@@ -945,6 +945,52 @@ def test_post_backtests_saved_response_includes_hashes_and_explicit_payload() ->
     }
 
 
+def test_post_backtests_returns_202_for_explicit_background_auto_launch() -> None:
+    """
+    Verify `/backtests` exposes queued auto-fallback launch via explicit `202 Accepted`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Background auto launch does not include inline-ranked variants in the response body.
+    Raises:
+        AssertionError: If route returns `200` or hides explicit `background_auto` metadata.
+    Side Effects:
+        None.
+    """
+    client = _build_client(
+        use_case=_FakeRunBacktestUseCase(result=_template_background_auto_response())
+    )
+
+    response = client.post(
+        "/backtests",
+        json={
+            "time_range": {
+                "start": "2026-02-16T00:00:00Z",
+                "end": "2026-02-16T01:00:00Z",
+            },
+            "template": _template_payload(),
+        },
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
+    )
+
+    assert response.status_code == 202
+    body = response.json()
+    assert body["run_id"] == "00000000-0000-0000-0000-000000000911"
+    assert body["state"] == "queued"
+    assert body["execution_mode"] == "background_auto"
+    assert body["engine_version"] == "signal_tf + 1m_risk"
+    assert body["artifact_slot"] == "slot_b"
+    assert body["artifact_slot_generation"] == 11
+    assert body["artifact_asof_date"] == "2026-03-28"
+    assert body["artifact_manifest_hash"] == "c" * 64
+    assert body["grid_request_hash"] is not None
+    assert body["engine_params_hash"] == "e" * 64
+    assert body["variants"] == []
+
+
 def test_post_backtests_preserves_application_variant_order() -> None:
     """
     Verify route preserves deterministic variant ordering provided by application DTO.
@@ -1470,6 +1516,44 @@ def _template_mode_two_variant_response() -> RunBacktestResponse:
         run_id=UUID("00000000-0000-0000-0000-000000000910"),
         state="succeeded",
         execution_mode="sync_inline",
+        engine_version="signal_tf + 1m_risk",
+        artifact_slot="slot_b",
+        artifact_slot_generation=11,
+        artifact_asof_date="2026-03-28",
+        artifact_manifest_hash="c" * 64,
+        engine_params_hash="e" * 64,
+    )
+
+
+def _template_background_auto_response() -> RunBacktestResponse:
+    """
+    Build deterministic queued `background_auto` launch response fixture.
+
+    Args:
+        None.
+    Returns:
+        RunBacktestResponse: Template-mode queued background launch fixture.
+    Assumptions:
+        Fallback launch is explicit and does not materialize ranked variants inline.
+    Raises:
+        ValueError: If fixture violates DTO invariants.
+    Side Effects:
+        None.
+    """
+    return RunBacktestResponse(
+        mode="template",
+        strategy_id=None,
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        warmup_bars=200,
+        top_k=2,
+        preselect=100,
+        top_trades_n=1,
+        variants=tuple(),
+        total_indicator_compute_calls=0,
+        run_id=UUID("00000000-0000-0000-0000-000000000911"),
+        state="queued",
+        execution_mode="background_auto",
         engine_version="signal_tf + 1m_risk",
         artifact_slot="slot_b",
         artifact_slot_generation=11,

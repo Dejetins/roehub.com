@@ -8,8 +8,11 @@ from .backtest_jobs_api_v1 import (
     ListBacktestJobsUseCase,
 )
 from .backtest_runs_api_v1 import (
+    BacktestBackgroundJobCreateUseCase,
+    BacktestRunPreflightUseCase,
     BacktestRunsApiUseCase,
     CreateAndRunBacktestSyncInlineUseCase,
+    LaunchBacktestRunWithAutoFallbackUseCase,
 )
 from .backtest_runs_history_api_v1 import (
     BacktestRunTopReadResult,
@@ -43,6 +46,8 @@ from .run_backtest_job_runner_v1 import (
 
 __all__ = [
     "BacktestRunsApiUseCase",
+    "BacktestRunPreflightUseCase",
+    "BacktestBackgroundJobCreateUseCase",
     "BacktestRunTopReadResult",
     "BuildBacktestRunVariantReportUseCase",
     "BacktestJobRunReportV1",
@@ -51,6 +56,7 @@ __all__ = [
     "CancelBacktestRunUseCase",
     "CancelBacktestJobUseCase",
     "CreateAndRunBacktestSyncInlineUseCase",
+    "LaunchBacktestRunWithAutoFallbackUseCase",
     "CreateBacktestJobCommand",
     "CreateBacktestJobUseCase",
     "GetBacktestRunStatusUseCase",

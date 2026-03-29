@@ -551,6 +551,77 @@ def test_build_backtests_post_response_maps_persisted_sync_inline_metadata() -> 
     assert built.engine_params_hash == "d" * 64
 
 
+def test_build_backtests_post_response_maps_background_auto_launch_metadata() -> None:
+    """
+    Verify queued `background_auto` launch maps to the additive `/backtests` response contract.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Background auto launch is explicit and does not include inline-ranked variants.
+    Raises:
+        AssertionError: If additive queued launch metadata or empty variants policy drift.
+    Side Effects:
+        None.
+    """
+    request = BacktestsPostRequest.model_validate(
+        {
+            "time_range": {
+                "start": datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2026, 2, 24, 1, 0, tzinfo=timezone.utc),
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1m",
+                "indicator_grids": [
+                    {
+                        "indicator_id": "ma.sma",
+                        "params": {"window": {"mode": "explicit", "values": [20]}},
+                    }
+                ],
+            },
+        }
+    )
+    response = RunBacktestResponse(
+        mode="template",
+        strategy_id=None,
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        warmup_bars=200,
+        top_k=1,
+        preselect=100,
+        top_trades_n=1,
+        variants=tuple(),
+        total_indicator_compute_calls=0,
+        run_id=UUID("00000000-0000-0000-0000-000000000911"),
+        state="queued",
+        execution_mode="background_auto",
+        engine_version="signal_tf + 1m_risk",
+        artifact_slot="slot_b",
+        artifact_slot_generation=11,
+        artifact_asof_date="2026-03-28",
+        artifact_manifest_hash="c" * 64,
+        engine_params_hash="d" * 64,
+    )
+
+    built = build_backtests_post_response(
+        request=request,
+        response=response,
+        strategy_snapshot=None,
+        include_reports=False,
+    )
+
+    assert built.run_id == UUID("00000000-0000-0000-0000-000000000911")
+    assert built.state == "queued"
+    assert built.execution_mode == "background_auto"
+    assert built.engine_version == "signal_tf + 1m_risk"
+    assert built.grid_request_hash is not None
+    assert built.engine_params_hash == "d" * 64
+    assert built.variants == []
+
+
 def test_build_backtests_post_response_rejects_missing_persisted_sync_metadata() -> None:
     """
     Verify sync response mapper fails deterministically when persisted run metadata is absent.

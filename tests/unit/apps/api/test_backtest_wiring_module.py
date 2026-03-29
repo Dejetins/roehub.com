@@ -386,6 +386,11 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
     )
     monkeypatch.setattr(
         backtest_module,
+        "LaunchBacktestRunWithAutoFallbackUseCase",
+        _DummyFactory,
+    )
+    monkeypatch.setattr(
+        backtest_module,
         "build_backtests_router",
         lambda **kwargs: _build_ping_router(path="/backtests/ping"),
     )
@@ -429,8 +434,9 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     Side Effects:
         None.
     """
-    captured_kwargs: dict[str, object] = {}
+    captured_run_use_case_kwargs: list[dict[str, object]] = []
     captured_sync_inline_kwargs: dict[str, object] = {}
+    captured_auto_fallback_kwargs: dict[str, object] = {}
     captured_backtests_router_kwargs: dict[str, object] = {}
     runtime_config = _runtime_config(
         jobs_enabled=False,
@@ -492,7 +498,7 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
             Side Effects:
                 Stores kwargs in enclosing test scope.
             """
-            captured_kwargs.update(kwargs)
+            captured_run_use_case_kwargs.append(dict(kwargs))
 
     class _CaptureCreateAndRunBacktestSyncInlineUseCase:
         """
@@ -516,11 +522,38 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
             """
             captured_sync_inline_kwargs.update(kwargs)
 
+    class _CaptureLaunchBacktestRunWithAutoFallbackUseCase:
+        """
+        Capture auto-fallback orchestrator constructor kwargs for wiring assertions.
+        """
+
+        def __init__(self, **kwargs) -> None:
+            """
+            Store kwargs for deterministic assertions.
+
+            Args:
+                **kwargs: Constructor kwargs from wiring module.
+            Returns:
+                None.
+            Assumptions:
+                Captured kwargs are not mutated by router builder.
+            Raises:
+                None.
+            Side Effects:
+                Stores kwargs in enclosing test scope.
+            """
+            captured_auto_fallback_kwargs.update(kwargs)
+
     monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _CaptureRunBacktestUseCase)
     monkeypatch.setattr(
         backtest_module,
         "CreateAndRunBacktestSyncInlineUseCase",
         _CaptureCreateAndRunBacktestSyncInlineUseCase,
+    )
+    monkeypatch.setattr(
+        backtest_module,
+        "LaunchBacktestRunWithAutoFallbackUseCase",
+        _CaptureLaunchBacktestRunWithAutoFallbackUseCase,
     )
     monkeypatch.setattr(
         backtest_module,
@@ -551,12 +584,16 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     )
     assert "/backtests/ping" in _paths_from_router(router=router)
     assert "/backtests/runs/ping" in _paths_from_router(router=router)
-    assert captured_kwargs["max_variants_per_compute"] == 50
-    assert captured_kwargs["max_compute_bytes_total"] == 500
-    assert captured_kwargs["max_numba_threads"] == 7
-    assert captured_kwargs["eager_top_reports_enabled"] is False
+    assert len(captured_run_use_case_kwargs) == 2
+    assert captured_run_use_case_kwargs[0]["max_variants_per_compute"] == 50
+    assert captured_run_use_case_kwargs[0]["max_compute_bytes_total"] == 500
+    assert captured_run_use_case_kwargs[0]["max_numba_threads"] == 7
+    assert captured_run_use_case_kwargs[0]["eager_top_reports_enabled"] is False
+    assert captured_run_use_case_kwargs[1]["max_variants_per_compute"] == 101
+    assert captured_run_use_case_kwargs[1]["max_compute_bytes_total"] == 1001
     assert captured_sync_inline_kwargs["backtest_runtime_config_hash"] == "f" * 64
     assert captured_sync_inline_kwargs["engine_version"] == "signal_tf + 1m_risk"
+    assert captured_auto_fallback_kwargs["engine_version"] == "signal_tf + 1m_risk"
     assert captured_backtests_router_kwargs["sync_deadline_seconds"] == 42.5
     assert captured_backtests_router_kwargs["eager_top_reports_enabled"] is False
 
@@ -679,6 +716,11 @@ def test_build_backtest_router_uses_artifact_root_from_artifact_config(monkeypat
     monkeypatch.setattr(
         backtest_module,
         "CreateAndRunBacktestSyncInlineUseCase",
+        _DummyFactory,
+    )
+    monkeypatch.setattr(
+        backtest_module,
+        "LaunchBacktestRunWithAutoFallbackUseCase",
         _DummyFactory,
     )
     monkeypatch.setattr(

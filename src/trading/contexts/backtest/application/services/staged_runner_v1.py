@@ -381,6 +381,57 @@ class BacktestStagedRunnerV1:
             indicator_estimate_calls=grid_context.indicator_estimate_calls,
         )
 
+    def preflight(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        candles: CandleArrays,
+        preselect: int,
+        indicator_compute: IndicatorCompute,
+        defaults_provider: BacktestGridDefaultsProvider | None = None,
+        max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
+        max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+    ) -> BacktestGridBuildContextV1:
+        """
+        Build staged grid context without Stage A/Stage B execution.
+
+        Docs:
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+        Args:
+            template: Resolved backtest template payload.
+            candles: Dense warmup-inclusive candle arrays.
+            preselect: Stage A shortlist size.
+            indicator_compute: Indicator estimate port used for staged grid materialization.
+            defaults_provider: Optional defaults provider for compute/signal fallback.
+            max_variants_per_compute: Stage variants guard limit.
+            max_compute_bytes_total: Stage memory guard limit.
+        Returns:
+            BacktestGridBuildContextV1: Deterministic grid context after canonical guard checks.
+        Assumptions:
+            Preflight is guard-only and does not score or persist variants.
+        Raises:
+            RoehubError: Propagated from staged grid-builder guard checks.
+            ValueError: If one scalar invariant is invalid.
+        Side Effects:
+            Calls `indicator_compute.estimate(...)` once per indicator block.
+        """
+        if preselect <= 0:
+            raise ValueError("BacktestStagedRunnerV1 preselect must be > 0")
+        return self._grid_builder.build(
+            template=template,
+            candles=candles,
+            indicator_compute=indicator_compute,
+            preselect=preselect,
+            defaults_provider=defaults_provider,
+            max_variants_per_compute=max_variants_per_compute,
+            max_compute_bytes_total=max_compute_bytes_total,
+        )
+
     def _prepare_scorer_for_grid_context(
         self,
         *,

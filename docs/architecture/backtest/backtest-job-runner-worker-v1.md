@@ -16,9 +16,8 @@
 - R7-02 cutover update:
   - `POST /backtests` теперь тоже пишет successful `sync_inline` terminal rows в тот же table
     family,
-  - worker contract не меняет свои background semantics и остаётся compatibility path для
-    `background_manual_legacy`,
-  - full sync -> background auto-fallback orchestration остаётся вне scope до R8-02.
+  - worker contract не меняет streaming/background semantics и остаётся execution path для
+    queued persisted runs.
 - R8-01 worker runtime cutover:
   - claimed execution path теперь обязателен для slot-pinned runtime v2 и стартует только из
     persisted `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`,
@@ -28,8 +27,15 @@
     sync artifact runtime contract,
   - hot path claimed run больше не читает live ClickHouse candles и не вызывает
     `IndicatorCompute.compute(...)`,
-  - внешний vocabulary не меняется: `execution_mode=background_manual_legacy` остаётся валидным
-    compatibility literal до R8-02.
+  - внешний vocabulary не меняется на уровне worker lifecycle: queued/running claimed attempts
+    могут приходить и как `background_manual_legacy`, и как `background_auto`.
+- R8-02 launch orchestration update:
+  - `POST /backtests` теперь может создавать queued rows с `execution_mode=background_auto`
+    после deterministic sync guard overflow и успешного full-budget preflight,
+  - worker claim/lease/runtime path для `background_auto` совпадает с
+    `background_manual_legacy`; различается только launch semantics на API create path,
+  - summary-only persistence contract остаётся неизменным:
+    `report_table_md=NULL`, `trades_json=NULL`.
 - Superseded by target-v2 orchestration decisions:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`

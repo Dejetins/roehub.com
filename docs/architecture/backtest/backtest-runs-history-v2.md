@@ -23,6 +23,12 @@
     persisted `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`,
     `artifact_asof_date` для pinned runtime context;
   - detail/report/trades payloads не сохраняются в PG и не участвуют в `/top`.
+- R8-02 additive note:
+  - `POST /backtests` теперь может создавать queued run с `execution_mode=background_auto`
+    и отвечать `202 Accepted` вместо скрытого mode switch;
+  - такие runs появляются в `/backtests/runs*` сразу после launch и используют тот же storage,
+    owner policy, status, `/top`, `/cancel` и history semantics, что и
+    `background_manual_legacy`.
 
 ## Цель
 
@@ -39,6 +45,7 @@
   - `backtest_job_top_variants`
   - `backtest_job_stage_a_shortlist`
 - R7-02 перевел `POST /backtests` на persisted `sync_inline` flow.
+- R8-02 добавил explicit `background_auto` launch branch в тот же persisted-run storage.
 - R7-03 поверх этого storage добавляет public history/status/top/cancel contract.
 
 ## Ключевые решения
@@ -90,6 +97,12 @@ Public runs payload не должен протекать внутренними 
 
 Hashes (`request_hash`, `engine_params_hash`, `backtest_runtime_config_hash`, `spec_hash`) остаются
 частью legacy `/backtests/jobs*`, но не требуются public `/backtests/runs*`.
+
+`execution_mode` после R8-02 может быть:
+
+- `sync_inline`
+- `background_auto`
+- `background_manual_legacy`
 
 ### 4) `/top` остается summary-only
 

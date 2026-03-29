@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Any, Mapping
 from uuid import UUID
@@ -21,12 +21,18 @@ from trading.contexts.backtest.application.ports import (
 )
 from trading.contexts.backtest.application.use_cases.backtest_runs_api_v1 import (
     CreateAndRunBacktestSyncInlineUseCase,
+    LaunchBacktestRunWithAutoFallbackUseCase,
 )
-from trading.contexts.backtest.domain.entities import BacktestJob, BacktestJobTopVariant
+from trading.contexts.backtest.domain.entities import (
+    BacktestJob,
+    BacktestJobArtifactPin,
+    BacktestJobTopVariant,
+)
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
+from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import (
     InstrumentId,
     MarketId,
@@ -274,6 +280,79 @@ class _FakeJobRepository:
         return 0
 
 
+@dataclass
+class _FakePreflightUseCase:
+    """
+    Minimal deterministic full-budget preflight fake for auto-fallback orchestration tests.
+    """
+
+    error: Exception | None = None
+    calls: int = 0
+
+    def preflight(
+        self,
+        *,
+        request: RunBacktestRequest,
+        current_user: CurrentUser,
+        run_control=None,
+    ) -> None:
+        """
+        Record call and raise configured error when requested.
+
+        Args:
+            request: Parsed run request DTO.
+            current_user: Authenticated owner identity.
+            run_control: Optional cooperative cancellation handle.
+        Returns:
+            None.
+        Assumptions:
+            Auto-fallback tests assert only call count and propagated errors.
+        Raises:
+            Exception: Configured fake error.
+        Side Effects:
+            Increments in-memory call counter.
+        """
+        _ = request, current_user, run_control
+        self.calls += 1
+        if self.error is not None:
+            raise self.error
+
+
+@dataclass
+class _FakeBackgroundCreateUseCase:
+    """
+    Minimal queued background-run creator fake for auto-fallback orchestration tests.
+    """
+
+    created_job: BacktestJob | None = None
+    calls: int = 0
+    last_command: Any | None = None
+    last_current_user: CurrentUser | None = None
+
+    def execute(self, *, command, current_user: CurrentUser) -> BacktestJob:
+        """
+        Return configured queued run snapshot and record command for assertions.
+
+        Args:
+            command: Canonical queued background-run create command.
+            current_user: Authenticated owner identity.
+        Returns:
+            BacktestJob: Preconfigured queued background run snapshot.
+        Assumptions:
+            Auto-fallback orchestration tests inspect the captured command directly.
+        Raises:
+            AssertionError: If the fake was not configured with a created job.
+        Side Effects:
+            Stores last command and increments in-memory call counter.
+        """
+        self.calls += 1
+        self.last_command = command
+        self.last_current_user = current_user
+        if self.created_job is None:
+            raise AssertionError("created_job is not configured")
+        return self.created_job
+
+
 def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> None:
     """
     Verify orchestrator persists terminal sync-inline run row and summary-only top rows.
@@ -379,6 +458,228 @@ def test_create_and_run_backtest_sync_inline_keeps_preflight_validation_error_wi
 
     assert repo.created_job is None
     assert repo.created_rows == tuple()
+
+
+def test_launch_backtest_with_auto_fallback_returns_sync_inline_when_sync_budgets_pass() -> None:
+    """
+    Verify orchestration returns sync-inline result unchanged when half-budgets pass.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Sync-inline orchestrator already persisted run metadata before auto-fallback wrapper.
+    Raises:
+        AssertionError: If fallback preflight/create paths are touched on sync success.
+    Side Effects:
+        None.
+    """
+    sync_response = replace(
+        _template_run_response(),
+        run_id=UUID("00000000-0000-0000-0000-000000000910"),
+        state="succeeded",
+        execution_mode="sync_inline",
+        engine_version="signal_tf + 1m_risk",
+        engine_params_hash="d" * 64,
+    )
+    preflight_use_case = _FakePreflightUseCase()
+    create_use_case = _FakeBackgroundCreateUseCase()
+    use_case = LaunchBacktestRunWithAutoFallbackUseCase(
+        sync_inline_use_case=_FakeRunUseCase(response=sync_response),
+        background_preflight_use_case=preflight_use_case,
+        background_create_use_case=create_use_case,
+        engine_version="signal_tf + 1m_risk",
+    )
+
+    persisted = use_case.execute(
+        request=_template_request(),
+        current_user=CurrentUser(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+        ),
+        request_payload=_template_request_payload(),
+    )
+
+    assert persisted.execution_mode == "sync_inline"
+    assert persisted.run_id == UUID("00000000-0000-0000-0000-000000000910")
+    assert preflight_use_case.calls == 0
+    assert create_use_case.calls == 0
+
+
+def test_launch_backtest_with_auto_fallback_creates_background_auto_after_guard_overflow() -> None:
+    """
+    Verify guard overflow falls back to explicit queued `background_auto` launch.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Full-budget preflight succeeds and queued run creation reuses existing jobs create flow.
+    Raises:
+        AssertionError: If fallback metadata or execution mode drift from R8-02 contract.
+    Side Effects:
+        None.
+    """
+    preflight_use_case = _FakePreflightUseCase()
+    create_use_case = _FakeBackgroundCreateUseCase(
+        created_job=_background_auto_job(),
+    )
+    use_case = LaunchBacktestRunWithAutoFallbackUseCase(
+        sync_inline_use_case=_FakeRunUseCase(
+            error=RoehubError(
+                code="validation_error",
+                message="Backtest variants guard exceeded",
+                details={
+                    "error": "max_variants_per_compute_exceeded",
+                    "stage": "stage_a",
+                    "total_variants": 999,
+                    "max_variants_per_compute": 100,
+                },
+            )
+        ),
+        background_preflight_use_case=preflight_use_case,
+        background_create_use_case=create_use_case,
+        engine_version="signal_tf + 1m_risk",
+    )
+
+    launched = use_case.execute(
+        request=_template_request(),
+        current_user=CurrentUser(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+        ),
+        request_payload=_template_request_payload(),
+    )
+
+    assert preflight_use_case.calls == 1
+    assert create_use_case.calls == 1
+    assert create_use_case.last_command is not None
+    assert create_use_case.last_command.execution_mode == "background_auto"
+    assert launched.run_id == UUID("00000000-0000-0000-0000-000000000911")
+    assert launched.state == "queued"
+    assert launched.execution_mode == "background_auto"
+    assert launched.engine_version == "signal_tf + 1m_risk"
+    assert launched.artifact_slot == "slot_b"
+    assert launched.artifact_slot_generation == 11
+    assert launched.artifact_asof_date == "2026-03-28"
+    assert launched.artifact_manifest_hash == "c" * 64
+    assert launched.top_k == 2
+    assert launched.preselect == 100
+    assert launched.top_trades_n == 1
+    assert launched.variants == tuple()
+    assert launched.engine_params_hash == "e" * 64
+
+
+def test_launch_backtest_with_auto_fallback_rethrows_full_budget_overflow_without_create() -> None:
+    """
+    Verify full-budget guard failure returns deterministic `422` without queued run creation.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Auto-fallback must stop before persistence when full budgets still overflow.
+    Raises:
+        AssertionError: If queued background create is attempted after failed full-budget preflight.
+    Side Effects:
+        None.
+    """
+    preflight_use_case = _FakePreflightUseCase(
+        error=RoehubError(
+            code="validation_error",
+            message="Backtest memory guard exceeded",
+            details={
+                "error": "max_compute_bytes_total_exceeded",
+                "stage": "stage_a",
+                "estimated_memory_bytes": 4096,
+                "max_compute_bytes_total": 2048,
+            },
+        )
+    )
+    create_use_case = _FakeBackgroundCreateUseCase()
+    use_case = LaunchBacktestRunWithAutoFallbackUseCase(
+        sync_inline_use_case=_FakeRunUseCase(
+            error=RoehubError(
+                code="validation_error",
+                message="Backtest variants guard exceeded",
+                details={
+                    "error": "max_variants_per_compute_exceeded",
+                    "stage": "stage_b",
+                    "total_variants": 1200,
+                    "max_variants_per_compute": 500,
+                },
+            )
+        ),
+        background_preflight_use_case=preflight_use_case,
+        background_create_use_case=create_use_case,
+        engine_version="signal_tf + 1m_risk",
+    )
+
+    with pytest.raises(RoehubError) as error_info:
+        use_case.execute(
+            request=_template_request(),
+            current_user=CurrentUser(
+                user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+            ),
+            request_payload=_template_request_payload(),
+        )
+
+    assert error_info.value.message == "Backtest memory guard exceeded"
+    assert preflight_use_case.calls == 1
+    assert create_use_case.calls == 0
+
+
+def test_launch_backtest_with_auto_fallback_skips_non_guard_validation_errors() -> None:
+    """
+    Verify non-guard validation errors propagate unchanged without fallback attempts.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Only structured guard overflow literals are eligible for `background_auto`.
+    Raises:
+        AssertionError: If wrapper masks unrelated validation errors behind fallback behavior.
+    Side Effects:
+        None.
+    """
+    preflight_use_case = _FakePreflightUseCase()
+    create_use_case = _FakeBackgroundCreateUseCase()
+    use_case = LaunchBacktestRunWithAutoFallbackUseCase(
+        sync_inline_use_case=_FakeRunUseCase(
+            error=RoehubError(
+                code="validation_error",
+                message="Backtest request top_trades_n must be <= top_k",
+                details={
+                    "errors": [
+                        {
+                            "path": "body.top_trades_n",
+                            "code": "max_value",
+                            "message": "top_trades_n must be <= top_k",
+                        }
+                    ]
+                },
+            )
+        ),
+        background_preflight_use_case=preflight_use_case,
+        background_create_use_case=create_use_case,
+        engine_version="signal_tf + 1m_risk",
+    )
+
+    with pytest.raises(RoehubError) as error_info:
+        use_case.execute(
+            request=_template_request(),
+            current_user=CurrentUser(
+                user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+            ),
+            request_payload=_template_request_payload(),
+        )
+
+    assert error_info.value.message == "Backtest request top_trades_n must be <= top_k"
+    assert preflight_use_case.calls == 0
+    assert create_use_case.calls == 0
 
 
 def _template_request() -> RunBacktestRequest:
@@ -564,4 +865,46 @@ def _template_run_response() -> RunBacktestResponse:
         artifact_slot_generation=11,
         artifact_asof_date="2026-03-28",
         artifact_manifest_hash="c" * 64,
+    )
+
+
+def _background_auto_job() -> BacktestJob:
+    """
+    Build deterministic queued `background_auto` run snapshot for orchestration tests.
+
+    Args:
+        None.
+    Returns:
+        BacktestJob: Queued persisted run fixture with explicit `background_auto` mode.
+    Assumptions:
+        `request_json` already contains resolved defaults as created by jobs create flow.
+    Raises:
+        ValueError: If fixture violates persisted-run invariants.
+    Side Effects:
+        None.
+    """
+    return BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000911"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000777"),
+        mode="template",
+        created_at=datetime(2026, 3, 28, 12, 0, 5, tzinfo=timezone.utc),
+        request_json=_template_request_payload(),
+        request_hash="f" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="e" * 64,
+        backtest_runtime_config_hash="d" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="c" * 64,
+            artifact_asof_date="2026-03-28",
+        ),
+        execution_mode="background_auto",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1m",
+        requested_top_n=2,
+        ranking_primary_metric="total_return_pct",
+        ranking_secondary_metric=None,
     )

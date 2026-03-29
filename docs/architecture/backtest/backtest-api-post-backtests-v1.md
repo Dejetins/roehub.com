@@ -1,10 +1,12 @@
 # Backtest API v1 — `POST /backtests` (saved strategy + ad-hoc grid) (BKT-EPIC-07)
 
-Фиксирует контракт BKT-EPIC-07: HTTP API v1 для синхронного (small-run) backtest запуска в двух режимах (saved/ad-hoc), с deterministic top-K ответом и unified deterministic 422 ошибками.
+Фиксирует контракт BKT-EPIC-07/R8-02: HTTP API v1 для deterministic launch flow в двух режимах
+(`saved` / `ad-hoc`) с explicit `sync_inline` / `background_auto` semantics и unified
+deterministic `422` ошибками.
 
 ## Status
 
-- Status: active v1 sync contract after R7-02 persisted `sync_inline` cutover.
+- Status: active v1 launch contract after R8-02 explicit auto-fallback cutover.
 - R7-03 follow-up note:
   - persisted runs created by `POST /backtests` are now publicly readable through
     `docs/architecture/backtest/backtest-runs-history-v2.md`;
@@ -23,6 +25,16 @@
     `IndicatorCompute.compute(...)`,
   - summary-only persistence contract remains unchanged:
     `report_table_md=NULL`, `trades_json=NULL`.
+- R8-02 launch orchestration note:
+  - `POST /backtests` теперь пробует `sync_inline` только в sync half-budgets,
+  - при canonical guard overflow backend выполняет explicit full-budget preflight; если он
+    проходит, создаётся queued persisted run с `execution_mode=background_auto`,
+  - fallback branch отвечает `202 Accepted` и явно возвращает `run_id`, `state=queued`,
+    `execution_mode=background_auto`, `engine_version` и artifact pin metadata,
+  - manual compatibility endpoint `POST /backtests/jobs` сохраняет поведение
+    `execution_mode=background_manual_legacy`,
+  - если full budgets тоже не проходят, backend возвращает canonical deterministic `422`
+    и не создаёт persisted run row.
 - R7-02 storage note:
   - sync and background executions share one persisted-run storage family in Postgres,
   - successful `POST /backtests` now performs internal preflight, executes inline, and persists
@@ -37,7 +49,7 @@
   - `docs/architecture/roadmap/base_refactor_plan.md`
   - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - Historical scope kept here:
-  - current `POST /backtests` sync behavior,
+  - current `POST /backtests` launch behavior,
   - legacy `top_k_*` naming and response fields,
   - current manual split between sync and jobs endpoints.
 - R1 target contract, enforced in backend validation:
@@ -50,7 +62,9 @@
 ## Цель
 
 - Дать UI один endpoint `POST /backtests`, который:
-  - запускает staged backtest v1 синхронно (Stage A shortlist -> Stage B exact -> top-K),
+  - запускает staged backtest v1 inline, если sync budgets проходят,
+  - автоматически переводит launch в queued background run, если sync budgets не проходят, но
+    full budgets проходят,
   - поддерживает режим `saved` (по `strategy_id`) и `ad-hoc` (по template/grid),
   - возвращает достаточно данных, чтобы UI мог сохранить выбранный вариант как StrategySpec (как минимум: конкретные параметры индикаторов, signals, risk/sizing/execution),
   - возвращает deterministic ошибки (unified 422), не “плавающие” между версиями.
@@ -103,7 +117,6 @@
 - Дополнительные endpoints (get status/list).
 - R7-03 history retrieval semantics documented separately in
   `docs/architecture/backtest/backtest-runs-history-v2.md`.
-- R8-02 не включает full auto-fallback sync -> background orchestration.
 
 ## Ключевые решения
 
@@ -185,6 +198,21 @@ Response v1 включает:
   - `report_table_md=NULL`,
   - `trades_json=NULL`.
 
+### 6A) `POST /backtests` теперь имеет три deterministic launch branch
+
+- Branch A: sync budgets проходят
+  - backend исполняет inline compute,
+  - persist'ит terminal row с `execution_mode=sync_inline`,
+  - возвращает `200 OK` и ranked `variants[]`.
+- Branch B: sync budgets не проходят по canonical guard overflow, но full budgets проходят
+  - backend не делает hidden mode switch,
+  - выполняет full-budget preflight и создаёт queued row с `execution_mode=background_auto`,
+  - возвращает `202 Accepted`,
+  - `variants[]` остаётся пустым, потому что ranking summary ещё не materialize'ился.
+- Branch C: full budgets тоже не проходят
+  - backend возвращает canonical deterministic `422`,
+  - persisted run row не создаётся.
+
 ### 7) Sync response остаётся summary-only; full report грузится on-demand
 
 - По умолчанию `POST /backtests` возвращает ranking + payload summary без `report` body.
@@ -223,8 +251,10 @@ Response v1 включает:
   - `floor(backtest.guards.max_variants_per_compute / 2)`;
   - `floor(backtest.guards.max_compute_bytes_total / 2)`.
 - Jobs path сохраняет полные лимиты из `backtest.guards.*`.
-
-HTTP response schema при этом не меняется.
+- C 2026-03-29 `POST /backtests` использует это различие как deterministic launch policy:
+  - half-budgets -> `sync_inline`,
+  - half overflow + full pass -> `background_auto`,
+  - full overflow -> canonical `422`.
 
 ### 10) CPU knob через Numba threads
 
@@ -293,10 +323,10 @@ Response содержит:
 - `mode: "saved"|"template"`
 - `instrument_id`, `timeframe`, `strategy_id?`
 - `warmup_bars`, `top_k`, `preselect`, `top_trades_n`
-- persisted sync run metadata:
+- persisted launch metadata:
   - `run_id`
   - `state`
-  - `execution_mode` (`sync_inline`)
+  - `execution_mode` (`sync_inline|background_auto`)
   - `engine_version`
   - `artifact_slot`
   - `artifact_slot_generation`
@@ -305,9 +335,10 @@ Response содержит:
 - reproducibility hashes:
   - `spec_hash?` or `grid_request_hash?`
   - `engine_params_hash`
-- `variants[]` (length `<= top_k`), отсортировано:
-  - primary/secondary: по выбранному ranking contract
-  - tie-break: `variant_key` asc
+- `variants[]`
+  - для `execution_mode=sync_inline`: length `<= top_k`, отсортировано по выбранному ranking
+    contract и tie-break `variant_key ASC`,
+  - для `execution_mode=background_auto`: пустой список до materialized background result.
 
 Каждый `variants[i]` содержит:
 
@@ -344,11 +375,14 @@ Response содержит:
 
 ## Ошибки и статус-коды
 
+- `200 OK` — sync branch (`execution_mode=sync_inline`) с inline-ranked `variants[]`.
+- `202 Accepted` — explicit queued fallback branch (`execution_mode=background_auto`).
 - `401` — unauthenticated (identity dependency).
 - `422` — `RoehubError(code="validation_error")`:
   - invalid payload
-  - guards/preflight budget exceeded
+  - sync/full guards or preflight budget exceeded
   - invalid time range / no market data
+  - full-budget branch does not create persisted run rows on this path
 - `404` — `RoehubError(code="not_found")`:
   - saved strategy missing or deleted
 - `403` — `RoehubError(code="forbidden")`:
@@ -362,15 +396,20 @@ Response содержит:
 
 FastAPI wiring v1:
 
-- `apps/api/routes/backtests.py` — thin route: DTO mapping -> use-case call -> response mapping.
+- `apps/api/routes/backtests.py` — thin route: DTO mapping -> use-case call -> `200`/`202`
+  status selection -> response mapping.
 - `apps/api/wiring/modules/backtest.py` — composition:
   - `CandleFeed` (reuse indicators `MarketDataCandleFeed`),
   - `IndicatorCompute` (reuse indicators compute adapter),
   - `BacktestStrategyReader` adapter (ACL over StrategyRepository),
   - `BacktestJobRepository` over the unified Postgres storage family for persisted
-    `sync_inline` writes,
+    `sync_inline` writes and queued `background_auto` fallback rows,
   - `BacktestGridDefaultsProvider` (reads `configs/<env>/indicators.yaml` defaults),
-  - `BacktestRuntimeConfig` from `configs/<env>/backtest.yaml`.
+  - `BacktestRuntimeConfig` from `configs/<env>/backtest.yaml`,
+  - application-layer launch orchestrator, который композиционно использует:
+    - sync persisted inline use-case,
+    - full-budget preflight use-case,
+    - jobs create use-case с explicit `background_auto`.
 
 Fail-fast:
 

@@ -428,6 +428,75 @@ class RunBacktestUseCase:
         except Exception as error:  # noqa: BLE001
             raise map_backtest_exception(error=error) from error
 
+    def preflight(
+        self,
+        *,
+        request: RunBacktestRequest,
+        current_user: CurrentUser,
+        run_control: BacktestRunControlV1 | None = None,
+    ) -> None:
+        """
+        Validate canonical staged guard budgets without executing Stage A or Stage B.
+
+        Docs:
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+          - apps/api/wiring/modules/backtest.py
+        Args:
+            request: Saved/ad-hoc backtest request.
+            current_user: Authenticated user for ownership checks in saved mode.
+            run_control: Optional cooperative cancellation/deadline control object.
+        Returns:
+            None.
+        Assumptions:
+            Preflight reuses the same request resolution, timeline loading, and guard budgets as
+            the corresponding sync or background launch path.
+        Raises:
+            RoehubError: Canonical mapped error for validation/forbidden/not-found/conflict/
+                unexpected.
+        Side Effects:
+            Reads candles via `CandleFeed` and calls `indicator_compute.estimate(...)` for
+            deterministic staged-grid planning only.
+        """
+        try:
+            if request is None:  # type: ignore[truthy-bool]
+                raise BacktestValidationError("RunBacktestUseCase.preflight requires request")
+            if current_user is None:  # type: ignore[truthy-bool]
+                raise BacktestValidationError(
+                    "RunBacktestUseCase.preflight requires current_user"
+                )
+
+            apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
+            if run_control is not None:
+                run_control.raise_if_cancelled(stage="stage_a")
+            resolved = self._resolve_run_context(request=request, current_user=current_user)
+            timeline = self._candle_timeline_builder.build(
+                market_id=resolved.template.instrument_id.market_id,
+                symbol=resolved.template.instrument_id.symbol,
+                timeframe=resolved.template.timeframe,
+                requested_time_range=request.time_range,
+                warmup_bars=resolved.warmup_bars,
+            )
+            if run_control is not None:
+                run_control.raise_if_cancelled(stage="stage_a")
+            self._staged_runner.preflight(
+                template=resolved.template,
+                candles=timeline.candles,
+                preselect=resolved.preselect,
+                indicator_compute=self._indicator_compute,
+                defaults_provider=self._defaults_provider,
+                max_variants_per_compute=self._max_variants_per_compute,
+                max_compute_bytes_total=self._max_compute_bytes_total,
+            )
+        except RoehubError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            raise map_backtest_exception(error=error) from error
+
     def build_variant_report(
         self,
         *,

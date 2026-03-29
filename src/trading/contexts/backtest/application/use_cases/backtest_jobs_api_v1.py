@@ -29,6 +29,7 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
+    BacktestJobExecutionMode,
     BacktestJobMode,
     BacktestJobState,
     BacktestJobTopVariant,
@@ -66,6 +67,7 @@ class CreateBacktestJobCommand:
 
     run_request: RunBacktestRequest
     request_payload: Mapping[str, Any]
+    execution_mode: BacktestJobExecutionMode = "background_manual_legacy"
 
     def __post_init__(self) -> None:
         """
@@ -86,6 +88,14 @@ class CreateBacktestJobCommand:
             raise ValueError("CreateBacktestJobCommand.run_request is required")
         if self.request_payload is None:  # type: ignore[truthy-bool]
             raise ValueError("CreateBacktestJobCommand.request_payload is required")
+        if self.execution_mode not in {
+            "background_auto",
+            "background_manual_legacy",
+        }:
+            raise ValueError(
+                "CreateBacktestJobCommand.execution_mode must be "
+                "'background_auto' or 'background_manual_legacy'"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -363,7 +373,7 @@ class CreateBacktestJobUseCase:
             ),
             backtest_runtime_config_hash=self._backtest_runtime_config_hash,
             artifact_pin=artifact_pin,
-            execution_mode="background_manual_legacy",
+            execution_mode=command.execution_mode,
             market_id=resolved.template.instrument_id.market_id.value,
             symbol=str(resolved.template.instrument_id.symbol),
             timeframe=str(resolved.template.timeframe),

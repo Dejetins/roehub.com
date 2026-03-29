@@ -25,12 +25,24 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
+from trading.platform.errors import RoehubError
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe
 
-from .backtest_jobs_api_v1 import _build_sha256_from_payload, _normalize_json_mapping
+from .backtest_jobs_api_v1 import (
+    CreateBacktestJobCommand,
+    _build_sha256_from_payload,
+    _normalize_json_mapping,
+)
 
 NowProvider = Callable[[], datetime]
 RunIdFactory = Callable[[], UUID]
 _SYNC_INLINE_LOCKED_BY = "sync-inline"
+_AUTO_FALLBACK_GUARD_ERRORS = frozenset(
+    {
+        "max_compute_bytes_total_exceeded",
+        "max_variants_per_compute_exceeded",
+    }
+)
 
 
 class BacktestRunsApiUseCase(Protocol):
@@ -102,6 +114,272 @@ class BacktestRunsApiUseCase(Protocol):
             Executes report generation logic and may perform compute IO.
         """
         ...
+
+
+class BacktestRunPreflightUseCase(Protocol):
+    """
+    Structural contract for deterministic staged-budget preflight without execution.
+
+    Docs:
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - apps/api/wiring/modules/backtest.py
+    """
+
+    def preflight(
+        self,
+        *,
+        request: RunBacktestRequest,
+        current_user: CurrentUser,
+        run_control: BacktestRunControlV1 | None = None,
+    ) -> None:
+        """
+        Validate the request against canonical staged guard budgets.
+
+        Args:
+            request: Parsed application request DTO.
+            current_user: Authenticated owner identity.
+            run_control: Optional cooperative cancellation/deadline control object.
+        Returns:
+            None.
+        Assumptions:
+            Preflight uses the same runtime contract as the corresponding launch path.
+        Raises:
+            Exception: Domain/application errors are implementation-specific.
+        Side Effects:
+            May read runtime inputs required for deterministic guard evaluation.
+        """
+        ...
+
+
+class BacktestBackgroundJobCreateUseCase(Protocol):
+    """
+    Structural contract for creating queued persisted runs for background execution.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - apps/api/wiring/modules/backtest.py
+    """
+
+    def execute(
+        self,
+        *,
+        command: CreateBacktestJobCommand,
+        current_user: CurrentUser,
+    ) -> BacktestJob:
+        """
+        Persist one queued background run snapshot.
+
+        Args:
+            command: Canonical queued background-run create command.
+            current_user: Authenticated owner identity.
+        Returns:
+            BacktestJob: Persisted queued run snapshot.
+        Assumptions:
+            Persistence remains deterministic and summary-only.
+        Raises:
+            Exception: Domain/application errors are implementation-specific.
+        Side Effects:
+            Writes one row into the unified persisted-run storage family.
+        """
+        ...
+
+
+class LaunchBacktestRunWithAutoFallbackUseCase:
+    """
+    Launch `POST /backtests` with deterministic `sync_inline -> background_auto` fallback.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - apps/api/routes/backtests.py
+    """
+
+    def __init__(
+        self,
+        *,
+        sync_inline_use_case: BacktestRunsApiUseCase,
+        background_preflight_use_case: BacktestRunPreflightUseCase,
+        background_create_use_case: BacktestBackgroundJobCreateUseCase,
+        engine_version: str,
+    ) -> None:
+        """
+        Initialize deterministic `/backtests` launch orchestration dependencies.
+
+        Docs:
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+          - apps/api/wiring/modules/backtest.py
+          - apps/api/routes/backtests.py
+        Args:
+            sync_inline_use_case: Persisted sync-inline launch path using sync half-budgets.
+            background_preflight_use_case: Full-budget guard preflight without persistence.
+            background_create_use_case: Queued background-run creator over unified storage.
+            engine_version: Stable engine/runtime literal exposed in API launch responses.
+        Returns:
+            None.
+        Assumptions:
+            Background preflight and background create share the same canonical request contract.
+        Raises:
+            ValueError: If dependencies or engine version are invalid.
+        Side Effects:
+            None.
+        """
+        if sync_inline_use_case is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "LaunchBacktestRunWithAutoFallbackUseCase requires sync_inline_use_case"
+            )
+        if background_preflight_use_case is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "LaunchBacktestRunWithAutoFallbackUseCase requires background_preflight_use_case"
+            )
+        if background_create_use_case is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "LaunchBacktestRunWithAutoFallbackUseCase requires background_create_use_case"
+            )
+        normalized_engine_version = engine_version.strip()
+        if not normalized_engine_version:
+            raise ValueError(
+                "LaunchBacktestRunWithAutoFallbackUseCase requires engine_version"
+            )
+
+        self._sync_inline_use_case = sync_inline_use_case
+        self._background_preflight_use_case = background_preflight_use_case
+        self._background_create_use_case = background_create_use_case
+        self._engine_version = normalized_engine_version
+
+    def execute(
+        self,
+        *,
+        request: RunBacktestRequest,
+        current_user: CurrentUser,
+        request_payload: Mapping[str, Any] | None = None,
+        run_control: BacktestRunControlV1 | None = None,
+    ) -> RunBacktestResponse:
+        """
+        Launch sync-inline first, then fallback deterministically to `background_auto`.
+
+        Docs:
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+          - apps/api/routes/backtests.py
+        Args:
+            request: Parsed application request DTO.
+            current_user: Authenticated owner identity.
+            request_payload: Strict API payload snapshot used for persistence-compatible flows.
+            run_control: Optional cooperative cancellation/deadline control object.
+        Returns:
+            RunBacktestResponse: Sync-inline success or explicit queued `background_auto` launch.
+        Assumptions:
+            Only canonical staged guard overflow errors are eligible for fallback.
+        Raises:
+            RoehubError: Canonical validation/not-found/forbidden/conflict errors.
+            ValueError: If required inputs are missing.
+        Side Effects:
+            May execute sync compute, run full-budget preflight, and persist one queued run row.
+        """
+        if request is None:  # type: ignore[truthy-bool]
+            raise ValueError("LaunchBacktestRunWithAutoFallbackUseCase.execute requires request")
+        if current_user is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "LaunchBacktestRunWithAutoFallbackUseCase.execute requires current_user"
+            )
+        if request_payload is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "LaunchBacktestRunWithAutoFallbackUseCase.execute requires request_payload"
+            )
+
+        try:
+            return self._sync_inline_use_case.execute(
+                request=request,
+                current_user=current_user,
+                request_payload=request_payload,
+                run_control=run_control,
+            )
+        except RoehubError as error:
+            if not _is_auto_fallback_guard_overflow(error=error):
+                raise
+
+        self._background_preflight_use_case.preflight(
+            request=request,
+            current_user=current_user,
+            run_control=run_control,
+        )
+        created_run = self._background_create_use_case.execute(
+            command=CreateBacktestJobCommand(
+                run_request=request,
+                request_payload=request_payload,
+                execution_mode="background_auto",
+            ),
+            current_user=current_user,
+        )
+        return _build_background_auto_launch_response(
+            request=request,
+            created_run=created_run,
+            engine_version=self._engine_version,
+        )
+
+    def build_variant_report(
+        self,
+        *,
+        request: RunBacktestRequest,
+        current_user: CurrentUser,
+        variant_payload: Any,
+        include_trades: bool = False,
+        run_control: BacktestRunControlV1 | None = None,
+    ) -> BacktestReportV1:
+        """
+        Delegate lazy variant-report generation to the sync-inline report path.
+
+        Docs:
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - apps/api/routes/backtests.py
+        Args:
+            request: Parsed application request DTO.
+            current_user: Authenticated owner identity.
+            variant_payload: Explicit variant payload selected for lazy detail/report fetch.
+            include_trades: Include-trades flag for report generation.
+            run_control: Optional cooperative cancellation/deadline control object.
+        Returns:
+            BacktestReportV1: Deterministic lazy report payload.
+        Assumptions:
+            Auto-fallback launch semantics do not change lazy detail generation contract.
+        Raises:
+            RoehubError: Propagates canonical errors from the delegated sync report path.
+        Side Effects:
+            Delegates to the existing report builder path without touching persisted storage.
+        """
+        return self._sync_inline_use_case.build_variant_report(
+            request=request,
+            current_user=current_user,
+            variant_payload=variant_payload,
+            include_trades=include_trades,
+            run_control=run_control,
+        )
 
 
 class CreateAndRunBacktestSyncInlineUseCase:
@@ -317,6 +595,223 @@ class CreateAndRunBacktestSyncInlineUseCase:
             include_trades=include_trades,
             run_control=run_control,
         )
+
+
+def _is_auto_fallback_guard_overflow(*, error: RoehubError) -> bool:
+    """
+    Classify deterministic sync guard overflow errors eligible for `background_auto` fallback.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - apps/api/routes/backtests.py
+    Args:
+        error: Canonical API/domain error raised by the sync-inline launch path.
+    Returns:
+        bool: `True` only for structured staged guard overflow errors.
+    Assumptions:
+        Structured guard details use the stable `details.error` literal contract.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if error.code != "validation_error" or error.details is None:
+        return False
+    detail_error = error.details.get("error")
+    if not isinstance(detail_error, str):
+        return False
+    return detail_error in _AUTO_FALLBACK_GUARD_ERRORS
+
+
+def _build_background_auto_launch_response(
+    *,
+    request: RunBacktestRequest,
+    created_run: BacktestJob,
+    engine_version: str,
+) -> RunBacktestResponse:
+    """
+    Convert queued `background_auto` run snapshot into `/backtests` launch response DTO.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - apps/api/dto/backtests.py
+    Args:
+        request: Original parsed application request DTO.
+        created_run: Persisted queued run snapshot created for fallback.
+        engine_version: Stable engine/runtime literal exposed by API responses.
+    Returns:
+        RunBacktestResponse: Explicit queued background launch response with empty variants.
+    Assumptions:
+        Auto-fallback launch is summary-only and does not compute top variants inline.
+    Raises:
+        BacktestValidationError: If persisted queued metadata is incomplete.
+    Side Effects:
+        None.
+    """
+    artifact_pin = _require_job_artifact_pin(created_run=created_run)
+    if created_run.execution_mode != "background_auto":
+        raise BacktestValidationError(
+            "background_auto launch response requires background_auto execution_mode"
+        )
+    return RunBacktestResponse(
+        mode=request.mode,
+        instrument_id=InstrumentId(
+            market_id=MarketId(_require_job_market_id(created_run=created_run)),
+            symbol=Symbol(_require_job_symbol(created_run=created_run)),
+        ),
+        timeframe=Timeframe(_require_job_timeframe(created_run=created_run)),
+        strategy_id=request.strategy_id,
+        warmup_bars=_require_positive_int_request_json(
+            request_json=created_run.request_json,
+            field_name="warmup_bars",
+        ),
+        top_k=_require_positive_int_request_json(
+            request_json=created_run.request_json,
+            field_name="top_k",
+        ),
+        preselect=_require_positive_int_request_json(
+            request_json=created_run.request_json,
+            field_name="preselect",
+        ),
+        top_trades_n=_require_positive_int_request_json(
+            request_json=created_run.request_json,
+            field_name="top_trades_n",
+        ),
+        variants=tuple(),
+        total_indicator_compute_calls=0,
+        run_id=created_run.job_id,
+        state=created_run.state,
+        execution_mode=created_run.execution_mode,
+        engine_version=engine_version,
+        artifact_slot=artifact_pin.artifact_slot,
+        artifact_slot_generation=artifact_pin.artifact_slot_generation,
+        artifact_asof_date=artifact_pin.artifact_asof_date,
+        artifact_manifest_hash=artifact_pin.artifact_manifest_hash,
+        spec_hash=created_run.spec_hash,
+        spec_payload_json=created_run.spec_payload_json,
+        engine_params_hash=created_run.engine_params_hash,
+    )
+
+
+def _require_job_artifact_pin(*, created_run: BacktestJob) -> BacktestJobArtifactPin:
+    """
+    Require pinned artifact metadata on one queued or terminal persisted run snapshot.
+
+    Args:
+        created_run: Persisted run snapshot.
+    Returns:
+        BacktestJobArtifactPin: Immutable artifact pin metadata.
+    Assumptions:
+        All persisted runs for `/backtests` carry slot-pinning identity.
+    Raises:
+        BacktestValidationError: If pin metadata is absent.
+    Side Effects:
+        None.
+    """
+    if created_run.artifact_pin is None:
+        raise BacktestValidationError("persisted run requires artifact pin metadata")
+    return created_run.artifact_pin
+
+
+def _require_positive_int_request_json(
+    *,
+    request_json: Mapping[str, Any],
+    field_name: str,
+) -> int:
+    """
+    Read one positive integer field from persisted canonical `request_json`.
+
+    Args:
+        request_json: Persisted canonical request payload.
+        field_name: Required positive integer field name.
+    Returns:
+        int: Positive integer field value.
+    Assumptions:
+        Background launch response reuses defaults already materialized into `request_json`.
+    Raises:
+        BacktestValidationError: If field is missing or not a positive integer.
+    Side Effects:
+        None.
+    """
+    raw_value = request_json.get(field_name)
+    if isinstance(raw_value, bool) or not isinstance(raw_value, int) or raw_value <= 0:
+        raise BacktestValidationError(
+            f"persisted run request_json requires positive integer field {field_name!r}"
+        )
+    return raw_value
+
+
+def _require_job_market_id(*, created_run: BacktestJob) -> int:
+    """
+    Require canonical market id on persisted run metadata.
+
+    Args:
+        created_run: Persisted run snapshot.
+    Returns:
+        int: Positive market id.
+    Assumptions:
+        Unified persisted-run metadata fills market id for all launch branches.
+    Raises:
+        BacktestValidationError: If market id is absent or invalid.
+    Side Effects:
+        None.
+    """
+    market_id = created_run.market_id
+    if market_id is None or market_id <= 0:
+        raise BacktestValidationError("persisted run requires positive market_id metadata")
+    return market_id
+
+
+def _require_job_symbol(*, created_run: BacktestJob) -> str:
+    """
+    Require canonical symbol on persisted run metadata.
+
+    Args:
+        created_run: Persisted run snapshot.
+    Returns:
+        str: Non-empty symbol literal.
+    Assumptions:
+        Unified persisted-run metadata fills symbol for all launch branches.
+    Raises:
+        BacktestValidationError: If symbol is absent or blank.
+    Side Effects:
+        None.
+    """
+    symbol = created_run.symbol
+    if symbol is None or not symbol.strip():
+        raise BacktestValidationError("persisted run requires symbol metadata")
+    return symbol
+
+
+def _require_job_timeframe(*, created_run: BacktestJob) -> str:
+    """
+    Require canonical timeframe on persisted run metadata.
+
+    Args:
+        created_run: Persisted run snapshot.
+    Returns:
+        str: Non-empty timeframe literal.
+    Assumptions:
+        Unified persisted-run metadata fills timeframe for all launch branches.
+    Raises:
+        BacktestValidationError: If timeframe is absent or blank.
+    Side Effects:
+        None.
+    """
+    timeframe = created_run.timeframe
+    if timeframe is None or not timeframe.strip():
+        raise BacktestValidationError("persisted run requires timeframe metadata")
+    return timeframe
 
 
 def _artifact_pin_from_response(*, response: RunBacktestResponse) -> BacktestJobArtifactPin:

@@ -11,7 +11,7 @@ from __future__ import annotations
 import asyncio
 from typing import Callable
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from apps.api.dto import (
     BacktestReportResponse,
@@ -127,10 +127,11 @@ def build_backtests_router(
     async def post_backtests(
         request: BacktestsPostRequest,
         http_request: Request,
+        http_response: Response,
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> BacktestsPostResponse:
         """
-        Execute deterministic sync backtest flow for saved/ad-hoc request envelope.
+        Launch deterministic `/backtests` flow for saved/ad-hoc request envelope.
 
         Docs:
           - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -142,9 +143,12 @@ def build_backtests_router(
 
         Args:
             request: Parsed strict API request payload.
+            http_response: Mutable HTTP response used for `200` vs `202 Accepted`.
             principal: Authenticated user principal resolved by identity dependency.
         Returns:
-            BacktestsPostResponse: Deterministic top-K response with reproducibility hashes.
+            BacktestsPostResponse:
+                Deterministic sync-inline result or explicit queued `background_auto` launch
+                response with reproducibility hashes.
         Assumptions:
             `POST /backtests` mode selection is `strategy_id xor template`.
         Raises:
@@ -173,6 +177,8 @@ def build_backtests_router(
             strategy_snapshot = None
             if request.strategy_id is not None and use_case_response.spec_hash is None:
                 strategy_snapshot = strategy_reader.load_any(strategy_id=request.strategy_id)
+            if use_case_response.execution_mode == "background_auto":
+                http_response.status_code = 202
             return build_backtests_post_response(
                 request=request,
                 response=use_case_response,
