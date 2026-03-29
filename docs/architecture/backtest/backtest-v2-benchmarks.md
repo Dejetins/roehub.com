@@ -12,8 +12,10 @@
 
 - Status: active benchmark/protocol reference for the delivered v2 runtime and summary-only UX.
 - Compatibility note:
-  - R10-02 synchronizes docs around the shipped runtime but does not claim R10-03 perf closure;
-  - benchmark/runbook expansion beyond this baseline remains pending under R10-03.
+  - R10-02 synchronized docs around the shipped runtime and left R10-03 for perf/runbook
+    closure only;
+  - R10-03 uses this document as the canonical benchmark protocol for legacy R0 reference,
+    artifact-backed v2 perf gates, and rollout evidence.
 
 ## Цель
 
@@ -83,6 +85,48 @@ R6-04 фиксирует полный runtime ranking contract и summary-only t
 - `indicator_compute_calls`: локальный proxy для текущего v1 signal/score compute path.
 
 R0 intentionally не фиксирует machine-specific SLA. Проверяется наличие метрик, shape и стабильность протокола, а не одинаковые абсолютные миллисекунды между машинами.
+
+## R10-03 closure protocol
+
+R10-03 не меняет runtime/API contract. Closure фиксируется через один deterministic protocol
+поверх тех же `r0_benchmark_scenarios.json` fixtures:
+
+- legacy reference path:
+  - direct `BacktestStagedRunnerV1` + `CloseFillBacktestStagedScorerV1`;
+  - benchmark остаётся approved R0 baseline и больше не идёт через `RunBacktestUseCase`,
+    потому что production launch после R10-01 уже artifact-backed.
+- artifact-backed path:
+  - real `RunBacktestUseCase`;
+  - strict local artifact tree;
+  - active engine semantics: `signal_tf + 1m_risk`.
+
+### Acceptance thresholds
+
+- `0 CH calls on hot path`
+- `0 IndicatorCompute.compute(...) calls on hot path`
+- measurable speedup reference:
+  - `hot_path_external_calls_total =
+    clickhouse_hot_path_calls + indicator_compute_calls`
+  - artifact-backed v2 must reduce this counter relative to the approved R0 baseline for every
+    representative scenario;
+  - current fixture contract encodes `expected_hot_path_cost_reduction_min=2`, which means one
+    legacy ClickHouse bootstrap proxy and one legacy indicator-compute hot-path call are both
+    eliminated.
+- `wall_clock_seconds` и `cpu_time_seconds` продолжают сниматься для operator diagnostics, но не
+  становятся CI SLA, потому что на synthetic artifact store они чувствительны к локальному disk
+  IO и mmap behavior.
+
+### Closure matrix
+
+| R10-03 scope item | Canonical verification |
+|---|---|
+| Legacy R0 reference remains executable | `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py::test_r0_baseline_perf_smoke_collects_metric_snapshots` |
+| `0 CH calls on hot path` | `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py::test_r10_artifact_v2_perf_gates_reduce_hot_path_cost_vs_r0_baseline` |
+| `0 IndicatorCompute.compute(...) calls on hot path` | `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py::test_r10_artifact_v2_perf_gates_reduce_hot_path_cost_vs_r0_baseline` |
+| Stage B `signal_tf + 1m_risk` fixture baseline | `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py` |
+| Background execution compatibility semantics | `tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py` |
+| Summary-only persisted runs/history/detail compatibility | `tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_api_v1.py`, `tests/unit/apps/api/test_backtests_routes.py` |
+| Rollout / rollback operations | `docs/runbooks/backtest-rollout-rollback.md` |
 
 ## Parity fixture scope
 
@@ -155,6 +199,9 @@ R0 intentionally не фиксирует machine-specific SLA. Проверяе�
 ```bash
 uv run pytest -q tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
 ```
+
+Эта команда теперь покрывает и legacy R0 reference, и R10-03 artifact-backed zero-call perf
+gates.
 
 2. Проверить R5-03 executable Stage B baseline:
 

@@ -14,7 +14,10 @@
       "top_k": 5,
       "preselect": 6,
       "top_trades_n": 2,
-      "expected_clickhouse_hot_path_calls": 1
+      "expected_clickhouse_hot_path_calls": 1,
+      "expected_v2_clickhouse_hot_path_calls": 0,
+      "expected_v2_indicator_compute_calls": 0,
+      "expected_hot_path_cost_reduction_min": 2
     },
     {
       "scenario_id": "large-run",
@@ -28,7 +31,10 @@
       "top_k": 8,
       "preselect": 8,
       "top_trades_n": 2,
-      "expected_clickhouse_hot_path_calls": 1
+      "expected_clickhouse_hot_path_calls": 1,
+      "expected_v2_clickhouse_hot_path_calls": 0,
+      "expected_v2_indicator_compute_calls": 0,
+      "expected_hot_path_cost_reduction_min": 2
     },
     {
       "scenario_id": "background-run",
@@ -42,7 +48,10 @@
       "top_k": 10,
       "preselect": 10,
       "top_trades_n": 1,
-      "expected_clickhouse_hot_path_calls": 1
+      "expected_clickhouse_hot_path_calls": 1,
+      "expected_v2_clickhouse_hot_path_calls": 0,
+      "expected_v2_indicator_compute_calls": 0,
+      "expected_hot_path_cost_reduction_min": 2
     }
   ]
 }

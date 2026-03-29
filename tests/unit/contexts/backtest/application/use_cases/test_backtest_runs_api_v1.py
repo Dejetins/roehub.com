@@ -406,7 +406,15 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_job.state == "succeeded"
     assert repo.created_job.market_id == 1
     assert repo.created_job.symbol == "BTCUSDT"
+    assert repo.created_job.timeframe == "1m"
     assert repo.created_job.requested_top_n == 2
+    assert repo.created_job.ranking_primary_metric == "total_return_pct"
+    assert repo.created_job.ranking_secondary_metric is None
+    assert repo.created_job.artifact_pin is not None
+    assert repo.created_job.artifact_pin.artifact_slot == "slot_b"
+    assert repo.created_job.artifact_pin.artifact_slot_generation == 11
+    assert repo.created_job.artifact_pin.artifact_manifest_hash == "c" * 64
+    assert repo.created_job.artifact_pin.artifact_asof_date == "2026-03-28"
     assert repo.created_job.request_json["template"]["execution"]["fee_pct"] == 0.075
     assert repo.created_job.request_json["template"]["direction_mode"] == "long-short"
     assert len(repo.created_rows) == 1

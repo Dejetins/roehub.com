@@ -1330,6 +1330,17 @@
 **DoD:**
 - migration считается завершённой только после прохождения test/perf/runbook closure.
 
+**Closure matrix (R10-03):**
+
+| Scope item | Canonical closure evidence |
+|---|---|
+| artifact validators / slot publish / pinning | `tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py`, `tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py` |
+| signal/mapping/hit-times loaders | `tests/unit/contexts/backtest/application/services/v2/test_signal_matrix_loader_v2.py`, `tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py` |
+| Stage A / Stage B kernels | `tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py`, `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py`, `tests/unit/contexts/backtest/application/services/v2/test_metrics_kernel_v2.py`, `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py` |
+| persisted run storage / history/detail compatibility | `tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_api_v1.py`, `tests/unit/apps/api/test_backtests_routes.py` |
+| perf gates and measurable speedup reference | `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py` |
+| artifact rebuild / background troubleshooting / rollout-rollback | `docs/runbooks/backtest-artifacts-rebuild.md`, `docs/runbooks/backtest-job-runner.md`, `docs/runbooks/backtest-rollout-rollback.md` |
+
 **Основные документы:**
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`

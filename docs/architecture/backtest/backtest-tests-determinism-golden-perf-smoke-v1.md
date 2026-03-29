@@ -12,6 +12,19 @@
 - Добавить “golden” тесты: один и тот же вход -> идентичный строковый отчёт (`report.table_md`) и ключевые числа.
 - Добавить perf-smoke тест: небольшой sync grid в пределах guards, без тяжёлых интеграционных прогонов.
 
+## R10-03 closure note
+
+Этот документ остаётся historical reference для legacy staged baseline и deterministic testing
+patterns, но после R10-01 / R10-02 active perf closure выглядит так:
+
+- legacy staged runner остаётся только approved R0 reference path;
+- production hot path проверяется отдельно через artifact-backed `signal_tf + 1m_risk` runtime;
+- zero-call guarantees и benchmark closure теперь живут в:
+  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+  - `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py`
+- summary-only persistence invariants (`report_table_md=NULL`, `trades_json=NULL`) продолжают
+  проверяться в runs/job API tests, а не в legacy staged perf-smoke.
+
 ## Контекст
 
 - Backtest v1 реализован по staged pipeline v1 (Stage A shortlist -> Stage B top-K):
@@ -122,6 +135,15 @@ Golden строки хранятся как ASCII `.md` и сравнивают�
 Связанные файлы:
 - `src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py` (signal cache)
 - `src/trading/contexts/backtest/application/services/staged_runner_v1.py`
+
+R10-03 additive clarification:
+
+- perf gate protocol теперь prioritizes counters/invariants over wall-clock absolutes;
+- canonical literals for closure:
+  - `0 CH calls on hot path`
+  - `0 IndicatorCompute.compute(...) calls on hot path`
+- measurable speedup against R0 is expressed through eliminated hot-path external-call cost,
+  while `wall_clock_seconds` / `cpu_time_seconds` remain diagnostic-only measurements.
 
 ## Контракты и инварианты
 

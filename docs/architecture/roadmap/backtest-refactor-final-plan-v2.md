@@ -1351,6 +1351,11 @@ Update note after R10-01 / R10-02:
   `summary-only` persisted history.
 - После этого final plan остаётся semantic source-of-truth, а незакрытым handoff остаётся только
   R10-03 perf/runbook closure.
+- R10-03 closure не добавляет новый runtime/API surface и должна завершаться только через:
+  - deterministic test closure;
+  - benchmark protocol c `0 CH calls on hot path` и
+    `0 IndicatorCompute.compute(...) calls on hot path`;
+  - explicit rollout / rollback runbook.
 
 ### Создать
 
@@ -1359,6 +1364,7 @@ Update note after R10-01 / R10-02:
 - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
+- `docs/runbooks/backtest-rollout-rollback.md`
 - `docs/architecture/backtest/backtest-runs-history-v2.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 

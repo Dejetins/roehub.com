@@ -2,6 +2,17 @@
 
 Ранбук для worker-процесса `backtest-job-runner`, который используется в Backtest Jobs v1.
 
+## Status
+
+- Status: active operational runbook after R10-01 / R10-02 / R10-03 closure.
+- Compatibility note:
+  - queued/running rows могут иметь `execution_mode=background_auto` или
+    `execution_mode=background_manual_legacy`;
+  - claimed hot path не должен обращаться к ClickHouse и не должен вызывать
+    `IndicatorCompute.compute(...)`;
+  - persisted summary rows остаются summary-only:
+    `report_table_md=NULL`, `trades_json=NULL`.
+
 ## 1) Область и ссылки
 
 Этот ранбук покрывает:
@@ -91,6 +102,25 @@ curl -fsS http://127.0.0.1:9204/metrics | head
 - `locked_by`
 - `stage`
 - `event`
+- `execution_mode`
+- `artifact_slot`
+- `artifact_manifest_hash`
+
+## 5.1 Closure smoke после rollout
+
+Команда минимальной проверки после релиза worker/API/runtime:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py \
+  tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+```
+
+Ожидаемый результат:
+
+- background path продолжает читать pinned artifacts;
+- `0 CH calls on hot path`;
+- `0 IndicatorCompute.compute(...) calls on hot path`.
 
 ## 6) Диагностика зависших jobs
 
@@ -213,3 +243,20 @@ Round trip smoke:
 - Некорректные значения `CH_*`: startup падает в loader настроек ClickHouse.
 - Jobs отключены toggle-ом: проверьте конфиг `backtest.jobs.enabled=false`.
 - Растёт failed counter: проверьте `last_error` и `last_error_json` в `backtest_jobs`.
+- `background_auto` остаётся в `queued` без перехода к `running`: проверить worker toggle,
+  claim loop и lease SQL.
+- `background_manual_legacy` или `background_auto` падает с pin/manifest drift:
+  проверить `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`,
+  `artifact_asof_date` на row и соответствие published slot.
+- В `/top` появились `report_table_md` или `trades_json`: это regression, потому что worker
+  snapshots и terminal persisted rows должны оставаться summary-only.
+
+## 11) Когда нужен rollback
+
+Rollback запускать по `docs/runbooks/backtest-rollout-rollback.md`, если наблюдается хотя бы один
+из признаков:
+
+- repeated `event=job_failed` без локально исправимой request-ошибки;
+- unexpected hot-path dependency on ClickHouse или `IndicatorCompute.compute(...)`;
+- pin drift между claimed rows и published slot;
+- массовое зависание `queued|running` runs после rollout.

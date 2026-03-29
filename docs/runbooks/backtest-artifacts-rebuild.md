@@ -303,6 +303,52 @@ uv run pytest -q \
 - если pin guard сработал, нужно дождаться terminal state блокирующих jobs или явно отменить их по штатной процедуре;
 - ручное редактирование `current.yaml` или manual cleanup slot contents вне процедуры запрещены.
 
+## R10-03 closure checks
+
+После rebuild/publish оператор должен выполнить closure-oriented verification именно в этом
+порядке:
+
+1. pointer и manifests:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py
+```
+
+2. loaders / slot-pinned bootstrap:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_resolver_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_signal_matrix_loader_v2.py
+```
+
+3. perf closure smoke:
+
+```bash
+uv run pytest -q \
+  tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+```
+
+Ожидаемый результат:
+
+- published runtime проходит с `0 CH calls on hot path`;
+- published runtime проходит с `0 IndicatorCompute.compute(...) calls on hot path`;
+- current slot продолжает быть пригоден и для sync launch, и для `execution_mode in
+  ('background_auto', 'background_manual_legacy')`.
+
+Стоп-условия:
+
+- любой validator diagnostic;
+- `inactive_slot_pinned`;
+- perf smoke failure;
+- mismatch между `current.yaml` и root `manifest.yaml`.
+
+При любом из этих stop conditions переходить к
+`docs/runbooks/backtest-rollout-rollback.md`, а не выполнять ручные правки slot contents.
+
 ## После изменения документации
 
 - `python -m tools.docs.generate_docs_index`

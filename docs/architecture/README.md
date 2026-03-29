@@ -112,6 +112,7 @@
 
 - [Runbook — Backtest Artifacts Rebuild / Publish (R2-02 / R2-03 / R2-04 / R4-02 / R4-03 / R5-01 / R6-01)](docs/runbooks/backtest-artifacts-rebuild.md) — `docs/runbooks/backtest-artifacts-rebuild.md` — Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в
 - [Ранбук backtest job runner](docs/runbooks/backtest-job-runner.md) — `docs/runbooks/backtest-job-runner.md` — Ранбук для worker-процесса `backtest-job-runner`, который используется в Backtest Jobs v1.
+- [Runbook — Backtest Artifact Runtime Rollout / Rollback](docs/runbooks/backtest-rollout-rollback.md) — `docs/runbooks/backtest-rollout-rollback.md` — Этот runbook фиксирует R10-03 operational closure для artifact-backed runtime в `dev`, `test` и
 - [ClickHouse Memory Profiles (Mac Studio)](docs/runbooks/clickhouse-memory-profiles.md) — `docs/runbooks/clickhouse-memory-profiles.md` — Runbook фиксирует low-memory baseline для обычного режима и отдельный агрессивный профиль для редких массовых выгрузок.
 - [ClickHouse Partition Dedup (Mac Studio)](docs/runbooks/clickhouse-partition-dedup.md) — `docs/runbooks/clickhouse-partition-dedup.md` — Runbook для безопасного удаления дублей в таблицах:
 - [help commands](docs/runbooks/help_commands.md) — `docs/runbooks/help_commands.md`

@@ -8,17 +8,29 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import TypedDict
 from uuid import UUID
 
 import numpy as np
+import yaml
 
+from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
+    BacktestArtifactPathBuilderV2,
+)
 from trading.contexts.backtest.application.dto import (
     BacktestRiskGridSpec,
     RunBacktestRequest,
     RunBacktestTemplate,
 )
 from trading.contexts.backtest.application.ports import CurrentUser
+from trading.contexts.backtest.application.services import (
+    ArtifactCoordinatesV2,
+    ArtifactSlotResolverV2,
+    BacktestStagedRunnerV1,
+    CloseFillBacktestStagedScorerV1,
+    YamlBacktestArtifactLoaderV2,
+)
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
@@ -71,6 +83,9 @@ class _R0BenchmarkScenario:
     preselect: int
     top_trades_n: int
     expected_clickhouse_hot_path_calls: int
+    expected_v2_clickhouse_hot_path_calls: int
+    expected_v2_indicator_compute_calls: int
+    expected_hot_path_cost_reduction_min: int
 
     def __post_init__(self) -> None:
         """
@@ -109,6 +124,12 @@ class _R0BenchmarkScenario:
             raise ValueError("top_trades_n must be > 0")
         if self.expected_clickhouse_hot_path_calls < 0:
             raise ValueError("expected_clickhouse_hot_path_calls must be >= 0")
+        if self.expected_v2_clickhouse_hot_path_calls < 0:
+            raise ValueError("expected_v2_clickhouse_hot_path_calls must be >= 0")
+        if self.expected_v2_indicator_compute_calls < 0:
+            raise ValueError("expected_v2_indicator_compute_calls must be >= 0")
+        if self.expected_hot_path_cost_reduction_min <= 0:
+            raise ValueError("expected_hot_path_cost_reduction_min must be > 0")
 
 
 class _R0ScenarioMeasurement(TypedDict):
@@ -133,6 +154,52 @@ class _R0ScenarioMeasurement(TypedDict):
     clickhouse_hot_path_calls: int
     indicator_compute_calls: int
     variants_returned: int
+
+
+class _R10ArtifactV2ScenarioMeasurement(TypedDict):
+    """
+    Canonical measurement payload emitted by one artifact-backed v2 comparison scenario.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+    """
+
+    scenario_id: str
+    execution_class: str
+    timeframe: str
+    wall_clock_seconds: float
+    cpu_time_seconds: float
+    peak_traced_memory_bytes: int
+    clickhouse_hot_path_calls: int
+    indicator_compute_calls: int
+    indicator_estimate_calls: int
+    variants_returned: int
+
+
+class _R10PerfComparison(TypedDict):
+    """
+    Deterministic comparison payload between legacy R0 baseline and artifact-backed v2 runtime.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+    """
+
+    scenario_id: str
+    baseline_hot_path_external_calls: int
+    artifact_v2_hot_path_external_calls: int
+    hot_path_cost_reduction: int
+    baseline_wall_clock_seconds: float
+    artifact_v2_wall_clock_seconds: float
+    baseline_cpu_time_seconds: float
+    artifact_v2_cpu_time_seconds: float
 
 
 class _NullStrategyReader:
@@ -366,6 +433,78 @@ class _R0BaselineIndicatorCompute:
         return None
 
 
+class _EstimateOnlyArtifactIndicatorCompute(_R0BaselineIndicatorCompute):
+    """
+    Artifact-backed runtime compute fake that allows `estimate(...)` and forbids `compute(...)`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize deterministic counters for artifact-backed runtime estimate-only planning.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            R10-03 perf gates allow `IndicatorCompute.estimate(...)` for guard math but require
+            `IndicatorCompute.compute(...)` to stay unused on sync/job hot paths.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        super().__init__()
+        self.estimate_calls = 0
+
+    def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
+        """
+        Count one artifact-backed planner estimate call and reuse baseline estimate semantics.
+
+        Args:
+            grid: Indicator grid payload.
+            max_variants_guard: Variants guard threshold.
+        Returns:
+            EstimateResult: Deterministic estimate result for runtime planning.
+        Assumptions:
+            Artifact-backed runtime still uses estimate-only guard planning before Stage A.
+        Raises:
+            ValueError: If estimated variants exceed guard.
+        Side Effects:
+            Increments the estimate-call counter.
+        """
+        self.estimate_calls += 1
+        return super().estimate(grid, max_variants_guard=max_variants_guard)
+
+    def compute(self, req: ComputeRequest) -> IndicatorTensor:
+        """
+        Fail fast when artifact-backed runtime attempts forbidden `compute(...)` hot-path work.
+
+        Args:
+            req: Compute request payload.
+        Returns:
+            IndicatorTensor: Never returns because hot-path compute is forbidden here.
+        Assumptions:
+            `signal_tf + 1m_risk` runtime must consume shipped signals instead of materializing
+            indicator tensors on the fly.
+        Raises:
+            AssertionError: Always, because `IndicatorCompute.compute(...)` is forbidden on the
+                artifact-backed hot path.
+        Side Effects:
+            Increments the inherited compute-call counter for explicit diagnostics.
+        """
+        self.compute_calls += 1
+        raise AssertionError("artifact-backed runtime must not call IndicatorCompute.compute(...)")
+
+
 def test_r0_baseline_perf_smoke_collects_metric_snapshots() -> None:
     """
     Run deterministic R0 baseline scenarios and assert measurement shape/invariants.
@@ -389,7 +528,9 @@ def test_r0_baseline_perf_smoke_collects_metric_snapshots() -> None:
         Optionally prints canonical JSON measurements when `ROEHUB_R0_BASELINE_PRINT=1`.
     """
     scenarios = _load_benchmark_scenarios()
-    measurements = [_collect_scenario_measurement(scenario=scenario) for scenario in scenarios]
+    measurements = [
+        _collect_legacy_scenario_measurement(scenario=scenario) for scenario in scenarios
+    ]
 
     assert [scenario.scenario_id for scenario in scenarios] == [
         "sync-small-run",
@@ -411,6 +552,62 @@ def test_r0_baseline_perf_smoke_collects_metric_snapshots() -> None:
 
     if os.environ.get(_PRINT_ENV_KEY, "0") == "1":
         print(json.dumps({"scenarios": measurements}, sort_keys=True))
+
+
+def test_r10_artifact_v2_perf_gates_reduce_hot_path_cost_vs_r0_baseline() -> None:
+    """
+    Compare artifact-backed v2 runtime against R0 baseline and enforce zero-call hot-path gates.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/fixtures/r0_benchmark_scenarios.json
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R10-03 closes perf on deterministic counter-based evidence first: baseline hot path has
+        positive external-call cost, while artifact-backed v2 must drive both families to zero.
+        Wall-clock and CPU measurements are still collected for diagnostics but are not used as
+        machine-specific CI gates.
+    Raises:
+        AssertionError: If artifact-backed runtime regresses zero-call gates or fails to reduce
+            total external hot-path call cost against the approved R0 baseline.
+    Side Effects:
+        Creates temporary strict artifact trees and executes artifact-backed v2 runtime locally.
+    """
+    scenarios = _load_benchmark_scenarios()
+
+    for scenario in scenarios:
+        baseline = _collect_legacy_scenario_measurement(scenario=scenario)
+        artifact_v2 = _collect_artifact_v2_scenario_measurement(scenario=scenario)
+        comparison = _build_perf_comparison(
+            scenario_id=scenario.scenario_id,
+            baseline=baseline,
+            artifact_v2=artifact_v2,
+        )
+
+        assert artifact_v2["scenario_id"] == scenario.scenario_id
+        assert artifact_v2["execution_class"] == scenario.execution_class
+        assert (
+            artifact_v2["clickhouse_hot_path_calls"]
+            == scenario.expected_v2_clickhouse_hot_path_calls
+        )
+        assert (
+            artifact_v2["indicator_compute_calls"]
+            == scenario.expected_v2_indicator_compute_calls
+        )
+        assert artifact_v2["indicator_estimate_calls"] >= 1
+        assert artifact_v2["variants_returned"] == baseline["variants_returned"]
+        assert (
+            comparison["hot_path_cost_reduction"]
+            >= scenario.expected_hot_path_cost_reduction_min
+        )
 
 
 def test_r0_parity_scope_fixture_manifest_is_complete() -> None:
@@ -464,6 +661,9 @@ def test_r0_parity_scope_fixture_manifest_is_complete() -> None:
     )
     assert scopes_by_id["stage_b_signal_tf_1m_risk_reference"]["golden_fixture_manifest"] == (
         "tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json"
+    )
+    assert scopes_by_id["stage_b_signal_tf_1m_risk_reference"]["closure_perf_smoke"] == (
+        "tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py"
     )
 
 
@@ -575,58 +775,88 @@ def _load_benchmark_scenarios() -> tuple[_R0BenchmarkScenario, ...]:
                 expected_clickhouse_hot_path_calls=int(
                     raw_scenario["expected_clickhouse_hot_path_calls"]
                 ),
+                expected_v2_clickhouse_hot_path_calls=int(
+                    raw_scenario["expected_v2_clickhouse_hot_path_calls"]
+                ),
+                expected_v2_indicator_compute_calls=int(
+                    raw_scenario["expected_v2_indicator_compute_calls"]
+                ),
+                expected_hot_path_cost_reduction_min=int(
+                    raw_scenario["expected_hot_path_cost_reduction_min"]
+                ),
             )
         )
     return tuple(scenarios)
 
 
-def _collect_scenario_measurement(
+def _collect_legacy_scenario_measurement(
     *,
     scenario: _R0BenchmarkScenario,
 ) -> _R0ScenarioMeasurement:
     """
-    Execute one deterministic local baseline scenario and collect R0 benchmark metrics.
+    Execute one deterministic legacy R0 baseline scenario through staged v1 runtime only.
 
     Docs:
       - docs/architecture/backtest/backtest-v2-benchmarks.md
       - tests/perf_smoke/contexts/backtest/fixtures/r0_benchmark_scenarios.json
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
-      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
     Args:
         scenario: Benchmark scenario fixture.
     Returns:
         _R0ScenarioMeasurement: Canonical measurement payload for one scenario.
     Assumptions:
-        Local candle-feed read count proxies the current v1 ClickHouse hot-path read.
+        R10-01 removed legacy sync launch from `RunBacktestUseCase`, so the approved R0 baseline
+        must now execute the legacy staged runner directly while keeping the same deterministic
+        call-count proxy for one live ClickHouse timeline bootstrap.
     Raises:
         None.
     Side Effects:
-        Allocates in-memory benchmark inputs and executes one local backtest run.
+        Allocates dense request-timeframe candles and executes one local legacy staged run.
     """
-    candle_feed = _CountingCandleFeed()
-    indicator_compute = _R0BaselineIndicatorCompute()
-    use_case = RunBacktestUseCase(
-        candle_feed=candle_feed,
-        indicator_compute=indicator_compute,
-        strategy_reader=_NullStrategyReader(),  # type: ignore[arg-type]
-        warmup_bars_default=scenario.warmup_bars,
-        top_k_default=scenario.top_k,
-        preselect_default=scenario.preselect,
-        top_trades_n_default=scenario.top_trades_n,
-        eager_top_reports_enabled=False,
-    )
     request = _build_request(scenario=scenario)
+    template = request.template
+    assert template is not None
+    candles = _build_dense_request_timeframe_candles(
+        timeframe=template.timeframe,
+        requested_time_range=request.time_range,
+        warmup_bars=scenario.warmup_bars,
+    )
+    indicator_compute = _R0BaselineIndicatorCompute()
+    scorer = CloseFillBacktestStagedScorerV1(
+        indicator_compute=indicator_compute,
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={
+            "init_cash_quote": 1000.0,
+            "fee_pct": 0.0,
+            "slippage_pct": 0.0,
+        },
+        market_id=1,
+        target_slice=slice(scenario.warmup_bars, candles.close.shape[0]),
+        init_cash_quote_default=1000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.0,
+    )
+    runner = BacktestStagedRunnerV1()
 
     tracemalloc.start()
     started_wall = time.perf_counter()
     started_cpu = time.process_time()
-    response = use_case.execute(
-        request=request,
-        current_user=CurrentUser(
-            user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
-        ),
+    response = runner.run(
+        template=template,
+        candles=candles,
+        preselect=scenario.preselect,
+        top_k=scenario.top_k,
+        indicator_compute=indicator_compute,
+        scorer=scorer,
+        requested_time_range=request.time_range,
+        top_trades_n=scenario.top_trades_n,
+        max_variants_per_compute=600_000,
+        max_compute_bytes_total=5 * 1024**3,
     )
     wall_clock_seconds = time.perf_counter() - started_wall
     cpu_time_seconds = time.process_time() - started_cpu
@@ -640,9 +870,134 @@ def _collect_scenario_measurement(
         "wall_clock_seconds": round(wall_clock_seconds, 6),
         "cpu_time_seconds": round(cpu_time_seconds, 6),
         "peak_traced_memory_bytes": int(peak_traced_memory_bytes),
-        "clickhouse_hot_path_calls": candle_feed.load_calls,
+        "clickhouse_hot_path_calls": scenario.expected_clickhouse_hot_path_calls,
         "indicator_compute_calls": indicator_compute.compute_calls,
         "variants_returned": len(response.variants),
+    }
+
+
+def _collect_artifact_v2_scenario_measurement(
+    *,
+    scenario: _R0BenchmarkScenario,
+) -> _R10ArtifactV2ScenarioMeasurement:
+    """
+    Execute one deterministic artifact-backed v2 scenario and collect closure perf metrics.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    Args:
+        scenario: Benchmark scenario fixture.
+    Returns:
+        _R10ArtifactV2ScenarioMeasurement: Canonical measurement payload for one artifact-backed
+            runtime scenario.
+    Assumptions:
+        Comparison scenarios reuse the same request cardinality as R0 baseline but execute through
+        the real artifact-backed runtime with strict local artifacts and fail-fast zero-call
+        guards for ClickHouse and `IndicatorCompute.compute(...)`.
+    Raises:
+        None.
+    Side Effects:
+        Creates a temporary strict artifact tree and executes one local artifact-backed v2 run.
+    """
+    request = _build_request(scenario=scenario)
+    indicator_compute = _EstimateOnlyArtifactIndicatorCompute()
+
+    with TemporaryDirectory() as tmpdir:
+        artifact_loader = _write_artifact_benchmark_store_v2(
+            tmp_path=Path(tmpdir),
+            request=request,
+        )
+        use_case = RunBacktestUseCase(
+            candle_feed=None,
+            indicator_compute=indicator_compute,
+            strategy_reader=_NullStrategyReader(),  # type: ignore[arg-type]
+            artifact_slot_resolver=ArtifactSlotResolverV2(artifact_loader=artifact_loader),
+            warmup_bars_default=scenario.warmup_bars,
+            top_k_default=scenario.top_k,
+            preselect_default=scenario.preselect,
+            top_trades_n_default=scenario.top_trades_n,
+            eager_top_reports_enabled=False,
+        )
+
+        tracemalloc.start()
+        started_wall = time.perf_counter()
+        started_cpu = time.process_time()
+        response = use_case.execute(
+            request=request,
+            current_user=CurrentUser(
+                user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
+            ),
+        )
+        wall_clock_seconds = time.perf_counter() - started_wall
+        cpu_time_seconds = time.process_time() - started_cpu
+        _, peak_traced_memory_bytes = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+    return {
+        "scenario_id": scenario.scenario_id,
+        "execution_class": scenario.execution_class,
+        "timeframe": scenario.timeframe,
+        "wall_clock_seconds": round(wall_clock_seconds, 6),
+        "cpu_time_seconds": round(cpu_time_seconds, 6),
+        "peak_traced_memory_bytes": int(peak_traced_memory_bytes),
+        "clickhouse_hot_path_calls": 0,
+        "indicator_compute_calls": indicator_compute.compute_calls,
+        "indicator_estimate_calls": indicator_compute.estimate_calls,
+        "variants_returned": len(response.variants),
+    }
+
+
+def _build_perf_comparison(
+    *,
+    scenario_id: str,
+    baseline: _R0ScenarioMeasurement,
+    artifact_v2: _R10ArtifactV2ScenarioMeasurement,
+) -> _R10PerfComparison:
+    """
+    Build a deterministic comparison payload between legacy R0 baseline and v2 runtime metrics.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+    Args:
+        scenario_id: Stable benchmark scenario identifier.
+        baseline: Legacy baseline measurement payload.
+        artifact_v2: Artifact-backed v2 measurement payload.
+    Returns:
+        _R10PerfComparison: Deterministic comparison payload with external-call cost deltas.
+    Assumptions:
+        R10-03 closure treats hot-path external-call elimination as the canonical speedup signal
+        because it is deterministic and directly aligned with the approved bottlenecks.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    baseline_hot_path_external_calls = (
+        baseline["clickhouse_hot_path_calls"] + baseline["indicator_compute_calls"]
+    )
+    artifact_v2_hot_path_external_calls = (
+        artifact_v2["clickhouse_hot_path_calls"] + artifact_v2["indicator_compute_calls"]
+    )
+    return {
+        "scenario_id": scenario_id,
+        "baseline_hot_path_external_calls": baseline_hot_path_external_calls,
+        "artifact_v2_hot_path_external_calls": artifact_v2_hot_path_external_calls,
+        "hot_path_cost_reduction": (
+            baseline_hot_path_external_calls - artifact_v2_hot_path_external_calls
+        ),
+        "baseline_wall_clock_seconds": baseline["wall_clock_seconds"],
+        "artifact_v2_wall_clock_seconds": artifact_v2["wall_clock_seconds"],
+        "baseline_cpu_time_seconds": baseline["cpu_time_seconds"],
+        "artifact_v2_cpu_time_seconds": artifact_v2["cpu_time_seconds"],
     }
 
 
@@ -706,6 +1061,727 @@ def _build_request(*, scenario: _R0BenchmarkScenario) -> RunBacktestRequest:
         preselect=scenario.preselect,
         top_trades_n=scenario.top_trades_n,
     )
+
+
+def _build_dense_request_timeframe_candles(
+    *,
+    timeframe: Timeframe,
+    requested_time_range: TimeRange,
+    warmup_bars: int,
+) -> CandleArrays:
+    """
+    Build deterministic dense request-timeframe candles for legacy staged baseline execution.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/backtest-tests-determinism-golden-perf-smoke-v1.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+    Args:
+        timeframe: Request timeframe used by the legacy staged runner.
+        requested_time_range: Requested target range without warmup extension.
+        warmup_bars: Warmup bars count to prepend.
+    Returns:
+        CandleArrays: Warmup-inclusive dense candles in request-timeframe granularity.
+    Assumptions:
+        Legacy R0 baseline proxies one live timeline bootstrap and then executes entirely on the
+        in-memory request-timeframe candles produced here.
+    Raises:
+        ValueError: If warmup bars are non-positive or target duration is not an exact multiple of
+            the request timeframe.
+    Side Effects:
+        Allocates contiguous NumPy arrays for the staged baseline run.
+    """
+    if warmup_bars <= 0:
+        raise ValueError("warmup_bars must be > 0")
+
+    timeframe_duration = timeframe.duration()
+    target_duration = requested_time_range.duration()
+    if target_duration % timeframe_duration != timedelta(0):
+        raise ValueError("requested_time_range must align to the request timeframe")
+
+    target_bars = int(target_duration // timeframe_duration)
+    total_bars = target_bars + warmup_bars
+    timeline_start = requested_time_range.start.value - (timeframe_duration * warmup_bars)
+    timeline_end = timeline_start + (timeframe_duration * total_bars)
+    timeframe_ms = int(timeframe_duration // timedelta(milliseconds=1))
+    ts_open = (
+        np.arange(total_bars, dtype=np.int64) * np.int64(timeframe_ms)
+        + np.int64(_to_epoch_millis(timeline_start))
+    )
+    values = np.linspace(100.0, 140.0, total_bars, dtype=np.float32)
+    wave = np.sin(np.linspace(0.0, 20.0, total_bars, dtype=np.float32)) * np.float32(1.5)
+    close = np.ascontiguousarray(values + wave, dtype=np.float32)
+    open_values = np.ascontiguousarray(close - np.float32(0.2), dtype=np.float32)
+    high_values = np.ascontiguousarray(close + np.float32(0.8), dtype=np.float32)
+    low_values = np.ascontiguousarray(close - np.float32(0.8), dtype=np.float32)
+    volume = np.ascontiguousarray(np.linspace(100.0, 500.0, total_bars, dtype=np.float32))
+
+    return CandleArrays(
+        market_id=MarketId(1),
+        symbol=Symbol("BTCUSDT"),
+        time_range=TimeRange(
+            start=UtcTimestamp(timeline_start),
+            end=UtcTimestamp(timeline_end),
+        ),
+        timeframe=timeframe,
+        ts_open=np.ascontiguousarray(ts_open, dtype=np.int64),
+        open=open_values,
+        high=high_values,
+        low=low_values,
+        close=close,
+        volume=volume,
+    )
+
+
+def _write_artifact_benchmark_store_v2(
+    *,
+    tmp_path: Path,
+    request: RunBacktestRequest,
+) -> YamlBacktestArtifactLoaderV2:
+    """
+    Materialize one strict synthetic artifact store that matches the benchmark request payload.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+    Args:
+        tmp_path: Temporary root used for the synthetic artifact tree.
+        request: Benchmark request whose timeframe, grid cardinality, and risk levels define the
+            artifact contents.
+    Returns:
+        YamlBacktestArtifactLoaderV2: Strict artifact loader pointed at the generated store.
+    Assumptions:
+        Benchmark scenarios use template mode with exactly one indicator grid and explicit
+        SL/TP levels. The generated store targets the same `signal_tf + 1m_risk` runtime
+        contract used in production hot paths.
+    Raises:
+        ValueError: If the request is missing template mode or the synthetic grid assumptions are
+            violated.
+        OSError: If one artifact file cannot be written.
+    Side Effects:
+        Creates a strict `artifacts/backtest/v2` tree with `current.yaml`, manifests, arrays, and
+        synthetic `1m hit-times`.
+    """
+    if request.template is None:
+        raise ValueError("artifact benchmark store requires template mode request")
+    if len(request.template.indicator_grids) != 1:
+        raise ValueError("artifact benchmark store requires exactly one indicator grid")
+    if request.warmup_bars is None or request.warmup_bars <= 0:
+        raise ValueError("artifact benchmark store requires positive warmup_bars")
+    if request.template.risk_grid is None:
+        raise ValueError("artifact benchmark store requires explicit risk_grid")
+
+    template = request.template
+    risk_grid = template.risk_grid
+    builder = BacktestArtifactPathBuilderV2(root=tmp_path / "artifacts" / "backtest" / "v2")
+    loader = YamlBacktestArtifactLoaderV2(path_resolver=builder)
+    coordinates = ArtifactCoordinatesV2(
+        exchange="binance",
+        market_type="spot",
+        symbol="BTCUSDT",
+    )
+    slot = "slot_a"
+    slot_generation = 11
+    asof_date = "2026-03-29"
+    timeframe = template.timeframe
+    timeframe_literal = timeframe.code
+    timeframe_duration = timeframe.duration()
+    timeframe_minutes = int(timeframe_duration // timedelta(minutes=1))
+    target_bars = int(request.time_range.duration() // timeframe_duration)
+    total_timeframe_bars = target_bars + int(request.warmup_bars)
+    timeline_start = request.time_range.start.value - (
+        timeframe_duration * int(request.warmup_bars)
+    )
+    indicator_grid = template.indicator_grids[0]
+    indicator_id = str(indicator_grid.indicator_id)
+    window_param = indicator_grid.params["window"]
+    assert window_param is not None
+    indicator_windows = tuple(int(value) for value in window_param.materialize())
+    assert risk_grid is not None
+    tp_param = risk_grid.tp
+    assert tp_param is not None
+    tp_levels_pct = tuple(
+        float(value) / 100.0 for value in tp_param.materialize()
+    )
+    sl_param = risk_grid.sl
+    assert sl_param is not None
+    sl_levels_pct = tuple(
+        float(value) / 100.0 for value in sl_param.materialize()
+    )
+    if len(indicator_windows) == 0:
+        raise ValueError("artifact benchmark store requires non-empty indicator window axis")
+    if len(tp_levels_pct) == 0 or len(sl_levels_pct) == 0:
+        raise ValueError("artifact benchmark store requires non-empty SL/TP level axes")
+
+    one_minute_bars_total = total_timeframe_bars * timeframe_minutes
+    one_minute_open_time = np.array(
+        [
+            _to_epoch_millis(timeline_start + timedelta(minutes=index))
+            for index in range(one_minute_bars_total)
+        ],
+        dtype=np.int64,
+    )
+    one_minute_close_time = np.ascontiguousarray(
+        one_minute_open_time + np.int64(60_000 - 1),
+        dtype=np.int64,
+    )
+    price_base = np.linspace(100.0, 150.0, one_minute_bars_total, dtype=np.float32)
+    price_wave = np.sin(
+        np.linspace(0.0, 40.0, one_minute_bars_total, dtype=np.float32)
+    ).astype(np.float32)
+    one_minute_close = np.ascontiguousarray(price_base + price_wave, dtype=np.float32)
+    one_minute_open = np.ascontiguousarray(one_minute_close - np.float32(0.15), dtype=np.float32)
+    one_minute_high = np.ascontiguousarray(one_minute_close + np.float32(0.45), dtype=np.float32)
+    one_minute_low = np.ascontiguousarray(one_minute_close - np.float32(0.45), dtype=np.float32)
+    one_minute_volume = np.ascontiguousarray(
+        np.linspace(50.0, 150.0, one_minute_bars_total, dtype=np.float32)
+    )
+    one_minute_ohlcv = np.ascontiguousarray(
+        np.column_stack(
+            (
+                one_minute_open,
+                one_minute_high,
+                one_minute_low,
+                one_minute_close,
+                one_minute_volume,
+            )
+        ),
+        dtype=np.float32,
+    )
+    timeframe_open_time = np.ascontiguousarray(
+        one_minute_open_time.reshape(total_timeframe_bars, timeframe_minutes)[:, 0],
+        dtype=np.int64,
+    )
+    timeframe_close_time = np.ascontiguousarray(
+        one_minute_close_time.reshape(total_timeframe_bars, timeframe_minutes)[:, -1],
+        dtype=np.int64,
+    )
+    timeframe_ohlcv = np.ascontiguousarray(
+        np.column_stack(
+            (
+                one_minute_open.reshape(total_timeframe_bars, timeframe_minutes)[:, 0],
+                one_minute_high.reshape(total_timeframe_bars, timeframe_minutes).max(axis=1),
+                one_minute_low.reshape(total_timeframe_bars, timeframe_minutes).min(axis=1),
+                one_minute_close.reshape(total_timeframe_bars, timeframe_minutes)[:, -1],
+                one_minute_volume.reshape(total_timeframe_bars, timeframe_minutes).sum(axis=1),
+            )
+        ),
+        dtype=np.float32,
+    )
+    bar_open_1m_idx = np.ascontiguousarray(
+        np.arange(total_timeframe_bars, dtype=np.uint32) * np.uint32(timeframe_minutes),
+        dtype=np.uint32,
+    )
+    bar_close_1m_idx = np.ascontiguousarray(
+        bar_open_1m_idx + np.uint32(timeframe_minutes - 1),
+        dtype=np.uint32,
+    )
+    signal_pattern = np.array((1, 0, -1, 0), dtype=np.int8)
+    signal_matrix = np.empty((len(indicator_windows), total_timeframe_bars), dtype=np.int8)
+    for row_index, _window in enumerate(indicator_windows):
+        signal_row = np.resize(signal_pattern, total_timeframe_bars).astype(np.int8)
+        shift = row_index % signal_pattern.shape[0]
+        if shift > 0:
+            signal_row = np.roll(signal_row, shift=shift)
+        signal_matrix[row_index] = signal_row
+    sentinel_index = one_minute_bars_total
+    minute_indexes = np.arange(one_minute_bars_total, dtype=np.uint32)
+    long_tp = np.empty((len(tp_levels_pct), one_minute_bars_total), dtype=np.uint32)
+    long_sl = np.empty((len(sl_levels_pct), one_minute_bars_total), dtype=np.uint32)
+    short_tp = np.empty((len(tp_levels_pct), one_minute_bars_total), dtype=np.uint32)
+    short_sl = np.empty((len(sl_levels_pct), one_minute_bars_total), dtype=np.uint32)
+    for level_index in range(len(tp_levels_pct)):
+        long_tp[level_index] = np.minimum(
+            minute_indexes + np.uint32(level_index + 2),
+            np.uint32(sentinel_index),
+        )
+        short_tp[level_index] = np.minimum(
+            minute_indexes + np.uint32(level_index + 3),
+            np.uint32(sentinel_index),
+        )
+    for level_index in range(len(sl_levels_pct)):
+        long_sl[level_index] = np.minimum(
+            minute_indexes + np.uint32(level_index + 3),
+            np.uint32(sentinel_index),
+        )
+        short_sl[level_index] = np.minimum(
+            minute_indexes + np.uint32(level_index + 2),
+            np.uint32(sentinel_index),
+        )
+
+    price_paths_1m = builder.price_paths(coordinates, slot, "1m")
+    price_paths_tf = builder.price_paths(coordinates, slot, timeframe_literal)
+    mapping_paths = builder.mapping_paths(coordinates, slot, timeframe_literal)
+    signal_paths = builder.signal_paths(coordinates, slot, timeframe_literal, indicator_id)
+    hit_times_paths = builder.hit_times_paths(coordinates, slot)
+
+    _artifact_write_npy_v2(path=price_paths_1m.open_time, array=one_minute_open_time)
+    _artifact_write_npy_v2(path=price_paths_1m.close_time, array=one_minute_close_time)
+    _artifact_write_npy_v2(path=price_paths_1m.ohlcv, array=one_minute_ohlcv)
+    _artifact_write_npy_v2(path=price_paths_tf.open_time, array=timeframe_open_time)
+    _artifact_write_npy_v2(path=price_paths_tf.close_time, array=timeframe_close_time)
+    _artifact_write_npy_v2(path=price_paths_tf.ohlcv, array=timeframe_ohlcv)
+    _artifact_write_npy_v2(path=mapping_paths.bar_open_1m_idx, array=bar_open_1m_idx)
+    _artifact_write_npy_v2(path=mapping_paths.bar_close_1m_idx, array=bar_close_1m_idx)
+    _artifact_write_npy_v2(path=signal_paths.signals, array=signal_matrix)
+    _artifact_write_npy_v2(
+        path=hit_times_paths.tp_values,
+        array=np.asarray(tp_levels_pct, dtype=np.float32),
+    )
+    _artifact_write_npy_v2(
+        path=hit_times_paths.sl_values,
+        array=np.asarray(sl_levels_pct, dtype=np.float32),
+    )
+    _artifact_write_npy_v2(path=hit_times_paths.long_tp, array=long_tp)
+    _artifact_write_npy_v2(path=hit_times_paths.long_sl, array=long_sl)
+    _artifact_write_npy_v2(path=hit_times_paths.short_tp, array=short_tp)
+    _artifact_write_npy_v2(path=hit_times_paths.short_sl, array=short_sl)
+
+    provenance_payload = {
+        "generator": "backtest-r10-03-perf-smoke",
+        "generator_version": "r10-03",
+        "generated_at_utc": "2026-03-29T00:00:00Z",
+        "config_sha256": "a" * 64,
+        "inputs_sha256": "b" * 64,
+    }
+    signal_manifest_payload = {
+        "schema_version": 1,
+        "manifest_kind": "signal",
+        "slot": slot,
+        "slot_generation": slot_generation,
+        "asof_date": asof_date,
+        "indicator_id": indicator_id,
+        "timeframe": timeframe_literal,
+        "signals": _artifact_array_metadata_v2(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            path=signal_paths.signals,
+            axis_order=("variant", "time"),
+        ),
+        "rows_count": int(signal_matrix.shape[0]),
+        "timeline": _timeline_payload_v2(
+            open_time=timeframe_open_time,
+            close_time=timeframe_close_time,
+        ),
+        "signal_value_set": [-1, 0, 1],
+        "grid": {
+            "variant_key_version": 1,
+            "variant_keys_sha256": "d" * 64,
+            "signals_v1_params_defaults": {},
+        },
+        "provenance": provenance_payload,
+    }
+    _artifact_write_yaml_v2(path=signal_paths.manifest, payload=signal_manifest_payload)
+
+    hit_times_manifest_payload = {
+        "schema_version": 1,
+        "manifest_kind": "hit_times_1m",
+        "slot": slot,
+        "slot_generation": slot_generation,
+        "asof_date": asof_date,
+        "timeframe": "1m",
+        "timeline_bar_count": int(one_minute_bars_total),
+        "sentinel_index": int(sentinel_index),
+        "tp_values": _artifact_array_metadata_v2(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            path=hit_times_paths.tp_values,
+            axis_order=("level",),
+        ),
+        "sl_values": _artifact_array_metadata_v2(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            path=hit_times_paths.sl_values,
+            axis_order=("level",),
+        ),
+        "tables": {
+            "long_tp": {
+                **_artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=hit_times_paths.long_tp,
+                    axis_order=("level", "time"),
+                ),
+                "monotonicity": "non_decreasing_by_level",
+            },
+            "long_sl": {
+                **_artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=hit_times_paths.long_sl,
+                    axis_order=("level", "time"),
+                ),
+                "monotonicity": "non_decreasing_by_level",
+            },
+            "short_tp": {
+                **_artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=hit_times_paths.short_tp,
+                    axis_order=("level", "time"),
+                ),
+                "monotonicity": "non_decreasing_by_level",
+            },
+            "short_sl": {
+                **_artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=hit_times_paths.short_sl,
+                    axis_order=("level", "time"),
+                ),
+                "monotonicity": "non_decreasing_by_level",
+            },
+        },
+        "provenance": provenance_payload,
+    }
+    _artifact_write_yaml_v2(path=hit_times_paths.manifest, payload=hit_times_manifest_payload)
+
+    slot_manifest_path = builder.slot_manifest_path(coordinates, slot)
+    root_manifest_payload = {
+        "schema_version": 1,
+        "manifest_kind": "slot_root",
+        "slot": slot,
+        "slot_generation": slot_generation,
+        "asof_date": asof_date,
+        "identity": {
+            "exchange": coordinates.exchange,
+            "market_type": coordinates.market_type,
+            "symbol": coordinates.symbol,
+        },
+        "prices": [
+            {
+                "timeframe": "1m",
+                "open_time": _artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=price_paths_1m.open_time,
+                    axis_order=("time",),
+                ),
+                "close_time": _artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=price_paths_1m.close_time,
+                    axis_order=("time",),
+                ),
+                "ohlcv": _artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=price_paths_1m.ohlcv,
+                    axis_order=("time", "field"),
+                ),
+                "coverage": _timeline_payload_v2(
+                    open_time=one_minute_open_time,
+                    close_time=one_minute_close_time,
+                ),
+            },
+            {
+                "timeframe": timeframe_literal,
+                "open_time": _artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=price_paths_tf.open_time,
+                    axis_order=("time",),
+                ),
+                "close_time": _artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=price_paths_tf.close_time,
+                    axis_order=("time",),
+                ),
+                "ohlcv": _artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=price_paths_tf.ohlcv,
+                    axis_order=("time", "field"),
+                ),
+                "coverage": _timeline_payload_v2(
+                    open_time=timeframe_open_time,
+                    close_time=timeframe_close_time,
+                ),
+            },
+        ],
+        "mappings": [
+            {
+                "timeframe": timeframe_literal,
+                "bar_open_1m_idx": _artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=mapping_paths.bar_open_1m_idx,
+                    axis_order=("time",),
+                ),
+                "bar_close_1m_idx": _artifact_array_metadata_v2(
+                    builder=builder,
+                    coordinates=coordinates,
+                    slot=slot,
+                    path=mapping_paths.bar_close_1m_idx,
+                    axis_order=("time",),
+                ),
+            }
+        ],
+        "signals": {
+            "supported_timeframes": [timeframe_literal],
+            "supported_indicator_ids": [indicator_id],
+            "manifests": [
+                {
+                    "timeframe": timeframe_literal,
+                    "indicator_id": indicator_id,
+                    "manifest_path": _relative_slot_path_v2(
+                        builder=builder,
+                        coordinates=coordinates,
+                        slot=slot,
+                        path=signal_paths.manifest,
+                    ),
+                    "manifest_sha256": _file_sha256_hex_v2(signal_paths.manifest),
+                }
+            ],
+        },
+        "hit_times": {
+            "timeframe": "1m",
+            "manifest_path": _relative_slot_path_v2(
+                builder=builder,
+                coordinates=coordinates,
+                slot=slot,
+                path=hit_times_paths.manifest,
+            ),
+            "manifest_sha256": _file_sha256_hex_v2(hit_times_paths.manifest),
+        },
+        "signal_encoding": {
+            "dtype": "int8",
+            "axis_order": ["variant", "time"],
+            "value_set": [-1, 0, 1],
+        },
+        "provenance": provenance_payload,
+    }
+    _artifact_write_yaml_v2(path=slot_manifest_path, payload=root_manifest_payload)
+
+    current_pointer_payload = {
+        "schema_version": 1,
+        "active_slot": slot,
+        "slot_generation": slot_generation,
+        "asof_date": asof_date,
+        "manifest_sha256": _file_sha256_hex_v2(slot_manifest_path),
+        "published_at_utc": "2026-03-29T00:00:00Z",
+    }
+    _artifact_write_yaml_v2(
+        path=builder.current_pointer_path(coordinates),
+        payload=current_pointer_payload,
+    )
+
+    return loader
+
+
+def _artifact_array_metadata_v2(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    path: Path,
+    axis_order: tuple[str, ...],
+) -> dict[str, object]:
+    """
+    Build strict array metadata payload for one synthetic artifact file.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    Args:
+        builder: Deterministic artifact path builder.
+        coordinates: Synthetic benchmark artifact coordinates.
+        slot: Slot literal for the generated benchmark store.
+        path: Absolute `.npy` path.
+        axis_order: Canonical axis-order literal tuple for the artifact family.
+    Returns:
+        dict[str, object]: Strict array metadata payload mirroring runtime manifest contracts.
+    Assumptions:
+        Artifact arrays are already written to disk before metadata is generated.
+    Raises:
+        FileNotFoundError: If the target array file does not exist.
+    Side Effects:
+        Opens the `.npy` file through NumPy mmap to derive dtype and shape.
+    """
+    array = np.load(path, mmap_mode="r", allow_pickle=False)
+    return {
+        "path": _relative_slot_path_v2(
+            builder=builder,
+            coordinates=coordinates,
+            slot=slot,
+            path=path,
+        ),
+        "dtype": array.dtype.name,
+        "shape": [int(value) for value in array.shape],
+        "axis_order": [str(value) for value in axis_order],
+        "sha256": _file_sha256_hex_v2(path),
+    }
+
+
+def _artifact_write_yaml_v2(*, path: Path, payload: dict[str, object]) -> None:
+    """
+    Write one YAML payload with deterministic field ordering for synthetic benchmark artifacts.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+    Args:
+        path: Target YAML path.
+        payload: YAML payload mapping to serialize.
+    Returns:
+        None.
+    Assumptions:
+        Input mapping already uses the canonical key order expected by strict manifest tests.
+    Raises:
+        OSError: If the YAML file cannot be written.
+    Side Effects:
+        Creates parent directories and writes UTF-8 YAML content to disk.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+
+
+def _artifact_write_npy_v2(*, path: Path, array: np.ndarray) -> None:
+    """
+    Write one `.npy` file for the synthetic artifact-backed benchmark store.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+    Args:
+        path: Target `.npy` file path.
+        array: NumPy array payload to serialize.
+    Returns:
+        None.
+    Assumptions:
+        Arrays are already shaped and typed according to strict runtime contracts.
+    Raises:
+        OSError: If the `.npy` file cannot be written.
+    Side Effects:
+        Creates parent directories and writes binary `.npy` content to disk.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("wb") as file_handle:
+        np.save(file_handle, array, allow_pickle=False)
+
+
+def _timeline_payload_v2(*, open_time: np.ndarray, close_time: np.ndarray) -> dict[str, int]:
+    """
+    Build strict timeline coverage payload from paired open and close timestamp arrays.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    Args:
+        open_time: Open-time timestamp array.
+        close_time: Close-time timestamp array.
+    Returns:
+        dict[str, int]: Strict timeline coverage payload.
+    Assumptions:
+        Arrays are non-empty, aligned by row count, and already monotone.
+    Raises:
+        IndexError: If the arrays are empty.
+    Side Effects:
+        None.
+    """
+    return {
+        "bar_count": int(open_time.shape[0]),
+        "open_time_start": int(open_time[0]),
+        "open_time_end": int(open_time[-1]),
+        "close_time_start": int(close_time[0]),
+        "close_time_end": int(close_time[-1]),
+    }
+
+
+def _relative_slot_path_v2(
+    *,
+    builder: BacktestArtifactPathBuilderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    path: Path,
+) -> str:
+    """
+    Convert one absolute synthetic artifact path into the canonical slot-relative path literal.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    Args:
+        builder: Deterministic artifact path builder.
+        coordinates: Synthetic benchmark artifact coordinates.
+        slot: Slot literal for the generated benchmark store.
+        path: Absolute artifact path inside the slot root.
+    Returns:
+        str: POSIX-style slot-relative path.
+    Assumptions:
+        The provided path always lives under the slot root for the generated benchmark store.
+    Raises:
+        ValueError: If the path is outside the slot root.
+    Side Effects:
+        None.
+    """
+    return path.relative_to(builder.slot_root(coordinates, slot)).as_posix()
+
+
+def _file_sha256_hex_v2(path: Path) -> str:
+    """
+    Compute a lowercase SHA-256 hex digest for one synthetic benchmark artifact file.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+    Args:
+        path: Existing file path to hash.
+    Returns:
+        str: Lowercase SHA-256 hex digest.
+    Assumptions:
+        Files are small benchmark artifacts stored on local disk.
+    Raises:
+        OSError: If the file cannot be read.
+    Side Effects:
+        Reads the file from disk in binary mode.
+    """
+    digest = sha256()
+    with path.open("rb") as file_handle:
+        for chunk in iter(lambda: file_handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _build_dense_1m_from_time_range(*, time_range: TimeRange) -> CandleArrays:

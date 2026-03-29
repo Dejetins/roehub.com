@@ -7,6 +7,8 @@
 - `docs/architecture/README.md`
 - `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
+- `docs/runbooks/backtest-job-runner.md`
+- `docs/runbooks/backtest-rollout-rollback.md`
 
 ## Backtest R5 / R6 / R7 / R9 Path
 
@@ -18,6 +20,8 @@
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
+- `docs/runbooks/backtest-job-runner.md`
+- `docs/runbooks/backtest-rollout-rollback.md`
 - `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`
 - `src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py`
 - `src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py`
