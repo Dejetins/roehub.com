@@ -9,6 +9,17 @@ owner: indicators
 
 Документ фиксирует пошаговый план изменений по 4 направлениям оптимизации (пункты 1-2-3-4) для `indicators` compute path без изменения бизнес-семантики индикаторов и порядка вариантов.
 
+## Status
+
+- Status: historical perf-plan reference.
+- Implementation note:
+  - current code/config already reflect the R1 cleanup and the 5 GiB prod guard budget;
+  - this document should be read as rationale/history for compute optimizations, not as the
+    active source of runtime semantics.
+- Compatibility note:
+  - remaining benchmark/perf closure work belongs to R10-03 and does not reopen the removed
+    heavy indicator set.
+
 ## Цель
 
 - Ускорить расчет индикаторных сеток на больших `T x V`.
@@ -92,6 +103,9 @@ TO-BE: оставить один preflight путь в router (deterministic и 
 AS-IS: `configs/prod/indicators.yaml` содержит аномально высокий budget.
 
 TO-BE: выровнять с контрактом и окружениями `dev/test` (5 GiB), чтобы guard снова защищал от OOM на широких сетках.
+
+R10-02 sync note:
+- текущее состояние уже соответствует TO-BE: `configs/prod/indicators.yaml` использует 5 GiB.
 
 ### Файлы (пункт 1)
 

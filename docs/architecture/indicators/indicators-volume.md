@@ -4,6 +4,15 @@
 
 Документ фиксирует поддерживаемые `volume.*` идентификаторы, ссылки на реализацию и критичные edge-cases группы Volume.
 
+## Status
+
+- Status: active group-level catalog for backtest/runtime-defaults supported `volume.*`.
+- Compatibility note:
+  - active product ids are only those present in both `docs/architecture/indicators/indicators_formula.yaml`
+    and `configs/prod/indicators.yaml`;
+  - removed heavy id `volume.vwap_deviation` is intentionally absent and stays `superseded`;
+  - backtest `signals.v1.params` remain `default-only`.
+
 ## Source of truth
 
 - Спецификация формул: `docs/architecture/indicators/indicators_formula.yaml`

@@ -7,10 +7,15 @@ deterministic `422` ошибками.
 ## Status
 
 - Status: active v1 launch contract after R8-02 explicit auto-fallback cutover.
+- Compatibility note:
+  - `POST /backtests` remains the active public launch route;
+  - `/backtests/jobs*` stays a `compatibility alias` for legacy background flows;
+  - request/response naming keeps `top_k`, while `top_n_default` and `top_n_max` stay additive
+    runtime-defaults literals.
 - R7-03 follow-up note:
   - persisted runs created by `POST /backtests` are now publicly readable through
     `docs/architecture/backtest/backtest-runs-history-v2.md`;
-  - legacy `/backtests/jobs*` remains a migration alias over the same storage family.
+  - legacy `/backtests/jobs*` remains a `compatibility alias` over the same storage family.
 - R7-04 follow-up note:
   - preferred public lazy detail endpoint is now
     `POST /backtests/runs/{run_id}/variant-report`,

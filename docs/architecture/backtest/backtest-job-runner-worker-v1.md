@@ -5,6 +5,11 @@
 ## Status
 
 - Status: active v1 worker contract with R0 freeze notes.
+- Compatibility note:
+  - lifecycle/storage/public literals stay active, but runtime internals are now artifact-backed;
+  - `background_auto` and `background_manual_legacy` share the same claimed-worker execution
+    path and pin semantics;
+  - legacy hot-path orchestrators are `superseded` for production execution.
 - R7-01 additive update:
   - worker продолжает использовать тот же table family, но теперь это canonical persisted-run
     storage и для inline, и для background flows,

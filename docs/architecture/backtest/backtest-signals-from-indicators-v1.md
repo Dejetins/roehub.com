@@ -13,16 +13,23 @@
   - current v1 signal families and legacy indicator catalog,
   - current AND aggregation and NaN semantics,
   - current signal-grid description as v1 reference.
-- R0 target freeze, not yet applied as breaking cleanup:
-  - `signals.v1.params` remain `default-only`,
-  - request-timeframe target contract excludes `1m` and `5m`,
-  - 11 heavy indicators listed in final plan are kept here only as historical v1 context until R1 cleanup.
+- Compatibility note:
+  - active runtime-supported indicator ids are the defaults published from
+    `configs/prod/indicators.yaml` and browser runtime defaults;
+  - removed heavy indicators stay `superseded` and must not be treated as active product
+    choices;
+  - `signals.v1.params` remain `default-only`.
+- R10-02 sync note:
+  - runtime contract already excludes request-timeframe `1m` and `5m`;
+  - the 11 heavy indicators listed in the final plan stay only as historical v1 context after
+    the completed R1 cleanup;
+  - `signals.v1.params` remain `default-only`.
 - R4-01 alignment note:
   - explicit v2 signal-rules engine reuses this catalog as the semantic source of truth;
   - `signals.v1.params` stay `default-only` for the precompute-facing signal flow;
   - `inputs.source` semantics become explicit in the v2 API for supported indicators;
   - compact encoding remains `NEUTRAL = 0`, `LONG = 1`, `SHORT = -1`, value set `{-1,0,1}`;
-  - `signals.i8.npy` materialization is still deferred to R4-02.
+  - `signals.i8.npy` materialization is part of the active post-R4-02 artifact contract.
 
 ## Цель
 

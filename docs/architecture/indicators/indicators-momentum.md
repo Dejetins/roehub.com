@@ -4,6 +4,16 @@
 
 Документ фиксирует поддерживаемые `momentum.*` идентификаторы, ключевые ссылки на реализацию и типовые ошибки сопровождения для группы Momentum.
 
+## Status
+
+- Status: active group-level catalog for backtest/runtime-defaults supported `momentum.*`.
+- Compatibility note:
+  - active product ids are only those present in both `docs/architecture/indicators/indicators_formula.yaml`
+    and `configs/prod/indicators.yaml`;
+  - removed heavy ids such as `momentum.macd`, `momentum.ppo`, and `momentum.stoch_rsi` are
+    intentionally absent and stay `superseded`;
+  - backtest `signals.v1.params` remain `default-only`.
+
 ## Source of truth
 
 - Спецификация формул: `docs/architecture/indicators/indicators_formula.yaml`

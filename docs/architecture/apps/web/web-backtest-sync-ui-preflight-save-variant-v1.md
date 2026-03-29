@@ -15,16 +15,22 @@
   - manual template-mode preflight,
   - separate sync result page state without persisted history,
   - legacy `top_k` naming in advanced controls.
+- Compatibility note:
+  - active user flow is runs-first and starts from `POST /api/backtests` without mandatory manual
+    preflight;
+  - `/backtests/history`, `/backtests/runs/{run_id}`, and
+    `/backtests/runs/{run_id}/variants/{variant_key}` are the canonical pages after R9-03;
+  - `POST /api/backtests/variant-report` remains compatibility-only for older clients.
 - R9-01 rollout note:
   - current `/backtests` page no longer requires manual `Estimate preflight`,
   - launch flow uses only `POST /api/backtests`,
   - explicit `202 Accepted` `background_auto` responses are surfaced in UI instead of a
     browser-side sync/job switch.
-- R0 target freeze, not yet implemented here:
-  - server-side auto-preflight replaces manual required preflight,
-  - sync/background mode becomes one launch flow with `execution_mode`,
-  - `top_n_default` / `top_n_max` become frozen target terms,
-  - request TF target contract excludes `1m` and `5m`.
+- R10-02 sync note:
+  - server-side auto-preflight уже заменил manual required preflight;
+  - sync/background launch уже объединён в один flow с `execution_mode`;
+  - `top_n_default` / `top_n_max` уже опубликованы как frozen additive target terms;
+  - request TF contract уже исключает `1m` и `5m`.
 - R1 practical contract:
   - indicator/source selectors are driven by backend runtime defaults,
   - request-level `signal_grids` must follow `signals.v1.params = default-only`.

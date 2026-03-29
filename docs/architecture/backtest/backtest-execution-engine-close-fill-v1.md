@@ -2,6 +2,17 @@
 
 Фиксирует контракт BKT-EPIC-05: детерминированное исполнение сделок по close (close-fill) по сигналам `LONG|SHORT|NEUTRAL` с direction modes, position sizing (4 режима), close-based SL/TP, fees/slippage и staged semantics (Stage A без SL/TP, Stage B с SL/TP).
 
+## Status
+
+- Status: superseded historical Stage-B/reference contract.
+- Superseded by:
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+- Compatibility note:
+  - active production runtime uses `signal_tf + 1m_risk` artifact-backed execution and no
+    longer routes launch/worker/detail through close-fill hot path;
+  - this document stays only for legacy close-fill semantics, migration context, and older tests.
+
 ## Цель
 
 - Реализовать backtest execution engine v1, который по одному и тому же входу даёт один и тот же trade log и equity результат.

@@ -4,6 +4,17 @@
 `artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning, config-driven validation
 plan, strict manifest validation и R6-01 runtime bootstrap boundary.
 
+## Status
+
+- Status: active operational runbook for the delivered artifact-backed runtime.
+- Canonical scope:
+  - rebuild/publish for the same slot family consumed by sync launch, claimed worker, and
+    run-scoped lazy detail;
+  - publish guards consider only active `background_auto` and `background_manual_legacy` rows.
+- Compatibility note:
+  - this runbook documents rebuild/publish only and does not revive legacy runtime paths;
+  - broader perf closure and extra troubleshooting expansion remain R10-03 scope.
+
 Основные документы:
 
 - `docs/architecture/backtest/backtest-artifact-store-v2.md`

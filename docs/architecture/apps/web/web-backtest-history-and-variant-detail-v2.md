@@ -12,7 +12,7 @@ lazy detail page для одного persisted variant.
   - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
 - Compatibility note:
-  - legacy `POST /api/backtests/variant-report` остаётся migration path;
+  - legacy `POST /api/backtests/variant-report` остаётся compatibility path;
   - preferred public detail flow использует
     `POST /api/backtests/runs/{run_id}/variant-report`.
   - after R9-03 launch/status/detail navigation is runs-first:
@@ -21,6 +21,10 @@ lazy detail page для одного persisted variant.
     - `/backtests/runs/{run_id}/variants/{variant_key}`
   - legacy `/backtests/jobs*` remains compatibility surface during migration and may still expose
     legacy report/cancel tooling.
+- Summary-only note:
+  - `/backtests/runs/{run_id}` stays summary-only and never depends on persisted
+    `report_table_md` or `trades_json`;
+  - one-variant detail lives only on `/backtests/runs/{run_id}/variants/{variant_key}`.
 
 ## Цель
 

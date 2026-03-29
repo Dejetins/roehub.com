@@ -5,11 +5,16 @@
 ## Status
 
 - Status: active v1 jobs storage contract with R0 freeze notes.
+- Compatibility note:
+  - same PG tables back both public `/backtests/runs*` and legacy `/backtests/jobs*`
+    `compatibility alias`;
+  - persisted top rows stay `summary-only`, while `report_table_md` and `trades_json` remain
+    transitional `NULL`-only columns.
 - R7-01 additive update:
   - same PG table family (`backtest_jobs`, `backtest_job_top_variants`,
     `backtest_job_stage_a_shortlist`) is now the canonical persisted-run storage for both
     inline and background executions,
-  - `backtest_jobs` carries denormalized run metadata for future history/filter endpoints:
+  - `backtest_jobs` carries denormalized run metadata for current history/filter endpoints:
     `execution_mode`, `market_id`, `symbol`, `timeframe`, `requested_top_n`,
     `ranking_primary_metric`, `ranking_secondary_metric`,
   - persisted top rows are summary-only:
@@ -35,10 +40,11 @@
   - current `backtest_jobs` / `backtest_job_top_variants` / `backtest_job_stage_a_shortlist` contract,
   - current `top_k_persisted_default` hash participation,
   - current jobs-only state machine.
-- R0 target freeze, not yet migrated:
-  - same PG table family becomes basis for unified persisted runs/history,
-  - result vocabulary shifts from `top_k` to `top_n` without breaking current fields,
-  - future run metadata must carry `execution_mode` and artifact slot identity.
+- R10-02 sync note:
+  - same PG table family уже является базой для unified persisted runs/history;
+  - current public/runtime docs keep `top_k` compatibility fields while additive
+    `top_n_default` / `top_n_max` stay frozen target literals;
+  - active rows already carry `execution_mode` and artifact slot identity.
 
 ## Цель
 

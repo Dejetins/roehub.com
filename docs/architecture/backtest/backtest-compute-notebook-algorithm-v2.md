@@ -15,6 +15,10 @@ production transfer contract.
   - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
+- Compatibility note:
+  - this document is reference-only and does not describe the active production orchestration;
+  - active runtime launch/detail paths consume artifact-backed modules and the canonical
+    `signal_tf + 1m_risk` contract from `backtest-runtime-kernels-v2.md`.
 - Historical/reference scope kept here:
   - notebook function anchors such as `build_trade_list_for_pair` and `evaluate_trade_factor`,
   - parity reference for `signal_tf + 1m_risk`,

@@ -8,6 +8,13 @@
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
 
+## Status
+
+- Status: active benchmark/protocol reference for the delivered v2 runtime and summary-only UX.
+- Compatibility note:
+  - R10-02 synchronizes docs around the shipped runtime but does not claim R10-03 perf closure;
+  - benchmark/runbook expansion beyond this baseline remains pending under R10-03.
+
 ## Цель
 
 R0 не внедряет runtime v2, а фиксирует:

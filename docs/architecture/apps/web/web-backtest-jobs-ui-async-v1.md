@@ -16,16 +16,20 @@
   - отдельные `/backtests/jobs*` маршруты,
   - split sync/jobs launch model,
   - polling around current job storage/worker semantics.
-- R0 target freeze, not yet implemented here:
-  - user-visible history становится unified `backtest run`,
-  - sync overflow должен auto-fallback в background вместо ручного mode toggle,
-  - summary-only top-N и lazy detail page становятся canonical result UX.
+- R10-02 sync note:
+  - user-visible history уже стала unified `backtest run`;
+  - sync overflow уже использует explicit auto-fallback в background вместо ручного mode toggle;
+  - `summary-only` top-N и lazy detail page уже стали canonical result UX.
 - R9-02 additive compatibility note:
   - primary user-facing navigation now lives at `/backtests/history` and
     `/backtests/runs/{run_id}`;
-  - `/backtests/jobs*` остаются migration alias поверх того же persisted run storage;
+  - `/backtests/jobs*` остаются `compatibility alias` поверх того же persisted run storage;
   - compatibility pages may keep legacy `Load report` and cancel affordances while summary/history
     vocabulary moves to runs.
+- Compatibility note:
+  - canonical result/detail flow now lives on `/backtests/history`,
+    `/backtests/runs/{run_id}`, and `/backtests/runs/{run_id}/variants/{variant_key}`;
+  - this document remains only for legacy jobs pages and polling affordances.
 - R1 practical contract:
   - create form reuse на `/backtests` обязан использовать backend runtime defaults catalog,
   - request TF `1m` и `5m` детерминированно отклоняются backend-ом,

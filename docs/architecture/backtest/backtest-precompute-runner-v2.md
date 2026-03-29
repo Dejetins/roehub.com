@@ -2,6 +2,20 @@
 
 Статус: `Milestone R2 / EPIC R2-03 + R2-04`, `Milestone R3 / EPIC R3-01 + R3-02 + R3-03 + R3-04`, `Milestone R4 / EPIC R4-01 + R4-02 + R4-03`, `Milestone R5 / EPIC R5-01`, `Milestone R6 / EPIC R6-01`
 
+## Status
+
+- Status: active canonical precompute/publish contract after R10-02 docs synchronization.
+- Canonical runtime relationship:
+  - precompute produces only artifact inputs for the active `signal_tf + 1m_risk` runtime;
+  - sync launch, claimed worker, and run-scoped lazy detail consume the same published slot
+    family through v2 loaders;
+  - `signals.v1.params` remain `default-only` and do not expand into signal-grid runtime
+    combinatorics.
+- Compatibility note:
+  - stage-specific prices+mappings publish remains an explicit helper only;
+  - active production docs no longer describe live ClickHouse rollup or runtime recompute as
+    equivalent alternatives.
+
 Документ фиксирует контракт precompute/publish слоя, который:
 
 - строит inactive slot в `artifacts/backtest/v2`;

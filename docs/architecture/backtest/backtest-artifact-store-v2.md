@@ -2,6 +2,22 @@
 
 Статус: `Milestone R2 / EPIC R2-01 + R2-02 + R2-03 + R2-04`, `Milestone R3 / EPIC R3-03 + R3-04`, `Milestone R4 / EPIC R4-02 + R4-03`, `Milestone R6 / EPIC R6-01`
 
+## Status
+
+- Status: active canonical artifact-store contract after R10-01 production cutover and R10-02
+  docs synchronization.
+- Consumed by active runtime:
+  - `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`
+  - `src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py`
+  - `src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py`
+  - `src/trading/contexts/backtest/application/use_cases/run_backtest.py`
+  - `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py`
+- Compatibility note:
+  - published slot switching remains one-way `inactive slot -> validate -> current.yaml`;
+  - `background_auto` and `background_manual_legacy` pin the same slot identity for rebuild
+    guards;
+  - this contract does not re-enable any legacy hot path or silent fallback.
+
 Документ фиксирует:
 
 - R2-01: deterministic layout/path contract для `artifacts/backtest/v2`;
@@ -271,7 +287,7 @@ contract для explicit configured targets.
 - placeholders сохраняются только для `hit_times/1m` до R5-01;
 - R4-04 runtime `source` integration теперь потребляет artifact row-order contract downstream
   через runtime defaults, persisted jobs payloads и `variant-report`; dedicated history/detail v2
-  docs из roadmap пока отсутствуют в этом репозитории.
+  docs уже синхронизированы в этом репозитории.
 
 ## R3-04 prices+mappings publish-ready boundary
 

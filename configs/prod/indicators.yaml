@@ -1,3 +1,9 @@
+# R10-02 docs synchronization note:
+# - This file is the active product catalog for backtest/runtime-defaults supported indicators.
+# - Heavy removed indicators from the final plan stay intentionally absent.
+# - `signals.v1.params` defaults below are `default-only`; runtime request-level expansion is not enabled.
+# - Some formulas may still exist in docs/architecture/indicators/indicators_formula.yaml as
+#   wrapper/reference-only entries without prod defaults.
 schema_version: 1
 compute:
   numba:

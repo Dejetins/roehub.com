@@ -11,7 +11,7 @@
   - `backtest_jobs.job_id` остается storage identity, но наружу используется vocabulary `run_id`;
   - `GET /backtests/runs/{run_id}/top` читает только summary rows из
     `backtest_job_top_variants`;
-  - legacy `/backtests/jobs*` остается compatibility alias на период миграции.
+  - legacy `/backtests/jobs*` остается `compatibility alias` на период миграции.
 - Summary-only note:
   - persisted top rows contract fields: `payload_json`, `summary_metrics_json`,
     `best_tp_pct`, `best_sl_pct`;
@@ -47,7 +47,8 @@
     - `/backtests/runs/{run_id}/variants/{variant_key}`
     - `Save as Strategy` через existing `/strategies/new?prefill=...` flow;
   - web detail page восстанавливает exact selected row через `/top`, затем вызывает только
-    run-scoped `POST /backtests/runs/{run_id}/variant-report`;
+    run-scoped `POST /backtests/runs/{run_id}/variant-report`
+    (`POST /api/backtests/runs/{run_id}/variant-report` на browser/API boundary);
   - detail/save UX не добавляет новых persisted report/trades storage surfaces.
 
 ## Цель
@@ -154,7 +155,7 @@ Hashes (`request_hash`, `engine_params_hash`, `backtest_runtime_config_hash`, `s
 - repeated cancel для уже помеченного `running` не должен перетирать первый
   `cancel_requested_at`.
 
-### 6) Legacy `/backtests/jobs*` остается migration alias
+### 6) Legacy `/backtests/jobs*` остается compatibility alias
 
 На период миграции legacy endpoints продолжают работать поверх тех же use-case/repository rules.
 

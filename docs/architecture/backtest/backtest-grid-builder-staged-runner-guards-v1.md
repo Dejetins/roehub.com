@@ -2,6 +2,17 @@
 
 Фиксирует контракт BKT-EPIC-04: как детерминированно строится grid вариантов для sync backtest v1 (Stage A/Stage B), какие guards применяются, и почему API возвращает только top-K результатов.
 
+## Status
+
+- Status: compatibility/reference document for guard vocabulary and historical staged builder.
+- Superseded as production orchestration description by:
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- Compatibility note:
+  - guard vocabulary and `top_k` request semantics stay active for `POST /backtests`;
+  - active production runtime plans variants from artifacts and does not silently fallback to the
+    legacy staged-core/grid hot path.
+
 ## Цель
 
 - Построить детерминированный grid вариантов backtest v1 из диапазонов/шагов `configs/<env>/indicators.yaml` (compute params + signal params) и risk-осей SL/TP из request.

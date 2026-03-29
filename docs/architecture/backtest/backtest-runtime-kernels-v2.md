@@ -7,7 +7,19 @@ R5-01 artifact contracts.
 
 Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02 + R6-03 + R6-04`,
 `Milestone R10 / EPIC R10-01 production hot-path cutover`  
-Следующие этапы реализации: `R10-02 docs synchronization`, `R10-03 perf/runbook closure`
+Следующий этап handoff: `R10-03 perf/runbook closure`
+
+## Status
+
+- Status: active canonical production runtime contract after R10-01 and R10-02.
+- Supersedes as hot-path description:
+  - `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
+  - `docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md`
+  - `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md`
+- Compatibility note:
+  - legacy v1 modules remain import-stable only where migration boundaries still need them;
+  - production launch, claimed worker execution, and run-scoped lazy detail do not silently
+    fallback to legacy runtime orchestration.
 
 Связанные документы:
 

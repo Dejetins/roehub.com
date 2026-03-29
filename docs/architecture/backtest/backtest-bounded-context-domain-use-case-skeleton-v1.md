@@ -2,6 +2,18 @@
 
 Документ фиксирует архитектуру BKT-EPIC-01: как вводим bounded context `backtest` (domain/application/ports), какие минимальные контракты (DTO/ошибки) и как он интегрируется с `market_data`/`indicators`/`strategy`, не фиксируя преждевременно детали исполнения/метрик.
 
+## Status
+
+- Status: active architectural boundary reference with historical v1 runtime notes.
+- Superseded for production hot-path details by:
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `docs/architecture/backtest/backtest-runs-history-v2.md`
+  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- Compatibility note:
+  - bounded-context layering, DTO/error boundaries, and stable imports remain relevant;
+  - live candle/runtime details inside older references are not the active production execution
+    path after R10-01.
+
 ## Цель
 
 1) Завести bounded context `src/trading/contexts/backtest/*` в стиле репозитория (DDD layers: domain/application/adapters).  
@@ -123,7 +135,7 @@ Backtest use-case зависит от `trading.contexts.indicators.application.p
 - либо `template` (ad-hoc grid mode)
 
 Причины:
-- один use-case и один контракт для future API `POST /backtests`.
+- один use-case и один контракт для public API `POST /backtests`.
 
 Последствия:
 - transport слой (FastAPI/Pydantic) в BKT-EPIC-07 повторит этот контракт без “расхождений”.

@@ -2,6 +2,18 @@
 
 Документ фиксирует фактическую реализацию `IND-EPIC-05` в `indicators`: CPU/Numba skeleton, warmup, runtime config, total memory guard.
 
+## Status
+
+- Status: active compute-engine reference for the cleaned indicator catalog used by backtest v2.
+- Canonical product catalog note:
+  - runtime-supported backtest indicator ids come from `configs/prod/indicators.yaml`;
+  - removed heavy ids from the final plan stay intentionally absent from prod defaults and are
+    deterministically rejected upstream.
+- Compatibility note:
+  - `docs/architecture/indicators/indicators_formula.yaml` may keep wrapper/reference formulas
+    that are not default-enabled in prod;
+  - `signals.v1.params` stay `default-only` at the backtest/runtime-defaults boundary.
+
 ## Реализация
 
 ### Ключевые файлы

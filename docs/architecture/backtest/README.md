@@ -2,6 +2,22 @@
 
 Краткий индекс и rollout-заметки для актуального backtest-контракта.
 
+## Status
+
+- Status: active navigation surface after R10-02 docs synchronization.
+- Canonical production surface:
+  - `POST /backtests`
+  - `/backtests/history`
+  - `/backtests/runs/{run_id}`
+  - `/backtests/runs/{run_id}/variants/{variant_key}`
+- Compatibility note:
+  - `/backtests/jobs*` и legacy `POST /api/backtests/variant-report` остаются
+    `compatibility alias`, но не primary UX;
+  - `background_manual_legacy` остаётся публичным persisted literal, а не selectable legacy
+    engine path;
+  - `top_k` остаётся request/response compatibility naming, а `top_n_default` и `top_n_max`
+    документируются как additive target literals через runtime defaults.
+
 ## Основные контракты
 
 - R6-01 runtime-side loader/context layer:
@@ -33,6 +49,19 @@
 - Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices, R3-03 `mappings/<tf>`, R3-04 publish-ready prices+mappings stage, R4-02 real `signals/<tf>/<indicator_id>` artifacts, R4-03 bounded `prefix + rebuilt_tail` signal rebuild и R5-01 real `hit_times/1m`: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Signal rules catalog and R4-01 semantic source-of-truth: `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
 - Artifact rebuild/publish runbook: `docs/runbooks/backtest-artifacts-rebuild.md`
+
+## Active Vs Compatibility Matrix
+
+| Surface | Current status | Canonical document |
+|---|---|---|
+| Sync and auto-fallback launch | Active | `docs/architecture/backtest/backtest-api-post-backtests-v1.md` |
+| Artifact-backed runtime kernels | Active | `docs/architecture/backtest/backtest-runtime-kernels-v2.md` |
+| Artifact store and publish/pinning | Active | `docs/architecture/backtest/backtest-artifact-store-v2.md` |
+| Runs history and summary/detail API | Active | `docs/architecture/backtest/backtest-runs-history-v2.md` |
+| Runs-first web UX | Active | `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md` |
+| `/backtests/jobs*` endpoints and pages | Compatibility alias | `docs/architecture/backtest/backtest-runs-history-v2.md` |
+| `POST /api/backtests/variant-report` | Compatibility alias | `docs/architecture/backtest/backtest-runs-history-v2.md` |
+| Live candle rollup / staged-core / close-fill hot path | superseded | `docs/architecture/backtest/backtest-runtime-kernels-v2.md` |
 
 ## Актуальная политика rollout
 
@@ -133,11 +162,16 @@
   - silent legacy fallback запрещён; `background_manual_legacy` остаётся только совместимым
     persisted/public literal.
 - После R10-01 вне scope остаются R10-02 docs synchronization и R10-03 perf/runbook closure.
+- R10-02 закрывает docs synchronization:
+  - canonical v2 docs и runbooks описывают active production semantics без silent legacy fallback;
+  - legacy v1 docs сохраняются только как historical / compatibility reference с явными
+    `superseded` и compatibility markers;
+  - единственный оставшийся migration handoff после этого README - R10-03 perf/runbook closure.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
   `signal_artifacts=[]` и `require_hit_times_manifest=false`.
 - R4-04 runtime `source` integration в текущем репозитории проходит через runtime defaults, jobs
-  `/top` payloads и explicit `variant-report` payloads, хотя отдельные history/detail v2 docs из
-  roadmap пока отсутствуют.
+  `/top` payloads и explicit `variant-report` payloads; related history/detail v2 docs уже
+  синхронизированы в этом doc set.
 
 ## Проверка согласованности
 

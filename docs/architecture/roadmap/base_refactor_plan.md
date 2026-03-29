@@ -1260,6 +1260,14 @@
 
 **Цель:** обновить весь связанный doc set под реальную v2-систему.
 
+**Closure note (R10-02):**
+- canonical v2 docs должны описывать active artifact-backed runtime, runs-first UX и
+  `summary-only` persisted results без параллельных трактовок;
+- legacy `/backtests/jobs*` и `POST /api/backtests/variant-report` допускаются только как
+  `compatibility alias`;
+- после R10-02 в handoff остаётся только R10-03 perf/runbook closure, а не дополнительный
+  runtime cutover.
+
 **Scope:**
 - создать:
   - `docs/architecture/backtest/backtest-artifact-store-v2.md`
@@ -1293,6 +1301,10 @@
 ### EPIC R10-03 — Tests, perf gates и runbooks
 
 **Цель:** закрыть миграцию не только кодом, но и проверками/эксплуатацией.
+
+**Closure note (R10-03 handoff):**
+- сюда входят perf gate closure, benchmark expansion и дополнительные runbooks;
+- сюда не входят новые изменения публичного runtime/API surface, уже зафиксированного в R10-02.
 
 **Scope:**
 - unit/integration/golden tests для:

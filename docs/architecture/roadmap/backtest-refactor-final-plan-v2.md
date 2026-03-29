@@ -1344,6 +1344,14 @@ History entry должна позволять:
 
 ## 19. Связанные документы, которые нужно создать или обновить
 
+Update note after R10-01 / R10-02:
+
+- R10-01 закрыл production hot-path cutover без silent legacy fallback.
+- R10-02 должен оставить один canonical doc set для artifact-backed runtime, runs-first UX и
+  `summary-only` persisted history.
+- После этого final plan остаётся semantic source-of-truth, а незакрытым handoff остаётся только
+  R10-03 perf/runbook closure.
+
 ### Создать
 
 - `docs/architecture/backtest/backtest-artifact-store-v2.md`

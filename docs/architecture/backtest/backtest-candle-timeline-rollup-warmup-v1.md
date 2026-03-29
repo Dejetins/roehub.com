@@ -2,6 +2,18 @@
 
 Фиксирует контракт BKT-EPIC-02: как backtest v1 строит свечной таймлайн на выбранном timeframe из canonical 1m, как работает best-effort rollup и warmup lookback.
 
+## Status
+
+- Status: superseded historical v1 runtime reference.
+- Superseded by:
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+  - `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- Compatibility note:
+  - active production launch, claimed worker execution, and lazy run detail do not build live
+    candle timelines through ClickHouse after R10-01;
+  - this document remains only for legacy module semantics and for explaining older v1 tests.
+
 ## Цель
 
 - Детерминированно загрузить 1m candles из canonical как source of truth.

@@ -4,6 +4,16 @@
 
 Документ фиксирует поддерживаемые `trend.*` идентификаторы, ссылки на реализацию и семантические ограничения группы Trend.
 
+## Status
+
+- Status: active group-level catalog for backtest/runtime-defaults supported `trend.*`.
+- Compatibility note:
+  - active product ids are only those present in both `docs/architecture/indicators/indicators_formula.yaml`
+    and `configs/prod/indicators.yaml`;
+  - removed heavy ids such as `trend.ichimoku`, `trend.chandelier_exit`, `trend.keltner`, and
+    `trend.supertrend` are intentionally absent and stay `superseded`;
+  - backtest `signals.v1.params` remain `default-only`.
+
 ## Source of truth
 
 - Спецификация формул: `docs/architecture/indicators/indicators_formula.yaml`
