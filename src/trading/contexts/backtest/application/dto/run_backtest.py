@@ -23,10 +23,12 @@ _ALLOWED_SIZING_MODES = {
 BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1 = "total_return_pct"
 BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1: str | None = None
 BACKTEST_RANKING_METRIC_LITERALS_V1: tuple[str, ...] = (
-    "max_drawdown_pct",
-    "profit_factor",
-    "return_over_max_drawdown",
     "total_return_pct",
+    "max_drawdown_pct",
+    "return_over_max_drawdown",
+    "profit_factor",
+    "sharpe_trades",
+    "win_rate_pct",
 )
 _BACKTEST_ALLOWED_RANKING_METRICS_V1 = frozenset(BACKTEST_RANKING_METRIC_LITERALS_V1)
 

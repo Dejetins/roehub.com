@@ -43,8 +43,9 @@
 - Snapshot cadence: писать persisted top-K при выполнении **любого** из условий:
   - прошло `snapshot_seconds`,
   - обработано `snapshot_variants_step` новых Stage-B вариантов.
-- Finalizing: детали (`report_table_md`/trades) считаются только для persisted cap:
-  - `persisted_k = min(request.top_k, backtest.jobs.top_k_persisted_default)`.
+- Finalizing остаётся summary-only для persisted cap:
+  - `persisted_k = min(request.top_k, backtest.jobs.top_k_persisted_default)`;
+  - `report_table_md` и `trades_json` не materialize'ятся даже для terminal snapshot.
 - Parallelism v1: один job исполняется последовательно (intra-job parallelism = 1).
   `backtest.jobs.parallel_workers` существует в runtime config, но в v1 воркер его не использует (зарезервирован под будущее).
 
@@ -54,8 +55,12 @@
 
 - Stage A/Stage B исполняются через `BacktestStagedCoreRunnerV1`.
 - Ranking/tie-break semantics между sync и jobs унифицированы в одном коде:
-  - Stage A: `total_return_pct DESC`, `base_variant_key ASC`;
-  - Stage B: `total_return_pct DESC`, `variant_key ASC`.
+  - Approved metrics:
+    `total_return_pct DESC`, `max_drawdown_pct ASC`,
+    `return_over_max_drawdown DESC`, `profit_factor DESC`,
+    `sharpe_trades DESC`, `win_rate_pct DESC`;
+  - Stage A deterministic tie-break: `base_variant_key ASC`;
+  - Stage B deterministic tie-break: `variant_key ASC`.
 - Перед стадиями scorer подготавливает batched indicator tensors (`prepare_for_grid_context(...)`), что убирает per-variant compute из hot path.
 - CPU лимит из runtime config (`backtest.cpu.max_numba_threads`) применяется в worker attempt через `numba.set_num_threads(...)`.
 
@@ -120,7 +125,13 @@ Source-of-truth payload:
 Контракт:
 
 - Ranking key Stage A:
-  - `total_return_pct DESC`,
+  - primary/secondary metrics выбираются из approved runtime set:
+    `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
+    `profit_factor`, `sharpe_trades`, `win_rate_pct`;
+  - direction map:
+    `total_return_pct DESC`, `max_drawdown_pct ASC`,
+    `return_over_max_drawdown DESC`, `profit_factor DESC`,
+    `sharpe_trades DESC`, `win_rate_pct DESC`;
   - tie-break `base_variant_key ASC`.
 - Progress:
   - `stage = stage_a`,
@@ -144,7 +155,8 @@ Source-of-truth payload:
 
 - `persisted_k = min(request.top_k, top_k_persisted_default)`.
 - Ranking key Stage B:
-  - `total_return_pct DESC`,
+  - primary/secondary metrics используют тот же approved runtime set и direction map, что и
+    Stage A;
   - tie-break `variant_key ASC`.
 - Worker держит только bounded структуру top-K (heap/эквивалент) + минимально нужный payload для финализации.
 - Progress:
@@ -160,6 +172,8 @@ Snapshot payload policy во время `running`:
 - `report_table_md = NULL`,
 - `trades_json = NULL`,
 - сохраняются ranking fields + `payload_json` для top rows.
+- Локальный UI re-sort не должен пересчитывать inclusion в `top_n`; frontier фиксируется runtime
+  ranking'ом.
 
 #### 3.3 Finalizing (только succeeded)
 

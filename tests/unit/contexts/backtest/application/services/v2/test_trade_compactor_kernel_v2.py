@@ -149,6 +149,7 @@ def test_compute_no_risk_metrics_v2_is_deterministic_and_shortlist_ready() -> No
     assert math.isinf(metrics.return_over_max_drawdown)
     assert math.isinf(metrics.profit_factor)
     assert metrics.trade_count == 2
+    assert metrics.sharpe_trades > 0.0
     assert metrics.win_rate_pct == 100.0
     assert round(metrics.avg_trade_ret_pct, 6) == 15.0
     assert metrics.avg_trade_exec_bars == 1.0
@@ -158,8 +159,9 @@ def test_compute_no_risk_metrics_v2_is_deterministic_and_shortlist_ready() -> No
         "max_drawdown_pct",
         "return_over_max_drawdown",
         "profit_factor",
-        "trade_count",
+        "sharpe_trades",
         "win_rate_pct",
+        "trade_count",
         "avg_trade_ret_pct",
         "avg_trade_exec_bars",
         "exposure_pct",

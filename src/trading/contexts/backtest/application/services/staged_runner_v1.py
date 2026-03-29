@@ -19,7 +19,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestVariantScoreDetailsV1,
 )
 from trading.contexts.backtest.application.services.grid_builder_v1 import (
-    STAGE_B_LITERAL,
     BacktestGridBuildContextV1,
     BacktestGridBuilderV1,
     BacktestStageABaseVariant,
@@ -261,13 +260,15 @@ class BacktestStagedRunnerV1:
             max_variants_per_compute: Stage variants guard limit.
             max_compute_bytes_total: Stage memory guard limit.
             requested_time_range:
-                Optional request range for reporting rows (`Start/End/Duration`).
+                Retained legacy argument; runtime summary responses stay summary-only and do not
+                materialize report rows or trades bodies.
             target_time_range:
                 Trading window used by artifact-backed Stage A kernels when available.
             artifact_context:
                 Optional shared slot-pinned artifact context resolved at runtime startup.
             top_trades_n:
-                Number of best variants for which full trades payload is included.
+                Retained compatibility knob for on-demand detail/report flows outside runtime
+                summary materialization.
             run_control:
                 Optional cooperative cancellation/deadline control shared with request/job
                 lifecycle.
@@ -679,85 +680,40 @@ class BacktestStagedRunnerV1:
         top_trades_n: int,
     ) -> _TopVariantPayloadContext:
         """
-        Build deterministic EPIC-06 report payloads for selected Stage-B top-k variants.
+        Enforce summary-only runtime materialization for ranked Stage-B top-k variants.
 
         Args:
-            requested_time_range: User request range for reporting rows.
-            top_rows: Already ranked Stage-B top rows.
-            stage_b_tasks: Stage-B task lookup by deterministic `variant_key`.
+            requested_time_range: Retained legacy argument, ignored by summary-only runtime path.
+            top_rows: Already ranked Stage-B top rows, unused by summary-only materialization.
+            stage_b_tasks: Stage-B task lookup by deterministic `variant_key`, unused here.
             retained_details_by_variant_key:
-                Optional details retained during Stage-B scoring for current top rows.
-            candles: Warmup-inclusive candles forwarded to scorer/reporting services.
-            scorer: Stage scorer port optionally supporting details extension.
-            top_trades_n: Number of best variants to include full trades list for.
+                Optional retained details mapping, unused by summary-only runtime path.
+            candles: Warmup-inclusive candles, unused by summary-only runtime path.
+            scorer: Stage scorer port, unused by summary-only runtime path.
+            top_trades_n: Retained compatibility knob, ignored for runtime summaries.
         Returns:
-            _TopVariantPayloadContext: Report and effective execution/risk payload maps.
+            _TopVariantPayloadContext: Empty report/execution/risk payload maps.
         Assumptions:
-            Ranking order in `top_rows` is deterministic and already final.
+            Sync runtime summary responses must remain summary-only until explicit on-demand
+            variant-report materialization happens through dedicated detail flows.
         Raises:
-            ValueError: If top-row task mapping is missing or scorer detail payload mismatches.
+            None.
         Side Effects:
-            Uses retained Stage-B details when available; falls back to one-pass re-score only
-            if retained details are unavailable.
+            None.
         """
-        if requested_time_range is None:
-            return _TopVariantPayloadContext(
-                reports_by_variant_key={},
-                execution_params_by_variant_key={},
-                risk_params_by_variant_key={},
-            )
-        details_scorer = _details_scorer(scorer=scorer)
-        if len(retained_details_by_variant_key) == 0 and details_scorer is None:
-            return _TopVariantPayloadContext(
-                reports_by_variant_key={},
-                execution_params_by_variant_key={},
-                risk_params_by_variant_key={},
-            )
-
-        reports_by_variant_key: dict[str, BacktestReportV1] = {}
-        execution_params_by_variant_key: dict[str, Mapping[str, BacktestVariantScalar]] = {}
-        risk_params_by_variant_key: dict[str, Mapping[str, BacktestVariantScalar]] = {}
-        for ranked_index, row in enumerate(top_rows):
-            task = stage_b_tasks.get(row.variant_key)
-            if task is None:
-                raise ValueError("missing Stage B task for top-row variant_key")
-
-            details = retained_details_by_variant_key.get(row.variant_key)
-            if details is None:
-                if details_scorer is None:
-                    raise ValueError("missing retained details for top-row variant_key")
-                details = details_scorer.score_variant_with_details(
-                    stage=STAGE_B_LITERAL,
-                    candles=candles,
-                    indicator_selections=task.indicator_selections,
-                    signal_params=task.signal_params,
-                    risk_params=task.risk_params,
-                    indicator_variant_key=task.indicator_variant_key,
-                    variant_key=task.variant_key,
-                )
-            detailed_total_return_pct = _extract_total_return_pct(metrics=details.metrics)
-            if abs(detailed_total_return_pct - row.total_return_pct) > 1e-12:
-                raise ValueError("detailed scorer payload must match ranked total return value")
-
-            reports_by_variant_key[row.variant_key] = self._reporting_service.build_report(
-                requested_time_range=requested_time_range,
-                candles=candles,
-                target_slice=details.target_slice,
-                execution_params=details.execution_params,
-                execution_outcome=details.execution_outcome,
-                include_table_md=True,
-                include_trades=ranked_index < top_trades_n,
-            )
-            execution_params_by_variant_key[row.variant_key] = _execution_params_to_mapping(
-                params=details.execution_params
-            )
-            risk_params_by_variant_key[row.variant_key] = _risk_params_to_mapping(
-                params=details.risk_params
-            )
+        _ = (
+            requested_time_range,
+            top_rows,
+            stage_b_tasks,
+            retained_details_by_variant_key,
+            candles,
+            scorer,
+            top_trades_n,
+        )
         return _TopVariantPayloadContext(
-            reports_by_variant_key=reports_by_variant_key,
-            execution_params_by_variant_key=execution_params_by_variant_key,
-            risk_params_by_variant_key=risk_params_by_variant_key,
+            reports_by_variant_key={},
+            execution_params_by_variant_key={},
+            risk_params_by_variant_key={},
         )
 
     def _resolve_parallel_workers(self, *, total_tasks: int) -> int:

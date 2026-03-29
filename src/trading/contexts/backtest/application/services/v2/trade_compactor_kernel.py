@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from types import MappingProxyType
 from typing import Mapping
 
@@ -17,6 +18,8 @@ from .contracts import (
     StageADirectionModeLiteralV2,
     StageANoRiskMetricsV2,
 )
+
+_BARS_PER_YEAR_EXEC_1M_V2 = 365.0 * 24.0 * 60.0
 
 
 def build_compact_trade_list_v2(
@@ -78,6 +81,7 @@ def compute_no_risk_metrics_v2(
     exec_close: np.ndarray,
     sentinel_index: int,
     execution_params: ExecutionParamsV1,
+    bars_per_year_exec: float = _BARS_PER_YEAR_EXEC_1M_V2,
     close_on_end: bool = True,
 ) -> StageANoRiskMetricsV2:
     """
@@ -89,6 +93,7 @@ def compute_no_risk_metrics_v2(
         exec_close: Local execution-timeline close prices.
         sentinel_index: Local execution timeline length (`T_exec`).
         execution_params: Resolved execution defaults for sizing, fees, and slippage.
+        bars_per_year_exec: Annualization denominator in execution bars for `sharpe_trades`.
         close_on_end: Whether open trades close on the last execution close when no signal exit
             exists.
     Returns:
@@ -97,7 +102,9 @@ def compute_no_risk_metrics_v2(
         The metric kernel works over compact trades only, uses `entry_exec_idx`,
         `sig_exit_exec_idx`, and never depends on Stage B risk artifacts.
     Raises:
-        ValueError: If execution arrays drift from `sentinel_index` or one trade index is invalid.
+        ValueError:
+            If execution arrays drift from `sentinel_index`, annualization denominator is
+            invalid, or one trade index is invalid.
     Side Effects:
         None.
     Docs:
@@ -117,6 +124,8 @@ def compute_no_risk_metrics_v2(
         values=exec_close,
         sentinel_index=sentinel_index,
     )
+    if bars_per_year_exec <= 0.0:
+        raise ValueError("bars_per_year_exec must be > 0")
 
     available_quote = float(execution_params.init_cash_quote)
     safe_quote = 0.0
@@ -127,6 +136,8 @@ def compute_no_risk_metrics_v2(
     gross_loss_quote = 0.0
     trade_count = 0
     win_count = 0
+    sum_trade_return = 0.0
+    sum_trade_return_squared = 0.0
     total_trade_return_pct = 0.0
     total_trade_exec_bars = 0.0
     exposure_bars = 0.0
@@ -193,6 +204,7 @@ def compute_no_risk_metrics_v2(
                 max_drawdown_pct = drawdown_pct
 
         trade_return_pct = (net_pnl_quote / quote_amount) * 100.0
+        trade_return = net_pnl_quote / quote_amount
         bars_held = float(max(exit_exec_idx - trade.entry_exec_idx, 0))
         trade_count += 1
         if net_pnl_quote > 0.0:
@@ -200,6 +212,8 @@ def compute_no_risk_metrics_v2(
             gross_profit_quote += net_pnl_quote
         elif net_pnl_quote < 0.0:
             gross_loss_quote += abs(net_pnl_quote)
+        sum_trade_return += trade_return
+        sum_trade_return_squared += trade_return * trade_return
         total_trade_return_pct += trade_return_pct
         total_trade_exec_bars += bars_held
         exposure_bars += bars_held
@@ -231,12 +245,20 @@ def compute_no_risk_metrics_v2(
     exposure_pct = (
         (exposure_bars / float(sentinel_index)) * 100.0 if sentinel_index > 0 else 0.0
     )
+    sharpe_trades = _trade_sharpe_v2(
+        trade_count=trade_count,
+        sum_trade_return=sum_trade_return,
+        sum_trade_return_squared=sum_trade_return_squared,
+        bars_per_year_exec=bars_per_year_exec,
+        sentinel_index=sentinel_index,
+    )
     return StageANoRiskMetricsV2(
         total_return_pct=total_return_pct,
         max_drawdown_pct=max_drawdown_pct,
         return_over_max_drawdown=return_over_max_drawdown,
         profit_factor=profit_factor,
         trade_count=trade_count,
+        sharpe_trades=sharpe_trades,
         win_rate_pct=win_rate_pct,
         avg_trade_ret_pct=avg_trade_ret_pct,
         avg_trade_exec_bars=avg_trade_exec_bars,
@@ -274,13 +296,62 @@ def no_risk_metrics_to_ranking_payload_v2(
             "max_drawdown_pct": metrics.max_drawdown_pct,
             "return_over_max_drawdown": metrics.return_over_max_drawdown,
             "profit_factor": metrics.profit_factor,
-            "trade_count": float(metrics.trade_count),
+            "sharpe_trades": metrics.sharpe_trades,
             "win_rate_pct": metrics.win_rate_pct,
+            "trade_count": float(metrics.trade_count),
             "avg_trade_ret_pct": metrics.avg_trade_ret_pct,
             "avg_trade_exec_bars": metrics.avg_trade_exec_bars,
             "exposure_pct": metrics.exposure_pct,
         }
     )
+
+
+def _trade_sharpe_v2(
+    *,
+    trade_count: int,
+    sum_trade_return: float,
+    sum_trade_return_squared: float,
+    bars_per_year_exec: float,
+    sentinel_index: int,
+) -> float:
+    """
+    Compute notebook-style Sharpe over trade returns with execution-bar annualization.
+
+    Args:
+        trade_count: Number of closed trades in the replay.
+        sum_trade_return: Sum of per-trade returns after fees.
+        sum_trade_return_squared: Sum of squared per-trade returns after fees.
+        bars_per_year_exec: Annualization denominator in execution bars.
+        sentinel_index: Total execution bars in the replay window.
+    Returns:
+        float: Deterministic trade-level Sharpe ratio.
+    Assumptions:
+        Sharpe uses `trades_per_year`, not bar returns, to match notebook semantics.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+      - src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py
+      - tests/unit/contexts/backtest/application/services/v2/test_trade_compactor_kernel_v2.py
+    """
+    if trade_count <= 1:
+        return 0.0
+    mean_trade_return = sum_trade_return / float(trade_count)
+    variance = (sum_trade_return_squared / float(trade_count)) - (
+        mean_trade_return * mean_trade_return
+    )
+    if variance <= 0.0:
+        return 0.0
+    years = float(sentinel_index) / float(bars_per_year_exec)
+    if years <= 0.0:
+        years = 1.0
+    trades_per_year = float(trade_count) / years
+    return (mean_trade_return / math.sqrt(variance)) * math.sqrt(trades_per_year)
 
 
 def _build_compact_trade_row_v2(

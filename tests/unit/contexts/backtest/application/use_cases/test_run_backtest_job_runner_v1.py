@@ -643,11 +643,15 @@ class _RankingAwareScorerWithDetails:
             else 0.0
         )
         total_return = 100.0 - primary
+        win_rate_pct = 100.0 - (secondary * 10.0)
+        sharpe_trades = total_return + (1.0 - secondary)
         return {
             "Total Return [%]": total_return,
             "total_return_pct": total_return,
             "max_drawdown_pct": primary,
             "profit_factor": secondary,
+            "sharpe_trades": sharpe_trades,
+            "win_rate_pct": win_rate_pct,
             "return_over_max_drawdown": (
                 total_return / primary if primary != 0.0 else float("inf")
             ),
@@ -1372,6 +1376,67 @@ def test_process_claimed_job_applies_configured_primary_and_secondary_ranking() 
     assert tuple(
         float(row.payload_json["risk_params"]["sl_pct"] or 0.0) for row in running_rows
     ) == (1.0, 0.0, 1.0, 0.0)
+
+
+def test_process_claimed_job_applies_secondary_win_rate_ordering() -> None:
+    """
+    Verify worker Stage-B ordering supports `win_rate_pct DESC` as configured secondary metric.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Fixture scorer derives `win_rate_pct` from `sl_pct`, so disabled SL outranks enabled SL
+        under equal `max_drawdown_pct`.
+    Raises:
+        AssertionError: If running snapshot order violates configured win-rate tie-break.
+    Side Effects:
+        None.
+    """
+    job = _build_running_job()
+    request = _build_request(
+        top_k=4,
+        preselect=2,
+        top_trades_n=1,
+        ranking=BacktestRankingConfig(
+            primary_metric="max_drawdown_pct",
+            secondary_metric="win_rate_pct",
+        ),
+    )
+    base_variants = _build_stage_a_variants()
+    risk_variants = _build_risk_variants()
+    job_repository = _FakeJobRepository(default_job=job)
+    lease_repository = _FakeLeaseRepository()
+    results_repository = _FakeResultsRepository()
+    use_case = _build_use_case(
+        request=request,
+        job_repository=job_repository,
+        lease_repository=lease_repository,
+        results_repository=results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=risk_variants,
+        ),
+        scorer=_RankingAwareScorerWithDetails(),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=4,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 6, 0)),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    running_rows = results_repository.replace_calls[0]["rows"]
+    assert tuple(
+        int(row.payload_json["signal_params"]["ema"]["threshold"]) for row in running_rows
+    ) == (1, 1, 2, 2)
+    assert tuple(
+        float(row.payload_json["risk_params"]["sl_pct"] or 0.0) for row in running_rows
+    ) == (0.0, 1.0, 0.0, 1.0)
 
 
 def test_process_claimed_job_cancels_on_batch_boundary() -> None:

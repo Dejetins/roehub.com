@@ -749,18 +749,18 @@ def test_run_backtest_use_case_bootstraps_active_slot_pinned_context_before_runt
     assert resolver.context.artifact_manifest_hash == "d" * 64
 
 
-def test_run_backtest_use_case_returns_trades_only_for_configured_top_n() -> None:
+def test_run_backtest_use_case_sync_summary_path_stays_summary_only() -> None:
     """
-    Verify reporting payload keeps full trades only for configured best N variants.
+    Verify sync runtime summary path omits report/trades bodies even with legacy eager flag set.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Variant ranking is deterministic by `Total Return [%]` descending.
+        Explicit eager flag must not re-enable runtime report/trades materialization.
     Raises:
-        AssertionError: If trades are not restricted to configured top-N variants.
+        AssertionError: If sync runtime summary response contains eager report/trades payloads.
     Side Effects:
         None.
     """
@@ -791,14 +791,7 @@ def test_run_backtest_use_case_returns_trades_only_for_configured_top_n() -> Non
     assert response.variants[0].total_return_pct == 30.0
     assert response.variants[1].total_return_pct == 25.0
     assert response.variants[2].total_return_pct == 20.0
-    assert response.variants[0].report is not None
-    assert response.variants[0].report.trades is not None
-    assert response.variants[1].report is not None
-    assert response.variants[1].report.trades is not None
-    assert response.variants[2].report is not None
-    assert response.variants[2].report.trades is None
-    assert response.variants[0].report.table_md is not None
-    assert response.variants[0].report.table_md.startswith("|Metric|Value|")
+    assert all(item.report is None for item in response.variants)
 
 
 def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_available() -> None:
@@ -984,7 +977,7 @@ def test_run_backtest_use_case_lazy_mode_omits_eager_reports_by_default() -> Non
     Returns:
         None.
     Assumptions:
-        `eager_top_reports_enabled` defaults to `False` during migration window.
+        Sync runtime summaries are summary-only by default.
     Raises:
         AssertionError: If report payload is unexpectedly present by default.
     Side Effects:

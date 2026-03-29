@@ -236,7 +236,9 @@ class RunBacktestJobRunnerV1:
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k request fallback.
             preselect_default: Runtime default Stage-A shortlist size.
-            top_trades_n_default: Runtime default trades payload cap in finalizing.
+            top_trades_n_default:
+                Retained compatibility default for downstream detail/report flows; job snapshots
+                and final persisted rows remain summary-only during R6-04.
             ranking_primary_metric_default:
                 Runtime default for ranking primary metric literal.
             ranking_secondary_metric_default:

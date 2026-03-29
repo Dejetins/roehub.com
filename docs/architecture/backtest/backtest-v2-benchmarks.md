@@ -17,7 +17,8 @@ R0 не внедряет runtime v2, а фиксирует:
 - где лежат reproducible inputs и как сохранять измерения.
 
 R6-01 не меняет сам R0 baseline, R6-02 добавляет deterministic Stage A shortlist verification,
-а R6-03 добавляет Stage B artifact-backed risk kernel verification поверх этого baseline. Для
+R6-03 добавляет Stage B artifact-backed risk kernel verification поверх этого baseline, а
+R6-04 фиксирует полный runtime ranking contract и summary-only top-N materialization. Для
 следующих milestone-сравнений обязательны:
 
 - shared `slot-pinned context` bootstrap для sync/background;
@@ -28,8 +29,13 @@ R6-01 не меняет сам R0 baseline, R6-02 добавляет determinist
   `mappings/<tf>/bar_close_1m_idx.u32.npy`, `hit_times/1m/manifest.yaml`.
 - deterministic `final_signal` aggregation, compact trade construction и shortlist ordering на
   `artifacts-only inputs`.
+- approved runtime ranking literals:
+  `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`, `profit_factor`,
+  `sharpe_trades`, `win_rate_pct`.
 - deterministic Stage B `1m hit-times` risk exits, fast TP/SL search и exact best-cell replay без
   runtime recompute hit-times.
+- summary-only runtime rows: ranking payload определяет inclusion в `top_n`, а report/trades тела
+  не materialize'ятся в sync/jobs summary paths.
 
 ## Артефакты R0
 
@@ -82,6 +88,7 @@ R0 intentionally не фиксирует machine-specific SLA. Проверяе�
   - compact trades с `entry_exec_idx`, `sig_exit_exec_idx`, `sentinel_index`,
     local `bar_close_1m_idx`;
   - no-risk shortlist ordering без Stage B TP/SL replay;
+  - `sharpe_trades` входит в no-risk ranking payload наравне с остальными approved literals;
   - deterministic tie-break по stable keys (`base_variant_key ASC` при равенстве ranking
     metrics);
   - `chunked variant processing` equivalence against non-chunked reference path.
@@ -198,6 +205,19 @@ uv run pytest -q \
   tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py \
   tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py \
   tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+```
+
+8. Проверить R6-04 ranking contract и summary-only materialization:
+
+```bash
+uv run pytest -q \
+  tests/unit/apps/api/test_backtests_dto.py \
+  tests/unit/contexts/backtest/adapters/test_backtest_runtime_config.py \
+  tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py \
+  tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py \
+  tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
 ```
 
 Где хранятся outputs:

@@ -110,16 +110,16 @@ def test_build_backtest_run_request_normalizes_ranking_metrics() -> None:
                 ],
             },
             "ranking": {
-                "primary_metric": "RETURN_OVER_MAX_DRAWDOWN",
-                "secondary_metric": "PROFIT_FACTOR",
+                "primary_metric": "SHARPE_TRADES",
+                "secondary_metric": "WIN_RATE_PCT",
             },
         }
     )
 
     built = build_backtest_run_request(request=request)
     assert built.ranking is not None
-    assert built.ranking.primary_metric == "return_over_max_drawdown"
-    assert built.ranking.secondary_metric == "profit_factor"
+    assert built.ranking.primary_metric == "sharpe_trades"
+    assert built.ranking.secondary_metric == "win_rate_pct"
 
 
 def test_backtests_post_request_rejects_unknown_ranking_metric() -> None:

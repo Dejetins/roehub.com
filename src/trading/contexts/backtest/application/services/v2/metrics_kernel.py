@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from types import MappingProxyType
 
 import numpy as np
@@ -12,7 +11,11 @@ from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1, TradeV
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
 from .contracts import StageBMetricsV2, StageBReplayPayloadV2, StageBTradeExitV2
-from .trade_compactor_kernel import _entry_quote_amount_v2, _fill_price_from_mark_v2
+from .trade_compactor_kernel import (
+    _entry_quote_amount_v2,
+    _fill_price_from_mark_v2,
+    _trade_sharpe_v2,
+)
 
 _BARS_PER_YEAR_EXEC_1M_V2 = 365.0 * 24.0 * 60.0
 
@@ -302,55 +305,6 @@ def build_execution_outcome_from_replay_v2(
         safe_quote=safe_quote,
         total_return_pct=float(metrics.total_return_pct),
     )
-
-
-def _trade_sharpe_v2(
-    *,
-    trade_count: int,
-    sum_trade_return: float,
-    sum_trade_return_squared: float,
-    bars_per_year_exec: float,
-    sentinel_index: int,
-) -> float:
-    """
-    Compute notebook-style Sharpe over trade returns with execution-bar annualization.
-
-    Args:
-        trade_count: Number of closed trades in the replay.
-        sum_trade_return: Sum of per-trade returns after fees.
-        sum_trade_return_squared: Sum of squared per-trade returns after fees.
-        bars_per_year_exec: Annualization denominator in execution bars.
-        sentinel_index: Total execution bars in the replay window.
-    Returns:
-        float: Deterministic trade-level Sharpe ratio.
-    Assumptions:
-        Sharpe uses `trades_per_year`, not bar returns, to match notebook semantics.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    Docs:
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-    Related:
-      - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
-      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
-    """
-    if trade_count <= 1:
-        return 0.0
-    mean_trade_return = sum_trade_return / float(trade_count)
-    variance = (sum_trade_return_squared / float(trade_count)) - (
-        mean_trade_return * mean_trade_return
-    )
-    if variance <= 0.0:
-        return 0.0
-    years = float(sentinel_index) / float(bars_per_year_exec)
-    if years <= 0.0:
-        years = 1.0
-    trades_per_year = float(trade_count) / years
-    return (mean_trade_return / math.sqrt(variance)) * math.sqrt(trades_per_year)
-
-
 def _normalize_execution_prices_v2(
     *,
     field_name: str,

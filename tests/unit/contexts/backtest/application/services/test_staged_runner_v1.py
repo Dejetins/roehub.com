@@ -328,7 +328,16 @@ class _ConstantTieScorer:
             indicator_variant_key,
             variant_key,
         )
-        return {TOTAL_RETURN_METRIC_LITERAL: 1.0}
+        return {
+            TOTAL_RETURN_METRIC_LITERAL: 1.0,
+            "total_return_pct": 1.0,
+            "max_drawdown_pct": 1.0,
+            "Max. Drawdown [%]": 1.0,
+            "return_over_max_drawdown": 1.0,
+            "profit_factor": 1.0,
+            "sharpe_trades": 1.0,
+            "win_rate_pct": 1.0,
+        }
 
 
 class _WindowScorer:
@@ -432,11 +441,15 @@ class _MultiMetricScorer:
         )
         max_drawdown_pct = float(window)
         profit_factor = sl_pct
+        win_rate_pct = 100.0 - (sl_pct * 10.0)
+        sharpe_trades = float(window) + (2.0 - sl_pct)
         return {
             TOTAL_RETURN_METRIC_LITERAL: float(window),
             "total_return_pct": float(window),
             "max_drawdown_pct": max_drawdown_pct,
             "profit_factor": profit_factor,
+            "sharpe_trades": sharpe_trades,
+            "win_rate_pct": win_rate_pct,
             "return_over_max_drawdown": (
                 float(window) / max_drawdown_pct if max_drawdown_pct != 0.0 else float("inf")
             ),
@@ -741,6 +754,8 @@ class _RankingContextRecordingScorer:
             "max_drawdown_pct": max_drawdown_pct,
             "Max. Drawdown [%]": max_drawdown_pct,
             "profit_factor": 1.0 + max(total_return_pct, 0.0),
+            "sharpe_trades": total_return_pct,
+            "win_rate_pct": 100.0 - max_drawdown_pct,
             "return_over_max_drawdown": (
                 total_return_pct / max_drawdown_pct if max_drawdown_pct != 0.0 else float("inf")
             ),
@@ -975,18 +990,18 @@ def test_staged_runner_v1_stage_b_risk_expansion_reuses_signal_cache() -> None:
     assert indicator_compute.requested_layout_preferences == [Layout.VARIANT_MAJOR]
 
 
-def test_staged_runner_v1_top_reports_use_retained_stage_b_details_without_rescore() -> None:
+def test_staged_runner_v1_runtime_summary_path_stays_summary_only() -> None:
     """
-    Verify Stage-B ranking stays metric-only and details are scored only for retained top rows.
+    Verify runtime Stage-B summaries stay summary-only and never score details eagerly.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Requested time range enables report generation for ranked top variants.
+        Explicit request range must not re-enable eager report/trades materialization.
     Raises:
-        AssertionError: If Stage-B ranking path calls details scorer in hot loop.
+        AssertionError: If runtime summary path materializes reports or scores details eagerly.
     Side Effects:
         None.
     """
@@ -1007,11 +1022,84 @@ def test_staged_runner_v1_top_reports_use_retained_stage_b_details_without_resco
 
     assert len(result.variants) == 2
     assert tuple(item.total_return_pct for item in result.variants) == (4.0, 3.0)
-    assert all(item.report is not None for item in result.variants)
+    assert all(item.report is None for item in result.variants)
     assert scorer.stage_a_score_variant_calls == result.stage_a_variants_total
     assert scorer.stage_b_score_variant_calls == result.stage_b_variants_total
     assert scorer.legacy_score_variant_calls == 0
-    assert scorer.stage_b_score_variant_with_details_calls == len(result.variants)
+    assert scorer.stage_b_score_variant_with_details_calls == 0
+
+
+def test_staged_runner_v1_applies_primary_sharpe_trades_with_deterministic_tie_break() -> None:
+    """
+    Verify `sharpe_trades DESC` ranking still falls back to deterministic variant-key ordering.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Fixture scorer returns identical values for all approved ranking metrics.
+    Raises:
+        AssertionError: If configured `sharpe_trades` ranking breaks deterministic tie-break order.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1()
+    result = runner.run(
+        template=_template_for_tie_breaks(),
+        candles=_build_candles(bars=60),
+        preselect=4,
+        top_k=4,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=_ConstantTieScorer(),
+        ranking=BacktestRankingConfig(primary_metric="sharpe_trades"),
+    )
+
+    variant_keys = tuple(item.variant_key for item in result.variants)
+    assert variant_keys == tuple(sorted(variant_keys))
+
+
+def test_staged_runner_v1_applies_secondary_win_rate_ordering() -> None:
+    """
+    Verify `max_drawdown_pct ASC, win_rate_pct DESC` ordering stays deterministic in Stage B.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Fixture scorer derives `win_rate_pct` from `sl_pct`, so lower `sl_pct` outranks under
+        equal drawdown values.
+    Raises:
+        AssertionError: If secondary `win_rate_pct` ordering drifts.
+    Side Effects:
+        None.
+    """
+    runner = BacktestStagedRunnerV1()
+    result = runner.run(
+        template=_template_for_tie_breaks(),
+        candles=_build_candles(bars=60),
+        preselect=4,
+        top_k=4,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=_MultiMetricScorer(),
+        ranking=BacktestRankingConfig(
+            primary_metric="max_drawdown_pct",
+            secondary_metric="win_rate_pct",
+        ),
+    )
+
+    payloads = []
+    for item in result.variants:
+        assert item.payload is not None
+        payloads.append(item.payload)
+
+    ranked_windows = tuple(
+        int(payload.indicator_selections[0].params["window"]) for payload in payloads
+    )
+    ranked_sl_values = tuple(float(payload.risk_params["sl_pct"] or 0.0) for payload in payloads)
+    assert ranked_windows == (10, 10, 10, 10)
+    assert ranked_sl_values == (1.0, 1.0, 2.0, 2.0)
 
 
 def test_staged_runner_v1_forwards_stage_ranking_context_to_metric_scorer() -> None:

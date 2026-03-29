@@ -182,7 +182,8 @@ def test_backtest_staged_runner_perf_smoke_small_sync_grid() -> None:
     Returns:
         None.
     Assumptions:
-        Perf-smoke validates viability and shape, not strict latency SLA.
+        Perf-smoke validates viability, deterministic ordering and summary-only response shape,
+        not strict latency SLA.
     Raises:
         AssertionError: If staged run output contracts or catastrophic-time guard fail.
     Side Effects:
@@ -234,9 +235,7 @@ def test_backtest_staged_runner_perf_smoke_small_sync_grid() -> None:
 
     for variant in result.variants:
         assert np.isfinite(variant.total_return_pct)
-        assert variant.report is not None
-        assert variant.report.table_md is not None
-        assert variant.report.table_md.startswith("|Metric|Value|")
+        assert variant.report is None
 
 
 def _perf_smoke_template() -> RunBacktestTemplate:

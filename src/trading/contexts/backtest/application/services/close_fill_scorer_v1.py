@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
@@ -11,6 +12,7 @@ from typing import Any, Mapping, cast
 import numpy as np
 
 from trading.contexts.backtest.application.ports import (
+    BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1,
     BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
     BacktestVariantScoreDetailsV1,
@@ -36,6 +38,7 @@ from trading.contexts.indicators.domain.entities import IndicatorId, Layout
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
 from trading.platform.errors import RoehubError
 
+from .equity_curve_builder_v1 import BacktestEquityCurveBuilderV1
 from .execution_engine_v1 import BacktestExecutionEngineV1
 from .grid_builder_v1 import (
     STAGE_A_LITERAL,
@@ -64,6 +67,13 @@ _DEFAULT_FEE_PCT_BY_MARKET_ID = {
 _DEFAULT_SIGNALS_CACHE_MAX_ENTRIES = 2048
 _DEFAULT_SIGNALS_CACHE_MAX_BYTES = 32 * 1024 * 1024
 _EMPTY_SCALAR_MAPPING: Mapping[str, BacktestVariantScalar] = MappingProxyType({})
+_RANKING_TOTAL_RETURN_METRIC_LITERAL = "total_return_pct"
+_RANKING_MAX_DRAWDOWN_METRIC_LITERAL = "max_drawdown_pct"
+_RANKING_RETURN_OVER_MAX_DRAWDOWN_METRIC_LITERAL = "return_over_max_drawdown"
+_RANKING_PROFIT_FACTOR_METRIC_LITERAL = "profit_factor"
+_RANKING_SHARPE_TRADES_METRIC_LITERAL = "sharpe_trades"
+_RANKING_WIN_RATE_PCT_METRIC_LITERAL = "win_rate_pct"
+_SECONDS_PER_YEAR_V1 = 365.0 * 24.0 * 60.0 * 60.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -328,6 +338,8 @@ class CloseFillBacktestStagedScorerV1(
         self._signals_cache_total_bytes = 0
         self._signals_cache_lock = Lock()
         self._prepared_grid_context: _PreparedGridContext | None = None
+        self._ranking_primary_by_stage: dict[str, str] = {}
+        self._ranking_secondary_by_stage: dict[str, str | None] = {}
 
     def prepare_for_grid_context(
         self,
@@ -414,6 +426,41 @@ class CloseFillBacktestStagedScorerV1(
             dependency_plans=MappingProxyType(dict(dependency_plans)),
             total_tensor_bytes=total_tensor_bytes,
         )
+
+    def configure_stage_ranking_context(
+        self,
+        *,
+        stage: str,
+        primary_metric: str,
+        secondary_metric: str | None,
+    ) -> None:
+        """
+        Store active staged ranking literals so legacy scoring computes only required metrics.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            primary_metric: Active primary ranking metric literal.
+            secondary_metric: Active secondary ranking metric literal or `None`.
+        Returns:
+            None.
+        Assumptions:
+            Total return remains part of the ranking payload for backward-compatible previews even
+            when another metric drives ordering.
+        Raises:
+            None.
+        Side Effects:
+            Updates in-memory per-stage ranking hints for the current scorer instance.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/
+            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+          - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+        """
+        self._ranking_primary_by_stage[stage] = primary_metric
+        self._ranking_secondary_by_stage[stage] = secondary_metric
 
     def _prepare_tensor_plan_for_indicator(
         self,
@@ -683,7 +730,17 @@ class CloseFillBacktestStagedScorerV1(
             execution_params=execution_params,
             risk_params=resolved_risk_params,
         )
-        metrics = MappingProxyType({TOTAL_RETURN_METRIC_LITERAL: float(outcome.total_return_pct)})
+        metrics = _ranking_metrics_from_execution_payload_v1(
+            candles=candles,
+            target_slice=self._target_slice,
+            execution_params=execution_params,
+            outcome=outcome,
+            requested_metric_literals=_requested_ranking_metric_literals_for_stage_v1(
+                ranking_primary_by_stage=self._ranking_primary_by_stage,
+                ranking_secondary_by_stage=self._ranking_secondary_by_stage,
+                stage=resolved_stage,
+            ),
+        )
         return (metrics, execution_params, resolved_risk_params, outcome)
 
     def _resolve_signal_cache_key(
@@ -1539,6 +1596,289 @@ def _normalize_fee_defaults(
     if len(normalized) == 0:
         raise ValueError("fee defaults mapping must be non-empty")
     return MappingProxyType(normalized)
+
+
+def _requested_ranking_metric_literals_for_stage_v1(
+    *,
+    ranking_primary_by_stage: Mapping[str, str],
+    ranking_secondary_by_stage: Mapping[str, str | None],
+    stage: str,
+) -> tuple[str, ...]:
+    """
+    Resolve minimal deterministic ranking metric set needed for one stage score call.
+
+    Args:
+        ranking_primary_by_stage: Active primary ranking metric by stage literal.
+        ranking_secondary_by_stage: Active secondary ranking metric by stage literal.
+        stage: Stage literal (`stage_a` or `stage_b`).
+    Returns:
+        tuple[str, ...]: Ordered metric literals required for the current stage score.
+    Assumptions:
+        When no stage ranking hint was forwarded yet, legacy scorer computes the full approved
+        ranking metric set to preserve direct-call compatibility.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/ports/staged_runner.py
+    """
+    primary_metric = ranking_primary_by_stage.get(stage)
+    secondary_metric = ranking_secondary_by_stage.get(stage)
+    if primary_metric is None:
+        return tuple(BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1.keys())
+
+    metric_literals: list[str] = [_RANKING_TOTAL_RETURN_METRIC_LITERAL, primary_metric]
+    if secondary_metric is not None:
+        metric_literals.append(secondary_metric)
+    if _RANKING_RETURN_OVER_MAX_DRAWDOWN_METRIC_LITERAL in metric_literals:
+        metric_literals.append(_RANKING_MAX_DRAWDOWN_METRIC_LITERAL)
+
+    ordered_unique_metrics: list[str] = []
+    seen: set[str] = set()
+    for metric_literal in metric_literals:
+        if metric_literal in seen:
+            continue
+        seen.add(metric_literal)
+        ordered_unique_metrics.append(metric_literal)
+    return tuple(ordered_unique_metrics)
+
+
+def _ranking_metrics_from_execution_payload_v1(
+    *,
+    candles: CandleArrays,
+    target_slice: slice,
+    execution_params: ExecutionParamsV1,
+    outcome: ExecutionOutcomeV1,
+    requested_metric_literals: tuple[str, ...],
+) -> RankingMetricsV1:
+    """
+    Build deterministic ranking metrics for legacy close-fill fallback paths.
+
+    Args:
+        candles: Warmup-inclusive candles aligned to the scored execution outcome.
+        target_slice: Trading slice used by the close-fill engine.
+        execution_params: Immutable execution settings used during scoring.
+        outcome: Deterministic execution outcome with closed trades and total return.
+        requested_metric_literals: Ordered ranking metric literals required by current stage.
+    Returns:
+        RankingMetricsV1: Immutable ranking payload with stable literal aliases.
+    Assumptions:
+        Runtime summary paths still expose `total_return_pct`, while drawdown-dependent metrics are
+        computed only when the active ranking plan needs them.
+    Raises:
+        ValueError: If target-slice or equity-curve contracts drift.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+    """
+    metrics: dict[str, float] = {
+        TOTAL_RETURN_METRIC_LITERAL: float(outcome.total_return_pct),
+        _RANKING_TOTAL_RETURN_METRIC_LITERAL: float(outcome.total_return_pct),
+    }
+    ordered_trades = tuple(
+        sorted(outcome.trades, key=lambda item: (item.trade_id, item.entry_bar_index))
+    )
+    trade_count = len(ordered_trades)
+    win_count = 0
+    gross_profit_quote = 0.0
+    gross_loss_quote = 0.0
+    sum_trade_return = 0.0
+    sum_trade_return_squared = 0.0
+
+    for trade in ordered_trades:
+        if trade.net_pnl_quote > 0.0:
+            win_count += 1
+            gross_profit_quote += float(trade.net_pnl_quote)
+        elif trade.net_pnl_quote < 0.0:
+            gross_loss_quote += abs(float(trade.net_pnl_quote))
+        trade_return = float(trade.net_pnl_quote) / float(trade.entry_quote_amount)
+        sum_trade_return += trade_return
+        sum_trade_return_squared += trade_return * trade_return
+
+    if _RANKING_WIN_RATE_PCT_METRIC_LITERAL in requested_metric_literals:
+        metrics[_RANKING_WIN_RATE_PCT_METRIC_LITERAL] = (
+            (float(win_count) / float(trade_count)) * 100.0 if trade_count > 0 else 0.0
+        )
+    if _RANKING_PROFIT_FACTOR_METRIC_LITERAL in requested_metric_literals:
+        if gross_loss_quote > 0.0:
+            profit_factor = gross_profit_quote / gross_loss_quote
+        elif gross_profit_quote > 0.0:
+            profit_factor = float("inf")
+        else:
+            profit_factor = 0.0
+        metrics[_RANKING_PROFIT_FACTOR_METRIC_LITERAL] = profit_factor
+    if _RANKING_SHARPE_TRADES_METRIC_LITERAL in requested_metric_literals:
+        metrics[_RANKING_SHARPE_TRADES_METRIC_LITERAL] = _trade_sharpe_v1(
+            trade_count=trade_count,
+            sum_trade_return=sum_trade_return,
+            sum_trade_return_squared=sum_trade_return_squared,
+            bars_per_year=_bars_per_year_for_candles_v1(candles=candles),
+            target_slice=target_slice,
+        )
+
+    requires_drawdown_metrics = any(
+        metric_literal in requested_metric_literals
+        for metric_literal in (
+            _RANKING_MAX_DRAWDOWN_METRIC_LITERAL,
+            _RANKING_RETURN_OVER_MAX_DRAWDOWN_METRIC_LITERAL,
+        )
+    )
+    if requires_drawdown_metrics:
+        equity_curve = BacktestEquityCurveBuilderV1().build(
+            candles=candles,
+            target_slice=target_slice,
+            trades=ordered_trades,
+            execution_params=execution_params,
+        )
+        max_drawdown_pct = _max_drawdown_pct_from_equity_curve_v1(
+            equity_close_quote=equity_curve.equity_close_quote,
+        )
+        metrics[_RANKING_MAX_DRAWDOWN_METRIC_LITERAL] = max_drawdown_pct
+        metrics["Max. Drawdown [%]"] = max_drawdown_pct
+        if max_drawdown_pct > 0.0:
+            metrics[_RANKING_RETURN_OVER_MAX_DRAWDOWN_METRIC_LITERAL] = (
+                float(outcome.total_return_pct) / max_drawdown_pct
+            )
+        elif float(outcome.total_return_pct) > 0.0:
+            metrics[_RANKING_RETURN_OVER_MAX_DRAWDOWN_METRIC_LITERAL] = float("inf")
+        else:
+            metrics[_RANKING_RETURN_OVER_MAX_DRAWDOWN_METRIC_LITERAL] = 0.0
+    return MappingProxyType(metrics)
+
+
+def _max_drawdown_pct_from_equity_curve_v1(
+    *,
+    equity_close_quote: np.ndarray,
+) -> float:
+    """
+    Compute deterministic maximum drawdown percentage from bar-close equity curve values.
+
+    Args:
+        equity_close_quote: Close-equity vector aligned to the runtime `target_slice`.
+    Returns:
+        float: Maximum drawdown percentage in `[0, +inf)`.
+    Assumptions:
+        Equity curve is ordered by bar close and may be empty for zero-length target slices.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
+      - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+    """
+    if int(equity_close_quote.shape[0]) == 0:
+        return 0.0
+    peak = float(equity_close_quote[0])
+    max_drawdown_pct = 0.0
+    for value in equity_close_quote:
+        equity_value = float(value)
+        if equity_value > peak:
+            peak = equity_value
+            continue
+        if peak <= 0.0:
+            continue
+        drawdown_pct = ((peak - equity_value) / peak) * 100.0
+        if drawdown_pct > max_drawdown_pct:
+            max_drawdown_pct = drawdown_pct
+    return max_drawdown_pct
+
+
+def _bars_per_year_for_candles_v1(*, candles: CandleArrays) -> float:
+    """
+    Convert candle timeframe duration into deterministic bars-per-year scalar.
+
+    Args:
+        candles: Warmup-inclusive candle arrays with canonical timeframe object.
+    Returns:
+        float: Approximate bars-per-year count for the candle timeframe.
+    Assumptions:
+        Legacy close-fill fallback annualizes `sharpe_trades` by request-timeframe bars because it
+        does not use `1m` execution artifacts.
+    Raises:
+        ValueError: If timeframe duration is non-positive.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/shared_kernel/primitives/timeframe.py
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+    """
+    timeframe_seconds = candles.timeframe.duration().total_seconds()
+    if timeframe_seconds <= 0.0:
+        raise ValueError("candles.timeframe duration must be > 0")
+    return _SECONDS_PER_YEAR_V1 / timeframe_seconds
+
+
+def _trade_sharpe_v1(
+    *,
+    trade_count: int,
+    sum_trade_return: float,
+    sum_trade_return_squared: float,
+    bars_per_year: float,
+    target_slice: slice,
+) -> float:
+    """
+    Compute deterministic trade-level Sharpe for legacy close-fill fallback scoring.
+
+    Args:
+        trade_count: Number of closed trades in the scored runtime window.
+        sum_trade_return: Sum of per-trade net returns after fees.
+        sum_trade_return_squared: Sum of squared per-trade net returns after fees.
+        bars_per_year: Annualization denominator derived from request timeframe bars.
+        target_slice: Runtime target slice used to estimate years in the scored window.
+    Returns:
+        float: Trade-level Sharpe ratio or `0.0` for degenerate inputs.
+    Assumptions:
+        Legacy fallback annualizes over request-timeframe bars because exact `1m` replay is not
+        available outside artifact-backed R6 kernels.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+      - tests/unit/contexts/backtest/application/services/test_close_fill_scorer_v1.py
+    """
+    if trade_count <= 1:
+        return 0.0
+    mean_trade_return = sum_trade_return / float(trade_count)
+    variance = (sum_trade_return_squared / float(trade_count)) - (
+        mean_trade_return * mean_trade_return
+    )
+    if variance <= 0.0:
+        return 0.0
+    target_bars = int((target_slice.stop or 0) - (target_slice.start or 0))
+    if target_bars <= 0:
+        target_bars = 1
+    years = float(target_bars) / float(bars_per_year)
+    if years <= 0.0:
+        years = 1.0
+    trades_per_year = float(trade_count) / years
+    return (mean_trade_return / math.sqrt(variance)) * math.sqrt(trades_per_year)
 
 
 def _encode_mixed_radix(

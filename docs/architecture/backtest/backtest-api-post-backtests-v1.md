@@ -53,8 +53,17 @@
 - Auth: endpoint защищён; доступ только для authenticated user.
   - saved mode: ownership/deleted checks выполняются в backtest use-case (не в HTTP слое).
 - Output policy v1:
-  - для grid запуска возвращаем только top-K (default `top_k_default=300`, override из request),
-  - ranking key: `Total Return [%]` (desc), tie-break: `variant_key` (asc).
+  - для grid запуска возвращаем только top-K summary rows (default `top_k_default=300`,
+    override из request),
+  - ranking выбирается по 1-2 approved runtime metrics:
+    `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
+    `profit_factor`, `sharpe_trades`, `win_rate_pct`,
+  - direction map фиксирован:
+    `total_return_pct DESC`, `max_drawdown_pct ASC`,
+    `return_over_max_drawdown DESC`, `profit_factor DESC`,
+    `sharpe_trades DESC`, `win_rate_pct DESC`,
+  - deterministic tie-break: `variant_key` (ASC),
+  - `report` и `trades` в runtime summary response не materialize'ятся.
 - Unified errors:
   - 422 payload детерминированный и единый через `RoehubError`.
 - Reproducibility:
@@ -131,15 +140,14 @@ Response v1 включает:
 Зачем:
 - подтверждение воспроизводимости и защита от “тихих” изменений runtime defaults.
 
-### 6) Sync response по умолчанию lazy; eager reports управляются feature flag
+### 6) Sync response остаётся summary-only; full report грузится on-demand
 
 - По умолчанию `POST /backtests` возвращает ranking + payload summary без `report` body.
 - Поля `rows/table_md/trades` загружаются on-demand через `POST /api/backtests/variant-report`.
-- Legacy eager mode включается только runtime flag:
-  `backtest.reporting.eager_top_reports_enabled=true`.
-
-Даже в eager mode ранжирование остаётся metric-only (`total_return_pct` + tie-break по `variant_key`),
-а `top_trades_n` продолжает ограничивать объём trades payload.
+- Runtime flag `backtest.reporting.eager_top_reports_enabled` остаётся только как compatibility
+  knob для переходного wiring, но summary path R6-04 всё равно не строит `report`/`trades` тела.
+- `top_trades_n` остаётся параметром downstream detail/report flows и не включает eager
+  materialization в summary response.
 
 ### 7) Sync cancellation: disconnect + hard deadline (кооперативно, без kill)
 
@@ -182,7 +190,7 @@ HTTP response schema при этом не меняется.
 Common fields:
 
 - `time_range`: `{start, end}` (UTC, half-open `[start, end)`).
-- `warmup_bars?`, `top_k?`, `preselect?`, `top_trades_n?`.
+- `warmup_bars?`, `top_k?`, `preselect?`, `top_trades_n?`, `ranking?`.
 
 Mode selection:
 
@@ -217,6 +225,15 @@ Percent units:
 - `slippage_pct=0.01` means `0.01%`.
 - `sl_pct=3.0` means `3%`.
 
+Ranking override:
+
+- `ranking.primary_metric` и `ranking.secondary_metric?` используют approved literals:
+  `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`, `profit_factor`,
+  `sharpe_trades`, `win_rate_pct`.
+- `secondary_metric` не может дублировать `primary_metric`.
+- Если ranking не задан, применяются runtime defaults:
+  `primary_metric=total_return_pct`, `secondary_metric=null`.
+
 ### Response (v1)
 
 Response содержит:
@@ -229,7 +246,7 @@ Response содержит:
   - `spec_hash?` or `grid_request_hash?`
   - `engine_params_hash`
 - `variants[]` (length `<= top_k`), отсортировано:
-  - primary: `Total Return [%]` desc
+  - primary/secondary: по выбранному ranking contract
   - tie-break: `variant_key` asc
 
 Каждый `variants[i]` содержит:
@@ -237,9 +254,9 @@ Response содержит:
 - `variant_index`, `variant_key`, `indicator_variant_key`
 - `total_return_pct`
 - `report`:
-  - `null` в lazy policy (default),
-  - `rows + table_md + optional trades` только когда
-    `backtest.reporting.eager_top_reports_enabled=true`
+  - всегда `null` в runtime summary response R6-04
+  - полный `rows + table_md + optional trades` загружается только через
+    `POST /api/backtests/variant-report`
 - `payload` (explicit parameters for saving):
   - `indicator_selections[]`
   - `signals`

@@ -5,8 +5,8 @@
 `tests/notebook_tests/06_backtest_compute.ipynb` в generic runtime boundaries, не меняя shipped
 R5-01 artifact contracts.
 
-Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02 + R6-03`  
-Следующие этапы реализации: `Milestone R6 / EPIC R6-04`
+Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02 + R6-03 + R6-04`  
+Следующие этапы реализации: `R7 persisted-run storage/API cutover`, `full legacy runtime cutover`
 
 Связанные документы:
 
@@ -100,9 +100,9 @@ artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kerne
 - artifact-backed Stage B scorer используется additively в sync/background runtime, когда есть
   валидный `slot-pinned context`, а legacy close-fill scorer остаётся guard fallback.
 
-Что остаётся вне scope после R6-03:
+Что остаётся вне scope после R6-04:
 
-- ranking/top-N runtime materialization из R6-04;
+- persisted-run storage schema/API cutover для history/detail flows из R7;
 - full cutover с legacy scorer/execution paths на v2 runtime kernels.
 
 ## Stage A Contract
@@ -244,6 +244,7 @@ load stage_a_output
   - `max_drawdown_pct`
   - `return_over_max_drawdown`
   - `profit_factor`
+  - `sharpe_trades`
   - `trade_count`
   - `win_rate_pct`
   - `avg_trade_ret_pct`
@@ -267,6 +268,15 @@ load stage_a_output
 
 - Вход: exact replay payload по лучшей ячейке и deterministic trade ordering.
 - Выход: ranking fields и финальные summary metrics.
+- Approved runtime ranking literals:
+  - `total_return_pct DESC`
+  - `max_drawdown_pct ASC`
+  - `return_over_max_drawdown DESC`
+  - `profit_factor DESC`
+  - `sharpe_trades DESC`
+  - `win_rate_pct DESC`
+- Deterministic final ordering для retained rows обязан оставаться
+  `ranking metrics -> variant_key ASC`.
 - Не должен:
   - делать DataFrame/report formatting;
   - materialize full trade bodies для всех variants;

@@ -2805,6 +2805,7 @@ class StageANoRiskMetricsV2:
     return_over_max_drawdown: float
     profit_factor: float
     trade_count: int
+    sharpe_trades: float
     win_rate_pct: float
     avg_trade_ret_pct: float
     avg_trade_exec_bars: float
@@ -2837,6 +2838,7 @@ class StageANoRiskMetricsV2:
             "max_drawdown_pct",
             "return_over_max_drawdown",
             "profit_factor",
+            "sharpe_trades",
             "win_rate_pct",
             "avg_trade_ret_pct",
             "avg_trade_exec_bars",

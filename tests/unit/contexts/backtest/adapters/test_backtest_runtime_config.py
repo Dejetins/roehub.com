@@ -419,8 +419,8 @@ backtest:
   top_k_default: 20
   preselect_default: 30
   ranking:
-    primary_metric_default: RETURN_OVER_MAX_DRAWDOWN
-    secondary_metric_default: profit_factor
+    primary_metric_default: SHARPE_TRADES
+    secondary_metric_default: WIN_RATE_PCT
   contracts:
     request_timeframes:
       allowed: [30m, 1h]
@@ -474,8 +474,8 @@ backtest:
     assert config.warmup_bars_default == 10
     assert config.top_k_default == 20
     assert config.preselect_default == 30
-    assert config.ranking.primary_metric_default == "return_over_max_drawdown"
-    assert config.ranking.secondary_metric_default == "profit_factor"
+    assert config.ranking.primary_metric_default == "sharpe_trades"
+    assert config.ranking.secondary_metric_default == "win_rate_pct"
     assert config.contracts.allowed_request_timeframes == ("30m", "1h")
     assert config.contracts.forbidden_request_timeframes == ("1m", "5m")
     assert config.contracts.top_n_default == 25

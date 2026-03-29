@@ -373,7 +373,7 @@ def build_finalized_snapshot_rows(
     trades_by_variant_key: Mapping[str, tuple[TradeV1, ...] | None],
 ) -> tuple[BacktestJobTopVariant, ...]:
     """
-    Build finalized succeeded snapshot rows with `report_table_md` and ranked trades policy.
+    Build finalized succeeded snapshot rows in summary-only form for persisted runtime storage.
 
     Args:
         job_id: Job identifier.
@@ -382,25 +382,24 @@ def build_finalized_snapshot_rows(
         direction_mode: Effective direction mode for payload.
         sizing_mode: Effective sizing mode for payload.
         execution_params: Effective execution parameters payload.
-        reports_by_variant_key: Markdown report table by variant key.
-        trades_by_variant_key: Optional trades tuple by variant key.
+        reports_by_variant_key:
+            Retained compatibility argument; summary-only persisted rows ignore eager report bodies.
+        trades_by_variant_key:
+            Retained compatibility argument; summary-only persisted rows ignore eager trades
+            payloads.
     Returns:
         tuple[BacktestJobTopVariant, ...]: Deterministic finalized rows.
     Assumptions:
-        Report markdown is present for every persisted candidate in succeeded finalization.
+        R6-04 keeps jobs `/top` snapshots and final rows summary-only; detail/report bodies remain
+        on-demand concerns outside persisted runtime materialization.
     Raises:
-        ValueError: If one candidate does not have required report markdown payload.
+        None.
     Side Effects:
         None.
     """
+    _ = reports_by_variant_key, trades_by_variant_key
     rows: list[BacktestJobTopVariant] = []
     for rank, candidate in enumerate(ranked_candidates, start=1):
-        report_table_md = reports_by_variant_key.get(candidate.variant_key)
-        if report_table_md is None:
-            raise ValueError(
-                "build_finalized_snapshot_rows requires report markdown for persisted candidate"
-            )
-        trades = trades_by_variant_key.get(candidate.variant_key)
         rows.append(
             BacktestJobTopVariant(
                 job_id=job_id,
@@ -415,8 +414,8 @@ def build_finalized_snapshot_rows(
                     sizing_mode=sizing_mode,
                     execution_params=execution_params,
                 ),
-                report_table_md=report_table_md,
-                trades_json=build_trades_json_payload(trades=trades),
+                report_table_md=None,
+                trades_json=None,
                 updated_at=now,
             )
         )

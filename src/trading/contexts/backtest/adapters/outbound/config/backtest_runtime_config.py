@@ -319,7 +319,7 @@ class BacktestFrozenContractRuntimeConfig:
         object.__setattr__(self, "allowed_request_timeframes", normalized_allowed_timeframes)
         object.__setattr__(self, "forbidden_request_timeframes", normalized_forbidden_timeframes)
 
-        normalized_ranking_metrics = _normalize_literal_sequence(
+        normalized_ranking_metrics = _normalize_ranking_metric_sequence(
             values=self.ranking_metrics,
             field_path="backtest.contracts.summary.ranking_metrics",
         )
@@ -1286,6 +1286,50 @@ def _normalize_literal_sequence(
         normalized_value = raw_value.strip()
         if not normalized_value:
             raise ValueError(f"{field_path} must not contain blank literals")
+        if normalized_value in seen:
+            raise ValueError(f"{field_path} must not contain duplicates")
+        seen.add(normalized_value)
+        normalized_values.append(normalized_value)
+    if len(normalized_values) == 0:
+        raise ValueError(f"{field_path} must not be empty")
+    return tuple(normalized_values)
+
+
+def _normalize_ranking_metric_sequence(
+    *,
+    values: Sequence[str],
+    field_path: str,
+) -> tuple[str, ...]:
+    """
+    Normalize ordered ranking-metric literals against the shared backtest contract.
+
+    Args:
+        values: Sequence of raw ranking metric literals.
+        field_path: Dotted field path used in validation errors.
+    Returns:
+        tuple[str, ...]: Normalized unique ranking metric literals in authored order.
+    Assumptions:
+        Runtime defaults must publish only approved backtest ranking literals while preserving
+        deterministic author-defined order.
+    Raises:
+        ValueError: If sequence is empty, contains duplicates, or one literal is unsupported.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - apps/api/dto/backtest_runtime_defaults.py
+    """
+    normalized_values: list[str] = []
+    seen: set[str] = set()
+    for raw_value in values:
+        normalized_value = normalize_backtest_ranking_metric_literal(
+            metric=raw_value,
+            field_path=field_path,
+        )
         if normalized_value in seen:
             raise ValueError(f"{field_path} must not contain duplicates")
         seen.add(normalized_value)

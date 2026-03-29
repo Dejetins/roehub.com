@@ -7,6 +7,7 @@ from trading.contexts.backtest.application.services import (
     BacktestJobSnapshotCadenceV1,
     BacktestJobTopKBufferV1,
     BacktestJobTopVariantCandidateV1,
+    build_finalized_snapshot_rows,
     build_running_snapshot_rows,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
@@ -247,3 +248,33 @@ def test_build_running_snapshot_rows_preserves_explicit_source_in_payload_json()
             "params": {"window": 20},
         }
     ]
+
+
+def test_build_finalized_snapshot_rows_remains_summary_only() -> None:
+    """
+    Verify finalized snapshot builder keeps `report_table_md` and `trades_json` null.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R6-04 persists summary-only top-N rows even for succeeded job snapshots.
+    Raises:
+        AssertionError: If finalized builder materializes eager report/trades payloads.
+    Side Effects:
+        None.
+    """
+    rows = build_finalized_snapshot_rows(
+        job_id=UUID("00000000-0000-0000-0000-000000000222"),
+        now=datetime(2026, 2, 23, 12, 30, tzinfo=timezone.utc),
+        ranked_candidates=(_candidate(variant_key="c" * 64, total_return_pct=11.0),),
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        execution_params={"fee_pct": 0.1, "fixed_quote": 100.0},
+        reports_by_variant_key={"c" * 64: "|Metric|Value|\n|---|---|"},
+        trades_by_variant_key={"c" * 64: None},
+    )
+
+    assert rows[0].report_table_md is None
+    assert rows[0].trades_json is None

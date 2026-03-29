@@ -1,7 +1,7 @@
 ---
 title: План оптимизации производительности staged backtest (ranking + reporting + UI on-demand) (v1)
 version: 1
-status: draft
+status: active roadmap; R6-04 ranking/materialization scope shipped
 owner: backtest
 ---
 
@@ -35,7 +35,9 @@ owner: backtest
 
 ## Инварианты (обязательно сохранить)
 
-- Детерминированный ranking order: сначала выбранные ranking metrics, затем `variant_key ASC`.
+- Детерминированный ranking order:
+  - Stage A shortlist: сначала выбранные ranking metrics, затем `base_variant_key ASC`;
+  - Stage B/final rows: сначала выбранные ranking metrics, затем `variant_key ASC`.
 - Детерминированность Stage A/Stage B variant enumeration.
 - `variant_key`/`indicator_variant_key` семантика и формат не меняются.
 - Default ranking остается `Total Return [%] DESC`.
@@ -76,7 +78,7 @@ backtest:
 }
 ```
 
-### 1.2 Допустимые ranking metrics (v1)
+### 1.2 Допустимые ranking metrics (v1 / shipped in R6-04)
 
 Метрики должны считаться в metric-only execution pass без построения полного report:
 
@@ -84,8 +86,13 @@ backtest:
 - `max_drawdown_pct` (`ASC`).
 - `return_over_max_drawdown` (`DESC`).
 - `profit_factor` (`DESC`).
+- `sharpe_trades` (`DESC`).
+- `win_rate_pct` (`DESC`).
 
-Если `secondary_metric` не задана: tie-break по `variant_key ASC`.
+Если `secondary_metric` не задана:
+
+- Stage A tie-break по `base_variant_key ASC`.
+- Stage B / final rows tie-break по `variant_key ASC`.
 
 ### 1.3 Изменения DTO/API/UI
 
@@ -128,12 +135,13 @@ score_variant_with_details(...) -> BacktestVariantScoreDetailsV1
 ### 2.2 Sync path
 
 - Stage A/Stage B: только metric-only.
+- Runtime summary response остаётся summary-only и не materialize'ит `report`/`trades` тела.
 - Details считаются только для выбранного варианта по explicit report request (см. направление 3).
 
 ### 2.3 Jobs path
 
 - Stage B ranking: только metric-only.
-- Finalizing не пересчитывает full details для persisted `top_k`.
+- Finalizing сохраняет persisted `top_k` только как summary-only rows.
 - Details/report считаются только по on-demand UI/API запросу.
 
 ### Файлы (направление 2)
@@ -265,8 +273,9 @@ Finalizing делает только terminal state/progress и не выпол�
 
 ## Совместимость и rollout
 
-- Ввести feature flag `backtest.reporting.eager_top_reports_enabled` (временный, default `false` в dev/test, `true` на переходном этапе в prod).
-- После подтверждения UI migration перевести prod default на lazy-only и удалить legacy флаг.
+- `backtest.reporting.eager_top_reports_enabled` сохраняется как compatibility knob для
+  переходного wiring, но runtime summary path после R6-04 остаётся summary-only.
+- R7 persisted-run storage/API cutover остаётся отдельным этапом и не смешивается с этим планом.
 - Сохранить backward-compatible поле `total_return_pct` в variant response даже при multi-metric ranking.
 
 ## Что обновить в документации
@@ -296,6 +305,6 @@ uv run python -m tools.docs.generate_docs_index --check
 - Ранжирование работает по конфигурируемым 1-2 метрикам, default = `total_return_pct`.
 - Stage A/Stage B не считают full details в ranking hot path.
 - Sync/jobs UI получает full report только по explicit user action.
-- Убраны дублирующие details расчеты в jobs finalizing.
+- Jobs finalizing и sync summary path остаются `summary-only`.
 - Snapshot writes и checkpoint serialization сокращены без потери детерминизма.
 - Документация и runtime defaults синхронизированы с кодом.

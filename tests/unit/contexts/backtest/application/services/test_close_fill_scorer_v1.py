@@ -196,6 +196,10 @@ def test_close_fill_scorer_v1_applies_stage_risk_policy() -> None:
 
     assert stage_a["Total Return [%]"] == pytest.approx(10.0)
     assert stage_b["Total Return [%]"] == pytest.approx(-10.0)
+    assert "sharpe_trades" in stage_a
+    assert "win_rate_pct" in stage_a
+    assert "max_drawdown_pct" in stage_b
+    assert "profit_factor" in stage_b
 
 
 def test_close_fill_scorer_v1_metric_api_and_legacy_api_do_not_call_details_path() -> None:

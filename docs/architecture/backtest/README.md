@@ -36,12 +36,18 @@
 
 ## Актуальная политика rollout
 
-- Ranking order в sync/jobs фиксирован:
-  - primary metric `total_return_pct` (DESC),
-  - tie-break `variant_key` (ASC).
+- Ranking order в sync/jobs конфигурируется по approved runtime set:
+  `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`, `profit_factor`,
+  `sharpe_trades`, `win_rate_pct`.
+- Direction map фиксирован:
+  `total_return_pct DESC`, `max_drawdown_pct ASC`, `return_over_max_drawdown DESC`,
+  `profit_factor DESC`, `sharpe_trades DESC`, `win_rate_pct DESC`.
+- Deterministic tie-break зафиксирован отдельно по стадиям:
+  - Stage A shortlist: `base_variant_key ASC`;
+  - Stage B/final rows: `variant_key ASC`.
 - Детальные отчёты (`rows/table_md/trades`) загружаются по explicit `variant-report`.
-- Runtime flag `backtest.reporting.eager_top_reports_enabled` оставлен для legacy sync fallback;
-  целевой режим v1: lazy-only (`false`).
+- Runtime flag `backtest.reporting.eager_top_reports_enabled` оставлен только как compatibility
+  knob; sync/jobs runtime summary paths остаются `summary-only` и не materialize'ят report/trades.
 - Artifact pipeline settings живут отдельно в `configs/<env>/backtest_artifacts.yaml`; runtime
   request defaults остаются в `configs/<env>/backtest.yaml`.
 - R3-04 может publish'ить validated slot с `prices+mappings`, если validation spec явно выведен
@@ -84,7 +90,11 @@
     replay winning cell / explicit retained variants;
   - sync/jobs используют artifact-backed Stage B scoring при наличии pinned artifact context,
     а legacy close-fill scorer остаётся fallback только для unpinned path.
-- После R6-03 вне scope остаются только R6-04 ranking/top-N materialization и full runtime
+- R6-04 закрывает runtime ranking/top-N materialization:
+  - accepted ranking literals совпадают между DTO/API/runtime defaults;
+  - Stage A/Stage B tie-break остаётся explicit и stable;
+  - sync/jobs runtime summary rows не строят `report`/`trades` тела.
+- После R6-04 вне scope остаются R7 persisted-run storage/API cutover и full runtime legacy
   cutover.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
   `signal_artifacts=[]` и `require_hit_times_manifest=false`.

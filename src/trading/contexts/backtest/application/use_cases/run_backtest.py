@@ -175,7 +175,9 @@ class RunBacktestUseCase:
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
-            top_trades_n_default: Runtime default number of variants with full trades payload.
+            top_trades_n_default:
+                Retained compatibility default for downstream on-demand trades/report flows; sync
+                runtime summaries themselves remain summary-only.
             ranking_primary_metric_default:
                 Runtime default for ranking primary metric literal.
             ranking_secondary_metric_default:
@@ -192,7 +194,8 @@ class RunBacktestUseCase:
             max_numba_threads:
                 Runtime CPU knob for backtest runs mapped to maximum Numba threads.
             eager_top_reports_enabled:
-                Feature flag for legacy eager report payloads in `POST /api/backtests`.
+                Retained legacy flag; sync runtime summaries stay summary-only and defer report
+                bodies to explicit on-demand variant-report flows.
             allowed_request_timeframes:
                 Optional runtime contract list for supported request timeframes.
             forbidden_request_timeframes:
@@ -856,7 +859,7 @@ class RunBacktestUseCase:
         request: RunBacktestRequest,
     ) -> TimeRange | None:
         """
-        Resolve whether sync `POST /api/backtests` should eagerly build top reports.
+        Enforce summary-only sync runtime materialization for `POST /api/backtests`.
 
         Docs:
           - docs/architecture/backtest/
@@ -870,16 +873,16 @@ class RunBacktestUseCase:
         Args:
             request: Sync run request envelope.
         Returns:
-            TimeRange | None: Request range for eager reports, otherwise `None` for lazy mode.
+            TimeRange | None: Always `None` because sync runtime summaries are summary-only.
         Assumptions:
-            Lazy mode keeps ranking/payload summary while deferring report body build.
+            Dedicated variant-report flows materialize report/trades payloads on demand using the
+            explicit selected variant payload and current pinned runtime context.
         Raises:
             None.
         Side Effects:
             None.
         """
-        if self._eager_top_reports_enabled:
-            return request.time_range
+        _ = request
         return None
 
     def _score_variant_payload_with_details(

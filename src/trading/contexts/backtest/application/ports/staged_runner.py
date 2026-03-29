@@ -24,6 +24,8 @@ BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1 = MappingProxyType(
         "max_drawdown_pct": "ASC",
         "return_over_max_drawdown": "DESC",
         "profit_factor": "DESC",
+        "sharpe_trades": "DESC",
+        "win_rate_pct": "DESC",
     }
 )
 BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1 = MappingProxyType(
@@ -32,6 +34,8 @@ BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1 = MappingProxyType(
         "max_drawdown_pct": ("max_drawdown_pct", "Max. Drawdown [%]"),
         "return_over_max_drawdown": ("return_over_max_drawdown",),
         "profit_factor": ("profit_factor",),
+        "sharpe_trades": ("sharpe_trades",),
+        "win_rate_pct": ("win_rate_pct",),
     }
 )
 
