@@ -111,3 +111,10 @@ jobs:
           test "$(curl -sS -o /tmp/web-root.html -w '%{http_code}' https://roehub.com/)" = '200'
           test "$(curl -sS -o /tmp/web-api.json -w '%{http_code}' https://roehub.com/api/auth/current-user)" = '401'
           test "$(curl -sS -o /tmp/web-www.headers -w '%{http_code}' -I https://www.roehub.com/)" = '301'
+
+      - name: Prune old Docker images on VPS
+        run: |
+          set -euxo pipefail
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "docker image prune -af"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "docker builder prune -af"
+          ssh "${{ vars.PROD_VPS_USER }}@${{ vars.PROD_VPS_HOST }}" "docker system df"
