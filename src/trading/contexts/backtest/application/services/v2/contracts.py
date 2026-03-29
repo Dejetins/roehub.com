@@ -177,6 +177,7 @@ type SignalSourceLiteralV2 = Literal[
     "hlc3",
     "ohlc4",
 ]
+type StageADirectionModeLiteralV2 = Literal["long-only", "short-only", "long-short"]
 type SignalRuleScalarV2 = int | float | str | bool | None
 
 SIGNALS_V1_PARAMS_PATH_LITERAL_V2 = "signals.v1.params"
@@ -2718,6 +2719,129 @@ class ArtifactSignalMatrixV2:
     indicator_id: str
     manifest: ArtifactSignalManifestDocumentV2
     matrix: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class StageACompactTradeV2:
+    """
+    Deterministic Stage A compact trade entry built without Stage B risk exits.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py
+      - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
+    """
+
+    entry_signal_idx: int
+    entry_exec_idx: int
+    direction: int
+    sig_exit_signal_idx: int | None
+    sig_exit_exec_idx: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one compact Stage A trade payload against deterministic kernel invariants.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            `entry_exec_idx` and `sig_exit_exec_idx` are rebased to the local execution timeline
+            of the current run, while `sig_exit_exec_idx == sentinel_index` denotes no signal exit.
+        Raises:
+            ValueError: If indexes are negative, direction is unsupported, or signal-exit order
+                is invalid.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py
+          - tests/unit/contexts/backtest/application/services/v2/test_trade_compactor_kernel_v2.py
+        """
+        if self.entry_signal_idx < 0:
+            raise ValueError("StageACompactTradeV2.entry_signal_idx must be >= 0")
+        if self.entry_exec_idx < 0:
+            raise ValueError("StageACompactTradeV2.entry_exec_idx must be >= 0")
+        if self.direction not in (-1, 1):
+            raise ValueError("StageACompactTradeV2.direction must be -1 or 1")
+        if (
+            self.sig_exit_signal_idx is not None
+            and self.sig_exit_signal_idx < self.entry_signal_idx
+        ):
+            raise ValueError(
+                "StageACompactTradeV2.sig_exit_signal_idx must be >= entry_signal_idx"
+            )
+        if self.sig_exit_exec_idx < self.entry_exec_idx:
+            raise ValueError("StageACompactTradeV2.sig_exit_exec_idx must be >= entry_exec_idx")
+
+
+@dataclass(frozen=True, slots=True)
+class StageANoRiskMetricsV2:
+    """
+    Deterministic no-risk Stage A metrics used for shortlist ranking and chunked processing.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py
+      - tests/unit/contexts/backtest/application/services/v2/test_trade_compactor_kernel_v2.py
+    """
+
+    total_return_pct: float
+    max_drawdown_pct: float
+    return_over_max_drawdown: float
+    profit_factor: float
+    trade_count: int
+    win_rate_pct: float
+    avg_trade_ret_pct: float
+    avg_trade_exec_bars: float
+    exposure_pct: float
+
+    def __post_init__(self) -> None:
+        """
+        Validate Stage A no-risk metric scalars produced by shortlist kernels.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Metrics are deterministic numeric scalars and may use `inf` for no-loss /
+            no-drawdown edge cases needed by ranking.
+        Raises:
+            ValueError: If one metric is non-numeric or `trade_count` is negative.
+        Side Effects:
+            Normalizes numeric fields to builtin `float`/`int`.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-v2-benchmarks.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py
+          - tests/unit/contexts/backtest/application/services/v2/test_trade_compactor_kernel_v2.py
+        """
+        numeric_fields = (
+            "total_return_pct",
+            "max_drawdown_pct",
+            "return_over_max_drawdown",
+            "profit_factor",
+            "win_rate_pct",
+            "avg_trade_ret_pct",
+            "avg_trade_exec_bars",
+            "exposure_pct",
+        )
+        for field_name in numeric_fields:
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                raise ValueError(f"StageANoRiskMetricsV2.{field_name} must be numeric")
+            object.__setattr__(self, field_name, float(value))
+        if self.trade_count < 0:
+            raise ValueError("StageANoRiskMetricsV2.trade_count must be >= 0")
 
 
 @dataclass(frozen=True, slots=True)

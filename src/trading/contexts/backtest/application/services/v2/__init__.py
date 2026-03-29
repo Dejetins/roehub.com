@@ -90,6 +90,9 @@ from .contracts import (
     SignalRuleFamilyLiteralV2,
     SignalRuleScalarV2,
     SignalRuleSpecV2,
+    StageACompactTradeV2,
+    StageADirectionModeLiteralV2,
+    StageANoRiskMetricsV2,
     artifact_coordinates_from_market_id_v2,
     artifact_market_id_from_coordinates_v2,
     freeze_artifact_payload_mapping_v2,
@@ -111,12 +114,17 @@ from .contracts import (
     validate_signal_timeframe_v2,
 )
 from .price_arrays_loader import MmapPriceArraysLoaderV2
+from .signal_aggregator_kernel import aggregate_final_signal_rows_v2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .signal_rules_engine_v2 import (
     BacktestSignalRulesEngineV2,
     list_signal_rule_registry_v2,
     signal_rule_spec_v2,
     supported_indicator_ids_for_signal_rules_v2,
+)
+from .stage_a_shortlist_builder_v2 import (
+    BacktestStageAShortlistBuilderV2,
+    build_default_stage_a_shortlist_builder_v2,
 )
 from .stage_b_golden_fixtures_v2 import (
     STAGE_B_GOLDEN_FIXTURE_EPIC_ID_V2,
@@ -148,6 +156,11 @@ from .stage_b_golden_fixtures_v2 import (
     replay_stage_b_best_cell_v2,
     serialize_stage_b_golden_fixture_payload_v2,
     validate_stage_b_golden_fixture_payload_v2,
+)
+from .trade_compactor_kernel import (
+    build_compact_trade_list_v2,
+    compute_no_risk_metrics_v2,
+    no_risk_metrics_to_ranking_payload_v2,
 )
 
 __all__ = [
@@ -200,6 +213,9 @@ __all__ = [
     "SignalRuleFamilyLiteralV2",
     "SignalRuleScalarV2",
     "SignalRuleSpecV2",
+    "StageACompactTradeV2",
+    "StageADirectionModeLiteralV2",
+    "StageANoRiskMetricsV2",
     "ArtifactSlotPublishErrorV2",
     "ArtifactTimelineCoverageV2",
     "ArtifactValidationDiagnosticV2",
@@ -242,6 +258,12 @@ __all__ = [
     "ArtifactSlotResolverV2",
     "MmapPriceArraysLoaderV2",
     "MmapSignalMatrixLoaderV2",
+    "aggregate_final_signal_rows_v2",
+    "BacktestStageAShortlistBuilderV2",
+    "build_default_stage_a_shortlist_builder_v2",
+    "build_compact_trade_list_v2",
+    "compute_no_risk_metrics_v2",
+    "no_risk_metrics_to_ranking_payload_v2",
     "YamlBacktestArtifactLoaderV2",
     "artifact_coordinates_from_market_id_v2",
     "artifact_market_id_from_coordinates_v2",

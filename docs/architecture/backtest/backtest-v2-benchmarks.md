@@ -16,8 +16,8 @@ R0 не внедряет runtime v2, а фиксирует:
 - какие parity fixtures обязательны до cutover;
 - где лежат reproducible inputs и как сохранять измерения.
 
-R6-01 не меняет сам R0 baseline, но добавляет обязательные runtime guardrails для следующих
-milestone-сравнений:
+R6-01 не меняет сам R0 baseline, а R6-02 добавляет deterministic Stage A shortlist verification
+поверх этого baseline. Для следующих milestone-сравнений обязательны:
 
 - shared `slot-pinned context` bootstrap для sync/background;
 - отсутствие runtime directory scanning;
@@ -25,6 +25,8 @@ milestone-сравнений:
 - explicit mmap loading для `prices/<tf>`, `signals/<tf>/<indicator_id>/signals.i8.npy`,
   `mappings/<tf>/bar_open_1m_idx.u32.npy`,
   `mappings/<tf>/bar_close_1m_idx.u32.npy`, `hit_times/1m/manifest.yaml`.
+- deterministic `final_signal` aggregation, compact trade construction и shortlist ordering на
+  `artifacts-only inputs`.
 
 ## Артефакты R0
 
@@ -71,7 +73,15 @@ R0 intentionally не фиксирует machine-specific SLA. Проверяе�
 ### Stage A no-risk
 
 - Источник: `tests/perf_smoke/contexts/backtest/fixtures/r0_parity_scope.json` -> `stage_a_no_risk`.
-- Проверяемая область: signal selection, no-risk shortlist ordering, deterministic tie-break.
+- Проверяемая область:
+  - subset signal row loading;
+  - deterministic `final_signal` c value set `{-1, 0, 1}`;
+  - compact trades с `entry_exec_idx`, `sig_exit_exec_idx`, `sentinel_index`,
+    local `bar_close_1m_idx`;
+  - no-risk shortlist ordering без Stage B TP/SL replay;
+  - deterministic tie-break по stable keys (`base_variant_key ASC` при равенстве ranking
+    metrics);
+  - `chunked variant processing` equivalence against non-chunked reference path.
 - Reference docs: `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`.
 
 ### Stage B legacy close-fill
@@ -163,6 +173,17 @@ uv run pytest -q \
   tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
 ```
 
+6. Проверить R6-02 Stage A kernels и additive shortlist bridge:
+
+```bash
+uv run pytest -q \
+  tests/unit/contexts/backtest/application/services/v2/test_signal_aggregator_kernel_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_trade_compactor_kernel_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py \
+  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
+```
+
 Где хранятся outputs:
 - version-controlled fixtures: `tests/perf_smoke/contexts/backtest/fixtures/*.json`
 - executable Stage B golden fixtures:
@@ -184,6 +205,8 @@ uv run pytest -q \
 - R5-03 публикует `r5_stage_b_golden_cases.json` и unit fixture catalog как canonical
   validation baseline для `signal_tf + 1m_risk` golden fixtures.
 - R6-01 фиксирует runtime bootstrap/loaders guardrails без kernel cutover.
+- R6-02 добавляет Stage A kernels, deterministic no-risk shortlist metrics и additive
+  artifact-backed shortlist path без Stage B risk execution cutover.
 - R6-R8 сравнивают `clickhouse_hot_path_calls` и `indicator_compute_calls` против R0 baseline,
   сохраняя запрет на runtime scanning и hot-path hash recomputation до cutover.
 - R10 обновляет этот документ уже как post-cutover benchmark ledger, но не меняет задним числом R0 fixtures.

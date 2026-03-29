@@ -16,6 +16,9 @@ from trading.contexts.backtest.application.services import (
     BacktestRiskVariantV1,
     BacktestStageABaseVariant,
 )
+from trading.contexts.backtest.application.services.staged_core_runner_v1 import (
+    BacktestStageAScoredVariantV1,
+)
 from trading.contexts.backtest.application.use_cases import RunBacktestJobRunnerV1
 from trading.contexts.backtest.domain.entities import BacktestJob, BacktestJobArtifactPin, TradeV1
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
@@ -149,6 +152,82 @@ class _RecordingArtifactSlotResolver:
         """
         self.pinned_calls.append((coordinates, pinned_identity))
         return self.context
+
+
+class _RecordingStageAShortlistBuilder:
+    """
+    Fake artifact-backed Stage A builder recording worker use-case wiring inputs.
+    """
+
+    def __init__(
+        self,
+        *,
+        rows: tuple[BacktestStageAScoredVariantV1, ...],
+    ) -> None:
+        """
+        Initialize fake builder with fixed deterministic shortlist rows.
+
+        Args:
+            rows: Ranked Stage A rows returned by every build call.
+        Returns:
+            None.
+        Assumptions:
+            Worker tests verify orchestration inputs and not kernel economics here.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call log.
+        """
+        self.rows = rows
+        self.calls: list[dict[str, Any]] = []
+
+    def build_shortlist(
+        self,
+        *,
+        grid_context: Any,
+        artifact_context: Any,
+        target_time_range: TimeRange,
+        shortlist_limit: int,
+        ranking: Any = None,
+        batch_size: int | None = None,
+        cancel_checker: Any = None,
+        on_checkpoint: Any = None,
+    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+        """
+        Record one Stage A build invocation and return predefined shortlist rows.
+
+        Args:
+            grid_context: Prepared Stage A grid context.
+            artifact_context: Resolved slot-pinned runtime context.
+            target_time_range: Requested trading window.
+            shortlist_limit: Stage A shortlist cap.
+            ranking: Optional ranking config.
+            batch_size: Optional chunk size override.
+            cancel_checker: Optional cancellation hook.
+            on_checkpoint: Optional checkpoint hook.
+        Returns:
+            tuple[BacktestStageAScoredVariantV1, ...]: Fixed deterministic shortlist rows.
+        Assumptions:
+            Fake builder bypasses hot-loop kernels and therefore ignores hooks.
+        Raises:
+            None.
+        Side Effects:
+            Appends call metadata to the in-memory log.
+        """
+        _ = grid_context, batch_size
+        self.calls.append(
+            {
+                "artifact_context": artifact_context,
+                "target_time_range": target_time_range,
+                "shortlist_limit": shortlist_limit,
+                "ranking": ranking,
+            }
+        )
+        if cancel_checker is not None:
+            cancel_checker("stage_a")
+        if on_checkpoint is not None:
+            on_checkpoint(len(self.rows), len(self.rows))
+        return self.rows
 
 
 class _FakeTimelineBuilder:
@@ -1644,6 +1723,78 @@ def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime() -> 
     assert pinned_identity.artifact_manifest_hash == "d" * 64
 
 
+def test_process_claimed_job_uses_artifact_stage_a_shortlist_builder_when_available() -> None:
+    """
+    Verify worker Stage A uses the artifact-backed shortlist builder with pinned context.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Additive R6-02 cutover replaces only Stage A shortlist construction in the worker flow.
+    Raises:
+        AssertionError: If builder wiring or shortlist persistence drifts.
+    Side Effects:
+        None.
+    """
+    job = _build_running_job_with_artifact_pin()
+    pinned_context = _FakeSlotPinnedContext(
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        ),
+        artifact_slot="slot_b",
+        slot_generation=11,
+        artifact_asof_date="2026-03-29",
+        artifact_manifest_hash="d" * 64,
+    )
+    shortlist_builder = _RecordingStageAShortlistBuilder(
+        rows=(
+            BacktestStageAScoredVariantV1(
+                base_variant=_build_stage_a_variants()[1],
+                total_return_pct=2.0,
+            ),
+        )
+    )
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    results_repository = _FakeResultsRepository()
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                _build_stage_a_variants()[0].base_variant_key: 3.0,
+                _build_stage_a_variants()[1].base_variant_key: 2.0,
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 11, 0, 0)),
+        artifact_slot_resolver=_RecordingArtifactSlotResolver(context=pinned_context),
+        stage_a_shortlist_builder=cast(Any, shortlist_builder),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert len(shortlist_builder.calls) == 1
+    assert shortlist_builder.calls[0]["artifact_context"] == pinned_context
+    assert shortlist_builder.calls[0]["target_time_range"] == request.time_range
+    assert shortlist_builder.calls[0]["shortlist_limit"] == 2
+    assert results_repository.shortlist_calls[0]["shortlist"].stage_a_indexes == (1,)
+
+
 def _build_use_case(
     *,
     request: RunBacktestRequest,
@@ -1659,6 +1810,7 @@ def _build_use_case(
     stage_batch_size: int,
     now_provider: _NowProvider,
     artifact_slot_resolver: Any | None = None,
+    stage_a_shortlist_builder: Any | None = None,
 ) -> RunBacktestJobRunnerV1:
     """
     Build job-runner use-case with deterministic fakes for unit tests.
@@ -1677,6 +1829,7 @@ def _build_use_case(
         stage_batch_size: Batch boundary size.
         now_provider: Monotonic now-provider fixture.
         artifact_slot_resolver: Optional shared slot-pinned context resolver test double.
+        stage_a_shortlist_builder: Optional artifact-backed Stage A builder test double.
     Returns:
         RunBacktestJobRunnerV1: Prepared use-case instance.
     Assumptions:
@@ -1708,6 +1861,7 @@ def _build_use_case(
         stage_batch_size=stage_batch_size,
         now_provider=now_provider,
         artifact_slot_resolver=cast(Any, artifact_slot_resolver),
+        stage_a_shortlist_builder=cast(Any, stage_a_shortlist_builder),
     )
 
 

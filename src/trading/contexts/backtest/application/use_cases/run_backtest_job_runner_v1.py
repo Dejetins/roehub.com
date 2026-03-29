@@ -37,8 +37,10 @@ from trading.contexts.backtest.application.services import (
     BacktestGridBuilderV1,
     BacktestReportingServiceV1,
     BacktestStageABaseVariant,
+    BacktestStageAShortlistBuilderV2,
     CloseFillBacktestStagedScorerV1,
     artifact_coordinates_from_market_id_v2,
+    build_default_stage_a_shortlist_builder_v2,
 )
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobSnapshotCadenceV1,
@@ -183,6 +185,7 @@ class RunBacktestJobRunnerV1:
         grid_builder: BacktestGridBuilderV1 | None = None,
         reporting_service: BacktestReportingServiceV1 | None = None,
         core_runner: BacktestStagedCoreRunnerV1 | None = None,
+        stage_a_shortlist_builder: BacktestStageAShortlistBuilderV2 | None = None,
         staged_scorer: MetricScorerV1 | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
@@ -226,6 +229,8 @@ class RunBacktestJobRunnerV1:
             grid_builder: Optional custom staged grid builder.
             reporting_service: Optional report assembly service for finalizing step.
             core_runner: Shared staged scoring core used by sync and job-runner paths.
+            stage_a_shortlist_builder:
+                Optional artifact-backed Stage A shortlist builder for additive R6-02 cutover.
             staged_scorer: Optional custom staged scorer.
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k request fallback.
@@ -331,6 +336,18 @@ class RunBacktestJobRunnerV1:
         self._core_runner = core_runner or BacktestStagedCoreRunnerV1(
             batch_size_default=stage_batch_size,
             configurable_ranking_enabled=configurable_ranking_enabled,
+        )
+        self._stage_a_shortlist_builder = (
+            stage_a_shortlist_builder
+            or build_default_stage_a_shortlist_builder_v2(
+                artifact_slot_resolver=artifact_slot_resolver,
+                configurable_ranking_enabled=configurable_ranking_enabled,
+                init_cash_quote_default=init_cash_quote_default,
+                fixed_quote_default=fixed_quote_default,
+                safe_profit_percent_default=safe_profit_percent_default,
+                slippage_pct_default=slippage_pct_default,
+                fee_pct_default_by_market_id=fee_pct_default_by_market_id,
+            )
         )
         self._staged_scorer = staged_scorer
         self._warmup_bars_default = warmup_bars_default
@@ -826,15 +843,31 @@ class RunBacktestJobRunnerV1:
                 now=now,
             )
 
-        shortlist_rows = self._core_runner.run_stage_a(
-            grid_context=grid_context,
-            candles=timeline.candles,
-            scorer=scorer,
-            shortlist_limit=stage_limit,
-            ranking=context.ranking,
-            batch_size=self._stage_batch_size,
-            on_checkpoint=_on_stage_a_checkpoint,
-        )
+        if self._stage_a_shortlist_builder is not None and context.artifact_context is not None:
+            shortlist_rows = self._stage_a_shortlist_builder.build_shortlist(
+                grid_context=grid_context,
+                artifact_context=context.artifact_context,
+                target_time_range=context.request.time_range,
+                shortlist_limit=stage_limit,
+                ranking=context.ranking,
+                batch_size=self._stage_batch_size,
+                cancel_checker=lambda stage: self._ensure_not_cancelled(
+                    job=job,
+                    locked_by=locked_by,
+                    stage=stage,
+                ),
+                on_checkpoint=_on_stage_a_checkpoint,
+            )
+        else:
+            shortlist_rows = self._core_runner.run_stage_a(
+                grid_context=grid_context,
+                candles=timeline.candles,
+                scorer=scorer,
+                shortlist_limit=stage_limit,
+                ranking=context.ranking,
+                batch_size=self._stage_batch_size,
+                on_checkpoint=_on_stage_a_checkpoint,
+            )
         shortlist = tuple(
             BacktestJobTopVariantCandidateV1(
                 variant_index=row.base_variant.stage_a_index,

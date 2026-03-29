@@ -34,9 +34,11 @@ from trading.contexts.backtest.application.services import (
     BacktestCandleTimeline,
     BacktestCandleTimelineBuilder,
     BacktestReportingServiceV1,
+    BacktestStageAShortlistBuilderV2,
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
     artifact_coordinates_from_market_id_v2,
+    build_default_stage_a_shortlist_builder_v2,
 )
 from trading.contexts.backtest.application.services.numba_runtime_v1 import (
     apply_backtest_numba_threads,
@@ -123,6 +125,7 @@ class RunBacktestUseCase:
         staged_scorer: MetricScorerV1 | None = None,
         reporting_service: BacktestReportingServiceV1 | None = None,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
+        stage_a_shortlist_builder: BacktestStageAShortlistBuilderV2 | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
@@ -166,6 +169,8 @@ class RunBacktestUseCase:
             staged_scorer: Optional Stage A/Stage B scorer port implementation.
             reporting_service: Optional report-builder service for variant-report endpoint.
             defaults_provider: Optional defaults provider for compute/signal grid fallback.
+            stage_a_shortlist_builder:
+                Optional artifact-backed Stage A shortlist builder for additive R6-02 cutover.
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
@@ -244,11 +249,25 @@ class RunBacktestUseCase:
         resolved_timeline_builder = candle_timeline_builder
         if resolved_timeline_builder is None:
             resolved_timeline_builder = BacktestCandleTimelineBuilder(candle_feed=candle_feed)
+        resolved_stage_a_shortlist_builder = (
+            stage_a_shortlist_builder
+            or build_default_stage_a_shortlist_builder_v2(
+                artifact_slot_resolver=artifact_slot_resolver,
+                configurable_ranking_enabled=configurable_ranking_enabled,
+                init_cash_quote_default=init_cash_quote_default,
+                fixed_quote_default=fixed_quote_default,
+                safe_profit_percent_default=safe_profit_percent_default,
+                slippage_pct_default=slippage_pct_default,
+                fee_pct_default_by_market_id=fee_pct_default_by_market_id,
+            )
+        )
 
         self._candle_timeline_builder = resolved_timeline_builder
         self._indicator_compute = indicator_compute
         self._strategy_reader = strategy_reader
-        self._staged_runner = staged_runner or BacktestStagedRunnerV1()
+        self._staged_runner = staged_runner or BacktestStagedRunnerV1(
+            stage_a_shortlist_builder=resolved_stage_a_shortlist_builder
+        )
         self._staged_scorer = staged_scorer
         self._reporting_service = reporting_service or BacktestReportingServiceV1()
         self._defaults_provider = defaults_provider
@@ -346,6 +365,8 @@ class RunBacktestUseCase:
                 requested_time_range=self._resolve_requested_time_range_for_sync_response(
                     request=request
                 ),
+                target_time_range=request.time_range,
+                artifact_context=resolved.artifact_context,
                 top_trades_n=resolved.top_trades_n,
                 run_control=run_control,
             )

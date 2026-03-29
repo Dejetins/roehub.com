@@ -5,8 +5,8 @@
 `tests/notebook_tests/06_backtest_compute.ipynb` в generic runtime boundaries, не меняя shipped
 R5-01 artifact contracts.
 
-Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01`  
-Следующие этапы реализации: `Milestone R6 / EPIC R6-02 + R6-03 + R6-04`
+Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02`  
+Следующие этапы реализации: `Milestone R6 / EPIC R6-03 + R6-04`
 
 Связанные документы:
 
@@ -28,6 +28,9 @@ R5-01 artifact contracts.
   `prices/<tf>`, `prices/1m`, `mappings/<tf>` и `signals/<tf>/<indicator_id>`.
 - R6-01 уже реализует runtime-side artifact loading primitives:
   `artifact_slot_resolver.py`, `price_arrays_loader.py`, `signal_matrix_loader.py`.
+- R6-02 уже реализует Stage A artifact-backed kernels и additive shortlist bridge:
+  `signal_aggregator_kernel.py`, `trade_compactor_kernel.py`,
+  `stage_a_shortlist_builder_v2.py`.
 - Sync и background starts теперь обязаны делить один immutable `slot-pinned context` contract,
   а не расходиться по разным pointer/discovery paths.
 - Документ не вводит новые API payloads, новые request TF или новые persisted storage contracts.
@@ -48,8 +51,8 @@ R5-01 artifact contracts.
 
 | Notebook concept | Production contract | Target v2 module | Status |
 |---|---|---|---|
-| Pair confirmations on request TF | Deterministic signal aggregation on `signal timeline` with output value set `{-1, 0, 1}` | `src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py` | Planned for R6 |
-| `build_trade_list_for_pair` | `compact trade list` with deterministic ordering and sentinel-based signal exits | `src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py` | Planned for R6 |
+| Pair confirmations on request TF | Deterministic signal aggregation on `signal timeline` with output value set `{-1, 0, 1}` | `src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py` | Implemented in R6-02 |
+| `build_trade_list_for_pair` | `compact trade list` with deterministic ordering and sentinel-based signal exits | `src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py` | Implemented in R6-02 |
 | `evaluate_trade_factor` over hit tables | `1m hit-times` risk-exit resolution on `execution timeline` | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | R5-01 input implemented, R6 kernel planned |
 | Monotone diff-buffer decomposition | `fast TP/SL grid search` over precomputed `1m hit-times` | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | R5-01 input implemented, R6 kernel planned |
 | Best-cell verification replay | `exact replay of best TP/SL cell` only after fast search converges | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | Planned for R6 |
@@ -62,9 +65,10 @@ R5-01 artifact contracts.
 | Stage A | `prices/<signal_tf>/*`, `signals/<signal_tf>/<indicator_id>/signals.i8.npy`, `mappings/<signal_tf>/bar_close_1m_idx.u32.npy` | `final_signal`, deterministic edges, `compact trade list`, shortlist-ready no-risk summaries |
 | Stage B | Stage A `compact trade list`, `prices/1m/*`, `hit_times/1m/manifest.yaml`, `hit_times/1m/*.npy` | best TP/SL cell, exact replay of best TP/SL cell, final `metrics over compact trades` |
 
-## R6-01 implemented boundary
+## R6-01 / R6-02 implemented boundary
 
-R6-01 закрывает не kernels, а runtime bootstrap/loaders boundary.
+R6-01 закрывает runtime bootstrap/loaders boundary, а R6-02 добавляет только Stage A kernels и
+artifact-backed shortlist bridge.
 
 Что уже зафиксировано кодом:
 
@@ -77,10 +81,14 @@ R6-01 закрывает не kernels, а runtime bootstrap/loaders boundary.
 - arrays открываются только через `np.load(..., mmap_mode='r')` и `allow_pickle=False`;
 - runtime fail-fast reject'ит drift по `path`, `dtype`, `shape`, `axis_order`, `timeline`,
   `slot_generation`, `asof_date`.
+- Stage A runtime может работать по `artifacts-only inputs` через
+  `BacktestStageAShortlistBuilderV2`, не переоткрывая artifact identity ad hoc;
+- subset row loading для `signals/<tf>/<indicator_id>/signals.i8.npy` используется по
+  выбранным variant rows, а не через full matrix materialization;
+- `chunked variant processing` обязано давать тот же shortlist result, что и non-chunked path.
 
-Что остаётся вне scope R6-01:
+Что остаётся вне scope после R6-02:
 
-- Stage A kernels (`signal_aggregator_kernel.py`, `trade_compactor_kernel.py`) из R6-02;
 - Stage B risk execution kernels из R6-03;
 - ranking/top-N runtime materialization из R6-04;
 - full cutover с legacy scorer/execution paths на v2 runtime kernels.
@@ -94,8 +102,10 @@ Stage A существует для batch-oriented работы на `signal tim
 1. Загрузить deterministic subset signal rows по уже выбранным variant keys.
 2. Собрать один `final_signal` на request timeframe без pair-specific notebook prefilters.
 3. Выделить входы/выходы стратегии из `final_signal`.
-4. Смаппить каждый signal entry в `execution timeline`.
+4. Смаппить каждый signal entry в `execution timeline` через local `bar_close_1m_idx`.
 5. Построить `compact trade list` без TP/SL replay.
+6. Посчитать deterministic no-risk metrics для shortlist/ranking без Stage B risk kernels.
+7. Поддерживать `chunked variant processing` без drift относительно reference path.
 
 Обязательные правила:
 
@@ -103,10 +113,33 @@ Stage A существует для batch-oriented работы на `signal tim
   research notebook они временно совпадали.
 - В artifact-backed runtime request TF остаётся `signal timeline`, а `1m` остаётся
   `execution timeline`.
+- `signal_aggregator_kernel.py` использует explicit consensus AND policy:
+  long только когда все выбранные indicator rows дают `+1`,
+  short только когда все выбранные indicator rows дают `-1`,
+  иначе `final_signal = 0`.
 - Повторное подтверждение в той же стороне не создаёт новую сделку.
 - Противоположное подтверждение закрывает текущую сделку по `sig_exit_exec` и сразу открывает
   новую.
 - Незакрытая до конца позиция получает `sig_exit_exec = sentinel_index`.
+- В `long-only` и `short-only` режимах запрещённый противоположный сигнал работает только как
+  signal exit и не открывает новую позицию.
+- Для shortlist ordering tie-break должен быть explicit и stable:
+  ranking payload сортируется детерминированно, а при полном равенстве метрик сохраняется
+  `base_variant_key ASC`.
+
+## R6-02 shipped Stage A runtime bridge
+
+R6-02 не заменяет весь runtime целиком. Он добавляет отдельный additive bridge:
+
+- `src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py`
+  materialize'ит Stage A shortlist из `artifacts-only inputs`;
+- `src/trading/contexts/backtest/application/use_cases/run_backtest.py` и
+  `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py`
+  подключают этот builder только когда есть валидный `slot-pinned context`;
+- `src/trading/contexts/backtest/application/services/staged_runner_v1.py` остаётся legacy
+  orchestration facade и использует v2 Stage A path additively;
+- если v2 builder/context недоступен, sync/background flow продолжает использовать legacy
+  Stage A scorer loop без изменения публичных imports.
 
 ## Stage B Contract
 
@@ -160,8 +193,13 @@ load stage_a_output
 
 ### `signal_aggregator_kernel.py`
 
-- Вход: signal rows по выбранным variants и deterministic aggregation policy.
+- Вход: subset-loaded signal rows по выбранным variants и deterministic aggregation policy.
 - Выход: `final_signal[V, T_signal]` c value set `{-1, 0, 1}`.
+- Каноническая функция:
+  - `aggregate_final_signal_rows_v2(selected_signal_rows=...)`
+- Deterministic ordering:
+  - indicator matrices обходятся в sorted order по `indicator_id`;
+  - shape drift и invalid signal values fail-fast reject'ятся до hot loop.
 - Не должен:
   - читать файлы;
   - знать о TP/SL grid;
@@ -171,9 +209,26 @@ load stage_a_output
 
 - Вход: `final_signal`, `bar_close_1m_idx`, `sentinel_index`.
 - Выход: `compact trade list` с полями `entry_exec_idx`, `direction`, `sig_exit_exec_idx`.
+- Канонические функции:
+  - `build_compact_trade_list_v2(...)`
+  - `compute_no_risk_metrics_v2(...)`
+  - `no_risk_metrics_to_ranking_payload_v2(...)`
+- `entry_exec_idx` вычисляется как `bar_close_1m_idx + 1` с sentinel fallback.
+- `sig_exit_exec_idx` равен execution index противоположного подтверждения либо
+  `sentinel_index`, если signal exit не наступил.
+- No-risk metric contract для shortlist включает:
+  - `total_return_pct`
+  - `max_drawdown_pct`
+  - `return_over_max_drawdown`
+  - `profit_factor`
+  - `trade_count`
+  - `win_rate_pct`
+  - `avg_trade_ret_pct`
+  - `avg_trade_exec_bars`
+  - `exposure_pct`
 - Не должен:
   - делать risk replay;
-  - считать финальные metrics;
+  - зависеть от `1m hit-times`;
   - менять ordering variants/trades недетерминированно.
 
 ### `risk_exit_kernel_1m.py`

@@ -16,6 +16,12 @@ from trading.contexts.backtest.application.ports import (
     CurrentUser,
 )
 from trading.contexts.backtest.application.services import ArtifactCoordinatesV2
+from trading.contexts.backtest.application.services.grid_builder_v1 import (
+    BacktestStageABaseVariant,
+)
+from trading.contexts.backtest.application.services.staged_core_runner_v1 import (
+    BacktestStageAScoredVariantV1,
+)
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1, TradeV1
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
@@ -118,6 +124,78 @@ class _RecordingArtifactSlotResolver:
         """
         _ = coordinates, pinned_identity
         raise AssertionError("sync use-case must not call resolve_pinned_context")
+
+
+class _RecordingStageAShortlistBuilder:
+    """
+    Fake artifact-backed Stage A builder recording sync use-case wiring inputs.
+    """
+
+    def __init__(
+        self,
+        *,
+        rows: tuple[BacktestStageAScoredVariantV1, ...],
+    ) -> None:
+        """
+        Initialize fake builder with deterministic shortlist rows.
+
+        Args:
+            rows: Ranked Stage A rows returned for every build call.
+        Returns:
+            None.
+        Assumptions:
+            Sync orchestration tests verify wiring and not kernel economics.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call log.
+        """
+        self.rows = rows
+        self.calls: list[dict[str, Any]] = []
+
+    def build_shortlist(
+        self,
+        *,
+        grid_context: Any,
+        artifact_context: Any,
+        target_time_range: TimeRange,
+        shortlist_limit: int,
+        ranking: Any = None,
+        batch_size: int | None = None,
+        cancel_checker: Any = None,
+        on_checkpoint: Any = None,
+    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+        """
+        Record one shortlist build call and return the predefined deterministic rows.
+
+        Args:
+            grid_context: Prepared Stage A grid context.
+            artifact_context: Resolved slot-pinned context.
+            target_time_range: Requested trading window.
+            shortlist_limit: Requested shortlist cap.
+            ranking: Optional ranking config.
+            batch_size: Optional chunk size override.
+            cancel_checker: Optional cancellation hook.
+            on_checkpoint: Optional checkpoint hook.
+        Returns:
+            tuple[BacktestStageAScoredVariantV1, ...]: Prebuilt deterministic Stage A rows.
+        Assumptions:
+            Fake builder does not execute kernels and therefore ignores runtime hooks.
+        Raises:
+            None.
+        Side Effects:
+            Appends call metadata to the in-memory log.
+        """
+        _ = grid_context, batch_size, cancel_checker, on_checkpoint
+        self.calls.append(
+            {
+                "artifact_context": artifact_context,
+                "target_time_range": target_time_range,
+                "shortlist_limit": shortlist_limit,
+                "ranking": ranking,
+            }
+        )
+        return self.rows
 
 
 class _AlignedOnlyCandleFeed:
@@ -712,10 +790,6 @@ def test_run_backtest_use_case_returns_trades_only_for_configured_top_n() -> Non
     assert response.variants[0].total_return_pct == 30.0
     assert response.variants[1].total_return_pct == 25.0
     assert response.variants[2].total_return_pct == 20.0
-
-    assert response.variants[0].report is not None
-    assert response.variants[1].report is not None
-    assert response.variants[2].report is not None
     assert response.variants[0].report is not None
     assert response.variants[0].report.trades is not None
     assert response.variants[1].report is not None
@@ -724,6 +798,87 @@ def test_run_backtest_use_case_returns_trades_only_for_configured_top_n() -> Non
     assert response.variants[2].report.trades is None
     assert response.variants[0].report.table_md is not None
     assert response.variants[0].report.table_md.startswith("|Metric|Value|")
+
+
+def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_available() -> None:
+    """
+    Verify sync use-case forwards pinned context and request range into artifact Stage A builder.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Additive R6-02 cutover replaces only Stage A shortlist build and leaves Stage B scoring
+        on the existing path.
+    Raises:
+        AssertionError: If builder wiring or returned variant payload drifts.
+    Side Effects:
+        None.
+    """
+    pinned_context = _FakeSlotPinnedContext(
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        ),
+        artifact_slot="slot_a",
+        slot_generation=7,
+        artifact_asof_date="2026-03-29",
+        artifact_manifest_hash="a" * 64,
+    )
+    shortlist_builder = _RecordingStageAShortlistBuilder(
+        rows=(
+            BacktestStageAScoredVariantV1(
+                base_variant=BacktestStageABaseVariant(
+                    stage_a_index=0,
+                    indicator_selections=(
+                        IndicatorVariantSelection(
+                            indicator_id="ema",
+                            inputs={"source": "close"},
+                            params={"window": 20},
+                        ),
+                    ),
+                    signal_params={},
+                    indicator_variant_key="1" * 64,
+                    base_variant_key="2" * 64,
+                ),
+                total_return_pct=20.0,
+            ),
+        )
+    )
+    request = RunBacktestRequest(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+        ),
+        template=_build_template(windows=(20, 25)),
+        top_k=1,
+        preselect=2,
+    )
+    use_case = RunBacktestUseCase(
+        candle_feed=_AlignedOnlyCandleFeed(),
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        strategy_reader=_UnusedStrategyReader(),
+        staged_scorer=_DeterministicScorer(),
+        artifact_slot_resolver=cast(
+            Any,
+            _RecordingArtifactSlotResolver(context=pinned_context),
+        ),
+        stage_a_shortlist_builder=cast(Any, shortlist_builder),
+    )
+
+    response = use_case.execute(
+        request=request,
+        current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
+    )
+
+    assert len(shortlist_builder.calls) == 1
+    assert shortlist_builder.calls[0]["artifact_context"] == pinned_context
+    assert shortlist_builder.calls[0]["target_time_range"] == request.time_range
+    assert shortlist_builder.calls[0]["shortlist_limit"] == 2
+    assert len(response.variants) == 1
+    assert response.variants[0].total_return_pct == 20.0
 
 
 def test_run_backtest_use_case_lazy_mode_omits_eager_reports_by_default() -> None:

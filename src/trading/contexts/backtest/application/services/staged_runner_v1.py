@@ -45,6 +45,7 @@ from .staged_core_runner_v1 import (
     BacktestStageBTaskV1,
     BacktestStagedCoreRunnerV1,
 )
+from .v2 import ArtifactSlotPinnedRuntimeContextV2, BacktestStageAShortlistBuilderV2
 
 TOTAL_RETURN_METRIC_LITERAL = "Total Return [%]"
 MetricScorerV1 = BacktestStagedVariantMetricScorer | BacktestStagedVariantScorer
@@ -194,6 +195,7 @@ class BacktestStagedRunnerV1:
         parallel_workers: int | None = None,
         reporting_service: BacktestReportingServiceV1 | None = None,
         core_runner: BacktestStagedCoreRunnerV1 | None = None,
+        stage_a_shortlist_builder: BacktestStageAShortlistBuilderV2 | None = None,
     ) -> None:
         """
         Initialize staged runner with optional custom grid-builder implementation.
@@ -203,6 +205,9 @@ class BacktestStagedRunnerV1:
             parallel_workers: Optional number of worker threads for variant scoring.
             reporting_service: Optional reporting service used for Stage-B top-k payloads.
             core_runner: Shared staged scoring core used by sync and jobs paths.
+            stage_a_shortlist_builder:
+                Optional artifact-backed Stage A shortlist builder used additively before the
+                legacy scorer loop.
         Returns:
             None.
         Assumptions:
@@ -218,6 +223,7 @@ class BacktestStagedRunnerV1:
         self._parallel_workers = parallel_workers
         self._reporting_service = reporting_service or BacktestReportingServiceV1()
         self._core_runner = core_runner or BacktestStagedCoreRunnerV1()
+        self._stage_a_shortlist_builder = stage_a_shortlist_builder
 
     def run(
         self,
@@ -233,6 +239,8 @@ class BacktestStagedRunnerV1:
         max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
         requested_time_range: TimeRange | None = None,
+        target_time_range: TimeRange | None = None,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None = None,
         top_trades_n: int = 3,
         run_control: BacktestRunControlV1 | None = None,
     ) -> BacktestStagedRunResultV1:
@@ -254,6 +262,10 @@ class BacktestStagedRunnerV1:
             max_compute_bytes_total: Stage memory guard limit.
             requested_time_range:
                 Optional request range for reporting rows (`Start/End/Duration`).
+            target_time_range:
+                Trading window used by artifact-backed Stage A kernels when available.
+            artifact_context:
+                Optional shared slot-pinned artifact context resolved at runtime startup.
             top_trades_n:
                 Number of best variants for which full trades payload is included.
             run_control:
@@ -300,6 +312,8 @@ class BacktestStagedRunnerV1:
             scorer=scorer,
             shortlist_limit=preselect,
             ranking=ranking,
+            target_time_range=target_time_range,
+            artifact_context=artifact_context,
             cancel_checker=cancel_checker,
         )
 
@@ -408,6 +422,8 @@ class BacktestStagedRunnerV1:
         scorer: MetricScorerV1,
         shortlist_limit: int,
         ranking: BacktestRankingConfig | None = None,
+        target_time_range: TimeRange | None = None,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None = None,
         cancel_checker: Callable[[str], None] | None = None,
     ) -> list[BacktestStageAScoredVariantV1]:
         """
@@ -428,6 +444,10 @@ class BacktestStagedRunnerV1:
             shortlist_limit: Maximum number of Stage A rows retained in memory.
             ranking:
                 Optional ranking config (`primary_metric`, optional `secondary_metric`).
+            target_time_range:
+                Trading window used by artifact-backed Stage A kernels when available.
+            artifact_context:
+                Optional slot-pinned artifact context used by the additive v2 Stage A path.
             cancel_checker: Optional cooperative cancellation callback by stage.
         Returns:
             list[BacktestStageAScoredVariantV1]:
@@ -439,6 +459,21 @@ class BacktestStagedRunnerV1:
         Side Effects:
             None.
         """
+        if (
+            self._stage_a_shortlist_builder is not None
+            and artifact_context is not None
+            and target_time_range is not None
+        ):
+            return list(
+                self._stage_a_shortlist_builder.build_shortlist(
+                    grid_context=grid_context,
+                    artifact_context=artifact_context,
+                    target_time_range=target_time_range,
+                    shortlist_limit=shortlist_limit,
+                    ranking=ranking,
+                    cancel_checker=cancel_checker,
+                )
+            )
         rows = self._core_runner.run_stage_a(
             grid_context=grid_context,
             candles=candles,

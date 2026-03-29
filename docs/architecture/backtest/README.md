@@ -8,6 +8,10 @@
   `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`,
   `src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py`,
   `src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py`
+- R6-02 Stage A artifact-backed kernels and shortlist bridge:
+  `src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py`,
+  `src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py`,
+  `src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py`
 - Runtime kernels v2 contract for `signal_tf + 1m_risk`, Stage A / Stage B boundaries and
   notebook-derived transfer scope: `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
 - Notebook transfer reference and function-level semantics anchors:
@@ -61,8 +65,16 @@
     `artifact_asof_date`, `artifact_manifest_hash`,
   - runtime loaders читают arrays только по explicit manifest-driven paths через
     `np.load(..., mmap_mode='r')` и `allow_pickle=False`.
-- R6-01 не включает R6-02 Stage A kernels, R6-03 risk execution kernels, R6-04 ranking/top-N
-  materialization и full runtime cutover.
+- R6-02 добавляет Stage A kernels и additive shortlist bridge:
+  - `signal_aggregator_kernel.py` агрегирует `final_signal` по strict consensus AND policy;
+  - `trade_compactor_kernel.py` строит compact trades и no-risk shortlist metrics без Stage B
+    risk exits;
+  - `stage_a_shortlist_builder_v2.py` использует `artifacts-only inputs`, subset row loading и
+    `chunked variant processing`;
+  - sync/jobs paths подключают v2 Stage A path только при наличии валидного pinned artifact
+    context.
+- R6-02 не включает R6-03 risk execution kernels, R6-04 ranking/top-N materialization и full
+  runtime cutover.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
   `signal_artifacts=[]` и `require_hit_times_manifest=false`.
 - R4-04 runtime `source` integration в текущем репозитории проходит через runtime defaults, jobs
