@@ -236,7 +236,7 @@ def test_strategies_list_page_renders_required_strategy_ui_hooks() -> None:
 
 def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     """
-    Verify `/backtests` renders required hooks and API literals for sync backtest UI module.
+    Verify `/backtests` renders required hooks and launch-contract literals for v2 backtest UI.
 
     Args:
         None.
@@ -245,7 +245,7 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     Assumptions:
         Backtests page is protected SSR that performs browser-side API calls to `/api/*`.
     Raises:
-        AssertionError: If required hooks/literals for preflight/run/prefill flow are missing.
+        AssertionError: If required hooks/literals for runtime-defaults launch flow are missing.
     Side Effects:
         None.
     """
@@ -258,16 +258,21 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     assert "/assets/backtest_ui.js" in response.text
     assert "/api/backtests" in response.text
     assert "/api/backtests/runtime-defaults" in response.text
-    assert "/api/indicators/estimate" in response.text
     assert "/api/strategies" in response.text
     assert "/api/market-data/markets" in response.text
     assert "/api/market-data/instruments" in response.text
     assert "/api/indicators" in response.text
+    assert "/backtests/jobs" in response.text
     assert "/strategies/new" in response.text
     assert "sessionStorage" in response.text
     assert "prefill" in response.text
     assert "Indicator params support both explicit values and range axes." in response.text
-    assert "Source is selected from allowed values." in response.text
+    assert "multi-source values are driven by runtime defaults" in response.text
+    assert "auto_preflight_enabled" in response.text
+    assert "202 Accepted" in response.text
+    assert "background_auto" in response.text
+    assert "Estimate preflight" not in response.text
+    assert "Run as job" not in response.text
 
 
 def test_backtest_jobs_list_page_renders_required_jobs_ui_hooks() -> None:

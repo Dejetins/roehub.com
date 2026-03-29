@@ -45,27 +45,57 @@ def test_backtest_ui_asset_supports_param_axis_modes_and_ma_window_labels() -> N
     assert "window grid step" in source
 
 
-def test_backtest_ui_asset_uses_single_select_source_with_explicit_axis_payload() -> None:
+def test_backtest_ui_asset_uses_runtime_defaults_for_timeframes_ranking_and_top_n_mapping() -> None:
     """
-    Verify source axis is rendered as single-select and serialized as explicit one-value axis.
+    Verify UI reads runtime defaults contracts for request_timeframes, ranking_metrics, and top_n.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Source input remains part of indicator grid contract (`BacktestAxisSpecRequest`).
+        R9-01 launch form is driven by `/api/backtests/runtime-defaults` contract fields.
     Raises:
-        AssertionError: If source UI is not select-based or payload is not explicit single-value.
+        AssertionError: If runtime-defaults-driven literals disappear from the UI asset.
     Side Effects:
         None.
     """
     source = _read_backtest_ui_asset()
 
-    assert "source-select" in source
-    assert "const sourceSelect = document.createElement(\"select\");" in source
-    assert "source requires one selected value" in source
-    assert "values: [selectedSource]" in source
+    assert "request_timeframes" in source
+    assert "ranking_metrics" in source
+    assert "top_n_default" in source
+    assert "top_n_max" in source
+    assert "requestPayload.top_k = advanced.topN" in source
+    assert "const cappedTopN = Math.min(parsedTopN, topNMax);" in source
+
+
+def test_backtest_ui_asset_supports_multi_source_selection_and_explicit_axis_payload() -> None:
+    """
+    Verify source axis supports multiple values and serializes explicit ordered source values.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R9-01 allows selecting several `inputs.source` values per indicator grid.
+    Raises:
+        AssertionError: If source UI stops being multi-select or payload loses
+            explicit values array.
+    Side Effects:
+        None.
+    """
+    source = _read_backtest_ui_asset()
+
+    assert "source values" in source
+    assert "sourceSelect.multiple = true;" in source
+    assert "Use Cmd/Ctrl to select multiple inputs.source values." in source
+    assert (
+        "rawSelectedValues: Array.from(sourceSelect.selectedOptions).map((item) => item.value)"
+        in source
+    )
+    assert "values: selectedSourceValues" in source
 
 
 def test_backtest_ui_asset_fetches_runtime_defaults_and_tracks_fee_dirty_state() -> None:
@@ -90,28 +120,29 @@ def test_backtest_ui_asset_fetches_runtime_defaults_and_tracks_fee_dirty_state()
     assert "executionFeeDirty" in source
     assert "applyDefaultFeeForSelectedMarket" in source
     assert "Runtime defaults:" in source
-    assert "top_k_persisted_default" in source
+    assert "request_timeframes=" in source
+    assert "ranking_metrics=" in source
 
 
-def test_backtest_ui_asset_formats_preflight_memory_and_toggles_risk_visibility() -> None:
+def test_backtest_ui_asset_surfaces_background_auto_202_and_toggles_risk_visibility() -> None:
     """
-    Verify UI shows human-readable memory and hides/shows SL/TP controls by enabled/mode.
+    Verify UI shows explicit `202 Accepted` background_auto fallback and toggles SL/TP controls.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        PR2 keeps visibility and memory formatting helpers in browser asset.
+        R9-01 keeps explicit launch-outcome messaging and risk visibility helpers in browser asset.
     Raises:
-        AssertionError: If memory/risk visibility literals disappear from the script.
+        AssertionError: If background_auto or risk visibility literals disappear from the script.
     Side Effects:
         None.
     """
     source = _read_backtest_ui_asset()
 
-    assert "formatEstimatedMemory" in source
-    assert "GiB (base-2)" in source
-    assert "MiB (base-2)" in source
+    assert "202 Accepted." in source
+    assert "background_auto" in source
+    assert "execution_mode=sync_inline." in source
     assert "updateRiskUiVisibility" in source
     assert "toggleNodesVisibility" in source

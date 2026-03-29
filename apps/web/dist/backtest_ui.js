@@ -1,15 +1,8 @@
 const BACKTEST_PAGE_SELECTOR = "[data-backtest-page]";
-const SUPPORTED_TIMEFRAMES = ["1m", "5m", "15m", "1h", "4h", "1d"];
 const RANGE_PRESET_DAYS = new Map([
   ["7d", 7],
   ["30d", 30],
   ["90d", 90],
-]);
-const RANKING_METRIC_LITERALS = new Set([
-  "max_drawdown_pct",
-  "profit_factor",
-  "return_over_max_drawdown",
-  "total_return_pct",
 ]);
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -23,8 +16,6 @@ document.addEventListener("DOMContentLoaded", () => {
 function initBacktestPage(pageRoot) {
   const backtestsPath = requireDataAttr(pageRoot, "apiBacktestsPath");
   const backtestVariantReportPath = requireDataAttr(pageRoot, "apiBacktestVariantReportPath");
-  const backtestJobsPath = requireDataAttr(pageRoot, "apiBacktestJobsPath");
-  const estimatePath = requireDataAttr(pageRoot, "apiEstimatePath");
   const strategiesPath = requireDataAttr(pageRoot, "apiStrategiesPath");
   const marketsPath = requireDataAttr(pageRoot, "apiMarketsPath");
   const instrumentsPath = requireDataAttr(pageRoot, "apiInstrumentsPath");
@@ -39,12 +30,11 @@ function initBacktestPage(pageRoot) {
   const form = pageRoot.querySelector("#backtest-form");
   const modeTemplate = pageRoot.querySelector("input[name=\"backtest-mode\"][value=\"template\"]");
   const modeSaved = pageRoot.querySelector("input[name=\"backtest-mode\"][value=\"saved\"]");
-  const runTypeSync = pageRoot.querySelector("input[name=\"backtest-run-type\"][value=\"sync\"]");
-  const runTypeJob = pageRoot.querySelector("input[name=\"backtest-run-type\"][value=\"job\"]");
   const templateModeSection = pageRoot.querySelector("#backtest-template-mode");
   const savedModeSection = pageRoot.querySelector("#backtest-saved-mode");
-  const jobNotice = pageRoot.querySelector("#backtest-job-notice");
-  const jobDisabledBanner = pageRoot.querySelector("#backtest-job-disabled-banner");
+  const launchStatus = pageRoot.querySelector("#backtest-launch-status");
+  const launchStatusMessage = pageRoot.querySelector("#backtest-launch-status-message");
+  const launchStatusLink = pageRoot.querySelector("#backtest-launch-status-link");
   const runButton = pageRoot.querySelector("#backtest-run-button");
   const runLoading = pageRoot.querySelector("#backtest-run-loading");
 
@@ -56,9 +46,6 @@ function initBacktestPage(pageRoot) {
   const timeframeSelect = pageRoot.querySelector("#backtest-timeframe");
   const addIndicatorButton = pageRoot.querySelector("#backtest-add-indicator");
   const blocksContainer = pageRoot.querySelector("#backtest-indicator-blocks");
-  const preflightButton = pageRoot.querySelector("#backtest-preflight-button");
-  const preflightLoading = pageRoot.querySelector("#backtest-preflight-loading");
-  const preflightSummary = pageRoot.querySelector("#backtest-preflight-summary");
 
   const strategiesSelect = pageRoot.querySelector("#backtest-strategy-id");
   const refreshStrategiesButton = pageRoot.querySelector("#backtest-refresh-strategies");
@@ -90,7 +77,7 @@ function initBacktestPage(pageRoot) {
   const riskTpStop = pageRoot.querySelector("#backtest-risk-tp-stop");
   const riskTpStep = pageRoot.querySelector("#backtest-risk-tp-step");
   const riskTpPct = pageRoot.querySelector("#backtest-risk-tp-pct");
-  const topKInput = pageRoot.querySelector("#backtest-top-k");
+  const topNInput = pageRoot.querySelector("#backtest-top-n");
   const preselectInput = pageRoot.querySelector("#backtest-preselect");
   const topTradesInput = pageRoot.querySelector("#backtest-top-trades-n");
   const warmupBarsInput = pageRoot.querySelector("#backtest-warmup-bars");
@@ -104,12 +91,11 @@ function initBacktestPage(pageRoot) {
     form === null
     || modeTemplate === null
     || modeSaved === null
-    || runTypeSync === null
-    || runTypeJob === null
     || templateModeSection === null
     || savedModeSection === null
-    || jobNotice === null
-    || jobDisabledBanner === null
+    || launchStatus === null
+    || launchStatusMessage === null
+    || launchStatusLink === null
     || runButton === null
     || runLoading === null
     || marketSelect === null
@@ -120,9 +106,6 @@ function initBacktestPage(pageRoot) {
     || timeframeSelect === null
     || addIndicatorButton === null
     || blocksContainer === null
-    || preflightButton === null
-    || preflightLoading === null
-    || preflightSummary === null
     || strategiesSelect === null
     || refreshStrategiesButton === null
     || rangePresetSelect === null
@@ -151,7 +134,7 @@ function initBacktestPage(pageRoot) {
     || riskTpStop === null
     || riskTpStep === null
     || riskTpPct === null
-    || topKInput === null
+    || topNInput === null
     || preselectInput === null
     || topTradesInput === null
     || warmupBarsInput === null
@@ -165,14 +148,12 @@ function initBacktestPage(pageRoot) {
 
   const state = {
     mode: "template",
-    runType: "sync",
     isRunning: false,
-    preflightReady: false,
-    jobsDisabled: false,
     markets: [],
     marketsById: new Map(),
     indicators: [],
     indicatorsById: new Map(),
+    indicatorDescriptors: [],
     strategiesById: new Map(),
     blocks: [],
     nextBlockNumber: 1,
@@ -189,8 +170,11 @@ function initBacktestPage(pageRoot) {
     reportCacheHitKeys: new Set(),
   };
 
-  const setPreflightSummary = (message) => {
-    preflightSummary.textContent = message;
+  const hideLaunchStatus = () => {
+    launchStatus.classList.add("hidden");
+    launchStatusMessage.textContent = "";
+    launchStatusLink.textContent = "/backtests/jobs";
+    launchStatusLink.href = jobsListPath;
   };
 
   const clearSelectedSymbol = () => {
@@ -198,9 +182,100 @@ function initBacktestPage(pageRoot) {
     selectedSymbol.textContent = "Selected symbol: none";
   };
 
-  const invalidatePreflight = () => {
-    state.preflightReady = false;
-    setPreflightSummary("Template mode requires successful preflight before run.");
+  const showLaunchStatus = ({ message, linkHref, linkLabel }) => {
+    launchStatusMessage.textContent = message;
+    launchStatusLink.href = linkHref;
+    launchStatusLink.textContent = linkLabel;
+    launchStatus.classList.remove("hidden");
+  };
+
+  const readRuntimeContracts = () => (
+    asRecord(asRecord(state.runtimeDefaults).contracts)
+  );
+
+  const readRuntimeRequestTimeframesContract = () => (
+    asRecord(readRuntimeContracts().request_timeframes)
+  );
+
+  const readRuntimeSummaryContract = () => (
+    asRecord(readRuntimeContracts().summary)
+  );
+
+  const readRuntimeLaunchContract = () => (
+    asRecord(readRuntimeContracts().launch)
+  );
+
+  const readAllowedTimeframes = () => {
+    const contract = readRuntimeRequestTimeframesContract();
+    return Array.isArray(contract.allowed)
+      ? contract.allowed.map((item) => String(item).trim()).filter((item) => item.length > 0)
+      : [];
+  };
+
+  const readRankingMetrics = () => {
+    const contract = readRuntimeSummaryContract();
+    return Array.isArray(contract.ranking_metrics)
+      ? contract.ranking_metrics
+        .map((item) => String(item).trim())
+        .filter((item) => item.length > 0)
+      : [];
+  };
+
+  const readSupportedIndicatorIds = () => {
+    const contract = readRuntimeLaunchContract();
+    return Array.isArray(contract.supported_indicator_ids)
+      ? contract.supported_indicator_ids
+        .map((item) => String(item).trim())
+        .filter((item) => item.length > 0)
+      : [];
+  };
+
+  const readSourceCatalogValues = (indicatorId) => {
+    const normalizedIndicatorId = String(indicatorId || "").trim();
+    if (normalizedIndicatorId.length === 0) {
+      return [];
+    }
+    const contract = readRuntimeLaunchContract();
+    const sourceCatalog = asRecord(contract.source_values_by_indicator_id);
+    const sourceValues = sourceCatalog[normalizedIndicatorId];
+    return Array.isArray(sourceValues)
+      ? sourceValues
+        .map((item) => String(item).trim())
+        .filter((item) => item.length > 0)
+      : [];
+  };
+
+  const readTopNMax = () => {
+    const contract = readRuntimeSummaryContract();
+    return readFiniteInteger(contract.top_n_max);
+  };
+
+  const readIndicatorSourceDefaultSelections = ({ descriptor, allowedValues }) => {
+    if (allowedValues.length === 0) {
+      return [];
+    }
+    const descriptorInputs = Array.isArray(descriptor.inputs) ? descriptor.inputs : [];
+    const sourceSpec = descriptorInputs.find(
+      (item) => String(asRecord(item).name || "").trim() === "source",
+    );
+    if (!sourceSpec) {
+      return [allowedValues[0]];
+    }
+    const defaultSpec = asRecord(asRecord(sourceSpec).default);
+    if (defaultSpec.mode !== "explicit" || !Array.isArray(defaultSpec.values)) {
+      return [allowedValues[0]];
+    }
+    const defaultValuesSet = new Set(
+      defaultSpec.values
+        .map((item) => String(item).trim())
+        .filter((item) => item.length > 0),
+    );
+    const selectedDefaults = allowedValues.filter((item) => defaultValuesSet.has(item));
+    return selectedDefaults.length > 0 ? selectedDefaults : [allowedValues[0]];
+  };
+
+  const refreshTemplateState = () => {
+    hideLaunchStatus();
     updateRunAvailability();
   };
 
@@ -208,46 +283,43 @@ function initBacktestPage(pageRoot) {
     const isTemplate = state.mode === "template";
     templateModeSection.classList.toggle("hidden", !isTemplate);
     savedModeSection.classList.toggle("hidden", isTemplate);
-    preflightButton.disabled = !isTemplate || state.isRunning;
-    if (!isTemplate) {
-      setPreflightSummary("Saved mode does not require preflight.");
-    } else if (!state.preflightReady) {
-      setPreflightSummary("Template mode requires successful preflight before run.");
-    }
   };
 
   const updateRunAvailability = () => {
-    const isJob = state.runType === "job";
-    jobNotice.classList.toggle("hidden", !isJob);
-    runButton.textContent = isJob ? "Run as job" : "Run sync";
     runButton.disabled = true;
-    runTypeJob.disabled = state.jobsDisabled;
 
     if (state.isRunning) {
       return;
     }
-    if (isJob && state.jobsDisabled) {
-      return;
-    }
-    if (state.mode === "template" && !isJob && !state.preflightReady) {
+    if (state.runtimeDefaults === null) {
       return;
     }
     if (state.mode === "saved" && String(strategiesSelect.value || "").trim().length === 0) {
       return;
     }
-    runButton.disabled = false;
-  };
-
-  const setJobsDisabled = () => {
-    state.jobsDisabled = true;
-    jobDisabledBanner.classList.remove("hidden");
-    runTypeJob.disabled = true;
-    if (state.runType === "job") {
-      state.runType = "sync";
-      runTypeSync.checked = true;
-      runTypeJob.checked = false;
+    if (state.mode === "template") {
+      const hasMissingSourceSelection = state.blocks.some((block) => {
+        const allowedSourceValues = readSourceCatalogValues(block.indicatorId);
+        if (allowedSourceValues.length === 0) {
+          return false;
+        }
+        return readSelectedSourceValues({
+          allowedValues: allowedSourceValues,
+          rawSelectedValues: block.sourceSelections,
+        }).length === 0;
+      });
+      if (
+        Number(marketSelect.value || "0") <= 0
+        || String(symbolValue.value || "").trim().length === 0
+        || String(timeframeSelect.value || "").trim().length === 0
+        || state.blocks.length === 0
+        || state.indicators.length === 0
+        || hasMissingSourceSelection
+      ) {
+        return;
+      }
     }
-    updateRunAvailability();
+    runButton.disabled = false;
   };
 
   const selectLabelForInput = (inputId) => (
@@ -396,30 +468,117 @@ function initBacktestPage(pageRoot) {
       return;
     }
     const defaultsRecord = asRecord(state.runtimeDefaults);
-    const jobsRecord = asRecord(defaultsRecord.jobs);
-    const rankingRecord = asRecord(defaultsRecord.ranking);
-    const topKDefault = readFiniteInteger(defaultsRecord.top_k_default);
+    const summaryContract = readRuntimeSummaryContract();
+    const launchContract = readRuntimeLaunchContract();
     const preselectDefault = readFiniteInteger(defaultsRecord.preselect_default);
     const warmupBarsDefault = readFiniteInteger(defaultsRecord.warmup_bars_default);
-    const jobsTopKCap = readFiniteInteger(jobsRecord.top_k_persisted_default);
-    const rankingPrimaryDefault = readOptionalRankingMetricLiteral({
-      rawValue: rankingRecord.primary_metric_default,
-      fieldLabel: "ranking.primary_metric_default",
-    });
-    const rankingSecondaryDefault = readOptionalRankingMetricLiteral({
-      rawValue: rankingRecord.secondary_metric_default,
-      fieldLabel: "ranking.secondary_metric_default",
-    });
+    const topNDefault = readFiniteInteger(summaryContract.top_n_default);
+    const topNMax = readFiniteInteger(summaryContract.top_n_max);
+    const requestTimeframes = readAllowedTimeframes();
+    const rankingMetrics = readRankingMetrics();
     runtimeDefaultsHint.textContent = [
       "Runtime defaults:",
-      `top_k=${topKDefault ?? "-"}`,
+      `top_n_default=${topNDefault ?? "-"}`,
+      `top_n_max=${topNMax ?? "-"}`,
       `preselect=${preselectDefault ?? "-"}`,
       `warmup_bars=${warmupBarsDefault ?? "-"}`,
-      `primary_metric=${rankingPrimaryDefault ?? "-"}`,
-      `secondary_metric=${rankingSecondaryDefault ?? "-"}.`,
-      `Jobs cap top_k_persisted_default=${jobsTopKCap ?? "-"}.`,
+      `request_timeframes=${requestTimeframes.join(",") || "-"}`,
+      `ranking_metrics=${rankingMetrics.join(",") || "-"}`,
+      `auto_preflight_enabled=${String(Boolean(launchContract.auto_preflight_enabled))}`,
+      `auto_fallback_to_background_enabled=${String(Boolean(launchContract.auto_fallback_to_background_enabled))}.`,
+      "Form top_n maps deterministically to request top_k.",
     ].join(" ");
     runtimeDefaultsHint.classList.remove("hidden");
+  };
+
+  const populateTimeframeOptions = () => {
+    const allowedTimeframes = readAllowedTimeframes();
+    const previousValue = String(timeframeSelect.value || "").trim();
+    timeframeSelect.innerHTML = "";
+    if (allowedTimeframes.length === 0) {
+      const option = document.createElement("option");
+      option.value = "";
+      option.textContent = "No request_timeframes available";
+      timeframeSelect.appendChild(option);
+      return;
+    }
+
+    allowedTimeframes.forEach((timeframe) => {
+      const option = document.createElement("option");
+      option.value = timeframe;
+      option.textContent = timeframe;
+      timeframeSelect.appendChild(option);
+    });
+    timeframeSelect.value = allowedTimeframes.includes(previousValue)
+      ? previousValue
+      : allowedTimeframes[0];
+  };
+
+  const repopulateRankingMetricSelect = ({ selectNode, includeEmptyOption, emptyLabel }) => {
+    const previousValue = String(selectNode.value || "").trim();
+    const metrics = readRankingMetrics();
+    selectNode.innerHTML = "";
+    if (includeEmptyOption) {
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = emptyLabel;
+      selectNode.appendChild(emptyOption);
+    }
+    metrics.forEach((metric) => {
+      const option = document.createElement("option");
+      option.value = metric;
+      option.textContent = metric;
+      selectNode.appendChild(option);
+    });
+    if (metrics.includes(previousValue)) {
+      selectNode.value = previousValue;
+    }
+  };
+
+  const rebuildIndicatorCatalog = () => {
+    if (state.runtimeDefaults === null || state.indicatorDescriptors.length === 0) {
+      state.indicators = [];
+      state.indicatorsById = new Map();
+      blocksContainer.innerHTML = "<p class=\"muted-text\">Waiting for runtime defaults...</p>";
+      updateRunAvailability();
+      return;
+    }
+
+    const descriptorsById = new Map(
+      state.indicatorDescriptors
+        .map((indicator) => [String(indicator.indicator_id || "").trim(), indicator])
+        .filter((entry) => entry[0].length > 0),
+    );
+    const supportedIndicatorIds = readSupportedIndicatorIds();
+    const missingIndicatorIds = supportedIndicatorIds.filter((item) => !descriptorsById.has(item));
+    state.indicators = supportedIndicatorIds
+      .map((indicatorId) => descriptorsById.get(indicatorId))
+      .filter((indicator) => indicator && typeof indicator === "object");
+    state.indicatorsById = new Map(
+      state.indicators.map((indicator) => [String(indicator.indicator_id), indicator]),
+    );
+    state.blocks = state.blocks.filter((block) => state.indicatorsById.has(block.indicatorId));
+
+    if (missingIndicatorIds.length > 0) {
+      showPageError(
+        pageRoot,
+        "Runtime defaults reference indicators that are unavailable in /api/indicators.",
+        missingIndicatorIds.map((indicatorId) => `missing indicator descriptor: ${indicatorId}`),
+      );
+    }
+
+    if (state.indicators.length === 0) {
+      blocksContainer.innerHTML = "<p class=\"muted-text\">No supported_indicator_ids are available.</p>";
+      updateRunAvailability();
+      return;
+    }
+
+    if (state.blocks.length === 0) {
+      addIndicatorBlock();
+      return;
+    }
+    renderIndicatorBlocks();
+    updateRunAvailability();
   };
 
   const applyRuntimeDefaultsToAdvancedFields = () => {
@@ -429,17 +588,22 @@ function initBacktestPage(pageRoot) {
     const defaultsRecord = asRecord(state.runtimeDefaults);
     const executionRecord = asRecord(defaultsRecord.execution);
     const rankingRecord = asRecord(defaultsRecord.ranking);
+    const summaryContract = readRuntimeSummaryContract();
 
     const warmupBarsDefault = readFiniteInteger(defaultsRecord.warmup_bars_default);
-    const topKDefault = readFiniteInteger(defaultsRecord.top_k_default);
+    const topNDefault = readFiniteInteger(summaryContract.top_n_default);
+    const topNMax = readFiniteInteger(summaryContract.top_n_max);
     const preselectDefault = readFiniteInteger(defaultsRecord.preselect_default);
     const topTradesDefault = readFiniteInteger(defaultsRecord.top_trades_n_default);
 
     if (warmupBarsDefault !== null) {
       warmupBarsInput.value = String(warmupBarsDefault);
     }
-    if (topKDefault !== null) {
-      topKInput.value = String(topKDefault);
+    if (topNDefault !== null) {
+      topNInput.value = String(topNDefault);
+    }
+    if (topNMax !== null && topNMax > 0) {
+      topNInput.max = String(topNMax);
     }
     if (preselectDefault !== null) {
       preselectInput.value = String(preselectDefault);
@@ -447,6 +611,17 @@ function initBacktestPage(pageRoot) {
     if (topTradesDefault !== null) {
       topTradesInput.value = String(topTradesDefault);
     }
+    populateTimeframeOptions();
+    repopulateRankingMetricSelect({
+      selectNode: rankingPrimaryMetricSelect,
+      includeEmptyOption: true,
+      emptyLabel: "Use runtime default",
+    });
+    repopulateRankingMetricSelect({
+      selectNode: rankingSecondaryMetricSelect,
+      includeEmptyOption: true,
+      emptyLabel: "None (tie-break by variant_key)",
+    });
     const primaryMetricDefault = readOptionalRankingMetricLiteral({
       rawValue: rankingRecord.primary_metric_default,
       fieldLabel: "ranking.primary_metric_default",
@@ -485,12 +660,9 @@ function initBacktestPage(pageRoot) {
     }
 
     applyDefaultFeeForSelectedMarket({ force: true, allowFallbackToFirst: true });
+    rebuildIndicatorCatalog();
     renderRuntimeDefaultsHint();
-    if (state.mode === "template") {
-      invalidatePreflight();
-    } else {
-      updateRunAvailability();
-    }
+    updateRunAvailability();
   };
 
   const loadRuntimeDefaults = async () => {
@@ -507,19 +679,6 @@ function initBacktestPage(pageRoot) {
     }
   };
 
-  const formatEstimatedMemory = (estimatedMemoryBytes) => {
-    const bytes = readFiniteNumber(estimatedMemoryBytes);
-    if (bytes === null || bytes < 0) {
-      return "n/a";
-    }
-    const gib = 1024 * 1024 * 1024;
-    const mib = 1024 * 1024;
-    if (bytes >= gib) {
-      return `${(bytes / gib).toFixed(2)} GiB (base-2)`;
-    }
-    return `${(bytes / mib).toFixed(2)} MiB (base-2)`;
-  };
-
   const renderSuggestionButtons = (symbols) => {
     suggestionsList.innerHTML = "";
     symbols.forEach((symbol) => {
@@ -533,7 +692,7 @@ function initBacktestPage(pageRoot) {
         symbolQuery.value = symbol;
         selectedSymbol.textContent = `Selected symbol: ${symbol}`;
         suggestionsList.innerHTML = "";
-        invalidatePreflight();
+        refreshTemplateState();
       });
       item.appendChild(button);
       suggestionsList.appendChild(item);
@@ -631,23 +790,6 @@ function initBacktestPage(pageRoot) {
     };
   };
 
-  const getSourceAllowedValues = (sourceRecord) => (
-    Array.isArray(sourceRecord.allowed_values)
-      ? sourceRecord.allowed_values.map((item) => String(item))
-      : []
-  );
-
-  const readSourceDefaultValue = (sourceRecord, allowedValues) => {
-    const defaultValue = readDefaultFieldValue(sourceRecord.default).trim();
-    if (defaultValue.length > 0 && (allowedValues.length === 0 || allowedValues.includes(defaultValue))) {
-      return defaultValue;
-    }
-    if (allowedValues.length > 0) {
-      return allowedValues[0];
-    }
-    return defaultValue;
-  };
-
   const ensureParamAxisState = ({ block, paramRecord }) => {
     const paramName = String(paramRecord.name || "");
     if (paramName.length === 0) {
@@ -704,28 +846,35 @@ function initBacktestPage(pageRoot) {
     };
   };
 
+  const readSelectedSourceValues = ({ allowedValues, rawSelectedValues }) => {
+    if (allowedValues.length === 0) {
+      return [];
+    }
+    const selectedValues = Array.isArray(rawSelectedValues)
+      ? rawSelectedValues
+        .map((item) => String(item).trim())
+        .filter((item) => item.length > 0)
+      : [];
+    const selectedValuesSet = new Set(selectedValues);
+    return allowedValues.filter((item) => selectedValuesSet.has(item));
+  };
+
   const ensureDefaultsForBlock = (block) => {
     const descriptor = state.indicatorsById.get(block.indicatorId);
     if (!descriptor) {
       return;
     }
-
-    const sourceSpec = Array.isArray(descriptor.inputs)
-      ? descriptor.inputs.find((item) => String(asRecord(item).name || "") === "source")
-      : null;
-    if (sourceSpec !== null) {
-      const sourceRecord = asRecord(sourceSpec);
-      const allowedValues = getSourceAllowedValues(sourceRecord);
-      const selectedSource = String(block.sourceSelection || "").trim();
-      if (
-        selectedSource.length === 0
-        || (allowedValues.length > 0 && !allowedValues.includes(selectedSource))
-      ) {
-        block.sourceSelection = readSourceDefaultValue(sourceRecord, allowedValues);
-      }
-    } else {
-      block.sourceSelection = "";
-    }
+    const allowedSourceValues = readSourceCatalogValues(block.indicatorId);
+    const selectedSourceValues = readSelectedSourceValues({
+      allowedValues: allowedSourceValues,
+      rawSelectedValues: block.sourceSelections,
+    });
+    block.sourceSelections = selectedSourceValues.length > 0
+      ? selectedSourceValues
+      : readIndicatorSourceDefaultSelections({
+        descriptor,
+        allowedValues: allowedSourceValues,
+      });
 
     const params = Array.isArray(descriptor.params) ? descriptor.params : [];
     const descriptorParamNames = new Set();
@@ -756,14 +905,14 @@ function initBacktestPage(pageRoot) {
     const block = {
       uid: `backtest-indicator-${state.nextBlockNumber}`,
       indicatorId: String(firstIndicator.indicator_id),
-      sourceSelection: "",
+      sourceSelections: [],
       paramAxes: {},
     };
     state.nextBlockNumber += 1;
     ensureDefaultsForBlock(block);
     state.blocks.push(block);
     renderIndicatorBlocks();
-    invalidatePreflight();
+    refreshTemplateState();
   };
 
   const renderIndicatorBlocks = () => {
@@ -802,7 +951,7 @@ function initBacktestPage(pageRoot) {
             const moved = state.blocks.splice(index, 1)[0];
             state.blocks.splice(index - 1, 0, moved);
             renderIndicatorBlocks();
-            invalidatePreflight();
+            refreshTemplateState();
           },
         }),
       );
@@ -814,7 +963,7 @@ function initBacktestPage(pageRoot) {
             const moved = state.blocks.splice(index, 1)[0];
             state.blocks.splice(index + 1, 0, moved);
             renderIndicatorBlocks();
-            invalidatePreflight();
+            refreshTemplateState();
           },
         }),
       );
@@ -825,7 +974,7 @@ function initBacktestPage(pageRoot) {
           onClick: () => {
             state.blocks = state.blocks.filter((candidate) => candidate.uid !== block.uid);
             renderIndicatorBlocks();
-            invalidatePreflight();
+            refreshTemplateState();
           },
         }),
       );
@@ -849,45 +998,48 @@ function initBacktestPage(pageRoot) {
       indicatorSelect.addEventListener("change", () => {
         block.indicatorId = indicatorSelect.value;
         block.paramAxes = {};
-        block.sourceSelection = "";
+        block.sourceSelections = [];
         ensureDefaultsForBlock(block);
         renderIndicatorBlocks();
-        invalidatePreflight();
+        refreshTemplateState();
       });
       card.appendChild(indicatorSelect);
 
-      const descriptorInputs = Array.isArray(descriptor.inputs) ? descriptor.inputs : [];
-      const sourceSpec = descriptorInputs.find(
-        (item) => String(asRecord(item).name || "") === "source",
-      );
-      if (sourceSpec) {
-        const sourceRecord = asRecord(sourceSpec);
-        const sourceOptions = getSourceAllowedValues(sourceRecord);
+      const sourceOptions = readSourceCatalogValues(block.indicatorId);
+      if (sourceOptions.length > 0) {
         const sourceLabel = document.createElement("label");
         sourceLabel.setAttribute("for", `${block.uid}-source-select`);
-        sourceLabel.textContent = "source";
+        sourceLabel.textContent = "source values";
         card.appendChild(sourceLabel);
 
         const sourceSelect = document.createElement("select");
         sourceSelect.id = `${block.uid}-source-select`;
+        sourceSelect.multiple = true;
+        sourceSelect.size = Math.min(Math.max(sourceOptions.length, 2), 4);
+        const selectedSourceValues = readSelectedSourceValues({
+          allowedValues: sourceOptions,
+          rawSelectedValues: block.sourceSelections,
+        });
         sourceOptions.forEach((sourceValue) => {
           const option = document.createElement("option");
           option.value = sourceValue;
           option.textContent = sourceValue;
+          option.selected = selectedSourceValues.includes(sourceValue);
           sourceSelect.appendChild(option);
         });
-        if (sourceOptions.length === 0) {
-          const option = document.createElement("option");
-          option.value = "";
-          option.textContent = "No source options";
-          sourceSelect.appendChild(option);
-        }
-        sourceSelect.value = String(block.sourceSelection || "");
         sourceSelect.addEventListener("change", () => {
-          block.sourceSelection = String(sourceSelect.value || "").trim();
-          invalidatePreflight();
+          block.sourceSelections = readSelectedSourceValues({
+            allowedValues: sourceOptions,
+            rawSelectedValues: Array.from(sourceSelect.selectedOptions).map((item) => item.value),
+          });
+          refreshTemplateState();
         });
         card.appendChild(sourceSelect);
+
+        const sourceHint = document.createElement("p");
+        sourceHint.className = "muted-text";
+        sourceHint.textContent = "Use Cmd/Ctrl to select multiple inputs.source values.";
+        card.appendChild(sourceHint);
       }
 
       const paramsTitle = document.createElement("h4");
@@ -947,7 +1099,7 @@ function initBacktestPage(pageRoot) {
           }
           explicitInput.addEventListener("change", () => {
             axisState.explicitValues = explicitInput.value.trim();
-            invalidatePreflight();
+            refreshTemplateState();
           });
           card.appendChild(explicitInput);
 
@@ -963,7 +1115,7 @@ function initBacktestPage(pageRoot) {
           rangeStartInput.value = String(axisState.rangeStart || "");
           rangeStartInput.addEventListener("change", () => {
             axisState.rangeStart = rangeStartInput.value.trim();
-            invalidatePreflight();
+            refreshTemplateState();
           });
           card.appendChild(rangeStartInput);
 
@@ -979,7 +1131,7 @@ function initBacktestPage(pageRoot) {
           rangeStopInput.value = String(axisState.rangeStopIncl || "");
           rangeStopInput.addEventListener("change", () => {
             axisState.rangeStopIncl = rangeStopInput.value.trim();
-            invalidatePreflight();
+            refreshTemplateState();
           });
           card.appendChild(rangeStopInput);
 
@@ -995,7 +1147,7 @@ function initBacktestPage(pageRoot) {
           rangeStepInput.value = String(axisState.rangeStep || "");
           rangeStepInput.addEventListener("change", () => {
             axisState.rangeStep = rangeStepInput.value.trim();
-            invalidatePreflight();
+            refreshTemplateState();
           });
           card.appendChild(rangeStepInput);
 
@@ -1014,7 +1166,7 @@ function initBacktestPage(pageRoot) {
           modeSelect.addEventListener("change", () => {
             axisState.mode = normalizeAxisMode(modeSelect.value);
             toggleParamMode();
-            invalidatePreflight();
+            refreshTemplateState();
           });
           toggleParamMode();
         });
@@ -1222,12 +1374,29 @@ function initBacktestPage(pageRoot) {
     if (metric.length === 0) {
       return null;
     }
-    if (!RANKING_METRIC_LITERALS.has(metric)) {
+    const rankingMetrics = readRankingMetrics();
+    if (!rankingMetrics.includes(metric)) {
       throw new Error(
-        `${fieldLabel} must be one of ${Array.from(RANKING_METRIC_LITERALS).sort(compareStableStrings).join(", ")}.`,
+        `${fieldLabel} must be one of ${rankingMetrics.join(", ")}.`,
       );
     }
     return metric;
+  };
+
+  const readRequestedTopN = () => {
+    const parsedTopN = readOptionalPositiveInt(topNInput, "top_n");
+    if (parsedTopN === null) {
+      return null;
+    }
+    const topNMax = readTopNMax();
+    if (topNMax === null || topNMax <= 0) {
+      return parsedTopN;
+    }
+    const cappedTopN = Math.min(parsedTopN, topNMax);
+    if (cappedTopN !== parsedTopN) {
+      topNInput.value = String(cappedTopN);
+    }
+    return cappedTopN;
   };
 
   const buildExecutionPayload = () => {
@@ -1341,7 +1510,7 @@ function initBacktestPage(pageRoot) {
       rankingSecondaryMetric: secondaryMetric,
       execution: buildExecutionPayload(),
       riskGrid: buildRiskGridPayload(),
-      topK: readOptionalPositiveInt(topKInput, "top_k"),
+      topN: readRequestedTopN(),
       preselect: readOptionalPositiveInt(preselectInput, "preselect"),
       topTradesN: readOptionalPositiveInt(topTradesInput, "top_trades_n"),
       warmupBars: readOptionalPositiveInt(warmupBarsInput, "warmup_bars"),
@@ -1396,86 +1565,22 @@ function initBacktestPage(pageRoot) {
         params,
       };
 
-      const descriptorInputs = Array.isArray(descriptor.inputs) ? descriptor.inputs : [];
-      const sourceSpec = descriptorInputs.find(
-        (item) => String(asRecord(item).name || "") === "source",
-      );
-      if (sourceSpec) {
-        const sourceRecord = asRecord(sourceSpec);
-        const sourceOptions = getSourceAllowedValues(sourceRecord);
-        const selectedSource = String(block.sourceSelection || "").trim();
-        if (selectedSource.length === 0) {
-          throw new Error(`indicator ${block.indicatorId} source requires one selected value.`);
-        }
-        if (sourceOptions.length > 0 && !sourceOptions.includes(selectedSource)) {
-          throw new Error(`indicator ${block.indicatorId} source must be one of allowed values.`);
-        }
+      const allowedSourceValues = readSourceCatalogValues(block.indicatorId);
+      const selectedSourceValues = readSelectedSourceValues({
+        allowedValues: allowedSourceValues,
+        rawSelectedValues: block.sourceSelections,
+      });
+      if (allowedSourceValues.length > 0 && selectedSourceValues.length === 0) {
+        throw new Error(`indicator ${block.indicatorId} source requires one or more selected values.`);
+      }
+      if (selectedSourceValues.length > 0) {
         grid.source = {
           mode: "explicit",
-          values: [selectedSource],
+          values: selectedSourceValues,
         };
       }
       return grid;
     });
-  };
-
-  const buildEstimateRisk = (riskGrid) => {
-    const fallbackAxis = { mode: "explicit", values: [1.0] };
-    if (riskGrid === null) {
-      return {
-        sl: fallbackAxis,
-        tp: fallbackAxis,
-      };
-    }
-
-    const slAxis = (
-      riskGrid.sl
-      || (typeof riskGrid.sl_pct === "number"
-        ? { mode: "explicit", values: [riskGrid.sl_pct] }
-        : fallbackAxis)
-    );
-    const tpAxis = (
-      riskGrid.tp
-      || (typeof riskGrid.tp_pct === "number"
-        ? { mode: "explicit", values: [riskGrid.tp_pct] }
-        : fallbackAxis)
-    );
-    return {
-      sl: slAxis,
-      tp: tpAxis,
-    };
-  };
-
-  const buildTemplatePreflightPayload = () => {
-    const marketId = Number(marketSelect.value || "0");
-    if (marketId <= 0) {
-      throw new Error("Please select market.");
-    }
-    if (String(symbolValue.value || "").trim().length === 0) {
-      throw new Error("Please select symbol from suggestions.");
-    }
-
-    const timeframe = String(timeframeSelect.value || "").trim();
-    if (!SUPPORTED_TIMEFRAMES.includes(timeframe)) {
-      throw new Error("Unsupported timeframe selected.");
-    }
-
-    const advanced = buildAdvancedOptions();
-    return {
-      timeframe,
-      time_range: parseTimeRange(),
-      indicators: buildTemplateIndicatorGrids().map((item) => {
-        const payload = {
-          indicator_id: item.indicator_id,
-          params: item.params,
-        };
-        if (item.source) {
-          payload.source = item.source;
-        }
-        return payload;
-      }),
-      risk: buildEstimateRisk(advanced.riskGrid),
-    };
   };
 
   const buildRunRequest = () => {
@@ -1485,8 +1590,8 @@ function initBacktestPage(pageRoot) {
       time_range: timeRange,
     };
 
-    if (advanced.topK !== null) {
-      requestPayload.top_k = advanced.topK;
+    if (advanced.topN !== null) {
+      requestPayload.top_k = advanced.topN;
     }
     if (advanced.preselect !== null) {
       requestPayload.preselect = advanced.preselect;
@@ -1517,8 +1622,8 @@ function initBacktestPage(pageRoot) {
         throw new Error("Please select symbol from suggestions.");
       }
       const timeframe = String(timeframeSelect.value || "").trim();
-      if (!SUPPORTED_TIMEFRAMES.includes(timeframe)) {
-        throw new Error("Unsupported timeframe selected.");
+      if (!readAllowedTimeframes().includes(timeframe)) {
+        throw new Error("timeframe must be one of runtime request_timeframes.allowed.");
       }
 
       const templatePayload = {
@@ -1632,7 +1737,6 @@ function initBacktestPage(pageRoot) {
   };
 
   const loadReferences = async () => {
-    clearPageError(pageRoot);
     try {
       const [marketsResponse, indicatorsResponse] = await Promise.all([
         fetch(marketsPath, { credentials: 'include' }),
@@ -1668,22 +1772,10 @@ function initBacktestPage(pageRoot) {
       const indicatorsItems = Array.isArray(indicatorsPayload.items)
         ? indicatorsPayload.items
         : [];
-      state.indicators = indicatorsItems
+      state.indicatorDescriptors = indicatorsItems
         .map((item) => asRecord(item))
-        .filter((item) => String(item.indicator_id || "").trim().length > 0)
-        .sort((left, right) => compareStableStrings(
-          String(left.indicator_id),
-          String(right.indicator_id),
-        ));
-      state.indicatorsById = new Map(
-        state.indicators.map((indicator) => [String(indicator.indicator_id), indicator]),
-      );
-
-      if (state.blocks.length === 0 && state.indicators.length > 0) {
-        addIndicatorBlock();
-      } else {
-        renderIndicatorBlocks();
-      }
+        .filter((item) => String(item.indicator_id || "").trim().length > 0);
+      rebuildIndicatorCatalog();
     } catch (error) {
       const normalized = normalizeError(error);
       showPageError(pageRoot, normalized.message, normalized.details);
@@ -1870,6 +1962,9 @@ function initBacktestPage(pageRoot) {
     const response = asRecord(responsePayload);
     const metaPayload = {
       schema_version: response.schema_version,
+      run_id: response.run_id || null,
+      state: response.state || null,
+      execution_mode: response.execution_mode || null,
       mode: response.mode,
       strategy_id: response.strategy_id || null,
       instrument_id: response.instrument_id || {},
@@ -1887,7 +1982,10 @@ function initBacktestPage(pageRoot) {
     variantsBody.innerHTML = "";
     const variants = Array.isArray(response.variants) ? response.variants : [];
     if (variants.length === 0) {
-      variantsBody.innerHTML = "<tr><td colspan=\"6\">No variants returned.</td></tr>";
+      const emptyMessage = String(response.execution_mode || "").trim() === "background_auto"
+        ? "No inline variants yet. background_auto launch is queued."
+        : "No variants returned.";
+      variantsBody.innerHTML = `<tr><td colspan="6">${escapeHtml(emptyMessage)}</td></tr>`;
     } else {
       variants.forEach((variant, index) => {
         const variantRecord = asRecord(variant);
@@ -2128,57 +2226,51 @@ function initBacktestPage(pageRoot) {
     `${jobsListPath}/${encodeURIComponent(jobId)}`
   );
 
-  const runPreflight = async () => {
-    clearPageError(pageRoot);
-    if (state.mode !== "template") {
+  const renderLaunchOutcome = ({ payload, responseStatus }) => {
+    const responsePayload = asRecord(payload);
+    const runId = String(responsePayload.run_id || "").trim();
+    const executionMode = String(responsePayload.execution_mode || "").trim();
+    const stateValue = String(responsePayload.state || "").trim();
+
+    if (responseStatus === 202 || executionMode === "background_auto") {
+      const linkHref = runId.length > 0 ? renderJobDetailsPath(runId) : jobsListPath;
+      const linkLabel = runId.length > 0
+        ? `Open background run ${runId}`
+        : "Open background runs";
+      showLaunchStatus({
+        message: [
+          "202 Accepted.",
+          "Server auto-preflight queued this launch in background_auto.",
+          `run_id=${runId || "-"}.`,
+          `state=${stateValue || "queued"}.`,
+        ].join(" "),
+        linkHref,
+        linkLabel,
+      });
       return;
     }
-    try {
-      const requestPayload = buildTemplatePreflightPayload();
-      state.preflightReady = false;
-      updateRunAvailability();
-      preflightButton.disabled = true;
-      preflightLoading.classList.remove("hidden");
 
-      const response = await fetch(estimatePath, {
-        method: "POST",
-        credentials: 'include',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestPayload),
-      });
-      if (!response.ok) {
-        throw await buildHttpError(response);
-      }
-      const payload = await response.json();
-      const totalVariants = Math.max(
-        0,
-        Math.trunc(readFiniteNumber(payload.total_variants) || 0),
-      );
-      const estimatedMemory = formatEstimatedMemory(payload.estimated_memory_bytes);
-      state.preflightReady = true;
-      setPreflightSummary(
-        [
-          "Preflight passed.",
-          `total_variants=${totalVariants}`,
-          `estimated_memory=${estimatedMemory}`,
+    if (executionMode === "sync_inline") {
+      showLaunchStatus({
+        message: [
+          "Inline launch completed.",
+          `execution_mode=sync_inline.`,
+          `run_id=${runId || "-"}.`,
+          `state=${stateValue || "-"}.`,
         ].join(" "),
-      );
-      updateRunAvailability();
-    } catch (error) {
-      state.preflightReady = false;
-      setPreflightSummary("Preflight failed. Fix validation errors before run.");
-      const normalized = normalizeError(error);
-      showPageError(pageRoot, normalized.message, normalized.details);
-      updateRunAvailability();
-    } finally {
-      preflightLoading.classList.add("hidden");
-      preflightButton.disabled = state.mode !== "template" || state.isRunning;
+        linkHref: jobsListPath,
+        linkLabel: "Open runs compatibility page",
+      });
+      return;
     }
+
+    hideLaunchStatus();
   };
 
-  const runBacktestSync = async () => {
+  const runBacktestLaunch = async () => {
     const request = buildRunRequest();
     state.isRunning = true;
+    hideLaunchStatus();
     updateRunAvailability();
     runLoading.classList.remove("hidden");
     try {
@@ -2192,6 +2284,12 @@ function initBacktestPage(pageRoot) {
         throw await buildHttpError(response);
       }
       const payload = await response.json();
+      if (response.status === 202) {
+        const runId = String(asRecord(payload).run_id || "").trim();
+        if (runId.length > 0) {
+          persistJobContext({ jobId: runId, request });
+        }
+      }
       state.latestRunToken += 1;
       state.latestRun = {
         response: payload,
@@ -2202,46 +2300,8 @@ function initBacktestPage(pageRoot) {
       state.reportLoadingKeys.clear();
       state.reportErrorsByVariantKey.clear();
       state.reportCacheHitKeys.clear();
+      renderLaunchOutcome({ payload, responseStatus: response.status });
       renderResults(payload);
-    } finally {
-      state.isRunning = false;
-      runLoading.classList.add("hidden");
-      updateRunAvailability();
-    }
-  };
-
-  const runBacktestJob = async () => {
-    if (state.jobsDisabled) {
-      showPageError(pageRoot, "Jobs disabled by config", []);
-      return;
-    }
-    const request = buildRunRequest();
-    state.isRunning = true;
-    updateRunAvailability();
-    runLoading.classList.remove("hidden");
-    try {
-      const response = await fetch(backtestJobsPath, {
-        method: "POST",
-        credentials: 'include',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(request.payload),
-      });
-      if (response.status === 404) {
-        setJobsDisabled();
-        showPageError(pageRoot, "Jobs disabled by config", []);
-        return;
-      }
-      if (!response.ok) {
-        throw await buildHttpError(response);
-      }
-
-      const payload = await response.json();
-      const jobId = String(payload.job_id || "").trim();
-      if (jobId.length === 0) {
-        throw new Error("Job create response does not contain job_id.");
-      }
-      persistJobContext({ jobId, request });
-      window.location.assign(renderJobDetailsPath(jobId));
     } finally {
       state.isRunning = false;
       runLoading.classList.add("hidden");
@@ -2252,11 +2312,7 @@ function initBacktestPage(pageRoot) {
   const runBacktest = async () => {
     clearPageError(pageRoot);
     try {
-      if (state.runType === "job") {
-        await runBacktestJob();
-      } else {
-        await runBacktestSync();
-      }
+      await runBacktestLaunch();
     } catch (error) {
       const normalized = normalizeError(error);
       showPageError(pageRoot, normalized.message, normalized.details);
@@ -2270,6 +2326,7 @@ function initBacktestPage(pageRoot) {
     state.mode = "template";
     updateModeSections();
     updateRunAvailability();
+    hideLaunchStatus();
   });
   modeSaved.addEventListener("change", () => {
     if (!modeSaved.checked) {
@@ -2278,20 +2335,9 @@ function initBacktestPage(pageRoot) {
     state.mode = "saved";
     updateModeSections();
     updateRunAvailability();
+    hideLaunchStatus();
     if (state.strategiesById.size === 0) {
       loadStrategies();
-    }
-  });
-  runTypeSync.addEventListener("change", () => {
-    if (runTypeSync.checked) {
-      state.runType = "sync";
-      updateRunAvailability();
-    }
-  });
-  runTypeJob.addEventListener("change", () => {
-    if (runTypeJob.checked) {
-      state.runType = "job";
-      updateRunAvailability();
     }
   });
 
@@ -2299,18 +2345,20 @@ function initBacktestPage(pageRoot) {
     clearSelectedSymbol();
     suggestionsList.innerHTML = "";
     applyDefaultFeeForSelectedMarket({ force: false, allowFallbackToFirst: false });
-    invalidatePreflight();
+    refreshTemplateState();
   });
   symbolQuery.addEventListener("input", () => {
     clearSelectedSymbol();
     scheduleInstrumentSearch();
-    invalidatePreflight();
+    refreshTemplateState();
   });
-  timeframeSelect.addEventListener("change", invalidatePreflight);
+  timeframeSelect.addEventListener("change", refreshTemplateState);
   addIndicatorButton.addEventListener("click", addIndicatorBlock);
-  preflightButton.addEventListener("click", runPreflight);
   refreshStrategiesButton.addEventListener("click", loadStrategies);
-  strategiesSelect.addEventListener("change", updateRunAvailability);
+  strategiesSelect.addEventListener("change", () => {
+    hideLaunchStatus();
+    updateRunAvailability();
+  });
   [riskSlEnabled, riskSlMode, riskTpEnabled, riskTpMode].forEach((node) => {
     node.addEventListener("change", updateRiskUiVisibility);
   });
@@ -2327,12 +2375,12 @@ function initBacktestPage(pageRoot) {
   rangePresetSelect.addEventListener("change", () => {
     const preset = String(rangePresetSelect.value || "custom");
     applyRangePreset(preset);
-    invalidatePreflight();
+    refreshTemplateState();
   });
   [rangeStartInput, rangeEndInput].forEach((node) => {
     const onRangeInputChanged = () => {
       rangePresetSelect.value = "custom";
-      invalidatePreflight();
+      refreshTemplateState();
     };
     node.addEventListener("change", onRangeInputChanged);
     node.addEventListener("input", onRangeInputChanged);
@@ -2362,17 +2410,14 @@ function initBacktestPage(pageRoot) {
     riskTpStop,
     riskTpStep,
     riskTpPct,
-    topKInput,
+    topNInput,
     preselectInput,
     topTradesInput,
     warmupBarsInput,
   ].forEach((node) => {
     const onAdvancedChanged = () => {
-      if (state.mode === "template") {
-        invalidatePreflight();
-      } else {
-        updateRunAvailability();
-      }
+      hideLaunchStatus();
+      updateRunAvailability();
     };
     node.addEventListener("change", onAdvancedChanged);
     node.addEventListener("input", onAdvancedChanged);
@@ -2383,21 +2428,19 @@ function initBacktestPage(pageRoot) {
     await runBacktest();
   });
 
-  const searchParams = new URLSearchParams(window.location.search);
-  const runTypeParam = String(searchParams.get("run_type") || "").trim().toLowerCase();
-  if (runTypeParam === "job") {
-    state.runType = "job";
-    runTypeJob.checked = true;
-    runTypeSync.checked = false;
-  }
-
   applyRangePreset("90d");
   updateRiskUiVisibility();
   updateModeSections();
+  hideLaunchStatus();
   updateRunAvailability();
-  loadRuntimeDefaults();
-  loadReferences();
-  loadStrategies();
+  const bootstrap = async () => {
+    await loadRuntimeDefaults();
+    await Promise.all([
+      loadReferences(),
+      loadStrategies(),
+    ]);
+  };
+  void bootstrap();
 }
 
 function renderMarkdownToSafeHtml(markdown) {

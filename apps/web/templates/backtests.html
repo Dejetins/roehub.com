@@ -7,8 +7,6 @@
     data-api-backtests-path="/api/backtests"
     data-api-backtest-variant-report-path="/api/backtests/variant-report"
     data-api-backtest-runtime-defaults-path="/api/backtests/runtime-defaults"
-    data-api-backtest-jobs-path="/api/backtests/jobs"
-    data-api-estimate-path="/api/indicators/estimate"
     data-api-strategies-path="/api/strategies"
     data-api-markets-path="/api/market-data/markets"
     data-api-instruments-path="/api/market-data/instruments"
@@ -28,12 +26,21 @@
     </div>
 
     <p>
-      Run synchronous backtests in template mode or saved mode. Browser requests are sent to
-      <code>/api/*</code> with credentials.
+      Launch backtests in template mode or saved mode through <code>POST /api/backtests</code>.
+      Browser requests are sent to <code>/api/*</code> with credentials, while server-side
+      <code>auto_preflight_enabled</code> may return explicit <code>202 Accepted</code>
+      <code>background_auto</code> fallback metadata.
     </p>
 
     <div id="backtest-error-banner" class="error-banner hidden" role="alert"></div>
     <div id="backtest-validation-errors" class="validation-list hidden"></div>
+
+    <section id="backtest-launch-status" class="panel panel--soft hidden" aria-live="polite">
+      <p id="backtest-launch-status-message" class="muted-text"></p>
+      <p class="muted-text">
+        Compatibility routes stay available at <a id="backtest-launch-status-link" href="/backtests/jobs">/backtests/jobs</a>.
+      </p>
+    </section>
 
     <form id="backtest-form" class="stack-form">
       <fieldset class="panel panel--soft">
@@ -48,24 +55,6 @@
             Saved mode
           </label>
         </div>
-      </fieldset>
-
-      <fieldset class="panel panel--soft">
-        <legend>Run type</legend>
-        <div class="inline-actions">
-          <label class="inline-radio">
-            <input type="radio" name="backtest-run-type" value="sync" checked>
-            Run sync
-          </label>
-          <label class="inline-radio">
-            <input type="radio" name="backtest-run-type" value="job">
-            Run as job
-          </label>
-        </div>
-        <p id="backtest-job-notice" class="muted-text hidden">
-          Job mode sends request to <code>/api/backtests/jobs</code> and redirects to details page.
-        </p>
-        <p id="backtest-job-disabled-banner" class="muted-text hidden">Jobs disabled by config</p>
       </fieldset>
 
       <fieldset class="panel panel--soft">
@@ -105,12 +94,7 @@
 
           <label for="backtest-timeframe">Timeframe</label>
           <select id="backtest-timeframe">
-            <option value="1m">1m</option>
-            <option value="5m">5m</option>
-            <option value="15m">15m</option>
-            <option value="1h">1h</option>
-            <option value="4h">4h</option>
-            <option value="1d">1d</option>
+            <option value="">Loading runtime defaults...</option>
           </select>
         </div>
 
@@ -126,20 +110,11 @@
             </button>
           </div>
           <p class="muted-text">
-            Indicator params support both explicit values and range axes. Source is selected from allowed values.
+            Indicator params support both explicit values and range axes. Indicator ids and
+            multi-source values are driven by runtime defaults.
           </p>
           <div id="backtest-indicator-blocks" class="indicator-blocks"></div>
         </section>
-
-        <div class="inline-actions">
-          <button id="backtest-preflight-button" class="button-link" type="button">
-            Estimate preflight
-          </button>
-          <span id="backtest-preflight-loading" class="muted-text hidden">Estimating...</span>
-        </div>
-        <p id="backtest-preflight-summary" class="muted-text">
-          Template mode requires successful preflight before run.
-        </p>
       </fieldset>
 
       <fieldset id="backtest-saved-mode" class="panel panel--soft hidden">
@@ -177,20 +152,12 @@
 
           <label for="backtest-ranking-primary-metric">primary_metric</label>
           <select id="backtest-ranking-primary-metric">
-            <option value="">Use API default</option>
-            <option value="total_return_pct">total_return_pct</option>
-            <option value="max_drawdown_pct">max_drawdown_pct</option>
-            <option value="return_over_max_drawdown">return_over_max_drawdown</option>
-            <option value="profit_factor">profit_factor</option>
+            <option value="">Loading runtime defaults...</option>
           </select>
 
           <label for="backtest-ranking-secondary-metric">secondary_metric</label>
           <select id="backtest-ranking-secondary-metric">
-            <option value="">None (tie-break by variant_key)</option>
-            <option value="total_return_pct">total_return_pct</option>
-            <option value="max_drawdown_pct">max_drawdown_pct</option>
-            <option value="return_over_max_drawdown">return_over_max_drawdown</option>
-            <option value="profit_factor">profit_factor</option>
+            <option value="">Loading runtime defaults...</option>
           </select>
 
           <label for="backtest-exec-init-cash">execution.init_cash_quote</label>
@@ -256,8 +223,8 @@
           <label for="backtest-risk-tp-pct">risk_grid.tp_pct</label>
           <input id="backtest-risk-tp-pct" type="number" step="any">
 
-          <label for="backtest-top-k">top_k</label>
-          <input id="backtest-top-k" type="number" min="1" step="1">
+          <label for="backtest-top-n">top_n</label>
+          <input id="backtest-top-n" type="number" min="1" step="1">
 
           <label for="backtest-preselect">preselect</label>
           <input id="backtest-preselect" type="number" min="1" step="1">
@@ -273,9 +240,9 @@
 
       <div class="inline-actions">
         <button id="backtest-run-button" class="button-link" type="submit" disabled>
-          Run sync
+          Launch backtest
         </button>
-        <span id="backtest-run-loading" class="muted-text hidden">Running...</span>
+        <span id="backtest-run-loading" class="muted-text hidden">Launching...</span>
       </div>
     </form>
 

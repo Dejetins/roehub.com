@@ -52,6 +52,14 @@ deterministic `422` ошибками.
   - current `POST /backtests` launch behavior,
   - legacy `top_k_*` naming and response fields,
   - current manual split between sync and jobs endpoints.
+- R9-01 web-launch note:
+  - `/backtests` browser UX now launches only through `POST /api/backtests`,
+  - user-facing `top_n` input is sourced from runtime defaults and mapped explicitly to request
+    `top_k`,
+  - runtime defaults drive request timeframes, ranking metrics, supported indicators, and
+    `inputs.source` catalogs,
+  - explicit `202 Accepted` + `execution_mode=background_auto` is surfaced in UI as queued launch
+    metadata, not as a silent mode switch.
 - R1 target contract, enforced in backend validation:
   - allowed request TF: `15m`, `30m`, `1h`, `2h`, `4h`, `6h`, `8h`, `1d`, `2d`, `3d`;
   - forbidden request TF in target contract: `1m`, `5m`;
@@ -182,6 +190,12 @@ Response v1 включает:
 
 Зачем:
 - подтверждение воспроизводимости и защита от “тихих” изменений runtime defaults.
+
+R9-01 launch UX note:
+
+- browser может читать `contracts.summary.top_n_default` / `top_n_max`, но request/response schema
+  endpoint-а остаётся `top_k`;
+- mapping `top_n -> top_k` должен быть явным и детерминированно тестируемым на стороне UI.
 
 ### 6) Успешный sync launch теперь always persisted (`execution_mode=sync_inline`)
 

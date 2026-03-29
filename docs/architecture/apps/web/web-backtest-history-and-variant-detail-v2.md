@@ -15,6 +15,9 @@ public UI работает через persisted `runs` vocabulary и откры�
   - legacy `POST /api/backtests/variant-report` остаётся migration path;
   - preferred public detail flow использует
     `POST /api/backtests/runs/{run_id}/variant-report`.
+  - after R9-01 the `/backtests` launch page may land on explicit
+    `202 Accepted` `background_auto` responses and hand users off to
+    `/backtests/jobs/{run_id}` as a compatibility surface until R9-02 history UX is promoted.
 
 ## Цель
 
@@ -22,6 +25,9 @@ public UI работает через persisted `runs` vocabulary и откры�
 - Из summary table run details пользователь открывает detail одного выбранного варианта.
 - Browser отправляет только `run_id` и explicit `variant` payload; backend сам восстанавливает
   original request semantics и pinned artifact context исходного run.
+- Launch UI must treat `execution_mode=background_auto` as an explicit queued outcome:
+  `run_id`, `state`, and `execution_mode` are shown to the user immediately after `POST /backtests`
+  instead of keeping an invisible browser-side sync/job toggle.
 
 ## Scope
 

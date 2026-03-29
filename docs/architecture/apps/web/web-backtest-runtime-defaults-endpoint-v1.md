@@ -13,6 +13,14 @@
 - Historical scope kept here:
   - current browser prefill defaults already loaded on API startup,
   - legacy `top_k_*` fields required for backward compatibility.
+- R9-01 rollout note:
+  - `/backtests` launch form consumes `contracts.request_timeframes.allowed`,
+    `contracts.summary.ranking_metrics`, `contracts.summary.top_n_default`,
+    `contracts.summary.top_n_max`, `contracts.launch.supported_indicator_ids`, and
+    `contracts.launch.source_values_by_indicator_id` directly,
+  - browser launch no longer requires manual `POST /api/indicators/estimate`,
+  - `202 Accepted` with `execution_mode=background_auto` is treated as an explicit launch outcome,
+    not as a silent mode switch.
 - R1 additive contract:
   - endpoint publishes additive `contracts.*` fields for target-v2 semantics,
   - request TF restrictions and `signals.v1.params = default-only` are enforced in backend,
@@ -165,9 +173,10 @@
   `data-api-backtest-runtime-defaults-path="/api/backtests/runtime-defaults"`.
 - `apps/web/dist/backtest_ui.js` загружает defaults один раз при инициализации страницы:
   - префилл `Advanced` input `.value`;
-  - префилл ranking selectors (`primary_metric`, `secondary_metric`);
+  - строит timeframe selector из `contracts.request_timeframes.allowed`;
+  - строит ranking selectors из `contracts.summary.ranking_metrics`;
+  - префилл user-facing `top_n` и кап `top_n_max`, затем явно маппит `top_n -> top_k`;
   - обновление `execution.fee_pct` при смене market, пока поле не стало user-dirty;
-  - подсказка по cap `jobs.top_k_persisted_default`;
   - чтение frozen target-v2 literals из `contracts.*` без изменения текущего v1 request shape;
   - построение indicator/source selectors из `contracts.launch.supported_indicator_ids` и
     `contracts.launch.source_values_by_indicator_id`.

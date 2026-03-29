@@ -15,6 +15,11 @@
   - manual template-mode preflight,
   - separate sync result page state without persisted history,
   - legacy `top_k` naming in advanced controls.
+- R9-01 rollout note:
+  - current `/backtests` page no longer requires manual `Estimate preflight`,
+  - launch flow uses only `POST /api/backtests`,
+  - explicit `202 Accepted` `background_auto` responses are surfaced in UI instead of a
+    browser-side sync/job switch.
 - R0 target freeze, not yet implemented here:
   - server-side auto-preflight replaces manual required preflight,
   - sync/background mode becomes one launch flow with `execution_mode`,
@@ -90,6 +95,12 @@ UI собирает `POST /api/backtests` request с `template` блоком:
 
 - перед `Run sync` UI вызывает `POST /api/indicators/estimate`.
 - пока preflight не выполнен успешно, запуск sync backtest запрещён.
+
+R9-01 migration note:
+
+- этот preflight flow считается legacy-only reference;
+- актуальный launch UI больше не вызывает `POST /api/indicators/estimate` как обязательный шаг;
+- bounded sync/background выбор теперь происходит на backend через `POST /api/backtests`.
 
 ### 4) Saved-mode run
 
