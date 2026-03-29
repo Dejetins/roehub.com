@@ -20,6 +20,9 @@ from trading.contexts.backtest.application.services.staged_core_runner_v1 import
     BacktestStageAScoredVariantV1,
 )
 from trading.contexts.backtest.application.use_cases import RunBacktestJobRunnerV1
+from trading.contexts.backtest.application.use_cases import (
+    run_backtest_job_runner_v1 as run_backtest_job_runner_module,
+)
 from trading.contexts.backtest.domain.entities import BacktestJob, BacktestJobArtifactPin, TradeV1
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
@@ -1793,6 +1796,119 @@ def test_process_claimed_job_uses_artifact_stage_a_shortlist_builder_when_availa
     assert shortlist_builder.calls[0]["target_time_range"] == request.time_range
     assert shortlist_builder.calls[0]["shortlist_limit"] == 2
     assert results_repository.shortlist_calls[0]["shortlist"].stage_a_indexes == (1,)
+
+
+def test_run_backtest_job_runner_v1_prefers_artifact_backed_stage_b_scorer_when_pinned(
+    monkeypatch: Any,
+) -> None:
+    """
+    Verify worker scorer resolution prefers the additive artifact-backed Stage B scorer factory.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Worker flow resolves slot-pinned context before scoring, so this test patches only the
+        Stage B scorer factory and validates forwarded pinned inputs.
+    Raises:
+        AssertionError: If worker scorer resolution does not prefer artifact-backed wiring.
+    Side Effects:
+        Monkeypatches the local Stage B scorer factory for the duration of the test.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+    pinned_context = _FakeSlotPinnedContext(
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        ),
+        artifact_slot="slot_b",
+        slot_generation=11,
+        artifact_asof_date="2026-03-29",
+        artifact_manifest_hash="d" * 64,
+    )
+    expected_scorer = object()
+    calls: list[dict[str, Any]] = []
+    requested_time_range = TimeRange(
+        start=UtcTimestamp(_utc(2026, 2, 23, 11, 0, 0)),
+        end=UtcTimestamp(_utc(2026, 2, 23, 11, 5, 0)),
+    )
+
+    def _fake_builder(**kwargs: Any) -> object:
+        """
+        Record worker artifact-backed scorer factory inputs and return a deterministic stub.
+
+        Args:
+            **kwargs: Factory arguments forwarded by the worker use-case.
+        Returns:
+            object: Deterministic scorer sentinel.
+        Assumptions:
+            This wiring test validates builder selection only and does not exercise Stage B math.
+        Raises:
+            None.
+        Side Effects:
+            Appends one call payload to the in-memory log.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+          - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py
+        """
+        calls.append(kwargs)
+        return expected_scorer
+
+    monkeypatch.setattr(
+        run_backtest_job_runner_module,
+        "build_default_artifact_backed_stage_b_scorer_v2",
+        _fake_builder,
+    )
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    assert request.template is not None
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=_build_running_job_with_artifact_pin()),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=_FakeResultsRepository(),
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                _build_stage_a_variants()[0].base_variant_key: 3.0,
+                _build_stage_a_variants()[1].base_variant_key: 2.0,
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 11, 0, 0)),
+        artifact_slot_resolver=cast(Any, object()),
+    )
+    use_case._staged_scorer = None
+
+    scorer = use_case._resolve_staged_scorer(
+        template=request.template,
+        target_slice=slice(0, 5),
+        target_time_range=requested_time_range,
+        artifact_context=cast(Any, pinned_context),
+    )
+
+    assert scorer is expected_scorer
+    assert len(calls) == 1
+    assert calls[0]["artifact_slot_resolver"] is use_case._artifact_slot_resolver
+    assert calls[0]["artifact_context"] == pinned_context
+    assert calls[0]["target_time_range"] == requested_time_range
+    assert calls[0]["report_target_slice"] == slice(0, 5)
 
 
 def _build_use_case(

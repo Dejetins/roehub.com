@@ -642,6 +642,111 @@ class _DetailsCountingScorer:
         )
 
 
+class _RankingContextRecordingScorer:
+    """
+    Staged scorer fake recording additive ranking-context hints forwarded by the core runner.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize deterministic in-memory call logs for ranking-context forwarding checks.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Tests need only the forwarded `(stage, primary_metric, secondary_metric)` tuples.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        self.calls: list[tuple[str, str, str | None]] = []
+
+    def configure_stage_ranking_context(
+        self,
+        *,
+        stage: str,
+        primary_metric: str,
+        secondary_metric: str | None,
+    ) -> None:
+        """
+        Record one forwarded stage ranking context tuple from the staged core runner.
+
+        Args:
+            stage: Stage literal that owns the active ranking loop.
+            primary_metric: Active ranking primary metric literal.
+            secondary_metric: Active ranking secondary metric literal or `None`.
+        Returns:
+            None.
+        Assumptions:
+            The hook is additive and must not affect deterministic metric values in this fake.
+        Raises:
+            None.
+        Side Effects:
+            Appends one tuple to the in-memory call log.
+        """
+        self.calls.append((stage, primary_metric, secondary_metric))
+
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return deterministic ranking payload while ignoring the additive ranking-context hook.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters payload.
+            risk_params: Risk payload.
+            indicator_variant_key: Indicators-only key.
+            variant_key: Full variant key.
+        Returns:
+            Mapping[str, float]: Deterministic metrics compatible with configurable ranking.
+        Assumptions:
+            Tests validate hook forwarding only and therefore keep metric logic intentionally
+            simple and deterministic.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = stage, candles, signal_params, indicator_variant_key, variant_key
+        total_return_pct = _details_scorer_total_return_pct(
+            indicator_selections=indicator_selections,
+            risk_params=risk_params,
+        )
+        max_drawdown_pct = float(len(indicator_selections))
+        return {
+            TOTAL_RETURN_METRIC_LITERAL: total_return_pct,
+            "total_return_pct": total_return_pct,
+            "max_drawdown_pct": max_drawdown_pct,
+            "Max. Drawdown [%]": max_drawdown_pct,
+            "profit_factor": 1.0 + max(total_return_pct, 0.0),
+            "return_over_max_drawdown": (
+                total_return_pct / max_drawdown_pct if max_drawdown_pct != 0.0 else float("inf")
+            ),
+        }
+
+
 def test_staged_runner_v1_applies_deterministic_tie_break_keys() -> None:
     """
     Verify tie-break ordering is deterministic for equal Stage A/Stage B metric values.
@@ -907,6 +1012,51 @@ def test_staged_runner_v1_top_reports_use_retained_stage_b_details_without_resco
     assert scorer.stage_b_score_variant_calls == result.stage_b_variants_total
     assert scorer.legacy_score_variant_calls == 0
     assert scorer.stage_b_score_variant_with_details_calls == len(result.variants)
+
+
+def test_staged_runner_v1_forwards_stage_ranking_context_to_metric_scorer() -> None:
+    """
+    Verify staged runner forwards additive stage ranking hints before Stage A and Stage B loops.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Artifact-backed Stage B scorers may use these hints to enable safe fast-path scoring, but
+        legacy scorers may ignore them entirely.
+    Raises:
+        AssertionError: If stage-specific ranking context is not forwarded deterministically.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
+    """
+    runner = BacktestStagedRunnerV1()
+    scorer = _RankingContextRecordingScorer()
+
+    runner.run(
+        template=_template_for_top_k(),
+        candles=_build_candles(bars=60),
+        preselect=2,
+        top_k=2,
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        scorer=scorer,
+        ranking=BacktestRankingConfig(
+            primary_metric="total_return_pct",
+            secondary_metric="profit_factor",
+        ),
+    )
+
+    assert scorer.calls == [
+        ("stage_a", "total_return_pct", "profit_factor"),
+        ("stage_b", "total_return_pct", "profit_factor"),
+    ]
 
 
 class _CancellingScorer:

@@ -1,3 +1,7 @@
+from .artifact_backed_stage_b_scorer_v2 import (
+    BacktestArtifactBackedStageBScorerV2,
+    build_default_artifact_backed_stage_b_scorer_v2,
+)
 from .artifact_manifest_loader import YamlBacktestArtifactLoaderV2
 from .artifact_manifest_validator import BacktestArtifactManifestValidatorV2
 from .artifact_precompute_runner import BacktestArtifactPrecomputeRunnerV2
@@ -93,6 +97,12 @@ from .contracts import (
     StageACompactTradeV2,
     StageADirectionModeLiteralV2,
     StageANoRiskMetricsV2,
+    StageBExitReasonLiteralV2,
+    StageBFastSearchResultV2,
+    StageBHitTimesSliceV2,
+    StageBMetricsV2,
+    StageBReplayPayloadV2,
+    StageBTradeExitV2,
     artifact_coordinates_from_market_id_v2,
     artifact_market_id_from_coordinates_v2,
     freeze_artifact_payload_mapping_v2,
@@ -113,7 +123,19 @@ from .contracts import (
     validate_signal_rule_family_v2,
     validate_signal_timeframe_v2,
 )
+from .metrics_kernel import (
+    build_execution_outcome_from_replay_v2,
+    compute_stage_b_metrics_v2,
+    stage_b_metrics_to_ranking_payload_v2,
+)
 from .price_arrays_loader import MmapPriceArraysLoaderV2
+from .risk_exit_kernel_1m import (
+    replay_best_risk_cell_exact_v2,
+    replay_risk_cell_exact_v2,
+    resolve_risk_trade_exit_1m_v2,
+    search_risk_cells_total_return_fast_v2,
+    slice_hit_times_to_execution_window_v2,
+)
 from .signal_aggregator_kernel import aggregate_final_signal_rows_v2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .signal_rules_engine_v2 import (
@@ -124,7 +146,11 @@ from .signal_rules_engine_v2 import (
 )
 from .stage_a_shortlist_builder_v2 import (
     BacktestStageAShortlistBuilderV2,
+    PreparedIndicatorRowPlanV2,
     build_default_stage_a_shortlist_builder_v2,
+    build_prepared_indicator_row_plan_from_grid_spec_v2,
+    compute_target_slice_by_close_time_v2,
+    rebase_bar_close_mapping_v2,
 )
 from .stage_b_golden_fixtures_v2 import (
     STAGE_B_GOLDEN_FIXTURE_EPIC_ID_V2,
@@ -174,6 +200,7 @@ __all__ = [
     "ARTIFACT_SLOT_A_LITERAL_V2",
     "ARTIFACT_SLOT_B_LITERAL_V2",
     "ARTIFACT_STORE_V2_ROOT_LITERAL",
+    "BacktestArtifactBackedStageBScorerV2",
     "BacktestSignalRulesEngineV2",
     "ArtifactArrayMetadataV2",
     "ArtifactCanonicalPriceExportRequestV2",
@@ -216,6 +243,12 @@ __all__ = [
     "StageACompactTradeV2",
     "StageADirectionModeLiteralV2",
     "StageANoRiskMetricsV2",
+    "StageBExitReasonLiteralV2",
+    "StageBFastSearchResultV2",
+    "StageBHitTimesSliceV2",
+    "StageBMetricsV2",
+    "StageBReplayPayloadV2",
+    "StageBTradeExitV2",
     "ArtifactSlotPublishErrorV2",
     "ArtifactTimelineCoverageV2",
     "ArtifactValidationDiagnosticV2",
@@ -260,10 +293,23 @@ __all__ = [
     "MmapSignalMatrixLoaderV2",
     "aggregate_final_signal_rows_v2",
     "BacktestStageAShortlistBuilderV2",
+    "PreparedIndicatorRowPlanV2",
+    "build_default_artifact_backed_stage_b_scorer_v2",
     "build_default_stage_a_shortlist_builder_v2",
+    "build_execution_outcome_from_replay_v2",
+    "build_prepared_indicator_row_plan_from_grid_spec_v2",
     "build_compact_trade_list_v2",
+    "compute_stage_b_metrics_v2",
+    "compute_target_slice_by_close_time_v2",
     "compute_no_risk_metrics_v2",
     "no_risk_metrics_to_ranking_payload_v2",
+    "rebase_bar_close_mapping_v2",
+    "replay_best_risk_cell_exact_v2",
+    "replay_risk_cell_exact_v2",
+    "resolve_risk_trade_exit_1m_v2",
+    "search_risk_cells_total_return_fast_v2",
+    "slice_hit_times_to_execution_window_v2",
+    "stage_b_metrics_to_ranking_payload_v2",
     "YamlBacktestArtifactLoaderV2",
     "artifact_coordinates_from_market_id_v2",
     "artifact_market_id_from_coordinates_v2",

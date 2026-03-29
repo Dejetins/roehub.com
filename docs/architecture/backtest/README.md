@@ -12,6 +12,10 @@
   `src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py`,
   `src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py`,
   `src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py`
+- R6-03 Stage B artifact-backed risk kernels and scorer bridge:
+  `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py`,
+  `src/trading/contexts/backtest/application/services/v2/metrics_kernel.py`,
+  `src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py`
 - Runtime kernels v2 contract for `signal_tf + 1m_risk`, Stage A / Stage B boundaries and
   notebook-derived transfer scope: `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
 - Notebook transfer reference and function-level semantics anchors:
@@ -73,8 +77,15 @@
     `chunked variant processing`;
   - sync/jobs paths подключают v2 Stage A path только при наличии валидного pinned artifact
     context.
-- R6-02 не включает R6-03 risk execution kernels, R6-04 ranking/top-N materialization и full
-  runtime cutover.
+- R6-03 добавляет Stage B kernels и additive scorer bridge:
+  - `risk_exit_kernel_1m.py` резолвит one-trade exits по compact trades и shipped `1m hit-times`;
+  - `metrics_kernel.py` считает deterministic ranking/summary payloads по exact replay;
+  - `artifact_backed_stage_b_scorer_v2.py` использует fast TP/SL search и ограничивает exact
+    replay winning cell / explicit retained variants;
+  - sync/jobs используют artifact-backed Stage B scoring при наличии pinned artifact context,
+    а legacy close-fill scorer остаётся fallback только для unpinned path.
+- После R6-03 вне scope остаются только R6-04 ranking/top-N materialization и full runtime
+  cutover.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
   `signal_artifacts=[]` и `require_hit_times_manifest=false`.
 - R4-04 runtime `source` integration в текущем репозитории проходит через runtime defaults, jobs

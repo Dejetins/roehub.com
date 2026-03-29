@@ -134,6 +134,45 @@ def _resolve_score_variant_metric_fn(*, scorer: MetricScorerV1) -> ScoreVariantM
     return cast(ScoreVariantMetricFnV1, legacy_scorer.score_variant)
 
 
+def _configure_stage_ranking_context_if_supported(
+    *,
+    scorer: MetricScorerV1,
+    stage: str,
+    ranking_plan: "_ResolvedRankingPlanV1",
+) -> None:
+    """
+    Forward active stage ranking literals to scorers that expose additive ranking-context hints.
+
+    Args:
+        scorer: Stage scorer implementation used by the current staged loop.
+        stage: Stage literal (`stage_a` or `stage_b`).
+        ranking_plan: Resolved ranking plan for the current staged loop.
+    Returns:
+        None.
+    Assumptions:
+        This hook is additive: scorers may ignore it, while artifact-backed Stage B scorers can
+        use it to decide when fast `total_return_pct` lookup is safe.
+    Raises:
+        None.
+    Side Effects:
+        May update scorer-local in-memory ranking hints for the current run.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+    configure_method = getattr(scorer, "configure_stage_ranking_context", None)
+    if configure_method is None:
+        return
+    configure_method(
+        stage=stage,
+        primary_metric=ranking_plan.primary_metric,
+        secondary_metric=ranking_plan.secondary_metric,
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _ResolvedRankingPlanV1:
     """
@@ -301,6 +340,11 @@ class BacktestStagedCoreRunnerV1:
                 ranking=ranking,
                 configurable_ranking_enabled=self._configurable_ranking_enabled,
             )
+        )
+        _configure_stage_ranking_context_if_supported(
+            scorer=scorer,
+            stage=STAGE_A_LITERAL,
+            ranking_plan=ranking_plan,
         )
         effective_batch = self._resolve_batch_size(batch_size=batch_size)
         score_variant_metric = _resolve_score_variant_metric_fn(scorer=scorer)
@@ -473,6 +517,11 @@ class BacktestStagedCoreRunnerV1:
                 configurable_ranking_enabled=self._configurable_ranking_enabled,
             )
         )
+        _configure_stage_ranking_context_if_supported(
+            scorer=scorer,
+            stage=STAGE_B_LITERAL,
+            ranking_plan=ranking_plan,
+        )
         effective_batch = self._resolve_batch_size(batch_size=batch_size)
         total = int(grid_context.stage_b_variants_total)
         if cancel_checker is not None:
@@ -531,9 +580,7 @@ class BacktestStagedCoreRunnerV1:
                 def _materialize_tasks() -> Mapping[str, BacktestStageBTaskV1]:
                     nonlocal tasks_cache
                     if tasks_cache is None:
-                        tasks_cache = _stage_b_tasks_from_sorted_entries(
-                            entries=_sorted_entries()
-                        )
+                        tasks_cache = _stage_b_tasks_from_sorted_entries(entries=_sorted_entries())
                     return tasks_cache
 
                 on_checkpoint(

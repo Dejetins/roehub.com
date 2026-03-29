@@ -23,6 +23,7 @@ from trading.contexts.backtest.application.services.staged_core_runner_v1 import
     BacktestStageAScoredVariantV1,
 )
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
+from trading.contexts.backtest.application.use_cases import run_backtest as run_backtest_module
 from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1, TradeV1
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1, RiskParamsV1
 from trading.contexts.indicators.application.dto import (
@@ -879,6 +880,99 @@ def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_avai
     assert shortlist_builder.calls[0]["shortlist_limit"] == 2
     assert len(response.variants) == 1
     assert response.variants[0].total_return_pct == 20.0
+
+
+def test_run_backtest_use_case_prefers_artifact_backed_stage_b_scorer_when_pinned(
+    monkeypatch: Any,
+) -> None:
+    """
+    Verify sync use-case resolves the additive artifact-backed Stage B scorer when context exists.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Resolver bootstrap and scorer construction are independent, so this test patches only the
+        Stage B scorer factory and verifies the forwarded slot-pinned context.
+    Raises:
+        AssertionError: If sync scorer resolution does not prefer the artifact-backed builder.
+    Side Effects:
+        Monkeypatches the local Stage B scorer factory for the duration of the test.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+    pinned_context = _FakeSlotPinnedContext(
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        ),
+        artifact_slot="slot_a",
+        slot_generation=7,
+        artifact_asof_date="2026-03-29",
+        artifact_manifest_hash="a" * 64,
+    )
+    requested_time_range = TimeRange(
+        start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+        end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+    )
+    expected_scorer = object()
+    calls: list[dict[str, Any]] = []
+
+    def _fake_builder(**kwargs: Any) -> object:
+        """
+        Record artifact-backed Stage B builder arguments and return a deterministic scorer stub.
+
+        Args:
+            **kwargs: Factory arguments forwarded by the sync use-case.
+        Returns:
+            object: Deterministic scorer sentinel.
+        Assumptions:
+            This wiring test validates only builder selection and argument forwarding.
+        Raises:
+            None.
+        Side Effects:
+            Appends one call payload to the in-memory log.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
+        """
+        calls.append(kwargs)
+        return expected_scorer
+
+    monkeypatch.setattr(
+        run_backtest_module,
+        "build_default_artifact_backed_stage_b_scorer_v2",
+        _fake_builder,
+    )
+    use_case = RunBacktestUseCase(
+        candle_feed=_AlignedOnlyCandleFeed(),
+        indicator_compute=_EstimateOnlyIndicatorCompute(),
+        strategy_reader=_UnusedStrategyReader(),
+        artifact_slot_resolver=cast(Any, object()),
+    )
+
+    scorer = use_case._resolve_staged_scorer(
+        template=_build_template(windows=(20, 25)),
+        target_slice=slice(0, 5),
+        target_time_range=requested_time_range,
+        artifact_context=cast(Any, pinned_context),
+    )
+
+    assert scorer is expected_scorer
+    assert len(calls) == 1
+    assert calls[0]["artifact_slot_resolver"] is use_case._artifact_slot_resolver
+    assert calls[0]["artifact_context"] == pinned_context
+    assert calls[0]["target_time_range"] == requested_time_range
+    assert calls[0]["report_target_slice"] == slice(0, 5)
 
 
 def test_run_backtest_use_case_lazy_mode_omits_eager_reports_by_default() -> None:

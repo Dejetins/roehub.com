@@ -40,6 +40,7 @@ from trading.contexts.backtest.application.services import (
     BacktestStageAShortlistBuilderV2,
     CloseFillBacktestStagedScorerV1,
     artifact_coordinates_from_market_id_v2,
+    build_default_artifact_backed_stage_b_scorer_v2,
     build_default_stage_a_shortlist_builder_v2,
 )
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
@@ -76,7 +77,7 @@ from trading.contexts.indicators.domain.specifications import (
     GridSpec,
     RangeValuesSpec,
 )
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe, TimeRange
 
 _LOG = logging.getLogger(__name__)
 
@@ -431,6 +432,8 @@ class RunBacktestJobRunnerV1:
             scorer = self._resolve_staged_scorer(
                 template=context.template,
                 target_slice=timeline.target_slice,
+                target_time_range=context.request.time_range,
+                artifact_context=context.artifact_context,
             )
             grid_context = self._grid_builder.build(
                 template=context.template,
@@ -1367,6 +1370,8 @@ class RunBacktestJobRunnerV1:
         *,
         template: RunBacktestTemplate,
         target_slice: slice,
+        target_time_range: TimeRange,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None,
     ) -> MetricScorerV1:
         """
         Resolve staged scorer implementation for current run context.
@@ -1374,6 +1379,8 @@ class RunBacktestJobRunnerV1:
         Args:
             template: Effective run template.
             target_slice: Target trading/reporting slice.
+            target_time_range: Requested trading/reporting window for artifact-backed kernels.
+            artifact_context: Optional slot-pinned artifact context resolved at runtime startup.
         Returns:
             MetricScorerV1: Scorer used for stage execution.
         Assumptions:
@@ -1382,9 +1389,30 @@ class RunBacktestJobRunnerV1:
             ValueError: If default scorer configuration is invalid.
         Side Effects:
             None.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
         """
         if self._staged_scorer is not None:
             return self._staged_scorer
+        artifact_backed_scorer = build_default_artifact_backed_stage_b_scorer_v2(
+            artifact_slot_resolver=self._artifact_slot_resolver,
+            artifact_context=artifact_context,
+            template=template,
+            target_time_range=target_time_range,
+            report_target_slice=target_slice,
+            init_cash_quote_default=self._init_cash_quote_default,
+            fixed_quote_default=self._fixed_quote_default,
+            safe_profit_percent_default=self._safe_profit_percent_default,
+            slippage_pct_default=self._slippage_pct_default,
+            fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
+        )
+        if artifact_backed_scorer is not None:
+            return artifact_backed_scorer
         return CloseFillBacktestStagedScorerV1(
             indicator_compute=self._indicator_compute,
             direction_mode=template.direction_mode,
@@ -1412,6 +1440,7 @@ class _BacktestJobLeaseLost(Exception):
     """
     Internal control-flow exception signaling lease-owner guarded write mismatch.
     """
+
 
 def _frontier_signature_from_ranked_rows(
     *,

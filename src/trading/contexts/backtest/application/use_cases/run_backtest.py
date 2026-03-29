@@ -38,6 +38,7 @@ from trading.contexts.backtest.application.services import (
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
     artifact_coordinates_from_market_id_v2,
+    build_default_artifact_backed_stage_b_scorer_v2,
     build_default_stage_a_shortlist_builder_v2,
 )
 from trading.contexts.backtest.application.services.numba_runtime_v1 import (
@@ -350,6 +351,8 @@ class RunBacktestUseCase:
             resolved_scorer = self._resolve_staged_scorer(
                 template=resolved.template,
                 target_slice=timeline.target_slice,
+                target_time_range=request.time_range,
+                artifact_context=resolved.artifact_context,
             )
             staged = self._staged_runner.run(
                 template=resolved.template,
@@ -460,6 +463,8 @@ class RunBacktestUseCase:
                 template=resolved.template,
                 timeline=timeline,
                 variant_payload=variant_payload,
+                target_time_range=request.time_range,
+                artifact_context=resolved.artifact_context,
             )
             return self._reporting_service.build_report_from_details(
                 requested_time_range=request.time_range,
@@ -784,6 +789,8 @@ class RunBacktestUseCase:
         *,
         template: RunBacktestTemplate,
         target_slice: slice,
+        target_time_range: TimeRange,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None,
     ) -> MetricScorerV1:
         """
         Resolve scorer for current execution, building default close-fill scorer when absent.
@@ -791,6 +798,8 @@ class RunBacktestUseCase:
         Args:
             template: Resolved run template containing direction/sizing/execution settings.
             target_slice: Trading/reporting target slice inside warmup-inclusive timeline.
+            target_time_range: Requested trading/reporting window for artifact-backed kernels.
+            artifact_context: Optional slot-pinned artifact context resolved at runtime startup.
         Returns:
             MetricScorerV1: Scorer used by staged runner.
         Assumptions:
@@ -799,9 +808,31 @@ class RunBacktestUseCase:
             ValueError: Propagated from default scorer constructor on invalid settings.
         Side Effects:
             None.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
         """
         if self._staged_scorer is not None:
             return self._staged_scorer
+
+        artifact_backed_scorer = build_default_artifact_backed_stage_b_scorer_v2(
+            artifact_slot_resolver=self._artifact_slot_resolver,
+            artifact_context=artifact_context,
+            template=template,
+            target_time_range=target_time_range,
+            report_target_slice=target_slice,
+            init_cash_quote_default=self._init_cash_quote_default,
+            fixed_quote_default=self._fixed_quote_default,
+            safe_profit_percent_default=self._safe_profit_percent_default,
+            slippage_pct_default=self._slippage_pct_default,
+            fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
+        )
+        if artifact_backed_scorer is not None:
+            return artifact_backed_scorer
 
         return CloseFillBacktestStagedScorerV1(
             indicator_compute=self._indicator_compute,
@@ -857,6 +888,8 @@ class RunBacktestUseCase:
         template: RunBacktestTemplate,
         timeline: BacktestCandleTimeline,
         variant_payload: BacktestVariantPayloadV1,
+        target_time_range: TimeRange,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None,
     ) -> BacktestVariantScoreDetailsV1:
         """
         Score one explicit variant payload with Stage-B details scorer contract.
@@ -874,6 +907,8 @@ class RunBacktestUseCase:
             template: Resolved run template with instrument/timeframe context.
             timeline: Warmup-inclusive candle timeline object built for request range.
             variant_payload: Explicit selected variant payload.
+            target_time_range: Requested trading/reporting window for artifact-backed kernels.
+            artifact_context: Optional slot-pinned artifact context resolved at runtime startup.
         Returns:
             BacktestVariantScoreDetailsV1: Deterministic details for report assembly.
         Assumptions:
@@ -898,6 +933,8 @@ class RunBacktestUseCase:
                 execution_params=variant_payload.execution_params,
             ),
             target_slice=timeline.target_slice,
+            target_time_range=target_time_range,
+            artifact_context=artifact_context,
         )
         if getattr(scorer, "score_variant_with_details", None) is None:
             raise BacktestValidationError(

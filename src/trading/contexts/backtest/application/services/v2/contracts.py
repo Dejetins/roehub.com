@@ -178,6 +178,13 @@ type SignalSourceLiteralV2 = Literal[
     "ohlc4",
 ]
 type StageADirectionModeLiteralV2 = Literal["long-only", "short-only", "long-short"]
+type StageBExitReasonLiteralV2 = Literal[
+    "signal_exit",
+    "tp",
+    "sl",
+    "close_on_end",
+    "unclosed",
+]
 type SignalRuleScalarV2 = int | float | str | bool | None
 
 SIGNALS_V1_PARAMS_PATH_LITERAL_V2 = "signals.v1.params"
@@ -2842,6 +2849,298 @@ class StageANoRiskMetricsV2:
             object.__setattr__(self, field_name, float(value))
         if self.trade_count < 0:
             raise ValueError("StageANoRiskMetricsV2.trade_count must be >= 0")
+
+
+@dataclass(frozen=True, slots=True)
+class StageBHitTimesSliceV2:
+    """
+    Local execution-window slice of strict `1m hit-times` tables used by Stage B kernels.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+    """
+
+    tp_values: np.ndarray
+    sl_values: np.ndarray
+    long_tp: np.ndarray
+    long_sl: np.ndarray
+    short_tp: np.ndarray
+    short_sl: np.ndarray
+    sentinel_index: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate local Stage B hit-times slice shapes against the shared sentinel contract.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Arrays are already rebased into local execution coordinates by runtime helpers.
+        Raises:
+            ValueError: If one array shape or sentinel-bound invariant is violated.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+        """
+        if self.sentinel_index < 0:
+            raise ValueError("StageBHitTimesSliceV2.sentinel_index must be >= 0")
+        expected_time = self.sentinel_index
+        if self.long_tp.shape != (self.tp_values.shape[0], expected_time):
+            raise ValueError(
+                "StageBHitTimesSliceV2.long_tp shape must match tp_values and sentinel"
+            )
+        if self.short_tp.shape != (self.tp_values.shape[0], expected_time):
+            raise ValueError(
+                "StageBHitTimesSliceV2.short_tp shape must match tp_values and sentinel"
+            )
+        if self.long_sl.shape != (self.sl_values.shape[0], expected_time):
+            raise ValueError(
+                "StageBHitTimesSliceV2.long_sl shape must match sl_values and sentinel"
+            )
+        if self.short_sl.shape != (self.sl_values.shape[0], expected_time):
+            raise ValueError(
+                "StageBHitTimesSliceV2.short_sl shape must match sl_values and sentinel"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class StageBTradeExitV2:
+    """
+    Deterministic exact exit fact for one compact trade in Stage B `signal_tf + 1m_risk`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
+    """
+
+    trade_index: int
+    entry_exec_idx: int
+    direction: int
+    sig_exit_exec_idx: int
+    exit_exec_idx: int
+    exit_reason: StageBExitReasonLiteralV2
+    gross_factor: float
+    closed: bool
+
+    def __post_init__(self) -> None:
+        """
+        Validate one exact Stage B exit payload.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            `gross_factor` is pre-fee and `closed=False` implies `exit_reason='unclosed'`.
+        Raises:
+            ValueError: If indexes, direction, factor, or reason invariants are invalid.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+          - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
+        """
+        if self.trade_index < 0:
+            raise ValueError("StageBTradeExitV2.trade_index must be >= 0")
+        if self.entry_exec_idx < 0:
+            raise ValueError("StageBTradeExitV2.entry_exec_idx must be >= 0")
+        if self.sig_exit_exec_idx < self.entry_exec_idx:
+            raise ValueError("StageBTradeExitV2.sig_exit_exec_idx must be >= entry_exec_idx")
+        if self.exit_exec_idx < self.entry_exec_idx:
+            raise ValueError("StageBTradeExitV2.exit_exec_idx must be >= entry_exec_idx")
+        if self.direction not in (-1, 1):
+            raise ValueError("StageBTradeExitV2.direction must be -1 or 1")
+        if isinstance(self.gross_factor, bool) or not isinstance(self.gross_factor, int | float):
+            raise ValueError("StageBTradeExitV2.gross_factor must be numeric")
+        object.__setattr__(self, "gross_factor", float(self.gross_factor))
+        if not self.closed and self.exit_reason != "unclosed":
+            raise ValueError("StageBTradeExitV2.closed=False requires exit_reason='unclosed'")
+
+
+@dataclass(frozen=True, slots=True)
+class StageBFastSearchResultV2:
+    """
+    Fast TP/SL search output over shipped `1m hit-times` for one compact trade list.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
+    """
+
+    total_return_pct: np.ndarray
+    best_tp_index: int
+    best_sl_index: int
+    best_total_return_pct: float
+
+    def __post_init__(self) -> None:
+        """
+        Validate one fast-search return matrix and the selected best-cell coordinates.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Matrix shape is `[n_tp, n_sl]` and best indexes point inside that matrix.
+        Raises:
+            ValueError: If the matrix is not 2D or one best-cell coordinate is out of range.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+          - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
+        """
+        if self.total_return_pct.ndim != 2:
+            raise ValueError("StageBFastSearchResultV2.total_return_pct must be a 2D array")
+        rows, cols = self.total_return_pct.shape
+        if rows == 0 or cols == 0:
+            raise ValueError("StageBFastSearchResultV2.total_return_pct must not be empty")
+        if self.best_tp_index < 0 or self.best_tp_index >= rows:
+            raise ValueError("StageBFastSearchResultV2.best_tp_index is out of range")
+        if self.best_sl_index < 0 or self.best_sl_index >= cols:
+            raise ValueError("StageBFastSearchResultV2.best_sl_index is out of range")
+        if isinstance(self.best_total_return_pct, bool) or not isinstance(
+            self.best_total_return_pct,
+            int | float,
+        ):
+            raise ValueError("StageBFastSearchResultV2.best_total_return_pct must be numeric")
+        object.__setattr__(self, "best_total_return_pct", float(self.best_total_return_pct))
+
+
+@dataclass(frozen=True, slots=True)
+class StageBReplayPayloadV2:
+    """
+    Exact replay payload for one selected Stage B TP/SL cell over compact trades.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+    """
+
+    tp_index: int | None
+    sl_index: int | None
+    sentinel_index: int
+    close_on_end: bool
+    trade_exits: tuple[StageBTradeExitV2, ...]
+
+    def __post_init__(self) -> None:
+        """
+        Validate the exact replay payload for one selected risk cell.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Disabled TP/SL axes are represented as `None` indexes.
+        Raises:
+            ValueError: If the sentinel or selected cell indexes are invalid.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+          - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+        """
+        if self.sentinel_index < 0:
+            raise ValueError("StageBReplayPayloadV2.sentinel_index must be >= 0")
+        if self.tp_index is not None and self.tp_index < 0:
+            raise ValueError("StageBReplayPayloadV2.tp_index must be >= 0 when set")
+        if self.sl_index is not None and self.sl_index < 0:
+            raise ValueError("StageBReplayPayloadV2.sl_index must be >= 0 when set")
+
+
+@dataclass(frozen=True, slots=True)
+class StageBMetricsV2:
+    """
+    Deterministic Stage B metrics computed from one exact replay payload.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+      - tests/unit/contexts/backtest/application/services/v2/test_metrics_kernel_v2.py
+    """
+
+    total_return_pct: float
+    max_drawdown_pct: float
+    return_over_max_drawdown: float
+    profit_factor: float
+    trade_count: int
+    win_rate_pct: float
+    avg_trade_ret_pct: float
+    avg_trade_exec_bars: float
+    exposure_pct: float
+    sharpe_trades: float
+
+    def __post_init__(self) -> None:
+        """
+        Validate Stage B exact metrics used by ranking and summary payloads.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Metrics are numeric scalars and may legitimately contain `inf`.
+        Raises:
+            ValueError: If one field is non-numeric or `trade_count` is negative.
+        Side Effects:
+            Normalizes numeric fields to builtin `float`/`int`.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-v2-benchmarks.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+          - tests/unit/contexts/backtest/application/services/v2/test_metrics_kernel_v2.py
+        """
+        numeric_fields = (
+            "total_return_pct",
+            "max_drawdown_pct",
+            "return_over_max_drawdown",
+            "profit_factor",
+            "win_rate_pct",
+            "avg_trade_ret_pct",
+            "avg_trade_exec_bars",
+            "exposure_pct",
+            "sharpe_trades",
+        )
+        for field_name in numeric_fields:
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                raise ValueError(f"StageBMetricsV2.{field_name} must be numeric")
+            object.__setattr__(self, field_name, float(value))
+        if self.trade_count < 0:
+            raise ValueError("StageBMetricsV2.trade_count must be >= 0")
 
 
 @dataclass(frozen=True, slots=True)

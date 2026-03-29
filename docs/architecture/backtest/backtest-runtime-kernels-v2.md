@@ -5,8 +5,8 @@
 `tests/notebook_tests/06_backtest_compute.ipynb` в generic runtime boundaries, не меняя shipped
 R5-01 artifact contracts.
 
-Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02`  
-Следующие этапы реализации: `Milestone R6 / EPIC R6-03 + R6-04`
+Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02 + R6-03`  
+Следующие этапы реализации: `Milestone R6 / EPIC R6-04`
 
 Связанные документы:
 
@@ -31,6 +31,9 @@ R5-01 artifact contracts.
 - R6-02 уже реализует Stage A artifact-backed kernels и additive shortlist bridge:
   `signal_aggregator_kernel.py`, `trade_compactor_kernel.py`,
   `stage_a_shortlist_builder_v2.py`.
+- R6-03 уже реализует Stage B artifact-backed risk kernels и additive scorer bridge:
+  `risk_exit_kernel_1m.py`, `metrics_kernel.py`,
+  `artifact_backed_stage_b_scorer_v2.py`.
 - Sync и background starts теперь обязаны делить один immutable `slot-pinned context` contract,
   а не расходиться по разным pointer/discovery paths.
 - Документ не вводит новые API payloads, новые request TF или новые persisted storage contracts.
@@ -53,10 +56,10 @@ R5-01 artifact contracts.
 |---|---|---|---|
 | Pair confirmations on request TF | Deterministic signal aggregation on `signal timeline` with output value set `{-1, 0, 1}` | `src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py` | Implemented in R6-02 |
 | `build_trade_list_for_pair` | `compact trade list` with deterministic ordering and sentinel-based signal exits | `src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py` | Implemented in R6-02 |
-| `evaluate_trade_factor` over hit tables | `1m hit-times` risk-exit resolution on `execution timeline` | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | R5-01 input implemented, R6 kernel planned |
-| Monotone diff-buffer decomposition | `fast TP/SL grid search` over precomputed `1m hit-times` | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | R5-01 input implemented, R6 kernel planned |
-| Best-cell verification replay | `exact replay of best TP/SL cell` only after fast search converges | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | Planned for R6 |
-| Notebook summary metrics after replay | `metrics over compact trades` for ranking and final summary | `src/trading/contexts/backtest/application/services/v2/metrics_kernel.py` | Planned for R6 |
+| `evaluate_trade_factor` over hit tables | `1m hit-times` risk-exit resolution on `execution timeline` | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | Implemented in R6-03 |
+| Monotone diff-buffer decomposition | `fast TP/SL grid search` over precomputed `1m hit-times` | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | Implemented in R6-03 |
+| Best-cell verification replay | `exact replay of best TP/SL cell` only after fast search converges | `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py` | Implemented in R6-03 |
+| Notebook summary metrics after replay | `metrics over compact trades` for ranking and final summary | `src/trading/contexts/backtest/application/services/v2/metrics_kernel.py` | Implemented in R6-03 |
 
 ## Artifact Dependencies By Stage
 
@@ -65,10 +68,11 @@ R5-01 artifact contracts.
 | Stage A | `prices/<signal_tf>/*`, `signals/<signal_tf>/<indicator_id>/signals.i8.npy`, `mappings/<signal_tf>/bar_close_1m_idx.u32.npy` | `final_signal`, deterministic edges, `compact trade list`, shortlist-ready no-risk summaries |
 | Stage B | Stage A `compact trade list`, `prices/1m/*`, `hit_times/1m/manifest.yaml`, `hit_times/1m/*.npy` | best TP/SL cell, exact replay of best TP/SL cell, final `metrics over compact trades` |
 
-## R6-01 / R6-02 implemented boundary
+## R6-01 / R6-03 implemented boundary
 
-R6-01 закрывает runtime bootstrap/loaders boundary, а R6-02 добавляет только Stage A kernels и
-artifact-backed shortlist bridge.
+R6-01 закрывает runtime bootstrap/loaders boundary, R6-02 добавляет Stage A kernels и
+artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kernels поверх shipped
+`1m hit-times` и additive artifact-backed scorer bridge для sync/background runtime.
 
 Что уже зафиксировано кодом:
 
@@ -86,10 +90,18 @@ artifact-backed shortlist bridge.
 - subset row loading для `signals/<tf>/<indicator_id>/signals.i8.npy` используется по
   выбранным variant rows, а не через full matrix materialization;
 - `chunked variant processing` обязано давать тот же shortlist result, что и non-chunked path.
+- `risk_exit_kernel_1m.py` резолвит one-trade exits по `entry_exec_idx`,
+  `sig_exit_exec_idx`, `sentinel_index` и shipped `1m hit-times`;
+- fast TP/SL search использует monotone / diff-buffer decomposition и не делает naive full replay
+  для каждой ячейки;
+- `exact replay of best TP/SL cell` ограничен только выбранной winning cell;
+- `metrics_kernel.py` считает deterministic Stage B ranking/summary fields и строит
+  details-compatible outcome только для retained exact replay;
+- artifact-backed Stage B scorer используется additively в sync/background runtime, когда есть
+  валидный `slot-pinned context`, а legacy close-fill scorer остаётся guard fallback.
 
-Что остаётся вне scope после R6-02:
+Что остаётся вне scope после R6-03:
 
-- Stage B risk execution kernels из R6-03;
 - ranking/top-N runtime materialization из R6-04;
 - full cutover с legacy scorer/execution paths на v2 runtime kernels.
 
@@ -153,6 +165,17 @@ artifacts, а не runtime recompute.
 3. Найти лучшую TP/SL ячейку без полного replay всего grid.
 4. Выполнить `exact replay of best TP/SL cell`.
 5. Посчитать финальные `metrics over compact trades`.
+
+R6-03 shipped boundary:
+
+- `TP/SL lookup starts at entry_exec + 1` явно enforced в runtime kernel;
+- `signal exit wins on equal bar`;
+- `SL wins TP tie`;
+- `close_on_end = 1` остаётся explicit notebook-derived default;
+- ranking hot path может использовать fast `total_return_pct` lookup только для pinned
+  artifact-backed Stage B scorer и только при primary=`total_return_pct`, secondary=`None`;
+- любой другой Stage B ranking/details path делает exact replay только для уже выбранной explicit
+  cell / retained variant.
 
 Канонический Stage B flow:
 

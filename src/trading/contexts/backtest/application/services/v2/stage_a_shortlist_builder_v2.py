@@ -30,6 +30,7 @@ from trading.contexts.backtest.domain.value_objects import (
     ExecutionParamsV1,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
+from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.shared_kernel.primitives import TimeRange
 
 from ..grid_builder_v1 import STAGE_A_LITERAL
@@ -64,7 +65,7 @@ StageACheckpointCallbackV2 = Callable[[int, int], None]
 
 
 @dataclass(frozen=True, slots=True)
-class _PreparedIndicatorRowPlanV2:
+class PreparedIndicatorRowPlanV2:
     """
     Pre-resolved indicator row-addressing plan for artifact-backed Stage A signal subsets.
 
@@ -87,14 +88,14 @@ class _PreparedIndicatorRowPlanV2:
         cls,
         *,
         plan: _IndicatorPlan,
-    ) -> _PreparedIndicatorRowPlanV2:
+    ) -> PreparedIndicatorRowPlanV2:
         """
         Build a deterministic row-addressing plan from one grid-builder indicator plan.
 
         Args:
             plan: Grid-builder indicator plan whose axis ordering defines artifact row ordering.
         Returns:
-            _PreparedIndicatorRowPlanV2: Prepared row-addressing metadata for one indicator.
+            PreparedIndicatorRowPlanV2: Prepared row-addressing metadata for one indicator.
         Assumptions:
             Artifact signal rows preserve the same mixed-radix ordering as Stage A compute plans.
         Raises:
@@ -328,15 +329,15 @@ class BacktestStageAShortlistBuilderV2:
             context=artifact_context,
             timeframe="1m",
         )
-        signal_target_slice = _compute_target_slice_by_close_time_v2(
+        signal_target_slice = compute_target_slice_by_close_time_v2(
             close_time=signal_prices.close_time,
             target_time_range=target_time_range,
         )
-        exec_target_slice = _compute_target_slice_by_close_time_v2(
+        exec_target_slice = compute_target_slice_by_close_time_v2(
             close_time=execution_prices.close_time,
             target_time_range=target_time_range,
         )
-        local_bar_close_1m_idx = _rebase_bar_close_mapping_v2(
+        local_bar_close_1m_idx = rebase_bar_close_mapping_v2(
             mapping_values=mapping_arrays.bar_close_1m_idx[signal_target_slice],
             exec_target_slice=exec_target_slice,
         )
@@ -354,7 +355,7 @@ class BacktestStageAShortlistBuilderV2:
             market_id=artifact_market_id_from_coordinates_v2(artifact_context.coordinates),
         )
         row_plans = tuple(
-            _PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
+            PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
             for plan in grid_context.indicator_plans
         )
 
@@ -492,7 +493,7 @@ class BacktestStageAShortlistBuilderV2:
     def _score_chunk_into_heap(
         self,
         *,
-        row_plans: Sequence[_PreparedIndicatorRowPlanV2],
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
         chunk_variants: tuple[BacktestStageABaseVariant, ...],
         grid_context: BacktestGridBuildContextV1,
         artifact_context: ArtifactSlotPinnedRuntimeContextV2,
@@ -658,7 +659,76 @@ def build_default_stage_a_shortlist_builder_v2(
     )
 
 
-def _compute_target_slice_by_close_time_v2(
+def build_prepared_indicator_row_plan_from_grid_spec_v2(
+    *,
+    indicator_id: str,
+    grid_spec: GridSpec,
+) -> PreparedIndicatorRowPlanV2:
+    """
+    Build artifact row-addressing metadata directly from one explicit indicator grid spec.
+
+    Args:
+        indicator_id: Canonical indicator id expected in the signal artifact tree.
+        grid_spec: Grid spec whose source/params ordering defines artifact row ordering.
+    Returns:
+        PreparedIndicatorRowPlanV2: Deterministic mixed-radix row-addressing plan.
+    Assumptions:
+        Artifact signal rows keep Stage A ordering semantics: optional `source` axis first, then
+        sorted parameter axes.
+    Raises:
+        ValueError: If the grid spec indicator id drifts from `indicator_id`.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/grid_builder_v1.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+    grid_indicator_id = str(grid_spec.indicator_id)
+    if grid_indicator_id != indicator_id:
+        raise ValueError(
+            "grid spec indicator id must match requested indicator_id; got "
+            f"{grid_indicator_id!r}, expected {indicator_id!r}"
+        )
+
+    axis_names: list[str] = []
+    axis_values_by_name: dict[str, tuple[int | float | str, ...]] = {}
+    if grid_spec.source is not None:
+        axis_names.append("source")
+        axis_values_by_name["source"] = tuple(
+            _normalize_indicator_scalar_v2(value=value)
+            for value in grid_spec.source.materialize()
+        )
+    for param_name in sorted(grid_spec.params.keys()):
+        axis_names.append(param_name)
+        axis_values_by_name[param_name] = tuple(
+            _normalize_indicator_scalar_v2(value=value)
+            for value in grid_spec.params[param_name].materialize()
+        )
+
+    axis_radices = tuple(len(axis_values_by_name[axis_name]) for axis_name in axis_names)
+    axis_positions: dict[str, Mapping[int | float | str, int]] = {}
+    for axis_name in axis_names:
+        positions: dict[int | float | str, int] = {}
+        for index, normalized_value in enumerate(axis_values_by_name[axis_name]):
+            if normalized_value in positions:
+                raise ValueError(
+                    "indicator axis values must be unique for artifact row addressing; "
+                    f"{indicator_id}.{axis_name} duplicates {normalized_value!r}"
+                )
+            positions[normalized_value] = index
+        axis_positions[axis_name] = MappingProxyType(positions)
+    return PreparedIndicatorRowPlanV2(
+        indicator_id=indicator_id,
+        axis_names=tuple(axis_names),
+        axis_radices=axis_radices,
+        axis_positions=MappingProxyType(axis_positions),
+    )
+
+
+def compute_target_slice_by_close_time_v2(
     *,
     close_time: np.ndarray,
     target_time_range: TimeRange,
@@ -698,7 +768,7 @@ def _compute_target_slice_by_close_time_v2(
     return slice(slice_start, slice_stop)
 
 
-def _rebase_bar_close_mapping_v2(
+def rebase_bar_close_mapping_v2(
     *,
     mapping_values: np.ndarray,
     exec_target_slice: slice,
@@ -918,5 +988,9 @@ def _utc_timestamp_to_epoch_millis_v2(value: object) -> int:
 
 __all__ = [
     "BacktestStageAShortlistBuilderV2",
+    "PreparedIndicatorRowPlanV2",
+    "build_prepared_indicator_row_plan_from_grid_spec_v2",
     "build_default_stage_a_shortlist_builder_v2",
+    "compute_target_slice_by_close_time_v2",
+    "rebase_bar_close_mapping_v2",
 ]
