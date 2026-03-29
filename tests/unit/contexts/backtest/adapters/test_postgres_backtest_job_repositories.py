@@ -269,6 +269,104 @@ def test_job_repository_create_serializes_mappingproxy_request_payload() -> None
     assert gateway.fetch_one_parameters[0]["ranking_secondary_metric"] == "win_rate_pct"
 
 
+def test_job_repository_create_with_top_variants_persists_terminal_sync_inline_rows_atomically(
+) -> None:
+    """
+    Verify atomic sync-inline create path inserts job row and summary-only top rows together.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R7-02 persists final sync-inline run metadata and top rows via the existing jobs family.
+    Raises:
+        AssertionError: If SQL or serialized parameters miss required summary-only clauses.
+    Side Effects:
+        None.
+    """
+    job_id = UUID("00000000-0000-0000-0000-000000000910")
+    persisted_row = dict(_build_job_row(state="succeeded"))
+    persisted_row["job_id"] = str(job_id)
+    persisted_row["execution_mode"] = "sync_inline"
+    persisted_row["artifact_slot_generation"] = 11
+    persisted_row["artifact_asof_date"] = "2026-03-28"
+    gateway = _FakeGateway(fetch_one_results=[persisted_row])
+    repository = PostgresBacktestJobRepository(gateway=gateway)
+    created_at = datetime(2026, 3, 28, 18, 0, tzinfo=timezone.utc)
+    finished_at = datetime(2026, 3, 28, 18, 0, 5, tzinfo=timezone.utc)
+
+    job = BacktestJob(
+        job_id=job_id,
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        mode="template",
+        state="succeeded",
+        created_at=created_at,
+        updated_at=finished_at,
+        started_at=created_at,
+        finished_at=finished_at,
+        request_json={"mode": "template", "warmup_bars": 200},
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-28",
+        ),
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+        stage="finalizing",
+        processed_units=100,
+        total_units=100,
+        progress_updated_at=finished_at,
+        locked_by=None,
+        locked_at=None,
+        lease_expires_at=None,
+        heartbeat_at=None,
+        attempt=1,
+    )
+    top_rows = (
+        BacktestJobTopVariant(
+            job_id=job_id,
+            rank=1,
+            variant_key="a" * 64,
+            indicator_variant_key="b" * 64,
+            variant_index=0,
+            total_return_pct=12.34,
+            payload_json={"schema_version": 1},
+            summary_metrics_json={"total_return_pct": 12.34, "profit_factor": 1.23},
+            best_tp_pct=4.0,
+            best_sl_pct=2.0,
+            report_table_md=None,
+            trades_json=None,
+            updated_at=finished_at,
+        ),
+    )
+
+    persisted = repository.create_with_top_variants(job=job, top_variants=top_rows)
+
+    assert persisted.state == "succeeded"
+    assert gateway.fetch_one_parameters[0]["execution_mode"] == "sync_inline"
+    assert isinstance(gateway.fetch_one_parameters[0]["rows_json"], str)
+    assert "INSERT INTO backtest_jobs" in gateway.fetch_one_queries[0]
+    assert "INSERT INTO backtest_job_top_variants" in gateway.fetch_one_queries[0]
+    assert "item -> 'summary_metrics_json' AS summary_metrics_json" in gateway.fetch_one_queries[0]
+    assert "NULL::TEXT AS report_table_md" in gateway.fetch_one_queries[0]
+    assert "NULL::JSONB AS trades_json" in gateway.fetch_one_queries[0]
+    assert "ORDER BY" in gateway.fetch_one_queries[0]
+    assert "(item ->> 'rank')::INTEGER ASC" in gateway.fetch_one_queries[0]
+    assert "(item ->> 'variant_key') ASC" in gateway.fetch_one_queries[0]
+
+
 def test_job_repository_count_active_for_artifact_manifest_uses_pin_and_instrument_filters(
 ) -> None:
     """

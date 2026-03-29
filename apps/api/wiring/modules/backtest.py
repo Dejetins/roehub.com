@@ -36,6 +36,7 @@ from trading.contexts.backtest.application.services import (
 )
 from trading.contexts.backtest.application.use_cases import (
     CancelBacktestJobUseCase,
+    CreateAndRunBacktestSyncInlineUseCase,
     CreateBacktestJobUseCase,
     GetBacktestJobStatusUseCase,
     GetBacktestJobTopUseCase,
@@ -145,8 +146,10 @@ def build_backtest_router(
     artifact_runtime_config = _load_backtest_artifacts_runtime_config(environ=environ)
     backtest_runtime_config_hash = build_backtest_runtime_config_hash(config=runtime_config)
 
-    if runtime_config.jobs.enabled and not runtime_settings.strategy_postgres_dsn:
-        raise ValueError(f"{_STRATEGY_PG_DSN_KEY} is required when backtest.jobs.enabled is true")
+    if not runtime_settings.strategy_postgres_dsn:
+        raise ValueError(
+            f"{_STRATEGY_PG_DSN_KEY} is required for persisted POST /backtests storage"
+        )
 
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     strategy_repository = _build_strategy_repository(settings=runtime_settings)
@@ -189,12 +192,20 @@ def build_backtest_router(
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
         artifact_slot_resolver=artifact_slot_resolver,
     )
+    jobs_gateway = _build_jobs_gateway(settings=runtime_settings)
+    job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)
+    sync_inline_run_use_case = CreateAndRunBacktestSyncInlineUseCase(
+        run_use_case=run_use_case,
+        job_repository=job_repository,
+        backtest_runtime_config_hash=backtest_runtime_config_hash,
+        engine_version=runtime_config.contracts.risk_model,
+    )
     runtime_defaults_response = build_backtest_runtime_defaults_response(
         config=runtime_config,
         defaults_provider=defaults_provider,
     )
     backtests_router = build_backtests_router(
-        run_use_case=run_use_case,
+        run_use_case=sync_inline_run_use_case,
         strategy_reader=strategy_reader,
         runtime_defaults_response=runtime_defaults_response,
         current_user_dependency=current_user_dependency,
@@ -204,8 +215,6 @@ def build_backtest_router(
     if not runtime_config.jobs.enabled:
         return backtests_router
 
-    jobs_gateway = _build_jobs_gateway(settings=runtime_settings)
-    job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)
     results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
     create_use_case = CreateBacktestJobUseCase(
         job_repository=job_repository,

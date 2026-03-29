@@ -15,6 +15,12 @@
   - persisted top rows are summary-only:
     `summary_metrics_json`, `best_tp_pct`, `best_sl_pct` are contract fields,
     while `report_table_md` and `trades_json` remain transitional `NULL`-only columns.
+- R7-02 cutover update:
+  - `POST /backtests` now persists successful inline executions into the same storage family
+    with `execution_mode=sync_inline`,
+  - sync-inline path writes one terminal `backtest_jobs` row plus summary-only top rows
+    atomically,
+  - canonical preflight/validation `422` failures remain non-persisted and do not create rows.
 - Superseded by target-v2 storage direction:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -189,6 +195,13 @@ R7-01 summary-only policy:
   `NULL` и для `running`, и для terminal snapshots;
 - legacy rows с `NULL` в additive полях остаются читаемыми через repository mappers.
 
+R7-02 additional sync-inline write path:
+
+- successful `POST /backtests` inserts terminal run row and persisted top rows in one SQL unit;
+- persisted row ordering remains explicit: `rank ASC, variant_key ASC`;
+- `payload_json` и `summary_metrics_json` остаются canonical JSON objects,
+  `report_table_md` и `trades_json` остаются `NULL`.
+
 #### 1.3 `backtest_job_stage_a_shortlist`
 
 Минимальные поля:
@@ -226,6 +239,7 @@ R7-01 summary-only policy:
 
 1. `BacktestJobRepository`
    - create/get/list/cancel
+   - atomic `create_with_top_variants(...)` for terminal sync-inline persisted launches
    - count active (`queued + running`) для quota check
    - count active pinned runs for one inactive-slot publish guard
 

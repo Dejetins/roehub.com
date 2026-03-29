@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from dataclasses import dataclass
 from datetime import datetime
 from types import MappingProxyType
 from typing import Annotated, Any, Literal, Mapping, Sequence
@@ -54,6 +55,30 @@ from trading.shared_kernel.primitives import (
 
 BacktestScalar = int | float | str | bool | None
 BacktestAxisScalar = int | float | str
+
+
+@dataclass(frozen=True, slots=True)
+class _PersistedSyncRunMetadata:
+    """
+    Strongly typed persisted sync-inline metadata extracted from application response DTO.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - apps/api/dto/backtests.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+    """
+
+    run_id: UUID
+    state: str
+    execution_mode: str
+    engine_version: str
+    artifact_slot: str
+    artifact_slot_generation: int
+    artifact_asof_date: str
+    artifact_manifest_hash: str
 
 
 class BacktestExplicitAxisSpecRequest(BaseModel):
@@ -615,6 +640,14 @@ class BacktestsPostResponse(BaseModel):
     top_k: int
     preselect: int
     top_trades_n: int
+    run_id: UUID
+    state: str
+    execution_mode: str
+    engine_version: str
+    artifact_slot: str
+    artifact_slot_generation: int
+    artifact_asof_date: str
+    artifact_manifest_hash: str
     spec_hash: str | None = None
     grid_request_hash: str | None = None
     engine_params_hash: str
@@ -853,19 +886,24 @@ def build_backtests_post_response(
         None.
     """
     variants = response.variants
+    sync_run_metadata = _require_sync_run_metadata(response=response)
 
     spec_hash: str | None = None
     grid_request_hash: str | None = None
     if response.mode == "saved":
-        if strategy_snapshot is None:
-            raise BacktestValidationError(
-                "Unable to build spec_hash: saved strategy snapshot is missing",
+        spec_hash = response.spec_hash
+        if spec_hash is None:
+            if strategy_snapshot is None:
+                raise BacktestValidationError(
+                    "Unable to build spec_hash: saved strategy snapshot is missing",
+                )
+            spec_hash = build_sha256_from_payload(
+                payload=dict(strategy_snapshot.spec_payload or {})
             )
-        spec_hash = build_sha256_from_payload(payload=dict(strategy_snapshot.spec_payload or {}))
     else:
         grid_request_hash = build_grid_request_hash(request=request)
 
-    engine_params_hash = build_engine_params_hash(
+    engine_params_hash = response.engine_params_hash or build_engine_params_hash(
         request=request,
         response=response,
         variants=variants,
@@ -884,6 +922,14 @@ def build_backtests_post_response(
         top_k=response.top_k,
         preselect=response.preselect,
         top_trades_n=response.top_trades_n,
+        run_id=sync_run_metadata.run_id,
+        state=sync_run_metadata.state,
+        execution_mode=sync_run_metadata.execution_mode,
+        engine_version=sync_run_metadata.engine_version,
+        artifact_slot=sync_run_metadata.artifact_slot,
+        artifact_slot_generation=sync_run_metadata.artifact_slot_generation,
+        artifact_asof_date=sync_run_metadata.artifact_asof_date,
+        artifact_manifest_hash=sync_run_metadata.artifact_manifest_hash,
         spec_hash=spec_hash,
         grid_request_hash=grid_request_hash,
         engine_params_hash=engine_params_hash,
@@ -891,6 +937,57 @@ def build_backtests_post_response(
             _build_variant_response(variant=item, include_report=include_reports)
             for item in variants
         ],
+    )
+
+
+def _require_sync_run_metadata(
+    *,
+    response: RunBacktestResponse,
+) -> _PersistedSyncRunMetadata:
+    """
+    Validate that successful sync `/backtests` response carries persisted run identity metadata.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - apps/api/dto/backtests.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+    Args:
+        response: Application-layer sync response DTO.
+    Returns:
+        _PersistedSyncRunMetadata: Strongly typed persisted sync-inline metadata payload.
+    Assumptions:
+        R7-02 cutover makes persisted run identity mandatory for every successful sync launch.
+    Raises:
+        BacktestValidationError: If one required persisted metadata field is missing.
+    Side Effects:
+        None.
+    """
+    if (
+        response.run_id is None
+        or response.state is None
+        or response.execution_mode is None
+        or response.engine_version is None
+        or response.artifact_slot is None
+        or response.artifact_slot_generation is None
+        or response.artifact_asof_date is None
+        or response.artifact_manifest_hash is None
+    ):
+        raise BacktestValidationError(
+            "Successful sync /backtests response requires persisted run metadata"
+        )
+    return _PersistedSyncRunMetadata(
+        run_id=response.run_id,
+        state=response.state,
+        execution_mode=response.execution_mode,
+        engine_version=response.engine_version,
+        artifact_slot=response.artifact_slot,
+        artifact_slot_generation=response.artifact_slot_generation,
+        artifact_asof_date=response.artifact_asof_date,
+        artifact_manifest_hash=response.artifact_manifest_hash,
     )
 
 

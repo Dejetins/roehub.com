@@ -7,6 +7,10 @@ from .backtest_jobs_api_v1 import (
     GetBacktestJobTopUseCase,
     ListBacktestJobsUseCase,
 )
+from .backtest_runs_api_v1 import (
+    BacktestRunsApiUseCase,
+    CreateAndRunBacktestSyncInlineUseCase,
+)
 from .errors import (
     backtest_conflict,
     backtest_forbidden,
@@ -28,10 +32,12 @@ from .run_backtest_job_runner_v1 import (
 )
 
 __all__ = [
+    "BacktestRunsApiUseCase",
     "BacktestJobRunReportV1",
     "BacktestJobRunStatus",
     "BacktestJobTopReadResult",
     "CancelBacktestJobUseCase",
+    "CreateAndRunBacktestSyncInlineUseCase",
     "CreateBacktestJobCommand",
     "CreateBacktestJobUseCase",
     "GetBacktestJobStatusUseCase",

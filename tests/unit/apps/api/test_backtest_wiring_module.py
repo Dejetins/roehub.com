@@ -381,6 +381,11 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
     monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _DummyFactory)
     monkeypatch.setattr(
         backtest_module,
+        "CreateAndRunBacktestSyncInlineUseCase",
+        _DummyFactory,
+    )
+    monkeypatch.setattr(
+        backtest_module,
         "build_backtests_router",
         lambda **kwargs: _build_ping_router(path="/backtests/ping"),
     )
@@ -416,6 +421,7 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         None.
     """
     captured_kwargs: dict[str, object] = {}
+    captured_sync_inline_kwargs: dict[str, object] = {}
     captured_backtests_router_kwargs: dict[str, object] = {}
     runtime_config = _runtime_config(
         jobs_enabled=False,
@@ -479,7 +485,34 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
             """
             captured_kwargs.update(kwargs)
 
+    class _CaptureCreateAndRunBacktestSyncInlineUseCase:
+        """
+        Capture persisted sync-inline orchestrator constructor kwargs for wiring assertions.
+        """
+
+        def __init__(self, **kwargs) -> None:
+            """
+            Store kwargs for deterministic assertions.
+
+            Args:
+                **kwargs: Constructor kwargs from wiring module.
+            Returns:
+                None.
+            Assumptions:
+                Captured kwargs are not mutated by router builder.
+            Raises:
+                None.
+            Side Effects:
+                Stores kwargs in enclosing test scope.
+            """
+            captured_sync_inline_kwargs.update(kwargs)
+
     monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _CaptureRunBacktestUseCase)
+    monkeypatch.setattr(
+        backtest_module,
+        "CreateAndRunBacktestSyncInlineUseCase",
+        _CaptureCreateAndRunBacktestSyncInlineUseCase,
+    )
     monkeypatch.setattr(
         backtest_module,
         "build_backtests_router",
@@ -488,7 +521,7 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     )
 
     router = backtest_module.build_backtest_router(
-        environ={},
+        environ={"STRATEGY_PG_DSN": "postgresql://user:pass@localhost:5432/roehub"},
         current_user_dependency=cast(
             RequireCurrentUserDependency,
             lambda _request: None,
@@ -500,6 +533,8 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     assert captured_kwargs["max_compute_bytes_total"] == 500
     assert captured_kwargs["max_numba_threads"] == 7
     assert captured_kwargs["eager_top_reports_enabled"] is False
+    assert captured_sync_inline_kwargs["backtest_runtime_config_hash"] == "f" * 64
+    assert captured_sync_inline_kwargs["engine_version"] == "signal_tf + 1m_risk"
     assert captured_backtests_router_kwargs["sync_deadline_seconds"] == 42.5
     assert captured_backtests_router_kwargs["eager_top_reports_enabled"] is False
 
@@ -523,7 +558,7 @@ def test_build_backtest_router_skips_jobs_routes_when_toggle_disabled(monkeypatc
     _patch_backtest_wiring_dependencies(monkeypatch=monkeypatch, jobs_enabled=False)
 
     router = backtest_module.build_backtest_router(
-        environ={},
+        environ={"STRATEGY_PG_DSN": "postgresql://user:pass@localhost:5432/roehub"},
         current_user_dependency=cast(
             RequireCurrentUserDependency,
             lambda _request: None,
@@ -619,6 +654,11 @@ def test_build_backtest_router_uses_artifact_root_from_artifact_config(monkeypat
     monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _DummyFactory)
     monkeypatch.setattr(
         backtest_module,
+        "CreateAndRunBacktestSyncInlineUseCase",
+        _DummyFactory,
+    )
+    monkeypatch.setattr(
+        backtest_module,
         "build_backtests_router",
         lambda **kwargs: _build_ping_router(path="/backtests/ping"),
     )
@@ -680,22 +720,24 @@ def test_build_backtest_router_uses_artifact_root_from_artifact_config(monkeypat
 
 
 
-def test_build_backtest_router_fails_fast_when_jobs_enabled_without_dsn(monkeypatch) -> None:
+def test_build_backtest_router_fails_fast_when_persisted_sync_storage_dsn_is_missing(
+    monkeypatch,
+) -> None:
     """
-    Verify wiring fails fast when jobs toggle is enabled and STRATEGY_PG_DSN is missing.
+    Verify wiring fails fast when persisted sync storage DSN is missing at startup.
 
     Args:
         monkeypatch: pytest monkeypatch fixture.
     Returns:
         None.
     Assumptions:
-        EPIC-11 jobs repositories require Postgres DSN at startup.
+        R7-02 sync-inline persistence reuses the jobs storage family and requires Postgres DSN.
     Raises:
         AssertionError: If wiring does not raise deterministic ValueError.
     Side Effects:
         None.
     """
-    _patch_backtest_wiring_dependencies(monkeypatch=monkeypatch, jobs_enabled=True)
+    _patch_backtest_wiring_dependencies(monkeypatch=monkeypatch, jobs_enabled=False)
 
     with pytest.raises(ValueError, match="STRATEGY_PG_DSN"):
         backtest_module.build_backtest_router(

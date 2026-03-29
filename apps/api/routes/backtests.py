@@ -28,7 +28,7 @@ from apps.api.dto import (
 from trading.contexts.backtest.application.ports import BacktestStrategyReader, CurrentUser
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.application.use_cases import (
-    RunBacktestUseCase,
+    BacktestRunsApiUseCase,
     map_backtest_exception,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
@@ -40,7 +40,7 @@ _SYNC_DISCONNECT_POLL_SECONDS = 0.2
 
 def build_backtests_router(
     *,
-    run_use_case: RunBacktestUseCase,
+    run_use_case: BacktestRunsApiUseCase,
     strategy_reader: BacktestStrategyReader,
     runtime_defaults_response: BacktestRuntimeDefaultsResponse,
     current_user_dependency: CurrentUserDependency,
@@ -153,17 +153,15 @@ def build_backtests_router(
             Invokes backtest use-case and reads saved strategy snapshot for `spec_hash`.
         """
         try:
-            strategy_snapshot = None
-            if request.strategy_id is not None:
-                strategy_snapshot = strategy_reader.load_any(strategy_id=request.strategy_id)
-
             use_case_request = build_backtest_run_request(request=request)
+            request_payload = request.model_dump(mode="json", exclude_none=True)
             run_control = BacktestRunControlV1(deadline_seconds=sync_deadline_seconds)
             run_task = asyncio.create_task(
                 asyncio.to_thread(
                     run_use_case.execute,
                     request=use_case_request,
                     current_user=CurrentUser(user_id=principal.user_id),
+                    request_payload=request_payload,
                     run_control=run_control,
                 )
             )
@@ -172,6 +170,9 @@ def build_backtests_router(
                     run_control.cancel(reason="client_disconnected")
                 await asyncio.sleep(_SYNC_DISCONNECT_POLL_SECONDS)
             use_case_response = await run_task
+            strategy_snapshot = None
+            if request.strategy_id is not None and use_case_response.spec_hash is None:
+                strategy_snapshot = strategy_reader.load_any(strategy_id=request.strategy_id)
             return build_backtests_post_response(
                 request=request,
                 response=use_case_response,

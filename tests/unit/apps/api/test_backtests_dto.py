@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 import pytest
 from pydantic import ValidationError
@@ -11,9 +12,30 @@ from apps.api.dto import (
     build_backtest_run_request,
     build_backtest_variant_report_payload,
     build_backtest_variant_report_run_request,
+    build_backtests_post_response,
+    build_sha256_from_payload,
 )
+from trading.contexts.backtest.application.dto import (
+    BacktestVariantPayloadV1,
+    BacktestVariantPreview,
+    RunBacktestResponse,
+)
+from trading.contexts.backtest.application.ports import BacktestStrategySnapshot
 from trading.contexts.backtest.domain.errors import BacktestValidationError
-from trading.contexts.indicators.domain.specifications import RangeValuesSpec
+from trading.contexts.indicators.application.dto import IndicatorVariantSelection
+from trading.contexts.indicators.domain.entities import IndicatorId
+from trading.contexts.indicators.domain.specifications import (
+    ExplicitValuesSpec,
+    GridSpec,
+    RangeValuesSpec,
+)
+from trading.shared_kernel.primitives import (
+    InstrumentId,
+    MarketId,
+    Symbol,
+    Timeframe,
+    UserId,
+)
 
 
 def test_build_backtest_run_request_preserves_int_range_axes() -> None:
@@ -368,6 +390,198 @@ def test_build_backtest_variant_report_payload_rejects_boolean_indicator_values(
                     "sizing_mode": "all_in",
                 },
             }
+        )
+
+
+def test_build_backtests_post_response_maps_persisted_sync_inline_metadata() -> None:
+    """
+    Verify sync response mapper exposes persisted run identity metadata additively.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R7-02 makes persisted sync-inline metadata mandatory for successful `/backtests`.
+    Raises:
+        AssertionError: If persisted metadata or stable hashes are mapped incorrectly.
+    Side Effects:
+        None.
+    """
+    request = BacktestsPostRequest.model_validate(
+        {
+            "time_range": {
+                "start": datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2026, 2, 24, 1, 0, tzinfo=timezone.utc),
+            },
+            "strategy_id": "00000000-0000-0000-0000-000000000123",
+        }
+    )
+    snapshot_payload = {
+        "schema_version": 1,
+        "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+        "timeframe": "1m",
+    }
+    response = RunBacktestResponse(
+        mode="saved",
+        strategy_id=UUID("00000000-0000-0000-0000-000000000123"),
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        warmup_bars=200,
+        top_k=1,
+        preselect=100,
+        top_trades_n=1,
+        variants=(
+            BacktestVariantPreview(
+                variant_index=0,
+                variant_key="a" * 64,
+                indicator_variant_key="b" * 64,
+                total_return_pct=12.5,
+                payload=BacktestVariantPayloadV1(
+                    indicator_selections=(
+                        IndicatorVariantSelection(
+                            indicator_id="ma.sma",
+                            inputs={"source": "close"},
+                            params={"window": 20},
+                        ),
+                    ),
+                    signal_params={"ma.sma": {"cross_up": 0.5}},
+                    risk_params={"sl_enabled": True, "sl_pct": 2.0},
+                    execution_params={"fee_pct": 0.075},
+                    direction_mode="long-short",
+                    sizing_mode="all_in",
+                ),
+            ),
+        ),
+        total_indicator_compute_calls=1,
+        run_id=UUID("00000000-0000-0000-0000-000000000910"),
+        state="succeeded",
+        execution_mode="sync_inline",
+        engine_version="signal_tf + 1m_risk",
+        artifact_slot="slot_b",
+        artifact_slot_generation=11,
+        artifact_asof_date="2026-03-28",
+        artifact_manifest_hash="c" * 64,
+        spec_hash=build_sha256_from_payload(payload=snapshot_payload),
+        engine_params_hash="d" * 64,
+    )
+    strategy_snapshot = BacktestStrategySnapshot(
+        strategy_id=UUID("00000000-0000-0000-0000-000000000123"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000777"),
+        is_deleted=False,
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        indicator_grids=(
+            GridSpec(
+                indicator_id=IndicatorId("ma.sma"),
+                params={"window": ExplicitValuesSpec(name="window", values=(20,))},
+            ),
+        ),
+        indicator_selections=(
+            IndicatorVariantSelection(
+                indicator_id="ma.sma",
+                inputs={"source": "close"},
+                params={"window": 20},
+            ),
+        ),
+        spec_payload=snapshot_payload,
+    )
+
+    built = build_backtests_post_response(
+        request=request,
+        response=response,
+        strategy_snapshot=strategy_snapshot,
+        include_reports=False,
+    )
+
+    assert built.run_id == UUID("00000000-0000-0000-0000-000000000910")
+    assert built.state == "succeeded"
+    assert built.execution_mode == "sync_inline"
+    assert built.engine_version == "signal_tf + 1m_risk"
+    assert built.artifact_slot == "slot_b"
+    assert built.artifact_slot_generation == 11
+    assert built.artifact_asof_date == "2026-03-28"
+    assert built.artifact_manifest_hash == "c" * 64
+    assert built.spec_hash == build_sha256_from_payload(payload=snapshot_payload)
+    assert built.engine_params_hash == "d" * 64
+
+
+def test_build_backtests_post_response_rejects_missing_persisted_sync_metadata() -> None:
+    """
+    Verify sync response mapper fails deterministically when persisted run metadata is absent.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Legacy non-persisted sync response contract is invalid after R7-02 cutover.
+    Raises:
+        AssertionError: If mapper silently accepts missing persisted metadata.
+    Side Effects:
+        None.
+    """
+    request = BacktestsPostRequest.model_validate(
+        {
+            "time_range": {
+                "start": datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2026, 2, 24, 1, 0, tzinfo=timezone.utc),
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1m",
+                "indicator_grids": [
+                    {
+                        "indicator_id": "ma.sma",
+                        "params": {"window": {"mode": "explicit", "values": [20]}},
+                    }
+                ],
+            },
+        }
+    )
+    response = RunBacktestResponse(
+        mode="template",
+        strategy_id=None,
+        instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
+        timeframe=Timeframe("1m"),
+        warmup_bars=200,
+        top_k=1,
+        preselect=100,
+        top_trades_n=1,
+        variants=(
+            BacktestVariantPreview(
+                variant_index=0,
+                variant_key="a" * 64,
+                indicator_variant_key="b" * 64,
+                total_return_pct=12.5,
+                payload=BacktestVariantPayloadV1(
+                    indicator_selections=(
+                        IndicatorVariantSelection(
+                            indicator_id="ma.sma",
+                            inputs={"source": "close"},
+                            params={"window": 20},
+                        ),
+                    ),
+                    signal_params={},
+                    risk_params={},
+                    execution_params={"fee_pct": 0.075},
+                    direction_mode="long-short",
+                    sizing_mode="all_in",
+                ),
+            ),
+        ),
+        total_indicator_compute_calls=1,
+    )
+
+    with pytest.raises(
+        BacktestValidationError,
+        match="requires persisted run metadata",
+    ):
+        build_backtests_post_response(
+            request=request,
+            response=response,
+            strategy_snapshot=None,
+            include_reports=False,
         )
 
 

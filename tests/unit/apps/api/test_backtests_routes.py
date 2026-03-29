@@ -267,13 +267,14 @@ class _FakeRunBacktestUseCase:
         self._variant_report_result = variant_report_result
         self._variant_report_error = variant_report_error
 
-    def execute(self, *, request, current_user, run_control=None):
+    def execute(self, *, request, current_user, request_payload=None, run_control=None):
         """
         Return configured result or raise configured error.
 
         Args:
             request: Application request DTO.
             current_user: Current user port object.
+            request_payload: Optional strict API payload snapshot for persisted sync tests.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             Any: Configured result payload.
@@ -284,7 +285,7 @@ class _FakeRunBacktestUseCase:
         Side Effects:
             None.
         """
-        _ = request, current_user, run_control
+        _ = request, current_user, request_payload, run_control
         if self._error is not None:
             raise self._error
         return self._result
@@ -906,10 +907,17 @@ def test_post_backtests_saved_response_includes_hashes_and_explicit_payload() ->
 
     assert response.status_code == 200
     body = response.json()
+    assert body["run_id"] == "00000000-0000-0000-0000-000000000910"
+    assert body["state"] == "succeeded"
+    assert body["execution_mode"] == "sync_inline"
+    assert body["engine_version"] == "signal_tf + 1m_risk"
+    assert body["artifact_slot"] == "slot_b"
+    assert body["artifact_slot_generation"] == 11
+    assert body["artifact_asof_date"] == "2026-03-28"
+    assert body["artifact_manifest_hash"] == "c" * 64
     assert body["spec_hash"] == build_sha256_from_payload(payload=snapshot_payload)
     assert body["grid_request_hash"] is None
-    assert isinstance(body["engine_params_hash"], str)
-    assert len(body["engine_params_hash"]) == 64
+    assert body["engine_params_hash"] == "e" * 64
     assert body["variants"][0]["payload"] == {
         "indicator_selections": [
             {
@@ -1378,6 +1386,15 @@ def _saved_mode_response() -> RunBacktestResponse:
             _variant(variant_index=1, variant_key="b" * 64, total_return_pct=10.0),
         ),
         total_indicator_compute_calls=1,
+        run_id=UUID("00000000-0000-0000-0000-000000000910"),
+        state="succeeded",
+        execution_mode="sync_inline",
+        engine_version="signal_tf + 1m_risk",
+        artifact_slot="slot_b",
+        artifact_slot_generation=11,
+        artifact_asof_date="2026-03-28",
+        artifact_manifest_hash="c" * 64,
+        engine_params_hash="e" * 64,
     )
 
 
@@ -1409,6 +1426,15 @@ def _template_mode_response() -> RunBacktestResponse:
             _variant(variant_index=0, variant_key="a" * 64, total_return_pct=12.0),
         ),
         total_indicator_compute_calls=1,
+        run_id=UUID("00000000-0000-0000-0000-000000000910"),
+        state="succeeded",
+        execution_mode="sync_inline",
+        engine_version="signal_tf + 1m_risk",
+        artifact_slot="slot_b",
+        artifact_slot_generation=11,
+        artifact_asof_date="2026-03-28",
+        artifact_manifest_hash="c" * 64,
+        engine_params_hash="e" * 64,
     )
 
 
@@ -1441,4 +1467,13 @@ def _template_mode_two_variant_response() -> RunBacktestResponse:
             _variant(variant_index=1, variant_key="b" * 64, total_return_pct=12.0),
         ),
         total_indicator_compute_calls=1,
+        run_id=UUID("00000000-0000-0000-0000-000000000910"),
+        state="succeeded",
+        execution_mode="sync_inline",
+        engine_version="signal_tf + 1m_risk",
+        artifact_slot="slot_b",
+        artifact_slot_generation=11,
+        artifact_asof_date="2026-03-28",
+        artifact_manifest_hash="c" * 64,
+        engine_params_hash="e" * 64,
     )

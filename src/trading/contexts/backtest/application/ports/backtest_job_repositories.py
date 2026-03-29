@@ -108,6 +108,39 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
+    def create_with_top_variants(
+        self,
+        *,
+        job: BacktestJob,
+        top_variants: tuple[BacktestJobTopVariant, ...],
+    ) -> BacktestJob:
+        """
+        Persist one terminal run row plus deterministic summary-only top rows atomically.
+
+        Docs:
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_repository.py
+          - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+        Args:
+            job: Prepared terminal persisted-run aggregate.
+            top_variants: Summary-only top rows ordered by `rank ASC, variant_key ASC`.
+        Returns:
+            BacktestJob: Persisted immutable job row projection.
+        Assumptions:
+            Sync-inline cutover writes final state and top rows via the existing jobs table family.
+        Raises:
+            ValueError: If storage write fails or row mapping breaks.
+        Side Effects:
+            Writes one row in `backtest_jobs` and zero or more rows in
+            `backtest_job_top_variants`.
+        """
+        ...
+
     def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
         """
         Load job snapshot by id with optional owner filter.

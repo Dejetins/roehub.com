@@ -106,6 +106,30 @@ class _FakeJobRepository:
         self.jobs_by_id[job.job_id] = job
         return job
 
+    def create_with_top_variants(
+        self,
+        *,
+        job: BacktestJob,
+        top_variants: tuple[BacktestJobTopVariant, ...],
+    ) -> BacktestJob:
+        """
+        Reject unexpected atomic sync-inline persistence calls in jobs API unit tests.
+
+        Args:
+            job: Terminal job snapshot.
+            top_variants: Persisted summary-only top rows.
+        Returns:
+            BacktestJob: Echoed job snapshot when used unexpectedly.
+        Assumptions:
+            `CreateBacktestJobUseCase` covers queued background job creation only.
+        Raises:
+            AssertionError: Always, because sync-inline persistence is out of scope here.
+        Side Effects:
+            None.
+        """
+        _ = job, top_variants
+        raise AssertionError("create_with_top_variants is not expected in these tests")
+
     def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
         """
         Read one job from in-memory store with optional owner filter.

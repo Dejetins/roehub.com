@@ -4,12 +4,16 @@
 
 ## Status
 
-- Status: active v1 sync contract with R0 freeze notes.
-- R7-01 storage note:
+- Status: active v1 sync contract after R7-02 persisted `sync_inline` cutover.
+- R7-02 storage note:
   - sync and background executions share one persisted-run storage family in Postgres,
-  - this epic does not change public `POST /backtests` create-and-execute behavior yet,
-  - future persisted sync runs use `execution_mode=sync_inline` in the same tables without a
-    second storage stack.
+  - successful `POST /backtests` now performs internal preflight, executes inline, and persists
+    one terminal run row plus summary-only top rows in the same table family,
+  - successful sync response now includes persisted run metadata:
+    `run_id`, `state`, `execution_mode=sync_inline`, `engine_version`,
+    `artifact_slot`, `artifact_slot_generation`, `artifact_asof_date`,
+    `artifact_manifest_hash`,
+  - deterministic validation failures remain canonical `422` and do not create persisted rows.
 - Superseded by target-v2 contract:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -77,10 +81,10 @@
 ## Non-goals
 
 - Async jobs/progress (Milestone 5).
-- История запусков и сохранение результатов backtest в БД.
+- Public history/list/status endpoints for persisted runs.
 - Дополнительные endpoints (get status/list).
-- R7-01 не включает cutover `POST /backtests` в create-and-execute persisted flow
-  (`execution_mode=sync_inline` wiring остаётся следующим эпиком).
+- R7-03 не включает public `/backtests/runs*` history endpoints.
+- R8-02 не включает full auto-fallback sync -> background orchestration.
 
 ## Ключевые решения
 
@@ -147,7 +151,22 @@ Response v1 включает:
 Зачем:
 - подтверждение воспроизводимости и защита от “тихих” изменений runtime defaults.
 
-### 6) Sync response остаётся summary-only; full report грузится on-demand
+### 6) Успешный sync launch теперь always persisted (`execution_mode=sync_inline`)
+
+- `POST /backtests` больше не является purely-ephemeral flow.
+- После успешного inline execution backend сохраняет:
+  - terminal row в `backtest_jobs`,
+  - summary-only top rows в `backtest_job_top_variants`,
+  - denormalized run metadata и artifact pin identity для будущих history/filter endpoints.
+- Persisted top rows сохраняют только:
+  - `payload_json`,
+  - `summary_metrics_json`,
+  - `best_tp_pct`,
+  - `best_sl_pct`,
+  - `report_table_md=NULL`,
+  - `trades_json=NULL`.
+
+### 7) Sync response остаётся summary-only; full report грузится on-demand
 
 - По умолчанию `POST /backtests` возвращает ranking + payload summary без `report` body.
 - Поля `rows/table_md/trades` загружаются on-demand через `POST /api/backtests/variant-report`.
@@ -159,7 +178,7 @@ Response v1 включает:
   в storage сохраняются только `payload_json`, `summary_metrics_json`, `best_tp_pct`,
   `best_sl_pct`; `report/trades` не становятся частью persisted summary rows.
 
-### 7) Sync cancellation: disconnect + hard deadline (кооперативно, без kill)
+### 8) Sync cancellation: disconnect + hard deadline (кооперативно, без kill)
 
 С 2026-02-25 sync route реализован как `async` и запускает compute в thread через `asyncio.to_thread(...)`.
 
@@ -174,7 +193,7 @@ Response v1 включает:
 
 Отмена реализована кооперативно: staged loops проверяют token/checkpoint и прекращают вычисление без принудительного завершения thread/process.
 
-### 8) Sync half-budgets, jobs full-budgets
+### 9) Sync half-budgets, jobs full-budgets
 
 С 2026-02-25 wiring применяет разные guard budgets:
 
@@ -185,7 +204,7 @@ Response v1 включает:
 
 HTTP response schema при этом не меняется.
 
-### 9) CPU knob через Numba threads
+### 10) CPU knob через Numba threads
 
 С 2026-02-25 в `backtest.yaml` добавлен `backtest.cpu.max_numba_threads`.
 
@@ -252,6 +271,15 @@ Response содержит:
 - `mode: "saved"|"template"`
 - `instrument_id`, `timeframe`, `strategy_id?`
 - `warmup_bars`, `top_k`, `preselect`, `top_trades_n`
+- persisted sync run metadata:
+  - `run_id`
+  - `state`
+  - `execution_mode` (`sync_inline`)
+  - `engine_version`
+  - `artifact_slot`
+  - `artifact_slot_generation`
+  - `artifact_asof_date`
+  - `artifact_manifest_hash`
 - reproducibility hashes:
   - `spec_hash?` or `grid_request_hash?`
   - `engine_params_hash`
@@ -279,7 +307,7 @@ Response содержит:
 - `401` — unauthenticated (identity dependency).
 - `422` — `RoehubError(code="validation_error")`:
   - invalid payload
-  - guards exceeded
+  - guards/preflight budget exceeded
   - invalid time range / no market data
 - `404` — `RoehubError(code="not_found")`:
   - saved strategy missing or deleted
@@ -299,6 +327,8 @@ FastAPI wiring v1:
   - `CandleFeed` (reuse indicators `MarketDataCandleFeed`),
   - `IndicatorCompute` (reuse indicators compute adapter),
   - `BacktestStrategyReader` adapter (ACL over StrategyRepository),
+  - `BacktestJobRepository` over the unified Postgres storage family for persisted
+    `sync_inline` writes,
   - `BacktestGridDefaultsProvider` (reads `configs/<env>/indicators.yaml` defaults),
   - `BacktestRuntimeConfig` from `configs/<env>/backtest.yaml`.
 

@@ -367,6 +367,9 @@ class BacktestStagedRunnerV1:
                         sizing_mode=template.sizing_mode,
                     ),
                     report=top_payload_context.reports_by_variant_key.get(row.variant_key),
+                    summary_metrics_json=row.summary_metrics_json,
+                    best_tp_pct=row.best_tp_pct,
+                    best_sl_pct=row.best_sl_pct,
                 )
             )
         variants = tuple(variants_list)

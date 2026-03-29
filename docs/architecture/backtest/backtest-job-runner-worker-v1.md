@@ -13,6 +13,12 @@
     `ranking_primary_metric`, `ranking_secondary_metric`,
   - persisted top rows остаются summary-only и записывают
     `summary_metrics_json`, `best_tp_pct`, `best_sl_pct` вместо eager report/trades payloads.
+- R7-02 cutover update:
+  - `POST /backtests` теперь тоже пишет successful `sync_inline` terminal rows в тот же table
+    family,
+  - worker contract не меняет свои background semantics и остаётся compatibility path для
+    `background_manual_legacy`,
+  - full sync -> background auto-fallback orchestration остаётся вне scope до R8-02.
 - Superseded by target-v2 orchestration decisions:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -39,6 +45,8 @@
   - `backtest_job_top_variants`
   - `backtest_job_stage_a_shortlist`
 - Sync backtest Milestone 4 (`RunBacktestUseCase`) сейчас ориентирован на in-memory staged flow и small runs.
+- После R7-02 sync API path уже использует тот же persisted-run storage family, но worker
+  по-прежнему отвечает только за background execution attempts и lease/reclaim lifecycle.
 - Для больших jobs нужен отдельный orchestration слой, который:
   - не materialize-ит сразу весь Stage A/Stage B,
   - работает батчами,

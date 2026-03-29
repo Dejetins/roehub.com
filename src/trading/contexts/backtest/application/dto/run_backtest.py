@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Mapping
+from typing import Any, Mapping
 from uuid import UUID
 
-from trading.contexts.backtest.domain.entities import TradeV1
+from trading.contexts.backtest.domain.entities import (
+    BacktestArtifactSlotLiteral,
+    BacktestJobExecutionMode,
+    BacktestJobState,
+    TradeV1,
+)
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 from trading.shared_kernel.primitives import InstrumentId, Timeframe, TimeRange
@@ -589,6 +594,9 @@ class BacktestVariantPreview:
     total_return_pct: float = 0.0
     payload: BacktestVariantPayloadV1 | None = None
     report: BacktestReportV1 | None = None
+    summary_metrics_json: Mapping[str, float] = field(default_factory=dict)
+    best_tp_pct: float | None = None
+    best_sl_pct: float | None = None
 
     def __post_init__(self) -> None:
         """
@@ -627,6 +635,38 @@ class BacktestVariantPreview:
 
         if self.payload is None:  # pragma: no cover - guarded by staged runner payload assembly
             raise ValueError("BacktestVariantPreview.payload is required")
+        resolved_payload = self.payload
+
+        object.__setattr__(
+            self,
+            "summary_metrics_json",
+            MappingProxyType(
+                _normalize_summary_metrics_mapping(
+                    values=self.summary_metrics_json,
+                    total_return_pct=float(self.total_return_pct),
+                )
+            ),
+        )
+        object.__setattr__(
+            self,
+            "best_tp_pct",
+            _resolve_best_risk_pct(
+                explicit_value=self.best_tp_pct,
+                payload=resolved_payload,
+                flag_key="tp_enabled",
+                value_key="tp_pct",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "best_sl_pct",
+            _resolve_best_risk_pct(
+                explicit_value=self.best_sl_pct,
+                payload=resolved_payload,
+                flag_key="sl_enabled",
+                value_key="sl_pct",
+            ),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -653,6 +693,20 @@ class RunBacktestResponse:
     top_trades_n: int
     variants: tuple[BacktestVariantPreview, ...]
     total_indicator_compute_calls: int
+    direction_mode: str | None = None
+    sizing_mode: str | None = None
+    execution_params: Mapping[str, BacktestRequestScalar] | None = None
+    run_id: UUID | None = None
+    state: BacktestJobState | None = None
+    execution_mode: BacktestJobExecutionMode | None = None
+    engine_version: str | None = None
+    artifact_slot: BacktestArtifactSlotLiteral | None = None
+    artifact_slot_generation: int | None = None
+    artifact_asof_date: str | None = None
+    artifact_manifest_hash: str | None = None
+    spec_hash: str | None = None
+    spec_payload_json: Mapping[str, Any] | None = None
+    engine_params_hash: str | None = None
 
     def __post_init__(self) -> None:
         """
@@ -692,6 +746,29 @@ class RunBacktestResponse:
         if self.total_indicator_compute_calls < 0:
             raise ValueError("RunBacktestResponse.total_indicator_compute_calls must be >= 0")
 
+        if self.direction_mode is not None:
+            normalized_direction_mode = self.direction_mode.strip().lower()
+            if normalized_direction_mode not in _ALLOWED_DIRECTION_MODES:
+                raise ValueError(
+                    "RunBacktestResponse.direction_mode must be one of: "
+                    f"{sorted(_ALLOWED_DIRECTION_MODES)}"
+                )
+            object.__setattr__(self, "direction_mode", normalized_direction_mode)
+        if self.sizing_mode is not None:
+            normalized_sizing_mode = self.sizing_mode.strip().lower()
+            if normalized_sizing_mode not in _ALLOWED_SIZING_MODES:
+                raise ValueError(
+                    "RunBacktestResponse.sizing_mode must be one of: "
+                    f"{sorted(_ALLOWED_SIZING_MODES)}"
+                )
+            object.__setattr__(self, "sizing_mode", normalized_sizing_mode)
+        if self.execution_params is not None:
+            object.__setattr__(
+                self,
+                "execution_params",
+                MappingProxyType(_normalize_scalar_mapping(values=self.execution_params)),
+            )
+
         variant_indexes = tuple(item.variant_index for item in self.variants)
         if len(set(variant_indexes)) != len(variant_indexes):
             raise ValueError("RunBacktestResponse variants must contain unique variant_index")
@@ -714,6 +791,68 @@ class RunBacktestResponse:
                     "by variant_key asc"
                 )
             previous_variant = current
+
+        has_artifact_metadata = any(
+            item is not None
+            for item in (
+                self.artifact_slot,
+                self.artifact_slot_generation,
+                self.artifact_asof_date,
+                self.artifact_manifest_hash,
+            )
+        )
+        if has_artifact_metadata:
+            if (
+                self.artifact_slot is None
+                or self.artifact_slot_generation is None
+                or self.artifact_asof_date is None
+                or self.artifact_manifest_hash is None
+            ):
+                raise ValueError(
+                    "RunBacktestResponse artifact metadata must be fully populated"
+                )
+            if self.artifact_slot_generation <= 0:
+                raise ValueError(
+                    "RunBacktestResponse.artifact_slot_generation must be > 0"
+                )
+
+        has_persisted_run_metadata = any(
+            item is not None
+            for item in (
+                self.run_id,
+                self.state,
+                self.execution_mode,
+                self.engine_version,
+            )
+        )
+        if has_persisted_run_metadata:
+            if (
+                self.run_id is None
+                or self.state is None
+                or self.execution_mode is None
+                or self.engine_version is None
+                or not has_artifact_metadata
+            ):
+                raise ValueError(
+                    "RunBacktestResponse persisted run metadata must be fully populated"
+                )
+            normalized_engine_version = self.engine_version.strip()
+            if not normalized_engine_version:
+                raise ValueError("RunBacktestResponse.engine_version must be non-empty")
+            object.__setattr__(self, "engine_version", normalized_engine_version)
+
+        if self.spec_hash is not None and len(self.spec_hash.strip()) != 64:
+            raise ValueError("RunBacktestResponse.spec_hash must be 64 hex chars when provided")
+        if self.engine_params_hash is not None and len(self.engine_params_hash.strip()) != 64:
+            raise ValueError(
+                "RunBacktestResponse.engine_params_hash must be 64 hex chars when provided"
+            )
+        if self.spec_payload_json is not None:
+            object.__setattr__(
+                self,
+                "spec_payload_json",
+                MappingProxyType(_normalize_json_payload_mapping(values=self.spec_payload_json)),
+            )
 
 
 def _validate_positive_optional_int(*, name: str, value: int | None) -> None:
@@ -848,6 +987,168 @@ def _normalize_nested_scalar_mapping(
             _normalize_scalar_mapping(values=values[raw_indicator_id])
         )
     return normalized
+
+
+def _normalize_summary_metrics_mapping(
+    *,
+    values: Mapping[str, float] | None,
+    total_return_pct: float,
+) -> dict[str, float]:
+    """
+    Normalize summary metrics into deterministic key-sorted float mapping for persisted previews.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+    Args:
+        values: Optional raw summary metrics payload.
+        total_return_pct: Canonical total-return metric for the preview.
+    Returns:
+        dict[str, float]: Deterministic float mapping with `total_return_pct` always populated.
+    Assumptions:
+        Summary metrics remain JSON-compatible scalar floats used for summary-only persistence.
+    Raises:
+        ValueError: If one metric key is blank or one metric value is non-numeric.
+    Side Effects:
+        None.
+    """
+    normalized: dict[str, float] = {}
+    source = values or {}
+    for raw_key in sorted(source.keys()):
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError("BacktestVariantPreview.summary_metrics_json keys must be non-empty")
+        metric_value = source[raw_key]
+        if isinstance(metric_value, bool) or not isinstance(metric_value, int | float):
+            raise ValueError(
+                "BacktestVariantPreview.summary_metrics_json values must be numeric"
+            )
+        normalized[key] = float(metric_value)
+    normalized["total_return_pct"] = float(total_return_pct)
+    return normalized
+
+
+def _resolve_best_risk_pct(
+    *,
+    explicit_value: float | None,
+    payload: BacktestVariantPayloadV1,
+    flag_key: str,
+    value_key: str,
+) -> float | None:
+    """
+    Resolve persisted best-risk percentage from explicit field or variant payload risk params.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+    Args:
+        explicit_value: Optional explicit best-risk scalar provided by the caller.
+        payload: Variant payload carrying risk params.
+        flag_key: Boolean risk-enabled flag key.
+        value_key: Percentage risk value key.
+    Returns:
+        float | None: Resolved non-negative risk percentage or `None`.
+    Assumptions:
+        Risk parameters use human percent units and nullable best-risk fields stay additive.
+    Raises:
+        ValueError: If explicit or payload-derived value is non-numeric or negative.
+    Side Effects:
+        None.
+    """
+    candidate = explicit_value
+    if candidate is None:
+        risk_params = payload.risk_params or {}
+        flag_value = risk_params.get(flag_key)
+        risk_value = risk_params.get(value_key)
+        if flag_value is True and isinstance(risk_value, int | float) and not isinstance(
+            risk_value,
+            bool,
+        ):
+            candidate = float(risk_value)
+    if candidate is None:
+        return None
+    if isinstance(candidate, bool) or not isinstance(candidate, int | float):
+        raise ValueError(f"BacktestVariantPreview.{value_key} must be numeric when provided")
+    normalized = float(candidate)
+    if normalized < 0.0:
+        raise ValueError(f"BacktestVariantPreview.{value_key} must be >= 0")
+    return normalized
+
+
+def _normalize_json_payload_mapping(
+    *,
+    values: Mapping[str, Any],
+) -> dict[str, Any]:
+    """
+    Normalize JSON payload mapping into deterministic immutable-friendly structure.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+    Args:
+        values: Raw JSON-like mapping payload.
+    Returns:
+        dict[str, Any]: Deterministic key-sorted JSON-compatible mapping.
+    Assumptions:
+        Payload is used only for reproducibility metadata carried alongside persisted sync runs.
+    Raises:
+        ValueError: If a key is blank.
+    Side Effects:
+        None.
+    """
+    normalized: dict[str, Any] = {}
+    for raw_key in sorted(values.keys(), key=lambda key: str(key).strip()):
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError("RunBacktestResponse.spec_payload_json keys must be non-empty")
+        normalized[key] = _normalize_json_payload_value(value=values[raw_key])
+    return normalized
+
+
+def _normalize_json_payload_value(*, value: Any) -> Any:
+    """
+    Normalize arbitrary JSON-like node into deterministic mapping/list/scalar structure.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+    Args:
+        value: Raw JSON-like node.
+    Returns:
+        Any: Deterministically normalized node.
+    Assumptions:
+        Non-mapping/list scalar values are already JSON-compatible or stringifiable.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, Mapping):
+        return _normalize_json_payload_mapping(values=value)
+    if isinstance(value, list | tuple):
+        return [_normalize_json_payload_value(value=item) for item in value]
+    if isinstance(value, UUID):
+        return str(value)
+    return value
 
 
 def _is_pre_sorted_indicator_selections(

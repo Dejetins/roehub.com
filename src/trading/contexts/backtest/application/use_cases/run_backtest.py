@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Mapping, cast
+from typing import Any, Mapping, cast
 from uuid import UUID
 
 from trading.contexts.backtest.application.dto import (
@@ -99,6 +101,8 @@ class _ResolvedRunContext:
     top_trades_n: int
     ranking: BacktestRankingConfig
     artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None = None
+    spec_hash: str | None = None
+    spec_payload_json: Mapping[str, Any] | None = None
 
 
 class RunBacktestUseCase:
@@ -305,6 +309,7 @@ class RunBacktestUseCase:
         *,
         request: RunBacktestRequest,
         current_user: CurrentUser,
+        request_payload: Mapping[str, Any] | None = None,
         run_control: BacktestRunControlV1 | None = None,
     ) -> RunBacktestResponse:
         """
@@ -321,6 +326,9 @@ class RunBacktestUseCase:
         Args:
             request: Saved/ad-hoc backtest request.
             current_user: Authenticated user for ownership checks in saved mode.
+            request_payload:
+                Optional strict API payload snapshot accepted for compatibility with
+                persisted-run orchestrators. Plain sync execution ignores this value.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             RunBacktestResponse: Deterministic staged response with ranked top-k variants.
@@ -337,6 +345,7 @@ class RunBacktestUseCase:
                 raise BacktestValidationError("RunBacktestUseCase.execute requires request")
             if current_user is None:  # type: ignore[truthy-bool]
                 raise BacktestValidationError("RunBacktestUseCase.execute requires current_user")
+            _ = request_payload
 
             apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
             if run_control is not None:
@@ -386,8 +395,33 @@ class RunBacktestUseCase:
                 top_k=resolved.top_k,
                 preselect=resolved.preselect,
                 top_trades_n=resolved.top_trades_n,
+                direction_mode=resolved.template.direction_mode,
+                sizing_mode=resolved.template.sizing_mode,
+                execution_params=resolved.template.execution_params,
                 variants=staged.variants,
                 total_indicator_compute_calls=staged.indicator_estimate_calls,
+                artifact_slot=(
+                    resolved.artifact_context.artifact_slot
+                    if resolved.artifact_context is not None
+                    else None
+                ),
+                artifact_slot_generation=(
+                    resolved.artifact_context.slot_generation
+                    if resolved.artifact_context is not None
+                    else None
+                ),
+                artifact_asof_date=(
+                    resolved.artifact_context.artifact_asof_date
+                    if resolved.artifact_context is not None
+                    else None
+                ),
+                artifact_manifest_hash=(
+                    resolved.artifact_context.artifact_manifest_hash
+                    if resolved.artifact_context is not None
+                    else None
+                ),
+                spec_hash=resolved.spec_hash,
+                spec_payload_json=resolved.spec_payload_json,
             )
         except RoehubError:
             raise
@@ -533,6 +567,7 @@ class RunBacktestUseCase:
                 snapshot=snapshot,
                 current_user=current_user,
             )
+            spec_payload_json = _build_saved_spec_payload(snapshot=snapshot)
             validate_template_runtime_contract(
                 template=base_template,
                 defaults_provider=self._defaults_provider,
@@ -564,6 +599,8 @@ class RunBacktestUseCase:
                 top_trades_n=top_trades_n,
                 ranking=ranking,
                 artifact_context=artifact_context,
+                spec_hash=_build_sha256_from_payload(payload=spec_payload_json),
+                spec_payload_json=MappingProxyType(spec_payload_json),
             )
 
         if request.template is None:  # pragma: no cover - guarded by request DTO invariant
@@ -589,6 +626,8 @@ class RunBacktestUseCase:
             top_trades_n=top_trades_n,
             ranking=ranking,
             artifact_context=artifact_context,
+            spec_hash=None,
+            spec_payload_json=None,
         )
 
     def _bootstrap_artifact_context(
@@ -1117,3 +1156,69 @@ def _normalize_timeframe_literals(
         seen.add(value)
         normalized.append(value)
     return tuple(normalized)
+
+
+def _build_saved_spec_payload(
+    *,
+    snapshot: BacktestStrategySnapshot | None,
+) -> dict[str, Any]:
+    """
+    Extract deterministic saved-strategy spec payload used by persisted sync runs.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/ports/strategy_reader.py
+    Args:
+        snapshot: Loaded saved strategy snapshot used for the current sync run.
+    Returns:
+        dict[str, Any]: Deterministic spec payload copied from the saved strategy snapshot.
+    Assumptions:
+        Persisted sync runs require the same saved spec snapshot that was used for execution.
+    Raises:
+        BacktestValidationError: If the snapshot does not carry a non-empty `spec_payload`.
+    Side Effects:
+        None.
+    """
+    spec_payload = dict(snapshot.spec_payload or {}) if snapshot is not None else {}
+    if len(spec_payload) == 0:
+        raise BacktestValidationError(
+            "saved mode backtest requires non-empty strategy spec payload"
+        )
+    return spec_payload
+
+
+def _build_sha256_from_payload(*, payload: Mapping[str, Any]) -> str:
+    """
+    Build deterministic SHA-256 hash from canonical JSON representation.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+    Args:
+        payload: JSON-compatible mapping payload.
+    Returns:
+        str: Lowercase SHA-256 hex hash string.
+    Assumptions:
+        Canonical JSON uses sorted keys and compact separators.
+    Raises:
+        TypeError: If payload contains unsupported non-JSON values.
+    Side Effects:
+        None.
+    """
+    canonical_json = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()

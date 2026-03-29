@@ -22,6 +22,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobMode,
     BacktestJobStage,
     BacktestJobState,
+    BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import BacktestStorageError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
@@ -86,6 +87,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         *,
         gateway: BacktestPostgresGateway,
         jobs_table: str = "backtest_jobs",
+        top_variants_table: str = "backtest_job_top_variants",
     ) -> None:
         """
         Initialize repository with SQL gateway and target table name.
@@ -93,6 +95,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Args:
             gateway: SQL gateway abstraction.
             jobs_table: Backtest jobs table name.
+            top_variants_table: Backtest job top-variants table name.
         Returns:
             None.
         Assumptions:
@@ -105,10 +108,16 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         if gateway is None:  # type: ignore[truthy-bool]
             raise ValueError("PostgresBacktestJobRepository requires gateway")
         normalized_table = jobs_table.strip()
+        normalized_top_variants_table = top_variants_table.strip()
         if not normalized_table:
             raise ValueError("PostgresBacktestJobRepository requires non-empty jobs_table")
+        if not normalized_top_variants_table:
+            raise ValueError(
+                "PostgresBacktestJobRepository requires non-empty top_variants_table"
+            )
         self._gateway = gateway
         self._jobs_table = normalized_table
+        self._top_variants_table = normalized_top_variants_table
 
     def create(self, *, job: BacktestJob) -> BacktestJob:
         """
@@ -133,6 +142,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Side Effects:
             Executes one SQL insert statement.
         """
+        insert_parameters = _build_job_insert_parameters(job=job)
         query = f"""
         INSERT INTO {self._jobs_table}
         (
@@ -219,60 +229,184 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         """
         row = self._gateway.fetch_one(
             query=query,
-            parameters={
-                "job_id": str(job.job_id),
-                "user_id": str(job.user_id),
-                "mode": job.mode,
-                "state": job.state,
-                "created_at": job.created_at,
-                "updated_at": job.updated_at,
-                "started_at": job.started_at,
-                "finished_at": job.finished_at,
-                "cancel_requested_at": job.cancel_requested_at,
-                "request_json": _json_dumps(payload=job.request_json),
-                "request_hash": job.request_hash,
-                "spec_hash": job.spec_hash,
-                "spec_payload_json": _json_dumps(payload=job.spec_payload_json)
-                if job.spec_payload_json is not None
-                else None,
-                "engine_params_hash": job.engine_params_hash,
-                "backtest_runtime_config_hash": job.backtest_runtime_config_hash,
-                "artifact_slot": job.artifact_pin.artifact_slot
-                if job.artifact_pin is not None
-                else None,
-                "artifact_slot_generation": job.artifact_pin.artifact_slot_generation
-                if job.artifact_pin is not None
-                else None,
-                "artifact_manifest_hash": job.artifact_pin.artifact_manifest_hash
-                if job.artifact_pin is not None
-                else None,
-                "artifact_asof_date": job.artifact_pin.artifact_asof_date
-                if job.artifact_pin is not None
-                else None,
-                "execution_mode": job.execution_mode,
-                "market_id": job.market_id,
-                "symbol": job.symbol,
-                "timeframe": job.timeframe,
-                "requested_top_n": job.requested_top_n,
-                "ranking_primary_metric": job.ranking_primary_metric,
-                "ranking_secondary_metric": job.ranking_secondary_metric,
-                "stage": job.stage,
-                "processed_units": job.processed_units,
-                "total_units": job.total_units,
-                "progress_updated_at": job.progress_updated_at,
-                "locked_by": job.locked_by,
-                "locked_at": job.locked_at,
-                "lease_expires_at": job.lease_expires_at,
-                "heartbeat_at": job.heartbeat_at,
-                "attempt": job.attempt,
-                "last_error": job.last_error,
-                "last_error_json": _json_dumps(payload=job.last_error_json.to_mapping())
-                if job.last_error_json is not None
-                else None,
-            },
+            parameters=insert_parameters,
         )
         if row is None:
             raise BacktestStorageError("PostgresBacktestJobRepository.create returned no row")
+        return _map_job_row(row=row)
+
+    def create_with_top_variants(
+        self,
+        *,
+        job: BacktestJob,
+        top_variants: tuple[BacktestJobTopVariant, ...],
+    ) -> BacktestJob:
+        """
+        Persist one terminal run row and summary-only top rows in one atomic SQL statement.
+
+        Docs:
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+          - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+        Args:
+            job: Prepared terminal persisted-run aggregate.
+            top_variants: Summary-only top rows ordered by `rank ASC, variant_key ASC`.
+        Returns:
+            BacktestJob: Persisted immutable job snapshot.
+        Assumptions:
+            Sync-inline cutover persists only final succeeded rows and does not store detail
+            payloads in `report_table_md/trades_json`.
+        Raises:
+            BacktestStorageError: If SQL execution fails or row mapping breaks.
+        Side Effects:
+            Writes one row in `backtest_jobs` and zero or more rows in
+            `backtest_job_top_variants`.
+        """
+        insert_parameters = _build_job_insert_parameters(job=job)
+        insert_parameters["rows_json"] = json.dumps(
+            _serialize_top_rows(job_id=job.job_id, rows=top_variants),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        )
+        query = f"""
+        WITH inserted_job AS (
+            INSERT INTO {self._jobs_table}
+            (
+                job_id,
+                user_id,
+                mode,
+                state,
+                created_at,
+                updated_at,
+                started_at,
+                finished_at,
+                cancel_requested_at,
+                request_json,
+                request_hash,
+                spec_hash,
+                spec_payload_json,
+                engine_params_hash,
+                backtest_runtime_config_hash,
+                artifact_slot,
+                artifact_slot_generation,
+                artifact_manifest_hash,
+                artifact_asof_date,
+                execution_mode,
+                market_id,
+                symbol,
+                timeframe,
+                requested_top_n,
+                ranking_primary_metric,
+                ranking_secondary_metric,
+                stage,
+                processed_units,
+                total_units,
+                progress_updated_at,
+                locked_by,
+                locked_at,
+                lease_expires_at,
+                heartbeat_at,
+                attempt,
+                last_error,
+                last_error_json
+            )
+            VALUES
+            (
+                %(job_id)s,
+                %(user_id)s,
+                %(mode)s,
+                %(state)s,
+                %(created_at)s,
+                %(updated_at)s,
+                %(started_at)s,
+                %(finished_at)s,
+                %(cancel_requested_at)s,
+                %(request_json)s::jsonb,
+                %(request_hash)s,
+                %(spec_hash)s,
+                %(spec_payload_json)s::jsonb,
+                %(engine_params_hash)s,
+                %(backtest_runtime_config_hash)s,
+                %(artifact_slot)s,
+                %(artifact_slot_generation)s,
+                %(artifact_manifest_hash)s,
+                %(artifact_asof_date)s,
+                %(execution_mode)s,
+                %(market_id)s,
+                %(symbol)s,
+                %(timeframe)s,
+                %(requested_top_n)s,
+                %(ranking_primary_metric)s,
+                %(ranking_secondary_metric)s,
+                %(stage)s,
+                %(processed_units)s,
+                %(total_units)s,
+                %(progress_updated_at)s,
+                %(locked_by)s,
+                %(locked_at)s,
+                %(lease_expires_at)s,
+                %(heartbeat_at)s,
+                %(attempt)s,
+                %(last_error)s,
+                %(last_error_json)s::jsonb
+            )
+            RETURNING
+                {_BACKTEST_JOB_SELECT_COLUMNS}
+        ),
+        source_rows AS (
+            SELECT item
+            FROM jsonb_array_elements(%(rows_json)s::jsonb) AS item
+        ),
+        inserted_rows AS (
+            INSERT INTO {self._top_variants_table}
+            (
+                job_id,
+                rank,
+                variant_key,
+                indicator_variant_key,
+                variant_index,
+                total_return_pct,
+                payload_json,
+                summary_metrics_json,
+                best_tp_pct,
+                best_sl_pct,
+                report_table_md,
+                trades_json,
+                updated_at
+            )
+            SELECT
+                %(job_id)s::uuid AS job_id,
+                (item ->> 'rank')::INTEGER AS rank,
+                item ->> 'variant_key' AS variant_key,
+                item ->> 'indicator_variant_key' AS indicator_variant_key,
+                (item ->> 'variant_index')::INTEGER AS variant_index,
+                (item ->> 'total_return_pct')::DOUBLE PRECISION AS total_return_pct,
+                item -> 'payload_json' AS payload_json,
+                item -> 'summary_metrics_json' AS summary_metrics_json,
+                (item ->> 'best_tp_pct')::DOUBLE PRECISION AS best_tp_pct,
+                (item ->> 'best_sl_pct')::DOUBLE PRECISION AS best_sl_pct,
+                NULL::TEXT AS report_table_md,
+                NULL::JSONB AS trades_json,
+                %(updated_at)s AS updated_at
+            FROM source_rows
+            ORDER BY
+                (item ->> 'rank')::INTEGER ASC,
+                (item ->> 'variant_key') ASC
+        )
+        SELECT
+            {_BACKTEST_JOB_SELECT_COLUMNS}
+        FROM inserted_job
+        """
+        row = self._gateway.fetch_one(query=query, parameters=insert_parameters)
+        if row is None:
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.create_with_top_variants returned no row"
+            )
         return _map_job_row(row=row)
 
     def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
@@ -641,6 +775,133 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
         )
     except Exception as error:  # noqa: BLE001
         raise BacktestStorageError("PostgresBacktestJobRepository cannot map job row") from error
+
+
+def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
+    """
+    Build canonical SQL parameters mapping for one `backtest_jobs` insert statement.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_repository.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+    Args:
+        job: Prepared immutable job aggregate.
+    Returns:
+        dict[str, Any]: SQL parameters mapping for one insert statement.
+    Assumptions:
+        JSON payloads are canonicalized via stable `json.dumps(... sort_keys=True)`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return {
+        "job_id": str(job.job_id),
+        "user_id": str(job.user_id),
+        "mode": job.mode,
+        "state": job.state,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+        "started_at": job.started_at,
+        "finished_at": job.finished_at,
+        "cancel_requested_at": job.cancel_requested_at,
+        "request_json": _json_dumps(payload=job.request_json),
+        "request_hash": job.request_hash,
+        "spec_hash": job.spec_hash,
+        "spec_payload_json": _json_dumps(payload=job.spec_payload_json)
+        if job.spec_payload_json is not None
+        else None,
+        "engine_params_hash": job.engine_params_hash,
+        "backtest_runtime_config_hash": job.backtest_runtime_config_hash,
+        "artifact_slot": job.artifact_pin.artifact_slot if job.artifact_pin is not None else None,
+        "artifact_slot_generation": (
+            job.artifact_pin.artifact_slot_generation if job.artifact_pin is not None else None
+        ),
+        "artifact_manifest_hash": (
+            job.artifact_pin.artifact_manifest_hash if job.artifact_pin is not None else None
+        ),
+        "artifact_asof_date": (
+            job.artifact_pin.artifact_asof_date if job.artifact_pin is not None else None
+        ),
+        "execution_mode": job.execution_mode,
+        "market_id": job.market_id,
+        "symbol": job.symbol,
+        "timeframe": job.timeframe,
+        "requested_top_n": job.requested_top_n,
+        "ranking_primary_metric": job.ranking_primary_metric,
+        "ranking_secondary_metric": job.ranking_secondary_metric,
+        "stage": job.stage,
+        "processed_units": job.processed_units,
+        "total_units": job.total_units,
+        "progress_updated_at": job.progress_updated_at,
+        "locked_by": job.locked_by,
+        "locked_at": job.locked_at,
+        "lease_expires_at": job.lease_expires_at,
+        "heartbeat_at": job.heartbeat_at,
+        "attempt": job.attempt,
+        "last_error": job.last_error,
+        "last_error_json": _json_dumps(payload=job.last_error_json.to_mapping())
+        if job.last_error_json is not None
+        else None,
+    }
+
+
+def _serialize_top_rows(
+    *,
+    job_id: UUID,
+    rows: tuple[BacktestJobTopVariant, ...],
+) -> list[dict[str, Any]]:
+    """
+    Serialize summary-only top rows into canonical JSON array for one atomic SQL insert.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_repository.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+    Args:
+        job_id: Parent job identifier expected on every row.
+        rows: Summary-only top rows ordered by rank.
+    Returns:
+        list[dict[str, Any]]: Canonical JSON-serializable rows payload.
+    Assumptions:
+        Persisted sync-inline rows keep `report_table_md/trades_json` null-only.
+    Raises:
+        BacktestStorageError: If one row belongs to another job id.
+    Side Effects:
+        None.
+    """
+    serialized_rows: list[dict[str, Any]] = []
+    for row in sorted(rows, key=lambda item: (item.rank, item.variant_key)):
+        if row.job_id != job_id:
+            raise BacktestStorageError(
+                "PostgresBacktestJobRepository.create_with_top_variants "
+                "received mismatched top row job_id"
+            )
+        serialized_rows.append(
+            {
+                "rank": row.rank,
+                "variant_key": row.variant_key,
+                "indicator_variant_key": row.indicator_variant_key,
+                "variant_index": row.variant_index,
+                "total_return_pct": row.total_return_pct,
+                "payload_json": dict(row.payload_json),
+                "summary_metrics_json": dict(row.summary_metrics_json),
+                "best_tp_pct": row.best_tp_pct,
+                "best_sl_pct": row.best_sl_pct,
+            }
+        )
+    return serialized_rows
 
 
 def _parse_artifact_pin(*, row: Mapping[str, Any]) -> BacktestJobArtifactPin | None:
