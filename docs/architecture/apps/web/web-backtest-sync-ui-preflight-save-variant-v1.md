@@ -146,6 +146,16 @@ UI отображает:
 3) Strategy builder (WEB-EPIC-04) читает `prefill_id`, загружает payload из `sessionStorage` и
    предзаполняет поля.
 
+R9-03 additive note:
+
+- тот же prefill shape и `sessionStorage` transport переиспользуются на persisted pages:
+  - `/backtests/runs/{run_id}`
+  - `/backtests/runs/{run_id}/variants/{variant_key}`
+- persisted runs pages строят тот же canonical indicators payload
+  `{"id": indicator_id, "inputs": {...}, "params": {...}}`,
+  но берут instrument/timeframe context из public run status + market catalog, а не из transient
+  launch-page state.
+
 ## Non-goals
 
 - История sync backtest запусков (нет persisted run_id/results).
@@ -216,6 +226,7 @@ Prefill payload переносится между страницами чере�
 - не раздуваем URL (payload может быть больше query string лимитов),
 - не кладем JSON payload в логи edge/proxy,
 - простая реализация без новых backend endpoints.
+- R9-03 persisted detail/save flow использует тот же transport без новых API surface.
 
 ### 7) Sync run отменяется кооперативно при disconnect/abort
 

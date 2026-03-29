@@ -709,39 +709,18 @@ function initJobDetailsPage(pageRoot) {
 
   const buildPrefillPayloadFromTopRow = (rawRow) => {
     const row = asRecord(rawRow);
-    const payload = asRecord(row.payload);
-    const selections = Array.isArray(payload.indicator_selections)
-      ? payload.indicator_selections
-      : [];
-
-    const indicators = selections.map((item) => {
-      const selection = asRecord(item);
-      return {
-        id: String(selection.indicator_id || "").trim(),
-        inputs: copyRecord(asRecord(selection.inputs)),
-        params: copyRecord(asRecord(selection.params)),
-      };
-    }).filter((item) => item.id.length > 0);
-
-    if (indicators.length === 0) {
-      throw new Error("Variant payload does not include indicator_selections.");
-    }
-
     const context = asRecord(readJobContext(jobId));
     const contextInstrumentId = asRecord(context.instrument_id);
-    const payloadInstrumentId = asRecord(payload.instrument_id);
 
     const marketId = Number(
-      contextInstrumentId.market_id || payloadInstrumentId.market_id || 0,
+      contextInstrumentId.market_id || 0,
     );
     const symbol = String(
-      contextInstrumentId.symbol || payloadInstrumentId.symbol || "",
+      contextInstrumentId.symbol || "",
     ).trim();
-    const timeframe = String(context.timeframe || payload.timeframe || "").trim();
-    const marketType = String(context.market_type || payload.market_type || "").trim();
-    const instrumentKey = String(
-      context.instrument_key || payload.instrument_key || "",
-    ).trim();
+    const timeframe = String(context.timeframe || "").trim();
+    const marketType = String(context.market_type || "").trim();
+    const instrumentKey = String(context.instrument_key || "").trim();
 
     if (marketId <= 0 || symbol.length === 0 || timeframe.length === 0) {
       throw new Error(
@@ -754,38 +733,32 @@ function initJobDetailsPage(pageRoot) {
       );
     }
 
-    return {
-      instrument_id: {
-        market_id: marketId,
-        symbol,
+    return buildStrategyPrefillPayload({
+      variantPayload: row.payload,
+      runContext: {
+        instrument_id: {
+          market_id: marketId,
+          symbol,
+        },
+        instrument_key: instrumentKey,
+        market_type: marketType,
+        timeframe,
       },
-      instrument_key: instrumentKey,
-      market_type: marketType,
-      timeframe,
-      indicators,
-    };
+    });
   };
 
   const saveTopRowAsStrategy = (row) => {
     clearPageError(pageRoot);
 
-    if (prefillStorage !== "sessionStorage" || typeof window.sessionStorage === "undefined") {
-      showPageError(pageRoot, "sessionStorage is unavailable in current browser.", []);
-      return;
-    }
-
     try {
       const prefillPayload = buildPrefillPayloadFromTopRow(row);
-      const prefillId = [
-        "prefill",
-        Date.now().toString(36),
-        Math.random().toString(36).slice(2, 10),
-      ].join("-");
-      window.sessionStorage.setItem(prefillId, JSON.stringify(prefillPayload));
-
-      const targetUrl = new URL(strategyBuilderPath, window.location.origin);
-      targetUrl.searchParams.set(prefillQueryParam, prefillId);
-      window.location.assign(targetUrl.pathname + targetUrl.search);
+      persistStrategyPrefillAndNavigate({
+        pageRoot,
+        strategyBuilderPath,
+        prefillQueryParam,
+        prefillStorage,
+        prefillPayload,
+      });
     } catch (error) {
       const normalized = normalizeError(error);
       showPageError(pageRoot, normalized.message, normalized.details);
@@ -1018,7 +991,7 @@ function readJobContext(jobId) {
   }
 }
 
-function renderMarkdownToSafeHtml(markdown) {
+export function renderMarkdownToSafeHtml(markdown) {
   const content = String(markdown || "");
   if (content.length === 0) {
     return "";
@@ -1072,6 +1045,81 @@ function renderMarkdownToSafeHtml(markdown) {
     });
   }
   return rendered;
+}
+
+export function buildStrategyPrefillPayload({ variantPayload, runContext }) {
+  const payload = asRecord(variantPayload);
+  const context = asRecord(runContext);
+  const selections = Array.isArray(payload.indicator_selections)
+    ? payload.indicator_selections
+    : [];
+
+  const indicators = selections.map((item) => {
+    const selection = asRecord(item);
+    return {
+      id: String(selection.indicator_id || "").trim(),
+      inputs: copyRecord(asRecord(selection.inputs)),
+      params: copyRecord(asRecord(selection.params)),
+    };
+  }).filter((item) => item.id.length > 0);
+
+  if (indicators.length === 0) {
+    throw new Error("Variant payload does not include indicator_selections.");
+  }
+
+  const contextInstrumentId = asRecord(context.instrument_id);
+  const payloadInstrumentId = asRecord(payload.instrument_id);
+  const marketId = Number(contextInstrumentId.market_id || payloadInstrumentId.market_id || 0);
+  const symbol = String(contextInstrumentId.symbol || payloadInstrumentId.symbol || "").trim();
+  const timeframe = String(context.timeframe || payload.timeframe || "").trim();
+  const marketType = String(context.market_type || payload.market_type || "").trim();
+  const instrumentKey = String(context.instrument_key || payload.instrument_key || "").trim();
+
+  if (marketId <= 0 || symbol.length === 0 || timeframe.length === 0) {
+    throw new Error("Variant prefill requires instrument_id and timeframe.");
+  }
+  if (marketType.length === 0 || instrumentKey.length === 0) {
+    throw new Error("Variant prefill requires market_type and instrument_key.");
+  }
+
+  return {
+    instrument_id: {
+      market_id: marketId,
+      symbol,
+    },
+    instrument_key: instrumentKey,
+    market_type: marketType,
+    timeframe,
+    indicators,
+  };
+}
+
+export function persistStrategyPrefillAndNavigate(
+  {
+    pageRoot,
+    strategyBuilderPath,
+    prefillQueryParam,
+    prefillStorage,
+    prefillPayload,
+  },
+) {
+  if (prefillStorage !== "sessionStorage" || typeof window.sessionStorage === "undefined") {
+    throw new Error("sessionStorage is unavailable in current browser.");
+  }
+
+  const prefillId = [
+    "prefill",
+    Date.now().toString(36),
+    Math.random().toString(36).slice(2, 10),
+  ].join("-");
+  window.sessionStorage.setItem(prefillId, JSON.stringify(prefillPayload));
+
+  const targetUrl = new URL(strategyBuilderPath, window.location.origin);
+  targetUrl.searchParams.set(prefillQueryParam, prefillId);
+  if (pageRoot instanceof HTMLElement) {
+    clearPageError(pageRoot);
+  }
+  window.location.assign(targetUrl.pathname + targetUrl.search);
 }
 
 export function parsePositiveInt(rawValue, fallback) {

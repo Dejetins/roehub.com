@@ -73,30 +73,33 @@ def test_backtest_runs_ui_asset_reads_runtime_defaults_sortable_columns() -> Non
     assert "server_order" in source
 
 
-def test_backtest_runs_ui_asset_keeps_summary_table_summary_only() -> None:
+def test_backtest_runs_ui_asset_adds_summary_actions_for_detail_and_strategy_prefill() -> None:
     """
-    Verify run summary asset renders summary fields without inline report or trades bodies.
+    Verify run summary asset exposes row actions for dedicated detail page and strategy prefill.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        R9-02 must keep persisted summary table trades-free and report-free.
+        R9-03 moves heavy detail to a separate page while save flow reuses `sessionStorage`.
     Raises:
-        AssertionError: If summary-only field literals disappear or report/trades UI leaks in.
+        AssertionError: If detail/save route literals disappear from the shared runs asset.
     Side Effects:
         None.
     """
     source = _read_backtest_runs_ui_asset()
 
-    assert "summary_metrics_json" in source
-    assert "best_tp_pct" in source
-    assert "best_sl_pct" in source
-    assert "indicator_variant_key" in source
-    assert "Load report" not in source
-    assert "table_md" not in source
-    assert "trades (" not in source
+    assert "Open detail" in source
+    assert "Save as Strategy" in source
+    assert "detailPathTemplate" in source
+    assert "{variant_key}" in source
+    assert "prefill" in source
+    assert "prefillStorage" in source
+    assert "strategyBuilderPath" in source
+    assert "buildStrategyPrefillPayload" in source
+    assert "persistStrategyPrefillAndNavigate" in source
+    assert "Detail, chart, and trades stay on the dedicated variant page only." in source
 
 
 def test_backtest_runs_ui_asset_applies_local_sort_without_top_refetch() -> None:
@@ -121,3 +124,30 @@ def test_backtest_runs_ui_asset_applies_local_sort_without_top_refetch() -> None
     assert "state.topRowsOriginal.slice().sort(compareTopRows)" in source
     assert "variant_key ASC" in source
     assert "summary_metrics_json" in source
+
+
+def test_backtest_runs_ui_asset_loads_one_variant_detail_via_run_scoped_endpoint() -> None:
+    """
+    Verify shared runs asset loads variant detail through the minimal run-scoped report contract.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Detail page must reuse `/api/backtests/runs/{run_id}/variant-report` and avoid the legacy
+        full-envelope variant-report path.
+    Raises:
+        AssertionError: If run-scoped detail or `include_trades` literals disappear.
+    Side Effects:
+        None.
+    """
+    source = _read_backtest_runs_ui_asset()
+
+    assert "apiVariantReportPathTemplate" in source
+    assert "include_trades" in source
+    assert "cloneJsonValue" in source
+    assert "state.reportCacheByKey" in source
+    assert "variant: cloneJsonValue" in source
+    assert "/api/backtests/variant-report" not in source
+    assert "time_range" not in source

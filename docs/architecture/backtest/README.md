@@ -115,6 +115,15 @@
   - local sort использует только runtime-approved `contracts.summary.sortable_columns`,
     переставляет loaded rows in-browser и не триггерит server recompute;
   - `/backtests/jobs*` остаются compatibility alias на переходный период.
+- R9-03 закрепляет persisted variant detail/save UX:
+  - dedicated detail page живёт по `/backtests/runs/{run_id}/variants/{variant_key}`;
+  - detail page находит exact summary row через `/top`, затем вызывает только
+    `POST /api/backtests/runs/{run_id}/variant-report` с `variant + include_trades`;
+  - summary page остаётся summary-only, но добавляет row actions `Open detail` и
+    `Save as Strategy`;
+  - save flow переиспользует existing strategy builder prefill transport через
+    `sessionStorage` и `/strategies/new?prefill=...`;
+  - `/backtests/jobs*` остаются compatibility alias и не становятся primary UX.
 - После R6-04 вне scope остаются R7 persisted-run storage/API cutover и full runtime legacy
   cutover.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит

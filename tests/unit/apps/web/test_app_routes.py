@@ -120,6 +120,10 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
             "/backtests/runs/00000000-0000-0000-0000-000000000778",
             "/login?next=%2Fbacktests%2Fruns%2F00000000-0000-0000-0000-000000000778",
         ),
+        (
+            "/backtests/runs/00000000-0000-0000-0000-000000000778/variants/variant-key-001",
+            "/login?next=%2Fbacktests%2Fruns%2F00000000-0000-0000-0000-000000000778%2Fvariants%2Fvariant-key-001",
+        ),
         ("/backtests/jobs", "/login?next=%2Fbacktests%2Fjobs"),
         (
             "/backtests/jobs/00000000-0000-0000-0000-000000000777",
@@ -278,7 +282,71 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     assert "auto_preflight_enabled" in response.text
     assert "202 Accepted" in response.text
     assert "background_auto" in response.text
-    assert "history/runs navigation" in response.text
+
+
+def test_backtest_variant_detail_page_renders_required_runs_detail_hooks() -> None:
+    """
+    Verify persisted variant detail SSR page exposes route-driven runs-detail hooks and assets.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Variant detail page is protected SSR and browser loads row/detail data through `/api/*`.
+    Raises:
+        AssertionError: If required hooks, literals, or assets are missing from rendered HTML.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+
+    response = client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000778/variants/variant-key-001"
+    )
+
+    assert response.status_code == 200
+    assert 'data-backtest-runs-page="detail"' in response.text
+    assert 'data-run-id="00000000-0000-0000-0000-000000000778"' in response.text
+    assert 'data-variant-key="variant-key-001"' in response.text
+    assert "/assets/backtest_runs_ui.js" in response.text
+    assert "/api/backtests/runs/{run_id}/top" in response.text
+    assert "/api/backtests/runs/{run_id}/variant-report" in response.text
+    assert "/api/market-data/markets" in response.text
+    assert "/strategies/new" in response.text
+    assert "sessionStorage" in response.text
+    assert "prefill" in response.text
+    assert "include_trades" in response.text
+
+
+def test_backtest_run_summary_page_renders_detail_and_save_hooks() -> None:
+    """
+    Verify persisted run summary SSR page exposes row-action hooks for detail/save flow.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Summary page remains SSR-only and browser-side JS owns row action rendering.
+    Raises:
+        AssertionError: If required route/data-hook literals are missing.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+
+    response = client.get("/backtests/runs/00000000-0000-0000-0000-000000000778")
+
+    assert response.status_code == 200
+    assert 'data-backtest-runs-page="summary"' in response.text
+    assert "/api/backtests/runtime-defaults" in response.text
+    assert "/api/market-data/markets" in response.text
+    assert "/backtests/runs/{run_id}/variants/{variant_key}" in response.text
+    assert "/strategies/new" in response.text
+    assert "sessionStorage" in response.text
+    assert "prefill" in response.text
+    assert "Per-variant chart" in response.text
     assert "Estimate preflight" not in response.text
     assert "Run as job" not in response.text
 

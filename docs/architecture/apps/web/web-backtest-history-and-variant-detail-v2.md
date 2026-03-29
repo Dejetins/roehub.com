@@ -1,12 +1,12 @@
 # Web UI -- Backtest History and Variant Detail v2
 
 Документ фиксирует web contract для R9-02/R9-03 flow поверх persisted `runs` vocabulary.
-На текущем шаге R9-02 public UI уже переключён на `Backtest history` и persisted run summary page,
-а lazy variant detail остаётся следующим additive шагом.
+После R9-03 public UI использует history-first навигацию, summary-only run page и отдельную
+lazy detail page для одного persisted variant.
 
 ## Status
 
-- Status: active target contract after R9-02 history/summary rollout.
+- Status: active delivered contract after R9-03 history/summary/detail rollout.
 - Depends on:
   - `docs/architecture/backtest/backtest-runs-history-v2.md`
   - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
@@ -15,9 +15,10 @@
   - legacy `POST /api/backtests/variant-report` остаётся migration path;
   - preferred public detail flow использует
     `POST /api/backtests/runs/{run_id}/variant-report`.
-  - after R9-02 launch/status navigation is history-first:
+  - after R9-03 launch/status/detail navigation is runs-first:
     - `/backtests/history`
     - `/backtests/runs/{run_id}`
+    - `/backtests/runs/{run_id}/variants/{variant_key}`
   - legacy `/backtests/jobs*` remains compatibility surface during migration and may still expose
     legacy report/cancel tooling.
 
@@ -37,12 +38,12 @@
 
 - `GET /backtests/history` в `apps/web`
 - `GET /backtests/runs/{run_id}` persisted run summary page
+- `GET /backtests/runs/{run_id}/variants/{variant_key}` persisted one-variant detail page
 - browser API calls:
   - `GET /api/backtests/runs`
   - `GET /api/backtests/runs/{run_id}`
   - `GET /api/backtests/runs/{run_id}/top`
-- `POST /api/backtests/runs/{run_id}/variant-report` остаётся additive detail endpoint для
-  следующего UI шага
+  - `POST /api/backtests/runs/{run_id}/variant-report`
 
 ### 2) History page
 
@@ -61,6 +62,9 @@
 
 - Загружает status snapshot через `GET /api/backtests/runs/{run_id}`.
 - Загружает summary rows через `GET /api/backtests/runs/{run_id}/top`.
+- Показывает действия per row:
+  - `Open detail` -> `/backtests/runs/{run_id}/variants/{variant_key}`
+  - `Save as Strategy` -> existing strategy builder prefill flow
 - Первый render сохраняет server order `rank ASC, variant_key ASC`.
 - Browser-side local resort:
   - читает approved `contracts.summary.sortable_columns` из
@@ -81,9 +85,12 @@
 
 ### 4) Variant detail fetch
 
-- В R9-02 новая persisted run summary page остаётся summary-only и не встраивает inline
-  report/trades UX.
-- По клику `Load report` UI отправляет:
+- Dedicated detail page открывается по persisted `run_id + variant_key`.
+- На bootstrap detail page:
+  - читает `GET /api/backtests/runs/{run_id}`;
+  - читает `GET /api/backtests/runs/{run_id}/top` c `limit=requested_top_n`;
+  - находит selected row exact-match по `variant_key`.
+- После разрешения row identity detail page отправляет:
   - `POST /api/backtests/runs/{run_id}/variant-report`
 - Request body:
   - `variant`
@@ -98,15 +105,24 @@
   - `rows`
   - `table_md`
   - `trades?`
+- UI показывает:
+  - detailed metrics из `rows`
+  - markdown table из `table_md`
+  - trades table
+  - trade-sequenced equity chart, построенный client-side из `trades`
 
 ### 5) Client-side state
 
 - `run_id` берётся из route/path и остаётся canonical public identifier.
-- `variant` payload берётся из selected `/top` row `payload` plus explicit
-  `direction_mode/sizing_mode/execution/risk/signal` scalars.
+- `variant` payload берётся из selected `/top` row `payload`.
 - Report cache key в браузере:
   - `run_id + variant_key + include_trades`
 - Изменение `include_trades=false -> true` считается отдельным fetch.
+- Save-as-strategy flow:
+  - строит prefill из `payload.indicator_selections[]`;
+  - `market_type` / `instrument_key` восстанавливает через `GET /api/market-data/markets`
+    + status fields `market_id/symbol/timeframe`;
+  - сохраняет payload в `sessionStorage` и редиректит на `/strategies/new?prefill=<id>`.
 
 ## Invariants
 
@@ -117,6 +133,8 @@
 - Detail endpoint пересчитывает ровно один selected variant.
 - Detail payload не сохраняется в PG как часть persisted run history.
 - Opening detail page не запускает full top-N recompute.
+- Missing `variant_key` на detail page даёт explicit browser-side fallback message вместо
+  silent fallback на другой variant.
 - Legacy `/api/backtests/variant-report` может использоваться только как compatibility path
   для старых клиентов, но новый UI не должен зависеть от full run envelope.
 
@@ -141,7 +159,9 @@ Manual smoke:
 
 1. Открыть history page и перейти в persisted run details.
 2. Убедиться, что summary table грузится через `/api/backtests/runs/{run_id}/top`.
-3. Нажать `Load report` у строки top table.
-4. Проверить, что browser вызывает `/api/backtests/runs/{run_id}/variant-report` и не шлёт
+3. Нажать `Open detail` у строки top table.
+4. Проверить, что detail page вызывает `/api/backtests/runs/{run_id}/variant-report` и не шлёт
    full run envelope.
 5. Проверить, что `include_trades=true` возвращает `trades`, а `false` — нет.
+6. Нажать `Save as Strategy` на summary и detail page и проверить редирект на
+   `/strategies/new?prefill=...`.

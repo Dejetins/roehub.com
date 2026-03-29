@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="panel"
+    data-backtest-runs-page="detail"
+    data-run-id="{{ run_id }}"
+    data-variant-key="{{ variant_key }}"
+    data-api-runs-path-prefix="/api/backtests/runs/"
+    data-api-top-path-template="/api/backtests/runs/{run_id}/top"
+    data-api-variant-report-path-template="/api/backtests/runs/{run_id}/variant-report"
+    data-api-markets-path="/api/market-data/markets"
+    data-strategy-builder-path="/strategies/new"
+    data-prefill-query-param="prefill"
+    data-prefill-storage="sessionStorage"
+    data-default-top-limit="50"
+  >
+    <div class="panel-heading">
+      <h1>Backtest variant detail</h1>
+      <div class="inline-actions">
+        <a class="button-link" href="/backtests/runs/{{ run_id }}">Back to run summary</a>
+        <a class="button-link button-link--secondary" href="/backtests/history">
+          Back to history
+        </a>
+        <a class="button-link button-link--secondary" href="/backtests/jobs/{{ run_id }}">
+          Open jobs alias
+        </a>
+      </div>
+    </div>
+
+    <p>
+      This page resolves <code>variant_key</code> from persisted
+      <code>/api/backtests/runs/{run_id}/top</code> rows and loads one-variant detail lazily
+      through <code>POST /api/backtests/runs/{run_id}/variant-report</code> with only
+      <code>variant</code> and <code>include_trades</code>.
+    </p>
+
+    <div class="error-banner hidden" role="alert"></div>
+    <div class="validation-list hidden"></div>
+    <p id="variant-missing-banner" class="error-banner hidden" role="alert"></p>
+
+    <section class="panel panel--soft">
+      <div class="panel-heading">
+        <h2>Variant identity</h2>
+        <div class="inline-actions">
+          <label class="inline-checkbox" for="variant-include-trades">
+            <input id="variant-include-trades" type="checkbox" checked>
+            include_trades
+          </label>
+          <button id="variant-refresh-detail" class="button-link button-link--secondary" type="button">
+            Reload detail
+          </button>
+          <button id="variant-save-strategy" class="button-link" type="button">
+            Save as Strategy
+          </button>
+        </div>
+      </div>
+
+      <dl class="key-value-grid">
+        <dt>run_id</dt>
+        <dd>{{ run_id }}</dd>
+
+        <dt>variant_key</dt>
+        <dd>{{ variant_key }}</dd>
+
+        <dt>run_state</dt>
+        <dd id="variant-field-run-state"></dd>
+
+        <dt>execution_mode</dt>
+        <dd id="variant-field-execution-mode"></dd>
+
+        <dt>market_id</dt>
+        <dd id="variant-field-market-id"></dd>
+
+        <dt>symbol</dt>
+        <dd id="variant-field-symbol"></dd>
+
+        <dt>timeframe</dt>
+        <dd id="variant-field-timeframe"></dd>
+
+        <dt>rank</dt>
+        <dd id="variant-field-rank"></dd>
+
+        <dt>indicator_variant_key</dt>
+        <dd id="variant-field-indicator-variant-key"></dd>
+
+        <dt>total_return_pct</dt>
+        <dd id="variant-field-total-return-pct"></dd>
+
+        <dt>direction_mode</dt>
+        <dd id="variant-field-direction-mode"></dd>
+
+        <dt>sizing_mode</dt>
+        <dd id="variant-field-sizing-mode"></dd>
+      </dl>
+
+      <p class="muted-text">
+        Save as Strategy reuses the existing <code>sessionStorage</code> prefill transport to
+        <code>/strategies/new?prefill=...</code>.
+      </p>
+    </section>
+
+    <section class="panel panel--soft">
+      <h2>Selected indicators</h2>
+      <ul id="variant-selected-indicators" class="compact-list">
+        <li>Loading selected indicators...</li>
+      </ul>
+    </section>
+
+    <section class="panel panel--soft">
+      <h2>Detail payload</h2>
+      <p id="variant-detail-loading" class="muted-text hidden">Loading one-variant detail...</p>
+
+      <div class="detail-stack">
+        <div class="detail-card">
+          <h3>Trade equity chart</h3>
+          <div id="variant-detail-chart"></div>
+        </div>
+
+        <div class="detail-card">
+          <h3>Detailed metrics</h3>
+          <div id="variant-detail-metrics"></div>
+        </div>
+
+        <div class="detail-card">
+          <h3>table_md</h3>
+          <div id="variant-detail-markdown"></div>
+        </div>
+
+        <div class="detail-card">
+          <h3>Trades</h3>
+          <div id="variant-detail-trades"></div>
+        </div>
+      </div>
+    </section>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/lib/marked.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+  <script type="module" src="/assets/backtest_runs_ui.js"></script>
+{% endblock %}

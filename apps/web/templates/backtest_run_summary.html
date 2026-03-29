@@ -8,6 +8,11 @@
     data-api-runs-path-prefix="/api/backtests/runs/"
     data-api-top-path-template="/api/backtests/runs/{run_id}/top"
     data-api-runtime-defaults-path="/api/backtests/runtime-defaults"
+    data-api-markets-path="/api/market-data/markets"
+    data-detail-path-template="/backtests/runs/{run_id}/variants/{variant_key}"
+    data-strategy-builder-path="/strategies/new"
+    data-prefill-query-param="prefill"
+    data-prefill-storage="sessionStorage"
     data-history-path="/backtests/history"
     data-default-top-limit="50"
   >
@@ -24,7 +29,8 @@
     <p>
       Status metadata comes from <code>/api/backtests/runs/{run_id}</code>, while summary rows come
       from <code>/api/backtests/runs/{run_id}/top</code>. The table remains summary-only and local
-      sorting reorders already-loaded rows without triggering server recompute.
+      sorting reorders already-loaded rows without triggering server recompute. Per-variant chart,
+      trades, and detailed metrics live on <code>/backtests/runs/{run_id}/variants/{variant_key}</code>.
     </p>
 
     <div id="run-summary-error-banner" class="error-banner hidden" role="alert"></div>
@@ -145,11 +151,12 @@
               <th scope="col">total_return_pct</th>
               <th scope="col">best_tp_pct</th>
               <th scope="col">best_sl_pct</th>
+              <th scope="col">actions</th>
             </tr>
           </thead>
           <tbody id="run-summary-table-body">
             <tr>
-              <td colspan="6">Loading summary rows...</td>
+              <td colspan="7">Loading summary rows...</td>
             </tr>
           </tbody>
         </table>

@@ -42,6 +42,13 @@
     runtime-approved `contracts.summary.sortable_columns`;
   - local resort не декодирует `next_cursor`, не пересчитывает top-N и не вызывает server-side
     recompute.
+- R9-03 additive note:
+  - persisted summary rows получили browser-side actions:
+    - `/backtests/runs/{run_id}/variants/{variant_key}`
+    - `Save as Strategy` через existing `/strategies/new?prefill=...` flow;
+  - web detail page восстанавливает exact selected row через `/top`, затем вызывает только
+    run-scoped `POST /backtests/runs/{run_id}/variant-report`;
+  - detail/save UX не добавляет новых persisted report/trades storage surfaces.
 
 ## Цель
 
@@ -133,6 +140,8 @@ Hashes (`request_hash`, `engine_params_hash`, `backtest_runtime_config_hash`, `s
   - `equity`
 - new history/summary web UX может локально пересортировывать уже загруженные rows по approved
   summary columns, но server payload первого render-а остаётся canonical ordering source.
+- summary page может добавлять only-browser actions (`Open detail`, `Save as Strategy`), но не
+  materialize'ит detail/report/trades inline.
 
 ### 5) Cancel endpoint idempotent
 

@@ -389,6 +389,49 @@ def _register_routes(
             template_context={"run_id": run_id},
         )
 
+    @app.get("/backtests/runs/{run_id}/variants/{variant_key}", response_class=HTMLResponse)
+    def get_backtest_variant_detail_page(
+        request: Request,
+        run_id: str,
+        variant_key: str,
+    ) -> Response:
+        """
+        Render protected persisted Backtest variant detail page for one exact `variant_key`.
+
+        Docs:
+          - docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - apps/web/templates/backtest_variant_detail.html
+          - apps/web/dist/backtest_runs_ui.js
+          - apps/api/routes/backtest_runs.py
+
+        Args:
+            request: HTTP request object.
+            run_id: Target persisted run identifier string from route path.
+            variant_key: Exact persisted summary-row identity string from route path.
+        Returns:
+            Response: HTML variant detail page or login redirect response.
+        Assumptions:
+            Browser resolves row identity via `/api/backtests/runs/{run_id}/top` and loads detail
+            lazily through run-scoped `/variant-report`.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path=f"/backtests/runs/{run_id}/variants/{variant_key}",
+            page_title="Backtest Variant Detail",
+            template_name="backtest_variant_detail.html",
+            template_context={
+                "run_id": run_id,
+                "variant_key": variant_key,
+            },
+        )
+
     @app.get("/backtests/jobs", response_class=HTMLResponse)
     def get_backtest_jobs_page(request: Request) -> Response:
         """

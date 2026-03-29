@@ -4,12 +4,16 @@ import {
   STATUS_POLL_INTERVAL_MS,
   TOP_POLL_INTERVAL_MS,
   asRecord,
+  buildActionButton,
   buildCell,
   buildHttpError,
+  buildStrategyPrefillPayload,
   clearPageError,
   compareStableStrings,
   normalizeError,
   parsePositiveInt,
+  persistStrategyPrefillAndNavigate,
+  renderMarkdownToSafeHtml,
   renderPathTemplate,
   requireDataAttr,
   showPageError,
@@ -32,6 +36,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (pageType === "summary") {
     initRunSummaryPage(pageRoot);
+    return;
+  }
+  if (pageType === "detail") {
+    initVariantDetailPage(pageRoot);
   }
 });
 
@@ -256,6 +264,11 @@ function initRunSummaryPage(pageRoot) {
   const runsPathPrefix = requireDataAttr(pageRoot, "apiRunsPathPrefix");
   const topPathTemplate = requireDataAttr(pageRoot, "apiTopPathTemplate");
   const runtimeDefaultsPath = requireDataAttr(pageRoot, "apiRuntimeDefaultsPath");
+  const marketsPath = requireDataAttr(pageRoot, "apiMarketsPath");
+  const variantDetailPathTemplate = requireDataAttr(pageRoot, "detailPathTemplate");
+  const strategyBuilderPath = requireDataAttr(pageRoot, "strategyBuilderPath");
+  const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
+  const prefillStorage = requireDataAttr(pageRoot, "prefillStorage");
   const defaultTopLimit = parsePositiveInt(requireDataAttr(pageRoot, "defaultTopLimit"), 50);
 
   const copyIdButton = pageRoot.querySelector("#run-copy-id");
@@ -307,6 +320,7 @@ function initRunSummaryPage(pageRoot) {
     return;
   }
 
+  const resolveRunStrategyContext = createRunStrategyContextResolver({ marketsPath });
   const state = {
     runtimeDefaults: null,
     status: null,
@@ -469,10 +483,31 @@ function initRunSummaryPage(pageRoot) {
     return Number(left.rank || 0) - Number(right.rank || 0);
   };
 
+  const saveRowAsStrategy = async (rawRow) => {
+    clearPageError(pageRoot);
+    try {
+      const runContext = await resolveRunStrategyContext(state.status);
+      const prefillPayload = buildStrategyPrefillPayload({
+        variantPayload: asRecord(rawRow).payload,
+        runContext,
+      });
+      persistStrategyPrefillAndNavigate({
+        pageRoot,
+        strategyBuilderPath,
+        prefillQueryParam,
+        prefillStorage,
+        prefillPayload,
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      showPageError(pageRoot, normalized.message, normalized.details);
+    }
+  };
+
   const renderTopTable = () => {
     state.visibleColumns = buildVisibleColumns();
-    renderTopHead(tableHead, state.visibleColumns);
-    const emptyColspan = Math.max(state.visibleColumns.length + 3, 3);
+    renderTopHead(tableHead, state.visibleColumns, { includeActions: true });
+    const emptyColspan = Math.max(state.visibleColumns.length + 4, 4);
 
     tableBody.innerHTML = "";
     if (state.topRowsSorted.length === 0) {
@@ -484,13 +519,44 @@ function initRunSummaryPage(pageRoot) {
 
     state.topRowsSorted.forEach((rawRow) => {
       const row = asRecord(rawRow);
+      const variantKey = String(row.variant_key || "").trim();
       const tr = document.createElement("tr");
       tr.appendChild(buildCell(formatValue(row.rank)));
-      tr.appendChild(buildCell(formatValue(row.variant_key)));
+      tr.appendChild(buildCell(formatValue(variantKey)));
       tr.appendChild(buildCell(formatValue(row.indicator_variant_key)));
       state.visibleColumns.forEach((column) => {
         tr.appendChild(buildCell(formatValue(readRenderedMetric(row, column))));
       });
+
+      const actionsCell = document.createElement("td");
+      const detailLink = document.createElement("a");
+      detailLink.className = "button-link";
+      detailLink.textContent = "Open detail";
+      detailLink.href = buildVariantDetailPath({
+        pathTemplate: variantDetailPathTemplate,
+        runId,
+        variantKey,
+      });
+      if (variantKey.length === 0) {
+        detailLink.setAttribute("aria-disabled", "true");
+        detailLink.classList.add("button-link--disabled");
+        detailLink.href = "#";
+        detailLink.addEventListener("click", (event) => {
+          event.preventDefault();
+        });
+      }
+      actionsCell.appendChild(detailLink);
+      actionsCell.appendChild(
+        buildActionButton({
+          label: "Save as Strategy",
+          className: "button-link--secondary",
+          disabled: variantKey.length === 0,
+          onClick: async () => {
+            await saveRowAsStrategy(rawRow);
+          },
+        }),
+      );
+      tr.appendChild(actionsCell);
       tableBody.appendChild(tr);
     });
   };
@@ -498,13 +564,15 @@ function initRunSummaryPage(pageRoot) {
   const applyLocalTopSort = () => {
     if (state.sortColumn === SERVER_ORDER_SORT) {
       state.topRowsSorted = state.topRowsOriginal.slice();
-      summaryNote.innerHTML = "First render keeps server order <code>rank ASC, variant_key ASC</code>.";
+      summaryNote.innerHTML = [
+        "First render keeps server order <code>rank ASC, variant_key ASC</code>.",
+        "Detail, chart, and trades stay on the dedicated variant page only.",
+      ].join(" ");
       sortDirectionSelect.disabled = true;
       renderTopTable();
       return;
     }
 
-    // Local sort reorders already-loaded rows only; do not refetch `/top` here.
     state.topRowsSorted = state.topRowsOriginal.slice().sort(compareTopRows);
     summaryNote.innerHTML = [
       "First render keeps server order <code>rank ASC, variant_key ASC</code>.",
@@ -641,7 +709,7 @@ function initRunSummaryPage(pageRoot) {
       }
       const normalized = normalizeError(error);
       showPageError(pageRoot, normalized.message, normalized.details);
-      const fallbackColspan = Math.max(state.visibleColumns.length + 3, 3);
+      const fallbackColspan = Math.max(state.visibleColumns.length + 4, 4);
       tableBody.innerHTML = (
         `<tr><td colspan="${fallbackColspan}">Failed to load summary rows.</td></tr>`
       );
@@ -711,6 +779,431 @@ function initRunSummaryPage(pageRoot) {
   bootstrap();
 }
 
+function initVariantDetailPage(pageRoot) {
+  const runId = requireDataAttr(pageRoot, "runId");
+  const variantKey = requireDataAttr(pageRoot, "variantKey");
+  const runsPathPrefix = requireDataAttr(pageRoot, "apiRunsPathPrefix");
+  const topPathTemplate = requireDataAttr(pageRoot, "apiTopPathTemplate");
+  const variantReportPathTemplate = requireDataAttr(pageRoot, "apiVariantReportPathTemplate");
+  const marketsPath = requireDataAttr(pageRoot, "apiMarketsPath");
+  const strategyBuilderPath = requireDataAttr(pageRoot, "strategyBuilderPath");
+  const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
+  const prefillStorage = requireDataAttr(pageRoot, "prefillStorage");
+  const defaultTopLimit = parsePositiveInt(requireDataAttr(pageRoot, "defaultTopLimit"), 50);
+
+  const refreshButton = pageRoot.querySelector("#variant-refresh-detail");
+  const saveButton = pageRoot.querySelector("#variant-save-strategy");
+  const includeTradesToggle = pageRoot.querySelector("#variant-include-trades");
+  const loadingNode = pageRoot.querySelector("#variant-detail-loading");
+  const missingBanner = pageRoot.querySelector("#variant-missing-banner");
+  const metricsNode = pageRoot.querySelector("#variant-detail-metrics");
+  const markdownNode = pageRoot.querySelector("#variant-detail-markdown");
+  const chartNode = pageRoot.querySelector("#variant-detail-chart");
+  const tradesNode = pageRoot.querySelector("#variant-detail-trades");
+  const selectedIndicatorsNode = pageRoot.querySelector("#variant-selected-indicators");
+
+  if (
+    refreshButton === null
+    || saveButton === null
+    || includeTradesToggle === null
+    || loadingNode === null
+    || missingBanner === null
+    || metricsNode === null
+    || markdownNode === null
+    || chartNode === null
+    || tradesNode === null
+    || selectedIndicatorsNode === null
+  ) {
+    return;
+  }
+
+  const fieldMap = {
+    runState: pageRoot.querySelector("#variant-field-run-state"),
+    executionMode: pageRoot.querySelector("#variant-field-execution-mode"),
+    marketId: pageRoot.querySelector("#variant-field-market-id"),
+    symbol: pageRoot.querySelector("#variant-field-symbol"),
+    timeframe: pageRoot.querySelector("#variant-field-timeframe"),
+    rank: pageRoot.querySelector("#variant-field-rank"),
+    indicatorVariantKey: pageRoot.querySelector("#variant-field-indicator-variant-key"),
+    totalReturnPct: pageRoot.querySelector("#variant-field-total-return-pct"),
+    directionMode: pageRoot.querySelector("#variant-field-direction-mode"),
+    sizingMode: pageRoot.querySelector("#variant-field-sizing-mode"),
+  };
+
+  if (Object.values(fieldMap).some((node) => node === null)) {
+    return;
+  }
+
+  const resolveRunStrategyContext = createRunStrategyContextResolver({ marketsPath });
+  const state = {
+    status: null,
+    topRows: [],
+    selectedRow: null,
+    topLimit: defaultTopLimit,
+    statusRequestToken: 0,
+    topRequestToken: 0,
+    reportRequestToken: 0,
+    reportCacheByKey: new Map(),
+    isLoadingReport: false,
+  };
+
+  const statusPath = `${runsPathPrefix}${encodeURIComponent(runId)}`;
+  const renderTopPath = () => {
+    const templatePath = renderPathTemplate(topPathTemplate, encodeURIComponent(runId));
+    const requestUrl = new URL(templatePath, window.location.origin);
+    requestUrl.searchParams.set("limit", String(state.topLimit));
+    return requestUrl.toString();
+  };
+  const variantReportPath = renderPathTemplate(
+    variantReportPathTemplate,
+    encodeURIComponent(runId),
+  );
+
+  const setLoadingState = (isLoading) => {
+    state.isLoadingReport = isLoading;
+    loadingNode.classList.toggle("hidden", !isLoading);
+    refreshButton.disabled = isLoading;
+    includeTradesToggle.disabled = isLoading;
+    saveButton.disabled = isLoading || state.selectedRow === null;
+  };
+
+  const renderMissingVariant = (message) => {
+    missingBanner.textContent = message;
+    missingBanner.classList.remove("hidden");
+    metricsNode.innerHTML = "";
+    markdownNode.innerHTML = "";
+    chartNode.innerHTML = "";
+    tradesNode.innerHTML = "";
+    selectedIndicatorsNode.innerHTML = "";
+    saveButton.disabled = true;
+  };
+
+  const clearMissingVariant = () => {
+    missingBanner.textContent = "";
+    missingBanner.classList.add("hidden");
+    saveButton.disabled = state.isLoadingReport || state.selectedRow === null;
+  };
+
+  const renderStatus = (rawStatus) => {
+    const status = asRecord(rawStatus);
+    state.status = status;
+    state.topLimit = parsePositiveInt(String(status.requested_top_n || ""), defaultTopLimit);
+    setBadgeContent(fieldMap.runState, String(status.state || ""));
+    setTextContent(fieldMap.executionMode, formatValue(status.execution_mode));
+    setTextContent(fieldMap.marketId, formatValue(status.market_id));
+    setTextContent(fieldMap.symbol, formatValue(status.symbol));
+    setTextContent(fieldMap.timeframe, formatValue(status.timeframe));
+  };
+
+  const renderSelectedVariantSummary = () => {
+    const row = asRecord(state.selectedRow);
+    const payload = asRecord(row.payload);
+    setTextContent(fieldMap.rank, formatValue(row.rank));
+    setTextContent(fieldMap.indicatorVariantKey, formatValue(row.indicator_variant_key));
+    setTextContent(fieldMap.totalReturnPct, formatValue(row.total_return_pct));
+    setTextContent(fieldMap.directionMode, formatValue(payload.direction_mode));
+    setTextContent(fieldMap.sizingMode, formatValue(payload.sizing_mode));
+    renderSelectedIndicators(payload);
+  };
+
+  const renderSelectedIndicators = (payload) => {
+    const selections = Array.isArray(asRecord(payload).indicator_selections)
+      ? asRecord(payload).indicator_selections
+      : [];
+    selectedIndicatorsNode.innerHTML = "";
+    if (selections.length === 0) {
+      const emptyNode = document.createElement("li");
+      emptyNode.textContent = "No indicator_selections payload.";
+      selectedIndicatorsNode.appendChild(emptyNode);
+      return;
+    }
+
+    selections.forEach((item) => {
+      const selection = asRecord(item);
+      const indicatorId = String(selection.indicator_id || "").trim();
+      const node = document.createElement("li");
+      node.textContent = [
+        indicatorId.length > 0 ? indicatorId : "unknown_indicator",
+        `inputs=${JSON.stringify(asRecord(selection.inputs))}`,
+        `params=${JSON.stringify(asRecord(selection.params))}`,
+      ].join(" ");
+      selectedIndicatorsNode.appendChild(node);
+    });
+  };
+
+  const renderMetricRows = (rows) => {
+    metricsNode.innerHTML = "";
+    if (!Array.isArray(rows) || rows.length === 0) {
+      const emptyNode = document.createElement("p");
+      emptyNode.className = "muted-text";
+      emptyNode.textContent = "No detail rows returned.";
+      metricsNode.appendChild(emptyNode);
+      return;
+    }
+
+    const list = document.createElement("dl");
+    list.className = "detail-metrics-grid";
+    rows.forEach((row) => {
+      const record = asRecord(row);
+      const metric = document.createElement("dt");
+      metric.textContent = String(record.metric || "");
+      const value = document.createElement("dd");
+      value.textContent = String(record.value || "");
+      list.appendChild(metric);
+      list.appendChild(value);
+    });
+    metricsNode.appendChild(list);
+  };
+
+  const renderMarkdownTable = (tableMarkdown) => {
+    const normalized = String(tableMarkdown || "").trim();
+    markdownNode.innerHTML = "";
+    if (normalized.length === 0) {
+      const emptyNode = document.createElement("p");
+      emptyNode.className = "muted-text";
+      emptyNode.textContent = "No table_md returned.";
+      markdownNode.appendChild(emptyNode);
+      return;
+    }
+
+    const content = document.createElement("div");
+    content.className = "markdown-report";
+    content.innerHTML = renderMarkdownToSafeHtml(normalized);
+    markdownNode.appendChild(content);
+  };
+
+  const renderTrades = (trades) => {
+    tradesNode.innerHTML = "";
+    if (!Array.isArray(trades) || trades.length === 0) {
+      const emptyNode = document.createElement("p");
+      emptyNode.className = "muted-text";
+      emptyNode.textContent = includeTradesToggle.checked
+        ? "No trades returned for this variant."
+        : "Trades disabled. Enable include_trades to inspect the trade list.";
+      tradesNode.appendChild(emptyNode);
+      return;
+    }
+
+    const tableScroll = document.createElement("div");
+    tableScroll.className = "table-scroll";
+    const table = document.createElement("table");
+    table.className = "data-table detail-trades-table";
+    table.innerHTML = [
+      "<thead>",
+      "<tr>",
+      "<th scope=\"col\">trade_id</th>",
+      "<th scope=\"col\">direction</th>",
+      "<th scope=\"col\">entry_bar_index</th>",
+      "<th scope=\"col\">exit_bar_index</th>",
+      "<th scope=\"col\">entry_fill_price</th>",
+      "<th scope=\"col\">exit_fill_price</th>",
+      "<th scope=\"col\">net_pnl_quote</th>",
+      "<th scope=\"col\">exit_reason</th>",
+      "</tr>",
+      "</thead>",
+      "<tbody></tbody>",
+    ].join("");
+    const tbody = table.querySelector("tbody");
+    trades.forEach((trade) => {
+      const record = asRecord(trade);
+      const row = document.createElement("tr");
+      row.appendChild(buildCell(formatValue(record.trade_id)));
+      row.appendChild(buildCell(formatValue(record.direction)));
+      row.appendChild(buildCell(formatValue(record.entry_bar_index)));
+      row.appendChild(buildCell(formatValue(record.exit_bar_index)));
+      row.appendChild(buildCell(formatValue(record.entry_fill_price)));
+      row.appendChild(buildCell(formatValue(record.exit_fill_price)));
+      row.appendChild(buildCell(formatValue(record.net_pnl_quote)));
+      row.appendChild(buildCell(formatValue(record.exit_reason)));
+      tbody?.appendChild(row);
+    });
+    tableScroll.appendChild(table);
+    tradesNode.appendChild(tableScroll);
+  };
+
+  const renderTradesChart = (trades) => {
+    chartNode.innerHTML = "";
+    chartNode.appendChild(buildTradesChartNode({ trades, includeTrades: includeTradesToggle.checked }));
+  };
+
+  const renderReport = (rawReport) => {
+    const report = asRecord(rawReport);
+    renderMetricRows(Array.isArray(report.rows) ? report.rows : []);
+    renderMarkdownTable(report.table_md);
+    renderTradesChart(Array.isArray(report.trades) ? report.trades : []);
+    renderTrades(Array.isArray(report.trades) ? report.trades : []);
+  };
+
+  const resolveSelectedRow = () => {
+    const matchedRow = state.topRows.find((item) => String(asRecord(item).variant_key || "") === variantKey);
+    state.selectedRow = matchedRow || null;
+    if (matchedRow === null) {
+      renderMissingVariant(
+        `variant_key ${variantKey} was not found in persisted summary rows for run ${runId}.`,
+      );
+      return false;
+    }
+
+    clearMissingVariant();
+    renderSelectedVariantSummary();
+    return true;
+  };
+
+  const loadStatus = async () => {
+    const token = state.statusRequestToken + 1;
+    state.statusRequestToken = token;
+
+    try {
+      const response = await fetch(statusPath, {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw await buildHttpError(response);
+      }
+      const payload = await response.json();
+      if (token !== state.statusRequestToken) {
+        return null;
+      }
+      renderStatus(payload);
+      return payload;
+    } catch (error) {
+      if (token !== state.statusRequestToken) {
+        return null;
+      }
+      const normalized = normalizeError(error);
+      showPageError(pageRoot, normalized.message, normalized.details);
+      return null;
+    }
+  };
+
+  const loadTop = async () => {
+    const token = state.topRequestToken + 1;
+    state.topRequestToken = token;
+
+    try {
+      const response = await fetch(renderTopPath(), {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw await buildHttpError(response);
+      }
+      const payload = await response.json();
+      if (token !== state.topRequestToken) {
+        return null;
+      }
+      state.topRows = Array.isArray(payload.items) ? payload.items.slice() : [];
+      resolveSelectedRow();
+      return payload;
+    } catch (error) {
+      if (token !== state.topRequestToken) {
+        return null;
+      }
+      const normalized = normalizeError(error);
+      showPageError(pageRoot, normalized.message, normalized.details);
+      renderMissingVariant("Failed to load persisted summary rows for this run.");
+      return null;
+    }
+  };
+
+  const currentReportCacheKey = () => (
+    includeTradesToggle.checked ? "include_trades:true" : "include_trades:false"
+  );
+
+  const loadVariantReport = async ({ forceReload = false } = {}) => {
+    clearPageError(pageRoot);
+    if (state.selectedRow === null) {
+      renderMissingVariant(
+        `variant_key ${variantKey} was not found in persisted summary rows for run ${runId}.`,
+      );
+      return;
+    }
+
+    const cacheKey = currentReportCacheKey();
+    if (!forceReload && state.reportCacheByKey.has(cacheKey)) {
+      renderReport(state.reportCacheByKey.get(cacheKey));
+      return;
+    }
+
+    setLoadingState(true);
+    try {
+      const requestPayload = {
+        variant: cloneJsonValue(asRecord(asRecord(state.selectedRow).payload)),
+        include_trades: includeTradesToggle.checked,
+      };
+      const response = await fetch(variantReportPath, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestPayload),
+      });
+      if (!response.ok) {
+        throw await buildHttpError(response);
+      }
+
+      const payload = await response.json();
+      state.reportCacheByKey.set(cacheKey, payload);
+      renderReport(payload);
+    } catch (error) {
+      const normalized = normalizeError(error);
+      showPageError(pageRoot, normalized.message, normalized.details);
+    } finally {
+      setLoadingState(false);
+    }
+  };
+
+  const saveSelectedVariant = async () => {
+    clearPageError(pageRoot);
+    if (state.selectedRow === null) {
+      renderMissingVariant(
+        `variant_key ${variantKey} was not found in persisted summary rows for run ${runId}.`,
+      );
+      return;
+    }
+
+    try {
+      const runContext = await resolveRunStrategyContext(state.status);
+      const prefillPayload = buildStrategyPrefillPayload({
+        variantPayload: asRecord(state.selectedRow).payload,
+        runContext,
+      });
+      persistStrategyPrefillAndNavigate({
+        pageRoot,
+        strategyBuilderPath,
+        prefillQueryParam,
+        prefillStorage,
+        prefillPayload,
+      });
+    } catch (error) {
+      const normalized = normalizeError(error);
+      showPageError(pageRoot, normalized.message, normalized.details);
+    }
+  };
+
+  refreshButton.addEventListener("click", async () => {
+    await loadVariantReport({ forceReload: true });
+  });
+
+  includeTradesToggle.addEventListener("change", async () => {
+    await loadVariantReport();
+  });
+
+  saveButton.addEventListener("click", async () => {
+    await saveSelectedVariant();
+  });
+
+  const bootstrap = async () => {
+    clearPageError(pageRoot);
+    await loadStatus();
+    const topPayload = await loadTop();
+    if (topPayload !== null && state.selectedRow !== null) {
+      await loadVariantReport();
+    }
+  };
+
+  setLoadingState(false);
+  bootstrap();
+}
+
 function buildBadgeCell(text) {
   const cell = document.createElement("td");
   cell.appendChild(buildStateBadge(text));
@@ -737,7 +1230,7 @@ function setTextContent(node, value) {
   node.textContent = value;
 }
 
-function renderTopHead(tableHead, visibleColumns) {
+function renderTopHead(tableHead, visibleColumns, { includeActions = false } = {}) {
   tableHead.innerHTML = "";
   const row = document.createElement("tr");
 
@@ -755,6 +1248,13 @@ function renderTopHead(tableHead, visibleColumns) {
     th.textContent = label;
     row.appendChild(th);
   });
+
+  if (includeActions) {
+    const actionsHeader = document.createElement("th");
+    actionsHeader.scope = "col";
+    actionsHeader.textContent = "actions";
+    row.appendChild(actionsHeader);
+  }
   tableHead.appendChild(row);
 }
 
@@ -782,4 +1282,241 @@ function formatValue(value) {
     return "-";
   }
   return String(value);
+}
+
+function buildVariantDetailPath({ pathTemplate, runId, variantKey }) {
+  return String(pathTemplate || "")
+    .replace("{run_id}", encodeURIComponent(runId))
+    .replace("{variant_key}", encodeURIComponent(variantKey));
+}
+
+function createRunStrategyContextResolver({ marketsPath }) {
+  const state = {
+    marketCatalogPromise: null,
+    marketsById: new Map(),
+  };
+
+  const loadMarketsById = async () => {
+    if (state.marketCatalogPromise !== null) {
+      return state.marketCatalogPromise;
+    }
+
+    state.marketCatalogPromise = fetch(new URL(marketsPath, window.location.origin).toString(), {
+      credentials: "include",
+    }).then(async (response) => {
+      if (!response.ok) {
+        throw await buildHttpError(response);
+      }
+      const payload = await response.json();
+      const markets = Array.isArray(payload) ? payload : [];
+      state.marketsById = new Map(
+        markets
+          .map((item) => asRecord(item))
+          .filter((item) => Number(item.market_id || 0) > 0)
+          .map((item) => [Number(item.market_id), item]),
+      );
+      return state.marketsById;
+    }).catch((error) => {
+      state.marketCatalogPromise = null;
+      throw error;
+    });
+
+    return state.marketCatalogPromise;
+  };
+
+  return async (rawStatus) => {
+    const status = asRecord(rawStatus);
+    const marketId = Number(status.market_id || 0);
+    const symbol = String(status.symbol || "").trim();
+    const timeframe = String(status.timeframe || "").trim();
+    if (marketId <= 0 || symbol.length === 0 || timeframe.length === 0) {
+      throw new Error("Run status does not contain instrument_id/timeframe for prefill.");
+    }
+
+    const marketsById = await loadMarketsById();
+    const market = asRecord(marketsById.get(marketId));
+    const marketType = String(market.market_type || "").trim();
+    const marketCode = String(market.market_code || "").trim();
+    if (marketType.length === 0 || marketCode.length === 0) {
+      throw new Error(`Market metadata for market_id=${marketId} is unavailable for prefill.`);
+    }
+
+    return {
+      instrument_id: {
+        market_id: marketId,
+        symbol,
+      },
+      timeframe,
+      market_type: marketType,
+      instrument_key: `${marketCode}:${marketType}:${symbol}`,
+    };
+  };
+}
+
+function cloneJsonValue(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => cloneJsonValue(item));
+  }
+  if (value !== null && typeof value === "object") {
+    const record = asRecord(value);
+    const cloned = {};
+    Object.keys(record).sort(compareStableStrings).forEach((key) => {
+      cloned[key] = cloneJsonValue(record[key]);
+    });
+    return cloned;
+  }
+  return value;
+}
+
+function buildTradesChartNode({ trades, includeTrades }) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "variant-chart-shell";
+
+  if (!includeTrades) {
+    const emptyNode = document.createElement("p");
+    emptyNode.className = "muted-text";
+    emptyNode.textContent = "Chart is disabled while include_trades=false.";
+    wrapper.appendChild(emptyNode);
+    return wrapper;
+  }
+  if (!Array.isArray(trades) || trades.length === 0) {
+    const emptyNode = document.createElement("p");
+    emptyNode.className = "muted-text";
+    emptyNode.textContent = "Trade chart is unavailable because the detail payload returned no trades.";
+    wrapper.appendChild(emptyNode);
+    return wrapper;
+  }
+
+  const chartWidth = 760;
+  const chartHeight = 240;
+  const paddingX = 36;
+  const paddingY = 20;
+  const points = [{ x: 0, y: 0, tradeId: 0, exitReason: "start" }];
+  let cumulativePnl = 0;
+  let maxX = 1;
+  let minY = 0;
+  let maxY = 0;
+
+  trades.forEach((trade) => {
+    const record = asRecord(trade);
+    const exitBarIndex = Number(record.exit_bar_index || 0);
+    const netPnl = Number(record.net_pnl_quote || 0);
+    cumulativePnl += Number.isFinite(netPnl) ? netPnl : 0;
+    maxX = Math.max(maxX, exitBarIndex);
+    minY = Math.min(minY, cumulativePnl);
+    maxY = Math.max(maxY, cumulativePnl);
+    points.push({
+      x: exitBarIndex,
+      y: cumulativePnl,
+      tradeId: Number(record.trade_id || 0),
+      exitReason: String(record.exit_reason || "").trim().toLowerCase(),
+    });
+  });
+
+  const normalizeX = (value) => {
+    const width = chartWidth - (paddingX * 2);
+    return paddingX + ((value / Math.max(maxX, 1)) * width);
+  };
+  const normalizeY = (value) => {
+    const height = chartHeight - (paddingY * 2);
+    const range = Math.max(maxY - minY, 1);
+    return chartHeight - paddingY - (((value - minY) / range) * height);
+  };
+
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNamespace, "svg");
+  svg.setAttribute("viewBox", `0 0 ${chartWidth} ${chartHeight}`);
+  svg.setAttribute("class", "variant-chart");
+  svg.setAttribute("role", "img");
+  svg.setAttribute("aria-label", "Trade equity chart by exit_bar_index");
+
+  const horizontalStops = [minY, (minY + maxY) / 2, maxY];
+  horizontalStops.forEach((value) => {
+    const line = document.createElementNS(svgNamespace, "line");
+    const y = normalizeY(value);
+    line.setAttribute("x1", String(paddingX));
+    line.setAttribute("x2", String(chartWidth - paddingX));
+    line.setAttribute("y1", String(y));
+    line.setAttribute("y2", String(y));
+    line.setAttribute("class", "variant-chart-grid");
+    svg.appendChild(line);
+  });
+
+  const zeroLine = document.createElementNS(svgNamespace, "line");
+  zeroLine.setAttribute("x1", String(paddingX));
+  zeroLine.setAttribute("x2", String(chartWidth - paddingX));
+  zeroLine.setAttribute("y1", String(normalizeY(0)));
+  zeroLine.setAttribute("y2", String(normalizeY(0)));
+  zeroLine.setAttribute("class", "variant-chart-zero");
+  svg.appendChild(zeroLine);
+
+  const path = document.createElementNS(svgNamespace, "polyline");
+  path.setAttribute(
+    "points",
+    points.map((point) => `${normalizeX(point.x)},${normalizeY(point.y)}`).join(" "),
+  );
+  path.setAttribute("class", "variant-chart-line");
+  svg.appendChild(path);
+
+  points.slice(1).forEach((point) => {
+    const marker = document.createElementNS(svgNamespace, "circle");
+    marker.setAttribute("cx", String(normalizeX(point.x)));
+    marker.setAttribute("cy", String(normalizeY(point.y)));
+    marker.setAttribute("r", "4");
+    marker.setAttribute("class", "variant-chart-point");
+    marker.setAttribute(
+      "data-exit-reason",
+      colorKeyForExitReason(point.exitReason),
+    );
+    const title = document.createElementNS(svgNamespace, "title");
+    title.textContent = `trade_id=${point.tradeId} exit_reason=${point.exitReason} cumulative_net=${point.y.toFixed(2)}`;
+    marker.appendChild(title);
+    svg.appendChild(marker);
+  });
+
+  wrapper.appendChild(svg);
+  wrapper.appendChild(buildExitReasonLegend(trades));
+  return wrapper;
+}
+
+function buildExitReasonLegend(trades) {
+  const legend = document.createElement("div");
+  legend.className = "variant-chart-legend";
+  const counts = new Map();
+  trades.forEach((trade) => {
+    const reason = colorKeyForExitReason(String(asRecord(trade).exit_reason || ""));
+    counts.set(reason, (counts.get(reason) || 0) + 1);
+  });
+
+  Array.from(counts.keys()).sort(compareStableStrings).forEach((reason) => {
+    const item = document.createElement("span");
+    item.className = "variant-chart-legend-item";
+    const marker = document.createElement("span");
+    marker.className = "variant-chart-legend-marker";
+    marker.dataset.exitReason = reason;
+    const label = document.createElement("span");
+    label.textContent = `${reason} (${counts.get(reason)})`;
+    item.appendChild(marker);
+    item.appendChild(label);
+    legend.appendChild(item);
+  });
+
+  return legend;
+}
+
+function colorKeyForExitReason(rawReason) {
+  const normalized = String(rawReason || "").trim().toLowerCase();
+  if (normalized === "tp") {
+    return "tp";
+  }
+  if (normalized === "sl") {
+    return "sl";
+  }
+  if (normalized === "close_on_end") {
+    return "close_on_end";
+  }
+  if (normalized === "signal_exit") {
+    return "signal_exit";
+  }
+  return normalized.length > 0 ? normalized : "other";
 }
