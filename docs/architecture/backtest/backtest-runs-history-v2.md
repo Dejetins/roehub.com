@@ -1,0 +1,219 @@
+# Backtest Runs History API v2
+
+Документ фиксирует публичный контракт EPIC R7-03: owner-scoped history/status/top/cancel API
+поверх unified persisted run storage (`backtest_jobs*`) после R7-02 cutover.
+
+## Status
+
+- Status: active public runs contract after R7-03.
+- Unified storage note:
+  - public `/backtests/runs*` читает то же семейство PG таблиц, что и legacy `/backtests/jobs*`;
+  - `backtest_jobs.job_id` остается storage identity, но наружу используется vocabulary `run_id`;
+  - `GET /backtests/runs/{run_id}/top` читает только summary rows из
+    `backtest_job_top_variants`;
+  - legacy `/backtests/jobs*` остается compatibility alias на период миграции.
+- Summary-only note:
+  - persisted top rows contract fields: `payload_json`, `summary_metrics_json`,
+    `best_tp_pct`, `best_sl_pct`;
+  - `report_table_md` и `trades_json` не входят в public runs contract и остаются `NULL`-only.
+
+## Цель
+
+- Дать UI/public clients единый vocabulary `runs/history`, а не `jobs`.
+- Зафиксировать deterministic owner policy для persisted history:
+  - missing run -> `404 not_found`;
+  - foreign existing run -> `403 forbidden`.
+- Зафиксировать public summary-level contract без detail/report payloads до R7-04.
+
+## Контекст
+
+- R7-01 обобщил PG jobs storage в canonical persisted run storage:
+  - `backtest_jobs`
+  - `backtest_job_top_variants`
+  - `backtest_job_stage_a_shortlist`
+- R7-02 перевел `POST /backtests` на persisted `sync_inline` flow.
+- R7-03 поверх этого storage добавляет public history/status/top/cancel contract.
+
+## Ключевые решения
+
+### 1) Public vocabulary: `run_id` и `/backtests/runs*`
+
+Внешний contract использует:
+
+- `GET /backtests/runs`
+- `GET /backtests/runs/{run_id}`
+- `GET /backtests/runs/{run_id}/top`
+- `POST /backtests/runs/{run_id}/cancel`
+
+Storage/domain внутри bounded context может сохранять `job_*` naming, но API наружу использует
+только `run_*`.
+
+### 2) История и cursor semantics остаются детерминированными
+
+Для `GET /backtests/runs`:
+
+- ordering фиксирован: `created_at DESC, job_id DESC`;
+- cursor payload совпадает с legacy jobs contract:
+  `base64url(canonical_json({created_at, job_id}))`;
+- `state` filter literals:
+  - `queued`
+  - `running`
+  - `succeeded`
+  - `failed`
+  - `cancelled`
+
+### 3) History/status payload показывает key metadata, но не внутренние hashes
+
+Public runs payload не должен протекать внутренними reproducibility hashes из legacy jobs API.
+
+Минимальные public metadata fields:
+
+- `execution_mode`
+- `market_id`
+- `symbol`
+- `timeframe`
+- `requested_top_n`
+- `ranking_primary_metric`
+- `ranking_secondary_metric`
+- `artifact_slot`
+- `artifact_slot_generation`
+- `artifact_manifest_hash`
+- `artifact_asof_date`
+
+Hashes (`request_hash`, `engine_params_hash`, `backtest_runtime_config_hash`, `spec_hash`) остаются
+частью legacy `/backtests/jobs*`, но не требуются public `/backtests/runs*`.
+
+### 4) `/top` остается summary-only
+
+`GET /backtests/runs/{run_id}/top`:
+
+- читает rows в deterministic order `rank ASC, variant_key ASC`;
+- возвращает только summary payload:
+  - `payload`
+  - `summary_metrics_json`
+  - `best_tp_pct`
+  - `best_sl_pct`
+- не возвращает:
+  - `report_table_md`
+  - `trades`
+  - `equity`
+
+### 5) Cancel endpoint idempotent
+
+`POST /backtests/runs/{run_id}/cancel`:
+
+- `queued -> cancelled` сразу;
+- `running -> cancel_requested_at` (best-effort);
+- terminal states возвращаются без изменений;
+- ответ всегда содержит status snapshot, а не `204`.
+
+### 6) Legacy `/backtests/jobs*` остается migration alias
+
+На период миграции legacy endpoints продолжают работать поверх тех же use-case/repository rules.
+
+| Legacy endpoint | Public endpoint | Notes |
+| --- | --- | --- |
+| `GET /backtests/jobs` | `GET /backtests/runs` | same keyset ordering and cursor semantics |
+| `GET /backtests/jobs/{job_id}` | `GET /backtests/runs/{run_id}` | same owner policy; public payload hides hashes |
+| `GET /backtests/jobs/{job_id}/top` | `GET /backtests/runs/{run_id}/top` | same deterministic summary rows; legacy payload may carry extra compatibility fields |
+| `POST /backtests/jobs/{job_id}/cancel` | `POST /backtests/runs/{run_id}/cancel` | same idempotent cancel semantics |
+
+## Endpoint contracts
+
+### 1) `GET /backtests/runs`
+
+Request params:
+
+- `state` optional enum:
+  - `queued`
+  - `running`
+  - `succeeded`
+  - `failed`
+  - `cancelled`
+- `limit` optional, default `50`, max `250`
+- `cursor` optional opaque base64url string
+
+Response (`200 OK`):
+
+- `items[]` ordered by `created_at DESC, run_id DESC`
+- `next_cursor` opaque string or `null`
+
+Каждый item содержит:
+
+- `run_id`
+- `mode`
+- `state`
+- `stage`
+- `created_at`, `updated_at`, `started_at`, `finished_at`, `cancel_requested_at`
+- `processed_units`, `total_units`
+- `execution_mode`
+- `market_id`, `symbol`, `timeframe`
+- `requested_top_n`
+- `ranking_primary_metric`, `ranking_secondary_metric`
+- `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`, `artifact_asof_date`
+
+### 2) `GET /backtests/runs/{run_id}`
+
+Response (`200 OK`):
+
+- полный status/progress snapshot run;
+- key metadata из history list;
+- для `failed` дополнительно:
+  - `last_error`
+  - `last_error_json` (`code/message/details`)
+
+### 3) `GET /backtests/runs/{run_id}/top?limit=...`
+
+Request params:
+
+- `limit` optional; default = `backtest.jobs.top_k_persisted_default`
+- validation:
+  - `limit > 0`
+  - `limit <= backtest.jobs.top_k_persisted_default`
+
+Response (`200 OK`):
+
+- `run_id`
+- `state`
+- `execution_mode`
+- `items[]`
+
+Каждый item содержит:
+
+- `rank`
+- `variant_key`
+- `indicator_variant_key`
+- `variant_index`
+- `total_return_pct`
+- `payload`
+- `summary_metrics_json`
+- `best_tp_pct`
+- `best_sl_pct`
+
+### 4) `POST /backtests/runs/{run_id}/cancel`
+
+Response (`200 OK`):
+
+- status snapshot после попытки cancel
+
+## Инварианты
+
+- Все operations owner-only.
+- Missing run -> `404 not_found`.
+- Foreign existing run -> `403 forbidden`.
+- History ordering фиксирован: `created_at DESC, job_id DESC`.
+- Top ordering фиксирован: `rank ASC, variant_key ASC`.
+- Public payload не хранит и не отдает persisted detail/report bodies.
+
+## Связанные файлы
+
+- `apps/api/routes/backtest_runs.py`
+- `apps/api/dto/backtest_runs.py`
+- `apps/api/wiring/modules/backtest.py`
+- `src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py`
+- `src/trading/contexts/backtest/application/ports/backtest_job_repositories.py`
+- `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py`
+- `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_results_repository.py`
+- `tests/unit/apps/api/test_backtest_runs_routes.py`
+- `tests/unit/apps/api/test_backtest_runs_dto.py`
+- `tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_history_api_v1.py`

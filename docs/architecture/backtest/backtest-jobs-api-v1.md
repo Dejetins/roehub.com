@@ -2,6 +2,14 @@
 
 Документ фиксирует архитектурный контракт EPIC-11: HTTP API для асинхронных backtest jobs (create/status/top/list/cancel) с owner-only доступом, deterministic пагинацией и единым RoehubError-контрактом.
 
+R7-03 rollout note:
+
+- public contract для history/status/top/cancel теперь живет в
+  `docs/architecture/backtest/backtest-runs-history-v2.md`;
+- `/backtests/jobs*` остается compatibility alias на период миграции;
+- additive summary fields в legacy `/top` payload (`summary_metrics_json`, `best_tp_pct`,
+  `best_sl_pct`) допускаются для выравнивания с public runs contract.
+
 ## Цель
 
 - Дать UI полный набор endpoints для async backtest workflow без polling по внутренним таблицам:
@@ -111,6 +119,14 @@
 
 `GET /backtests/jobs/{job_id}/top` возвращает rows из `backtest_job_top_variants` (`rank ASC, variant_key ASC`) с полями ranking + payload всегда.
 
+R7-03 additive alignment:
+
+- legacy `/top` payload может дополнительно содержать:
+  - `summary_metrics_json`
+  - `best_tp_pct`
+  - `best_sl_pct`
+- это не меняет lazy-details policy и не добавляет report/trades bodies в persisted summary rows.
+
 Дополнительно endpoint возвращает `report_context` (run-context для
 `POST /api/backtests/variant-report`), чтобы UI мог загрузить report/trades
 по явному действию `Load report` для выбранного `variant_key`.
@@ -189,7 +205,8 @@ Response (`200 OK`):
 
 - `job_id`, `state`, `report_context`, `items[]`.
 - `items[]` rows ordered by rank:
-  - `rank`, `variant_key`, `indicator_variant_key`, `variant_index`, `total_return_pct`, `payload`.
+  - `rank`, `variant_key`, `indicator_variant_key`, `variant_index`, `total_return_pct`,
+    `payload`, `summary_metrics_json`, `best_tp_pct`, `best_sl_pct`.
 - `report_context` содержит поля run-context (`time_range`, `strategy_id xor template`,
   `overrides?`, `warmup_bars?`, `include_trades`) для on-demand report endpoint.
 
@@ -223,6 +240,9 @@ Response (`200 OK`):
 - Jobs endpoints доступны только при `backtest.jobs.enabled=true`.
 - Все operations owner-only; чужая существующая job -> `403`, отсутствующая -> `404`.
 - List ordering фиксирован: `created_at DESC, job_id DESC`.
+- Migration note:
+  - `/backtests/jobs*` и `/backtests/runs*` используют один storage/use-case слой;
+  - основное отличие public contract: `run_id` vocabulary и скрытие внутренних hashes.
 - `/top` ordering фиксирован: `rank ASC, variant_key ASC`.
 - `request_hash/engine_params_hash/backtest_runtime_config_hash` всегда возвращаются в status payload.
 - `failed` status всегда включает `last_error + last_error_json`.

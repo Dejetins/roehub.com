@@ -5,6 +5,10 @@
 ## Status
 
 - Status: active v1 sync contract after R7-02 persisted `sync_inline` cutover.
+- R7-03 follow-up note:
+  - persisted runs created by `POST /backtests` are now publicly readable through
+    `docs/architecture/backtest/backtest-runs-history-v2.md`;
+  - legacy `/backtests/jobs*` remains a migration alias over the same storage family.
 - R7-02 storage note:
   - sync and background executions share one persisted-run storage family in Postgres,
   - successful `POST /backtests` now performs internal preflight, executes inline, and persists
@@ -81,9 +85,10 @@
 ## Non-goals
 
 - Async jobs/progress (Milestone 5).
-- Public history/list/status endpoints for persisted runs.
+- Public history/list/status endpoint design inside this document.
 - Дополнительные endpoints (get status/list).
-- R7-03 не включает public `/backtests/runs*` history endpoints.
+- R7-03 history retrieval semantics documented separately in
+  `docs/architecture/backtest/backtest-runs-history-v2.md`.
 - R8-02 не включает full auto-fallback sync -> background orchestration.
 
 ## Ключевые решения

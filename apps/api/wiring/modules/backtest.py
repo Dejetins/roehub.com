@@ -14,7 +14,11 @@ from typing import Mapping
 from fastapi import APIRouter
 
 from apps.api.dto import build_backtest_runtime_defaults_response
-from apps.api.routes import build_backtest_jobs_router, build_backtests_router
+from apps.api.routes import (
+    build_backtest_jobs_router,
+    build_backtest_runs_router,
+    build_backtests_router,
+)
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest.adapters.outbound import (
     BacktestArtifactPathBuilderV2,
@@ -36,11 +40,15 @@ from trading.contexts.backtest.application.services import (
 )
 from trading.contexts.backtest.application.use_cases import (
     CancelBacktestJobUseCase,
+    CancelBacktestRunUseCase,
     CreateAndRunBacktestSyncInlineUseCase,
     CreateBacktestJobUseCase,
     GetBacktestJobStatusUseCase,
     GetBacktestJobTopUseCase,
+    GetBacktestRunStatusUseCase,
+    GetBacktestRunTopUseCase,
     ListBacktestJobsUseCase,
+    ListBacktestRunsUseCase,
     RunBacktestUseCase,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
@@ -212,10 +220,23 @@ def build_backtest_router(
         sync_deadline_seconds=runtime_config.sync.sync_deadline_seconds,
         eager_top_reports_enabled=runtime_config.reporting.eager_top_reports_enabled,
     )
+
+    results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
+    runs_router = build_backtest_runs_router(
+        get_status_use_case=GetBacktestRunStatusUseCase(job_repository=job_repository),
+        get_top_use_case=GetBacktestRunTopUseCase(
+            job_repository=job_repository,
+            results_repository=results_repository,
+            top_k_persisted_default=runtime_config.jobs.top_k_persisted_default,
+        ),
+        list_use_case=ListBacktestRunsUseCase(job_repository=job_repository),
+        cancel_use_case=CancelBacktestRunUseCase(job_repository=job_repository),
+        current_user_dependency=current_user_dependency,
+    )
+    backtests_router.include_router(runs_router)
     if not runtime_config.jobs.enabled:
         return backtests_router
 
-    results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
     create_use_case = CreateBacktestJobUseCase(
         job_repository=job_repository,
         strategy_reader=strategy_reader,

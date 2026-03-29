@@ -25,6 +25,12 @@ from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 
 BacktestJobsStateLiteral = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 BacktestJobsStageLiteral = Literal["stage_a", "stage_b", "finalizing"]
+BacktestJobExecutionModeLiteral = Literal[
+    "sync_inline",
+    "background_auto",
+    "background_manual_legacy",
+]
+BacktestJobArtifactSlotLiteral = Literal["slot_a", "slot_b"]
 _BACKTEST_JOBS_STATE_VALUES: tuple[BacktestJobsStateLiteral, ...] = (
     "queued",
     "running",
@@ -85,6 +91,17 @@ class BacktestJobStatusResponse(BaseModel):
     engine_params_hash: str
     backtest_runtime_config_hash: str
     spec_hash: str | None = None
+    execution_mode: BacktestJobExecutionModeLiteral | None = None
+    market_id: int | None = None
+    symbol: str | None = None
+    timeframe: str | None = None
+    requested_top_n: int | None = None
+    ranking_primary_metric: str | None = None
+    ranking_secondary_metric: str | None = None
+    artifact_slot: BacktestJobArtifactSlotLiteral | None = None
+    artifact_slot_generation: int | None = None
+    artifact_manifest_hash: str | None = None
+    artifact_asof_date: str | None = None
     last_error: str | None = None
     last_error_json: BacktestJobErrorResponse | None = None
 
@@ -115,6 +132,17 @@ class BacktestJobsListItemResponse(BaseModel):
     cancel_requested_at: datetime | None = None
     processed_units: int
     total_units: int
+    execution_mode: BacktestJobExecutionModeLiteral | None = None
+    market_id: int | None = None
+    symbol: str | None = None
+    timeframe: str | None = None
+    requested_top_n: int | None = None
+    ranking_primary_metric: str | None = None
+    ranking_secondary_metric: str | None = None
+    artifact_slot: BacktestJobArtifactSlotLiteral | None = None
+    artifact_slot_generation: int | None = None
+    artifact_manifest_hash: str | None = None
+    artifact_asof_date: str | None = None
 
 
 class BacktestJobsListResponse(BaseModel):
@@ -157,6 +185,9 @@ class BacktestJobTopItemResponse(BaseModel):
     variant_index: int
     total_return_pct: float
     payload: dict[str, Any]
+    summary_metrics_json: dict[str, Any]
+    best_tp_pct: float | None = None
+    best_sl_pct: float | None = None
 
 
 class BacktestJobVariantReportContextResponse(BaseModel):
@@ -252,6 +283,23 @@ def build_backtest_job_status_response(*, job: BacktestJob) -> BacktestJobStatus
         engine_params_hash=job.engine_params_hash,
         backtest_runtime_config_hash=job.backtest_runtime_config_hash,
         spec_hash=job.spec_hash,
+        execution_mode=job.execution_mode,
+        market_id=job.market_id,
+        symbol=job.symbol,
+        timeframe=job.timeframe,
+        requested_top_n=job.requested_top_n,
+        ranking_primary_metric=job.ranking_primary_metric,
+        ranking_secondary_metric=job.ranking_secondary_metric,
+        artifact_slot=job.artifact_pin.artifact_slot if job.artifact_pin is not None else None,
+        artifact_slot_generation=(
+            job.artifact_pin.artifact_slot_generation if job.artifact_pin is not None else None
+        ),
+        artifact_manifest_hash=(
+            job.artifact_pin.artifact_manifest_hash if job.artifact_pin is not None else None
+        ),
+        artifact_asof_date=(
+            job.artifact_pin.artifact_asof_date if job.artifact_pin is not None else None
+        ),
         last_error=job.last_error,
         last_error_json=error_payload,
     )
@@ -300,6 +348,29 @@ def build_backtest_jobs_list_response(
                 cancel_requested_at=item.cancel_requested_at,
                 processed_units=item.processed_units,
                 total_units=item.total_units,
+                execution_mode=item.execution_mode,
+                market_id=item.market_id,
+                symbol=item.symbol,
+                timeframe=item.timeframe,
+                requested_top_n=item.requested_top_n,
+                ranking_primary_metric=item.ranking_primary_metric,
+                ranking_secondary_metric=item.ranking_secondary_metric,
+                artifact_slot=(
+                    item.artifact_pin.artifact_slot if item.artifact_pin is not None else None
+                ),
+                artifact_slot_generation=(
+                    item.artifact_pin.artifact_slot_generation
+                    if item.artifact_pin is not None
+                    else None
+                ),
+                artifact_manifest_hash=(
+                    item.artifact_pin.artifact_manifest_hash
+                    if item.artifact_pin is not None
+                    else None
+                ),
+                artifact_asof_date=(
+                    item.artifact_pin.artifact_asof_date if item.artifact_pin is not None else None
+                ),
             )
             for item in items
         ],
@@ -344,6 +415,9 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
                 variant_index=row.variant_index,
                 total_return_pct=row.total_return_pct,
                 payload=dict(row.payload_json),
+                summary_metrics_json=dict(row.summary_metrics_json),
+                best_tp_pct=row.best_tp_pct,
+                best_sl_pct=row.best_sl_pct,
             )
             for row in result.rows
         ],
@@ -644,7 +718,9 @@ def _normalize_json_value(*, value: Any) -> Any:
 
 
 __all__ = [
+    "BacktestJobArtifactSlotLiteral",
     "BacktestJobErrorResponse",
+    "BacktestJobExecutionModeLiteral",
     "BacktestJobStatusResponse",
     "BacktestJobsListItemResponse",
     "BacktestJobsListResponse",

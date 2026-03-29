@@ -7,13 +7,21 @@ import pytest
 
 from apps.api.dto import (
     BacktestsPostRequest,
+    build_backtest_job_top_response,
     build_backtest_run_request,
     decode_backtest_jobs_cursor,
     decode_backtest_jobs_state,
     encode_backtest_jobs_cursor,
 )
+from trading.contexts.backtest.application.use_cases import BacktestJobTopReadResult
+from trading.contexts.backtest.domain.entities import (
+    BacktestJob,
+    BacktestJobArtifactPin,
+    BacktestJobTopVariant,
+)
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
+from trading.shared_kernel.primitives import UserId
 
 
 def test_backtest_jobs_cursor_codec_roundtrip_is_deterministic() -> None:
@@ -233,3 +241,72 @@ def test_backtest_jobs_create_request_accepts_ranking_block() -> None:
     assert run_request.ranking is not None
     assert run_request.ranking.primary_metric == "total_return_pct"
     assert run_request.ranking.secondary_metric == "max_drawdown_pct"
+
+
+def test_build_backtest_job_top_response_includes_summary_metrics_fields() -> None:
+    """
+    Verify legacy jobs `/top` mapper exposes persisted summary metrics and TP/SL columns.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Additive summary fields keep legacy alias closer to the public runs contract.
+    Raises:
+        AssertionError: If persisted summary fields are dropped by DTO mapping.
+    Side Effects:
+        None.
+    """
+    job = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000995"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 30, tzinfo=timezone.utc),
+        request_json={"top_k": 25},
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-29",
+        ),
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+    row = BacktestJobTopVariant(
+        job_id=job.job_id,
+        rank=1,
+        variant_key="a" * 64,
+        indicator_variant_key="b" * 64,
+        variant_index=0,
+        total_return_pct=12.34,
+        payload_json={"schema_version": 1},
+        summary_metrics_json={"total_return_pct": 12.34, "profit_factor": 1.23},
+        best_tp_pct=4.0,
+        best_sl_pct=2.0,
+        report_table_md=None,
+        trades_json=None,
+        updated_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+    )
+
+    response = build_backtest_job_top_response(
+        result=BacktestJobTopReadResult(job=job, rows=(row,))
+    )
+    dumped = response.model_dump(mode="json")
+
+    assert dumped["items"][0]["summary_metrics_json"] == {
+        "total_return_pct": 12.34,
+        "profit_factor": 1.23,
+    }
+    assert dumped["items"][0]["best_tp_pct"] == 4.0
+    assert dumped["items"][0]["best_sl_pct"] == 2.0

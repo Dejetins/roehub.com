@@ -166,6 +166,66 @@ def backtest_job_forbidden(*, job_id: UUID) -> RoehubError:
     )
 
 
+def backtest_run_not_found(*, run_id: UUID) -> RoehubError:
+    """
+    Build deterministic not-found API error for public Backtest run id lookups.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - apps/api/routes/backtest_runs.py
+      - apps/api/common/errors.py
+
+    Args:
+        run_id: Requested Backtest run identifier.
+    Returns:
+        RoehubError: Canonical `not_found` payload.
+    Assumptions:
+        Public runs API uses `run_id` vocabulary instead of legacy `job_id`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return RoehubError(
+        code="not_found",
+        message="Backtest run was not found",
+        details={"run_id": str(run_id)},
+    )
+
+
+def backtest_run_forbidden(*, run_id: UUID) -> RoehubError:
+    """
+    Build deterministic forbidden API error for foreign public Backtest run access.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - apps/api/routes/backtest_runs.py
+      - apps/api/common/errors.py
+
+    Args:
+        run_id: Existing Backtest run identifier requested by non-owner.
+    Returns:
+        RoehubError: Canonical `forbidden` payload.
+    Assumptions:
+        Existing foreign runs must return `403` (not `404`) by the R7-03 contract.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return RoehubError(
+        code="forbidden",
+        message="Backtest run does not belong to current user",
+        details={"run_id": str(run_id)},
+    )
+
+
 def backtest_conflict(*, message: str, details: Mapping[str, Any]) -> RoehubError:
     """
     Build deterministic conflict API error for request/use-case state conflicts.

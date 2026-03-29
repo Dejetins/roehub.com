@@ -21,6 +21,12 @@
   - sync-inline path writes one terminal `backtest_jobs` row plus summary-only top rows
     atomically,
   - canonical preflight/validation `422` failures remain non-persisted and do not create rows.
+- R7-03 public history update:
+  - public `/backtests/runs*` reads this same storage family without introducing a second
+    persistence stack,
+  - explicit owner policy remains storage-backed and deterministic:
+    missing run -> `404`, foreign existing run -> `403`,
+  - legacy `/backtests/jobs*` continues to read/write the same rows as a compatibility alias.
 - Superseded by target-v2 storage direction:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`

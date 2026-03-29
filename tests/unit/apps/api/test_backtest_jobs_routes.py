@@ -13,6 +13,7 @@ from trading.contexts.backtest.application.ports import BacktestJobListPage
 from trading.contexts.backtest.application.use_cases import BacktestJobTopReadResult
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
+    BacktestJobArtifactPin,
     BacktestJobErrorPayload,
     BacktestJobTopVariant,
 )
@@ -341,6 +342,9 @@ def test_get_backtest_job_status_returns_failed_last_error_payload() -> None:
 
     assert response.status_code == 200
     assert response.json()["last_error"] == "Execution failed"
+    assert response.json()["execution_mode"] == "sync_inline"
+    assert response.json()["artifact_slot"] == "slot_b"
+    assert response.json()["requested_top_n"] == 25
     assert response.json()["last_error_json"] == {
         "code": "unexpected_error",
         "message": "Execution failed",
@@ -522,6 +526,9 @@ def test_get_backtest_job_top_hides_details_for_non_succeeded_jobs() -> None:
     item = payload["items"][0]
     assert "report_table_md" not in item
     assert "trades" not in item
+    assert item["summary_metrics_json"]["profit_factor"] == 1.5
+    assert item["best_tp_pct"] == 4.0
+    assert item["best_sl_pct"] == 2.0
 
 
 
@@ -558,6 +565,9 @@ def test_get_backtest_job_top_omits_details_even_for_succeeded_jobs() -> None:
     item = payload["items"][0]
     assert "report_table_md" not in item
     assert "trades" not in item
+    assert item["summary_metrics_json"]["profit_factor"] == 1.5
+    assert item["best_tp_pct"] == 4.0
+    assert item["best_sl_pct"] == 2.0
 
 
 def test_get_backtest_job_top_preserves_explicit_source_in_summary_payload() -> None:
@@ -660,6 +670,7 @@ def test_list_backtest_jobs_decodes_cursor_and_returns_next_cursor() -> None:
 
     assert response.status_code == 200
     assert resolved_list_fake.last_cursor == previous_cursor
+    assert response.json()["items"][0]["execution_mode"] == "sync_inline"
     assert response.json()["next_cursor"] == encode_backtest_jobs_cursor(cursor=next_cursor)
 
 
@@ -888,6 +899,19 @@ def _queued_job(*, job_id: UUID) -> BacktestJob:
         spec_payload_json=None,
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-29",
+        ),
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1m",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
     )
 
 

@@ -394,10 +394,19 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
     monkeypatch.setattr(backtest_module, "PostgresBacktestJobRepository", _DummyFactory)
     monkeypatch.setattr(backtest_module, "PostgresBacktestJobResultsRepository", _DummyFactory)
     monkeypatch.setattr(backtest_module, "CreateBacktestJobUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "GetBacktestRunStatusUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "GetBacktestRunTopUseCase", _DummyFactory)
     monkeypatch.setattr(backtest_module, "GetBacktestJobStatusUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "ListBacktestRunsUseCase", _DummyFactory)
     monkeypatch.setattr(backtest_module, "GetBacktestJobTopUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "CancelBacktestRunUseCase", _DummyFactory)
     monkeypatch.setattr(backtest_module, "ListBacktestJobsUseCase", _DummyFactory)
     monkeypatch.setattr(backtest_module, "CancelBacktestJobUseCase", _DummyFactory)
+    monkeypatch.setattr(
+        backtest_module,
+        "build_backtest_runs_router",
+        lambda **kwargs: _build_ping_router(path="/backtests/runs/ping"),
+    )
     monkeypatch.setattr(
         backtest_module,
         "build_backtest_jobs_router",
@@ -519,6 +528,18 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         lambda **kwargs: captured_backtests_router_kwargs.update(kwargs)
         or _build_ping_router(path="/backtests/ping"),
     )
+    monkeypatch.setattr(backtest_module, "_build_jobs_gateway", lambda *, settings: object())
+    monkeypatch.setattr(backtest_module, "PostgresBacktestJobRepository", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "PostgresBacktestJobResultsRepository", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "GetBacktestRunStatusUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "GetBacktestRunTopUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "ListBacktestRunsUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "CancelBacktestRunUseCase", _DummyFactory)
+    monkeypatch.setattr(
+        backtest_module,
+        "build_backtest_runs_router",
+        lambda **kwargs: _build_ping_router(path="/backtests/runs/ping"),
+    )
 
     router = backtest_module.build_backtest_router(
         environ={"STRATEGY_PG_DSN": "postgresql://user:pass@localhost:5432/roehub"},
@@ -529,6 +550,7 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         indicator_compute=cast(IndicatorCompute, SimpleNamespace()),
     )
     assert "/backtests/ping" in _paths_from_router(router=router)
+    assert "/backtests/runs/ping" in _paths_from_router(router=router)
     assert captured_kwargs["max_variants_per_compute"] == 50
     assert captured_kwargs["max_compute_bytes_total"] == 500
     assert captured_kwargs["max_numba_threads"] == 7
@@ -568,6 +590,7 @@ def test_build_backtest_router_skips_jobs_routes_when_toggle_disabled(monkeypatc
     paths = _paths_from_router(router=router)
 
     assert "/backtests/ping" in paths
+    assert "/backtests/runs/ping" in paths
     assert "/backtests/jobs/ping" not in paths
 
 
@@ -600,6 +623,7 @@ def test_build_backtest_router_mounts_jobs_routes_when_toggle_enabled(monkeypatc
     paths = _paths_from_router(router=router)
 
     assert "/backtests/ping" in paths
+    assert "/backtests/runs/ping" in paths
     assert "/backtests/jobs/ping" in paths
 
 
@@ -666,10 +690,19 @@ def test_build_backtest_router_uses_artifact_root_from_artifact_config(monkeypat
     monkeypatch.setattr(backtest_module, "PostgresBacktestJobRepository", _DummyFactory)
     monkeypatch.setattr(backtest_module, "PostgresBacktestJobResultsRepository", _DummyFactory)
     monkeypatch.setattr(backtest_module, "CreateBacktestJobUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "GetBacktestRunStatusUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "GetBacktestRunTopUseCase", _DummyFactory)
     monkeypatch.setattr(backtest_module, "GetBacktestJobStatusUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "ListBacktestRunsUseCase", _DummyFactory)
     monkeypatch.setattr(backtest_module, "GetBacktestJobTopUseCase", _DummyFactory)
+    monkeypatch.setattr(backtest_module, "CancelBacktestRunUseCase", _DummyFactory)
     monkeypatch.setattr(backtest_module, "ListBacktestJobsUseCase", _DummyFactory)
     monkeypatch.setattr(backtest_module, "CancelBacktestJobUseCase", _DummyFactory)
+    monkeypatch.setattr(
+        backtest_module,
+        "build_backtest_runs_router",
+        lambda **kwargs: _build_ping_router(path="/backtests/runs/ping"),
+    )
     monkeypatch.setattr(
         backtest_module,
         "build_backtest_jobs_router",
@@ -715,6 +748,7 @@ def test_build_backtest_router_uses_artifact_root_from_artifact_config(monkeypat
         indicator_compute=cast(IndicatorCompute, SimpleNamespace()),
     )
 
+    assert "/backtests/runs/ping" in _paths_from_router(router=router)
     assert "/backtests/jobs/ping" in _paths_from_router(router=router)
     assert captured_builder_root == Path("custom/artifacts/backtest/v2")
 

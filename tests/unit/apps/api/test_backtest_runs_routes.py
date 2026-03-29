@@ -1,0 +1,691 @@
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from uuid import UUID
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.testclient import TestClient
+
+from apps.api.common import register_api_error_handlers
+from apps.api.dto import encode_backtest_runs_cursor
+from apps.api.routes import build_backtest_runs_router
+from trading.contexts.backtest.application.ports import BacktestJobListPage
+from trading.contexts.backtest.application.use_cases import (
+    BacktestRunTopReadResult,
+    backtest_run_forbidden,
+    backtest_run_not_found,
+)
+from trading.contexts.backtest.domain.entities import (
+    BacktestJob,
+    BacktestJobArtifactPin,
+    BacktestJobErrorPayload,
+    BacktestJobTopVariant,
+)
+from trading.contexts.backtest.domain.errors import BacktestValidationError
+from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
+from trading.shared_kernel.primitives import PaidLevel, UserId
+
+
+class _HeaderCurrentUserDependency:
+    """
+    Request dependency resolving authenticated principal from `X-User-Id` header.
+    """
+
+    def __call__(self, request: Request):
+        """
+        Resolve principal or raise deterministic HTTP 401 payload.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            object: CurrentUserPrincipal-compatible object.
+        Assumptions:
+            Header contains UUID string when provided.
+        Raises:
+            HTTPException: If authentication header is missing.
+        Side Effects:
+            None.
+        """
+        raw_user_id = request.headers.get("x-user-id")
+        if raw_user_id is None:
+            raise HTTPException(
+                status_code=401,
+                detail={
+                    "error": "unauthorized",
+                    "message": "Authentication required",
+                },
+            )
+
+        from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+
+        return CurrentUserPrincipal(
+            user_id=UserId.from_string(raw_user_id),
+            paid_level=PaidLevel.free(),
+        )
+
+
+@dataclass
+class _StatusUseCaseFake:
+    """
+    Deterministic status use-case fake returning preconfigured run or error.
+    """
+
+    run: BacktestJob | None = None
+    error: Exception | None = None
+
+    def execute(self, *, run_id: UUID, current_user):
+        """
+        Return configured run snapshot or raise configured exception.
+
+        Args:
+            run_id: Requested run identifier.
+            current_user: Authenticated user payload.
+        Returns:
+            BacktestJob: Configured run snapshot.
+        Assumptions:
+            `run_id/current_user` are irrelevant for static fake responses.
+        Raises:
+            Exception: Configured exception.
+        Side Effects:
+            None.
+        """
+        _ = run_id, current_user
+        if self.error is not None:
+            raise self.error
+        if self.run is None:  # pragma: no cover - guarded by fixtures
+            raise ValueError("status fake requires run")
+        return self.run
+
+
+@dataclass
+class _TopUseCaseFake:
+    """
+    Deterministic top use-case fake returning preconfigured result or error.
+    """
+
+    result: BacktestRunTopReadResult | None = None
+    error: Exception | None = None
+
+    def execute(self, *, run_id: UUID, current_user, limit: int | None):
+        """
+        Return configured top result payload or raise configured exception.
+
+        Args:
+            run_id: Requested run identifier.
+            current_user: Authenticated user payload.
+            limit: Optional top rows limit.
+        Returns:
+            BacktestRunTopReadResult: Configured top payload.
+        Assumptions:
+            Fake does not enforce limit semantics.
+        Raises:
+            Exception: Configured exception.
+        Side Effects:
+            None.
+        """
+        _ = run_id, current_user, limit
+        if self.error is not None:
+            raise self.error
+        if self.result is None:  # pragma: no cover - guarded by fixtures
+            raise ValueError("top fake requires result")
+        return self.result
+
+
+@dataclass
+class _ListUseCaseFake:
+    """
+    Deterministic list use-case fake returning preconfigured page payload or error.
+    """
+
+    page: BacktestJobListPage
+    error: Exception | None = None
+    last_cursor: BacktestJobListCursor | None = None
+    last_state: str | None = None
+
+    def execute(self, *, current_user, state: str | None, limit: int, cursor):
+        """
+        Return configured list page and record decoded cursor/state arguments.
+
+        Args:
+            current_user: Authenticated user payload.
+            state: Optional state filter.
+            limit: Page size.
+            cursor: Optional decoded keyset cursor.
+        Returns:
+            BacktestJobListPage: Configured page fixture.
+        Assumptions:
+            Fake does not validate state/limit values.
+        Raises:
+            Exception: Configured exception.
+        Side Effects:
+            Stores last cursor and state payloads for assertions.
+        """
+        _ = current_user, limit
+        self.last_cursor = cursor
+        self.last_state = state
+        if self.error is not None:
+            raise self.error
+        return self.page
+
+
+@dataclass
+class _CancelUseCaseFake:
+    """
+    Deterministic cancel use-case fake returning preconfigured run or error.
+    """
+
+    run: BacktestJob | None = None
+    error: Exception | None = None
+
+    def execute(self, *, run_id: UUID, current_user):
+        """
+        Return configured cancel status payload or raise configured exception.
+
+        Args:
+            run_id: Requested run identifier.
+            current_user: Authenticated user payload.
+        Returns:
+            BacktestJob: Configured updated run snapshot.
+        Assumptions:
+            Fake ignores input ids and always returns fixture run.
+        Raises:
+            Exception: Configured exception.
+        Side Effects:
+            None.
+        """
+        _ = run_id, current_user
+        if self.error is not None:
+            raise self.error
+        if self.run is None:  # pragma: no cover - guarded by fixtures
+            raise ValueError("cancel fake requires run")
+        return self.run
+
+
+def _build_client(
+    *,
+    status_use_case: _StatusUseCaseFake | None = None,
+    top_use_case: _TopUseCaseFake | None = None,
+    list_use_case: _ListUseCaseFake | None = None,
+    cancel_use_case: _CancelUseCaseFake | None = None,
+) -> tuple[TestClient, _ListUseCaseFake]:
+    """
+    Build minimal FastAPI TestClient with public runs router and shared error handlers.
+
+    Args:
+        status_use_case: Optional status use-case fake.
+        top_use_case: Optional top use-case fake.
+        list_use_case: Optional list use-case fake.
+        cancel_use_case: Optional cancel use-case fake.
+    Returns:
+        tuple[TestClient, _ListUseCaseFake]: Configured client and resolved list fake.
+    Assumptions:
+        Shared API error handlers provide deterministic Roehub/422 payloads.
+    Raises:
+        ValueError: If router dependencies are invalid.
+    Side Effects:
+        None.
+    """
+    base_run = _queued_run(run_id=UUID("00000000-0000-0000-0000-000000000930"))
+    resolved_list_use_case = list_use_case or _ListUseCaseFake(
+        page=BacktestJobListPage(items=(base_run,), next_cursor=None)
+    )
+
+    app = FastAPI()
+    register_api_error_handlers(app=app)
+    app.include_router(
+        build_backtest_runs_router(
+            get_status_use_case=status_use_case or _StatusUseCaseFake(run=base_run),  # type: ignore[arg-type]
+            get_top_use_case=top_use_case
+            or _TopUseCaseFake(result=_top_result(run=base_run)),  # type: ignore[arg-type]
+            list_use_case=resolved_list_use_case,  # type: ignore[arg-type]
+            cancel_use_case=cancel_use_case or _CancelUseCaseFake(run=base_run),  # type: ignore[arg-type]
+            current_user_dependency=_HeaderCurrentUserDependency(),
+        )
+    )
+    return TestClient(app), resolved_list_use_case
+
+
+def test_get_backtest_runs_returns_history_page_with_public_run_metadata() -> None:
+    """
+    Verify `GET /backtests/runs` returns deterministic history payload with `run_id` vocabulary.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public history list hides internal hashes and exposes persisted metadata fields.
+    Raises:
+        AssertionError: If status code, cursor decoding, or payload shape drifts.
+    Side Effects:
+        None.
+    """
+    cursor = BacktestJobListCursor(
+        created_at=datetime(2026, 3, 29, 11, 30, tzinfo=timezone.utc),
+        job_id=UUID("00000000-0000-0000-0000-000000000931"),
+    )
+    list_fake = _ListUseCaseFake(
+        page=BacktestJobListPage(
+            items=(
+                _queued_run(run_id=UUID("00000000-0000-0000-0000-000000000932")),
+            ),
+            next_cursor=cursor,
+        )
+    )
+    client, resolved_list_fake = _build_client(list_use_case=list_fake)
+
+    response = client.get(
+        "/backtests/runs",
+        params={
+            "state": "RUNNING",
+            "cursor": encode_backtest_runs_cursor(cursor=cursor),
+        },
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"][0]["run_id"] == "00000000-0000-0000-0000-000000000932"
+    assert body["items"][0]["execution_mode"] == "sync_inline"
+    assert body["items"][0]["market_id"] == 1
+    assert body["items"][0]["symbol"] == "BTCUSDT"
+    assert body["items"][0]["requested_top_n"] == 25
+    assert body["next_cursor"] == encode_backtest_runs_cursor(cursor=cursor)
+    assert resolved_list_fake.last_state == "running"
+    assert resolved_list_fake.last_cursor == cursor
+
+
+def test_get_backtest_run_status_returns_failed_payload_with_public_fields() -> None:
+    """
+    Verify `GET /backtests/runs/{run_id}` returns failure payload and persisted metadata.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public runs payload exposes owner-visible state metadata but not internal hashes.
+    Raises:
+        AssertionError: If payload shape drifts from the R7-03 contract.
+    Side Effects:
+        None.
+    """
+    failed_run = _failed_run(run_id=UUID("00000000-0000-0000-0000-000000000933"))
+    client, _ = _build_client(status_use_case=_StatusUseCaseFake(run=failed_run))
+
+    response = client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000933",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["run_id"] == "00000000-0000-0000-0000-000000000933"
+    assert body["state"] == "failed"
+    assert body["execution_mode"] == "sync_inline"
+    assert body["artifact_slot"] == "slot_b"
+    assert body["artifact_slot_generation"] == 11
+    assert body["artifact_asof_date"] == "2026-03-29"
+    assert body["last_error_json"] == {
+        "code": "unexpected_error",
+        "message": "Execution failed",
+        "details": {"stage": "stage_b"},
+    }
+    assert "request_hash" not in body
+
+
+def test_get_backtest_run_top_returns_summary_only_rows_with_persisted_metrics() -> None:
+    """
+    Verify `GET /backtests/runs/{run_id}/top` exposes deterministic summary-only row fields.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public `/top` rows expose `summary_metrics_json/best_tp_pct/best_sl_pct` and no details.
+    Raises:
+        AssertionError: If payload shape drifts from the persisted summary contract.
+    Side Effects:
+        None.
+    """
+    run = _queued_run(run_id=UUID("00000000-0000-0000-0000-000000000934"))
+    client, _ = _build_client(top_use_case=_TopUseCaseFake(result=_top_result(run=run)))
+
+    response = client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000934/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["run_id"] == "00000000-0000-0000-0000-000000000934"
+    assert body["execution_mode"] == "sync_inline"
+    assert body["items"] == [
+        {
+            "rank": 1,
+            "variant_key": "a" * 64,
+            "indicator_variant_key": "b" * 64,
+            "variant_index": 0,
+            "total_return_pct": 10.0,
+            "payload": {"schema_version": 1},
+            "summary_metrics_json": {
+                "total_return_pct": 10.0,
+                "profit_factor": 1.5,
+            },
+            "best_tp_pct": 4.0,
+            "best_sl_pct": 2.0,
+        }
+    ]
+
+
+def test_post_backtest_run_cancel_returns_updated_status_snapshot() -> None:
+    """
+    Verify `POST /backtests/runs/{run_id}/cancel` returns updated public status payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Cancel use-case returns updated owner snapshot.
+    Raises:
+        AssertionError: If endpoint status or payload drifts from the R7-03 contract.
+    Side Effects:
+        None.
+    """
+    cancelled_run = _queued_run(
+        run_id=UUID("00000000-0000-0000-0000-000000000935")
+    ).request_cancel(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
+    )
+    client, _ = _build_client(cancel_use_case=_CancelUseCaseFake(run=cancelled_run))
+
+    response = client.post(
+        "/backtests/runs/00000000-0000-0000-0000-000000000935/cancel",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "cancelled"
+    assert response.json()["run_id"] == "00000000-0000-0000-0000-000000000935"
+
+
+def test_get_backtest_run_status_maps_foreign_and_missing_errors() -> None:
+    """
+    Verify public status route preserves explicit `403` for foreign and `404` for missing runs.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Use-case already produced canonical public runs errors.
+    Raises:
+        AssertionError: If route/error-handler mapping changes status codes or payloads.
+    Side Effects:
+        None.
+    """
+    forbidden_client, _ = _build_client(
+        status_use_case=_StatusUseCaseFake(
+            error=backtest_run_forbidden(
+                run_id=UUID("00000000-0000-0000-0000-000000000936")
+            )
+        )
+    )
+    not_found_client, _ = _build_client(
+        status_use_case=_StatusUseCaseFake(
+            error=backtest_run_not_found(
+                run_id=UUID("00000000-0000-0000-0000-000000000937")
+            )
+        )
+    )
+
+    forbidden = forbidden_client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000936",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+    not_found = not_found_client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000937",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert forbidden.status_code == 403
+    assert forbidden.json()["error"]["details"]["run_id"] == (
+        "00000000-0000-0000-0000-000000000936"
+    )
+    assert not_found.status_code == 404
+    assert not_found.json()["error"]["details"]["run_id"] == (
+        "00000000-0000-0000-0000-000000000937"
+    )
+
+
+def test_get_backtest_runs_rejects_invalid_state_filter() -> None:
+    """
+    Verify `GET /backtests/runs` rejects unknown state values with deterministic 422 payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public runs reuse the legacy state decoder and unified deterministic 422 mapping.
+    Raises:
+        AssertionError: If invalid state is accepted or payload changes.
+    Side Effects:
+        None.
+    """
+    client, _ = _build_client()
+
+    response = client.get(
+        "/backtests/runs",
+        params={"state": "done"},
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "validation_error",
+            "message": "Invalid runs state filter",
+            "details": {
+                "errors": [
+                    {
+                        "path": "query.state",
+                        "code": "invalid_value",
+                        "message": (
+                            "state must be one of: queued, running, succeeded, failed, cancelled"
+                        ),
+                    }
+                ]
+            },
+        }
+    }
+
+
+def test_get_backtest_run_top_maps_validation_error_for_invalid_limit() -> None:
+    """
+    Verify `GET /backtests/runs/{run_id}/top` maps use-case validation errors to 422.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Top-limit validation stays in application layer and flows through shared handlers.
+    Raises:
+        AssertionError: If validation error stops mapping to canonical 422 payload.
+    Side Effects:
+        None.
+    """
+    client, _ = _build_client(
+        top_use_case=_TopUseCaseFake(
+            error=BacktestValidationError(
+                "Top rows limit must be > 0",
+                errors=(
+                    {
+                        "path": "query.limit",
+                        "code": "greater_than",
+                        "message": "limit must be > 0",
+                    },
+                ),
+            )
+        )
+    )
+
+    response = client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000938/top?limit=0",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "validation_error",
+            "message": "Top rows limit must be > 0",
+            "details": {
+                "errors": [
+                    {
+                        "path": "query.limit",
+                        "code": "greater_than",
+                        "message": "limit must be > 0",
+                    }
+                ]
+            },
+        }
+    }
+
+
+def _top_result(*, run: BacktestJob) -> BacktestRunTopReadResult:
+    """
+    Build deterministic top-use-case result fixture for public runs route tests.
+
+    Args:
+        run: Persisted run fixture used for response state and metadata.
+    Returns:
+        BacktestRunTopReadResult: Deterministic summary-only top result fixture.
+    Assumptions:
+        Persisted rows remain summary-only under the R7-03 contract.
+    Raises:
+        ValueError: If top-row fixture violates entity invariants.
+    Side Effects:
+        None.
+    """
+    row = BacktestJobTopVariant(
+        job_id=run.job_id,
+        rank=1,
+        variant_key="a" * 64,
+        indicator_variant_key="b" * 64,
+        variant_index=0,
+        total_return_pct=10.0,
+        payload_json={"schema_version": 1},
+        summary_metrics_json={"total_return_pct": 10.0, "profit_factor": 1.5},
+        best_tp_pct=4.0,
+        best_sl_pct=2.0,
+        report_table_md=None,
+        trades_json=None,
+        updated_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+    )
+    return BacktestRunTopReadResult(job=run, rows=(row,))
+
+
+def _queued_run(*, run_id: UUID) -> BacktestJob:
+    """
+    Build deterministic queued persisted run fixture for public route tests.
+
+    Args:
+        run_id: Deterministic persisted run identifier.
+    Returns:
+        BacktestJob: Queued persisted run fixture.
+    Assumptions:
+        Run belongs to the request principal used in route tests.
+    Raises:
+        ValueError: If fixture violates domain invariants.
+    Side Effects:
+        None.
+    """
+    return BacktestJob.create_queued(
+        job_id=run_id,
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 30, tzinfo=timezone.utc),
+        request_json={
+            "time_range": {
+                "start": "2026-03-28T00:00:00+00:00",
+                "end": "2026-03-28T01:00:00+00:00",
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1h",
+            },
+            "top_k": 25,
+        },
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-29",
+        ),
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+
+
+def _running_run(*, run_id: UUID) -> BacktestJob:
+    """
+    Build deterministic running persisted run fixture for lifecycle route tests.
+
+    Args:
+        run_id: Deterministic persisted run identifier.
+    Returns:
+        BacktestJob: Running persisted run fixture.
+    Assumptions:
+        Lease fields remain valid and non-expired for running state.
+    Raises:
+        ValueError: If fixture violates lifecycle invariants.
+    Side Effects:
+        None.
+    """
+    queued = _queued_run(run_id=run_id)
+    return queued.claim(
+        changed_at=datetime(2026, 3, 29, 11, 35, tzinfo=timezone.utc),
+        locked_by="worker-a-1",
+        lease_expires_at=datetime(2026, 3, 29, 11, 36, tzinfo=timezone.utc),
+    )
+
+
+def _failed_run(*, run_id: UUID) -> BacktestJob:
+    """
+    Build deterministic failed persisted run fixture with Roehub-like error payload.
+
+    Args:
+        run_id: Deterministic persisted run identifier.
+    Returns:
+        BacktestJob: Failed persisted run fixture.
+    Assumptions:
+        Failed state includes both short and structured error payload fields.
+    Raises:
+        ValueError: If fixture violates lifecycle invariants.
+    Side Effects:
+        None.
+    """
+    running = _running_run(run_id=run_id)
+    return running.finish(
+        next_state="failed",
+        changed_at=datetime(2026, 3, 29, 11, 37, tzinfo=timezone.utc),
+        last_error="Execution failed",
+        last_error_json=BacktestJobErrorPayload(
+            code="unexpected_error",
+            message="Execution failed",
+            details={"stage": "stage_b"},
+        ),
+    )
