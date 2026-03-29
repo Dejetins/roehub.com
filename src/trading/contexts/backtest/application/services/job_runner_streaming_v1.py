@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from heapq import heappush, heapreplace
 from types import MappingProxyType
@@ -118,11 +118,22 @@ class BacktestJobTopVariantCandidateV1:
     indicator_selections: tuple[IndicatorVariantSelection, ...]
     signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]]
     risk_params: Mapping[str, BacktestVariantScalar]
+    summary_metrics_json: Mapping[str, Any] = field(default_factory=dict)
+    best_tp_pct: float | None = None
+    best_sl_pct: float | None = None
 
     def __post_init__(self) -> None:
         """
         Validate deterministic candidate identity and normalize nested mappings.
 
+        Docs:
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+          - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
         Args:
             None.
         Returns:
@@ -154,6 +165,35 @@ class BacktestJobTopVariantCandidateV1:
             MappingProxyType(_sorted_scalar_mapping(values=self.risk_params)),
         )
         object.__setattr__(self, "total_return_pct", float(self.total_return_pct))
+        normalized_summary_metrics = _sorted_summary_metrics_mapping(
+            values=self.summary_metrics_json,
+            total_return_pct=float(self.total_return_pct),
+        )
+        object.__setattr__(
+            self,
+            "summary_metrics_json",
+            MappingProxyType(normalized_summary_metrics),
+        )
+        object.__setattr__(
+            self,
+            "best_tp_pct",
+            _resolve_best_risk_pct(
+                explicit_value=self.best_tp_pct,
+                risk_params=self.risk_params,
+                flag_key="tp_enabled",
+                value_key="tp_pct",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "best_sl_pct",
+            _resolve_best_risk_pct(
+                explicit_value=self.best_sl_pct,
+                risk_params=self.risk_params,
+                flag_key="sl_enabled",
+                value_key="sl_pct",
+            ),
+        )
 
 
 class BacktestJobTopKBufferV1:
@@ -289,6 +329,15 @@ def build_running_snapshot_rows(
     """
     Build persisted running snapshot rows with `report_table_md` and trades set to null.
 
+    Docs:
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
     Args:
         job_id: Job identifier.
         now: Snapshot timestamp in UTC.
@@ -321,6 +370,9 @@ def build_running_snapshot_rows(
                     sizing_mode=sizing_mode,
                     execution_params=execution_params,
                 ),
+                summary_metrics_json=candidate.summary_metrics_json,
+                best_tp_pct=candidate.best_tp_pct,
+                best_sl_pct=candidate.best_sl_pct,
                 report_table_md=None,
                 trades_json=None,
                 updated_at=now,
@@ -375,6 +427,15 @@ def build_finalized_snapshot_rows(
     """
     Build finalized succeeded snapshot rows in summary-only form for persisted runtime storage.
 
+    Docs:
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
     Args:
         job_id: Job identifier.
         now: Snapshot timestamp in UTC.
@@ -414,6 +475,9 @@ def build_finalized_snapshot_rows(
                     sizing_mode=sizing_mode,
                     execution_params=execution_params,
                 ),
+                summary_metrics_json=candidate.summary_metrics_json,
+                best_tp_pct=candidate.best_tp_pct,
+                best_sl_pct=candidate.best_sl_pct,
                 report_table_md=None,
                 trades_json=None,
                 updated_at=now,
@@ -610,6 +674,96 @@ def _descending_text_key(*, value: str) -> tuple[int, ...]:
         Allocates tuple used only for retained heap entries.
     """
     return (*(-ord(char) for char in value), 0)
+
+
+def _sorted_summary_metrics_mapping(
+    *,
+    values: Mapping[str, Any],
+    total_return_pct: float,
+) -> dict[str, Any]:
+    """
+    Normalize persisted summary metrics mapping into deterministic JSON-object shape.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+    Args:
+        values: Raw summary metrics mapping.
+        total_return_pct: Deterministic total return value for compatibility fill-in.
+    Returns:
+        dict[str, Any]: Key-sorted summary metrics object containing `total_return_pct`.
+    Assumptions:
+        Summary metrics remain JSON-serializable numeric scalars used for persisted top rows.
+    Raises:
+        ValueError: If a metric key is blank.
+    Side Effects:
+        None.
+    """
+    normalized: dict[str, Any] = {}
+    for raw_key in sorted(values.keys(), key=lambda item: str(item)):
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError("summary metrics keys must be non-empty")
+        normalized[key] = values[raw_key]
+    normalized["total_return_pct"] = float(total_return_pct)
+    return normalized
+
+
+def _resolve_best_risk_pct(
+    *,
+    explicit_value: float | None,
+    risk_params: Mapping[str, BacktestVariantScalar],
+    flag_key: str,
+    value_key: str,
+) -> float | None:
+    """
+    Resolve persisted best TP/SL percentage from explicit value or normalized risk payload.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+    Args:
+        explicit_value: Preferred explicit best percentage.
+        risk_params: Risk payload carrying `*_enabled` and `*_pct` fields.
+        flag_key: Enable flag key (`tp_enabled` or `sl_enabled`).
+        value_key: Percentage key (`tp_pct` or `sl_pct`).
+    Returns:
+        float | None: Resolved non-negative percentage or `None`.
+    Assumptions:
+        Disabled TP/SL axes keep persisted percentage fields null.
+    Raises:
+        ValueError: If resolved value is boolean, non-numeric, or negative.
+    Side Effects:
+        None.
+    """
+    if explicit_value is not None:
+        if isinstance(explicit_value, bool) or not isinstance(explicit_value, int | float):
+            raise ValueError("best_tp_pct/best_sl_pct must be numeric")
+        normalized_explicit = float(explicit_value)
+        if normalized_explicit < 0.0:
+            raise ValueError("best_tp_pct/best_sl_pct must be >= 0")
+        return normalized_explicit
+    if risk_params.get(flag_key) is False:
+        return None
+    value = risk_params.get(value_key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError("best_tp_pct/best_sl_pct must be numeric")
+    normalized = float(value)
+    if normalized < 0.0:
+        raise ValueError("best_tp_pct/best_sl_pct must be >= 0")
+    return normalized
 
 
 def _sorted_scalar_mapping(

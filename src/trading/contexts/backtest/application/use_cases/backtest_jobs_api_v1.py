@@ -7,7 +7,12 @@ from types import MappingProxyType
 from typing import Any, Callable, Mapping
 from uuid import UUID, uuid4
 
-from trading.contexts.backtest.application.dto import RunBacktestRequest, RunBacktestTemplate
+from trading.contexts.backtest.application.dto import (
+    BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
+    BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
+    RunBacktestRequest,
+    RunBacktestTemplate,
+)
 from trading.contexts.backtest.application.ports import (
     BacktestGridDefaultsProvider,
     BacktestJobListQuery,
@@ -265,6 +270,14 @@ class CreateBacktestJobUseCase:
         """
         Validate and persist queued Backtest job snapshot for authenticated owner.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-api-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+          - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
         Args:
             command: Create command with parsed run request and strict API payload snapshot.
             current_user: Authenticated owner identity.
@@ -321,6 +334,16 @@ class CreateBacktestJobUseCase:
             template=resolved.template,
             mode=resolved.mode,
         )
+        ranking_primary_metric = (
+            command.run_request.ranking.primary_metric
+            if command.run_request.ranking is not None
+            else BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1
+        )
+        ranking_secondary_metric = (
+            command.run_request.ranking.secondary_metric
+            if command.run_request.ranking is not None
+            else BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
+        )
 
         job = BacktestJob.create_queued(
             job_id=self._job_id_factory(),
@@ -340,6 +363,13 @@ class CreateBacktestJobUseCase:
             ),
             backtest_runtime_config_hash=self._backtest_runtime_config_hash,
             artifact_pin=artifact_pin,
+            execution_mode="background_manual_legacy",
+            market_id=resolved.template.instrument_id.market_id.value,
+            symbol=str(resolved.template.instrument_id.symbol),
+            timeframe=str(resolved.template.timeframe),
+            requested_top_n=resolved.top_k,
+            ranking_primary_metric=ranking_primary_metric,
+            ranking_secondary_metric=ranking_secondary_metric,
         )
         return self._job_repository.create(job=job)
 

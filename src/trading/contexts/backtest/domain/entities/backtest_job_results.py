@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from types import MappingProxyType
 from typing import Any, Mapping, Sequence
@@ -33,14 +33,26 @@ class BacktestJobTopVariant:
     variant_index: int
     total_return_pct: float
     payload_json: Mapping[str, Any]
-    report_table_md: str | None
-    trades_json: tuple[Mapping[str, Any], ...] | None
     updated_at: datetime
+    summary_metrics_json: Mapping[str, Any] = field(default_factory=dict)
+    best_tp_pct: float | None = None
+    best_sl_pct: float | None = None
+    report_table_md: str | None = None
+    trades_json: tuple[Mapping[str, Any], ...] | None = None
 
     def __post_init__(self) -> None:
         """
         Validate top-variant row shape and normalize JSON payloads.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_results_repository.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
         Args:
             None.
         Returns:
@@ -71,29 +83,37 @@ class BacktestJobTopVariant:
             )
 
         payload = _normalize_json_object(value=self.payload_json)
-        trades_payload: tuple[Mapping[str, Any], ...] | None = None
-        if self.trades_json is not None:
-            normalized_trades: list[Mapping[str, Any]] = []
-            for item in self.trades_json:
-                normalized_trades.append(MappingProxyType(_normalize_json_object(value=item)))
-            trades_payload = tuple(normalized_trades)
+        summary_metrics = _normalize_json_object(value=self.summary_metrics_json)
+        summary_metrics["total_return_pct"] = float(self.total_return_pct)
 
         _ensure_utc_datetime(name="updated_at", value=self.updated_at)
 
-        normalized_report = self.report_table_md
-        if normalized_report is not None:
-            normalized_report = normalized_report.strip()
-            if not normalized_report:
-                raise BacktestJobTransitionError(
-                    "BacktestJobTopVariant.report_table_md cannot be blank"
-                )
+        if self.report_table_md is not None:
+            raise BacktestJobTransitionError(
+                "BacktestJobTopVariant.report_table_md must stay null in summary-only contract"
+            )
+        if self.trades_json is not None:
+            raise BacktestJobTransitionError(
+                "BacktestJobTopVariant.trades_json must stay null in summary-only contract"
+            )
 
         object.__setattr__(self, "variant_key", normalized_variant_key)
         object.__setattr__(self, "indicator_variant_key", normalized_indicator_key)
         object.__setattr__(self, "total_return_pct", float(self.total_return_pct))
         object.__setattr__(self, "payload_json", MappingProxyType(payload))
-        object.__setattr__(self, "trades_json", trades_payload)
-        object.__setattr__(self, "report_table_md", normalized_report)
+        object.__setattr__(self, "summary_metrics_json", MappingProxyType(summary_metrics))
+        object.__setattr__(
+            self,
+            "best_tp_pct",
+            _normalize_optional_non_negative_float(name="best_tp_pct", value=self.best_tp_pct),
+        )
+        object.__setattr__(
+            self,
+            "best_sl_pct",
+            _normalize_optional_non_negative_float(name="best_sl_pct", value=self.best_sl_pct),
+        )
+        object.__setattr__(self, "trades_json", None)
+        object.__setattr__(self, "report_table_md", None)
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,20 +204,64 @@ class BacktestJobStageAShortlist:
 
 def report_table_md_allowed_for_state(*, state: BacktestJobState) -> bool:
     """
-    Check whether `report_table_md` is allowed for given job state.
+    Check legacy `report_table_md` compatibility policy for one job state.
 
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
     Args:
         state: Job lifecycle state.
     Returns:
-        bool: `True` only for `succeeded` state.
+        bool: Always `False` under the summary-only persisted rows contract.
     Assumptions:
-        Non-succeeded jobs keep `report_table_md` as `NULL` in storage contract.
+        `report_table_md` is deprecated and remains outside the R7-01 persisted results contract.
     Raises:
         None.
     Side Effects:
         None.
     """
-    return state == "succeeded"
+    _ = state
+    return False
+
+
+def _normalize_optional_non_negative_float(*, name: str, value: float | None) -> float | None:
+    """
+    Normalize one optional non-negative percentage field used by summary-only persisted rows.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Optional raw percentage value.
+    Returns:
+        float | None: Normalized float value or `None`.
+    Assumptions:
+        Persisted best TP/SL percentages are nullable and must be non-negative when present.
+    Raises:
+        BacktestJobTransitionError: If the value is boolean, non-numeric, or negative.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise BacktestJobTransitionError(f"BacktestJobTopVariant.{name} must be numeric")
+    normalized = float(value)
+    if normalized < 0.0:
+        raise BacktestJobTransitionError(f"BacktestJobTopVariant.{name} must be >= 0")
+    return normalized
 
 
 

@@ -1313,6 +1313,26 @@ def test_process_claimed_job_persists_stage_progress_and_finalizing_policy() -> 
     running_rows = results_repository.replace_calls[0]["rows"]
     assert all(row.report_table_md is None for row in running_rows)
     assert all(row.trades_json is None for row in running_rows)
+    assert all(
+        row.summary_metrics_json["total_return_pct"] == row.total_return_pct
+        for row in running_rows
+    )
+    assert tuple(row.best_tp_pct for row in running_rows) == tuple(
+        (
+            float(row.payload_json["risk_params"]["tp_pct"])
+            if row.payload_json["risk_params"]["tp_enabled"] is True
+            else None
+        )
+        for row in running_rows
+    )
+    assert tuple(row.best_sl_pct for row in running_rows) == tuple(
+        (
+            float(row.payload_json["risk_params"]["sl_pct"])
+            if row.payload_json["risk_params"]["sl_enabled"] is True
+            else None
+        )
+        for row in running_rows
+    )
 
     assert len(results_repository.replace_calls) == 1
     assert reporting_service.calls == []
@@ -2132,6 +2152,13 @@ def _build_running_job() -> BacktestJob:
         spec_payload_json=None,
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
+        execution_mode="background_manual_legacy",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=5,
+        ranking_primary_metric="total_return_pct",
+        ranking_secondary_metric=None,
     )
     return queued.claim(
         changed_at=created_at + timedelta(seconds=5),
@@ -2173,6 +2200,13 @@ def _build_running_job_with_artifact_pin() -> BacktestJob:
             artifact_manifest_hash="d" * 64,
             artifact_asof_date="2026-03-29",
         ),
+        execution_mode="background_manual_legacy",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=5,
+        ranking_primary_metric="total_return_pct",
+        ranking_secondary_metric=None,
     )
     return queued.claim(
         changed_at=created_at + timedelta(seconds=5),

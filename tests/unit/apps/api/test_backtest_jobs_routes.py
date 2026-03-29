@@ -597,6 +597,9 @@ def test_get_backtest_job_top_preserves_explicit_source_in_summary_payload() -> 
             "direction_mode": "long-short",
             "sizing_mode": "all_in",
         },
+        summary_metrics_json={"total_return_pct": 8.5, "win_rate_pct": 60.0},
+        best_tp_pct=None,
+        best_sl_pct=None,
         report_table_md=None,
         trades_json=None,
         updated_at=datetime(2026, 2, 23, 12, 0, tzinfo=timezone.utc),
@@ -812,12 +815,13 @@ def _top_result(*, job: BacktestJob, include_details: bool) -> BacktestJobTopRea
     Returns:
         BacktestJobTopReadResult: Top result fixture.
     Assumptions:
-        Route mapping enforces details visibility based on job state.
+        R7-01 keeps persisted rows summary-only, so `include_details` is legacy test input only.
     Raises:
         ValueError: If top-row fixture violates entity invariants.
     Side Effects:
         None.
     """
+    _ = include_details
     row = BacktestJobTopVariant(
         job_id=job.job_id,
         rank=1,
@@ -826,8 +830,11 @@ def _top_result(*, job: BacktestJob, include_details: bool) -> BacktestJobTopRea
         variant_index=0,
         total_return_pct=10.0,
         payload_json={"schema_version": 1},
-        report_table_md="|Metric|Value|" if include_details else None,
-        trades_json=({"trade_id": 1, "net_pnl_quote": 12.34},) if include_details else None,
+        summary_metrics_json={"total_return_pct": 10.0, "profit_factor": 1.5},
+        best_tp_pct=4.0,
+        best_sl_pct=2.0,
+        report_table_md=None,
+        trades_json=None,
         updated_at=datetime(2026, 2, 23, 12, 0, tzinfo=timezone.utc),
     )
     return BacktestJobTopReadResult(job=job, rows=(row,))

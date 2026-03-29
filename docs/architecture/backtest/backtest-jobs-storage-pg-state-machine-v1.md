@@ -5,6 +5,16 @@
 ## Status
 
 - Status: active v1 jobs storage contract with R0 freeze notes.
+- R7-01 additive update:
+  - same PG table family (`backtest_jobs`, `backtest_job_top_variants`,
+    `backtest_job_stage_a_shortlist`) is now the canonical persisted-run storage for both
+    inline and background executions,
+  - `backtest_jobs` carries denormalized run metadata for future history/filter endpoints:
+    `execution_mode`, `market_id`, `symbol`, `timeframe`, `requested_top_n`,
+    `ranking_primary_metric`, `ranking_secondary_metric`,
+  - persisted top rows are summary-only:
+    `summary_metrics_json`, `best_tp_pct`, `best_sl_pct` are contract fields,
+    while `report_table_md` and `trades_json` remain transitional `NULL`-only columns.
 - Superseded by target-v2 storage direction:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -72,6 +82,13 @@
   - `spec_payload_json jsonb null` (обязателен для `mode=saved`)
   - `engine_params_hash text not null` (sha256 hex)
   - `backtest_runtime_config_hash text not null` (sha256 hex)
+  - `execution_mode text null` (`sync_inline|background_auto|background_manual_legacy`)
+  - `market_id int null`
+  - `symbol text null`
+  - `timeframe text null`
+  - `requested_top_n int null`
+  - `ranking_primary_metric text null`
+  - `ranking_secondary_metric text null`
   - `artifact_slot text null`
   - `artifact_slot_generation int null`
   - `artifact_manifest_hash text null`
@@ -109,6 +126,17 @@
     - `artifact_slot_generation > 0`
     - `artifact_manifest_hash` соответствует sha256 hex
     - `artifact_asof_date` соответствует `YYYY-MM-DD`
+  - persisted-run metadata consistency:
+    - `execution_mode in ('sync_inline', 'background_auto', 'background_manual_legacy')`
+    - `market_id > 0`, `requested_top_n > 0` когда заданы
+    - `symbol/timeframe` не пустые строки когда заданы
+    - `ranking_primary_metric/ranking_secondary_metric` ограничены approved literals:
+      `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
+      `profit_factor`, `sharpe_trades`, `win_rate_pct`
+    - `ranking_secondary_metric != ranking_primary_metric` когда обе заданы
+    - additive run metadata заполняется согласованно:
+      либо все новые поля `NULL`, либо заданы
+      `execution_mode/market_id/symbol/timeframe/requested_top_n/ranking_primary_metric`
 - indexes:
   - list: `(user_id, state, created_at desc, job_id desc)`
   - queue claim FIFO: `(state, created_at asc, job_id asc)`
@@ -116,6 +144,10 @@
   - active quota helper (partial): `(user_id)` where `state in ('queued','running')`
   - active artifact pin helper (partial): `(artifact_slot, artifact_manifest_hash)`
     where `state in ('queued','running')`
+  - persisted-run history/filter helpers:
+    - `(user_id, execution_mode, created_at desc, job_id desc)`
+    - `(user_id, market_id, symbol, timeframe, created_at desc, job_id desc)`
+    - `(user_id, ranking_primary_metric, ranking_secondary_metric, created_at desc, job_id desc)`
 
 #### 1.2 `backtest_job_top_variants`
 
@@ -128,8 +160,11 @@
 - `variant_index int not null`
 - `total_return_pct double precision not null`
 - `payload_json jsonb not null`
-- `report_table_md text null`
-- `trades_json jsonb null`
+- `summary_metrics_json jsonb null`
+- `best_tp_pct double precision null`
+- `best_sl_pct double precision null`
+- `report_table_md text null` (transitional, contract write policy = always `NULL`)
+- `trades_json jsonb null` (transitional, contract write policy = always `NULL`)
 - `updated_at timestamptz not null`
 
 Минимальные constraints/indexes:
@@ -140,14 +175,19 @@
 - checks:
   - `rank > 0`, `variant_index >= 0`
   - `payload_json` object shape
+  - `summary_metrics_json` is null or json object
+  - `best_tp_pct >= 0`, `best_sl_pct >= 0` when present
   - `trades_json` is null or json array
 - index:
   - `idx_backtest_job_top_variants_job_rank (job_id, rank)`
 
-Примечание по `report_table_md`:
+R7-01 summary-only policy:
 
-- Для `succeeded` job поле заполняется на этапе `finalizing`.
-- Для `running`/`failed`/`cancelled` допускается только `NULL`.
+- persisted ordering остаётся `rank ASC, variant_key ASC`;
+- contract top row включает `payload_json + summary_metrics_json + best_tp_pct + best_sl_pct`;
+- `report_table_md` и `trades_json` не участвуют в persisted-run contract и должны оставаться
+  `NULL` и для `running`, и для terminal snapshots;
+- legacy rows с `NULL` в additive полях остаются читаемыми через repository mappers.
 
 #### 1.3 `backtest_job_stage_a_shortlist`
 

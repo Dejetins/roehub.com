@@ -225,11 +225,12 @@ def test_build_running_snapshot_rows_preserves_explicit_source_in_payload_json()
         ),
         signal_params={"ma.sma": {"cross_up": 0.5}},
         risk_params={
-            "sl_enabled": False,
-            "sl_pct": None,
-            "tp_enabled": False,
-            "tp_pct": None,
+            "sl_enabled": True,
+            "sl_pct": 1.5,
+            "tp_enabled": True,
+            "tp_pct": 3.0,
         },
+        summary_metrics_json={"profit_factor": 1.3},
     )
 
     rows = build_running_snapshot_rows(
@@ -248,6 +249,12 @@ def test_build_running_snapshot_rows_preserves_explicit_source_in_payload_json()
             "params": {"window": 20},
         }
     ]
+    assert rows[0].summary_metrics_json == {
+        "profit_factor": 1.3,
+        "total_return_pct": 12.5,
+    }
+    assert rows[0].best_tp_pct == 3.0
+    assert rows[0].best_sl_pct == 1.5
 
 
 def test_build_finalized_snapshot_rows_remains_summary_only() -> None:
@@ -278,3 +285,6 @@ def test_build_finalized_snapshot_rows_remains_summary_only() -> None:
 
     assert rows[0].report_table_md is None
     assert rows[0].trades_json is None
+    assert rows[0].summary_metrics_json == {"total_return_pct": 11.0}
+    assert rows[0].best_tp_pct is None
+    assert rows[0].best_sl_pct is None

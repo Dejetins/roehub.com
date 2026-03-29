@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from types import MappingProxyType
 from typing import Any, Literal, Mapping, Sequence, cast
@@ -17,6 +17,11 @@ BacktestJobMode = Literal["saved", "template"]
 BacktestJobState = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 BacktestJobStage = Literal["stage_a", "stage_b", "finalizing"]
 BacktestArtifactSlotLiteral = Literal["slot_a", "slot_b"]
+BacktestJobExecutionMode = Literal[
+    "sync_inline",
+    "background_auto",
+    "background_manual_legacy",
+]
 
 _ACTIVE_JOB_STATES: frozenset[str] = frozenset({"queued", "running"})
 _TERMINAL_JOB_STATES: frozenset[str] = frozenset({"succeeded", "failed", "cancelled"})
@@ -33,6 +38,19 @@ _STAGE_ORDER: dict[str, int] = {
     "finalizing": 2,
 }
 _ALLOWED_ARTIFACT_SLOTS: frozenset[str] = frozenset({"slot_a", "slot_b"})
+_ALLOWED_EXECUTION_MODES: frozenset[str] = frozenset(
+    {"sync_inline", "background_auto", "background_manual_legacy"}
+)
+_ALLOWED_RANKING_METRICS: frozenset[str] = frozenset(
+    {
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,6 +240,13 @@ class BacktestJob:
     engine_params_hash: str = ""
     backtest_runtime_config_hash: str = ""
     artifact_pin: BacktestJobArtifactPin | None = None
+    execution_mode: BacktestJobExecutionMode | None = None
+    market_id: int | None = None
+    symbol: str | None = None
+    timeframe: str | None = None
+    requested_top_n: int | None = None
+    ranking_primary_metric: str | None = None
+    ranking_secondary_metric: str | None = None
     stage: BacktestJobStage = "stage_a"
     processed_units: int = 0
     total_units: int = 0
@@ -238,6 +263,15 @@ class BacktestJob:
         """
         Validate lifecycle, stage, lease, and reproducibility invariants for persisted jobs.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_repository.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
         Args:
             None.
         Returns:
@@ -404,6 +438,78 @@ class BacktestJob:
             _ensure_sha256_hex(name="spec_hash", value=self.spec_hash)
             object.__setattr__(self, "spec_hash", self.spec_hash.strip().lower())
 
+        has_persisted_run_metadata = any(
+            item is not None
+            for item in (
+                self.execution_mode,
+                self.market_id,
+                self.symbol,
+                self.timeframe,
+                self.requested_top_n,
+                self.ranking_primary_metric,
+                self.ranking_secondary_metric,
+            )
+        )
+        if has_persisted_run_metadata:
+            if (
+                self.execution_mode is None
+                or self.market_id is None
+                or self.symbol is None
+                or self.timeframe is None
+                or self.requested_top_n is None
+                or self.ranking_primary_metric is None
+            ):
+                raise BacktestJobTransitionError(
+                    "BacktestJob persisted run metadata must be all set except "
+                    "ranking_secondary_metric"
+                )
+            normalized_execution_mode = self.execution_mode.strip().lower()
+            if normalized_execution_mode not in _ALLOWED_EXECUTION_MODES:
+                raise BacktestJobTransitionError(
+                    "BacktestJob.execution_mode must be one of "
+                    f"{sorted(_ALLOWED_EXECUTION_MODES)}"
+                )
+            if isinstance(self.market_id, bool) or not isinstance(self.market_id, int):
+                raise BacktestJobTransitionError("BacktestJob.market_id must be integer")
+            if self.market_id <= 0:
+                raise BacktestJobTransitionError("BacktestJob.market_id must be > 0")
+            normalized_symbol = self.symbol.strip().upper()
+            if not normalized_symbol:
+                raise BacktestJobTransitionError("BacktestJob.symbol must be non-empty")
+            normalized_timeframe = self.timeframe.strip().lower()
+            if not normalized_timeframe:
+                raise BacktestJobTransitionError("BacktestJob.timeframe must be non-empty")
+            if isinstance(self.requested_top_n, bool) or not isinstance(self.requested_top_n, int):
+                raise BacktestJobTransitionError("BacktestJob.requested_top_n must be integer")
+            if self.requested_top_n <= 0:
+                raise BacktestJobTransitionError("BacktestJob.requested_top_n must be > 0")
+            normalized_primary_metric = _normalize_ranking_metric_literal(
+                name="ranking_primary_metric",
+                value=self.ranking_primary_metric,
+            )
+            normalized_secondary_metric = None
+            if self.ranking_secondary_metric is not None:
+                normalized_secondary_metric = _normalize_ranking_metric_literal(
+                    name="ranking_secondary_metric",
+                    value=self.ranking_secondary_metric,
+                )
+                if normalized_secondary_metric == normalized_primary_metric:
+                    raise BacktestJobTransitionError(
+                        "BacktestJob.ranking_secondary_metric must differ from "
+                        "ranking_primary_metric"
+                    )
+            object.__setattr__(
+                self,
+                "execution_mode",
+                cast(BacktestJobExecutionMode, normalized_execution_mode),
+            )
+            object.__setattr__(self, "market_id", self.market_id)
+            object.__setattr__(self, "symbol", normalized_symbol)
+            object.__setattr__(self, "timeframe", normalized_timeframe)
+            object.__setattr__(self, "requested_top_n", self.requested_top_n)
+            object.__setattr__(self, "ranking_primary_metric", normalized_primary_metric)
+            object.__setattr__(self, "ranking_secondary_metric", normalized_secondary_metric)
+
         if self.state == "failed":
             if self.last_error is None or not self.last_error.strip():
                 raise BacktestJobTransitionError(
@@ -442,10 +548,26 @@ class BacktestJob:
         engine_params_hash: str,
         backtest_runtime_config_hash: str,
         artifact_pin: BacktestJobArtifactPin | None = None,
+        execution_mode: BacktestJobExecutionMode | None = None,
+        market_id: int | None = None,
+        symbol: str | None = None,
+        timeframe: str | None = None,
+        requested_top_n: int | None = None,
+        ranking_primary_metric: str | None = None,
+        ranking_secondary_metric: str | None = None,
     ) -> BacktestJob:
         """
         Build initial queued job snapshot with deterministic defaults.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_repository.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
         Args:
             job_id: Stable job identifier.
             user_id: Job owner identifier.
@@ -458,6 +580,13 @@ class BacktestJob:
             engine_params_hash: Effective execution settings hash.
             backtest_runtime_config_hash: Runtime result-affecting hash.
             artifact_pin: Optional strict artifact-slot identity pinned at job creation time.
+            execution_mode: Optional persisted-run execution mode literal for R7-01 storage.
+            market_id: Optional denormalized instrument market id for history reads.
+            symbol: Optional denormalized instrument symbol for history reads.
+            timeframe: Optional denormalized timeframe literal for history reads.
+            requested_top_n: Optional persisted summary rows request cap.
+            ranking_primary_metric: Optional persisted primary ranking metric literal.
+            ranking_secondary_metric: Optional persisted secondary ranking metric literal.
         Returns:
             BacktestJob: New queued job aggregate.
         Assumptions:
@@ -484,6 +613,13 @@ class BacktestJob:
             engine_params_hash=engine_params_hash,
             backtest_runtime_config_hash=backtest_runtime_config_hash,
             artifact_pin=artifact_pin,
+            execution_mode=execution_mode,
+            market_id=market_id,
+            symbol=symbol,
+            timeframe=timeframe,
+            requested_top_n=requested_top_n,
+            ranking_primary_metric=ranking_primary_metric,
+            ranking_secondary_metric=ranking_secondary_metric,
             stage="stage_a",
             processed_units=0,
             total_units=0,
@@ -541,6 +677,13 @@ class BacktestJob:
         """
         Claim queued or expired-running job and assign active lease owner.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_lease_repository.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
         Args:
             changed_at: Claim timestamp in UTC.
             locked_by: Lease owner identity (`<hostname>-<pid>` style literal).
@@ -575,27 +718,12 @@ class BacktestJob:
             )
 
         started_at = self.started_at if self.started_at is not None else changed_at
-        return BacktestJob(
-            job_id=self.job_id,
-            user_id=self.user_id,
-            mode=self.mode,
+        return replace(
+            self,
             state="running",
-            created_at=self.created_at,
             updated_at=changed_at,
             started_at=started_at,
             finished_at=None,
-            cancel_requested_at=self.cancel_requested_at,
-            request_json=self.request_json,
-            request_hash=self.request_hash,
-            spec_hash=self.spec_hash,
-            spec_payload_json=self.spec_payload_json,
-            engine_params_hash=self.engine_params_hash,
-            backtest_runtime_config_hash=self.backtest_runtime_config_hash,
-            artifact_pin=self.artifact_pin,
-            stage=self.stage,
-            processed_units=self.processed_units,
-            total_units=self.total_units,
-            progress_updated_at=self.progress_updated_at,
             locked_by=normalized_locked_by,
             locked_at=changed_at,
             lease_expires_at=lease_expires_at,
@@ -615,6 +743,13 @@ class BacktestJob:
         """
         Extend running job lease for the same owner.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_lease_repository.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
         Args:
             changed_at: Heartbeat timestamp in UTC.
             locked_by: Expected active owner identifier.
@@ -647,34 +782,11 @@ class BacktestJob:
                 "BacktestJob.renew_lease lease_expires_at must be after changed_at"
             )
 
-        return BacktestJob(
-            job_id=self.job_id,
-            user_id=self.user_id,
-            mode=self.mode,
-            state=self.state,
-            created_at=self.created_at,
+        return replace(
+            self,
             updated_at=changed_at,
-            started_at=self.started_at,
-            finished_at=self.finished_at,
-            cancel_requested_at=self.cancel_requested_at,
-            request_json=self.request_json,
-            request_hash=self.request_hash,
-            spec_hash=self.spec_hash,
-            spec_payload_json=self.spec_payload_json,
-            engine_params_hash=self.engine_params_hash,
-            backtest_runtime_config_hash=self.backtest_runtime_config_hash,
-            artifact_pin=self.artifact_pin,
-            stage=self.stage,
-            processed_units=self.processed_units,
-            total_units=self.total_units,
-            progress_updated_at=self.progress_updated_at,
-            locked_by=self.locked_by,
-            locked_at=self.locked_at,
             lease_expires_at=lease_expires_at,
             heartbeat_at=changed_at,
-            attempt=self.attempt,
-            last_error=self.last_error,
-            last_error_json=self.last_error_json,
         )
 
     def update_progress(
@@ -688,6 +800,13 @@ class BacktestJob:
         """
         Update running progress counters with monotonic stage progression.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_lease_repository.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
         Args:
             changed_at: Progress timestamp in UTC.
             stage: Progress stage literal.
@@ -732,32 +851,13 @@ class BacktestJob:
                 f"BacktestJob.update_progress cannot move stage backward: {self.stage} -> {stage}"
             )
 
-        return BacktestJob(
-            job_id=self.job_id,
-            user_id=self.user_id,
-            mode=self.mode,
-            state=self.state,
-            created_at=self.created_at,
+        return replace(
+            self,
             updated_at=changed_at,
-            started_at=self.started_at,
-            finished_at=self.finished_at,
-            cancel_requested_at=self.cancel_requested_at,
-            request_json=self.request_json,
-            request_hash=self.request_hash,
-            spec_hash=self.spec_hash,
-            spec_payload_json=self.spec_payload_json,
-            engine_params_hash=self.engine_params_hash,
-            backtest_runtime_config_hash=self.backtest_runtime_config_hash,
-            artifact_pin=self.artifact_pin,
             stage=stage,
             processed_units=processed_units,
             total_units=total_units,
             progress_updated_at=changed_at,
-            locked_by=self.locked_by,
-            locked_at=self.locked_at,
-            lease_expires_at=self.lease_expires_at,
-            heartbeat_at=self.heartbeat_at,
-            attempt=self.attempt,
             last_error=None,
             last_error_json=None,
         )
@@ -766,6 +866,13 @@ class BacktestJob:
         """
         Apply cancel intent according to current state (`queued` immediate, `running` deferred).
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_repository.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
         Args:
             changed_at: Cancel-request timestamp in UTC.
         Returns:
@@ -784,63 +891,26 @@ class BacktestJob:
             )
 
         if self.state == "queued":
-            return BacktestJob(
-                job_id=self.job_id,
-                user_id=self.user_id,
-                mode=self.mode,
+            return replace(
+                self,
                 state="cancelled",
-                created_at=self.created_at,
                 updated_at=changed_at,
                 started_at=None,
                 finished_at=changed_at,
                 cancel_requested_at=changed_at,
-                request_json=self.request_json,
-                request_hash=self.request_hash,
-                spec_hash=self.spec_hash,
-                spec_payload_json=self.spec_payload_json,
-                engine_params_hash=self.engine_params_hash,
-                backtest_runtime_config_hash=self.backtest_runtime_config_hash,
-                artifact_pin=self.artifact_pin,
-                stage=self.stage,
-                processed_units=self.processed_units,
-                total_units=self.total_units,
-                progress_updated_at=self.progress_updated_at,
                 locked_by=None,
                 locked_at=None,
                 lease_expires_at=None,
                 heartbeat_at=None,
-                attempt=self.attempt,
                 last_error=None,
                 last_error_json=None,
             )
 
         if self.state == "running":
-            return BacktestJob(
-                job_id=self.job_id,
-                user_id=self.user_id,
-                mode=self.mode,
-                state=self.state,
-                created_at=self.created_at,
+            return replace(
+                self,
                 updated_at=changed_at,
-                started_at=self.started_at,
-                finished_at=self.finished_at,
                 cancel_requested_at=changed_at,
-                request_json=self.request_json,
-                request_hash=self.request_hash,
-                spec_hash=self.spec_hash,
-                spec_payload_json=self.spec_payload_json,
-                engine_params_hash=self.engine_params_hash,
-                backtest_runtime_config_hash=self.backtest_runtime_config_hash,
-                artifact_pin=self.artifact_pin,
-                stage=self.stage,
-                processed_units=self.processed_units,
-                total_units=self.total_units,
-                progress_updated_at=self.progress_updated_at,
-                locked_by=self.locked_by,
-                locked_at=self.locked_at,
-                lease_expires_at=self.lease_expires_at,
-                heartbeat_at=self.heartbeat_at,
-                attempt=self.attempt,
                 last_error=None,
                 last_error_json=None,
             )
@@ -858,6 +928,14 @@ class BacktestJob:
         """
         Transition running job to terminal state with deterministic failure payload rules.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+            backtest_job_lease_repository.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
         Args:
             next_state: Target terminal state (`succeeded`, `failed`, or `cancelled`).
             changed_at: Terminal transition timestamp in UTC.
@@ -905,32 +983,16 @@ class BacktestJob:
         if next_state == "succeeded":
             next_stage = "finalizing"
 
-        return BacktestJob(
-            job_id=self.job_id,
-            user_id=self.user_id,
-            mode=self.mode,
+        return replace(
+            self,
             state=cast(BacktestJobState, next_state),
-            created_at=self.created_at,
             updated_at=changed_at,
-            started_at=self.started_at,
             finished_at=changed_at,
-            cancel_requested_at=self.cancel_requested_at,
-            request_json=self.request_json,
-            request_hash=self.request_hash,
-            spec_hash=self.spec_hash,
-            spec_payload_json=self.spec_payload_json,
-            engine_params_hash=self.engine_params_hash,
-            backtest_runtime_config_hash=self.backtest_runtime_config_hash,
-            artifact_pin=self.artifact_pin,
             stage=next_stage,
-            processed_units=self.processed_units,
-            total_units=self.total_units,
-            progress_updated_at=self.progress_updated_at,
             locked_by=None,
             locked_at=None,
             lease_expires_at=None,
             heartbeat_at=None,
-            attempt=self.attempt,
             last_error=normalized_last_error,
             last_error_json=normalized_last_error_json,
         )
@@ -1070,6 +1132,40 @@ def _ensure_strict_date_literal(*, name: str, value: str) -> None:
         raise BacktestJobTransitionError(f"{name} must be YYYY-MM-DD") from error
 
 
+def _normalize_ranking_metric_literal(*, name: str, value: str) -> str:
+    """
+    Normalize one persisted ranking metric literal against the fixed R6-04/R7-01 set.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Raw ranking metric literal.
+    Returns:
+        str: Lowercase normalized metric literal.
+    Assumptions:
+        Allowed literals are fixed by the approved ranking contract and stay additive-only here.
+    Raises:
+        BacktestJobTransitionError: If literal is blank or unsupported.
+    Side Effects:
+        None.
+    """
+    normalized = value.strip().lower()
+    if not normalized:
+        raise BacktestJobTransitionError(f"BacktestJob.{name} must be non-empty")
+    if normalized not in _ALLOWED_RANKING_METRICS:
+        raise BacktestJobTransitionError(
+            f"BacktestJob.{name} must be one of {sorted(_ALLOWED_RANKING_METRICS)}"
+        )
+    return normalized
+
+
 def _normalize_json_object(*, value: Mapping[str, Any]) -> dict[str, Any]:
     """
     Normalize mapping payload into deterministic JSON-compatible object.
@@ -1132,6 +1228,7 @@ __all__ = [
     "BacktestArtifactSlotLiteral",
     "BacktestJob",
     "BacktestJobArtifactPin",
+    "BacktestJobExecutionMode",
     "BacktestJobErrorPayload",
     "BacktestJobMode",
     "BacktestJobStage",

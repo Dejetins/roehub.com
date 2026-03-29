@@ -1507,6 +1507,9 @@ def _ranked_candidates_from_core_rows(
                 indicator_selections=task.indicator_selections,
                 signal_params=task.signal_params,
                 risk_params=task.risk_params,
+                summary_metrics_json=row.summary_metrics_json,
+                best_tp_pct=row.best_tp_pct,
+                best_sl_pct=row.best_sl_pct,
             )
         )
     return tuple(candidates)

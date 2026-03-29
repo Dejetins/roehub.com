@@ -239,6 +239,13 @@ def test_job_repository_create_serializes_mappingproxy_request_payload() -> None
             artifact_manifest_hash="d" * 64,
             artifact_asof_date="2026-03-24",
         ),
+        execution_mode="background_manual_legacy",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
         stage="stage_a",
         processed_units=0,
         total_units=0,
@@ -253,6 +260,13 @@ def test_job_repository_create_serializes_mappingproxy_request_payload() -> None
     assert gateway.fetch_one_parameters[0]["artifact_slot"] == "slot_b"
     assert gateway.fetch_one_parameters[0]["artifact_slot_generation"] == 9
     assert gateway.fetch_one_parameters[0]["artifact_manifest_hash"] == "d" * 64
+    assert gateway.fetch_one_parameters[0]["execution_mode"] == "background_manual_legacy"
+    assert gateway.fetch_one_parameters[0]["market_id"] == 1
+    assert gateway.fetch_one_parameters[0]["symbol"] == "BTCUSDT"
+    assert gateway.fetch_one_parameters[0]["timeframe"] == "1h"
+    assert gateway.fetch_one_parameters[0]["requested_top_n"] == 25
+    assert gateway.fetch_one_parameters[0]["ranking_primary_metric"] == "profit_factor"
+    assert gateway.fetch_one_parameters[0]["ranking_secondary_metric"] == "win_rate_pct"
 
 
 def test_job_repository_count_active_for_artifact_manifest_uses_pin_and_instrument_filters(
@@ -285,6 +299,8 @@ def test_job_repository_count_active_for_artifact_manifest_uses_pin_and_instrume
     assert blocked_total == 2
     assert "artifact_slot = %(artifact_slot)s" in gateway.fetch_one_queries[0]
     assert "artifact_manifest_hash = %(artifact_manifest_hash)s" in gateway.fetch_one_queries[0]
+    assert "market_id = %(market_id)s" in gateway.fetch_one_queries[0]
+    assert "symbol = %(symbol)s" in gateway.fetch_one_queries[0]
     assert "request_json -> 'template' -> 'instrument_id'" in gateway.fetch_one_queries[0]
     assert "spec_payload_json -> 'instrument_id'" in gateway.fetch_one_queries[0]
 
@@ -390,6 +406,12 @@ def test_results_repository_replace_snapshot_uses_delete_insert_single_statement
                 variant_index=0,
                 total_return_pct=12.34,
                 payload_json={"schema_version": 1},
+                summary_metrics_json={
+                    "total_return_pct": 12.34,
+                    "profit_factor": 1.23,
+                },
+                best_tp_pct=4.0,
+                best_sl_pct=2.0,
                 report_table_md=None,
                 trades_json=None,
                 updated_at=datetime(2026, 2, 22, 19, 2, tzinfo=timezone.utc),
@@ -402,7 +424,104 @@ def test_results_repository_replace_snapshot_uses_delete_insert_single_statement
     assert "INSERT INTO backtest_job_top_variants" in gateway.fetch_one_queries[0]
     assert "state = 'running'" in gateway.fetch_one_queries[0]
     assert "lease_expires_at > %(now)s" in gateway.fetch_one_queries[0]
-    assert "item ->> 'report_table_md' AS report_table_md" in gateway.fetch_one_queries[0]
+    assert "item -> 'summary_metrics_json' AS summary_metrics_json" in gateway.fetch_one_queries[0]
+    assert "NULL::TEXT AS report_table_md" in gateway.fetch_one_queries[0]
+    assert "NULL::JSONB AS trades_json" in gateway.fetch_one_queries[0]
+
+
+def test_job_repository_get_accepts_legacy_rows_with_null_persisted_run_metadata() -> None:
+    """
+    Verify row mapper keeps legacy jobs readable when additive persisted-run columns stay null.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Migration rollout must not require destructive backfill for existing rows.
+    Raises:
+        AssertionError: If null additive metadata breaks job mapping.
+    Side Effects:
+        None.
+    """
+    legacy_row = dict(_build_job_row(state="queued"))
+    legacy_row["execution_mode"] = None
+    legacy_row["market_id"] = None
+    legacy_row["symbol"] = None
+    legacy_row["timeframe"] = None
+    legacy_row["requested_top_n"] = None
+    legacy_row["ranking_primary_metric"] = None
+    legacy_row["ranking_secondary_metric"] = None
+    gateway = _FakeGateway(fetch_one_results=[legacy_row])
+    repository = PostgresBacktestJobRepository(gateway=gateway)
+
+    row = repository.get(job_id=UUID("00000000-0000-0000-0000-000000000810"))
+
+    assert row is not None
+    assert row.execution_mode is None
+    assert row.market_id is None
+    assert row.symbol is None
+    assert row.timeframe is None
+    assert row.requested_top_n is None
+    assert row.ranking_primary_metric is None
+    assert row.ranking_secondary_metric is None
+
+
+def test_results_repository_list_top_variants_maps_legacy_rows_to_summary_only_shape() -> None:
+    """
+    Verify legacy top rows with null additive columns are still readable as summary-only rows.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Legacy rows may miss `summary_metrics_json/best_tp_pct/best_sl_pct` during transition.
+    Raises:
+        AssertionError: If mapper fails to synthesize deterministic summary-only fields.
+    Side Effects:
+        None.
+    """
+    gateway = _FakeGateway(
+        fetch_all_results=[
+            (
+                {
+                    "job_id": "00000000-0000-0000-0000-000000000810",
+                    "rank": 1,
+                    "variant_key": "a" * 64,
+                    "indicator_variant_key": "b" * 64,
+                    "variant_index": 0,
+                    "total_return_pct": 12.34,
+                    "payload_json": {
+                        "schema_version": 1,
+                        "risk_params": {
+                            "tp_enabled": True,
+                            "tp_pct": 4.0,
+                            "sl_enabled": True,
+                            "sl_pct": 2.0,
+                        },
+                    },
+                    "summary_metrics_json": None,
+                    "best_tp_pct": None,
+                    "best_sl_pct": None,
+                    "updated_at": datetime(2026, 2, 22, 19, 2, tzinfo=timezone.utc),
+                },
+            )
+        ]
+    )
+    repository = PostgresBacktestJobResultsRepository(gateway=gateway)
+
+    rows = repository.list_top_variants(
+        job_id=UUID("00000000-0000-0000-0000-000000000810"),
+        limit=10,
+    )
+
+    assert len(rows) == 1
+    assert rows[0].summary_metrics_json["total_return_pct"] == 12.34
+    assert rows[0].best_tp_pct == 4.0
+    assert rows[0].best_sl_pct == 2.0
+    assert rows[0].report_table_md is None
+    assert rows[0].trades_json is None
 
 
 def test_results_repository_save_stage_a_shortlist_uses_lease_guarded_upsert() -> None:
@@ -490,6 +609,13 @@ def _build_job_row(*, state: str) -> Mapping[str, Any]:
         "artifact_slot_generation": 9,
         "artifact_manifest_hash": "d" * 64,
         "artifact_asof_date": "2026-03-24",
+        "execution_mode": "background_manual_legacy",
+        "market_id": 1,
+        "symbol": "BTCUSDT",
+        "timeframe": "1h",
+        "requested_top_n": 25,
+        "ranking_primary_metric": "profit_factor",
+        "ranking_secondary_metric": "win_rate_pct",
         "stage": (
             "stage_b" if state == "running" else "finalizing" if state == "succeeded" else "stage_a"
         ),

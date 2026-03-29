@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from heapq import heappush, heapreplace
+from numbers import Real
 from types import MappingProxyType
-from typing import Callable, Iterator, Mapping, cast
+from typing import Any, Callable, Iterator, Mapping, cast
 
 from trading.contexts.backtest.application.dto import (
     BacktestRankingConfig,
@@ -259,6 +260,9 @@ class BacktestStageBScoredVariantV1:
     indicator_variant_key: str
     variant_key: str
     total_return_pct: float
+    summary_metrics_json: Mapping[str, float]
+    best_tp_pct: float | None
+    best_sl_pct: float | None
 
 
 class BacktestStagedCoreRunnerV1:
@@ -810,6 +814,17 @@ class BacktestStagedCoreRunnerV1:
                     metrics=metrics,
                     metric_literal=_TOTAL_RETURN_METRIC_KEY_LITERAL,
                 ),
+                summary_metrics_json=_summary_metrics_from_ranking_metrics(metrics=metrics),
+                best_tp_pct=_risk_pct_from_task(
+                    task=task,
+                    flag_key="tp_enabled",
+                    value_key="tp_pct",
+                ),
+                best_sl_pct=_risk_pct_from_task(
+                    task=task,
+                    flag_key="sl_enabled",
+                    value_key="sl_pct",
+                ),
             ),
             metrics,
         )
@@ -963,6 +978,131 @@ def _resolve_ranking_plan(*, ranking: BacktestRankingConfig) -> _ResolvedRanking
         secondary_direction=secondary_direction,
         secondary_scorer_metric_keys=secondary_keys,
     )
+
+
+def _summary_metrics_from_ranking_metrics(*, metrics: RankingMetricsV1) -> Mapping[str, float]:
+    """
+    Normalize Stage-B ranking metrics into deterministic persisted summary metrics payload.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+    Args:
+        metrics: Raw scorer metrics payload for one Stage-B variant.
+    Returns:
+        Mapping[str, float]: Immutable mapping with deterministic summary metric keys.
+    Assumptions:
+        Only approved numeric summary metrics participate in persisted summary-only rows.
+    Raises:
+        ValueError: If one kept metric value is boolean or non-numeric.
+    Side Effects:
+        None.
+    """
+    normalized: dict[str, float] = {}
+    metric_key_aliases: tuple[tuple[str, tuple[str, ...]], ...] = (
+        (
+            "total_return_pct",
+            _SCORER_METRIC_KEYS_BY_LITERAL_V1["total_return_pct"],
+        ),
+        (
+            "max_drawdown_pct",
+            _SCORER_METRIC_KEYS_BY_LITERAL_V1["max_drawdown_pct"],
+        ),
+        (
+            "return_over_max_drawdown",
+            _SCORER_METRIC_KEYS_BY_LITERAL_V1["return_over_max_drawdown"],
+        ),
+        (
+            "profit_factor",
+            _SCORER_METRIC_KEYS_BY_LITERAL_V1["profit_factor"],
+        ),
+        (
+            "sharpe_trades",
+            _SCORER_METRIC_KEYS_BY_LITERAL_V1["sharpe_trades"],
+        ),
+        (
+            "win_rate_pct",
+            _SCORER_METRIC_KEYS_BY_LITERAL_V1["win_rate_pct"],
+        ),
+        ("trade_count", ("trade_count",)),
+        ("avg_trade_ret_pct", ("avg_trade_ret_pct",)),
+        ("avg_trade_exec_bars", ("avg_trade_exec_bars",)),
+        ("exposure_pct", ("exposure_pct",)),
+    )
+    for metric_key, aliases in metric_key_aliases:
+        value = next(
+            (
+                metrics[alias]
+                for alias in aliases
+                if alias in metrics and metrics[alias] is not None
+            ),
+            None,
+        )
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, Real):
+            raise ValueError(f"summary metric {metric_key!r} must be numeric")
+        normalized[metric_key] = float(value)
+    total_return_pct = next(
+        (
+            metrics[alias]
+            for alias in _SCORER_METRIC_KEYS_BY_LITERAL_V1["total_return_pct"]
+            if alias in metrics and metrics[alias] is not None
+        ),
+        None,
+    )
+    if isinstance(total_return_pct, bool) or not isinstance(total_return_pct, Real):
+        raise ValueError("summary metric 'total_return_pct' must be numeric")
+    normalized["total_return_pct"] = float(total_return_pct)
+    return MappingProxyType(normalized)
+
+
+def _risk_pct_from_task(
+    *,
+    task: BacktestStageBTaskV1,
+    flag_key: str,
+    value_key: str,
+) -> float | None:
+    """
+    Extract nullable best TP/SL percentage from one Stage-B task risk payload.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
+    Args:
+        task: Stage-B task carrying deterministic risk params.
+        flag_key: Enable flag key (`tp_enabled` or `sl_enabled`).
+        value_key: Percentage key (`tp_pct` or `sl_pct`).
+    Returns:
+        float | None: Non-negative percentage value or `None` when axis is disabled.
+    Assumptions:
+        Disabled TP/SL axes keep persisted best-cell fields null.
+    Raises:
+        ValueError: If enabled risk percent is boolean, non-numeric, or negative.
+    Side Effects:
+        None.
+    """
+    if task.risk_params.get(flag_key) is False:
+        return None
+    value: Any = task.risk_params.get(value_key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"risk param {value_key!r} must be numeric")
+    normalized = float(value)
+    if normalized < 0.0:
+        raise ValueError(f"risk param {value_key!r} must be >= 0")
+    return normalized
 
 
 def _stage_a_heap_entry(

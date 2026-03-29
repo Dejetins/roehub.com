@@ -5,6 +5,11 @@
 ## Status
 
 - Status: active v1 sync contract with R0 freeze notes.
+- R7-01 storage note:
+  - sync and background executions share one persisted-run storage family in Postgres,
+  - this epic does not change public `POST /backtests` create-and-execute behavior yet,
+  - future persisted sync runs use `execution_mode=sync_inline` in the same tables without a
+    second storage stack.
 - Superseded by target-v2 contract:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -74,6 +79,8 @@
 - Async jobs/progress (Milestone 5).
 - История запусков и сохранение результатов backtest в БД.
 - Дополнительные endpoints (get status/list).
+- R7-01 не включает cutover `POST /backtests` в create-and-execute persisted flow
+  (`execution_mode=sync_inline` wiring остаётся следующим эпиком).
 
 ## Ключевые решения
 
@@ -148,6 +155,9 @@ Response v1 включает:
   knob для переходного wiring, но summary path R6-04 всё равно не строит `report`/`trades` тела.
 - `top_trades_n` остаётся параметром downstream detail/report flows и не включает eager
   materialization в summary response.
+- Этот summary-only shape совпадает с R7-01 persisted top-row contract:
+  в storage сохраняются только `payload_json`, `summary_metrics_json`, `best_tp_pct`,
+  `best_sl_pct`; `report/trades` не становятся частью persisted summary rows.
 
 ### 7) Sync cancellation: disconnect + hard deadline (кооперативно, без kill)
 

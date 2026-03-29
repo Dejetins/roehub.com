@@ -5,6 +5,14 @@
 ## Status
 
 - Status: active v1 worker contract with R0 freeze notes.
+- R7-01 additive update:
+  - worker продолжает использовать тот же table family, но теперь это canonical persisted-run
+    storage и для inline, и для background flows,
+  - queued/running rows обязаны нести denormalized run metadata:
+    `execution_mode`, `market_id`, `symbol`, `timeframe`, `requested_top_n`,
+    `ranking_primary_metric`, `ranking_secondary_metric`,
+  - persisted top rows остаются summary-only и записывают
+    `summary_metrics_json`, `best_tp_pct`, `best_sl_pct` вместо eager report/trades payloads.
 - Superseded by target-v2 orchestration decisions:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -169,6 +177,8 @@ Source-of-truth payload:
 
 Snapshot payload policy во время `running`:
 
+- `summary_metrics_json` хранит только approved deterministic summary metrics object,
+- `best_tp_pct` / `best_sl_pct` хранят nullable best-risk scalars,
 - `report_table_md = NULL`,
 - `trades_json = NULL`,
 - сохраняются ranking fields + `payload_json` для top rows.
@@ -183,6 +193,7 @@ Finalizing запускается только если job не cancelled и н
 
 1. Зафиксировать progress `stage=finalizing, processed_units=0, total_units=1`.
 2. Сохранить terminal snapshot без eager report bodies:
+   `summary_metrics_json/best_tp_pct/best_sl_pct` заполнены,
    `report_table_md=NULL`, `trades_json=NULL`.
 3. Перезаписать snapshot в `backtest_job_top_variants` в summary-only формате.
 4. `finish(..., next_state="succeeded")`.
@@ -241,6 +252,10 @@ Cancel best-effort:
 - Один и тот же `request_json` + pinned artifact identity
   (`artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`, `artifact_asof_date`)
   -> один и тот же dataset contract для queued/running job attempt.
+- Один и тот же denormalized persisted-run metadata tuple
+  (`execution_mode`, `market_id`, `symbol`, `timeframe`, `requested_top_n`,
+  `ranking_primary_metric`, `ranking_secondary_metric`)
+  читается одинаково из API/worker path и остаётся пригодным для будущих history filters.
 - Stage A tie-break фиксирован: `base_variant_key ASC`.
 - Stage B tie-break фиксирован: `variant_key ASC`.
 - Snapshot replace policy фиксирована: full replace (delete+insert contract) через results repository.

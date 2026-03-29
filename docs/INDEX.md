@@ -8,7 +8,7 @@
 - `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 
-## Backtest R5 / R6 Path
+## Backtest R5 / R6 / R7 Path
 
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
@@ -27,6 +27,12 @@
 - `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py`
 - `src/trading/contexts/backtest/application/services/v2/metrics_kernel.py`
 - `src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py`
+- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
+- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+- `alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py`
+- `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py`
+- `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_results_repository.py`
 - R6-01 boundary: shared `slot-pinned context`, explicit `np.load(..., mmap_mode='r')`,
   `allow_pickle=False`, no runtime scanning, no hot-path hash recomputation.
 - R6-02 boundary: Stage A only, `artifacts-only inputs`, deterministic `final_signal`,
@@ -34,3 +40,7 @@
 - R6-03 boundary: Stage B artifact-backed risk execution over compact trades and shipped
   `1m hit-times`, fast TP/SL search, exact replay of best TP/SL cell, deterministic metrics,
   additive sync/background scorer bridge for pinned runtime context.
+- R7-01 boundary: unified persisted-run storage in existing PG table family, denormalized
+  `execution_mode/market_id/symbol/timeframe/requested_top_n/ranking_*` metadata, summary-only
+  top rows with `summary_metrics_json`, `best_tp_pct`, `best_sl_pct`, and transitional
+  `report_table_md/trades_json = NULL`.

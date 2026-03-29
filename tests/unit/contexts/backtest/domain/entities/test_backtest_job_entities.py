@@ -9,6 +9,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobErrorPayload,
+    BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import (
     BacktestJobLeaseError,
@@ -195,6 +196,135 @@ def test_backtest_job_preserves_artifact_pin_across_claim_and_finish() -> None:
 
     assert claimed.artifact_pin == queued.artifact_pin
     assert finished.artifact_pin == queued.artifact_pin
+
+
+def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transitions() -> None:
+    """
+    Verify additive persisted-run metadata is normalized on create and preserved by transitions.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R7-01 keeps one storage family for background and inline runs, so metadata must survive
+        state transitions unchanged.
+    Raises:
+        AssertionError: If normalization or transition preservation drifts.
+    Side Effects:
+        None.
+    """
+    now = datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc)
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000951"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"),
+        mode="template",
+        created_at=now,
+        request_json={"mode": "template"},
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        execution_mode="background_manual_legacy",
+        market_id=1,
+        symbol="btcusdt",
+        timeframe="1H",
+        requested_top_n=25,
+        ranking_primary_metric=" total_return_pct ",
+        ranking_secondary_metric=" profit_factor ",
+    )
+
+    claimed = queued.claim(
+        changed_at=now + timedelta(seconds=1),
+        locked_by="worker-a-123",
+        lease_expires_at=now + timedelta(seconds=61),
+    )
+    finished = claimed.finish(
+        next_state="succeeded",
+        changed_at=now + timedelta(seconds=5),
+    )
+
+    assert queued.execution_mode == "background_manual_legacy"
+    assert queued.market_id == 1
+    assert queued.symbol == "BTCUSDT"
+    assert queued.timeframe == "1h"
+    assert queued.requested_top_n == 25
+    assert queued.ranking_primary_metric == "total_return_pct"
+    assert queued.ranking_secondary_metric == "profit_factor"
+    assert claimed.execution_mode == queued.execution_mode
+    assert claimed.market_id == queued.market_id
+    assert claimed.symbol == queued.symbol
+    assert claimed.timeframe == queued.timeframe
+    assert claimed.requested_top_n == queued.requested_top_n
+    assert claimed.ranking_primary_metric == queued.ranking_primary_metric
+    assert claimed.ranking_secondary_metric == queued.ranking_secondary_metric
+    assert finished.execution_mode == queued.execution_mode
+    assert finished.market_id == queued.market_id
+    assert finished.symbol == queued.symbol
+    assert finished.timeframe == queued.timeframe
+    assert finished.requested_top_n == queued.requested_top_n
+    assert finished.ranking_primary_metric == queued.ranking_primary_metric
+    assert finished.ranking_secondary_metric == queued.ranking_secondary_metric
+
+
+def test_backtest_job_top_variant_rejects_legacy_report_and_keeps_summary_only_fields() -> None:
+    """
+    Verify top-variant entity enforces summary-only persistence and normalizes additive fields.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R7-01 deprecates persisted report/trades payloads while retaining summary metrics and
+        best TP/SL values.
+    Raises:
+        AssertionError: If deprecated fields are still accepted or additive fields drift.
+    Side Effects:
+        None.
+    """
+    with pytest.raises(BacktestJobTransitionError, match="report_table_md must stay null"):
+        BacktestJobTopVariant(
+            job_id=UUID("00000000-0000-0000-0000-000000000952"),
+            rank=1,
+            variant_key="a" * 64,
+            indicator_variant_key="b" * 64,
+            variant_index=0,
+            total_return_pct=12.5,
+            payload_json={"variant_key": "a" * 64},
+            updated_at=datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc),
+            summary_metrics_json={"profit_factor": 1.3},
+            best_tp_pct=3.0,
+            best_sl_pct=1.5,
+            report_table_md="|Metric|Value|",
+            trades_json=None,
+        )
+
+    row = BacktestJobTopVariant(
+        job_id=UUID("00000000-0000-0000-0000-000000000953"),
+        rank=1,
+        variant_key="a" * 64,
+        indicator_variant_key="b" * 64,
+        variant_index=0,
+        total_return_pct=12.5,
+        payload_json={"variant_key": "a" * 64},
+        updated_at=datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc),
+        summary_metrics_json={"profit_factor": 1.3},
+        best_tp_pct=3.0,
+        best_sl_pct=1.5,
+        report_table_md=None,
+        trades_json=None,
+    )
+
+    assert row.summary_metrics_json == {
+        "profit_factor": 1.3,
+        "total_return_pct": 12.5,
+    }
+    assert row.best_tp_pct == 3.0
+    assert row.best_sl_pct == 1.5
+    assert row.report_table_md is None
+    assert row.trades_json is None
 
 
 def test_backtest_job_rejects_lease_fields_outside_running_state() -> None:

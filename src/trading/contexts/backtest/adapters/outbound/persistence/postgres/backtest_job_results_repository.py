@@ -88,6 +88,14 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         """
         Replace full top-k snapshot using one SQL statement (delete old + insert new rows).
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+          - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
         Args:
             job_id: Job identifier.
             now: Snapshot timestamp in UTC.
@@ -96,8 +104,8 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         Returns:
             bool: `True` when lease-guarded replace is applied; `False` when lease is lost.
         Assumptions:
-            Caller uses frontier_signature gating and keeps `report_table_md` null for
-            running writes.
+            Caller uses frontier_signature gating and writes summary-only top rows for both
+            running and terminal snapshots.
         Raises:
             BacktestStorageError: If SQL execution fails or row payload is invalid.
         Side Effects:
@@ -134,6 +142,9 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                 variant_index,
                 total_return_pct,
                 payload_json,
+                summary_metrics_json,
+                best_tp_pct,
+                best_sl_pct,
                 report_table_md,
                 trades_json,
                 updated_at
@@ -146,8 +157,11 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                 (item ->> 'variant_index')::INTEGER AS variant_index,
                 (item ->> 'total_return_pct')::DOUBLE PRECISION AS total_return_pct,
                 item -> 'payload_json' AS payload_json,
-                item ->> 'report_table_md' AS report_table_md,
-                item -> 'trades_json' AS trades_json,
+                item -> 'summary_metrics_json' AS summary_metrics_json,
+                (item ->> 'best_tp_pct')::DOUBLE PRECISION AS best_tp_pct,
+                (item ->> 'best_sl_pct')::DOUBLE PRECISION AS best_sl_pct,
+                NULL::TEXT AS report_table_md,
+                NULL::JSONB AS trades_json,
                 %(now)s AS updated_at
             FROM source_rows
             WHERE EXISTS (SELECT 1 FROM lease_owner)
@@ -188,6 +202,14 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         """
         Load persisted top variants ordered deterministically by rank and key.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
         Args:
             job_id: Job identifier.
             limit: Max row count.
@@ -214,8 +236,9 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
             variant_index,
             total_return_pct,
             payload_json,
-            report_table_md,
-            trades_json,
+            summary_metrics_json,
+            best_tp_pct,
+            best_sl_pct,
             updated_at
         FROM {self._top_variants_table}
         WHERE job_id = %(job_id)s
@@ -386,10 +409,9 @@ def _serialize_top_rows(
                 "variant_index": row.variant_index,
                 "total_return_pct": row.total_return_pct,
                 "payload_json": dict(row.payload_json),
-                "report_table_md": row.report_table_md,
-                "trades_json": [dict(item) for item in row.trades_json]
-                if row.trades_json is not None
-                else None,
+                "summary_metrics_json": dict(row.summary_metrics_json),
+                "best_tp_pct": row.best_tp_pct,
+                "best_sl_pct": row.best_sl_pct,
             }
         )
     return serialized
@@ -400,30 +422,27 @@ def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
     """
     Map SQL row payload into immutable `BacktestJobTopVariant` entity.
 
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
     Args:
         row: SQL row mapping.
     Returns:
         BacktestJobTopVariant: Mapped top-variant snapshot.
     Assumptions:
-        Row schema follows Backtest jobs v1 storage contract.
+        Row schema follows additive summary-only persisted top-row storage contract.
     Raises:
         BacktestStorageError: If row cannot be mapped.
     Side Effects:
         None.
     """
     try:
-        trades_value = _parse_json_array(value=row.get("trades_json"), field_name="trades_json")
-        trades_json: tuple[Mapping[str, Any], ...] | None = None
-        if trades_value is not None:
-            parsed_items: list[Mapping[str, Any]] = []
-            for item in trades_value:
-                if not isinstance(item, Mapping):
-                    raise BacktestStorageError(
-                        "backtest_job_top_variants.trades_json must contain JSON objects"
-                    )
-                parsed_items.append(dict(item))
-            trades_json = tuple(parsed_items)
-
         payload_json = _parse_json_object(
             value=row.get("payload_json"),
             field_name="payload_json",
@@ -431,6 +450,11 @@ def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
         )
         if payload_json is None:
             raise BacktestStorageError("backtest_job_top_variants.payload_json is required")
+        summary_metrics_json = _parse_json_object(
+            value=row.get("summary_metrics_json"),
+            field_name="summary_metrics_json",
+            required=False,
+        ) or {}
 
         return BacktestJobTopVariant(
             job_id=UUID(str(row["job_id"])),
@@ -440,10 +464,25 @@ def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
             variant_index=int(row["variant_index"]),
             total_return_pct=float(row["total_return_pct"]),
             payload_json=payload_json,
-            report_table_md=str(row["report_table_md"])
-            if row.get("report_table_md") is not None
-            else None,
-            trades_json=trades_json,
+            summary_metrics_json=summary_metrics_json,
+            best_tp_pct=_coalesce_optional_float(
+                first=_parse_optional_float(value=row.get("best_tp_pct")),
+                second=_extract_optional_risk_pct_from_payload(
+                    payload_json=payload_json,
+                    flag_key="tp_enabled",
+                    value_key="tp_pct",
+                ),
+            ),
+            best_sl_pct=_coalesce_optional_float(
+                first=_parse_optional_float(value=row.get("best_sl_pct")),
+                second=_extract_optional_risk_pct_from_payload(
+                    payload_json=payload_json,
+                    flag_key="sl_enabled",
+                    value_key="sl_pct",
+                ),
+            ),
+            report_table_md=None,
+            trades_json=None,
             updated_at=row["updated_at"],
         )
     except Exception as error:  # noqa: BLE001
@@ -559,6 +598,110 @@ def _parse_json_array(*, value: Any, field_name: str) -> list[Any] | None:
         raise BacktestStorageError(f"{field_name} must be JSON array")
     return decoded
 
+
+
+def _parse_optional_float(*, value: Any) -> float | None:
+    """
+    Parse one optional SQL scalar into Python float while preserving `None`.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+    Args:
+        value: Raw SQL scalar value.
+    Returns:
+        float | None: Parsed float or `None`.
+    Assumptions:
+        Best TP/SL columns are nullable and already constrained to non-negative values.
+    Raises:
+        BacktestStorageError: If value cannot be converted to float.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        raise BacktestStorageError("best_tp_pct/best_sl_pct must not be boolean")
+    try:
+        return float(value)
+    except (TypeError, ValueError) as error:
+        raise BacktestStorageError("best_tp_pct/best_sl_pct must be numeric") from error
+
+
+def _coalesce_optional_float(*, first: float | None, second: float | None) -> float | None:
+    """
+    Return the first non-null float between persisted column and legacy payload fallback.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+    Args:
+        first: Preferred persisted scalar value.
+        second: Legacy payload-derived fallback value.
+    Returns:
+        float | None: First non-null value, or `None` when both are absent.
+    Assumptions:
+        Legacy rows may miss additive R7-01 columns during transition.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if first is not None:
+        return first
+    return second
+
+
+def _extract_optional_risk_pct_from_payload(
+    *,
+    payload_json: Mapping[str, Any],
+    flag_key: str,
+    value_key: str,
+) -> float | None:
+    """
+    Read legacy TP/SL percentage from `payload_json.risk_params` when additive columns are null.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+    Args:
+        payload_json: Persisted variant payload object.
+        flag_key: Risk enable-flag key (`tp_enabled` or `sl_enabled`).
+        value_key: Risk percentage key (`tp_pct` or `sl_pct`).
+    Returns:
+        float | None: Extracted percentage when enabled and numeric, otherwise `None`.
+    Assumptions:
+        Legacy payloads store risk fields inside `payload_json.risk_params`.
+    Raises:
+        BacktestStorageError: If enabled value is non-numeric.
+    Side Effects:
+        None.
+    """
+    risk_payload = payload_json.get("risk_params")
+    if not isinstance(risk_payload, Mapping):
+        return None
+    if risk_payload.get(flag_key) is False:
+        return None
+    value = risk_payload.get(value_key)
+    return _parse_optional_float(value=value)
 
 
 def _decode_json_value(*, value: Any, field_name: str, required: bool) -> Any:

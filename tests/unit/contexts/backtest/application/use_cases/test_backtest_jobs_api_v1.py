@@ -653,6 +653,13 @@ def test_create_backtest_job_use_case_artifact_pin_converts_to_pinned_identity_v
     assert pinned_identity.slot_generation == 9
     assert pinned_identity.artifact_asof_date == "2026-03-24"
     assert pinned_identity.artifact_manifest_hash == "a" * 64
+    assert created.execution_mode == "background_manual_legacy"
+    assert created.market_id == 1
+    assert created.symbol == "BTCUSDT"
+    assert created.timeframe == "1m"
+    assert created.requested_top_n == 300
+    assert created.ranking_primary_metric == "total_return_pct"
+    assert created.ranking_secondary_metric is None
 
 
 
@@ -725,6 +732,13 @@ def test_create_backtest_job_use_case_saved_mode_persists_spec_hash_and_snapshot
     assert created.artifact_pin is not None
     assert created.artifact_pin.artifact_slot == "slot_b"
     assert created.artifact_pin.artifact_manifest_hash == "a" * 64
+    assert created.execution_mode == "background_manual_legacy"
+    assert created.market_id == 1
+    assert created.symbol == "BTCUSDT"
+    assert created.timeframe == "1m"
+    assert created.requested_top_n == 300
+    assert created.ranking_primary_metric == "total_return_pct"
+    assert created.ranking_secondary_metric is None
 
 
 def test_create_backtest_job_use_case_rejects_missing_current_yaml_for_pinning() -> None:
@@ -1123,6 +1137,9 @@ def test_get_top_use_case_validates_limit_and_reads_rows() -> None:
         variant_index=0,
         total_return_pct=10.0,
         payload_json={"schema_version": 1},
+        summary_metrics_json={"total_return_pct": 10.0, "profit_factor": 1.2},
+        best_tp_pct=4.0,
+        best_sl_pct=2.0,
         report_table_md=None,
         trades_json=None,
         updated_at=datetime(2026, 2, 23, 12, 0, tzinfo=timezone.utc),

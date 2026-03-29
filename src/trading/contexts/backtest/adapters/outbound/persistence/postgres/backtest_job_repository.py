@@ -18,6 +18,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobErrorPayload,
+    BacktestJobExecutionMode,
     BacktestJobMode,
     BacktestJobStage,
     BacktestJobState,
@@ -46,6 +47,13 @@ _BACKTEST_JOB_SELECT_COLUMNS = """
     artifact_slot_generation,
     artifact_manifest_hash,
     artifact_asof_date,
+    execution_mode,
+    market_id,
+    symbol,
+    timeframe,
+    requested_top_n,
+    ranking_primary_metric,
+    ranking_secondary_metric,
     stage,
     processed_units,
     total_units,
@@ -106,6 +114,14 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         """
         Persist new job row and return mapped immutable aggregate snapshot.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
         Args:
             job: Prepared queued Backtest job aggregate.
         Returns:
@@ -139,6 +155,13 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             artifact_slot_generation,
             artifact_manifest_hash,
             artifact_asof_date,
+            execution_mode,
+            market_id,
+            symbol,
+            timeframe,
+            requested_top_n,
+            ranking_primary_metric,
+            ranking_secondary_metric,
             stage,
             processed_units,
             total_units,
@@ -172,6 +195,13 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             %(artifact_slot_generation)s,
             %(artifact_manifest_hash)s,
             %(artifact_asof_date)s,
+            %(execution_mode)s,
+            %(market_id)s,
+            %(symbol)s,
+            %(timeframe)s,
+            %(requested_top_n)s,
+            %(ranking_primary_metric)s,
+            %(ranking_secondary_metric)s,
             %(stage)s,
             %(processed_units)s,
             %(total_units)s,
@@ -219,6 +249,13 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 "artifact_asof_date": job.artifact_pin.artifact_asof_date
                 if job.artifact_pin is not None
                 else None,
+                "execution_mode": job.execution_mode,
+                "market_id": job.market_id,
+                "symbol": job.symbol,
+                "timeframe": job.timeframe,
+                "requested_top_n": job.requested_top_n,
+                "ranking_primary_metric": job.ranking_primary_metric,
+                "ranking_secondary_metric": job.ranking_secondary_metric,
                 "stage": job.stage,
                 "processed_units": job.processed_units,
                 "total_units": job.total_units,
@@ -429,6 +466,14 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         """
         Count active jobs pinning one previously published inactive-slot manifest identity.
 
+        Docs:
+          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+        Related:
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
         Args:
             market_id: Canonical market id for the symbol-root being published.
             symbol: Instrument symbol pinned by the active jobs.
@@ -437,8 +482,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Returns:
             int: Number of active jobs blocking rebuild/publish of this slot content.
         Assumptions:
-            Template-mode jobs keep `instrument_id` in `request_json.template`, while saved-mode
-            jobs keep it in `spec_payload_json`.
+            R7-01 rows prefer denormalized `(market_id, symbol)` columns, while legacy rows still
+            fall back to canonical payload snapshots inside `request_json/spec_payload_json`.
         Raises:
             BacktestStorageError: If count row is missing or invalid.
         Side Effects:
@@ -453,13 +498,24 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
           AND artifact_manifest_hash = %(artifact_manifest_hash)s
           AND (
                 (
-                    request_json -> 'template' -> 'instrument_id' ->> 'market_id'
-                )::integer = %(market_id)s
-                AND request_json -> 'template' -> 'instrument_id' ->> 'symbol' = %(symbol)s
-              OR (
-                    spec_payload_json -> 'instrument_id' ->> 'market_id'
-                )::integer = %(market_id)s
-                AND spec_payload_json -> 'instrument_id' ->> 'symbol' = %(symbol)s
+                    market_id = %(market_id)s
+                    AND symbol = %(symbol)s
+                )
+                OR (
+                    market_id IS NULL
+                    AND symbol IS NULL
+                    AND (
+                        (
+                            request_json -> 'template' -> 'instrument_id' ->> 'market_id'
+                        )::integer = %(market_id)s
+                        AND request_json -> 'template' -> 'instrument_id' ->> 'symbol'
+                            = %(symbol)s
+                        OR (
+                            spec_payload_json -> 'instrument_id' ->> 'market_id'
+                        )::integer = %(market_id)s
+                        AND spec_payload_json -> 'instrument_id' ->> 'symbol' = %(symbol)s
+                    )
+                )
           )
         """
         row = self._gateway.fetch_one(
@@ -488,12 +544,21 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
     """
     Map SQL row payload into immutable `BacktestJob` aggregate.
 
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_repository.py
     Args:
         row: SQL row mapping.
     Returns:
         BacktestJob: Mapped immutable job aggregate.
     Assumptions:
-        Row schema follows Backtest jobs v1 storage contract.
+        Row schema follows additive Backtest jobs persisted-run storage contract.
     Raises:
         BacktestStorageError: If one field cannot be mapped.
     Side Effects:
@@ -549,6 +614,19 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
             engine_params_hash=str(row["engine_params_hash"]),
             backtest_runtime_config_hash=str(row["backtest_runtime_config_hash"]),
             artifact_pin=artifact_pin,
+            execution_mode=_parse_execution_mode(value=row.get("execution_mode")),
+            market_id=int(row["market_id"]) if row.get("market_id") is not None else None,
+            symbol=str(row["symbol"]) if row.get("symbol") is not None else None,
+            timeframe=str(row["timeframe"]) if row.get("timeframe") is not None else None,
+            requested_top_n=int(row["requested_top_n"])
+            if row.get("requested_top_n") is not None
+            else None,
+            ranking_primary_metric=str(row["ranking_primary_metric"])
+            if row.get("ranking_primary_metric") is not None
+            else None,
+            ranking_secondary_metric=str(row["ranking_secondary_metric"])
+            if row.get("ranking_secondary_metric") is not None
+            else None,
             stage=_parse_job_stage(value=row["stage"]),
             processed_units=int(row["processed_units"]),
             total_units=int(row["total_units"]),
@@ -711,6 +789,40 @@ def _parse_job_stage(*, value: Any) -> BacktestJobStage:
     if normalized not in {"stage_a", "stage_b", "finalizing"}:
         raise BacktestStorageError(f"Unexpected backtest job stage value: {normalized!r}")
     return cast(BacktestJobStage, normalized)
+
+
+def _parse_execution_mode(*, value: Any) -> BacktestJobExecutionMode | None:
+    """
+    Parse and validate nullable persisted-run execution mode literal.
+
+    Docs:
+      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_repository.py
+    Args:
+        value: Raw storage execution mode value.
+    Returns:
+        BacktestJobExecutionMode | None: Typed execution mode literal or `None`.
+    Assumptions:
+        Legacy rows may keep persisted-run metadata columns null during additive rollout.
+    Raises:
+        BacktestStorageError: If value is unknown.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if normalized not in {"sync_inline", "background_auto", "background_manual_legacy"}:
+        raise BacktestStorageError(
+            f"Unexpected backtest job execution_mode value: {normalized!r}"
+        )
+    return cast(BacktestJobExecutionMode, normalized)
 
 
 def _json_dumps(*, payload: Mapping[str, Any] | None) -> str | None:
