@@ -57,6 +57,12 @@ ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2: tuple[str, ...] = ("level",)
 ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2: tuple[str, str] = ("level", "time")
 ARTIFACT_HIT_TIMES_TABLE_MONOTONICITY_LITERAL_V2 = "non_decreasing_by_level"
 ARTIFACT_PLACEHOLDER_SHA256_V2 = "0" * 64
+ARTIFACT_PUBLISH_BLOCKING_JOB_STATES_V2: tuple[str, ...] = ("queued", "running")
+ARTIFACT_PUBLISH_BLOCKING_EXECUTION_MODES_V2: tuple[str, ...] = (
+    "background_auto",
+    "background_manual_legacy",
+)
+ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2 = "inactive_slot_pinned"
 SUPPORTED_CURRENT_ARTIFACT_POINTER_SCHEMA_VERSIONS_V2: tuple[int, ...] = (
     CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
 )

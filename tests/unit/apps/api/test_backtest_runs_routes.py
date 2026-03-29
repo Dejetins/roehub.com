@@ -19,6 +19,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobErrorPayload,
+    BacktestJobExecutionMode,
     BacktestJobTopVariant,
     TradeV1,
 )
@@ -467,6 +468,50 @@ def test_post_backtest_run_cancel_returns_updated_status_snapshot() -> None:
     assert response.json()["run_id"] == "00000000-0000-0000-0000-000000000935"
 
 
+def test_get_backtest_runs_returns_background_modes_and_cancel_marker() -> None:
+    """
+    Verify public history list preserves both background execution modes and running cancel marker.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R8-03 public history keeps `queued/running` visibility for both background launch modes.
+    Raises:
+        AssertionError: If execution mode or `cancel_requested_at` fields are dropped.
+    Side Effects:
+        None.
+    """
+    running = _running_run(
+        run_id=UUID("00000000-0000-0000-0000-000000000936"),
+        execution_mode="background_manual_legacy",
+    ).request_cancel(
+        changed_at=datetime(2026, 3, 29, 12, 0, 30, tzinfo=timezone.utc)
+    )
+    queued = _queued_run(
+        run_id=UUID("00000000-0000-0000-0000-000000000937"),
+        execution_mode="background_auto",
+    )
+    list_fake = _ListUseCaseFake(
+        page=BacktestJobListPage(items=(running, queued), next_cursor=None)
+    )
+    client, _, _ = _build_client(list_use_case=list_fake)
+
+    response = client.get(
+        "/backtests/runs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"][0]["execution_mode"] == "background_manual_legacy"
+    assert body["items"][0]["state"] == "running"
+    assert body["items"][0]["cancel_requested_at"] == "2026-03-29T12:00:30Z"
+    assert body["items"][1]["execution_mode"] == "background_auto"
+    assert body["items"][1]["state"] == "queued"
+
+
 def test_get_backtest_run_status_maps_foreign_and_missing_errors() -> None:
     """
     Verify public status route preserves explicit `403` for foreign and `404` for missing runs.
@@ -801,12 +846,17 @@ def _top_result(*, run: BacktestJob) -> BacktestRunTopReadResult:
     return BacktestRunTopReadResult(job=run, rows=(row,))
 
 
-def _queued_run(*, run_id: UUID) -> BacktestJob:
+def _queued_run(
+    *,
+    run_id: UUID,
+    execution_mode: BacktestJobExecutionMode = "sync_inline",
+) -> BacktestJob:
     """
     Build deterministic queued persisted run fixture for public route tests.
 
     Args:
         run_id: Deterministic persisted run identifier.
+        execution_mode: Persisted execution-mode literal exposed by public routes.
     Returns:
         BacktestJob: Queued persisted run fixture.
     Assumptions:
@@ -843,7 +893,7 @@ def _queued_run(*, run_id: UUID) -> BacktestJob:
             artifact_manifest_hash="d" * 64,
             artifact_asof_date="2026-03-29",
         ),
-        execution_mode="sync_inline",
+        execution_mode=execution_mode,
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -853,12 +903,17 @@ def _queued_run(*, run_id: UUID) -> BacktestJob:
     )
 
 
-def _running_run(*, run_id: UUID) -> BacktestJob:
+def _running_run(
+    *,
+    run_id: UUID,
+    execution_mode: BacktestJobExecutionMode = "sync_inline",
+) -> BacktestJob:
     """
     Build deterministic running persisted run fixture for lifecycle route tests.
 
     Args:
         run_id: Deterministic persisted run identifier.
+        execution_mode: Persisted execution-mode literal exposed by public routes.
     Returns:
         BacktestJob: Running persisted run fixture.
     Assumptions:
@@ -868,7 +923,7 @@ def _running_run(*, run_id: UUID) -> BacktestJob:
     Side Effects:
         None.
     """
-    queued = _queued_run(run_id=run_id)
+    queued = _queued_run(run_id=run_id, execution_mode=execution_mode)
     return queued.claim(
         changed_at=datetime(2026, 3, 29, 11, 35, tzinfo=timezone.utc),
         locked_by="worker-a-1",

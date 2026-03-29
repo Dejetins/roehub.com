@@ -41,6 +41,9 @@ _ALLOWED_ARTIFACT_SLOTS: frozenset[str] = frozenset({"slot_a", "slot_b"})
 _ALLOWED_EXECUTION_MODES: frozenset[str] = frozenset(
     {"sync_inline", "background_auto", "background_manual_legacy"}
 )
+_BACKGROUND_JOB_EXECUTION_MODES: frozenset[str] = frozenset(
+    {"background_auto", "background_manual_legacy"}
+)
 _ALLOWED_RANKING_METRICS: frozenset[str] = frozenset(
     {
         "total_return_pct",
@@ -878,7 +881,8 @@ class BacktestJob:
         Returns:
             BacktestJob: Updated snapshot.
         Assumptions:
-            Cancel operation is idempotent for terminal states.
+            Running cancel remains best-effort, but the first `cancel_requested_at` marker is
+            preserved for deterministic public lifecycle visibility and slot-safety checks.
         Raises:
             BacktestJobTransitionError: If timestamp ordering is invalid.
         Side Effects:
@@ -907,6 +911,8 @@ class BacktestJob:
             )
 
         if self.state == "running":
+            if self.cancel_requested_at is not None:
+                return self
             return replace(
                 self,
                 updated_at=changed_at,

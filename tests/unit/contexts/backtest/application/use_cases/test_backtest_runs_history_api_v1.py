@@ -30,6 +30,7 @@ from trading.contexts.backtest.application.use_cases import (
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
+    BacktestJobExecutionMode,
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
@@ -651,6 +652,47 @@ def test_cancel_use_case_returns_updated_owner_run_snapshot() -> None:
     assert repository.last_cancel_call == (owner_run.job_id, owner_user_id)
 
 
+def test_cancel_use_case_keeps_running_background_auto_visible() -> None:
+    """
+    Verify running `background_auto` cancel stays visible as `running + cancel_requested_at`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R8-03 keeps running cancel best-effort while public runs API must expose the marker until
+        worker finalization.
+    Raises:
+        AssertionError: If cancel use-case hides the running state or background execution mode.
+    Side Effects:
+        None.
+    """
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
+    owner_run = _running_run(
+        run_id=UUID("00000000-0000-0000-0000-000000000954"),
+        user_id=owner_user_id,
+        execution_mode="background_auto",
+    )
+    repository = _FakeJobRepository(jobs_by_id={owner_run.job_id: owner_run})
+    cancel_requested_at = datetime(2026, 3, 29, 12, 5, tzinfo=timezone.utc)
+    use_case = CancelBacktestRunUseCase(
+        job_repository=repository,
+        now_provider=lambda: cancel_requested_at,
+    )
+
+    updated = use_case.execute(
+        run_id=owner_run.job_id,
+        current_user=CurrentUser(user_id=owner_user_id),
+    )
+
+    assert updated.state == "running"
+    assert updated.execution_mode == "background_auto"
+    assert updated.cancel_requested_at == cancel_requested_at
+    assert updated.finished_at is None
+    assert repository.last_cancel_call == (owner_run.job_id, owner_user_id)
+
+
 def test_build_variant_report_use_case_reconstructs_saved_run_from_persisted_snapshot() -> None:
     """
     Verify run-scoped detail use-case rebuilds saved-mode template from persisted run storage.
@@ -870,13 +912,19 @@ def test_list_use_case_passes_keyset_query_to_repository_for_runs() -> None:
     assert repository.last_list_query.cursor == cursor
 
 
-def _queued_run(*, run_id: UUID, user_id: UserId) -> BacktestJob:
+def _queued_run(
+    *,
+    run_id: UUID,
+    user_id: UserId,
+    execution_mode: BacktestJobExecutionMode = "sync_inline",
+) -> BacktestJob:
     """
     Build deterministic queued persisted run fixture for R7-03 use-case unit tests.
 
     Args:
         run_id: Deterministic persisted run identifier.
         user_id: Run owner identifier.
+        execution_mode: Persisted execution-mode literal exposed by public runs surfaces.
     Returns:
         BacktestJob: Queued persisted run snapshot fixture.
     Assumptions:
@@ -897,13 +945,43 @@ def _queued_run(*, run_id: UUID, user_id: UserId) -> BacktestJob:
         spec_payload_json=None,
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
-        execution_mode="sync_inline",
+        execution_mode=execution_mode,
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
         requested_top_n=25,
         ranking_primary_metric="profit_factor",
         ranking_secondary_metric="win_rate_pct",
+    )
+
+
+def _running_run(
+    *,
+    run_id: UUID,
+    user_id: UserId,
+    execution_mode: BacktestJobExecutionMode = "background_manual_legacy",
+) -> BacktestJob:
+    """
+    Build deterministic running persisted run fixture for public lifecycle tests.
+
+    Args:
+        run_id: Deterministic persisted run identifier.
+        user_id: Run owner identifier.
+        execution_mode: Persisted background execution mode literal.
+    Returns:
+        BacktestJob: Running persisted run fixture with active lease metadata.
+    Assumptions:
+        Lease fields stay valid for public status/cancel tests.
+    Raises:
+        ValueError: If fixture violates domain lifecycle invariants.
+    Side Effects:
+        None.
+    """
+    queued = _queued_run(run_id=run_id, user_id=user_id, execution_mode=execution_mode)
+    return queued.claim(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        locked_by="worker-test-1",
+        lease_expires_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
     )
 
 

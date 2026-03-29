@@ -432,6 +432,39 @@ def test_backtest_job_request_cancel_for_running_marks_cancel_requested_only() -
     assert updated.locked_by == "worker-a-123"
 
 
+def test_backtest_job_request_cancel_for_running_preserves_first_marker() -> None:
+    """
+    Verify repeated running cancel requests keep the first persisted marker unchanged.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R8-03 keeps running cancel best-effort but fixes the first `cancel_requested_at`
+        timestamp for deterministic lifecycle visibility.
+    Raises:
+        AssertionError: If repeated cancel mutates the running snapshot.
+    Side Effects:
+        None.
+    """
+    running = _build_queued_job().claim(
+        changed_at=datetime(2026, 2, 22, 18, 0, 1, tzinfo=timezone.utc),
+        locked_by="worker-a-123",
+        lease_expires_at=datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc),
+    )
+    first_cancel_at = datetime(2026, 2, 22, 18, 0, 30, tzinfo=timezone.utc)
+    repeated_cancel_at = datetime(2026, 2, 22, 18, 0, 45, tzinfo=timezone.utc)
+
+    first = running.request_cancel(changed_at=first_cancel_at)
+    repeated = first.request_cancel(changed_at=repeated_cancel_at)
+
+    assert repeated is first
+    assert repeated.state == "running"
+    assert repeated.cancel_requested_at == first_cancel_at
+    assert repeated.updated_at == first_cancel_at
+
+
 def test_backtest_job_request_cancel_is_idempotent_for_terminal_state() -> None:
     """
     Verify repeated cancel requests on terminal job are idempotent.

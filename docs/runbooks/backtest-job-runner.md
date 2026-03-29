@@ -152,6 +152,10 @@ curl -fsS -X POST -b cookies.txt \
 Ожидаемое поведение:
 - job в `queued`: сразу `cancelled`
 - job в `running`: best-effort, отмена происходит на границах батчей
+- у `running` job поле `cancel_requested_at` фиксируется один раз и остаётся видимым до terminal
+  state
+- такой `running` job продолжает удерживать publish guard для своего pinned slot identity до
+  `succeeded|failed|cancelled`
 
 Проверить статус:
 
@@ -166,6 +170,7 @@ curl -fsS -b cookies.txt "http://127.0.0.1:8000/backtests/jobs/<job_id>/top?limi
 ```
 
 Для jobs, которые не в `succeeded`, `report_table_md` и `trades` не возвращаются.
+Это одинаково для `background_auto` и `background_manual_legacy`.
 
 ## 8) Ранбук lease-lost
 

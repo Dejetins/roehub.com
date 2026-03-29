@@ -395,12 +395,56 @@ def test_job_repository_count_active_for_artifact_manifest_uses_pin_and_instrume
     )
 
     assert blocked_total == 2
+    assert "state IN ('queued', 'running')" in gateway.fetch_one_queries[0]
+    assert (
+        "execution_mode IN ('background_auto', 'background_manual_legacy')"
+        in gateway.fetch_one_queries[0]
+    )
     assert "artifact_slot = %(artifact_slot)s" in gateway.fetch_one_queries[0]
     assert "artifact_manifest_hash = %(artifact_manifest_hash)s" in gateway.fetch_one_queries[0]
     assert "market_id = %(market_id)s" in gateway.fetch_one_queries[0]
     assert "symbol = %(symbol)s" in gateway.fetch_one_queries[0]
     assert "request_json -> 'template' -> 'instrument_id'" in gateway.fetch_one_queries[0]
     assert "spec_payload_json -> 'instrument_id'" in gateway.fetch_one_queries[0]
+
+
+def test_job_repository_cancel_preserves_existing_running_cancel_marker() -> None:
+    """
+    Verify running cancel SQL keeps the first `cancel_requested_at` marker unchanged.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R8-03 keeps running cancel idempotent while queued cancel still transitions directly to
+        `cancelled`.
+    Raises:
+        AssertionError: If SQL shape would overwrite an existing running cancel marker.
+    Side Effects:
+        None.
+    """
+    first_cancel_at = datetime(2026, 3, 29, 12, 5, tzinfo=timezone.utc)
+    persisted_row = dict(_build_job_row(state="running"))
+    persisted_row["cancel_requested_at"] = first_cancel_at
+    persisted_row["updated_at"] = first_cancel_at
+    gateway = _FakeGateway(
+        fetch_one_results=[persisted_row]
+    )
+    repository = PostgresBacktestJobRepository(gateway=gateway)
+
+    updated = repository.cancel(
+        job_id=UUID("00000000-0000-0000-0000-000000000810"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        cancel_requested_at=datetime(2026, 3, 29, 12, 6, tzinfo=timezone.utc),
+    )
+
+    assert updated is not None
+    assert updated.state == "running"
+    assert updated.cancel_requested_at == first_cancel_at
+    assert "cancel_requested_at IS NOT NULL" in gateway.fetch_one_queries[0]
+    assert "THEN cancel_requested_at" in gateway.fetch_one_queries[0]
+    assert "THEN updated_at" in gateway.fetch_one_queries[0]
 
 
 def test_lease_repository_heartbeat_uses_active_lease_owner_predicate() -> None:

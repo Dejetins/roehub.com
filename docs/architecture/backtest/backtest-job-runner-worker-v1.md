@@ -313,6 +313,11 @@ R2-02 добавляет внешний publish safety contract между worke
 - пока job в `queued|running`, эта identity считается активной и может блокировать publish/rebuild inactive slot;
 - после terminal state (`succeeded|failed|cancelled`) job больше не участвует в publish guard;
 - worker не имеет права менять pinned slot identity по ходу attempt, даже если `current.yaml` успел переключиться.
+- R8-03 уточняет cancel interaction:
+  - `queued -> cancelled` освобождает publish guard сразу;
+  - `running` с `cancel_requested_at` остаётся в `running` и продолжает держать guard до
+    `succeeded|failed|cancelled`;
+  - это правило одинаково для `background_auto` и `background_manual_legacy`.
 
 ## Observability
 

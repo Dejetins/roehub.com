@@ -17,6 +17,7 @@ from trading.contexts.backtest.adapters.outbound.config import (
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services import (
+    ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
     ArtifactSlotPublishErrorV2,
@@ -286,7 +287,7 @@ def test_backtest_artifact_slot_publisher_v2_blocks_publish_when_inactive_slot_i
     precheck = publisher.precheck_publish(store.coordinates)
 
     assert precheck.ready is False
-    assert precheck.failure_code == "inactive_slot_pinned"
+    assert precheck.failure_code == ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2
     with pytest.raises(ArtifactSlotPublishErrorV2, match="slot_b"):
         publisher.publish(
             precheck=precheck,
@@ -430,7 +431,7 @@ def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_
             ),
         )
 
-    assert error_info.value.code == "inactive_slot_pinned"
+    assert error_info.value.code == ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2
     assert runner.called is False
 
 

@@ -79,6 +79,7 @@ Fail-fast loader обязан reject'ить:
 До rebuild inactive slot нужно проверить active pins:
 
 - найти active background jobs (`queued | running`) для того же инструмента;
+- учитывать только `execution_mode in ('background_auto', 'background_manual_legacy')`;
 - сравнить persisted `artifact_slot` + `artifact_manifest_hash` с текущей inactive identity;
 - если найден хотя бы один active pin, publish блокируется.
 
@@ -89,6 +90,8 @@ Fail-fast loader обязан reject'ить:
 Операционное значение:
 
 - inactive slot нельзя rebuild'ить, пока на нём ещё висят активные runs;
+- `queued -> cancelled` снимает блокировку сразу, потому что run становится terminal;
+- `running` с `cancel_requested_at` всё ещё блокирует rebuild до terminal transition;
 - active slot contents и inactive slot contents не должны быть перезаписаны вручную в обход guard.
 
 ## Шаг 3. build inactive slot

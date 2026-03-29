@@ -19,6 +19,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobErrorPayload,
+    BacktestJobExecutionMode,
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
@@ -126,6 +127,38 @@ def test_build_backtest_run_status_response_uses_run_vocabulary_without_hashes()
     assert dumped["artifact_slot"] == "slot_b"
     assert dumped["last_error_json"]["code"] == "unexpected_error"
     assert "request_hash" not in dumped
+
+
+def test_build_backtest_run_status_response_keeps_running_background_cancel_marker() -> None:
+    """
+    Verify public status mapper preserves running background state and `cancel_requested_at`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R8-03 status surface must expose best-effort running cancel without forcing terminal
+        state prematurely.
+    Raises:
+        AssertionError: If execution mode or cancel marker is dropped.
+    Side Effects:
+        None.
+    """
+    run = _running_run(
+        run_id=UUID("00000000-0000-0000-0000-000000000994"),
+        execution_mode="background_auto",
+    ).request_cancel(
+        changed_at=datetime(2026, 3, 29, 12, 0, 30, tzinfo=timezone.utc)
+    )
+
+    response = build_backtest_run_status_response(run=run)
+    dumped = response.model_dump(mode="json")
+
+    assert dumped["state"] == "running"
+    assert dumped["execution_mode"] == "background_auto"
+    assert dumped["cancel_requested_at"] == "2026-03-29T12:00:30Z"
+    assert dumped["finished_at"] is None
 
 
 def test_build_backtest_run_top_response_includes_summary_metrics_fields() -> None:
@@ -263,12 +296,17 @@ def test_backtest_run_variant_report_request_rejects_full_run_envelope_fields() 
         )
 
 
-def _queued_run(*, run_id: UUID) -> BacktestJob:
+def _queued_run(
+    *,
+    run_id: UUID,
+    execution_mode: BacktestJobExecutionMode = "sync_inline",
+) -> BacktestJob:
     """
     Build deterministic queued persisted run fixture for DTO tests.
 
     Args:
         run_id: Deterministic persisted run identifier.
+        execution_mode: Persisted execution-mode literal exposed by DTO mappers.
     Returns:
         BacktestJob: Queued persisted run fixture.
     Assumptions:
@@ -295,13 +333,40 @@ def _queued_run(*, run_id: UUID) -> BacktestJob:
             artifact_manifest_hash="d" * 64,
             artifact_asof_date="2026-03-29",
         ),
-        execution_mode="sync_inline",
+        execution_mode=execution_mode,
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
         requested_top_n=25,
         ranking_primary_metric="profit_factor",
         ranking_secondary_metric="win_rate_pct",
+    )
+
+
+def _running_run(
+    *,
+    run_id: UUID,
+    execution_mode: BacktestJobExecutionMode = "sync_inline",
+) -> BacktestJob:
+    """
+    Build deterministic running persisted run fixture for DTO tests.
+
+    Args:
+        run_id: Deterministic persisted run identifier.
+        execution_mode: Persisted execution-mode literal exposed by DTO mappers.
+    Returns:
+        BacktestJob: Running persisted run fixture.
+    Assumptions:
+        Running fixture shares the same additive metadata as queued fixture.
+    Raises:
+        ValueError: If fixture violates lifecycle invariants.
+    Side Effects:
+        None.
+    """
+    return _queued_run(run_id=run_id, execution_mode=execution_mode).claim(
+        changed_at=datetime(2026, 3, 29, 11, 35, tzinfo=timezone.utc),
+        locked_by="worker-a-1",
+        lease_expires_at=datetime(2026, 3, 29, 11, 36, tzinfo=timezone.utc),
     )
 
 
@@ -320,11 +385,7 @@ def _failed_run(*, run_id: UUID) -> BacktestJob:
     Side Effects:
         None.
     """
-    running = _queued_run(run_id=run_id).claim(
-        changed_at=datetime(2026, 3, 29, 11, 35, tzinfo=timezone.utc),
-        locked_by="worker-a-1",
-        lease_expires_at=datetime(2026, 3, 29, 11, 36, tzinfo=timezone.utc),
-    )
+    running = _running_run(run_id=run_id)
     return running.finish(
         next_state="failed",
         changed_at=datetime(2026, 3, 29, 11, 37, tzinfo=timezone.utc),

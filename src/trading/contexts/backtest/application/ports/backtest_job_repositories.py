@@ -193,7 +193,8 @@ class BacktestJobRepository(Protocol):
         Returns:
             BacktestJob | None: Updated job snapshot or `None` when job is not found.
         Assumptions:
-            `queued` jobs are cancelled immediately; `running` jobs get cancel-request mark.
+            `queued` jobs are cancelled immediately; `running` jobs keep state=`running` and
+            preserve the first persisted `cancel_requested_at` marker until worker finalization.
         Raises:
             ValueError: If storage write/read fails.
         Side Effects:
@@ -237,8 +238,10 @@ class BacktestJobRepository(Protocol):
         Returns:
             int: Number of active jobs blocking rebuild/publish of this slot content.
         Assumptions:
-            Active background jobs are `queued + running`, and saved/template requests store
-            `(market_id, symbol)` in `request_json` or `spec_payload_json`.
+            R8-03 blocking set is explicit: only `queued|running` rows with
+            `execution_mode in ('background_auto', 'background_manual_legacy')` participate in
+            inactive-slot publish guard, and saved/template requests store `(market_id, symbol)`
+            in `request_json` or `spec_payload_json`.
         Raises:
             ValueError: If storage read fails.
         Side Effects:

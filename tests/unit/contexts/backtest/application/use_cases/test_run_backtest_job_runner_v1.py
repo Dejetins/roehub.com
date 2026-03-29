@@ -7,6 +7,7 @@ from typing import Any, Mapping, cast
 from uuid import UUID
 
 import numpy as np
+import pytest
 
 from trading.contexts.backtest.application.dto import (
     BacktestRankingConfig,
@@ -25,7 +26,12 @@ from trading.contexts.backtest.application.use_cases import RunBacktestJobRunner
 from trading.contexts.backtest.application.use_cases import (
     run_backtest_job_runner_v1 as run_backtest_job_runner_module,
 )
-from trading.contexts.backtest.domain.entities import BacktestJob, BacktestJobArtifactPin, TradeV1
+from trading.contexts.backtest.domain.entities import (
+    BacktestJob,
+    BacktestJobArtifactPin,
+    BacktestJobExecutionMode,
+    TradeV1,
+)
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
@@ -1929,7 +1935,16 @@ def test_process_claimed_job_builds_runtime_candles_from_pinned_artifact_prices(
     assert price_arrays_loader.calls[0]["timeframe"] == request.template.timeframe.code
 
 
-def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime() -> None:
+@pytest.mark.parametrize(
+    ("execution_mode",),
+    (
+        ("background_auto",),
+        ("background_manual_legacy",),
+    ),
+)
+def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime(
+    execution_mode: BacktestJobExecutionMode,
+) -> None:
     """
     Verify background use-case resolves the shared slot-pinned context before runtime work starts.
 
@@ -1950,7 +1965,7 @@ def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime() -> 
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
     """
-    job = _build_running_job_with_artifact_pin()
+    job = _build_running_job_with_artifact_pin(execution_mode=execution_mode)
     resolver = _RecordingArtifactSlotResolver(
         context=_FakeSlotPinnedContext(
             coordinates=ArtifactCoordinatesV2(
@@ -2002,6 +2017,7 @@ def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime() -> 
     assert pinned_identity.slot_generation == 11
     assert pinned_identity.artifact_asof_date == "2026-03-29"
     assert pinned_identity.artifact_manifest_hash == "d" * 64
+    assert job.execution_mode == execution_mode
 
 
 def test_process_claimed_job_uses_artifact_stage_a_shortlist_builder_when_available() -> None:
@@ -2334,12 +2350,15 @@ def _build_request(
     )
 
 
-def _build_running_job() -> BacktestJob:
+def _build_running_job(
+    *,
+    execution_mode: BacktestJobExecutionMode = "background_manual_legacy",
+) -> BacktestJob:
     """
     Build deterministic running Backtest job fixture with persisted artifact pin metadata.
 
     Args:
-        None.
+        execution_mode: Background execution mode literal persisted on the claimed job.
     Returns:
         BacktestJob: Running claimed job fixture pinned to immutable artifact identity.
     Assumptions:
@@ -2367,7 +2386,7 @@ def _build_running_job() -> BacktestJob:
             artifact_manifest_hash="d" * 64,
             artifact_asof_date="2026-03-29",
         ),
-        execution_mode="background_manual_legacy",
+        execution_mode=execution_mode,
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -2382,12 +2401,15 @@ def _build_running_job() -> BacktestJob:
     )
 
 
-def _build_running_job_with_artifact_pin() -> BacktestJob:
+def _build_running_job_with_artifact_pin(
+    *,
+    execution_mode: BacktestJobExecutionMode = "background_manual_legacy",
+) -> BacktestJob:
     """
     Build deterministic running Backtest job fixture with persisted artifact pin metadata.
 
     Args:
-        None.
+        execution_mode: Background execution mode literal persisted on the claimed job.
     Returns:
         BacktestJob: Running claimed job fixture with immutable artifact pin metadata.
     Assumptions:
@@ -2397,7 +2419,7 @@ def _build_running_job_with_artifact_pin() -> BacktestJob:
     Side Effects:
         None.
     """
-    return _build_running_job()
+    return _build_running_job(execution_mode=execution_mode)
 
 
 def _default_pinned_context() -> _FakeSlotPinnedContext:

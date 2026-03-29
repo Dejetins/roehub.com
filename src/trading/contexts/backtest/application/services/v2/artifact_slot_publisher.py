@@ -13,6 +13,7 @@ from trading.contexts.backtest.application.ports import BacktestJobRepository
 from .artifact_manifest_validator import BacktestArtifactManifestValidatorV2
 from .artifact_precompute_runner import BacktestArtifactPrecomputeRunnerV2
 from .contracts import (
+    ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2,
     CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
@@ -172,7 +173,7 @@ class BacktestArtifactSlotPublisherV2:
                 inactive_manifest_hash=inactive_manifest_hash,
                 blocking_active_run_count=blocking_active_run_count,
                 ready=False,
-                failure_code="inactive_slot_pinned",
+                failure_code=ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2,
                 failure_message=failure_message,
             )
 

@@ -333,7 +333,15 @@ R2-02 не ломает jobs API/storage contract, а расширяет его 
   - `artifact_slot_generation`
   - `artifact_manifest_hash`
   - `artifact_asof_date`
-- publish guard читает active jobs и блокирует rebuild/publish inactive slot, если найден хотя бы один active pin на ту же inactive identity;
+- publish guard читает active jobs и блокирует rebuild/publish inactive slot, если найден хотя бы
+  один active pin на ту же inactive identity;
+- R8-03 фиксирует blocking set явно:
+  - состояния только `queued|running`;
+  - `execution_mode` только `background_auto|background_manual_legacy`;
+  - terminal rows (`succeeded|failed|cancelled`) никогда не участвуют в guard;
+- `queued -> cancelled` снимает publish block сразу;
+- `running` с уже выставленным `cancel_requested_at` остаётся blocking до terminal transition и не
+  должен терять pinned identity;
 - все изменения additive и backward-compatible для существующих API/imports.
 
 ## Ключевые решения

@@ -29,6 +29,12 @@
   - такие runs появляются в `/backtests/runs*` сразу после launch и используют тот же storage,
     owner policy, status, `/top`, `/cancel` и history semantics, что и
     `background_manual_legacy`.
+- R8-03 additive note:
+  - public history/status продолжает показывать lifecycle literals
+    `queued|running|succeeded|failed|cancelled` без отдельного vocabulary для background modes;
+  - `POST /backtests/runs/{run_id}/cancel` для `running` rows возвращает всё ещё `running`, но с
+    заполненным `cancel_requested_at`, пока worker не доведёт run до terminal state;
+  - это поведение одинаково для `background_auto` и `background_manual_legacy`.
 
 ## Цель
 
@@ -127,6 +133,8 @@ Hashes (`request_hash`, `engine_params_hash`, `backtest_runtime_config_hash`, `s
 - `running -> cancel_requested_at` (best-effort);
 - terminal states возвращаются без изменений;
 - ответ всегда содержит status snapshot, а не `204`.
+- repeated cancel для уже помеченного `running` не должен перетирать первый
+  `cancel_requested_at`.
 
 ### 6) Legacy `/backtests/jobs*` остается migration alias
 

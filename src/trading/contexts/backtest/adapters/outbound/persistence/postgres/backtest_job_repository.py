@@ -517,7 +517,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Returns:
             BacktestJob | None: Updated snapshot or `None` when job is missing.
         Assumptions:
-            Cancel operation is idempotent for already-terminal jobs.
+            Cancel operation is idempotent for terminal jobs and preserves the first running
+            `cancel_requested_at` marker for deterministic R8-03 lifecycle visibility.
         Raises:
             BacktestStorageError: If row mapping fails.
         Side Effects:
@@ -534,8 +535,16 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 WHEN state = 'queued' THEN %(cancel_requested_at)s
                 ELSE finished_at
             END,
-            cancel_requested_at = %(cancel_requested_at)s,
-            updated_at = %(cancel_requested_at)s
+            cancel_requested_at = CASE
+                WHEN state = 'running' AND cancel_requested_at IS NOT NULL
+                    THEN cancel_requested_at
+                ELSE %(cancel_requested_at)s
+            END,
+            updated_at = CASE
+                WHEN state = 'running' AND cancel_requested_at IS NOT NULL
+                    THEN updated_at
+                ELSE %(cancel_requested_at)s
+            END
         WHERE job_id = %(job_id)s
           AND user_id = %(user_id)s
           AND state IN ('queued', 'running')
@@ -616,8 +625,11 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Returns:
             int: Number of active jobs blocking rebuild/publish of this slot content.
         Assumptions:
-            R7-01 rows prefer denormalized `(market_id, symbol)` columns, while legacy rows still
-            fall back to canonical payload snapshots inside `request_json/spec_payload_json`.
+            R8-03 blocking set is explicit: only `queued|running` rows with
+            `execution_mode in ('background_auto', 'background_manual_legacy')` participate in
+            inactive-slot publish guard. R7-01 rows prefer denormalized `(market_id, symbol)`
+            columns, while legacy rows still fall back to canonical payload snapshots inside
+            `request_json/spec_payload_json`.
         Raises:
             BacktestStorageError: If count row is missing or invalid.
         Side Effects:
@@ -628,6 +640,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             COUNT(*) AS active_total
         FROM {self._jobs_table}
         WHERE state IN ('queued', 'running')
+          AND execution_mode IN ('background_auto', 'background_manual_legacy')
           AND artifact_slot = %(artifact_slot)s
           AND artifact_manifest_hash = %(artifact_manifest_hash)s
           AND (

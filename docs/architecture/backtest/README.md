@@ -94,6 +94,12 @@
   - accepted ranking literals совпадают между DTO/API/runtime defaults;
   - Stage A/Stage B tie-break остаётся explicit и stable;
   - sync/jobs runtime summary rows не строят `report`/`trades` тела.
+- R8-03 закрепляет background safety contract:
+  - publish guard блокируется только по active background runs
+    (`queued|running` + `background_auto|background_manual_legacy`);
+  - `queued -> cancelled` снимает guard сразу;
+  - `running` с `cancel_requested_at` остаётся blocking до terminal state;
+  - runs history/status сохраняют один и тот же lifecycle vocabulary для обоих background modes.
 - После R6-04 вне scope остаются R7 persisted-run storage/API cutover и full runtime legacy
   cutover.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
