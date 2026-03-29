@@ -25,6 +25,7 @@ from .backtest_runs import (
     BacktestRunStatusResponse,
     BacktestRunTopItemResponse,
     BacktestRunTopResponse,
+    BacktestRunVariantReportPostRequest,
     build_backtest_run_status_response,
     build_backtest_run_top_response,
     build_backtest_runs_list_response,
@@ -76,6 +77,7 @@ from .backtests import (
     build_engine_params_hash,
     build_grid_request_hash,
     build_sha256_from_payload,
+    decode_backtest_request_payload,
 )
 from .indicators import (
     ComputeAxisResponse,
@@ -181,6 +183,7 @@ __all__ = [
     "BacktestRunsListResponse",
     "BacktestRunsStageLiteral",
     "BacktestRunsStateLiteral",
+    "BacktestRunVariantReportPostRequest",
     "BacktestRunTopItemResponse",
     "BacktestRunTopResponse",
     "build_backtest_run_status_response",
@@ -230,4 +233,5 @@ __all__ = [
     "build_engine_params_hash",
     "build_grid_request_hash",
     "build_sha256_from_payload",
+    "decode_backtest_request_payload",
 ]

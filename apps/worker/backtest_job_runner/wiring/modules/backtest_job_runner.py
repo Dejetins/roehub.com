@@ -19,7 +19,7 @@ from prometheus_client import (
     start_http_server,
 )
 
-from apps.api.dto.backtests import BacktestsPostRequest, build_backtest_run_request
+from apps.api.dto.backtests import decode_backtest_request_payload
 from apps.api.wiring.modules.indicators import (
     build_indicators_candle_feed,
     build_indicators_compute,
@@ -91,8 +91,7 @@ class _ApiBacktestJobRequestDecoderV1(BacktestJobRequestDecoder):
         Side Effects:
             None.
         """
-        request = BacktestsPostRequest.model_validate(payload)
-        return build_backtest_run_request(request=request)
+        return decode_backtest_request_payload(payload=payload)
 
 
 class BacktestJobRunnerMetrics:

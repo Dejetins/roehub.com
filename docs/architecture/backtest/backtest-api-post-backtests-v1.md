@@ -9,6 +9,12 @@
   - persisted runs created by `POST /backtests` are now publicly readable through
     `docs/architecture/backtest/backtest-runs-history-v2.md`;
   - legacy `/backtests/jobs*` remains a migration alias over the same storage family.
+- R7-04 follow-up note:
+  - preferred public lazy detail endpoint is now
+    `POST /backtests/runs/{run_id}/variant-report`,
+    which reconstructs original run context from persisted storage and pinned artifact fields;
+  - legacy `POST /backtests/variant-report` remains behavior-compatible compatibility path for
+    clients that still send full run envelope in request body.
 - R7-02 storage note:
   - sync and background executions share one persisted-run storage family in Postgres,
   - successful `POST /backtests` now performs internal preflight, executes inline, and persists
@@ -175,6 +181,9 @@ Response v1 включает:
 
 - По умолчанию `POST /backtests` возвращает ranking + payload summary без `report` body.
 - Поля `rows/table_md/trades` загружаются on-demand через `POST /api/backtests/variant-report`.
+- После R7-04 public clients SHOULD prefer
+  `POST /api/backtests/runs/{run_id}/variant-report`, где `run_id` приходит из persisted runs
+  history/status/top API, а body содержит только `variant + include_trades`.
 - Runtime flag `backtest.reporting.eager_top_reports_enabled` остаётся только как compatibility
   knob для переходного wiring, но summary path R6-04 всё равно не строит `report`/`trades` тела.
 - `top_trades_n` остаётся параметром downstream detail/report flows и не включает eager
@@ -300,12 +309,30 @@ Response содержит:
   - всегда `null` в runtime summary response R6-04
   - полный `rows + table_md + optional trades` загружается только через
     `POST /api/backtests/variant-report`
+    или preferred run-scoped endpoint `POST /api/backtests/runs/{run_id}/variant-report`
 - `payload` (explicit parameters for saving):
   - `indicator_selections[]`
   - `signals`
   - `risk`
   - `execution`
   - `direction_mode`, `sizing_mode`
+
+## Lazy detail compatibility after R7-04
+
+- Legacy compatibility endpoint:
+  - `POST /api/backtests/variant-report`
+  - request body содержит full run envelope (`time_range`, `strategy_id xor template`,
+    `overrides?`, `warmup_bars?`) + explicit `variant`
+- Preferred public endpoint:
+  - `POST /api/backtests/runs/{run_id}/variant-report`
+  - path содержит persisted `run_id`
+  - request body содержит только:
+    - `variant`
+    - `include_trades?`
+- Общие invariants:
+  - пересчитывается ровно один selected variant;
+  - detail/report/trades payloads не сохраняются в persisted summary rows;
+  - full top-N recompute не запускается.
 
 ## Ошибки и статус-коды
 

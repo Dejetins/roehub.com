@@ -13,6 +13,7 @@ from .backtest_runs_api_v1 import (
 )
 from .backtest_runs_history_api_v1 import (
     BacktestRunTopReadResult,
+    BuildBacktestRunVariantReportUseCase,
     CancelBacktestRunUseCase,
     GetBacktestRunStatusUseCase,
     GetBacktestRunTopUseCase,
@@ -43,6 +44,7 @@ from .run_backtest_job_runner_v1 import (
 __all__ = [
     "BacktestRunsApiUseCase",
     "BacktestRunTopReadResult",
+    "BuildBacktestRunVariantReportUseCase",
     "BacktestJobRunReportV1",
     "BacktestJobRunStatus",
     "BacktestJobTopReadResult",

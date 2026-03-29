@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from apps.api.common import register_api_error_handlers
 from apps.api.dto import encode_backtest_runs_cursor
 from apps.api.routes import build_backtest_runs_router
+from trading.contexts.backtest.application.dto import BacktestMetricRowV1, BacktestReportV1
 from trading.contexts.backtest.application.ports import BacktestJobListPage
 from trading.contexts.backtest.application.use_cases import (
     BacktestRunTopReadResult,
@@ -19,6 +20,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobArtifactPin,
     BacktestJobErrorPayload,
     BacktestJobTopVariant,
+    TradeV1,
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
@@ -200,13 +202,62 @@ class _CancelUseCaseFake:
         return self.run
 
 
+@dataclass
+class _VariantReportUseCaseFake:
+    """
+    Deterministic run-scoped variant-report fake returning preconfigured report or error.
+    """
+
+    report: BacktestReportV1 | None = None
+    error: Exception | None = None
+    last_run_id: UUID | None = None
+    last_include_trades: bool | None = None
+
+    def execute(
+        self,
+        *,
+        run_id: UUID,
+        current_user,
+        variant_payload,
+        include_trades: bool,
+        run_control=None,
+    ) -> BacktestReportV1:
+        """
+        Return configured report payload or raise configured exception.
+
+        Args:
+            run_id: Requested persisted run identifier.
+            current_user: Authenticated user payload.
+            variant_payload: Explicit selected variant payload.
+            include_trades: Include-trades flag.
+            run_control: Optional cooperative cancellation handle.
+        Returns:
+            BacktestReportV1: Configured report payload.
+        Assumptions:
+            Route tests verify wiring and error mapping, not report compute logic.
+        Raises:
+            Exception: Configured fake exception.
+        Side Effects:
+            Stores last `run_id` and `include_trades` for assertions.
+        """
+        _ = current_user, variant_payload, run_control
+        self.last_run_id = run_id
+        self.last_include_trades = include_trades
+        if self.error is not None:
+            raise self.error
+        if self.report is None:  # pragma: no cover - guarded by fixtures
+            raise ValueError("variant_report fake requires report")
+        return self.report
+
+
 def _build_client(
     *,
     status_use_case: _StatusUseCaseFake | None = None,
     top_use_case: _TopUseCaseFake | None = None,
     list_use_case: _ListUseCaseFake | None = None,
     cancel_use_case: _CancelUseCaseFake | None = None,
-) -> tuple[TestClient, _ListUseCaseFake]:
+    variant_report_use_case: _VariantReportUseCaseFake | None = None,
+) -> tuple[TestClient, _ListUseCaseFake, _VariantReportUseCaseFake]:
     """
     Build minimal FastAPI TestClient with public runs router and shared error handlers.
 
@@ -216,7 +267,8 @@ def _build_client(
         list_use_case: Optional list use-case fake.
         cancel_use_case: Optional cancel use-case fake.
     Returns:
-        tuple[TestClient, _ListUseCaseFake]: Configured client and resolved list fake.
+        tuple[TestClient, _ListUseCaseFake, _VariantReportUseCaseFake]:
+            Configured client and resolved fake dependencies.
     Assumptions:
         Shared API error handlers provide deterministic Roehub/422 payloads.
     Raises:
@@ -228,6 +280,9 @@ def _build_client(
     resolved_list_use_case = list_use_case or _ListUseCaseFake(
         page=BacktestJobListPage(items=(base_run,), next_cursor=None)
     )
+    resolved_variant_report_use_case = variant_report_use_case or _VariantReportUseCaseFake(
+        report=_variant_report()
+    )
 
     app = FastAPI()
     register_api_error_handlers(app=app)
@@ -238,10 +293,12 @@ def _build_client(
             or _TopUseCaseFake(result=_top_result(run=base_run)),  # type: ignore[arg-type]
             list_use_case=resolved_list_use_case,  # type: ignore[arg-type]
             cancel_use_case=cancel_use_case or _CancelUseCaseFake(run=base_run),  # type: ignore[arg-type]
+            variant_report_use_case=resolved_variant_report_use_case,  # type: ignore[arg-type]
             current_user_dependency=_HeaderCurrentUserDependency(),
+            sync_deadline_seconds=55.0,
         )
     )
-    return TestClient(app), resolved_list_use_case
+    return TestClient(app), resolved_list_use_case, resolved_variant_report_use_case
 
 
 def test_get_backtest_runs_returns_history_page_with_public_run_metadata() -> None:
@@ -271,7 +328,7 @@ def test_get_backtest_runs_returns_history_page_with_public_run_metadata() -> No
             next_cursor=cursor,
         )
     )
-    client, resolved_list_fake = _build_client(list_use_case=list_fake)
+    client, resolved_list_fake, _ = _build_client(list_use_case=list_fake)
 
     response = client.get(
         "/backtests/runs",
@@ -310,7 +367,7 @@ def test_get_backtest_run_status_returns_failed_payload_with_public_fields() -> 
         None.
     """
     failed_run = _failed_run(run_id=UUID("00000000-0000-0000-0000-000000000933"))
-    client, _ = _build_client(status_use_case=_StatusUseCaseFake(run=failed_run))
+    client, _, _ = _build_client(status_use_case=_StatusUseCaseFake(run=failed_run))
 
     response = client.get(
         "/backtests/runs/00000000-0000-0000-0000-000000000933",
@@ -349,7 +406,7 @@ def test_get_backtest_run_top_returns_summary_only_rows_with_persisted_metrics()
         None.
     """
     run = _queued_run(run_id=UUID("00000000-0000-0000-0000-000000000934"))
-    client, _ = _build_client(top_use_case=_TopUseCaseFake(result=_top_result(run=run)))
+    client, _, _ = _build_client(top_use_case=_TopUseCaseFake(result=_top_result(run=run)))
 
     response = client.get(
         "/backtests/runs/00000000-0000-0000-0000-000000000934/top",
@@ -398,7 +455,7 @@ def test_post_backtest_run_cancel_returns_updated_status_snapshot() -> None:
     ).request_cancel(
         changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
     )
-    client, _ = _build_client(cancel_use_case=_CancelUseCaseFake(run=cancelled_run))
+    client, _, _ = _build_client(cancel_use_case=_CancelUseCaseFake(run=cancelled_run))
 
     response = client.post(
         "/backtests/runs/00000000-0000-0000-0000-000000000935/cancel",
@@ -425,14 +482,14 @@ def test_get_backtest_run_status_maps_foreign_and_missing_errors() -> None:
     Side Effects:
         None.
     """
-    forbidden_client, _ = _build_client(
+    forbidden_client, _, _ = _build_client(
         status_use_case=_StatusUseCaseFake(
             error=backtest_run_forbidden(
                 run_id=UUID("00000000-0000-0000-0000-000000000936")
             )
         )
     )
-    not_found_client, _ = _build_client(
+    not_found_client, _, _ = _build_client(
         status_use_case=_StatusUseCaseFake(
             error=backtest_run_not_found(
                 run_id=UUID("00000000-0000-0000-0000-000000000937")
@@ -474,7 +531,7 @@ def test_get_backtest_runs_rejects_invalid_state_filter() -> None:
     Side Effects:
         None.
     """
-    client, _ = _build_client()
+    client, _, _ = _build_client()
 
     response = client.get(
         "/backtests/runs",
@@ -517,7 +574,7 @@ def test_get_backtest_run_top_maps_validation_error_for_invalid_limit() -> None:
     Side Effects:
         None.
     """
-    client, _ = _build_client(
+    client, _, _ = _build_client(
         top_use_case=_TopUseCaseFake(
             error=BacktestValidationError(
                 "Top rows limit must be > 0",
@@ -549,6 +606,162 @@ def test_get_backtest_run_top_maps_validation_error_for_invalid_limit() -> None:
                         "code": "greater_than",
                         "message": "limit must be > 0",
                     }
+                ]
+            },
+        }
+    }
+
+
+def test_post_backtest_run_variant_report_returns_report_for_one_selected_variant() -> None:
+    """
+    Verify run-scoped variant-report endpoint returns deterministic detail payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Client sends only `run_id` path param plus explicit selected variant payload.
+    Raises:
+        AssertionError: If status code, response shape, or forwarded arguments drift.
+    Side Effects:
+        None.
+    """
+    variant_report_fake = _VariantReportUseCaseFake(report=_variant_report())
+    client, _, resolved_variant_report_fake = _build_client(
+        variant_report_use_case=variant_report_fake
+    )
+
+    response = client.post(
+        "/backtests/runs/00000000-0000-0000-0000-000000000939/variant-report",
+        json=_variant_report_payload(),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "rows": [{"metric": "Total Return [%]", "value": "12.00"}],
+        "table_md": "|Metric|Value|\n|---|---|\n|Total Return [%]|12.00|",
+        "trades": [
+            {
+                "trade_id": 1,
+                "direction": "long",
+                "entry_bar_index": 0,
+                "exit_bar_index": 1,
+                "entry_fill_price": 100.0,
+                "exit_fill_price": 101.0,
+                "qty_base": 1.0,
+                "entry_quote_amount": 100.0,
+                "exit_quote_amount": 101.0,
+                "entry_fee_quote": 0.0,
+                "exit_fee_quote": 0.0,
+                "gross_pnl_quote": 1.0,
+                "net_pnl_quote": 1.0,
+                "locked_profit_quote": 0.0,
+                "exit_reason": "signal_exit",
+            }
+        ],
+    }
+    assert resolved_variant_report_fake.last_run_id == UUID(
+        "00000000-0000-0000-0000-000000000939"
+    )
+    assert resolved_variant_report_fake.last_include_trades is True
+
+
+def test_post_backtest_run_variant_report_maps_owner_and_missing_errors() -> None:
+    """
+    Verify run-scoped variant-report endpoint preserves explicit `403` and `404` semantics.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Use-case remains source of truth for owner-backed persisted run access policy.
+    Raises:
+        AssertionError: If route/error mapping drifts from public runs contract.
+    Side Effects:
+        None.
+    """
+    forbidden_client, _, _ = _build_client(
+        variant_report_use_case=_VariantReportUseCaseFake(
+            error=backtest_run_forbidden(
+                run_id=UUID("00000000-0000-0000-0000-000000000940")
+            )
+        )
+    )
+    not_found_client, _, _ = _build_client(
+        variant_report_use_case=_VariantReportUseCaseFake(
+            error=backtest_run_not_found(
+                run_id=UUID("00000000-0000-0000-0000-000000000941")
+            )
+        )
+    )
+
+    forbidden = forbidden_client.post(
+        "/backtests/runs/00000000-0000-0000-0000-000000000940/variant-report",
+        json=_variant_report_payload(),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+    not_found = not_found_client.post(
+        "/backtests/runs/00000000-0000-0000-0000-000000000941/variant-report",
+        json=_variant_report_payload(),
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert forbidden.status_code == 403
+    assert forbidden.json()["error"]["details"]["run_id"] == (
+        "00000000-0000-0000-0000-000000000940"
+    )
+    assert not_found.status_code == 404
+    assert not_found.json()["error"]["details"]["run_id"] == (
+        "00000000-0000-0000-0000-000000000941"
+    )
+
+
+def test_post_backtest_run_variant_report_rejects_invalid_payload_with_422() -> None:
+    """
+    Verify run-scoped variant-report endpoint rejects invalid body shape deterministically.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        New route requires only `variant` and optional `include_trades` in request body.
+    Raises:
+        AssertionError: If invalid payload no longer maps to canonical validation error.
+    Side Effects:
+        None.
+    """
+    client, _, _ = _build_client()
+
+    response = client.post(
+        "/backtests/runs/00000000-0000-0000-0000-000000000942/variant-report",
+        json={
+            "include_trades": True,
+            "template": {"unexpected": "full-run-envelope-is-forbidden-here"},
+        },
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "validation_error",
+            "message": "Validation failed",
+            "details": {
+                "errors": [
+                    {
+                        "path": "body.template",
+                        "code": "extra_forbidden",
+                        "message": "Extra inputs are not permitted",
+                    },
+                    {
+                        "path": "body.variant",
+                        "code": "required",
+                        "message": "Field required",
+                    },
                 ]
             },
         }
@@ -687,5 +900,90 @@ def _failed_run(*, run_id: UUID) -> BacktestJob:
             code="unexpected_error",
             message="Execution failed",
             details={"stage": "stage_b"},
+        ),
+    )
+
+
+def _variant_report_payload() -> dict[str, object]:
+    """
+    Build deterministic request body for run-scoped variant-report route tests.
+
+    Args:
+        None.
+    Returns:
+        dict[str, object]: Minimal strict request payload with explicit selected variant.
+    Assumptions:
+        `run_id` is passed via route path and must not be duplicated in body.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return {
+        "include_trades": True,
+        "variant": {
+            "indicator_selections": [
+                {
+                    "indicator_id": "ma.sma",
+                    "inputs": {"source": "close"},
+                    "params": {"window": 20},
+                }
+            ],
+            "signal_params": {"ma.sma": {"cross_up": 0.5}},
+            "risk_params": {
+                "sl_enabled": True,
+                "sl_pct": 2.0,
+                "tp_enabled": True,
+                "tp_pct": 4.0,
+            },
+            "execution_params": {
+                "init_cash_quote": 10000.0,
+                "fee_pct": 0.075,
+                "slippage_pct": 0.01,
+                "fixed_quote": 100.0,
+                "safe_profit_percent": 30.0,
+            },
+            "direction_mode": "long-short",
+            "sizing_mode": "all_in",
+        },
+    }
+
+
+def _variant_report() -> BacktestReportV1:
+    """
+    Build deterministic detail-report fixture for run-scoped route tests.
+
+    Args:
+        None.
+    Returns:
+        BacktestReportV1: Report fixture with rows, markdown table, and one trade.
+    Assumptions:
+        One trade item is enough to validate strict response serialization.
+    Raises:
+        ValueError: If fixture violates report entity invariants.
+    Side Effects:
+        None.
+    """
+    return BacktestReportV1(
+        rows=(BacktestMetricRowV1(metric="Total Return [%]", value="12.00"),),
+        table_md="|Metric|Value|\n|---|---|\n|Total Return [%]|12.00|",
+        trades=(
+            TradeV1(
+                trade_id=1,
+                direction="long",
+                entry_bar_index=0,
+                exit_bar_index=1,
+                entry_fill_price=100.0,
+                exit_fill_price=101.0,
+                qty_base=1.0,
+                entry_quote_amount=100.0,
+                exit_quote_amount=101.0,
+                entry_fee_quote=0.0,
+                exit_fee_quote=0.0,
+                gross_pnl_quote=1.0,
+                net_pnl_quote=1.0,
+                locked_profit_quote=0.0,
+                exit_reason="signal_exit",
+            ),
         ),
     )

@@ -480,31 +480,118 @@ class RunBacktestUseCase:
                 raise BacktestValidationError(
                     "RunBacktestUseCase.build_variant_report requires variant_payload"
                 )
+            resolved = self._resolve_run_context(request=request, current_user=current_user)
+            return self.build_variant_report_for_template(
+                requested_time_range=request.time_range,
+                template=resolved.template,
+                warmup_bars=resolved.warmup_bars,
+                variant_payload=variant_payload,
+                include_trades=include_trades,
+                run_control=run_control,
+                artifact_context=resolved.artifact_context,
+                template_root_path=(
+                    "saved_strategy" if resolved.mode == "saved" else "body.template"
+                ),
+                template_already_validated=True,
+            )
+        except RoehubError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            raise map_backtest_exception(error=error) from error
+
+    def build_variant_report_for_template(
+        self,
+        *,
+        requested_time_range: TimeRange,
+        template: RunBacktestTemplate,
+        warmup_bars: int | None,
+        variant_payload: BacktestVariantPayloadV1,
+        include_trades: bool = False,
+        run_control: BacktestRunControlV1 | None = None,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None = None,
+        template_root_path: str = "body.template",
+        template_already_validated: bool = False,
+    ) -> BacktestReportV1:
+        """
+        Build one lazy report from already resolved template and artifact context.
+
+        Docs:
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+          - apps/api/routes/backtest_runs.py
+
+        Args:
+            requested_time_range: Original user request range used for reporting metrics.
+            template: Effective template resolved from ad-hoc request or persisted run snapshot.
+            warmup_bars: Optional warmup override from request or persisted request snapshot.
+            variant_payload: Explicit selected variant payload for one lazy detail recompute.
+            include_trades: Whether to include trades in response payload.
+            run_control: Optional cooperative cancellation/deadline control object.
+            artifact_context: Optional already pinned artifact runtime context.
+            template_root_path: Validation root path used when runtime-contract checks run here.
+            template_already_validated:
+                Whether caller already ran deterministic template runtime-contract validation.
+        Returns:
+            BacktestReportV1: Deterministic report payload for exactly one selected variant.
+        Assumptions:
+            Caller may provide persisted run template + pinned artifact context to avoid reading
+            live strategy storage or active `current.yaml`.
+        Raises:
+            BacktestValidationError: If inputs or runtime contract invariants are invalid.
+            RoehubError: Canonical mapped unexpected/domain errors.
+        Side Effects:
+            Reads candles, scores one explicit variant, and materializes report/trades payloads.
+        """
+        try:
+            if template is None:  # type: ignore[truthy-bool]
+                raise BacktestValidationError(
+                    "RunBacktestUseCase.build_variant_report_for_template requires template"
+                )
+            if variant_payload is None:  # type: ignore[truthy-bool]
+                raise BacktestValidationError(
+                    "RunBacktestUseCase.build_variant_report_for_template requires "
+                    "variant_payload"
+                )
+            if not template_already_validated:
+                validate_template_runtime_contract(
+                    template=template,
+                    defaults_provider=self._defaults_provider,
+                    allowed_request_timeframes=self._allowed_request_timeframes,
+                    forbidden_request_timeframes=self._forbidden_request_timeframes,
+                    root_path=template_root_path,
+                )
 
             apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
             if run_control is not None:
                 run_control.raise_if_cancelled(stage=STAGE_B_LITERAL)
 
-            resolved = self._resolve_run_context(request=request, current_user=current_user)
+            resolved_warmup_bars = self._resolve_with_default(
+                value=warmup_bars,
+                default=self._warmup_bars_default,
+            )
             timeline = self._candle_timeline_builder.build(
-                market_id=resolved.template.instrument_id.market_id,
-                symbol=resolved.template.instrument_id.symbol,
-                timeframe=resolved.template.timeframe,
-                requested_time_range=request.time_range,
-                warmup_bars=resolved.warmup_bars,
+                market_id=template.instrument_id.market_id,
+                symbol=template.instrument_id.symbol,
+                timeframe=template.timeframe,
+                requested_time_range=requested_time_range,
+                warmup_bars=resolved_warmup_bars,
             )
             if run_control is not None:
                 run_control.raise_if_cancelled(stage=STAGE_B_LITERAL)
 
             scored_details = self._score_variant_payload_with_details(
-                template=resolved.template,
+                template=template,
                 timeline=timeline,
                 variant_payload=variant_payload,
-                target_time_range=request.time_range,
-                artifact_context=resolved.artifact_context,
+                target_time_range=requested_time_range,
+                artifact_context=artifact_context,
             )
             return self._reporting_service.build_report_from_details(
-                requested_time_range=request.time_range,
+                requested_time_range=requested_time_range,
                 candles=timeline.candles,
                 details=scored_details,
                 include_table_md=True,

@@ -13,7 +13,10 @@ from typing import Mapping
 
 from fastapi import APIRouter
 
-from apps.api.dto import build_backtest_runtime_defaults_response
+from apps.api.dto import (
+    build_backtest_runtime_defaults_response,
+    decode_backtest_request_payload,
+)
 from apps.api.routes import (
     build_backtest_jobs_router,
     build_backtest_runs_router,
@@ -39,6 +42,7 @@ from trading.contexts.backtest.application.services import (
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.backtest.application.use_cases import (
+    BuildBacktestRunVariantReportUseCase,
     CancelBacktestJobUseCase,
     CancelBacktestRunUseCase,
     CreateAndRunBacktestSyncInlineUseCase,
@@ -109,6 +113,39 @@ class BacktestRuntimeSettings:
                 f"BacktestRuntimeSettings.env_name must be one of {_ALLOWED_ENVS}, "
                 f"got {self.env_name!r}"
             )
+
+
+@dataclass(frozen=True, slots=True)
+class _ApiBacktestJobRequestDecoderV1:
+    """
+    Decode persisted `request_json` payloads through strict API DTO contract.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+    Related:
+      - apps/api/dto/backtests.py
+      - apps/api/wiring/modules/backtest.py
+      - apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py
+    """
+
+    def decode(self, *, payload: Mapping[str, object]):
+        """
+        Convert persisted canonical request payload into application request DTO.
+
+        Args:
+            payload: Canonical JSON-compatible persisted request payload.
+        Returns:
+            RunBacktestRequest: Decoded application request DTO.
+        Assumptions:
+            Persisted `request_json` shape matches strict `POST /backtests` semantics.
+        Raises:
+            ValidationError: If persisted payload no longer matches strict DTO contract.
+            BacktestValidationError: If semantic request invariants are violated.
+        Side Effects:
+            None.
+        """
+        return decode_backtest_request_payload(payload=payload)
 
 
 def build_backtest_router(
@@ -222,6 +259,7 @@ def build_backtest_router(
     )
 
     results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
+    request_decoder = _ApiBacktestJobRequestDecoderV1()
     runs_router = build_backtest_runs_router(
         get_status_use_case=GetBacktestRunStatusUseCase(job_repository=job_repository),
         get_top_use_case=GetBacktestRunTopUseCase(
@@ -231,7 +269,14 @@ def build_backtest_router(
         ),
         list_use_case=ListBacktestRunsUseCase(job_repository=job_repository),
         cancel_use_case=CancelBacktestRunUseCase(job_repository=job_repository),
+        variant_report_use_case=BuildBacktestRunVariantReportUseCase(
+            job_repository=job_repository,
+            request_decoder=request_decoder,
+            run_use_case=run_use_case,
+            artifact_slot_resolver=artifact_slot_resolver,
+        ),
         current_user_dependency=current_user_dependency,
+        sync_deadline_seconds=runtime_config.sync.sync_deadline_seconds,
     )
     backtests_router.include_router(runs_router)
     if not runtime_config.jobs.enabled:

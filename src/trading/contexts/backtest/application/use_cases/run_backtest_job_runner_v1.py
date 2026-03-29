@@ -701,8 +701,10 @@ class RunBacktestJobRunnerV1:
         if job.spec_payload_json is None:
             raise ValueError("saved mode job requires spec_payload_json when template is absent")
 
-        base_template = _template_from_saved_spec_payload(spec_payload=job.spec_payload_json)
-        return _apply_saved_overrides(
+        base_template = build_template_from_saved_spec_payload_v1(
+            spec_payload=job.spec_payload_json
+        )
+        return apply_saved_overrides_v1(
             base_template=base_template,
             overrides=request.overrides,
         )
@@ -1641,7 +1643,7 @@ def _build_variant_key_for_stage_b(
     )
 
 
-def _template_from_saved_spec_payload(
+def build_template_from_saved_spec_payload_v1(
     *,
     spec_payload: Mapping[str, Any],
 ) -> RunBacktestTemplate:
@@ -1760,7 +1762,7 @@ def _template_from_saved_spec_payload(
     )
 
 
-def _apply_saved_overrides(
+def apply_saved_overrides_v1(
     *,
     base_template: RunBacktestTemplate,
     overrides: RunBacktestSavedOverrides | None,
@@ -2314,4 +2316,6 @@ __all__ = [
     "BacktestJobRunReportV1",
     "BacktestJobRunStatus",
     "RunBacktestJobRunnerV1",
+    "apply_saved_overrides_v1",
+    "build_template_from_saved_spec_payload_v1",
 ]

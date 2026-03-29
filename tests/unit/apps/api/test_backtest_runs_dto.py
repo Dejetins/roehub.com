@@ -4,8 +4,10 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
+from pydantic import ValidationError
 
 from apps.api.dto import (
+    BacktestRunVariantReportPostRequest,
     build_backtest_run_status_response,
     build_backtest_run_top_response,
     decode_backtest_runs_cursor,
@@ -183,6 +185,82 @@ def test_build_backtest_run_top_response_includes_summary_metrics_fields() -> No
             }
         ],
     }
+
+
+def test_backtest_run_variant_report_request_accepts_minimal_run_scoped_payload() -> None:
+    """
+    Verify run-scoped variant-report request DTO accepts only selected variant + flag payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `run_id` is carried by route path and must not be duplicated in body contract.
+    Raises:
+        AssertionError: If parsed payload drifts from strict request shape.
+    Side Effects:
+        None.
+    """
+    request = BacktestRunVariantReportPostRequest.model_validate(
+        {
+            "include_trades": True,
+            "variant": {
+                "indicator_selections": [
+                    {
+                        "indicator_id": "ma.sma",
+                        "inputs": {"source": "close"},
+                        "params": {"window": 20},
+                    }
+                ],
+                "signal_params": {"ma.sma": {"cross_up": 0.5}},
+                "risk_params": {"sl_enabled": True, "sl_pct": 2.0},
+                "execution_params": {"fee_pct": 0.075},
+                "direction_mode": "long-short",
+                "sizing_mode": "all_in",
+            },
+        }
+    )
+
+    assert request.include_trades is True
+    assert request.variant.direction_mode == "long-short"
+
+
+def test_backtest_run_variant_report_request_rejects_full_run_envelope_fields() -> None:
+    """
+    Verify run-scoped variant-report request DTO forbids legacy full run-context body fields.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        New endpoint reconstructs original run context from persisted storage, not client body.
+    Raises:
+        AssertionError: If extra legacy body fields are accepted.
+    Side Effects:
+        None.
+    """
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        BacktestRunVariantReportPostRequest.model_validate(
+            {
+                "template": {"instrument_id": {"market_id": 1, "symbol": "BTCUSDT"}},
+                "variant": {
+                    "indicator_selections": [
+                        {
+                            "indicator_id": "ma.sma",
+                            "inputs": {"source": "close"},
+                            "params": {"window": 20},
+                        }
+                    ],
+                    "signal_params": {"ma.sma": {"cross_up": 0.5}},
+                    "risk_params": {"sl_enabled": True},
+                    "execution_params": {"fee_pct": 0.075},
+                    "direction_mode": "long-short",
+                    "sizing_mode": "all_in",
+                },
+            }
+        )
 
 
 def _queued_run(*, run_id: UUID) -> BacktestJob:

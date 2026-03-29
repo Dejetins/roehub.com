@@ -14,6 +14,7 @@ from apps.api.dto import (
     build_backtest_variant_report_run_request,
     build_backtests_post_response,
     build_sha256_from_payload,
+    decode_backtest_request_payload,
 )
 from trading.contexts.backtest.application.dto import (
     BacktestVariantPayloadV1,
@@ -142,6 +143,50 @@ def test_build_backtest_run_request_normalizes_ranking_metrics() -> None:
     assert built.ranking is not None
     assert built.ranking.primary_metric == "sharpe_trades"
     assert built.ranking.secondary_metric == "win_rate_pct"
+
+
+def test_decode_backtest_request_payload_reuses_strict_post_backtests_contract() -> None:
+    """
+    Verify persisted request decoder rebuilds application request via strict API DTO contract.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Persisted `request_json` keeps the same shape as canonical `POST /backtests` payload.
+    Raises:
+        AssertionError: If decoded request drifts from strict mapper behavior.
+    Side Effects:
+        None.
+    """
+    built = decode_backtest_request_payload(
+        payload={
+            "time_range": {
+                "start": datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2026, 2, 24, 1, 0, tzinfo=timezone.utc),
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1m",
+                "indicator_grids": [
+                    {
+                        "indicator_id": "ma.sma",
+                        "params": {"window": {"mode": "explicit", "values": [20]}},
+                    }
+                ],
+            },
+            "warmup_bars": 144,
+        }
+    )
+
+    assert built.mode == "template"
+    assert built.warmup_bars == 144
+    assert built.template is not None
+    assert built.template.instrument_id == InstrumentId(
+        market_id=MarketId(1),
+        symbol=Symbol("BTCUSDT"),
+    )
 
 
 def test_backtests_post_request_rejects_unknown_ranking_metric() -> None:

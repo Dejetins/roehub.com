@@ -722,6 +722,35 @@ def build_backtest_run_request(*, request: BacktestsPostRequest) -> RunBacktestR
     )
 
 
+def decode_backtest_request_payload(*, payload: Mapping[str, Any]) -> RunBacktestRequest:
+    """
+    Decode canonical persisted backtest request payload through strict API DTO contract.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+    Related:
+      - apps/api/dto/backtests.py
+      - apps/api/wiring/modules/backtest.py
+      - apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py
+
+    Args:
+        payload: Canonical JSON-compatible request snapshot from persisted storage.
+    Returns:
+        RunBacktestRequest: Decoded application-layer request DTO.
+    Assumptions:
+        Persisted `request_json` follows strict `POST /backtests` request semantics.
+    Raises:
+        ValidationError: If persisted payload no longer matches strict API DTO contract.
+        BacktestValidationError: If mode-selection or semantic mapper invariants are violated.
+    Side Effects:
+        None.
+    """
+    request = BacktestsPostRequest.model_validate(payload)
+    return build_backtest_run_request(request=request)
+
+
 def build_backtest_variant_report_run_request(
     *,
     request: BacktestsVariantReportPostRequest,
@@ -2250,4 +2279,5 @@ __all__ = [
     "build_engine_params_hash",
     "build_grid_request_hash",
     "build_sha256_from_payload",
+    "decode_backtest_request_payload",
 ]

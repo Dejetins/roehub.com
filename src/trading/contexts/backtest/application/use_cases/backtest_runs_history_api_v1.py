@@ -5,17 +5,31 @@ from datetime import datetime, timezone
 from typing import Callable
 from uuid import UUID
 
+from trading.contexts.backtest.application.dto import (
+    BacktestReportV1,
+    BacktestVariantPayloadV1,
+    RunBacktestRequest,
+)
 from trading.contexts.backtest.application.ports import (
     BacktestJobListPage,
     BacktestJobRepository,
+    BacktestJobRequestDecoder,
     BacktestJobResultsRepository,
     CurrentUser,
 )
+from trading.contexts.backtest.application.services import (
+    ArtifactPinnedIdentityV2,
+    ArtifactSlotPinnedRuntimeContextV2,
+    BacktestArtifactSlotResolverV2,
+    artifact_coordinates_from_market_id_v2,
+)
+from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobState,
     BacktestJobTopVariant,
 )
+from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 
 from .backtest_jobs_api_v1 import ListBacktestJobsUseCase
@@ -23,6 +37,11 @@ from .errors import (
     backtest_run_forbidden,
     backtest_run_not_found,
     validation_error,
+)
+from .run_backtest import RunBacktestUseCase
+from .run_backtest_job_runner_v1 import (
+    apply_saved_overrides_v1,
+    build_template_from_saved_spec_payload_v1,
 )
 
 NowProvider = Callable[[], datetime]
@@ -44,6 +63,247 @@ class BacktestRunTopReadResult:
 
     job: BacktestJob
     rows: tuple[BacktestJobTopVariant, ...]
+
+
+class BuildBacktestRunVariantReportUseCase:
+    """
+    Recompute one persisted run variant detail from stored request and pinned artifact context.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - apps/api/routes/backtest_runs.py
+    """
+
+    def __init__(
+        self,
+        *,
+        job_repository: BacktestJobRepository,
+        request_decoder: BacktestJobRequestDecoder,
+        run_use_case: RunBacktestUseCase,
+        artifact_slot_resolver: BacktestArtifactSlotResolverV2,
+    ) -> None:
+        """
+        Initialize persisted-run single-variant detail use-case dependencies.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/ports/backtest_job_request_decoder.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - apps/api/wiring/modules/backtest.py
+        Args:
+            job_repository: Persisted-run repository over unified jobs storage.
+            request_decoder: Decoder for canonical persisted `request_json`.
+            run_use_case: Backtest use-case exposing one-variant report build path.
+            artifact_slot_resolver: Shared slot-pinned artifact resolver used for reproducibility.
+        Returns:
+            None.
+        Assumptions:
+            Startup wiring already validated artifact configs and resolver dependencies fail-fast.
+        Raises:
+            ValueError: If one dependency is missing.
+        Side Effects:
+            None.
+        """
+        if job_repository is None:  # type: ignore[truthy-bool]
+            raise ValueError("BuildBacktestRunVariantReportUseCase requires job_repository")
+        if request_decoder is None:  # type: ignore[truthy-bool]
+            raise ValueError("BuildBacktestRunVariantReportUseCase requires request_decoder")
+        if run_use_case is None:  # type: ignore[truthy-bool]
+            raise ValueError("BuildBacktestRunVariantReportUseCase requires run_use_case")
+        if artifact_slot_resolver is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BuildBacktestRunVariantReportUseCase requires artifact_slot_resolver"
+            )
+        self._job_repository = job_repository
+        self._request_decoder = request_decoder
+        self._run_use_case = run_use_case
+        self._artifact_slot_resolver = artifact_slot_resolver
+
+    def execute(
+        self,
+        *,
+        run_id: UUID,
+        current_user: CurrentUser,
+        variant_payload: BacktestVariantPayloadV1,
+        include_trades: bool = False,
+        run_control: BacktestRunControlV1 | None = None,
+    ) -> BacktestReportV1:
+        """
+        Recompute exactly one selected persisted-run variant detail lazily.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - apps/api/routes/backtest_runs.py
+        Args:
+            run_id: Persisted public run identifier.
+            current_user: Authenticated owner identity.
+            variant_payload: Explicit selected variant payload from summary row/UI selection.
+            include_trades: Whether report payload should include trades.
+            run_control: Optional cooperative cancellation/deadline control object.
+        Returns:
+            BacktestReportV1: Deterministic report payload for one variant only.
+        Assumptions:
+            Existing foreign run must map to `403 forbidden`, missing run to `404 not_found`.
+        Raises:
+            RoehubError: Canonical `forbidden`, `not_found`, or `validation_error` failures.
+        Side Effects:
+            Reads persisted run row, loads pinned artifact metadata, and executes one report build.
+        """
+        owner_run = _require_owner_run(
+            job_repository=self._job_repository,
+            run_id=run_id,
+            current_user=current_user,
+        )
+        request = self._request_decoder.decode(payload=owner_run.request_json)
+        resolved_request = self._resolve_report_request(run=owner_run, request=request)
+        artifact_context = self._resolve_pinned_artifact_context(
+            run=owner_run,
+            request=resolved_request,
+        )
+        if resolved_request.template is None:  # pragma: no cover - guarded above
+            raise BacktestValidationError(
+                "Persisted run detail request requires resolved template payload"
+            )
+        return self._run_use_case.build_variant_report_for_template(
+            requested_time_range=resolved_request.time_range,
+            template=resolved_request.template,
+            warmup_bars=resolved_request.warmup_bars,
+            variant_payload=variant_payload,
+            include_trades=include_trades,
+            run_control=run_control,
+            artifact_context=artifact_context,
+            template_root_path="persisted_run.template",
+        )
+
+    def _resolve_report_request(
+        self,
+        *,
+        run: BacktestJob,
+        request: RunBacktestRequest,
+    ) -> RunBacktestRequest:
+        """
+        Rebuild original request semantics from persisted run storage snapshot only.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+        Args:
+            run: Owner persisted run row.
+            request: Decoded canonical `request_json` payload.
+        Returns:
+            RunBacktestRequest: Request rebuilt for one-variant lazy detail execution.
+        Assumptions:
+            Saved-mode persisted runs reconstruct template from `spec_payload_json + overrides`.
+        Raises:
+            BacktestValidationError: If persisted run snapshot is incomplete or inconsistent.
+        Side Effects:
+            None.
+        """
+        if request.template is not None:
+            return request
+        if run.mode != "saved":
+            raise BacktestValidationError(
+                "Persisted run request_json must include template payload for template mode"
+            )
+        if run.spec_payload_json is None:
+            raise BacktestValidationError(
+                "Persisted saved run requires spec_payload_json for lazy variant detail"
+            )
+        template = apply_saved_overrides_v1(
+            base_template=build_template_from_saved_spec_payload_v1(
+                spec_payload=run.spec_payload_json
+            ),
+            overrides=request.overrides,
+        )
+        return RunBacktestRequest(
+            time_range=request.time_range,
+            strategy_id=None,
+            template=template,
+            overrides=None,
+            warmup_bars=request.warmup_bars,
+            top_k=request.top_k,
+            preselect=request.preselect,
+            top_trades_n=request.top_trades_n,
+            ranking=request.ranking,
+        )
+
+    def _resolve_pinned_artifact_context(
+        self,
+        *,
+        run: BacktestJob,
+        request: RunBacktestRequest,
+    ) -> ArtifactSlotPinnedRuntimeContextV2:
+        """
+        Resolve immutable slot-pinned runtime context from persisted run artifact identity.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+        Args:
+            run: Owner persisted run row carrying pinned artifact metadata.
+            request: Reconstructed run request with effective template payload.
+        Returns:
+            ArtifactSlotPinnedRuntimeContextV2: Immutable pinned artifact context.
+        Assumptions:
+            Lazy detail must not read live `current.yaml`; it must reuse persisted run pin fields.
+        Raises:
+            BacktestValidationError: If persisted artifact metadata is missing or inconsistent.
+        Side Effects:
+            Reads one explicit slot manifest from disk.
+        """
+        if run.artifact_pin is None:
+            raise BacktestValidationError(
+                "Persisted run requires slot-pinned artifact metadata for lazy variant detail"
+            )
+        if request.template is None:  # pragma: no cover - guarded by caller
+            raise BacktestValidationError(
+                "Persisted run detail request requires resolved template payload"
+            )
+        try:
+            coordinates = artifact_coordinates_from_market_id_v2(
+                market_id=request.template.instrument_id.market_id.value,
+                symbol=str(request.template.instrument_id.symbol),
+            )
+            return self._artifact_slot_resolver.resolve_pinned_context(
+                coordinates,
+                ArtifactPinnedIdentityV2(
+                    artifact_slot=run.artifact_pin.artifact_slot,
+                    slot_generation=run.artifact_pin.artifact_slot_generation,
+                    artifact_asof_date=run.artifact_pin.artifact_asof_date,
+                    artifact_manifest_hash=run.artifact_pin.artifact_manifest_hash,
+                ),
+            )
+        except ValueError as error:
+            raise BacktestValidationError(
+                "Persisted run artifact pin violates shared slot-pinned context contract: "
+                f"{error}"
+            ) from error
+        except FileNotFoundError as error:
+            raise BacktestValidationError(
+                "Pinned backtest artifacts are unavailable for persisted run instrument"
+            ) from error
 
 
 class GetBacktestRunStatusUseCase:
@@ -483,6 +743,7 @@ def _utc_now() -> datetime:
 
 __all__ = [
     "BacktestRunTopReadResult",
+    "BuildBacktestRunVariantReportUseCase",
     "CancelBacktestRunUseCase",
     "GetBacktestRunStatusUseCase",
     "GetBacktestRunTopUseCase",

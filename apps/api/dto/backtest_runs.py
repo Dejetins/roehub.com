@@ -28,6 +28,7 @@ from .backtest_jobs import (
     decode_backtest_jobs_state,
     encode_backtest_jobs_cursor,
 )
+from .backtests import BacktestVariantPayloadRequest
 
 BacktestRunsStateLiteral = BacktestJobsStateLiteral
 BacktestRunsStageLiteral = Literal["stage_a", "stage_b", "finalizing"]
@@ -198,6 +199,26 @@ class BacktestRunTopResponse(BaseModel):
     state: BacktestRunsStateLiteral
     execution_mode: BacktestJobExecutionModeLiteral | None = None
     items: list[BacktestRunTopItemResponse]
+
+
+class BacktestRunVariantReportPostRequest(BaseModel):
+    """
+    API request envelope for run-scoped lazy `POST /backtests/runs/{run_id}/variant-report`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - apps/api/dto/backtest_runs.py
+      - apps/api/routes/backtest_runs.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    variant: BacktestVariantPayloadRequest
+    include_trades: bool = False
 
 
 def build_backtest_run_status_response(*, run: BacktestJob) -> BacktestRunStatusResponse:
@@ -474,6 +495,7 @@ __all__ = [
     "BacktestRunsListResponse",
     "BacktestRunsStageLiteral",
     "BacktestRunsStateLiteral",
+    "BacktestRunVariantReportPostRequest",
     "BacktestRunTopItemResponse",
     "BacktestRunTopResponse",
     "build_backtest_run_status_response",

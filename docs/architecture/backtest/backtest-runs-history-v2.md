@@ -16,6 +16,13 @@
   - persisted top rows contract fields: `payload_json`, `summary_metrics_json`,
     `best_tp_pct`, `best_sl_pct`;
   - `report_table_md` и `trades_json` не входят в public runs contract и остаются `NULL`-only.
+- R7-04 additive note:
+  - public lazy detail endpoint `POST /backtests/runs/{run_id}/variant-report` пересчитывает
+    ровно один выбранный вариант по persisted `run_id` и explicit `variant` payload;
+  - endpoint восстанавливает original request semantics из `request_json` и использует только
+    persisted `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`,
+    `artifact_asof_date` для pinned runtime context;
+  - detail/report/trades payloads не сохраняются в PG и не участвуют в `/top`.
 
 ## Цель
 
@@ -43,6 +50,7 @@
 - `GET /backtests/runs`
 - `GET /backtests/runs/{run_id}`
 - `GET /backtests/runs/{run_id}/top`
+- `POST /backtests/runs/{run_id}/variant-report`
 - `POST /backtests/runs/{run_id}/cancel`
 
 Storage/domain внутри bounded context может сохранять `job_*` naming, но API наружу использует
@@ -196,6 +204,36 @@ Response (`200 OK`):
 
 - status snapshot после попытки cancel
 
+### 5) `POST /backtests/runs/{run_id}/variant-report`
+
+Request body:
+
+- `variant` required:
+  - explicit selected variant payload from summary row:
+    - `indicator_selections`
+    - `signal_params`
+    - `risk_params`
+    - `execution_params`
+    - `direction_mode`
+    - `sizing_mode`
+- `include_trades` optional bool, default `false`
+
+Request invariants:
+
+- client не присылает `time_range`, `strategy_id`, `template`, `overrides` или любой другой
+  full run envelope;
+- backend восстанавливает original request context из persisted `request_json`;
+- saved-mode runs восстанавливают effective template из `spec_payload_json + overrides`;
+- runtime context pin'ится строго по persisted
+  `artifact_slot/artifact_slot_generation/artifact_manifest_hash/artifact_asof_date`;
+- endpoint пересчитывает ровно один выбранный вариант и не запускает full top-N recompute.
+
+Response (`200 OK`):
+
+- `rows`
+- `table_md`
+- `trades` optional (when `include_trades=true`)
+
 ## Инварианты
 
 - Все operations owner-only.
@@ -204,6 +242,8 @@ Response (`200 OK`):
 - History ordering фиксирован: `created_at DESC, job_id DESC`.
 - Top ordering фиксирован: `rank ASC, variant_key ASC`.
 - Public payload не хранит и не отдает persisted detail/report bodies.
+- `POST /backtests/runs/{run_id}/variant-report` сохраняет explicit owner policy:
+  missing run -> `404`, foreign existing run -> `403`.
 
 ## Связанные файлы
 
