@@ -97,8 +97,10 @@ artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kerne
 - `exact replay of best TP/SL cell` ограничен только выбранной winning cell;
 - `metrics_kernel.py` считает deterministic Stage B ranking/summary fields и строит
   details-compatible outcome только для retained exact replay;
-- artifact-backed Stage B scorer используется additively в sync/background runtime, когда есть
-  валидный `slot-pinned context`, а legacy close-fill scorer остаётся guard fallback.
+- artifact-backed Stage B scorer остаётся additive path для sync runtime, когда есть валидный
+  `slot-pinned context`;
+- claimed background worker после R8-01 обязан использовать этот scorer как mandatory runtime
+  contract и больше не возвращается к legacy close-fill fallback.
 
 Что остаётся вне scope после R6-04:
 
@@ -150,8 +152,22 @@ R6-02 не заменяет весь runtime целиком. Он добавля
   подключают этот builder только когда есть валидный `slot-pinned context`;
 - `src/trading/contexts/backtest/application/services/staged_runner_v1.py` остаётся legacy
   orchestration facade и использует v2 Stage A path additively;
-- если v2 builder/context недоступен, sync/background flow продолжает использовать legacy
-  Stage A scorer loop без изменения публичных imports.
+- если v2 builder/context недоступен, sync flow продолжает использовать legacy Stage A scorer
+  loop без изменения публичных imports; claimed background worker после R8-01 этот fallback не
+  использует.
+
+## R8-01 worker cutover
+
+R8-01 не меняет kernel semantics, но меняет orchestration boundary для claimed background runs:
+
+- `RunBacktestJobRunnerV1` стартует только из persisted pin metadata и вызывает
+  `resolve_pinned_context(...)` вместо live `current.yaml` discovery;
+- worker использует pinned `prices/<signal_tf>` для warmup-aware grid guard candles и не строит
+  live candle timeline через ClickHouse;
+- worker hot path не вызывает `IndicatorCompute.compute(...)`; artifact-backed Stage A / Stage B
+  читают только shipped signals, mappings, `prices/1m` и `1m hit-times`;
+- lifecycle/persistence contract не меняется: `queued -> running -> succeeded|failed|cancelled`,
+  snapshots и terminal rows остаются summary-only (`report_table_md=NULL`, `trades_json=NULL`).
 
 ## Stage B Contract
 

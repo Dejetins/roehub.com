@@ -15,6 +15,14 @@
     which reconstructs original run context from persisted storage and pinned artifact fields;
   - legacy `POST /backtests/variant-report` remains behavior-compatible compatibility path for
     clients that still send full run envelope in request body.
+- R8-01 background follow-up note:
+  - external `execution_mode=background_manual_legacy` remains unchanged for persisted queued/running
+    rows and public history payloads,
+  - claimed worker execution behind that mode now reuses the same slot-pinned Stage A / Stage B
+    artifact runtime contract as sync path and no longer depends on ClickHouse or
+    `IndicatorCompute.compute(...)`,
+  - summary-only persistence contract remains unchanged:
+    `report_table_md=NULL`, `trades_json=NULL`.
 - R7-02 storage note:
   - sync and background executions share one persisted-run storage family in Postgres,
   - successful `POST /backtests` now performs internal preflight, executes inline, and persists

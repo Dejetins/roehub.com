@@ -20,14 +20,7 @@ from prometheus_client import (
 )
 
 from apps.api.dto.backtests import decode_backtest_request_payload
-from apps.api.wiring.modules.indicators import (
-    build_indicators_candle_feed,
-    build_indicators_compute,
-)
-from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
+from apps.api.wiring.modules.indicators import build_indicators_compute
 from trading.contexts.backtest.adapters.outbound import (
     BacktestArtifactPathBuilderV2,
     PostgresBacktestJobLeaseRepository,
@@ -45,18 +38,12 @@ from trading.contexts.backtest.application.ports import (
 )
 from trading.contexts.backtest.application.services import (
     ArtifactSlotResolverV2,
-    BacktestCandleTimelineBuilder,
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.backtest.application.use_cases import (
     BacktestJobRunReportV1,
     RunBacktestJobRunnerV1,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleReader,
-    ThreadLocalClickHouseConnectGateway,
-)
-from trading.platform.time.system_clock import SystemClock
 
 _LOG = logging.getLogger(__name__)
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
@@ -356,7 +343,7 @@ def build_backtest_job_runner_app(
     Returns:
         BacktestJobRunnerApp: Ready-to-run worker app.
     Assumptions:
-        Runtime environment includes `STRATEGY_PG_DSN` and valid ClickHouse settings.
+        Runtime environment includes `STRATEGY_PG_DSN` and valid backtest artifact settings.
     Raises:
         ValueError: If required environment/settings are missing or invalid.
         FileNotFoundError: If runtime configs cannot be loaded.
@@ -379,17 +366,6 @@ def build_backtest_job_runner_app(
     lease_repository = PostgresBacktestJobLeaseRepository(gateway=postgres_gateway)
     results_repository = PostgresBacktestJobResultsRepository(gateway=postgres_gateway)
 
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
-    clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
-        client_factory=lambda: _clickhouse_client(clickhouse_settings)
-    )
-    canonical_reader = ClickHouseCanonicalCandleReader(
-        gateway=clickhouse_gateway,
-        clock=SystemClock(),
-        database=clickhouse_settings.database,
-    )
-    candle_feed = build_indicators_candle_feed(canonical_candle_reader=canonical_reader)
-    candle_timeline_builder = BacktestCandleTimelineBuilder(candle_feed=candle_feed)
     indicator_compute = build_indicators_compute(environ=environ)
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     request_decoder = _ApiBacktestJobRequestDecoderV1()
@@ -405,7 +381,6 @@ def build_backtest_job_runner_app(
         lease_repository=lease_repository,
         results_repository=results_repository,
         request_decoder=request_decoder,
-        candle_timeline_builder=candle_timeline_builder,
         indicator_compute=indicator_compute,
         defaults_provider=defaults_provider,
         warmup_bars_default=runtime_config.warmup_bars_default,

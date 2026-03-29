@@ -19,6 +19,17 @@
   - worker contract не меняет свои background semantics и остаётся compatibility path для
     `background_manual_legacy`,
   - full sync -> background auto-fallback orchestration остаётся вне scope до R8-02.
+- R8-01 worker runtime cutover:
+  - claimed execution path теперь обязателен для slot-pinned runtime v2 и стартует только из
+    persisted `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`,
+    `artifact_asof_date`,
+  - worker bootstrap использует `resolve_pinned_context(...)` и строит Stage A / Stage B через
+    те же `BacktestStageAShortlistBuilderV2` и `BacktestArtifactBackedStageBScorerV2`, что и
+    sync artifact runtime contract,
+  - hot path claimed run больше не читает live ClickHouse candles и не вызывает
+    `IndicatorCompute.compute(...)`,
+  - внешний vocabulary не меняется: `execution_mode=background_manual_legacy` остаётся валидным
+    compatibility literal до R8-02.
 - Superseded by target-v2 orchestration decisions:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -27,10 +38,11 @@
   - current streaming worker orchestration,
   - current `top_k_persisted_default` snapshot cap,
   - current lease/reclaim/cancel behavior.
-- R0 target freeze, not yet cut over:
-  - worker must eventually consume the same artifact-backed runtime as sync path,
-  - persisted result vocabulary shifts to summary-only `top N`,
-  - run metadata must surface `execution_mode` and slot-pinning fields without removing current tables first.
+- R8-01 active baseline:
+  - claimed worker уже потребляет тот же artifact-backed runtime contract, что и sync path,
+  - persisted result vocabulary остаётся summary-only `top N`,
+  - run metadata обязано нести `execution_mode` и slot-pinning fields без альтернативного
+    runtime discovery path.
 
 ## Цель
 
@@ -80,6 +92,20 @@
 - Перед стадиями scorer подготавливает batched indicator tensors (`prepare_for_grid_context(...)`), что убирает per-variant compute из hot path.
 - CPU лимит из runtime config (`backtest.cpu.max_numba_threads`) применяется в worker attempt через `numba.set_num_threads(...)`.
 
+## Update 2026-03-29 (R8-01 slot-pinned runtime v2)
+
+С 2026-03-29 claimed worker attempt выполняется как artifact-only background runtime:
+
+- `RunBacktestJobRunnerV1` fail-fast требует `artifact_slot_resolver` и persisted pin metadata на
+  claimed row;
+- warmup-aware request-timeframe candles для grid guards строятся из pinned `prices/<signal_tf>`
+  artifacts, а не через `CandleFeed`/ClickHouse;
+- Stage A всегда materialize'ится через `BacktestStageAShortlistBuilderV2`;
+- Stage B всегда materialize'ится через `BacktestArtifactBackedStageBScorerV2`;
+- legacy close-fill scorer больше не является guard fallback для claimed background execution;
+- lease / heartbeat / snapshot / cancel / finish semantics и summary-only persistence
+  (`report_table_md=NULL`, `trades_json=NULL`) не меняются.
+
 ## Scope
 
 ### 1) Новый worker процесс и wiring
@@ -95,8 +121,9 @@
 Wiring обязан собрать:
 
 - runtime config (`backtest.jobs.*` + result-affecting defaults),
-- `IndicatorCompute`,
-- candle feed/reader для canonical candles,
+- `IndicatorCompute` только для deterministic `estimate(...)` grid metadata,
+- artifact loader / `ArtifactSlotResolverV2` для `resolve_pinned_context(...)` и pinned
+  `prices/<tf>` loading,
 - репозитории EPIC-09:
   - `BacktestJobRepository`,
   - `BacktestJobLeaseRepository`,
@@ -130,6 +157,8 @@ Source-of-truth payload:
 - worker использует pinned artifact identity из `job.artifact_slot`, `job.artifact_slot_generation`,
   `job.artifact_manifest_hash`, `job.artifact_asof_date`, а не повторно читает живой `current.yaml`
   для уже созданной job.
+- missing/drifted pin metadata считается deterministic attempt failure: claimed path не
+  переключается на live slot discovery и не возвращается к legacy runtime.
 
 #### 3.1 Stage A (streaming shortlist)
 

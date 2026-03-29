@@ -6,6 +6,8 @@ from types import SimpleNamespace
 from typing import Any, Mapping, cast
 from uuid import UUID
 
+import numpy as np
+
 from trading.contexts.backtest.application.dto import (
     BacktestRankingConfig,
     RunBacktestRequest,
@@ -235,7 +237,7 @@ class _RecordingStageAShortlistBuilder:
 
 class _FakeTimelineBuilder:
     """
-    Timeline builder stub returning minimal deterministic timeline payload.
+    Timeline builder stub that must stay unused after R8-01 artifact cutover.
     """
 
     def build(
@@ -248,7 +250,7 @@ class _FakeTimelineBuilder:
         warmup_bars: int,
     ) -> Any:
         """
-        Build minimal timeline payload required by job-runner use-case.
+        Fail fast when claimed worker path attempts to build a live timeline.
 
         Args:
             market_id: Requested market identifier.
@@ -257,16 +259,16 @@ class _FakeTimelineBuilder:
             requested_time_range: Requested time range.
             warmup_bars: Warmup bars count.
         Returns:
-            Any: Timeline-like payload with `candles` and `target_slice`.
+            Any: Never returns because live timeline build is forbidden in these tests.
         Assumptions:
-            Staged scorer fake does not inspect candle arrays.
+            Claimed worker execution must use slot-pinned artifact prices instead of ClickHouse.
         Raises:
-            None.
+            AssertionError: Always, because live timeline build is forbidden here.
         Side Effects:
             None.
         """
         _ = market_id, symbol, timeframe, requested_time_range, warmup_bars
-        return SimpleNamespace(candles=object(), target_slice=slice(0, 1))
+        raise AssertionError("job runner must not build live candle timeline in R8-01")
 
 
 class _NoOpIndicatorCompute:
@@ -295,21 +297,21 @@ class _NoOpIndicatorCompute:
 
     def compute(self, req: Any) -> Any:
         """
-        Return no-op compute payload.
+        Fail fast when worker hot path falls back to `IndicatorCompute.compute(...)`.
 
         Args:
             req: Compute request payload.
         Returns:
-            Any: Placeholder payload.
+            Any: Never returns because compute is forbidden in claimed worker hot path.
         Assumptions:
-            Test grid-builder fake bypasses indicator compute calls.
+            Stage A/Stage B runtime is artifact-backed and must not call compute here.
         Raises:
-            None.
+            AssertionError: Always, because worker hot path must not call compute.
         Side Effects:
             None.
         """
         _ = req
-        return None
+        raise AssertionError("job runner must not call IndicatorCompute.compute in R8-01")
 
     def warmup(self) -> None:
         """
@@ -445,6 +447,145 @@ class _FakeGridBuilder:
             max_compute_bytes_total,
         )
         return self._context
+
+
+class _FakePriceArraysLoader:
+    """
+    Artifact price loader fake returning deterministic request-timeframe arrays.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize deterministic artifact prices fixture and in-memory call log.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Worker tests need only one request-timeframe price family for warmup slicing.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call log.
+        """
+        self.calls: list[dict[str, Any]] = []
+        self._open_time = np.asarray(
+            [
+                int(_utc(2026, 1, 31, 23, 58, 0).timestamp() * 1000),
+                int(_utc(2026, 1, 31, 23, 59, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 0, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 1, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 2, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 3, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 4, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 5, 0).timestamp() * 1000),
+            ],
+            dtype=np.int64,
+        )
+        self._close_time = np.asarray(
+            [
+                int(_utc(2026, 1, 31, 23, 59, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 0, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 1, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 2, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 3, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 4, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 5, 0).timestamp() * 1000),
+                int(_utc(2026, 2, 1, 0, 6, 0).timestamp() * 1000),
+            ],
+            dtype=np.int64,
+        )
+        self._ohlcv = np.asarray(
+            [
+                [10.0, 11.0, 9.0, 10.5, 1.0],
+                [10.5, 11.5, 10.0, 11.0, 1.0],
+                [11.0, 12.0, 10.5, 11.5, 1.0],
+                [11.5, 12.5, 11.0, 12.0, 1.0],
+                [12.0, 13.0, 11.5, 12.5, 1.0],
+                [12.5, 13.5, 12.0, 13.0, 1.0],
+                [13.0, 14.0, 12.5, 13.5, 1.0],
+                [13.5, 14.5, 13.0, 14.0, 1.0],
+            ],
+            dtype=np.float32,
+        )
+
+    def load_price_arrays(self, *, context: Any, timeframe: str) -> Any:
+        """
+        Return deterministic artifact prices payload for worker warmup slicing.
+
+        Args:
+            context: Slot-pinned runtime context forwarded by the use-case.
+            timeframe: Requested price timeframe literal.
+        Returns:
+            Any: Minimal artifact price payload with `open_time/close_time/ohlcv`.
+        Assumptions:
+            Tests exercise request timeframe only and do not need mapping/hit-times loaders here.
+        Raises:
+            None.
+        Side Effects:
+            Appends call metadata to the in-memory log.
+        """
+        self.calls.append({"context": context, "timeframe": timeframe})
+        return SimpleNamespace(
+            open_time=self._open_time,
+            close_time=self._close_time,
+            ohlcv=self._ohlcv,
+        )
+
+
+class _ArtifactOnlyStageAShortlistBuilder:
+    """
+    Deterministic artifact-only Stage A builder fake for claimed worker tests.
+    """
+
+    def build_shortlist(
+        self,
+        *,
+        grid_context: Any,
+        artifact_context: Any,
+        target_time_range: TimeRange,
+        shortlist_limit: int,
+        ranking: Any = None,
+        batch_size: int | None = None,
+        cancel_checker: Any = None,
+        on_checkpoint: Any = None,
+    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+        """
+        Build deterministic shortlist rows directly from Stage-A base variants fixture order.
+
+        Args:
+            grid_context: Prepared Stage A grid context.
+            artifact_context: Resolved slot-pinned runtime context.
+            target_time_range: Requested trading window.
+            shortlist_limit: Maximum number of rows to retain.
+            ranking: Optional ranking config.
+            batch_size: Optional chunk size.
+            cancel_checker: Optional cooperative cancellation hook.
+            on_checkpoint: Optional checkpoint hook.
+        Returns:
+            tuple[BacktestStageAScoredVariantV1, ...]: Deterministic shortlist rows.
+        Assumptions:
+            Tests focus on worker orchestration and do not need real Stage A kernel economics.
+        Raises:
+            None.
+        Side Effects:
+            Invokes provided cancellation and checkpoint hooks.
+        """
+        _ = artifact_context, target_time_range, ranking, batch_size
+        if cancel_checker is not None:
+            cancel_checker("stage_a")
+        base_variants = tuple(grid_context.iter_stage_a_variants())[:shortlist_limit]
+        rows = tuple(
+            BacktestStageAScoredVariantV1(
+                base_variant=base_variant,
+                total_return_pct=float(index + 1),
+            )
+            for index, base_variant in enumerate(base_variants)
+        )
+        if on_checkpoint is not None:
+            on_checkpoint(len(rows), int(grid_context.stage_a_variants_total))
+        return rows
 
 
 class _DeterministicScorerWithDetails:
@@ -1736,6 +1877,58 @@ def test_process_claimed_job_skips_snapshot_replace_when_frontier_signature_unch
     assert len(running_snapshots) == 1
 
 
+def test_process_claimed_job_builds_runtime_candles_from_pinned_artifact_prices() -> None:
+    """
+    Verify claimed worker runtime loads pinned `prices/<tf>` artifacts instead of live timeline IO.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `_FakeTimelineBuilder` and `_NoOpIndicatorCompute.compute(...)` already fail if the worker
+        attempts legacy hot-path behavior.
+    Raises:
+        AssertionError: If artifact price loader is not used for runtime candle bootstrap.
+    Side Effects:
+        None.
+    """
+    job = _build_running_job()
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    assert request.template is not None
+    price_arrays_loader = _FakePriceArraysLoader()
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=_FakeResultsRepository(),
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                _build_stage_a_variants()[0].base_variant_key: 3.0,
+                _build_stage_a_variants()[1].base_variant_key: 2.0,
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 42, 0)),
+        price_arrays_loader=price_arrays_loader,
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert len(price_arrays_loader.calls) == 1
+    assert price_arrays_loader.calls[0]["context"] == _default_pinned_context()
+    assert price_arrays_loader.calls[0]["timeframe"] == request.template.timeframe.code
+
+
 def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime() -> None:
     """
     Verify background use-case resolves the shared slot-pinned context before runtime work starts.
@@ -2012,6 +2205,7 @@ def _build_use_case(
     now_provider: _NowProvider,
     artifact_slot_resolver: Any | None = None,
     stage_a_shortlist_builder: Any | None = None,
+    price_arrays_loader: Any | None = None,
 ) -> RunBacktestJobRunnerV1:
     """
     Build job-runner use-case with deterministic fakes for unit tests.
@@ -2031,6 +2225,7 @@ def _build_use_case(
         now_provider: Monotonic now-provider fixture.
         artifact_slot_resolver: Optional shared slot-pinned context resolver test double.
         stage_a_shortlist_builder: Optional artifact-backed Stage A builder test double.
+        price_arrays_loader: Optional artifact price loader test double.
     Returns:
         RunBacktestJobRunnerV1: Prepared use-case instance.
     Assumptions:
@@ -2040,6 +2235,19 @@ def _build_use_case(
     Side Effects:
         None.
     """
+    resolved_artifact_slot_resolver = (
+        artifact_slot_resolver
+        if artifact_slot_resolver is not None
+        else _RecordingArtifactSlotResolver(context=_default_pinned_context())
+    )
+    resolved_stage_a_shortlist_builder = (
+        stage_a_shortlist_builder
+        if stage_a_shortlist_builder is not None
+        else _ArtifactOnlyStageAShortlistBuilder()
+    )
+    resolved_price_arrays_loader = (
+        price_arrays_loader if price_arrays_loader is not None else _FakePriceArraysLoader()
+    )
     return RunBacktestJobRunnerV1(
         job_repository=cast(Any, job_repository),
         lease_repository=cast(Any, lease_repository),
@@ -2061,8 +2269,9 @@ def _build_use_case(
         snapshot_variants_step=snapshot_variants_step,
         stage_batch_size=stage_batch_size,
         now_provider=now_provider,
-        artifact_slot_resolver=cast(Any, artifact_slot_resolver),
-        stage_a_shortlist_builder=cast(Any, stage_a_shortlist_builder),
+        artifact_slot_resolver=cast(Any, resolved_artifact_slot_resolver),
+        stage_a_shortlist_builder=cast(Any, resolved_stage_a_shortlist_builder),
+        price_arrays_loader=cast(Any, resolved_price_arrays_loader),
     )
 
 
@@ -2127,14 +2336,14 @@ def _build_request(
 
 def _build_running_job() -> BacktestJob:
     """
-    Build deterministic running Backtest job fixture.
+    Build deterministic running Backtest job fixture with persisted artifact pin metadata.
 
     Args:
         None.
     Returns:
-        BacktestJob: Running claimed job fixture.
+        BacktestJob: Running claimed job fixture pinned to immutable artifact identity.
     Assumptions:
-        Hash literals use valid sha256-like 64-char lowercase strings.
+        Worker claimed path in R8-01 always executes from persisted slot-pinned metadata.
     Raises:
         None.
     Side Effects:
@@ -2152,6 +2361,12 @@ def _build_running_job() -> BacktestJob:
         spec_payload_json=None,
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-29",
+        ),
         execution_mode="background_manual_legacy",
         market_id=1,
         symbol="BTCUSDT",
@@ -2182,36 +2397,34 @@ def _build_running_job_with_artifact_pin() -> BacktestJob:
     Side Effects:
         None.
     """
-    created_at = _utc(2026, 2, 23, 9, 0, 0)
-    queued = BacktestJob.create_queued(
-        job_id=UUID("00000000-0000-0000-0000-000000000911"),
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
-        mode="template",
-        created_at=created_at,
-        request_json={"mode": "template"},
-        request_hash="a" * 64,
-        spec_hash=None,
-        spec_payload_json=None,
-        engine_params_hash="b" * 64,
-        backtest_runtime_config_hash="c" * 64,
-        artifact_pin=BacktestJobArtifactPin(
-            artifact_slot="slot_b",
-            artifact_slot_generation=11,
-            artifact_manifest_hash="d" * 64,
-            artifact_asof_date="2026-03-29",
+    return _build_running_job()
+
+
+def _default_pinned_context() -> _FakeSlotPinnedContext:
+    """
+    Build default slot-pinned runtime context fixture for artifact-only worker tests.
+
+    Args:
+        None.
+    Returns:
+        _FakeSlotPinnedContext: Deterministic pinned context matching default job pin metadata.
+    Assumptions:
+        Default worker tests use BTCUSDT spot artifacts pinned to `slot_b`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _FakeSlotPinnedContext(
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
         ),
-        execution_mode="background_manual_legacy",
-        market_id=1,
-        symbol="BTCUSDT",
-        timeframe="1h",
-        requested_top_n=5,
-        ranking_primary_metric="total_return_pct",
-        ranking_secondary_metric=None,
-    )
-    return queued.claim(
-        changed_at=created_at + timedelta(seconds=5),
-        locked_by="worker-test-1",
-        lease_expires_at=created_at + timedelta(seconds=65),
+        artifact_slot="slot_b",
+        slot_generation=11,
+        artifact_asof_date="2026-03-29",
+        artifact_manifest_hash="d" * 64,
     )
 
 

@@ -8,6 +8,8 @@ from time import perf_counter
 from typing import Any, Callable, Literal, Mapping, cast
 from uuid import UUID
 
+import numpy as np
+
 from trading.contexts.backtest.application.dto import (
     BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
     BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
@@ -33,15 +35,18 @@ from trading.contexts.backtest.application.services import (
     ArtifactPinnedIdentityV2,
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactSlotResolverV2,
+    BacktestCandleTimeline,
     BacktestCandleTimelineBuilder,
     BacktestGridBuilderV1,
+    BacktestPriceArraysLoaderV2,
     BacktestReportingServiceV1,
     BacktestStageABaseVariant,
     BacktestStageAShortlistBuilderV2,
-    CloseFillBacktestStagedScorerV1,
+    MmapPriceArraysLoaderV2,
     artifact_coordinates_from_market_id_v2,
     build_default_artifact_backed_stage_b_scorer_v2,
     build_default_stage_a_shortlist_builder_v2,
+    compute_target_slice_by_close_time_v2,
 )
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobSnapshotCadenceV1,
@@ -68,7 +73,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobStageAShortlist,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestVariantScalar
-from trading.contexts.indicators.application.dto import IndicatorVariantSelection
+from trading.contexts.indicators.application.dto import CandleArrays, IndicatorVariantSelection
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.domain.entities import IndicatorId
 from trading.contexts.indicators.domain.specifications import (
@@ -77,7 +82,14 @@ from trading.contexts.indicators.domain.specifications import (
     GridSpec,
     RangeValuesSpec,
 )
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe, TimeRange
+from trading.shared_kernel.primitives import (
+    InstrumentId,
+    MarketId,
+    Symbol,
+    Timeframe,
+    TimeRange,
+    UtcTimestamp,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -156,7 +168,7 @@ class _ResolvedJobRequestContext:
     top_trades_n: int
     persisted_k: int
     ranking: BacktestRankingConfig
-    artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None = None
+    artifact_context: ArtifactSlotPinnedRuntimeContextV2
 
 
 class RunBacktestJobRunnerV1:
@@ -180,13 +192,14 @@ class RunBacktestJobRunnerV1:
         lease_repository: BacktestJobLeaseRepository,
         results_repository: BacktestJobResultsRepository,
         request_decoder: BacktestJobRequestDecoder,
-        candle_timeline_builder: BacktestCandleTimelineBuilder,
+        candle_timeline_builder: BacktestCandleTimelineBuilder | None = None,
         indicator_compute: IndicatorCompute,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         grid_builder: BacktestGridBuilderV1 | None = None,
         reporting_service: BacktestReportingServiceV1 | None = None,
         core_runner: BacktestStagedCoreRunnerV1 | None = None,
         stage_a_shortlist_builder: BacktestStageAShortlistBuilderV2 | None = None,
+        price_arrays_loader: BacktestPriceArraysLoaderV2 | None = None,
         staged_scorer: MetricScorerV1 | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
@@ -224,14 +237,19 @@ class RunBacktestJobRunnerV1:
             lease_repository: Lease-guarded write repository.
             results_repository: Snapshot/shortlist repository.
             request_decoder: Decoder for persisted `request_json`.
-            candle_timeline_builder: Candle timeline builder used by compute pipeline.
+            candle_timeline_builder:
+                Retained compatibility dependency. Claimed worker runtime no longer builds a live
+                ClickHouse-backed candle timeline after R8-01.
             indicator_compute: Indicator compute port for staged grid estimates/scoring.
             defaults_provider: Optional grid defaults provider.
             grid_builder: Optional custom staged grid builder.
             reporting_service: Optional report assembly service for finalizing step.
             core_runner: Shared staged scoring core used by sync and job-runner paths.
             stage_a_shortlist_builder:
-                Optional artifact-backed Stage A shortlist builder for additive R6-02 cutover.
+                Optional artifact-backed Stage A shortlist builder for slot-pinned claimed runs.
+            price_arrays_loader:
+                Optional explicit-path artifact price loader used to construct warmup-aware
+                request-timeframe candles from pinned `prices/<tf>` arrays.
             staged_scorer: Optional custom staged scorer.
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k request fallback.
@@ -285,10 +303,10 @@ class RunBacktestJobRunnerV1:
             raise ValueError("RunBacktestJobRunnerV1 requires results_repository")
         if request_decoder is None:  # type: ignore[truthy-bool]
             raise ValueError("RunBacktestJobRunnerV1 requires request_decoder")
-        if candle_timeline_builder is None:  # type: ignore[truthy-bool]
-            raise ValueError("RunBacktestJobRunnerV1 requires candle_timeline_builder")
         if indicator_compute is None:  # type: ignore[truthy-bool]
             raise ValueError("RunBacktestJobRunnerV1 requires indicator_compute")
+        if artifact_slot_resolver is None:  # type: ignore[truthy-bool]
+            raise ValueError("RunBacktestJobRunnerV1 requires artifact_slot_resolver")
         if warmup_bars_default <= 0:
             raise ValueError("warmup_bars_default must be > 0")
         if top_k_default <= 0:
@@ -326,6 +344,27 @@ class RunBacktestJobRunnerV1:
             primary_metric=ranking_primary_metric_default,
             secondary_metric=ranking_secondary_metric_default,
         )
+        resolved_stage_a_shortlist_builder = (
+            stage_a_shortlist_builder
+            or build_default_stage_a_shortlist_builder_v2(
+                artifact_slot_resolver=artifact_slot_resolver,
+                configurable_ranking_enabled=configurable_ranking_enabled,
+                init_cash_quote_default=init_cash_quote_default,
+                fixed_quote_default=fixed_quote_default,
+                safe_profit_percent_default=safe_profit_percent_default,
+                slippage_pct_default=slippage_pct_default,
+                fee_pct_default_by_market_id=fee_pct_default_by_market_id,
+            )
+        )
+        resolved_price_arrays_loader = price_arrays_loader or _build_price_arrays_loader(
+            artifact_slot_resolver=artifact_slot_resolver
+        )
+        if resolved_stage_a_shortlist_builder is None:
+            raise ValueError(
+                "RunBacktestJobRunnerV1 requires artifact-backed stage_a_shortlist_builder"
+            )
+        if resolved_price_arrays_loader is None:
+            raise ValueError("RunBacktestJobRunnerV1 requires price_arrays_loader")
 
         self._job_repository = job_repository
         self._lease_repository = lease_repository
@@ -340,18 +379,8 @@ class RunBacktestJobRunnerV1:
             batch_size_default=stage_batch_size,
             configurable_ranking_enabled=configurable_ranking_enabled,
         )
-        self._stage_a_shortlist_builder = (
-            stage_a_shortlist_builder
-            or build_default_stage_a_shortlist_builder_v2(
-                artifact_slot_resolver=artifact_slot_resolver,
-                configurable_ranking_enabled=configurable_ranking_enabled,
-                init_cash_quote_default=init_cash_quote_default,
-                fixed_quote_default=fixed_quote_default,
-                safe_profit_percent_default=safe_profit_percent_default,
-                slippage_pct_default=slippage_pct_default,
-                fee_pct_default_by_market_id=fee_pct_default_by_market_id,
-            )
-        )
+        self._stage_a_shortlist_builder = resolved_stage_a_shortlist_builder
+        self._price_arrays_loader = resolved_price_arrays_loader
         self._staged_scorer = staged_scorer
         self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
@@ -424,13 +453,7 @@ class RunBacktestJobRunnerV1:
         try:
             apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
             context = self._resolve_request_context(job=job)
-            timeline = self._candle_timeline_builder.build(
-                market_id=context.template.instrument_id.market_id,
-                symbol=context.template.instrument_id.symbol,
-                timeframe=context.template.timeframe,
-                requested_time_range=context.request.time_range,
-                warmup_bars=context.warmup_bars,
-            )
+            timeline = self._build_artifact_runtime_timeline(context=context)
             scorer = self._resolve_staged_scorer(
                 template=context.template,
                 target_slice=timeline.target_slice,
@@ -456,8 +479,6 @@ class RunBacktestJobRunnerV1:
                 job=job,
                 locked_by=normalized_locked_by,
                 context=context,
-                timeline=timeline,
-                scorer=scorer,
                 grid_context=grid_context,
             )
             stage_durations[STAGE_A_LITERAL] = max(perf_counter() - stage_started_at, 0.0)
@@ -629,35 +650,37 @@ class RunBacktestJobRunnerV1:
         *,
         job: BacktestJob,
         template: RunBacktestTemplate,
-    ) -> ArtifactSlotPinnedRuntimeContextV2 | None:
+    ) -> ArtifactSlotPinnedRuntimeContextV2:
         """
-        Resolve the optional shared R6-01 slot-pinned context before background runtime work.
+        Resolve the required shared R6-01 slot-pinned context before background runtime work.
 
         Args:
             job: Claimed running job snapshot that may carry persisted artifact pin metadata.
             template: Effective validated run template with canonical instrument identity.
         Returns:
-            ArtifactSlotPinnedRuntimeContextV2 | None: Bootstrapped immutable slot context when
-                resolver wiring and persisted job pin metadata are both available, otherwise
-                `None`.
+            ArtifactSlotPinnedRuntimeContextV2: Bootstrapped immutable slot context for the
+                claimed attempt.
         Assumptions:
-            This bootstrap remains additive until the full v2 kernel cutover consumes the returned
-            context directly in Stage A and Stage B runtime code.
+            Claimed worker execution is slot-pinned in R8-01 and must not fall back to live
+            `current.yaml` or legacy runtime discovery.
         Raises:
-            ValueError: If pinned artifact coordinates or slot manifest identity violate the
-                shared startup contract.
+            ValueError: If claimed job misses persisted pin metadata or slot identity drift
+                violates the shared startup contract.
         Side Effects:
-            Reads strict slot metadata from disk when resolver wiring is enabled and the job
-            carries artifact pin metadata.
+            Reads one explicit pinned slot manifest from disk via `resolve_pinned_context(...)`.
         Docs:
           - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
           - src/trading/contexts/backtest/domain/entities/backtest_job.py
         """
-        if self._artifact_slot_resolver is None or job.artifact_pin is None:
-            return None
+        if job.artifact_pin is None:
+            raise ValueError(
+                "claimed backtest job requires persisted artifact_slot/"
+                "artifact_slot_generation/artifact_manifest_hash/artifact_asof_date pin metadata"
+            )
         coordinates = artifact_coordinates_from_market_id_v2(
             market_id=template.instrument_id.market_id.value,
             symbol=str(template.instrument_id.symbol),
@@ -668,10 +691,15 @@ class RunBacktestJobRunnerV1:
             artifact_asof_date=job.artifact_pin.artifact_asof_date,
             artifact_manifest_hash=job.artifact_pin.artifact_manifest_hash,
         )
-        return self._artifact_slot_resolver.resolve_pinned_context(
-            coordinates,
-            pinned_identity,
-        )
+        try:
+            return self._artifact_slot_resolver.resolve_pinned_context(
+                coordinates,
+                pinned_identity,
+            )
+        except FileNotFoundError as error:
+            raise ValueError(
+                "claimed backtest job pinned artifacts are unavailable for persisted slot identity"
+            ) from error
 
     def _resolve_template(
         self,
@@ -791,8 +819,6 @@ class RunBacktestJobRunnerV1:
         job: BacktestJob,
         locked_by: str,
         context: _ResolvedJobRequestContext,
-        timeline: Any,
-        scorer: MetricScorerV1,
         grid_context: Any,
     ) -> tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
         """
@@ -802,8 +828,6 @@ class RunBacktestJobRunnerV1:
             job: Claimed running job snapshot.
             locked_by: Active lease owner.
             context: Resolved request context.
-            timeline: Built candle timeline payload.
-            scorer: Deterministic staged scorer.
             grid_context: Prepared staged grid context.
         Returns:
             tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
@@ -850,31 +874,20 @@ class RunBacktestJobRunnerV1:
                 now=now,
             )
 
-        if self._stage_a_shortlist_builder is not None and context.artifact_context is not None:
-            shortlist_rows = self._stage_a_shortlist_builder.build_shortlist(
-                grid_context=grid_context,
-                artifact_context=context.artifact_context,
-                target_time_range=context.request.time_range,
-                shortlist_limit=stage_limit,
-                ranking=context.ranking,
-                batch_size=self._stage_batch_size,
-                cancel_checker=lambda stage: self._ensure_not_cancelled(
-                    job=job,
-                    locked_by=locked_by,
-                    stage=stage,
-                ),
-                on_checkpoint=_on_stage_a_checkpoint,
-            )
-        else:
-            shortlist_rows = self._core_runner.run_stage_a(
-                grid_context=grid_context,
-                candles=timeline.candles,
-                scorer=scorer,
-                shortlist_limit=stage_limit,
-                ranking=context.ranking,
-                batch_size=self._stage_batch_size,
-                on_checkpoint=_on_stage_a_checkpoint,
-            )
+        shortlist_rows = self._stage_a_shortlist_builder.build_shortlist(
+            grid_context=grid_context,
+            artifact_context=context.artifact_context,
+            target_time_range=context.request.time_range,
+            shortlist_limit=stage_limit,
+            ranking=context.ranking,
+            batch_size=self._stage_batch_size,
+            cancel_checker=lambda stage: self._ensure_not_cancelled(
+                job=job,
+                locked_by=locked_by,
+                stage=stage,
+            ),
+            on_checkpoint=_on_stage_a_checkpoint,
+        )
         shortlist = tuple(
             BacktestJobTopVariantCandidateV1(
                 variant_index=row.base_variant.stage_a_index,
@@ -1417,20 +1430,67 @@ class RunBacktestJobRunnerV1:
         )
         if artifact_backed_scorer is not None:
             return artifact_backed_scorer
-        return CloseFillBacktestStagedScorerV1(
-            indicator_compute=self._indicator_compute,
-            direction_mode=template.direction_mode,
-            sizing_mode=template.sizing_mode,
-            execution_params=template.execution_params or {},
-            market_id=template.instrument_id.market_id.value,
-            target_slice=target_slice,
-            init_cash_quote_default=self._init_cash_quote_default,
-            fixed_quote_default=self._fixed_quote_default,
-            safe_profit_percent_default=self._safe_profit_percent_default,
-            slippage_pct_default=self._slippage_pct_default,
-            fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
-            max_variants_guard=self._max_variants_per_compute,
-            max_compute_bytes_total=self._max_compute_bytes_total,
+        raise ValueError(
+            "claimed backtest job requires artifact-backed Stage B scorer for slot-pinned runtime"
+        )
+
+    def _build_artifact_runtime_timeline(
+        self,
+        *,
+        context: _ResolvedJobRequestContext,
+    ) -> BacktestCandleTimeline:
+        """
+        Build warmup-aware request-timeframe candles directly from pinned `prices/<tf>` artifacts.
+
+        Args:
+            context: Resolved claimed-job request context with pinned artifact identity.
+        Returns:
+            BacktestCandleTimeline: Warmup-inclusive candles and target slice derived from the
+                persisted slot-pinned artifact family.
+        Assumptions:
+            Claimed worker execution must not query ClickHouse or rebuild live timeline state.
+        Raises:
+            ValueError: If artifact prices do not cover the requested target window.
+        Side Effects:
+            Memory-maps one `prices/<tf>` artifact family and slices arrays for current attempt.
+        Docs:
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+        """
+        artifact_prices = self._price_arrays_loader.load_price_arrays(
+            context=context.artifact_context,
+            timeframe=context.template.timeframe.code,
+        )
+        full_target_slice = compute_target_slice_by_close_time_v2(
+            close_time=artifact_prices.close_time,
+            target_time_range=context.request.time_range,
+        )
+        if full_target_slice.start is None or full_target_slice.stop is None:
+            raise ValueError("artifact target slice must define explicit start/stop bounds")
+        if full_target_slice.stop <= full_target_slice.start:
+            raise ValueError("artifact-backed runtime found no candles for requested time_range")
+        warmup_start = max(0, int(full_target_slice.start) - context.warmup_bars)
+        local_slice = slice(warmup_start, int(full_target_slice.stop))
+        local_target_slice = slice(
+            int(full_target_slice.start) - warmup_start,
+            int(full_target_slice.stop) - warmup_start,
+        )
+        candles = _artifact_candles_from_price_arrays(
+            market_id=context.template.instrument_id.market_id,
+            symbol=context.template.instrument_id.symbol,
+            timeframe=context.template.timeframe,
+            price_open_time=artifact_prices.open_time[local_slice],
+            price_close_time=artifact_prices.close_time[local_slice],
+            price_ohlcv=artifact_prices.ohlcv[local_slice],
+        )
+        return BacktestCandleTimeline(
+            candles=candles,
+            normalized_1m_time_range=context.request.time_range,
+            target_slice=local_target_slice,
         )
 
 
@@ -1444,6 +1504,114 @@ class _BacktestJobLeaseLost(Exception):
     """
     Internal control-flow exception signaling lease-owner guarded write mismatch.
     """
+
+
+def _build_price_arrays_loader(
+    *,
+    artifact_slot_resolver: BacktestArtifactSlotResolverV2,
+) -> BacktestPriceArraysLoaderV2 | None:
+    """
+    Build default explicit-path price loader from the resolver's underlying artifact loader.
+
+    Args:
+        artifact_slot_resolver: Shared slot-pinned resolver wired at worker startup.
+    Returns:
+        BacktestPriceArraysLoaderV2 | None: Default mmap price loader when resolver exposes an
+            artifact loader, otherwise `None`.
+    Assumptions:
+        Worker startup must fail fast when artifact loader wiring is incomplete for claimed runs.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+      - apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py
+    """
+    artifact_loader = getattr(artifact_slot_resolver, "artifact_loader", None)
+    if artifact_loader is None:
+        return None
+    return MmapPriceArraysLoaderV2(artifact_loader=artifact_loader)
+
+
+def _artifact_candles_from_price_arrays(
+    *,
+    market_id: MarketId,
+    symbol: Symbol,
+    timeframe: Timeframe,
+    price_open_time: np.ndarray,
+    price_close_time: np.ndarray,
+    price_ohlcv: np.ndarray,
+) -> CandleArrays:
+    """
+    Convert one sliced `prices/<tf>` artifact family into warmup-inclusive `CandleArrays`.
+
+    Args:
+        market_id: Stable market identifier for the run template.
+        symbol: Canonical instrument symbol for the run template.
+        timeframe: Request timeframe of the artifact price family.
+        price_open_time: Sliced artifact `open_time` vector.
+        price_close_time: Sliced artifact `close_time` vector.
+        price_ohlcv: Sliced artifact `ohlcv` matrix.
+    Returns:
+        CandleArrays: Dense timeframe candles aligned to the pinned artifact slice.
+    Assumptions:
+        Arrays were already validated by `BacktestPriceArraysLoaderV2` before slicing.
+    Raises:
+        ValueError: If the sliced artifact family is empty or `CandleArrays` validation fails.
+    Side Effects:
+        Allocates contiguous numpy views for the legacy grid-builder compatibility contract.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/candle_arrays.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+    """
+    if int(price_open_time.shape[0]) == 0:
+        raise ValueError("artifact-backed runtime candle slice must not be empty")
+    return CandleArrays(
+        market_id=market_id,
+        symbol=symbol,
+        time_range=TimeRange(
+            start=_utc_timestamp_from_epoch_millis(int(price_open_time[0])),
+            end=_utc_timestamp_from_epoch_millis(int(price_close_time[-1])),
+        ),
+        timeframe=timeframe,
+        ts_open=np.ascontiguousarray(price_open_time, dtype=np.int64),
+        open=np.ascontiguousarray(price_ohlcv[:, 0], dtype=np.float32),
+        high=np.ascontiguousarray(price_ohlcv[:, 1], dtype=np.float32),
+        low=np.ascontiguousarray(price_ohlcv[:, 2], dtype=np.float32),
+        close=np.ascontiguousarray(price_ohlcv[:, 3], dtype=np.float32),
+        volume=np.ascontiguousarray(price_ohlcv[:, 4], dtype=np.float32),
+    )
+
+
+def _utc_timestamp_from_epoch_millis(value: int) -> UtcTimestamp:
+    """
+    Convert epoch-millis integer into timezone-aware UTC timestamp primitive.
+
+    Args:
+        value: Epoch milliseconds literal from artifact price arrays.
+    Returns:
+        UtcTimestamp: UTC timestamp wrapper used by `TimeRange`.
+    Assumptions:
+        Artifact timelines are stored in UTC epoch milliseconds.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/shared_kernel/primitives/utc_timestamp.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+    """
+    return UtcTimestamp(datetime.fromtimestamp(value / 1000.0, tz=timezone.utc))
 
 
 def _frontier_signature_from_ranked_rows(
