@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Callable, Iterator, Mapping, cast
+from typing import Any, Callable, Iterator, Mapping, cast
 
 from trading.contexts.backtest.application.dto import (
     BacktestRankingConfig,
@@ -520,13 +520,16 @@ class BacktestStagedRunnerV1:
             and target_time_range is not None
         ):
             return list(
-                self._stage_a_shortlist_builder.build_shortlist(
-                    grid_context=grid_context,
-                    artifact_context=artifact_context,
-                    target_time_range=target_time_range,
-                    shortlist_limit=shortlist_limit,
-                    ranking=ranking,
-                    cancel_checker=cancel_checker,
+                cast(
+                    tuple[BacktestStageAScoredVariantV1, ...],
+                    self._stage_a_shortlist_builder.build_shortlist(
+                        grid_context=cast(Any, grid_context),
+                        artifact_context=artifact_context,
+                        target_time_range=target_time_range,
+                        shortlist_limit=shortlist_limit,
+                        ranking=ranking,
+                        cancel_checker=cancel_checker,
+                    ),
                 )
             )
         rows = self._core_runner.run_stage_a(

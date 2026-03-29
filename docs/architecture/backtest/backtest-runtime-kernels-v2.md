@@ -5,8 +5,9 @@
 `tests/notebook_tests/06_backtest_compute.ipynb` в generic runtime boundaries, не меняя shipped
 R5-01 artifact contracts.
 
-Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02 + R6-03 + R6-04`  
-Следующие этапы реализации: `R7 persisted-run storage/API cutover`, `full legacy runtime cutover`
+Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02 + R6-03 + R6-04`,
+`Milestone R10 / EPIC R10-01 production hot-path cutover`  
+Следующие этапы реализации: `R10-02 docs synchronization`, `R10-03 perf/runbook closure`
 
 Связанные документы:
 
@@ -97,15 +98,16 @@ artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kerne
 - `exact replay of best TP/SL cell` ограничен только выбранной winning cell;
 - `metrics_kernel.py` считает deterministic Stage B ranking/summary fields и строит
   details-compatible outcome только для retained exact replay;
-- artifact-backed Stage B scorer остаётся additive path для sync runtime, когда есть валидный
+- artifact-backed Stage B scorer после R10-01 является mandatory production runtime contract для
+  sync launch, claimed background execution и run-scoped lazy detail при валидном
   `slot-pinned context`;
-- claimed background worker после R8-01 обязан использовать этот scorer как mandatory runtime
-  contract и больше не возвращается к legacy close-fill fallback.
+- production orchestration больше не возвращается к legacy close-fill fallback и не строит live
+  candle timelines через ClickHouse.
 
-Что остаётся вне scope после R6-04:
+Что остаётся вне scope после R10-01:
 
-- persisted-run storage schema/API cutover для history/detail flows из R7;
-- full cutover с legacy scorer/execution paths на v2 runtime kernels.
+- EPIC R10-02 full docs synchronization scope;
+- EPIC R10-03 perf benchmark closure и runbook expansion.
 
 ## Stage A Contract
 
@@ -141,20 +143,20 @@ Stage A существует для batch-oriented работы на `signal tim
   ranking payload сортируется детерминированно, а при полном равенстве метрик сохраняется
   `base_variant_key ASC`.
 
-## R6-02 shipped Stage A runtime bridge
+## R10-01 production hot-path cutover
 
-R6-02 не заменяет весь runtime целиком. Он добавляет отдельный additive bridge:
+R10-01 закрывает production reachability legacy hot-path orchestrators для покрытого scope:
 
-- `src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py`
-  materialize'ит Stage A shortlist из `artifacts-only inputs`;
-- `src/trading/contexts/backtest/application/use_cases/run_backtest.py` и
-  `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py`
-  подключают этот builder только когда есть валидный `slot-pinned context`;
-- `src/trading/contexts/backtest/application/services/staged_runner_v1.py` остаётся legacy
-  orchestration facade и использует v2 Stage A path additively;
-- если v2 builder/context недоступен, sync flow продолжает использовать legacy Stage A scorer
-  loop без изменения публичных imports; claimed background worker после R8-01 этот fallback не
-  использует.
+- `src/trading/contexts/backtest/application/use_cases/run_backtest.py` больше не исполняет
+  sync launch и lazy detail через `candle_timeline_builder.py` или `staged_runner_v1.py`;
+- `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py` больше не
+  исполняет claimed background runs через `grid_builder_v1.py` или `staged_core_runner_v1.py`;
+- production paths используют только
+  `artifact_runtime_timeline_v2.py`, `artifact_runtime_plan_v2.py`,
+  `stage_a_shortlist_builder_v2.py`, `artifact_runtime_core_v2.py`,
+  `artifact_backed_stage_b_scorer_v2.py`;
+- legacy v1 modules остаются compatibility-only для stable imports и non-production migration
+  boundaries, но не являются implicit runtime fallback.
 
 ## R8-01 worker cutover
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from typing import Any, Mapping, cast
 from uuid import UUID
 
@@ -197,6 +198,140 @@ class _RecordingStageAShortlistBuilder:
             }
         )
         return self.rows
+
+
+class _RecordingArtifactTimelineBuilder:
+    """
+    Artifact timeline builder fake recording sync use-case inputs and returning dense candles.
+    """
+
+    def __init__(self) -> None:
+        """
+        Initialize artifact timeline builder fake with empty call log.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Sync use-case tests only need request-timeframe warmup handling and call recording.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call log.
+        """
+        self.calls: list[dict[str, Any]] = []
+
+    def build(
+        self,
+        *,
+        artifact_context: Any,
+        market_id: MarketId,
+        symbol: Symbol,
+        timeframe: Timeframe,
+        requested_time_range: TimeRange,
+        warmup_bars: int,
+    ) -> Any:
+        """
+        Record one build call and return deterministic warmup-inclusive `1m` candles.
+
+        Args:
+            artifact_context: Slot-pinned runtime context forwarded by the use-case.
+            market_id: Requested market identifier.
+            symbol: Requested symbol.
+            timeframe: Requested timeframe.
+            requested_time_range: Requested reporting/trading window.
+            warmup_bars: Requested warmup bars count.
+        Returns:
+            Any: Timeline-like object exposing `candles`, `target_slice`, and `full_target_slice`.
+        Assumptions:
+            Tests use `1m` timeframe only and rely on minute-floor/ceil normalization here.
+        Raises:
+            ValueError: If `warmup_bars` is non-positive.
+        Side Effects:
+            Appends build metadata to the in-memory log.
+        """
+        if warmup_bars <= 0:
+            raise ValueError("warmup_bars must be > 0")
+        _ = market_id, symbol, timeframe
+        normalized_target_range = _normalize_request_time_range_to_minutes(
+            requested_time_range=requested_time_range
+        )
+        normalized_timeline_range = TimeRange(
+            start=UtcTimestamp(normalized_target_range.start.value - (warmup_bars * _ONE_MINUTE)),
+            end=normalized_target_range.end,
+        )
+        candles = _build_dense_1m_from_time_range(time_range=normalized_timeline_range)
+        target_bars = int(normalized_target_range.duration() // _ONE_MINUTE)
+        target_slice = slice(warmup_bars, warmup_bars + target_bars)
+        self.calls.append(
+            {
+                "artifact_context": artifact_context,
+                "requested_time_range": requested_time_range,
+                "warmup_bars": warmup_bars,
+                "normalized_timeline_range": normalized_timeline_range,
+                "target_slice": target_slice,
+            }
+        )
+        return SimpleNamespace(
+            candles=candles,
+            target_slice=target_slice,
+            full_target_slice=target_slice,
+        )
+
+
+class _ArtifactOnlyStageAShortlistBuilder:
+    """
+    Artifact-only Stage A shortlist builder fake for sync use-case tests.
+    """
+
+    def build_shortlist(
+        self,
+        *,
+        grid_context: Any,
+        artifact_context: Any,
+        target_time_range: TimeRange,
+        shortlist_limit: int,
+        ranking: Any = None,
+        batch_size: int | None = None,
+        cancel_checker: Any = None,
+        on_checkpoint: Any = None,
+    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+        """
+        Build deterministic shortlist rows directly from runtime-plan Stage A variants.
+
+        Args:
+            grid_context: Prepared runtime plan exposing `iter_stage_a_variants()`.
+            artifact_context: Slot-pinned runtime context.
+            target_time_range: Requested trading/reporting window.
+            shortlist_limit: Maximum shortlist size.
+            ranking: Optional ranking config.
+            batch_size: Optional chunk size override.
+            cancel_checker: Optional cancellation hook.
+            on_checkpoint: Optional checkpoint hook.
+        Returns:
+            tuple[BacktestStageAScoredVariantV1, ...]: Deterministic shortlist rows.
+        Assumptions:
+            Tests only need stable shortlist materialization and not real Stage A kernel math.
+        Raises:
+            None.
+        Side Effects:
+            May invoke provided cancellation/checkpoint hooks.
+        """
+        _ = artifact_context, target_time_range, ranking, batch_size
+        if cancel_checker is not None:
+            cancel_checker("stage_a")
+        base_variants = tuple(grid_context.iter_stage_a_variants())[:shortlist_limit]
+        rows = tuple(
+            BacktestStageAScoredVariantV1(
+                base_variant=cast(Any, base_variant),
+                total_return_pct=float(base_variant.indicator_selections[0].params["window"]),
+            )
+            for base_variant in base_variants
+        )
+        if on_checkpoint is not None:
+            on_checkpoint(len(rows), len(tuple(grid_context.iter_stage_a_variants())))
+        return rows
 
 
 class _AlignedOnlyCandleFeed:
@@ -414,6 +549,47 @@ class _DeterministicScorer:
         window = int(indicator_selections[0].params["window"])
         return {"Total Return [%]": float(window)}
 
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: CandleArrays,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, float | int | str | bool | None]],
+        risk_params: Mapping[str, float | int | str | bool | None],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> dict[str, float]:
+        """
+        Return metric-only payload required by artifact-backed Stage B ranking loops.
+
+        Args:
+            stage: Stage literal (`stage_a` or `stage_b`).
+            candles: Dense candles payload.
+            indicator_selections: Explicit indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicator key for deterministic identity.
+            variant_key: Backtest variant key for deterministic identity.
+        Returns:
+            dict[str, float]: Deterministic ranking metric payload.
+        Assumptions:
+            Metric-only output is equal to `score_variant(...)` payload for this test double.
+        Raises:
+            KeyError: If expected `window` parameter is missing.
+        Side Effects:
+            None.
+        """
+        return self.score_variant(
+            stage=stage,
+            candles=candles,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
+        )
+
 
 class _DeterministicScorerWithDetails:
     """
@@ -589,28 +765,113 @@ class _UnusedStrategyReader:
         return None
 
 
-def test_run_backtest_use_case_normalizes_non_aligned_range_via_timeline_builder() -> None:
+def _default_slot_pinned_context() -> _FakeSlotPinnedContext:
     """
-    Verify use-case normalizes non-aligned request range before candle feed call.
+    Build deterministic default slot-pinned context fixture for sync use-case tests.
+
+    Args:
+        None.
+    Returns:
+        _FakeSlotPinnedContext: Default slot-pinned context fixture.
+    Assumptions:
+        Sync use-case tests all target the same `binance/spot/BTCUSDT` artifact family.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _FakeSlotPinnedContext(
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        ),
+        artifact_slot="slot_a",
+        slot_generation=7,
+        artifact_asof_date="2026-03-29",
+        artifact_manifest_hash="d" * 64,
+    )
+
+
+def _build_use_case(
+    *,
+    indicator_compute: Any | None = None,
+    staged_scorer: Any | None = None,
+    artifact_slot_resolver: Any | None = None,
+    artifact_timeline_builder: Any | None = None,
+    stage_a_shortlist_builder: Any | None = None,
+    **kwargs: Any,
+) -> RunBacktestUseCase:
+    """
+    Build sync run use-case with deterministic artifact-runtime test doubles.
+
+    Args:
+        indicator_compute: Optional indicator compute fake.
+        staged_scorer: Optional staged scorer fake.
+        artifact_slot_resolver: Optional slot-pinned resolver fake.
+        artifact_timeline_builder: Optional artifact timeline builder fake.
+        stage_a_shortlist_builder: Optional artifact Stage A shortlist builder fake.
+        **kwargs: Additional constructor kwargs forwarded to `RunBacktestUseCase`.
+    Returns:
+        RunBacktestUseCase: Prepared sync use-case instance.
+    Assumptions:
+        Tests exercise template mode only and therefore use the unused strategy reader stub.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    resolved_artifact_slot_resolver = (
+        artifact_slot_resolver
+        if artifact_slot_resolver is not None
+        else _RecordingArtifactSlotResolver(context=_default_slot_pinned_context())
+    )
+    resolved_timeline_builder = (
+        artifact_timeline_builder
+        if artifact_timeline_builder is not None
+        else _RecordingArtifactTimelineBuilder()
+    )
+    resolved_stage_a_shortlist_builder = (
+        stage_a_shortlist_builder
+        if stage_a_shortlist_builder is not None
+        else _ArtifactOnlyStageAShortlistBuilder()
+    )
+    return RunBacktestUseCase(
+        candle_feed=None,
+        indicator_compute=cast(
+            Any,
+            indicator_compute if indicator_compute is not None else _EstimateOnlyIndicatorCompute(),
+        ),
+        strategy_reader=_UnusedStrategyReader(),
+        staged_scorer=cast(Any, staged_scorer),
+        artifact_slot_resolver=cast(Any, resolved_artifact_slot_resolver),
+        artifact_timeline_builder=cast(Any, resolved_timeline_builder),
+        stage_a_shortlist_builder=cast(Any, resolved_stage_a_shortlist_builder),
+        **kwargs,
+    )
+
+
+def test_run_backtest_use_case_routes_sync_path_through_artifact_timeline_builder() -> None:
+    """
+    Verify sync use-case routes through artifact timeline builder and preserves warmup handling.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Timeline builder is responsible for minute normalization and warmup lookback.
+        Artifact timeline builder owns minute normalization and warmup expansion in R10-01.
     Raises:
-        AssertionError: If feed call range or staged output counters are incorrect.
+        AssertionError: If builder call payload or staged output counters are incorrect.
     Side Effects:
         None.
     """
-    candle_feed = _AlignedOnlyCandleFeed()
+    timeline_builder = _RecordingArtifactTimelineBuilder()
     indicator_compute = _EstimateOnlyIndicatorCompute()
-    use_case = RunBacktestUseCase(
-        candle_feed=candle_feed,
+    use_case = _build_use_case(
         indicator_compute=indicator_compute,
-        strategy_reader=_UnusedStrategyReader(),
         staged_scorer=_DeterministicScorer(),
+        artifact_timeline_builder=timeline_builder,
     )
     request = RunBacktestRequest(
         time_range=TimeRange(
@@ -626,8 +887,10 @@ def test_run_backtest_use_case_normalizes_non_aligned_range_via_timeline_builder
         current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
     )
 
-    assert len(candle_feed.calls) == 1
-    normalized_range = candle_feed.calls[0]
+    assert len(timeline_builder.calls) == 1
+    normalized_range = timeline_builder.calls[0]["normalized_timeline_range"]
+    assert timeline_builder.calls[0]["requested_time_range"] == request.time_range
+    assert timeline_builder.calls[0]["warmup_bars"] == 2
     assert normalized_range.start == UtcTimestamp(
         datetime(2026, 2, 16, 11, 58, tzinfo=timezone.utc)
     )
@@ -652,10 +915,7 @@ def test_run_backtest_use_case_applies_staged_top_k_limit() -> None:
     Side Effects:
         None.
     """
-    use_case = RunBacktestUseCase(
-        candle_feed=_AlignedOnlyCandleFeed(),
-        indicator_compute=_EstimateOnlyIndicatorCompute(),
-        strategy_reader=_UnusedStrategyReader(),
+    use_case = _build_use_case(
         staged_scorer=_DeterministicScorer(),
     )
     request = RunBacktestRequest(
@@ -711,10 +971,8 @@ def test_run_backtest_use_case_bootstraps_active_slot_pinned_context_before_runt
             artifact_manifest_hash="d" * 64,
         )
     )
-    use_case = RunBacktestUseCase(
-        candle_feed=_AlignedOnlyCandleFeed(),
+    use_case = _build_use_case(
         indicator_compute=_EstimateOnlyIndicatorCompute(),
-        strategy_reader=_UnusedStrategyReader(),
         staged_scorer=_DeterministicScorer(),
         artifact_slot_resolver=cast(Any, resolver),
     )
@@ -764,10 +1022,7 @@ def test_run_backtest_use_case_sync_summary_path_stays_summary_only() -> None:
     Side Effects:
         None.
     """
-    use_case = RunBacktestUseCase(
-        candle_feed=_AlignedOnlyCandleFeed(),
-        indicator_compute=_EstimateOnlyIndicatorCompute(),
-        strategy_reader=_UnusedStrategyReader(),
+    use_case = _build_use_case(
         staged_scorer=_DeterministicScorerWithDetails(),
         top_trades_n_default=2,
         eager_top_reports_enabled=True,
@@ -850,10 +1105,7 @@ def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_avai
         top_k=1,
         preselect=2,
     )
-    use_case = RunBacktestUseCase(
-        candle_feed=_AlignedOnlyCandleFeed(),
-        indicator_compute=_EstimateOnlyIndicatorCompute(),
-        strategy_reader=_UnusedStrategyReader(),
+    use_case = _build_use_case(
         staged_scorer=_DeterministicScorer(),
         artifact_slot_resolver=cast(
             Any,
@@ -946,10 +1198,7 @@ def test_run_backtest_use_case_prefers_artifact_backed_stage_b_scorer_when_pinne
         "build_default_artifact_backed_stage_b_scorer_v2",
         _fake_builder,
     )
-    use_case = RunBacktestUseCase(
-        candle_feed=_AlignedOnlyCandleFeed(),
-        indicator_compute=_EstimateOnlyIndicatorCompute(),
-        strategy_reader=_UnusedStrategyReader(),
+    use_case = _build_use_case(
         artifact_slot_resolver=cast(Any, object()),
     )
 
@@ -983,10 +1232,7 @@ def test_run_backtest_use_case_lazy_mode_omits_eager_reports_by_default() -> Non
     Side Effects:
         None.
     """
-    use_case = RunBacktestUseCase(
-        candle_feed=_AlignedOnlyCandleFeed(),
-        indicator_compute=_EstimateOnlyIndicatorCompute(),
-        strategy_reader=_UnusedStrategyReader(),
+    use_case = _build_use_case(
         staged_scorer=_DeterministicScorerWithDetails(),
         top_trades_n_default=2,
     )
@@ -1077,6 +1323,33 @@ def _build_template(*, windows: tuple[int, ...]) -> RunBacktestTemplate:
                 },
             ),
         ),
+    )
+
+
+def _normalize_request_time_range_to_minutes(*, requested_time_range: TimeRange) -> TimeRange:
+    """
+    Normalize one request range to minute boundaries using floor-start and ceil-end semantics.
+
+    Args:
+        requested_time_range: Raw requested time range.
+    Returns:
+        TimeRange: Minute-aligned target range without warmup extension.
+    Assumptions:
+        Test fixtures use timezone-aware UTC timestamps.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    start_value = requested_time_range.start.value.astimezone(timezone.utc)
+    end_value = requested_time_range.end.value.astimezone(timezone.utc)
+    aligned_start = start_value.replace(second=0, microsecond=0)
+    aligned_end = end_value.replace(second=0, microsecond=0)
+    if aligned_end != end_value:
+        aligned_end += _ONE_MINUTE
+    return TimeRange(
+        start=UtcTimestamp(aligned_start),
+        end=UtcTimestamp(aligned_end),
     )
 
 

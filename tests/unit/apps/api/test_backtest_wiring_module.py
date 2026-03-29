@@ -377,7 +377,6 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
         "StrategyRepositoryBacktestStrategyReader",
         _DummyStrategyReader,
     )
-    monkeypatch.setattr(backtest_module, "_build_backtest_candle_feed", lambda *, environ: object())
     monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _DummyFactory)
     monkeypatch.setattr(
         backtest_module,
@@ -476,8 +475,6 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         "StrategyRepositoryBacktestStrategyReader",
         _DummyStrategyReader,
     )
-    monkeypatch.setattr(backtest_module, "_build_backtest_candle_feed", lambda *, environ: object())
-
     class _CaptureRunBacktestUseCase:
         """
         Capture run use-case constructor kwargs for guard/CPU assertions.
@@ -585,10 +582,12 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     assert "/backtests/ping" in _paths_from_router(router=router)
     assert "/backtests/runs/ping" in _paths_from_router(router=router)
     assert len(captured_run_use_case_kwargs) == 2
+    assert captured_run_use_case_kwargs[0]["candle_feed"] is None
     assert captured_run_use_case_kwargs[0]["max_variants_per_compute"] == 50
     assert captured_run_use_case_kwargs[0]["max_compute_bytes_total"] == 500
     assert captured_run_use_case_kwargs[0]["max_numba_threads"] == 7
     assert captured_run_use_case_kwargs[0]["eager_top_reports_enabled"] is False
+    assert captured_run_use_case_kwargs[1]["candle_feed"] is None
     assert captured_run_use_case_kwargs[1]["max_variants_per_compute"] == 101
     assert captured_run_use_case_kwargs[1]["max_compute_bytes_total"] == 1001
     assert captured_sync_inline_kwargs["backtest_runtime_config_hash"] == "f" * 64
@@ -711,7 +710,6 @@ def test_build_backtest_router_uses_artifact_root_from_artifact_config(monkeypat
         "StrategyRepositoryBacktestStrategyReader",
         _DummyStrategyReader,
     )
-    monkeypatch.setattr(backtest_module, "_build_backtest_candle_feed", lambda *, environ: object())
     monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _DummyFactory)
     monkeypatch.setattr(
         backtest_module,

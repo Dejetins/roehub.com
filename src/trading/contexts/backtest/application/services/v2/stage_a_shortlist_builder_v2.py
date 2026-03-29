@@ -10,21 +10,6 @@ from typing import Callable, Mapping, Sequence, cast
 import numpy as np
 
 from trading.contexts.backtest.application.dto import BacktestRankingConfig
-from trading.contexts.backtest.application.services.grid_builder_v1 import (
-    BacktestGridBuildContextV1,
-    BacktestStageABaseVariant,
-    _IndicatorPlan,
-)
-from trading.contexts.backtest.application.services.staged_core_runner_v1 import (
-    BacktestStageAScoredVariantV1,
-    StageAHeapEntryV1,
-    _effective_ranking_config,
-    _heap_entry_outranks,
-    _resolve_ranking_plan,
-    _ResolvedRankingPlanV1,
-    _stage_a_heap_entry,
-    _stage_a_rows_from_heap,
-)
 from trading.contexts.backtest.domain.value_objects import (
     BacktestVariantScalar,
     ExecutionParamsV1,
@@ -33,7 +18,22 @@ from trading.contexts.indicators.application.dto import IndicatorVariantSelectio
 from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.shared_kernel.primitives import TimeRange
 
-from ..grid_builder_v1 import STAGE_A_LITERAL
+from .artifact_runtime_core_v2 import (
+    BacktestStageAScoredVariantV2,
+    ResolvedRankingPlanV2,
+    StageAHeapEntryV2,
+    effective_ranking_config_v2,
+    heap_entry_outranks_v2,
+    resolve_ranking_plan_v2,
+    stage_a_heap_entry_v2,
+    stage_a_rows_from_heap_v2,
+)
+from .artifact_runtime_plan_v2 import (
+    STAGE_A_LITERAL_V2,
+    BacktestArtifactRuntimePlanV2,
+    BacktestIndicatorPlanV2,
+    BacktestStageABaseVariantV2,
+)
 from .contracts import (
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactLoaderV2,
@@ -87,7 +87,7 @@ class PreparedIndicatorRowPlanV2:
     def from_indicator_plan(
         cls,
         *,
-        plan: _IndicatorPlan,
+        plan: BacktestIndicatorPlanV2,
     ) -> PreparedIndicatorRowPlanV2:
         """
         Build a deterministic row-addressing plan from one grid-builder indicator plan.
@@ -268,7 +268,7 @@ class BacktestStageAShortlistBuilderV2:
     def build_shortlist(
         self,
         *,
-        grid_context: BacktestGridBuildContextV1,
+        grid_context: BacktestArtifactRuntimePlanV2,
         artifact_context: ArtifactSlotPinnedRuntimeContextV2,
         target_time_range: TimeRange,
         shortlist_limit: int,
@@ -276,7 +276,7 @@ class BacktestStageAShortlistBuilderV2:
         batch_size: int | None = None,
         cancel_checker: StageACancelCheckerV2 | None = None,
         on_checkpoint: StageACheckpointCallbackV2 | None = None,
-    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+    ) -> tuple[BacktestStageAScoredVariantV2, ...]:
         """
         Build a deterministic Stage A shortlist from artifacts-only inputs with chunked variants.
 
@@ -290,7 +290,7 @@ class BacktestStageAShortlistBuilderV2:
             cancel_checker: Optional cooperative cancellation callback by stage literal.
             on_checkpoint: Optional progress callback `(processed, total)` after each chunk.
         Returns:
-            tuple[BacktestStageAScoredVariantV1, ...]: Deterministically ranked Stage A shortlist.
+            tuple[BacktestStageAScoredVariantV2, ...]: Deterministically ranked Stage A shortlist.
         Assumptions:
             Runtime uses artifacts-only inputs, reuses subset signal row loading, and keeps
             Stage B risk kernels out of scope.
@@ -308,14 +308,14 @@ class BacktestStageAShortlistBuilderV2:
         if shortlist_limit <= 0:
             raise ValueError("BacktestStageAShortlistBuilderV2.shortlist_limit must be > 0")
         effective_batch_size = self._resolve_batch_size(batch_size=batch_size)
-        ranking_plan = _resolve_ranking_plan(
-            ranking=_effective_ranking_config(
+        ranking_plan = resolve_ranking_plan_v2(
+            ranking=effective_ranking_config_v2(
                 ranking=ranking,
                 configurable_ranking_enabled=self.configurable_ranking_enabled,
             )
         )
         if cancel_checker is not None:
-            cancel_checker(STAGE_A_LITERAL)
+            cancel_checker(STAGE_A_LITERAL_V2)
 
         signal_prices = self.price_arrays_loader.load_price_arrays(
             context=artifact_context,
@@ -359,8 +359,8 @@ class BacktestStageAShortlistBuilderV2:
             for plan in grid_context.indicator_plans
         )
 
-        shortlist_heap: list[StageAHeapEntryV1] = []
-        chunk_variants: list[BacktestStageABaseVariant] = []
+        shortlist_heap: list[StageAHeapEntryV2] = []
+        chunk_variants: list[BacktestStageABaseVariantV2] = []
         total = int(grid_context.stage_a_variants_total)
         processed = 0
 
@@ -372,7 +372,7 @@ class BacktestStageAShortlistBuilderV2:
             ):
                 continue
             if cancel_checker is not None:
-                cancel_checker(STAGE_A_LITERAL)
+                cancel_checker(STAGE_A_LITERAL_V2)
             self._score_chunk_into_heap(
                 row_plans=row_plans,
                 chunk_variants=tuple(chunk_variants),
@@ -393,7 +393,7 @@ class BacktestStageAShortlistBuilderV2:
                 on_checkpoint(processed, total)
             chunk_variants.clear()
 
-        return _stage_a_rows_from_heap(heap=shortlist_heap)
+        return stage_a_rows_from_heap_v2(heap=shortlist_heap)
 
     def _resolve_batch_size(
         self,
@@ -429,7 +429,7 @@ class BacktestStageAShortlistBuilderV2:
     def _resolve_execution_params(
         self,
         *,
-        grid_context: BacktestGridBuildContextV1,
+        grid_context: BacktestArtifactRuntimePlanV2,
         market_id: int,
     ) -> ExecutionParamsV1:
         """
@@ -494,8 +494,8 @@ class BacktestStageAShortlistBuilderV2:
         self,
         *,
         row_plans: Sequence[PreparedIndicatorRowPlanV2],
-        chunk_variants: tuple[BacktestStageABaseVariant, ...],
-        grid_context: BacktestGridBuildContextV1,
+        chunk_variants: tuple[BacktestStageABaseVariantV2, ...],
+        grid_context: BacktestArtifactRuntimePlanV2,
         artifact_context: ArtifactSlotPinnedRuntimeContextV2,
         signal_target_slice: slice,
         local_bar_close_1m_idx: np.ndarray,
@@ -503,9 +503,9 @@ class BacktestStageAShortlistBuilderV2:
         local_exec_open: np.ndarray,
         local_exec_close: np.ndarray,
         execution_params: ExecutionParamsV1,
-        ranking_plan: _ResolvedRankingPlanV1,
+        ranking_plan: ResolvedRankingPlanV2,
         shortlist_limit: int,
-        shortlist_heap: list[StageAHeapEntryV1],
+        shortlist_heap: list[StageAHeapEntryV2],
     ) -> None:
         """
         Score one Stage A chunk and merge ranked rows into the bounded shortlist heap.
@@ -584,18 +584,18 @@ class BacktestStageAShortlistBuilderV2:
                 sentinel_index=sentinel_index,
                 execution_params=execution_params,
             )
-            row = BacktestStageAScoredVariantV1(
+            row = BacktestStageAScoredVariantV2(
                 base_variant=base_variant,
                 total_return_pct=metrics.total_return_pct,
             )
-            heap_entry = _stage_a_heap_entry(
+            heap_entry = stage_a_heap_entry_v2(
                 row=row,
                 metrics=no_risk_metrics_to_ranking_payload_v2(metrics=metrics),
                 ranking_plan=ranking_plan,
             )
             if len(shortlist_heap) < shortlist_limit:
                 heappush(shortlist_heap, heap_entry)
-            elif _heap_entry_outranks(candidate=heap_entry, baseline=shortlist_heap[0]):
+            elif heap_entry_outranks_v2(candidate=heap_entry, baseline=shortlist_heap[0]):
                 heapreplace(shortlist_heap, heap_entry)
 
 
@@ -807,7 +807,7 @@ def rebase_bar_close_mapping_v2(
 
 def _indicator_selection_for_plan_v2(
     *,
-    base_variant: BacktestStageABaseVariant,
+    base_variant: BacktestStageABaseVariantV2,
     indicator_position: int,
     indicator_id: str,
 ) -> IndicatorVariantSelection:

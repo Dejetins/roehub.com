@@ -36,6 +36,16 @@
     `background_manual_legacy`; различается только launch semantics на API create path,
   - summary-only persistence contract остаётся неизменным:
     `report_table_md=NULL`, `trades_json=NULL`.
+- R10-01 production hot-path cutover:
+  - claimed worker использует только artifact-backed runtime orchestration:
+    `BacktestArtifactTimelineBuilderV2`, `BacktestArtifactRuntimePlannerV2`,
+    `BacktestStageAShortlistBuilderV2`, `BacktestArtifactRuntimeRunnerV2`,
+    `BacktestArtifactBackedStageBScorerV2`,
+  - silent fallback к `grid_builder_v1.py`, `staged_core_runner_v1.py`,
+    `candle_timeline_builder.py` и legacy close-fill scorer удалён из claimed production path,
+  - persisted compatibility vocabulary не меняется:
+    `execution_mode=background_auto|background_manual_legacy`,
+    `report_table_md=NULL`, `trades_json=NULL`.
 - Superseded by target-v2 orchestration decisions:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -83,7 +93,7 @@
 - Parallelism v1: один job исполняется последовательно (intra-job parallelism = 1).
   `backtest.jobs.parallel_workers` существует в runtime config, но в v1 воркер его не использует (зарезервирован под будущее).
 
-## Update 2026-02-25 (Perf Phase 3)
+## Update 2026-02-25 (Historical pre-cutover note)
 
 С 2026-02-25 worker использует тот же scoring core, что и sync path:
 
@@ -98,17 +108,21 @@
 - Перед стадиями scorer подготавливает batched indicator tensors (`prepare_for_grid_context(...)`), что убирает per-variant compute из hot path.
 - CPU лимит из runtime config (`backtest.cpu.max_numba_threads`) применяется в worker attempt через `numba.set_num_threads(...)`.
 
-## Update 2026-03-29 (R8-01 slot-pinned runtime v2)
+## Update 2026-03-29 (R10-01 production hot-path cutover)
 
 С 2026-03-29 claimed worker attempt выполняется как artifact-only background runtime:
 
 - `RunBacktestJobRunnerV1` fail-fast требует `artifact_slot_resolver` и persisted pin metadata на
   claimed row;
-- warmup-aware request-timeframe candles для grid guards строятся из pinned `prices/<signal_tf>`
-  artifacts, а не через `CandleFeed`/ClickHouse;
-- Stage A всегда materialize'ится через `BacktestStageAShortlistBuilderV2`;
-- Stage B всегда materialize'ится через `BacktestArtifactBackedStageBScorerV2`;
-- legacy close-fill scorer больше не является guard fallback для claimed background execution;
+- warmup-aware request-timeframe candles для grid guards строятся через
+  `BacktestArtifactTimelineBuilderV2` из pinned `prices/<signal_tf>` artifacts,
+  а не через `CandleFeed`/ClickHouse;
+- runtime plan строится через `BacktestArtifactRuntimePlannerV2`, а Stage B top-k loop
+  исполняется через `BacktestArtifactRuntimeRunnerV2`;
+- Stage A materialize'ится через `BacktestStageAShortlistBuilderV2`, а Stage B scorer
+  materialize'ится через `BacktestArtifactBackedStageBScorerV2`;
+- legacy close-fill scorer и legacy staged-core/grid hot path больше не являются fallback для
+  claimed background execution;
 - lease / heartbeat / snapshot / cancel / finish semantics и summary-only persistence
   (`report_table_md=NULL`, `trades_json=NULL`) не меняются.
 

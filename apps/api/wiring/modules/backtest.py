@@ -22,7 +22,6 @@ from apps.api.routes import (
     build_backtest_runs_router,
     build_backtests_router,
 )
-from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest.adapters.outbound import (
     BacktestArtifactPathBuilderV2,
     BacktestArtifactsRuntimeConfig,
@@ -57,19 +56,13 @@ from trading.contexts.backtest.application.use_cases import (
     RunBacktestUseCase,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
-from trading.contexts.indicators.adapters.outbound import MarketDataCandleFeed
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleReader,
-    ThreadLocalClickHouseConnectGateway,
-)
 from trading.contexts.strategy.adapters.outbound import (
     InMemoryStrategyRepository,
     PostgresStrategyRepository,
     PsycopgStrategyPostgresGateway,
 )
 from trading.contexts.strategy.application import StrategyRepository
-from trading.platform.time.system_clock import SystemClock
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _BACKTEST_FAIL_FAST_KEY = "BACKTEST_FAIL_FAST"
@@ -179,7 +172,7 @@ def build_backtest_router(
         FileNotFoundError: If `backtest.yaml`, `backtest_artifacts.yaml`, or `indicators.yaml`
             cannot be resolved.
     Side Effects:
-        Reads runtime YAML files and configures storage/candle-feed adapters.
+        Reads runtime YAML files and configures storage/artifact-runtime adapters.
     """
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_backtest_router requires current_user_dependency")
@@ -200,7 +193,6 @@ def build_backtest_router(
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     strategy_repository = _build_strategy_repository(settings=runtime_settings)
     strategy_reader = StrategyRepositoryBacktestStrategyReader(repository=strategy_repository)
-    candle_feed = _build_backtest_candle_feed(environ=environ)
     artifact_loader = YamlBacktestArtifactLoaderV2(
         path_resolver=BacktestArtifactPathBuilderV2(
             root=artifact_runtime_config.artifact_root_path()
@@ -209,7 +201,7 @@ def build_backtest_router(
     artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
 
     run_use_case_kwargs: dict[str, Any] = dict(
-        candle_feed=candle_feed,
+        candle_feed=None,
         indicator_compute=indicator_compute,
         strategy_reader=strategy_reader,
         defaults_provider=defaults_provider,
@@ -519,44 +511,6 @@ def _build_jobs_gateway(*, settings: BacktestRuntimeSettings) -> PsycopgBacktest
     if not settings.strategy_postgres_dsn:
         raise ValueError(f"{_STRATEGY_PG_DSN_KEY} is required when backtest.jobs.enabled is true")
     return PsycopgBacktestPostgresGateway(dsn=settings.strategy_postgres_dsn)
-
-
-def _build_backtest_candle_feed(*, environ: Mapping[str, str]) -> MarketDataCandleFeed:
-    """
-    Build backtests candle-feed adapter backed by market_data canonical candle reader.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md
-    Related:
-      - apps/api/wiring/modules/backtest.py
-      - src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/
-        market_data_candle_feed.py
-      - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
-        canonical_candle_reader.py
-
-    Args:
-        environ: Runtime environment mapping.
-    Returns:
-        MarketDataCandleFeed: Candle-feed adapter for backtest use-case.
-    Assumptions:
-        ClickHouse client is created lazily by thread-local gateway factory.
-    Raises:
-        ValueError: If ClickHouse settings are invalid.
-    Side Effects:
-        Configures clickhouse gateway factory callable for runtime reads.
-    """
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
-    clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
-        client_factory=lambda: _clickhouse_client(clickhouse_settings)
-    )
-    canonical_reader = ClickHouseCanonicalCandleReader(
-        gateway=clickhouse_gateway,
-        clock=SystemClock(),
-        database=clickhouse_settings.database,
-    )
-    return MarketDataCandleFeed(canonical_candle_reader=canonical_reader)
-
 
 __all__ = [
     "BacktestRuntimeSettings",

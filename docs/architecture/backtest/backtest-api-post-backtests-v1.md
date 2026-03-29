@@ -25,6 +25,18 @@ deterministic `422` ошибками.
     `IndicatorCompute.compute(...)`,
   - summary-only persistence contract remains unchanged:
     `report_table_md=NULL`, `trades_json=NULL`.
+- R10-01 production cutover note:
+  - `POST /backtests` sync branch, claimed background execution, and run-scoped lazy
+    `POST /backtests/runs/{run_id}/variant-report` now share one artifact-backed production hot
+    path built from `BacktestArtifactTimelineBuilderV2`,
+    `BacktestArtifactRuntimePlannerV2`, `BacktestStageAShortlistBuilderV2`,
+    `BacktestArtifactRuntimeRunnerV2`, and `BacktestArtifactBackedStageBScorerV2`,
+  - silent fallback to legacy `candle_timeline_builder.py`, `grid_builder_v1.py`,
+    `staged_core_runner_v1.py`, `staged_runner_v1.py`, and close-fill Stage B wiring is no longer
+    allowed in production launch/history/detail flows,
+  - compatibility literals remain unchanged:
+    `sync_inline`, `background_auto`, `background_manual_legacy`, `execution_mode`,
+    `engine_version`.
 - R8-02 launch orchestration note:
   - `POST /backtests` теперь пробует `sync_inline` только в sync half-budgets,
   - при canonical guard overflow backend выполняет explicit full-budget preflight; если он
@@ -79,9 +91,12 @@ deterministic `422` ошибками.
 
 ## Контекст
 
-- Backtest v1 уже реализован как use-case и staged pipeline:
+- Public API contract остаётся v1, но active production runtime для launch/detail теперь идёт
+  через artifact-backed v2 orchestration:
   - `src/trading/contexts/backtest/application/use_cases/run_backtest.py`
-  - `src/trading/contexts/backtest/application/services/staged_runner_v1.py`
+  - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_timeline_v2.py`
+  - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py`
+  - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py`
 - Варианты детерминированы, guards применяются в sync режиме:
   - `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md`
 - Execution engine v1: close-fill + fee/slippage + sizing + SL/TP:

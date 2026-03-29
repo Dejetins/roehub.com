@@ -16,11 +16,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestVariantScoreDetailsV1,
     RankingMetricsV1,
 )
-from trading.contexts.backtest.application.services.grid_builder_v1 import (
-    STAGE_A_LITERAL,
-    STAGE_B_LITERAL,
-    BacktestGridBuildContextV1,
-)
 from trading.contexts.backtest.domain.value_objects import (
     BacktestVariantScalar,
     ExecutionParamsV1,
@@ -31,6 +26,11 @@ from trading.contexts.indicators.application.dto import CandleArrays, IndicatorV
 from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.shared_kernel.primitives import TimeRange
 
+from .artifact_runtime_plan_v2 import (
+    STAGE_A_LITERAL_V2,
+    STAGE_B_LITERAL_V2,
+    BacktestArtifactRuntimePlanV2,
+)
 from .contracts import (
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactLoaderV2,
@@ -273,7 +273,7 @@ class BacktestArtifactBackedStageBScorerV2(
     def prepare_for_grid_context(
         self,
         *,
-        grid_context: BacktestGridBuildContextV1,
+        grid_context: BacktestArtifactRuntimePlanV2,
         candles: CandleArrays,
         max_compute_bytes_total: int,
         run_control: object | None = None,
@@ -384,7 +384,7 @@ class BacktestArtifactBackedStageBScorerV2(
           - tests/unit/contexts/backtest/application/services/v2/test_metrics_kernel_v2.py
         """
         _ = candles
-        if stage == STAGE_A_LITERAL:
+        if stage == STAGE_A_LITERAL_V2:
             base_variant_key = self._base_variant_key_v2(
                 indicator_variant_key=indicator_variant_key,
                 signal_params=signal_params,
@@ -395,7 +395,7 @@ class BacktestArtifactBackedStageBScorerV2(
                 base_variant_key=base_variant_key,
             )
             return no_risk_metrics_to_ranking_payload_v2(metrics=payload.no_risk_metrics)
-        if stage != STAGE_B_LITERAL:
+        if stage != STAGE_B_LITERAL_V2:
             raise ValueError(f"unsupported stage literal for artifact-backed scorer: {stage!r}")
 
         base_variant_key = self._base_variant_key_v2(
@@ -515,7 +515,7 @@ class BacktestArtifactBackedStageBScorerV2(
           - src/trading/contexts/backtest/application/use_cases/run_backtest.py
         """
         _ = candles
-        if stage != STAGE_B_LITERAL:
+        if stage != STAGE_B_LITERAL_V2:
             raise ValueError("artifact-backed details scorer supports Stage B only")
         base_variant_key = self._base_variant_key_v2(
             indicator_variant_key=indicator_variant_key,
@@ -866,8 +866,8 @@ class BacktestArtifactBackedStageBScorerV2(
             artifact_backed_stage_b_scorer_v2.py
         """
         return (
-            self._ranking_primary_by_stage.get(STAGE_B_LITERAL) == "total_return_pct"
-            and self._ranking_secondary_by_stage.get(STAGE_B_LITERAL) is None
+            self._ranking_primary_by_stage.get(STAGE_B_LITERAL_V2) == "total_return_pct"
+            and self._ranking_secondary_by_stage.get(STAGE_B_LITERAL_V2) is None
         )
 
 

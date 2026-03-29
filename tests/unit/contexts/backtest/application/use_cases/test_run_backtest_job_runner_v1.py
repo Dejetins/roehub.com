@@ -941,6 +941,47 @@ class _FrontierStableScorer:
             return {"Total Return [%]": 50.0}
         return {"Total Return [%]": 1.0}
 
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: Any,
+        indicator_selections: tuple[IndicatorVariantSelection, ...],
+        signal_params: Mapping[str, Mapping[str, Any]],
+        risk_params: Mapping[str, Any],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> Mapping[str, float]:
+        """
+        Return metric-only payload used by artifact-backed Stage B ranking loop checkpoints.
+
+        Args:
+            stage: Stage literal.
+            candles: Candle arrays payload.
+            indicator_selections: Indicator selections.
+            signal_params: Signal parameters mapping.
+            risk_params: Risk payload mapping.
+            indicator_variant_key: Indicators-only variant key.
+            variant_key: Backtest variant key.
+        Returns:
+            Mapping[str, float]: Deterministic ranking payload.
+        Assumptions:
+            Metric-only path is equivalent to `score_variant` for this fake.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self.score_variant(
+            stage=stage,
+            candles=candles,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            risk_params=risk_params,
+            indicator_variant_key=indicator_variant_key,
+            variant_key=variant_key,
+        )
+
 
 class _FakeReportingService:
     """
@@ -2269,9 +2310,8 @@ def _build_use_case(
         lease_repository=cast(Any, lease_repository),
         results_repository=cast(Any, results_repository),
         request_decoder=cast(Any, _FakeRequestDecoder(request=request)),
-        candle_timeline_builder=cast(Any, _FakeTimelineBuilder()),
         indicator_compute=cast(Any, _NoOpIndicatorCompute()),
-        grid_builder=cast(Any, _FakeGridBuilder(context=grid_context)),
+        runtime_planner=cast(Any, _FakeGridBuilder(context=grid_context)),
         reporting_service=cast(Any, reporting_service),
         staged_scorer=cast(Any, scorer),
         warmup_bars_default=200,

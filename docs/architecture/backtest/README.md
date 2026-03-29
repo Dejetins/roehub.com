@@ -88,8 +88,9 @@
   - `metrics_kernel.py` считает deterministic ranking/summary payloads по exact replay;
   - `artifact_backed_stage_b_scorer_v2.py` использует fast TP/SL search и ограничивает exact
     replay winning cell / explicit retained variants;
-  - sync/jobs используют artifact-backed Stage B scoring при наличии pinned artifact context,
-    а legacy close-fill scorer остаётся fallback только для unpinned path.
+  - sync/jobs/detail используют artifact-backed Stage B scoring как production hot path при
+    pinned artifact context; legacy close-fill scorer остаётся только compatibility-only module и
+    не используется в active production orchestration.
 - R6-04 закрывает runtime ranking/top-N materialization:
   - accepted ranking literals совпадают между DTO/API/runtime defaults;
   - Stage A/Stage B tie-break остаётся explicit и stable;
@@ -124,8 +125,14 @@
   - save flow переиспользует existing strategy builder prefill transport через
     `sessionStorage` и `/strategies/new?prefill=...`;
   - `/backtests/jobs*` остаются compatibility alias и не становятся primary UX.
-- После R6-04 вне scope остаются R7 persisted-run storage/API cutover и full runtime legacy
-  cutover.
+- R10-01 закрепляет production hot-path cutover:
+  - `/backtests` sync launch, claimed worker execution и run-scoped lazy detail используют только
+    artifact-backed v2 runtime orchestration;
+  - active production path больше не зависит от `candle_timeline_builder.py`,
+    `grid_builder_v1.py`, `staged_core_runner_v1.py`, `staged_runner_v1.py`;
+  - silent legacy fallback запрещён; `background_manual_legacy` остаётся только совместимым
+    persisted/public literal.
+- После R10-01 вне scope остаются R10-02 docs synchronization и R10-03 perf/runbook closure.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит
   `signal_artifacts=[]` и `require_hit_times_manifest=false`.
 - R4-04 runtime `source` integration в текущем репозитории проходит через runtime defaults, jobs

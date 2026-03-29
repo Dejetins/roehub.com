@@ -14,6 +14,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestRankingConfig,
     BacktestReportV1,
     BacktestVariantPayloadV1,
+    BacktestVariantPreview,
     RunBacktestRequest,
     RunBacktestResponse,
     RunBacktestSavedOverrides,
@@ -22,7 +23,6 @@ from trading.contexts.backtest.application.dto import (
 from trading.contexts.backtest.application.ports import (
     BacktestGridDefaultsProvider,
     BacktestStagedVariantMetricScorer,
-    BacktestStagedVariantScorer,
     BacktestStagedVariantScorerWithDetails,
     BacktestStrategyReader,
     BacktestStrategySnapshot,
@@ -30,15 +30,10 @@ from trading.contexts.backtest.application.ports import (
     CurrentUser,
 )
 from trading.contexts.backtest.application.services import (
-    STAGE_B_LITERAL,
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactSlotResolverV2,
-    BacktestCandleTimeline,
-    BacktestCandleTimelineBuilder,
     BacktestReportingServiceV1,
     BacktestStageAShortlistBuilderV2,
-    BacktestStagedRunnerV1,
-    CloseFillBacktestStagedScorerV1,
     artifact_coordinates_from_market_id_v2,
     build_default_artifact_backed_stage_b_scorer_v2,
     build_default_stage_a_shortlist_builder_v2,
@@ -47,6 +42,23 @@ from trading.contexts.backtest.application.services.numba_runtime_v1 import (
     apply_backtest_numba_threads,
 )
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
+from trading.contexts.backtest.application.services.v2.artifact_runtime_core_v2 import (
+    STAGE_B_LITERAL_V2,
+    BacktestArtifactRuntimeRunnerV2,
+    BacktestStageBScoredVariantV2,
+    BacktestStageBTaskV2,
+)
+from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
+    BacktestArtifactRuntimePlannerV2,
+    BacktestArtifactRuntimePlanV2,
+)
+from trading.contexts.backtest.application.services.v2.artifact_runtime_timeline_v2 import (
+    BacktestArtifactRuntimeTimelineV2,
+    BacktestArtifactTimelineBuilderV2,
+)
+from trading.contexts.backtest.application.services.v2.price_arrays_loader import (
+    MmapPriceArraysLoaderV2,
+)
 from trading.contexts.backtest.application.use_cases.errors import map_backtest_exception
 from trading.contexts.backtest.application.use_cases.request_runtime_contract_v1 import (
     validate_signal_overrides_default_only,
@@ -76,7 +88,7 @@ _DEFAULT_FEE_PCT_BY_MARKET_ID = {
     4: 0.1,
 }
 _DEFAULT_MAX_NUMBA_THREADS = max(1, os.cpu_count() or 1)
-MetricScorerV1 = BacktestStagedVariantMetricScorer | BacktestStagedVariantScorer
+MetricScorerV1 = BacktestStagedVariantMetricScorer
 
 
 @dataclass(frozen=True, slots=True)
@@ -100,7 +112,7 @@ class _ResolvedRunContext:
     preselect: int
     top_trades_n: int
     ranking: BacktestRankingConfig
-    artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None = None
+    artifact_context: ArtifactSlotPinnedRuntimeContextV2
     spec_hash: str | None = None
     spec_payload_json: Mapping[str, Any] | None = None
 
@@ -122,15 +134,18 @@ class RunBacktestUseCase:
     def __init__(
         self,
         *,
-        candle_feed: CandleFeed,
+        candle_feed: CandleFeed | None,
         indicator_compute: IndicatorCompute,
         strategy_reader: BacktestStrategyReader,
-        candle_timeline_builder: BacktestCandleTimelineBuilder | None = None,
-        staged_runner: BacktestStagedRunnerV1 | None = None,
+        candle_timeline_builder: object | None = None,
+        staged_runner: object | None = None,
         staged_scorer: MetricScorerV1 | None = None,
         reporting_service: BacktestReportingServiceV1 | None = None,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         stage_a_shortlist_builder: BacktestStageAShortlistBuilderV2 | None = None,
+        runtime_planner: BacktestArtifactRuntimePlannerV2 | None = None,
+        runtime_runner: BacktestArtifactRuntimeRunnerV2 | None = None,
+        artifact_timeline_builder: BacktestArtifactTimelineBuilderV2 | None = None,
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
@@ -169,13 +184,26 @@ class RunBacktestUseCase:
             indicator_compute:
                 Indicators compute port used for staged grid estimate/materialization.
             strategy_reader: Backtest ACL strategy reader without owner filtering.
-            candle_timeline_builder: Optional custom timeline builder (BKT-EPIC-02).
-            staged_runner: Optional custom staged runner implementation.
+            candle_timeline_builder:
+                Retained compatibility dependency. Production execution no longer routes through
+                live `candle_timeline_builder.py` after R10-01.
+            staged_runner:
+                Retained compatibility dependency. Production execution no longer routes through
+                `staged_runner_v1.py` after R10-01.
             staged_scorer: Optional Stage A/Stage B scorer port implementation.
             reporting_service: Optional report-builder service for variant-report endpoint.
             defaults_provider: Optional defaults provider for compute/signal grid fallback.
             stage_a_shortlist_builder:
-                Optional artifact-backed Stage A shortlist builder for additive R6-02 cutover.
+                Optional artifact-backed Stage A shortlist builder for production runtime cutover.
+            runtime_planner:
+                Optional artifact-backed runtime planner replacing `grid_builder_v1` in
+                production paths.
+            runtime_runner:
+                Optional shared artifact-backed Stage B runner replacing
+                `staged_core_runner_v1` in production paths.
+            artifact_timeline_builder:
+                Optional artifact-backed request-timeframe timeline builder replacing live
+                ClickHouse timeline construction in production paths.
             warmup_bars_default: Runtime default warmup bars.
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
@@ -205,23 +233,23 @@ class RunBacktestUseCase:
             forbidden_request_timeframes:
                 Optional runtime contract list for explicitly forbidden request timeframes.
             artifact_slot_resolver:
-                Optional shared R6-01 slot-pinned context bootstrap used before runtime work
-                starts.
+                Shared slot-pinned context bootstrap used before runtime work starts. Production
+                execution requires this dependency after R10-01.
         Returns:
             None.
         Assumptions:
             Runtime defaults come from fail-fast `configs/<env>/backtest.yaml` loader.
         Raises:
-            ValueError: If dependencies are missing or scalar defaults/guards are non-positive.
+            ValueError: If dependencies are missing or scalar defaults/guards are invalid.
         Side Effects:
             None.
         """
-        if candle_feed is None:  # type: ignore[truthy-bool]
-            raise ValueError("RunBacktestUseCase requires candle_feed")
         if indicator_compute is None:  # type: ignore[truthy-bool]
             raise ValueError("RunBacktestUseCase requires indicator_compute")
         if strategy_reader is None:  # type: ignore[truthy-bool]
             raise ValueError("RunBacktestUseCase requires strategy_reader")
+        if artifact_slot_resolver is None:  # type: ignore[truthy-bool]
+            raise ValueError("RunBacktestUseCase requires artifact_slot_resolver")
         if warmup_bars_default <= 0:
             raise ValueError("RunBacktestUseCase.warmup_bars_default must be > 0")
         if top_k_default <= 0:
@@ -254,9 +282,7 @@ class RunBacktestUseCase:
             secondary_metric=ranking_secondary_metric_default,
         )
 
-        resolved_timeline_builder = candle_timeline_builder
-        if resolved_timeline_builder is None:
-            resolved_timeline_builder = BacktestCandleTimelineBuilder(candle_feed=candle_feed)
+        _ = candle_feed, candle_timeline_builder, staged_runner
         resolved_stage_a_shortlist_builder = (
             stage_a_shortlist_builder
             or build_default_stage_a_shortlist_builder_v2(
@@ -269,16 +295,27 @@ class RunBacktestUseCase:
                 fee_pct_default_by_market_id=fee_pct_default_by_market_id,
             )
         )
+        if resolved_stage_a_shortlist_builder is None:
+            raise ValueError(
+                "RunBacktestUseCase requires artifact-backed stage_a_shortlist_builder"
+            )
+        resolved_timeline_builder = artifact_timeline_builder or BacktestArtifactTimelineBuilderV2(
+            price_arrays_loader=_build_price_arrays_loader_v2(
+                artifact_slot_resolver=artifact_slot_resolver
+            )
+        )
 
-        self._candle_timeline_builder = resolved_timeline_builder
+        self._artifact_timeline_builder = resolved_timeline_builder
         self._indicator_compute = indicator_compute
         self._strategy_reader = strategy_reader
-        self._staged_runner = staged_runner or BacktestStagedRunnerV1(
-            stage_a_shortlist_builder=resolved_stage_a_shortlist_builder
-        )
         self._staged_scorer = staged_scorer
         self._reporting_service = reporting_service or BacktestReportingServiceV1()
         self._defaults_provider = defaults_provider
+        self._stage_a_shortlist_builder = resolved_stage_a_shortlist_builder
+        self._runtime_planner = runtime_planner or BacktestArtifactRuntimePlannerV2()
+        self._runtime_runner = runtime_runner or BacktestArtifactRuntimeRunnerV2(
+            configurable_ranking_enabled=configurable_ranking_enabled
+        )
         self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
@@ -338,7 +375,8 @@ class RunBacktestUseCase:
             RoehubError: Canonical mapped error for validation/forbidden/not-found/conflict/
                 unexpected.
         Side Effects:
-            Reads candles via `CandleFeed`, resolves staged variants, and calls scorer port.
+            Loads pinned artifact candles, resolves deterministic runtime variants, and calls the
+            Stage B scorer port.
         """
         try:
             if request is None:  # type: ignore[truthy-bool]
@@ -349,41 +387,61 @@ class RunBacktestUseCase:
 
             apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
             if run_control is not None:
-                run_control.raise_if_cancelled(stage="stage_a")
+                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
             resolved = self._resolve_run_context(request=request, current_user=current_user)
-            timeline = self._candle_timeline_builder.build(
+            timeline = self._artifact_timeline_builder.build(
+                artifact_context=resolved.artifact_context,
                 market_id=resolved.template.instrument_id.market_id,
                 symbol=resolved.template.instrument_id.symbol,
                 timeframe=resolved.template.timeframe,
                 requested_time_range=request.time_range,
                 warmup_bars=resolved.warmup_bars,
             )
+            runtime_plan = self._runtime_planner.build(
+                template=resolved.template,
+                candles=timeline.candles,
+                indicator_compute=self._indicator_compute,
+                preselect=resolved.preselect,
+                defaults_provider=self._defaults_provider,
+                max_variants_per_compute=self._max_variants_per_compute,
+                max_compute_bytes_total=self._max_compute_bytes_total,
+            )
             if run_control is not None:
-                run_control.raise_if_cancelled(stage="stage_a")
+                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
             resolved_scorer = self._resolve_staged_scorer(
                 template=resolved.template,
                 target_slice=timeline.target_slice,
                 target_time_range=request.time_range,
                 artifact_context=resolved.artifact_context,
             )
-            staged = self._staged_runner.run(
-                template=resolved.template,
-                candles=timeline.candles,
-                preselect=resolved.preselect,
-                top_k=resolved.top_k,
-                indicator_compute=self._indicator_compute,
+            self._prepare_scorer_for_runtime_plan(
                 scorer=resolved_scorer,
-                ranking=resolved.ranking,
-                defaults_provider=self._defaults_provider,
-                max_variants_per_compute=self._max_variants_per_compute,
-                max_compute_bytes_total=self._max_compute_bytes_total,
-                requested_time_range=self._resolve_requested_time_range_for_sync_response(
-                    request=request
-                ),
-                target_time_range=request.time_range,
-                artifact_context=resolved.artifact_context,
-                top_trades_n=resolved.top_trades_n,
+                runtime_plan=runtime_plan,
+                candles=timeline.candles,
                 run_control=run_control,
+            )
+            shortlist = self._stage_a_shortlist_builder.build_shortlist(
+                grid_context=runtime_plan,
+                artifact_context=resolved.artifact_context,
+                target_time_range=request.time_range,
+                shortlist_limit=resolved.preselect,
+                ranking=resolved.ranking,
+                cancel_checker=_cancel_checker_from_run_control(run_control=run_control),
+            )
+            ranked_rows, ranked_tasks = self._runtime_runner.run_stage_b(
+                template=resolved.template,
+                runtime_plan=runtime_plan,
+                shortlist=shortlist,
+                candles=timeline.candles,
+                scorer=resolved_scorer,
+                top_k_limit=resolved.top_k,
+                ranking=resolved.ranking,
+                cancel_checker=_cancel_checker_from_run_control(run_control=run_control),
+            )
+            variants = self._build_variant_previews(
+                template=resolved.template,
+                ranked_rows=ranked_rows,
+                ranked_tasks=ranked_tasks,
             )
 
             return RunBacktestResponse(
@@ -398,28 +456,12 @@ class RunBacktestUseCase:
                 direction_mode=resolved.template.direction_mode,
                 sizing_mode=resolved.template.sizing_mode,
                 execution_params=resolved.template.execution_params,
-                variants=staged.variants,
-                total_indicator_compute_calls=staged.indicator_estimate_calls,
-                artifact_slot=(
-                    resolved.artifact_context.artifact_slot
-                    if resolved.artifact_context is not None
-                    else None
-                ),
-                artifact_slot_generation=(
-                    resolved.artifact_context.slot_generation
-                    if resolved.artifact_context is not None
-                    else None
-                ),
-                artifact_asof_date=(
-                    resolved.artifact_context.artifact_asof_date
-                    if resolved.artifact_context is not None
-                    else None
-                ),
-                artifact_manifest_hash=(
-                    resolved.artifact_context.artifact_manifest_hash
-                    if resolved.artifact_context is not None
-                    else None
-                ),
+                variants=variants,
+                total_indicator_compute_calls=runtime_plan.indicator_estimate_calls,
+                artifact_slot=resolved.artifact_context.artifact_slot,
+                artifact_slot_generation=resolved.artifact_context.slot_generation,
+                artifact_asof_date=resolved.artifact_context.artifact_asof_date,
+                artifact_manifest_hash=resolved.artifact_context.artifact_manifest_hash,
                 spec_hash=resolved.spec_hash,
                 spec_payload_json=resolved.spec_payload_json,
             )
@@ -459,8 +501,8 @@ class RunBacktestUseCase:
             RoehubError: Canonical mapped error for validation/forbidden/not-found/conflict/
                 unexpected.
         Side Effects:
-            Reads candles via `CandleFeed` and calls `indicator_compute.estimate(...)` for
-            deterministic staged-grid planning only.
+            Loads pinned artifact candles and calls `indicator_compute.estimate(...)` for
+            deterministic runtime planning only.
         """
         try:
             if request is None:  # type: ignore[truthy-bool]
@@ -472,9 +514,10 @@ class RunBacktestUseCase:
 
             apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
             if run_control is not None:
-                run_control.raise_if_cancelled(stage="stage_a")
+                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
             resolved = self._resolve_run_context(request=request, current_user=current_user)
-            timeline = self._candle_timeline_builder.build(
+            timeline = self._artifact_timeline_builder.build(
+                artifact_context=resolved.artifact_context,
                 market_id=resolved.template.instrument_id.market_id,
                 symbol=resolved.template.instrument_id.symbol,
                 timeframe=resolved.template.timeframe,
@@ -482,12 +525,12 @@ class RunBacktestUseCase:
                 warmup_bars=resolved.warmup_bars,
             )
             if run_control is not None:
-                run_control.raise_if_cancelled(stage="stage_a")
-            self._staged_runner.preflight(
+                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
+            self._runtime_planner.build(
                 template=resolved.template,
                 candles=timeline.candles,
-                preselect=resolved.preselect,
                 indicator_compute=self._indicator_compute,
+                preselect=resolved.preselect,
                 defaults_provider=self._defaults_provider,
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
@@ -636,13 +679,19 @@ class RunBacktestUseCase:
 
             apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
             if run_control is not None:
-                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL)
+                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
 
             resolved_warmup_bars = self._resolve_with_default(
                 value=warmup_bars,
                 default=self._warmup_bars_default,
             )
-            timeline = self._candle_timeline_builder.build(
+            resolved_artifact_context = (
+                artifact_context
+                if artifact_context is not None
+                else self._bootstrap_artifact_context(template=template)
+            )
+            timeline = self._artifact_timeline_builder.build(
+                artifact_context=resolved_artifact_context,
                 market_id=template.instrument_id.market_id,
                 symbol=template.instrument_id.symbol,
                 timeframe=template.timeframe,
@@ -650,14 +699,14 @@ class RunBacktestUseCase:
                 warmup_bars=resolved_warmup_bars,
             )
             if run_control is not None:
-                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL)
+                run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
 
             scored_details = self._score_variant_payload_with_details(
                 template=template,
                 timeline=timeline,
                 variant_payload=variant_payload,
                 target_time_range=requested_time_range,
-                artifact_context=artifact_context,
+                artifact_context=resolved_artifact_context,
             )
             return self._reporting_service.build_report_from_details(
                 requested_time_range=requested_time_range,
@@ -790,19 +839,19 @@ class RunBacktestUseCase:
         self,
         *,
         template: RunBacktestTemplate,
-    ) -> ArtifactSlotPinnedRuntimeContextV2 | None:
+    ) -> ArtifactSlotPinnedRuntimeContextV2:
         """
         Resolve the optional shared R6-01 slot-pinned context before sync runtime work starts.
 
         Args:
             template: Effective validated run template with canonical instrument identity.
         Returns:
-            ArtifactSlotPinnedRuntimeContextV2 | None: Bootstrapped immutable slot context when
-                resolver wiring is enabled, otherwise `None`.
+            ArtifactSlotPinnedRuntimeContextV2: Bootstrapped immutable slot context.
         Assumptions:
-            This bootstrap remains additive until the full v2 kernel cutover consumes the returned
-            context directly.
+            Production sync/detail runtime is slot-pinned and must fail fast when artifacts are
+            unavailable or resolver wiring is missing.
         Raises:
+            BacktestValidationError: If artifact-slot resolver wiring is missing.
             BacktestValidationError: If artifact coordinates, `current.yaml`, or slot manifest are
                 unavailable or violate strict startup contracts.
         Side Effects:
@@ -815,7 +864,9 @@ class RunBacktestUseCase:
           - src/trading/contexts/backtest/application/use_cases/run_backtest.py
         """
         if self._artifact_slot_resolver is None:
-            return None
+            raise BacktestValidationError(
+                "artifact-backed runtime requires artifact_slot_resolver wiring"
+            )
         market_id = template.instrument_id.market_id.value
         symbol_literal = str(template.instrument_id.symbol)
         try:
@@ -988,31 +1039,31 @@ class RunBacktestUseCase:
         template: RunBacktestTemplate,
         target_slice: slice,
         target_time_range: TimeRange,
-        artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
     ) -> MetricScorerV1:
         """
-        Resolve scorer for current execution, building default close-fill scorer when absent.
+        Resolve artifact-backed scorer for current execution.
 
         Args:
             template: Resolved run template containing direction/sizing/execution settings.
             target_slice: Trading/reporting target slice inside warmup-inclusive timeline.
             target_time_range: Requested trading/reporting window for artifact-backed kernels.
-            artifact_context: Optional slot-pinned artifact context resolved at runtime startup.
+            artifact_context: Slot-pinned artifact context resolved at runtime startup.
         Returns:
-            MetricScorerV1: Scorer used by staged runner.
+            MetricScorerV1: Scorer used by artifact-backed runtime.
         Assumptions:
-            Injected scorer takes precedence over default close-fill scorer composition.
+            Injected scorer takes precedence over default artifact-backed scorer composition.
         Raises:
-            ValueError: Propagated from default scorer constructor on invalid settings.
+            ValueError: If artifact-backed scorer wiring is unavailable.
         Side Effects:
             None.
         Docs:
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/
             artifact_backed_stage_b_scorer_v2.py
-          - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
         """
         if self._staged_scorer is not None:
             return self._staged_scorer
@@ -1029,24 +1080,11 @@ class RunBacktestUseCase:
             slippage_pct_default=self._slippage_pct_default,
             fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
         )
-        if artifact_backed_scorer is not None:
-            return artifact_backed_scorer
-
-        return CloseFillBacktestStagedScorerV1(
-            indicator_compute=self._indicator_compute,
-            direction_mode=template.direction_mode,
-            sizing_mode=template.sizing_mode,
-            execution_params=template.execution_params or {},
-            market_id=template.instrument_id.market_id.value,
-            target_slice=target_slice,
-            init_cash_quote_default=self._init_cash_quote_default,
-            fixed_quote_default=self._fixed_quote_default,
-            safe_profit_percent_default=self._safe_profit_percent_default,
-            slippage_pct_default=self._slippage_pct_default,
-            fee_pct_default_by_market_id=self._fee_pct_default_by_market_id,
-            max_variants_guard=self._max_variants_per_compute,
-            max_compute_bytes_total=self._max_compute_bytes_total,
-        )
+        if artifact_backed_scorer is None:
+            raise ValueError(
+                "artifact-backed runtime requires slot-pinned Stage B scorer wiring"
+            )
+        return artifact_backed_scorer
 
     def _resolve_requested_time_range_for_sync_response(
         self,
@@ -1084,10 +1122,10 @@ class RunBacktestUseCase:
         self,
         *,
         template: RunBacktestTemplate,
-        timeline: BacktestCandleTimeline,
+        timeline: BacktestArtifactRuntimeTimelineV2,
         variant_payload: BacktestVariantPayloadV1,
         target_time_range: TimeRange,
-        artifact_context: ArtifactSlotPinnedRuntimeContextV2 | None,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
     ) -> BacktestVariantScoreDetailsV1:
         """
         Score one explicit variant payload with Stage-B details scorer contract.
@@ -1157,7 +1195,7 @@ class RunBacktestUseCase:
             execution_params=execution_params,
         )
         return details_scorer.score_variant_with_details(
-            stage=STAGE_B_LITERAL,
+            stage=STAGE_B_LITERAL_V2,
             candles=timeline.candles,
             indicator_selections=variant_payload.indicator_selections,
             signal_params=signal_params,
@@ -1165,6 +1203,91 @@ class RunBacktestUseCase:
             indicator_variant_key=indicator_variant_key,
             variant_key=variant_key,
         )
+
+    def _prepare_scorer_for_runtime_plan(
+        self,
+        *,
+        scorer: MetricScorerV1,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        candles: Any,
+        run_control: BacktestRunControlV1 | None,
+    ) -> None:
+        """
+        Prepare scorer run context when the scorer exposes additive runtime-plan hooks.
+
+        Args:
+            scorer: Artifact-backed scorer implementation for the current run.
+            runtime_plan: Deterministic artifact-backed runtime plan.
+            candles: Warmup-inclusive request-timeframe candles.
+            run_control: Optional cooperative cancellation/deadline control object.
+        Returns:
+            None.
+        Assumptions:
+            Optional scorer extension is discovered via method presence.
+        Raises:
+            Exception: Propagates scorer preparation errors.
+        Side Effects:
+            May populate scorer-local caches for prepared indicator row addressing.
+        """
+        prepare_method = getattr(scorer, "prepare_for_grid_context", None)
+        if prepare_method is None:
+            return
+        prepare_method(
+            grid_context=runtime_plan,
+            candles=candles,
+            max_compute_bytes_total=self._max_compute_bytes_total,
+            run_control=run_control,
+        )
+
+    def _build_variant_previews(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        ranked_rows: tuple[BacktestStageBScoredVariantV2, ...],
+        ranked_tasks: Mapping[str, BacktestStageBTaskV2],
+    ) -> tuple[BacktestVariantPreview, ...]:
+        """
+        Build summary-only variant previews from ranked artifact-backed Stage B rows.
+
+        Args:
+            template: Effective run template carrying stable direction/sizing/execution defaults.
+            ranked_rows: Deterministically ranked Stage B rows.
+            ranked_tasks: Deterministic `variant_key -> task` mapping for ranked rows.
+        Returns:
+            tuple[BacktestVariantPreview, ...]: Summary-only ranked variant previews.
+        Assumptions:
+            Runtime summary responses remain report/trades-free after R10-01.
+        Raises:
+            ValueError: If one ranked row has no matching Stage B task payload.
+        Side Effects:
+            None.
+        """
+        variants: list[BacktestVariantPreview] = []
+        for row in ranked_rows:
+            task = ranked_tasks.get(row.variant_key)
+            if task is None:
+                raise ValueError("missing Stage B task for ranked variant_key")
+            variants.append(
+                BacktestVariantPreview(
+                    variant_index=row.variant_index,
+                    variant_key=row.variant_key,
+                    indicator_variant_key=row.indicator_variant_key,
+                    total_return_pct=row.total_return_pct,
+                    payload=BacktestVariantPayloadV1(
+                        indicator_selections=task.indicator_selections,
+                        signal_params=task.signal_params,
+                        risk_params=task.risk_params,
+                        execution_params=template.execution_params or {},
+                        direction_mode=template.direction_mode,
+                        sizing_mode=template.sizing_mode,
+                    ),
+                    report=None,
+                    summary_metrics_json=row.summary_metrics_json,
+                    best_tp_pct=row.best_tp_pct,
+                    best_sl_pct=row.best_sl_pct,
+                )
+            )
+        return tuple(variants)
 
 
 def _merge_scalar_mappings(
@@ -1312,6 +1435,71 @@ def _normalize_timeframe_literals(
         seen.add(value)
         normalized.append(value)
     return tuple(normalized)
+
+
+def _build_price_arrays_loader_v2(
+    *,
+    artifact_slot_resolver: BacktestArtifactSlotResolverV2,
+) -> MmapPriceArraysLoaderV2:
+    """
+    Build explicit-path price loader from resolver wiring for artifact-backed runtime.
+
+    Args:
+        artifact_slot_resolver: Shared slot-pinned resolver wired at startup.
+    Returns:
+        MmapPriceArraysLoaderV2: Default mmap price loader for pinned artifact prices.
+    Assumptions:
+        Production sync/detail runtime must fail fast when resolver wiring is incomplete.
+    Raises:
+        ValueError: If resolver does not expose an artifact loader.
+    Side Effects:
+        None.
+    """
+    artifact_loader = getattr(artifact_slot_resolver, "artifact_loader", None)
+    if artifact_loader is None:
+        raise ValueError("artifact_slot_resolver must expose artifact_loader")
+    return MmapPriceArraysLoaderV2(artifact_loader=artifact_loader)
+
+
+def _cancel_checker_from_run_control(
+    *,
+    run_control: BacktestRunControlV1 | None,
+) -> Any:
+    """
+    Convert optional run control into a stage-aware cancel-checker callback.
+
+    Args:
+        run_control: Optional cooperative cancellation/deadline control object.
+    Returns:
+        Any: `None` when no run control is supplied, otherwise a stage checker callback.
+    Assumptions:
+        Callback shape matches Stage A/Stage B runtime helper expectations.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if run_control is None:
+        return None
+
+    def _checker(stage: str) -> None:
+        """
+        Raise when the shared run control marks the current stage as cancelled.
+
+        Args:
+            stage: Current stage literal.
+        Returns:
+            None.
+        Assumptions:
+            Caller provides stable stage literals owned by the backtest runtime.
+        Raises:
+            BacktestRunCancelledV1: Propagated by the shared run control when cancelled.
+        Side Effects:
+            None.
+        """
+        run_control.raise_if_cancelled(stage=stage)
+
+    return _checker
 
 
 def _build_saved_spec_payload(
