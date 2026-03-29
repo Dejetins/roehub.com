@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="panel"
+    data-backtest-runs-page="summary"
+    data-run-id="{{ run_id }}"
+    data-api-runs-path-prefix="/api/backtests/runs/"
+    data-api-top-path-template="/api/backtests/runs/{run_id}/top"
+    data-api-runtime-defaults-path="/api/backtests/runtime-defaults"
+    data-history-path="/backtests/history"
+    data-default-top-limit="50"
+  >
+    <div class="panel-heading">
+      <h1>Backtest run summary</h1>
+      <div class="inline-actions">
+        <a class="button-link" href="/backtests/history">Back to history</a>
+        <a class="button-link button-link--secondary" href="/backtests/jobs/{{ run_id }}">
+          Open jobs alias
+        </a>
+      </div>
+    </div>
+
+    <p>
+      Status metadata comes from <code>/api/backtests/runs/{run_id}</code>, while summary rows come
+      from <code>/api/backtests/runs/{run_id}/top</code>. The table remains summary-only and local
+      sorting reorders already-loaded rows without triggering server recompute.
+    </p>
+
+    <div id="run-summary-error-banner" class="error-banner hidden" role="alert"></div>
+    <div id="run-summary-validation-errors" class="validation-list hidden"></div>
+
+    <section class="panel panel--soft">
+      <div class="panel-heading">
+        <h2>Status</h2>
+        <div class="inline-actions">
+          <button id="run-copy-id" class="button-link button-link--secondary" type="button">
+            Copy run_id
+          </button>
+          <button
+            id="run-refresh-status"
+            class="button-link button-link--secondary"
+            type="button"
+          >
+            Refresh status
+          </button>
+          <button
+            id="run-refresh-summary"
+            class="button-link button-link--secondary"
+            type="button"
+          >
+            Refresh summary
+          </button>
+        </div>
+      </div>
+
+      <dl class="key-value-grid">
+        <dt>run_id</dt>
+        <dd id="run-field-id">{{ run_id }}</dd>
+
+        <dt>mode</dt>
+        <dd id="run-field-mode"></dd>
+
+        <dt>state</dt>
+        <dd id="run-field-state"></dd>
+
+        <dt>stage</dt>
+        <dd id="run-field-stage"></dd>
+
+        <dt>execution_mode</dt>
+        <dd id="run-field-execution-mode"></dd>
+
+        <dt>market_id</dt>
+        <dd id="run-field-market-id"></dd>
+
+        <dt>symbol</dt>
+        <dd id="run-field-symbol"></dd>
+
+        <dt>timeframe</dt>
+        <dd id="run-field-timeframe"></dd>
+
+        <dt>requested_top_n</dt>
+        <dd id="run-field-requested-top-n"></dd>
+
+        <dt>created_at</dt>
+        <dd id="run-field-created-at"></dd>
+
+        <dt>updated_at</dt>
+        <dd id="run-field-updated-at"></dd>
+
+        <dt>started_at</dt>
+        <dd id="run-field-started-at"></dd>
+
+        <dt>finished_at</dt>
+        <dd id="run-field-finished-at"></dd>
+
+        <dt>cancel_requested_at</dt>
+        <dd id="run-field-cancel-requested-at"></dd>
+
+        <dt>processed_units / total_units</dt>
+        <dd id="run-field-progress"></dd>
+
+        <dt>ranking_primary_metric</dt>
+        <dd id="run-field-ranking-primary-metric"></dd>
+
+        <dt>ranking_secondary_metric</dt>
+        <dd id="run-field-ranking-secondary-metric"></dd>
+      </dl>
+
+      <div class="job-progress-track" role="progressbar" aria-label="Run progress">
+        <div id="run-progress-bar" class="job-progress-bar"></div>
+      </div>
+      <p id="run-progress-caption" class="muted-text">Progress: 0%</p>
+    </section>
+
+    <section class="panel panel--soft">
+      <div class="panel-heading">
+        <h2>Summary table</h2>
+        <div class="summary-sort-controls">
+          <label for="run-summary-sort-column">Sort by</label>
+          <select id="run-summary-sort-column">
+            <option value="server_order">server_order</option>
+          </select>
+
+          <label for="run-summary-sort-direction">Direction</label>
+          <select id="run-summary-sort-direction">
+            <option value="desc" selected>DESC</option>
+            <option value="asc">ASC</option>
+          </select>
+        </div>
+      </div>
+
+      <p id="run-summary-note" class="muted-text">
+        First render keeps server order <code>rank ASC, variant_key ASC</code>. Local resort uses
+        runtime-approved <code>sortable_columns</code> and loaded rows only.
+      </p>
+
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead id="run-summary-table-head">
+            <tr>
+              <th scope="col">rank</th>
+              <th scope="col">variant_key</th>
+              <th scope="col">indicator_variant_key</th>
+              <th scope="col">total_return_pct</th>
+              <th scope="col">best_tp_pct</th>
+              <th scope="col">best_sl_pct</th>
+            </tr>
+          </thead>
+          <tbody id="run-summary-table-body">
+            <tr>
+              <td colspan="6">Loading summary rows...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/backtest_runs_ui.js"></script>
+{% endblock %}

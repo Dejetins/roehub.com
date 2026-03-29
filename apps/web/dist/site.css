@@ -214,11 +214,59 @@ body {
   background: #f5f8ff;
 }
 
+.state-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.18rem 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: #eef2fa;
+  color: var(--muted);
+}
+
+.state-badge--queued {
+  background: #eef4ff;
+  color: #2854b6;
+}
+
+.state-badge--running {
+  background: #fff4e4;
+  color: #8b5b00;
+}
+
+.state-badge--succeeded {
+  background: #e9f8ef;
+  color: #196a37;
+}
+
+.state-badge--failed {
+  background: #ffe9e9;
+  color: #9b2525;
+}
+
+.state-badge--cancelled {
+  background: #f0f1f5;
+  color: #5c6372;
+}
+
 .inline-actions {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0.45rem;
+}
+
+.summary-sort-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.summary-sort-controls label {
+  color: var(--muted);
+  font-size: 0.86rem;
 }
 
 .stack-form {

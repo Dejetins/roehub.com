@@ -35,6 +35,13 @@
   - `POST /backtests/runs/{run_id}/cancel` для `running` rows возвращает всё ещё `running`, но с
     заполненным `cancel_requested_at`, пока worker не доведёт run до terminal state;
   - это поведение одинаково для `background_auto` и `background_manual_legacy`.
+- R9-02 additive note:
+  - web primary UX теперь использует `/backtests/history` и `/backtests/runs/{run_id}` поверх
+    этого public API;
+  - persisted run summary page загружает `/top` summary rows и разрешает только local resort по
+    runtime-approved `contracts.summary.sortable_columns`;
+  - local resort не декодирует `next_cursor`, не пересчитывает top-N и не вызывает server-side
+    recompute.
 
 ## Цель
 
@@ -124,6 +131,8 @@ Hashes (`request_hash`, `engine_params_hash`, `backtest_runtime_config_hash`, `s
   - `report_table_md`
   - `trades`
   - `equity`
+- new history/summary web UX может локально пересортировывать уже загруженные rows по approved
+  summary columns, но server payload первого render-а остаётся canonical ordering source.
 
 ### 5) Cancel endpoint idempotent
 

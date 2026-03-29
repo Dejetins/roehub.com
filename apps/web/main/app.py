@@ -339,10 +339,60 @@ def _register_routes(
             template_name="backtests.html",
         )
 
+    @app.get("/backtests/history", response_class=HTMLResponse)
+    def get_backtest_history_page(request: Request) -> Response:
+        """
+        Render protected Backtest history page backed by public persisted runs endpoints.
+
+        Args:
+            request: HTTP request object.
+        Returns:
+            Response: HTML history page or login redirect response.
+        Assumptions:
+            Browser loads history data through same-origin `/api/backtests/runs`.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/backtests/history",
+            page_title="Backtest History",
+            template_name="backtest_history.html",
+        )
+
+    @app.get("/backtests/runs/{run_id}", response_class=HTMLResponse)
+    def get_backtest_run_summary_page(request: Request, run_id: str) -> Response:
+        """
+        Render protected persisted Backtest run summary page.
+
+        Args:
+            request: HTTP request object.
+            run_id: Target persisted run identifier string from route path.
+        Returns:
+            Response: HTML run summary page or login redirect response.
+        Assumptions:
+            Browser loads status and summary rows through `/api/backtests/runs/{run_id}*`.
+        Raises:
+            None.
+        Side Effects:
+            May perform server-side API request to `/api/auth/current-user`.
+        """
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/backtests/history",
+            page_title="Backtest Run Summary",
+            template_name="backtest_run_summary.html",
+            template_context={"run_id": run_id},
+        )
+
     @app.get("/backtests/jobs", response_class=HTMLResponse)
     def get_backtest_jobs_page(request: Request) -> Response:
         """
-        Render protected Backtest jobs list page behind current-user login gate.
+        Render protected Backtest jobs compatibility page behind current-user login gate.
 
         Args:
             request: HTTP request object.
@@ -359,14 +409,14 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/backtests/jobs",
-            page_title="Backtest Jobs",
+            page_title="Backtest Jobs Compatibility",
             template_name="backtest_jobs_list.html",
         )
 
     @app.get("/backtests/jobs/{job_id}", response_class=HTMLResponse)
     def get_backtest_job_details_page(request: Request, job_id: str) -> Response:
         """
-        Render protected Backtest job details page behind current-user login gate.
+        Render protected Backtest job compatibility details page behind current-user login gate.
 
         Args:
             request: HTTP request object.
@@ -384,7 +434,7 @@ def _register_routes(
             request=request,
             templates=templates,
             page_path="/backtests/jobs",
-            page_title="Backtest Job Details",
+            page_title="Backtest Job Compatibility",
             template_name="backtest_job_details.html",
             template_context={"job_id": job_id},
         )

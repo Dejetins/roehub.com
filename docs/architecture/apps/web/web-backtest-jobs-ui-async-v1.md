@@ -6,11 +6,12 @@
 
 ## Status
 
-- Status: historical v1 jobs UX contract with R0 freeze notes.
+- Status: historical v1 jobs UX contract kept as compatibility surface after R9-02.
 - Superseded by target-v2 UX:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
   - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+  - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 - Historical scope kept here:
   - отдельные `/backtests/jobs*` маршруты,
   - split sync/jobs launch model,
@@ -19,6 +20,12 @@
   - user-visible history становится unified `backtest run`,
   - sync overflow должен auto-fallback в background вместо ручного mode toggle,
   - summary-only top-N и lazy detail page становятся canonical result UX.
+- R9-02 additive compatibility note:
+  - primary user-facing navigation now lives at `/backtests/history` and
+    `/backtests/runs/{run_id}`;
+  - `/backtests/jobs*` остаются migration alias поверх того же persisted run storage;
+  - compatibility pages may keep legacy `Load report` and cancel affordances while summary/history
+    vocabulary moves to runs.
 - R1 practical contract:
   - create form reuse на `/backtests` обязан использовать backend runtime defaults catalog,
   - request TF `1m` и `5m` детерминированно отклоняются backend-ом,
@@ -64,6 +71,8 @@
 
 - `GET /backtests/jobs` — protected jobs list page.
 - `GET /backtests/jobs/{job_id}` — protected job details page.
+- После R9-02 эти маршруты считаются compatibility alias; primary navigation не должна
+  рекламировать их вместо `/backtests/history` и `/backtests/runs/{run_id}`.
 
 ### 2) Job creation UX (фикс)
 

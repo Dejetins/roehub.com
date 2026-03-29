@@ -106,8 +106,15 @@
   - request timeframes, ranking metrics, `top_n_default` / `top_n_max`,
     `supported_indicator_ids`, `source_values_by_indicator_id` читаются из runtime defaults;
   - user-facing `top_n` маппится в request `top_k`;
-  - `202 Accepted` + `execution_mode=background_auto` показываются пользователю явно и могут
-    вести на `/backtests/jobs/{run_id}` как compatibility surface.
+  - `202 Accepted` + `execution_mode=background_auto` показываются пользователю явно.
+- R9-02 закрепляет history/summary UX:
+  - primary navigation теперь использует `/backtests/history` и `/backtests/runs/{run_id}`;
+  - history page грузит `GET /api/backtests/runs` с opaque `next_cursor`;
+  - run summary page грузит `GET /api/backtests/runs/{run_id}` и
+    `GET /api/backtests/runs/{run_id}/top`;
+  - local sort использует только runtime-approved `contracts.summary.sortable_columns`,
+    переставляет loaded rows in-browser и не триггерит server recompute;
+  - `/backtests/jobs*` остаются compatibility alias на переходный период.
 - После R6-04 вне scope остаются R7 persisted-run storage/API cutover и full runtime legacy
   cutover.
 - Отдельный R3-04 prices+mappings publish helper остаётся stage-specific и по-прежнему выводит

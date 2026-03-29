@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section
+    class="panel"
+    data-backtest-runs-page="history"
+    data-api-runs-path="/api/backtests/runs"
+    data-details-path-template="/backtests/runs/{run_id}"
+    data-default-limit="50"
+  >
+    <div class="panel-heading">
+      <h1>Backtest history</h1>
+      <div class="inline-actions">
+        <a class="button-link" href="/backtests">Launch backtest</a>
+        <a class="button-link button-link--secondary" href="/backtests/jobs">
+          Open jobs alias
+        </a>
+      </div>
+    </div>
+
+    <p>
+      This page is backed by <code>GET /api/backtests/runs</code>. State filter, limit, and
+      <code>next_cursor</code> use the public runs contract; the browser keeps cursor as opaque
+      <code>base64url(json)</code> text and never parses it client-side.
+    </p>
+
+    <div id="runs-history-error-banner" class="error-banner hidden" role="alert"></div>
+    <div id="runs-history-validation-errors" class="validation-list hidden"></div>
+
+    <section class="panel panel--soft">
+      <h2>Filters</h2>
+      <div class="filters-grid">
+        <label for="runs-history-state">State</label>
+        <select id="runs-history-state">
+          <option value="">All</option>
+          <option value="queued">queued</option>
+          <option value="running">running</option>
+          <option value="succeeded">succeeded</option>
+          <option value="failed">failed</option>
+          <option value="cancelled">cancelled</option>
+        </select>
+
+        <label for="runs-history-limit">Limit</label>
+        <select id="runs-history-limit">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+        </select>
+
+        <label for="runs-history-cursor-value">Current cursor</label>
+        <input id="runs-history-cursor-value" type="text" readonly placeholder="" value="">
+      </div>
+
+      <div class="inline-actions">
+        <button id="runs-history-refresh" class="button-link" type="button">Refresh</button>
+        <button
+          id="runs-history-prev"
+          class="button-link button-link--secondary"
+          type="button"
+        >
+          Previous page
+        </button>
+        <button
+          id="runs-history-next"
+          class="button-link button-link--secondary"
+          type="button"
+        >
+          Next page
+        </button>
+      </div>
+
+      <p id="runs-history-cursor-note" class="muted-text">next_cursor: none</p>
+    </section>
+
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">run_id</th>
+            <th scope="col">state</th>
+            <th scope="col">execution_mode</th>
+            <th scope="col">market_id</th>
+            <th scope="col">symbol</th>
+            <th scope="col">timeframe</th>
+            <th scope="col">requested_top_n</th>
+            <th scope="col">created_at</th>
+            <th scope="col">updated_at</th>
+            <th scope="col">processed_units/total_units</th>
+          </tr>
+        </thead>
+        <tbody id="runs-history-table-body">
+          <tr>
+            <td colspan="10">Loading backtest history...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="/assets/backtest_runs_ui.js"></script>
+{% endblock %}

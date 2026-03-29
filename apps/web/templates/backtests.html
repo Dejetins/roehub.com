@@ -12,6 +12,8 @@
     data-api-instruments-path="/api/market-data/instruments"
     data-api-indicators-path="/api/indicators"
     data-strategy-builder-path="/strategies/new"
+    data-history-path="/backtests/history"
+    data-run-summary-path-template="/backtests/runs/{run_id}"
     data-jobs-list-path="/backtests/jobs"
     data-prefill-query-param="prefill"
     data-prefill-storage="sessionStorage"
@@ -21,7 +23,10 @@
       <h1>Backtests</h1>
       <div class="inline-actions">
         <a class="button-link button-link--secondary" href="/strategies">Open strategies</a>
-        <a class="button-link button-link--secondary" href="/backtests/jobs">Open jobs</a>
+        <a class="button-link button-link--secondary" href="/backtests/history">
+          Open history
+        </a>
+        <a class="button-link button-link--secondary" href="/backtests/jobs">Open jobs alias</a>
       </div>
     </div>
 
@@ -29,7 +34,8 @@
       Launch backtests in template mode or saved mode through <code>POST /api/backtests</code>.
       Browser requests are sent to <code>/api/*</code> with credentials, while server-side
       <code>auto_preflight_enabled</code> may return explicit <code>202 Accepted</code>
-      <code>background_auto</code> fallback metadata.
+      <code>background_auto</code> fallback metadata and persisted <code>run_id</code> for
+      history/runs navigation.
     </p>
 
     <div id="backtest-error-banner" class="error-banner hidden" role="alert"></div>
@@ -38,7 +44,9 @@
     <section id="backtest-launch-status" class="panel panel--soft hidden" aria-live="polite">
       <p id="backtest-launch-status-message" class="muted-text"></p>
       <p class="muted-text">
-        Compatibility routes stay available at <a id="backtest-launch-status-link" href="/backtests/jobs">/backtests/jobs</a>.
+        Primary history lives at
+        <a id="backtest-launch-status-link" href="/backtests/history">/backtests/history</a>.
+        Compatibility routes stay available at <a href="/backtests/jobs">/backtests/jobs</a>.
       </p>
     </section>
 

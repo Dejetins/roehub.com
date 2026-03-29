@@ -115,6 +115,11 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
     ("path", "expected_location"),
     [
         ("/backtests", "/login?next=%2Fbacktests"),
+        ("/backtests/history", "/login?next=%2Fbacktests%2Fhistory"),
+        (
+            "/backtests/runs/00000000-0000-0000-0000-000000000778",
+            "/login?next=%2Fbacktests%2Fruns%2F00000000-0000-0000-0000-000000000778",
+        ),
         ("/backtests/jobs", "/login?next=%2Fbacktests%2Fjobs"),
         (
             "/backtests/jobs/00000000-0000-0000-0000-000000000777",
@@ -262,6 +267,8 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     assert "/api/market-data/markets" in response.text
     assert "/api/market-data/instruments" in response.text
     assert "/api/indicators" in response.text
+    assert "/backtests/history" in response.text
+    assert "/backtests/runs/{run_id}" in response.text
     assert "/backtests/jobs" in response.text
     assert "/strategies/new" in response.text
     assert "sessionStorage" in response.text
@@ -271,8 +278,71 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     assert "auto_preflight_enabled" in response.text
     assert "202 Accepted" in response.text
     assert "background_auto" in response.text
+    assert "history/runs navigation" in response.text
     assert "Estimate preflight" not in response.text
     assert "Run as job" not in response.text
+
+
+def test_backtest_history_page_renders_required_runs_ui_hooks() -> None:
+    """
+    Verify `/backtests/history` renders list-page hooks and required runs API literals.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        History page is SSR shell and browser performs JSON requests to `/api/backtests/runs`.
+    Raises:
+        AssertionError: If required history hooks or literals are missing in rendered HTML.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+
+    response = client.get("/backtests/history")
+
+    assert response.status_code == 200
+    assert 'data-backtest-runs-page="history"' in response.text
+    assert "/assets/backtest_runs_ui.js" in response.text
+    assert "/api/backtests/runs" in response.text
+    assert "/backtests/runs/{run_id}" in response.text
+    assert "base64url(json)" in response.text
+    assert "next_cursor" in response.text
+    assert "requested_top_n" in response.text
+    assert "/backtests/jobs" in response.text
+
+
+def test_backtest_run_summary_page_renders_required_runs_summary_literals() -> None:
+    """
+    Verify `/backtests/runs/{run_id}` renders summary hooks and required runs API paths.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Summary page route is SSR-only and run payload is fetched browser-side.
+    Raises:
+        AssertionError: If route run_id or required API path literals are missing.
+    Side Effects:
+        None.
+    """
+    client = _build_test_client()
+    run_id = "00000000-0000-0000-0000-000000000654"
+
+    response = client.get(f"/backtests/runs/{run_id}")
+
+    assert response.status_code == 200
+    assert 'data-backtest-runs-page="summary"' in response.text
+    assert f'data-run-id="{run_id}"' in response.text
+    assert "/api/backtests/runs/" in response.text
+    assert "/api/backtests/runs/{run_id}/top" in response.text
+    assert "/api/backtests/runtime-defaults" in response.text
+    assert "sortable_columns" in response.text
+    assert "rank ASC, variant_key ASC" in response.text
+    assert "summary-only" in response.text
+    assert "already-loaded rows without triggering server recompute" in response.text
 
 
 def test_backtest_jobs_list_page_renders_required_jobs_ui_hooks() -> None:
@@ -298,10 +368,12 @@ def test_backtest_jobs_list_page_renders_required_jobs_ui_hooks() -> None:
     assert 'data-backtest-jobs-page="list"' in response.text
     assert "/assets/backtest_jobs_ui.js" in response.text
     assert "/api/backtests/jobs" in response.text
+    assert "/backtests/history" in response.text
     assert "base64url(json)" in response.text
     assert "next_cursor" in response.text
+    assert "compatibility alias" in response.text
     assert "Jobs disabled by config" in response.text
-    assert "/backtests?run_type=job" in response.text
+    assert "/backtests" in response.text
 
 
 def test_backtest_job_details_page_renders_job_id_and_required_jobs_literals() -> None:
@@ -331,6 +403,7 @@ def test_backtest_job_details_page_renders_job_id_and_required_jobs_literals() -
     assert "/api/backtests/jobs/{job_id}/top" in response.text
     assert "/api/backtests/variant-report" in response.text
     assert "/api/backtests/jobs/{job_id}/cancel" in response.text
+    assert f"/backtests/runs/{job_id}" in response.text
     assert "limit=50" in response.text
     assert "Load report" in response.text
     assert "Jobs disabled by config" in response.text

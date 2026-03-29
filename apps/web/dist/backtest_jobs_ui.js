@@ -1,8 +1,8 @@
 const BACKTEST_JOBS_PAGE_SELECTOR = "[data-backtest-jobs-page]";
-const ACTIVE_JOB_STATES = new Set(["queued", "running"]);
-const TERMINAL_JOB_STATES = new Set(["succeeded", "failed", "cancelled"]);
-const STATUS_POLL_INTERVAL_MS = 2000;
-const TOP_POLL_INTERVAL_MS = 3000;
+export const ACTIVE_JOB_STATES = new Set(["queued", "running"]);
+export const TERMINAL_JOB_STATES = new Set(["succeeded", "failed", "cancelled"]);
+export const STATUS_POLL_INTERVAL_MS = 2000;
+export const TOP_POLL_INTERVAL_MS = 3000;
 const JOB_CONTEXT_STORAGE_PREFIX = "backtest-job-context:";
 
 
@@ -1074,7 +1074,7 @@ function renderMarkdownToSafeHtml(markdown) {
   return rendered;
 }
 
-function parsePositiveInt(rawValue, fallback) {
+export function parsePositiveInt(rawValue, fallback) {
   const parsed = Number.parseInt(String(rawValue || "").trim(), 10);
   if (Number.isNaN(parsed) || parsed <= 0) {
     return fallback;
@@ -1082,11 +1082,13 @@ function parsePositiveInt(rawValue, fallback) {
   return parsed;
 }
 
-function renderPathTemplate(pathTemplate, identifier) {
-  return String(pathTemplate || "").replace("{job_id}", String(identifier || ""));
+export function renderPathTemplate(pathTemplate, identifier) {
+  return String(pathTemplate || "")
+    .replace("{job_id}", String(identifier || ""))
+    .replace("{run_id}", String(identifier || ""));
 }
 
-function buildHttpError(response) {
+export function buildHttpError(response) {
   return parseApiError(response).then((parsed) => {
     const error = new Error(parsed.message);
     error.details = parsed.details;
@@ -1244,7 +1246,7 @@ function normalizeJsonLikeValue(value) {
   return value;
 }
 
-function showPageError(pageRoot, message, details) {
+export function showPageError(pageRoot, message, details) {
   const banner = pageRoot.querySelector(".error-banner");
   if (banner !== null) {
     banner.textContent = message;
@@ -1272,7 +1274,7 @@ function showPageError(pageRoot, message, details) {
   detailsContainer.classList.remove("hidden");
 }
 
-function clearPageError(pageRoot) {
+export function clearPageError(pageRoot) {
   const banner = pageRoot.querySelector(".error-banner");
   if (banner !== null) {
     banner.textContent = "";
@@ -1286,7 +1288,7 @@ function clearPageError(pageRoot) {
   }
 }
 
-function normalizeError(error) {
+export function normalizeError(error) {
   if (error instanceof Error) {
     const details = Array.isArray(error.details) ? error.details : [];
     const message = String(error.message || "").trim();
@@ -1298,7 +1300,7 @@ function normalizeError(error) {
   return { message: "Unexpected backtest operation error.", details: [] };
 }
 
-function requireDataAttr(node, camelCaseName) {
+export function requireDataAttr(node, camelCaseName) {
   const value = node.dataset[camelCaseName];
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Missing data attribute: ${camelCaseName}`);
@@ -1306,14 +1308,14 @@ function requireDataAttr(node, camelCaseName) {
   return value;
 }
 
-function asRecord(value) {
+export function asRecord(value) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     return {};
   }
   return value;
 }
 
-function compareStableStrings(left, right) {
+export function compareStableStrings(left, right) {
   if (left < right) {
     return -1;
   }
@@ -1340,13 +1342,13 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function buildCell(text) {
+export function buildCell(text) {
   const cell = document.createElement("td");
   cell.textContent = text;
   return cell;
 }
 
-function buildActionButton({ label, onClick, className = "", disabled = false }) {
+export function buildActionButton({ label, onClick, className = "", disabled = false }) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = `button-link ${className}`.trim();

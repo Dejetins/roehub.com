@@ -21,6 +21,8 @@ function initBacktestPage(pageRoot) {
   const instrumentsPath = requireDataAttr(pageRoot, "apiInstrumentsPath");
   const indicatorsPath = requireDataAttr(pageRoot, "apiIndicatorsPath");
   const strategyBuilderPath = requireDataAttr(pageRoot, "strategyBuilderPath");
+  const historyPath = requireDataAttr(pageRoot, "historyPath");
+  const runSummaryPathTemplate = requireDataAttr(pageRoot, "runSummaryPathTemplate");
   const jobsListPath = requireDataAttr(pageRoot, "jobsListPath");
   const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
   const prefillStorage = requireDataAttr(pageRoot, "prefillStorage");
@@ -173,8 +175,8 @@ function initBacktestPage(pageRoot) {
   const hideLaunchStatus = () => {
     launchStatus.classList.add("hidden");
     launchStatusMessage.textContent = "";
-    launchStatusLink.textContent = "/backtests/jobs";
-    launchStatusLink.href = jobsListPath;
+    launchStatusLink.textContent = "/backtests/history";
+    launchStatusLink.href = historyPath;
   };
 
   const clearSelectedSymbol = () => {
@@ -2222,8 +2224,8 @@ function initBacktestPage(pageRoot) {
     window.sessionStorage.setItem(storageKey, JSON.stringify(contextPayload));
   };
 
-  const renderJobDetailsPath = (jobId) => (
-    `${jobsListPath}/${encodeURIComponent(jobId)}`
+  const renderRunSummaryPath = (runId) => (
+    renderPathTemplate(runSummaryPathTemplate, encodeURIComponent(runId))
   );
 
   const renderLaunchOutcome = ({ payload, responseStatus }) => {
@@ -2231,12 +2233,12 @@ function initBacktestPage(pageRoot) {
     const runId = String(responsePayload.run_id || "").trim();
     const executionMode = String(responsePayload.execution_mode || "").trim();
     const stateValue = String(responsePayload.state || "").trim();
+    const primaryRunLink = runId.length > 0 ? renderRunSummaryPath(runId) : historyPath;
+    const primaryRunLabel = runId.length > 0
+      ? `Open run ${runId}`
+      : "Open backtest history";
 
     if (responseStatus === 202 || executionMode === "background_auto") {
-      const linkHref = runId.length > 0 ? renderJobDetailsPath(runId) : jobsListPath;
-      const linkLabel = runId.length > 0
-        ? `Open background run ${runId}`
-        : "Open background runs";
       showLaunchStatus({
         message: [
           "202 Accepted.",
@@ -2244,8 +2246,8 @@ function initBacktestPage(pageRoot) {
           `run_id=${runId || "-"}.`,
           `state=${stateValue || "queued"}.`,
         ].join(" "),
-        linkHref,
-        linkLabel,
+        linkHref: primaryRunLink,
+        linkLabel: primaryRunLabel,
       });
       return;
     }
@@ -2258,8 +2260,8 @@ function initBacktestPage(pageRoot) {
           `run_id=${runId || "-"}.`,
           `state=${stateValue || "-"}.`,
         ].join(" "),
-        linkHref: jobsListPath,
-        linkLabel: "Open runs compatibility page",
+        linkHref: primaryRunLink,
+        linkLabel: primaryRunLabel,
       });
       return;
     }
@@ -2716,6 +2718,12 @@ function requireDataAttr(node, camelCaseName) {
     throw new Error(`Missing data attribute: ${camelCaseName}`);
   }
   return value;
+}
+
+function renderPathTemplate(pathTemplate, identifier) {
+  return String(pathTemplate || "")
+    .replace("{job_id}", String(identifier || ""))
+    .replace("{run_id}", String(identifier || ""));
 }
 
 function compareStableStrings(left, right) {

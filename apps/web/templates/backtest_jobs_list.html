@@ -9,12 +9,17 @@
     data-default-limit="50"
   >
     <div class="panel-heading">
-      <h1>Backtest jobs</h1>
-      <a class="button-link" href="/backtests?run_type=job">Create job</a>
+      <h1>Backtest jobs compatibility</h1>
+      <div class="inline-actions">
+        <a class="button-link" href="/backtests/history">Open history</a>
+        <a class="button-link button-link--secondary" href="/backtests">Launch backtest</a>
+      </div>
     </div>
 
     <p>
-      Browser loads jobs from <code>/api/*</code> with credentials and keeps cursor as opaque
+      This page stays available as a compatibility alias over the same persisted run storage.
+      Primary user-facing history now lives at <code>/backtests/history</code>, while this screen
+      still loads legacy <code>/api/backtests/jobs</code> and keeps cursor as opaque
       <code>base64url(json)</code> text. The UI stores <code>next_cursor</code> exactly as returned.
     </p>
 
@@ -75,11 +80,11 @@
         </thead>
         <tbody id="jobs-list-table-body">
           <tr>
-            <td colspan="7">Loading jobs...</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+              <td colspan="7">Loading jobs compatibility view...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
   </section>
 {% endblock %}
 

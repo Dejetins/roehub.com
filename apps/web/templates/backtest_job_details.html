@@ -10,20 +10,25 @@
     data-api-variant-report-path="/api/backtests/variant-report"
     data-api-cancel-path-template="/api/backtests/jobs/{job_id}/cancel"
     data-list-path="/backtests/jobs"
+    data-run-summary-path="/backtests/runs/{{ job_id }}"
     data-strategy-builder-path="/strategies/new"
     data-prefill-query-param="prefill"
     data-prefill-storage="sessionStorage"
     data-default-top-limit="50"
   >
     <div class="panel-heading">
-      <h1>Backtest job details</h1>
-      <a class="button-link button-link--secondary" href="/backtests/jobs">Back to jobs</a>
+      <h1>Backtest job compatibility view</h1>
+      <div class="inline-actions">
+        <a class="button-link" href="/backtests/runs/{{ job_id }}">Open run summary</a>
+        <a class="button-link button-link--secondary" href="/backtests/jobs">Back to jobs alias</a>
+      </div>
     </div>
 
     <p>
-      Status endpoint: <code>/api/backtests/jobs/{job_id}</code>. Top endpoint:
-      <code>/api/backtests/jobs/{job_id}/top</code> (default <code>limit=50</code>) returns summary
-      rows. Use <code>Load report</code> to request report details from
+      Primary persisted summary now lives at <code>/backtests/runs/{job_id}</code>. This
+      compatibility page keeps legacy status/top/report tools:
+      <code>/api/backtests/jobs/{job_id}</code>,
+      <code>/api/backtests/jobs/{job_id}/top</code> (default <code>limit=50</code>) and
       <code>/api/backtests/variant-report</code>. Polling runs only while state is active.
     </p>
 

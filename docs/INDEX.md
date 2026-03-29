@@ -8,7 +8,7 @@
 - `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 
-## Backtest R5 / R6 / R7 Path
+## Backtest R5 / R6 / R7 / R9 Path
 
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
@@ -29,7 +29,10 @@
 - `src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py`
 - `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
 - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
 - `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+- `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
+- `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
 - `alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py`
 - `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py`
 - `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_results_repository.py`

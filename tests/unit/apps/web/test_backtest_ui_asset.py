@@ -144,5 +144,8 @@ def test_backtest_ui_asset_surfaces_background_auto_202_and_toggles_risk_visibil
     assert "202 Accepted." in source
     assert "background_auto" in source
     assert "execution_mode=sync_inline." in source
+    assert "historyPath" in source
+    assert "runSummaryPathTemplate" in source
+    assert "Open run" in source
     assert "updateRiskUiVisibility" in source
     assert "toggleNodesVisibility" in source

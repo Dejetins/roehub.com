@@ -1,12 +1,12 @@
 # Web UI -- Backtest History and Variant Detail v2
 
-Документ фиксирует web contract для history/details flow после R7-04:
-public UI работает через persisted `runs` vocabulary и открывает detail выбранного варианта
-по `run_id + variant`, без отправки полного run envelope обратно с клиента.
+Документ фиксирует web contract для R9-02/R9-03 flow поверх persisted `runs` vocabulary.
+На текущем шаге R9-02 public UI уже переключён на `Backtest history` и persisted run summary page,
+а lazy variant detail остаётся следующим additive шагом.
 
 ## Status
 
-- Status: active target contract after R7-04.
+- Status: active target contract after R9-02 history/summary rollout.
 - Depends on:
   - `docs/architecture/backtest/backtest-runs-history-v2.md`
   - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
@@ -15,9 +15,11 @@ public UI работает через persisted `runs` vocabulary и откры�
   - legacy `POST /api/backtests/variant-report` остаётся migration path;
   - preferred public detail flow использует
     `POST /api/backtests/runs/{run_id}/variant-report`.
-  - after R9-01 the `/backtests` launch page may land on explicit
-    `202 Accepted` `background_auto` responses and hand users off to
-    `/backtests/jobs/{run_id}` as a compatibility surface until R9-02 history UX is promoted.
+  - after R9-02 launch/status navigation is history-first:
+    - `/backtests/history`
+    - `/backtests/runs/{run_id}`
+  - legacy `/backtests/jobs*` remains compatibility surface during migration and may still expose
+    legacy report/cancel tooling.
 
 ## Цель
 
@@ -33,13 +35,14 @@ public UI работает через persisted `runs` vocabulary и откры�
 
 ### 1) Routes
 
-- `GET /backtests/history` или equivalent history page route в `apps/web`
-- `GET /backtests/runs/{run_id}` или equivalent run details page route
+- `GET /backtests/history` в `apps/web`
+- `GET /backtests/runs/{run_id}` persisted run summary page
 - browser API calls:
   - `GET /api/backtests/runs`
   - `GET /api/backtests/runs/{run_id}`
   - `GET /api/backtests/runs/{run_id}/top`
-  - `POST /api/backtests/runs/{run_id}/variant-report`
+- `POST /api/backtests/runs/{run_id}/variant-report` остаётся additive detail endpoint для
+  следующего UI шага
 
 ### 2) History page
 
@@ -50,14 +53,20 @@ public UI работает через persisted `runs` vocabulary и откры�
   - `execution_mode`
   - `market_id`, `symbol`, `timeframe`
   - `requested_top_n`
-  - `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`,
-    `artifact_asof_date`
+  - timestamps
+  - progress counters
 - Не показывает и не кэширует internal hashes (`request_hash`, `engine_params_hash`, etc.).
 
 ### 3) Run details page
 
 - Загружает status snapshot через `GET /api/backtests/runs/{run_id}`.
 - Загружает summary rows через `GET /api/backtests/runs/{run_id}/top`.
+- Первый render сохраняет server order `rank ASC, variant_key ASC`.
+- Browser-side local resort:
+  - читает approved `contracts.summary.sortable_columns` из
+    `GET /api/backtests/runtime-defaults`;
+  - переставляет только уже загруженные summary rows;
+  - не триггерит новый run и не запрашивает server recompute `/top`.
 - `/top` rows содержат только:
   - `rank`
   - `variant_key`
@@ -72,6 +81,8 @@ public UI работает через persisted `runs` vocabulary и откры�
 
 ### 4) Variant detail fetch
 
+- В R9-02 новая persisted run summary page остаётся summary-only и не встраивает inline
+  report/trades UX.
 - По клику `Load report` UI отправляет:
   - `POST /api/backtests/runs/{run_id}/variant-report`
 - Request body:
@@ -102,6 +113,7 @@ public UI работает через persisted `runs` vocabulary и откры�
 - Owner policy user-visible и deterministic:
   - missing run -> `404 not_found`
   - foreign existing run -> `403 forbidden`
+- Summary table на `/backtests/runs/{run_id}` остаётся trades-free и report-free.
 - Detail endpoint пересчитывает ровно один selected variant.
 - Detail payload не сохраняется в PG как часть persisted run history.
 - Opening detail page не запускает full top-N recompute.
