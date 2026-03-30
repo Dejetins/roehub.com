@@ -12,7 +12,12 @@ from apps.scheduler.backtest_artifact_publisher.wiring.modules import (
     BacktestArtifactPublisherMetrics,
     BacktestArtifactPublisherSchedule,
 )
-from trading.contexts.backtest.application.services import ArtifactCoordinatesV2
+from trading.contexts.backtest.application.services import (
+    ArtifactCoordinatesV2,
+    ArtifactStageRebuildStatsCollectionV2,
+    ArtifactStageRebuildStatsV2,
+    ArtifactTailRebuildBarsV2,
+)
 from trading.contexts.backtest.application.use_cases import (
     PublishBacktestArtifactsV2Request,
     PublishBacktestArtifactsV2Result,
@@ -221,6 +226,21 @@ def _result(*, exchange: str, market_type: str, symbol: str) -> PublishBacktestA
             signal_manifest_count=1,
             hit_times_manifest_present=True,
             diagnostics_count=0,
+        ),
+        stage_rebuild_stats=ArtifactStageRebuildStatsCollectionV2(
+            prices=ArtifactStageRebuildStatsV2(reused_prefix_bars=1438, rewritten_tail_bars=2),
+            mappings=ArtifactStageRebuildStatsV2(reused_prefix_bars=95, rewritten_tail_bars=3),
+            signals=ArtifactStageRebuildStatsV2(reused_prefix_bars=94, rewritten_tail_bars=4),
+            hit_times=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=1435,
+                rewritten_tail_bars=5,
+            ),
+        ),
+        tail_rebuild_bars=ArtifactTailRebuildBarsV2(
+            prices=2,
+            mappings=3,
+            signals=4,
+            hit_times=5,
         ),
     )
 

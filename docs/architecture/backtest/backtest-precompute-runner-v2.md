@@ -91,6 +91,12 @@ runtime request defaults и artifact pipeline knobs не смешивались 
   - `lookback_policy.signal_tail_bars_1m`
 - `hit_times/1m` должны использовать такой же bounded incremental rebuild по
   `lookback_policy.hit_times_tail_bars_1m`.
+- Runner result contract обязан публиковать explicit stage-level stats для `prices`, `mappings`,
+  `signals`, `hit_times`:
+  - `reused_prefix_bars`
+  - `rewritten_tail_bars`
+  - scheduler/prometheus aggregation по-прежнему строится из per-stage `rewritten_tail_bars` через
+    `backtest_artifact_tail_rebuild_bars_total{stage}`.
 - Если reuse prerequisites нарушены для конкретного stage или symbol root, выполняется
   deterministic full rebuild только для этого symbol root, после чего whole-slot validation и
   publish semantics остаются неизменными.
@@ -171,6 +177,7 @@ artifact-backed `prices/1m.ohlcv`.
   - merge strategy: `prefix + rebuilt_tail`;
   - missing existing files, grid drift или manifest drift переводят symbol root в deterministic
     full rebuild;
+  - unchanged prefix columns must stay byte-stable between repeated daily runs;
 - на этом boundary ответственность precompute слоя заканчивается: `signal timeline`,
   `execution timeline`, `compact trade list`, `fast TP/SL grid search`,
   `exact replay of best TP/SL cell` и `metrics over compact trades` описываются отдельно в
@@ -249,6 +256,10 @@ Signal rebuild для explicit configured targets обязан быть лока
   - `signals.sha256`
   - provenance inputs с `lookback_policy.signal_tail_bars_1m`,
     `effective_target_tail_bars` и `rebuild_strategy = prefix + rebuilt_tail`
+- correctness proof для long-window targets обязана учитывать explicit `warmup`:
+  - effective compute window может быть шире, чем `effective_target_tail_bars`;
+  - shipped incremental result должен совпадать с deterministic full rebuild, даже если naive
+    tail cut без warmup дал бы другой `signals.i8.npy`.
 - root `signals` catalog обязан оставаться deterministic:
   - `signals.supported_timeframes` deduplicated in canonical timeframe order
   - `signals.supported_indicator_ids` in lexical order

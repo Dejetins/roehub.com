@@ -7,7 +7,12 @@ from typing import Mapping, cast
 
 import apps.cli.main.main as cli_main_module
 from apps.cli.commands.backtest_artifact_publish import BacktestArtifactPublishCli
-from trading.contexts.backtest.application.services import ArtifactCoordinatesV2
+from trading.contexts.backtest.application.services import (
+    ArtifactCoordinatesV2,
+    ArtifactStageRebuildStatsCollectionV2,
+    ArtifactStageRebuildStatsV2,
+    ArtifactTailRebuildBarsV2,
+)
 from trading.contexts.backtest.application.use_cases import (
     PublishBacktestArtifactsV2Request,
     PublishBacktestArtifactsV2Result,
@@ -349,5 +354,20 @@ def _sample_publish_result_v2() -> PublishBacktestArtifactsV2Result:
             signal_manifest_count=1,
             hit_times_manifest_present=True,
             diagnostics_count=0,
+        ),
+        stage_rebuild_stats=ArtifactStageRebuildStatsCollectionV2(
+            prices=ArtifactStageRebuildStatsV2(reused_prefix_bars=4300, rewritten_tail_bars=20),
+            mappings=ArtifactStageRebuildStatsV2(reused_prefix_bars=95, rewritten_tail_bars=3),
+            signals=ArtifactStageRebuildStatsV2(reused_prefix_bars=94, rewritten_tail_bars=2),
+            hit_times=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=4290,
+                rewritten_tail_bars=20,
+            ),
+        ),
+        tail_rebuild_bars=ArtifactTailRebuildBarsV2(
+            prices=20,
+            mappings=3,
+            signals=2,
+            hit_times=20,
         ),
     )

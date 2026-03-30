@@ -87,7 +87,8 @@ from .contracts import (
     ArtifactSignalPathsV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotLiteralV2,
-    ArtifactTailRebuildBarsV2,
+    ArtifactStageRebuildStatsCollectionV2,
+    ArtifactStageRebuildStatsV2,
     ArtifactTimelineCoverageV2,
     BacktestArtifactLoaderV2,
     SignalRuleEvaluationRequestV2,
@@ -95,7 +96,11 @@ from .contracts import (
     inactive_artifact_slot_v2,
     validate_artifact_slot_v2,
 )
-from .hit_times_compute_v2 import HitTimesArraysV2, materialize_hit_times_from_ohlcv_v2
+from .hit_times_compute_v2 import (
+    HitTimesArraysV2,
+    materialize_hit_times_from_ohlcv_v2,
+    merge_hit_times_prefix_with_rebuilt_tail_v2,
+)
 from .signal_rules_engine_v2 import BacktestSignalRulesEngineV2
 
 _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
@@ -211,6 +216,7 @@ class _SignalArtifactBuildResultV2:
 
     catalog: ArtifactSignalCatalogV2
     manifests: tuple[ArtifactSignalManifestDocumentV2, ...]
+    reused_prefix_bars: int
     rewritten_tail_bars: int
 
 
@@ -227,6 +233,7 @@ class _SignalArtifactMaterializationResultV2:
     """
 
     manifest: ArtifactSignalManifestDocumentV2
+    reused_prefix_bars: int
     rewritten_tail_bars: int
 
 
@@ -245,6 +252,7 @@ class _HitTimesArtifactBuildResultV2:
 
     manifest: ArtifactHitTimesManifestDocumentV2
     reference: ArtifactHitTimesReferenceV2
+    reused_prefix_bars: int
     rewritten_tail_bars: int
 
 
@@ -261,6 +269,7 @@ class _MappingArtifactBuildResultV2:
     """
 
     manifests: tuple[ArtifactMappingTimeframeManifestV2, ...]
+    reused_prefix_bars: int
     rewritten_tail_bars: int
 
 
@@ -277,6 +286,7 @@ class _TimeframeMappingBuildResultV2:
     """
 
     arrays: _TimeframeMappingArraysV2
+    reused_prefix_bars: int
     rewritten_tail_bars: int
 
 
@@ -299,6 +309,23 @@ class _ExistingSignalArtifactV2:
 
 
 @dataclass(frozen=True, slots=True)
+class _ExistingHitTimesArtifactV2:
+    """
+    Internal immutable snapshot of one existing inactive-slot `hit_times/1m` family.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+
+    manifest: ArtifactHitTimesManifestDocumentV2
+    arrays: HitTimesArraysV2
+
+
+@dataclass(frozen=True, slots=True)
 class _SignalArtifactTailPlanV2:
     """
     Internal deterministic plan for signal prefix reuse and bounded tail rebuild.
@@ -313,6 +340,23 @@ class _SignalArtifactTailPlanV2:
     prefix_matrix: np.ndarray | None
     compute_start_idx: int
     trim_prefix_bars: int
+    effective_tail_bars: int
+
+
+@dataclass(frozen=True, slots=True)
+class _HitTimesArtifactTailPlanV2:
+    """
+    Internal deterministic plan for `hit_times/1m` prefix reuse and bounded tail rebuild.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    prefix: HitTimesArraysV2 | None
+    prefix_bars: int
     effective_tail_bars: int
 
 
@@ -513,6 +557,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             coordinates=request.coordinates,
             slot=inactive_slot,
             slot_root=slot_root,
+            existing_manifest=existing_manifest,
             request=request,
             slot_generation=target_slot_generation,
             runtime_settings=self.runtime_settings,
@@ -569,6 +614,32 @@ class BacktestArtifactPrecomputeRunnerV2:
             provenance=provenance,
         )
         _write_yaml_atomically_v2(path=manifest_path, payload=root_manifest_payload)
+        stage_rebuild_stats = ArtifactStageRebuildStatsCollectionV2(
+            prices=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=(
+                    0 if tail_plan.prefix is None else int(tail_plan.prefix.open_time.shape[0])
+                ),
+                rewritten_tail_bars=int(tail_arrays.open_time.shape[0]),
+            ),
+            mappings=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=mapping_build_result.reused_prefix_bars,
+                rewritten_tail_bars=mapping_build_result.rewritten_tail_bars,
+            ),
+            signals=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=(
+                    0 if signal_build_result is None else signal_build_result.reused_prefix_bars
+                ),
+                rewritten_tail_bars=(
+                    0
+                    if signal_build_result is None
+                    else signal_build_result.rewritten_tail_bars
+                ),
+            ),
+            hit_times=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=hit_times_build_result.reused_prefix_bars,
+                rewritten_tail_bars=hit_times_build_result.rewritten_tail_bars,
+            ),
+        )
         return ArtifactCanonicalPriceExportResultV2(
             coordinates=request.coordinates,
             slot=inactive_slot,
@@ -580,20 +651,10 @@ class BacktestArtifactPrecomputeRunnerV2:
             coverage=one_minute_manifest.coverage,
             source_time_range=tail_plan.source_time_range,
             source_candle_count=len(source_rows),
-            reused_prefix_bars=(
-                0 if tail_plan.prefix is None else int(tail_plan.prefix.open_time.shape[0])
-            ),
-            rewritten_tail_bars=int(tail_arrays.open_time.shape[0]),
-            tail_rebuild_bars=ArtifactTailRebuildBarsV2(
-                prices=int(tail_arrays.open_time.shape[0]),
-                mappings=mapping_build_result.rewritten_tail_bars,
-                signals=(
-                    0
-                    if signal_build_result is None
-                    else signal_build_result.rewritten_tail_bars
-                ),
-                hit_times=hit_times_build_result.rewritten_tail_bars,
-            ),
+            reused_prefix_bars=stage_rebuild_stats.prices.reused_prefix_bars,
+            rewritten_tail_bars=stage_rebuild_stats.prices.rewritten_tail_bars,
+            stage_rebuild_stats=stage_rebuild_stats,
+            tail_rebuild_bars=stage_rebuild_stats.tail_rebuild_bars(),
         )
 
 
@@ -702,6 +763,7 @@ def _materialize_signal_artifacts_v2(
 
     manifests: list[ArtifactSignalManifestDocumentV2] = []
     catalog_entries: list[ArtifactSignalCatalogEntryV2] = []
+    reused_prefix_bars = 0
     rewritten_tail_bars = 0
     for signal_target in signal_targets:
         price_manifest = price_manifest_by_timeframe.get(signal_target.timeframe)
@@ -728,6 +790,7 @@ def _materialize_signal_artifacts_v2(
         )
         signal_manifest = signal_build_result.manifest
         manifests.append(signal_manifest)
+        reused_prefix_bars += signal_build_result.reused_prefix_bars
         rewritten_tail_bars += signal_build_result.rewritten_tail_bars
         catalog_entries.append(
             ArtifactSignalCatalogEntryV2(
@@ -760,6 +823,7 @@ def _materialize_signal_artifacts_v2(
             manifests=ordered_catalog_entries,
         ),
         manifests=tuple(manifests),
+        reused_prefix_bars=reused_prefix_bars,
         rewritten_tail_bars=rewritten_tail_bars,
     )
 
@@ -960,6 +1024,11 @@ def _materialize_signal_artifact_v2(
     )
     return _SignalArtifactMaterializationResultV2(
         manifest=signal_manifest,
+        reused_prefix_bars=(
+            0
+            if signal_tail_plan.prefix_matrix is None
+            else int(signal_tail_plan.prefix_matrix.shape[1])
+        ),
         rewritten_tail_bars=int(rebuilt_tail.shape[1]),
     )
 
@@ -2974,6 +3043,7 @@ def _materialize_mapping_timeframes_v2(
     """
     price_by_timeframe = {section.timeframe: section for section in price_manifests}
     mapping_sections: list[ArtifactMappingTimeframeManifestV2] = []
+    reused_prefix_bars = 0
     rewritten_tail_bars = 0
     for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2:
         price_manifest = price_by_timeframe.get(timeframe)
@@ -3014,9 +3084,11 @@ def _materialize_mapping_timeframes_v2(
                 arrays=mapping_build_result.arrays,
             )
         )
+        reused_prefix_bars += mapping_build_result.reused_prefix_bars
         rewritten_tail_bars += mapping_build_result.rewritten_tail_bars
     return _MappingArtifactBuildResultV2(
         manifests=tuple(mapping_sections),
+        reused_prefix_bars=reused_prefix_bars,
         rewritten_tail_bars=rewritten_tail_bars,
     )
 
@@ -3064,6 +3136,7 @@ def _build_mapping_arrays_with_tail_update_v2(
         )
         return _TimeframeMappingBuildResultV2(
             arrays=arrays,
+            reused_prefix_bars=0,
             rewritten_tail_bars=int(timeframe_arrays.open_time.shape[0]),
         )
 
@@ -3076,6 +3149,7 @@ def _build_mapping_arrays_with_tail_update_v2(
         )
         return _TimeframeMappingBuildResultV2(
             arrays=arrays,
+            reused_prefix_bars=0,
             rewritten_tail_bars=int(timeframe_arrays.open_time.shape[0]),
         )
 
@@ -3110,6 +3184,7 @@ def _build_mapping_arrays_with_tail_update_v2(
         )
         return _TimeframeMappingBuildResultV2(
             arrays=prefix,
+            reused_prefix_bars=prefix_bar_count,
             rewritten_tail_bars=0,
         )
 
@@ -3133,6 +3208,7 @@ def _build_mapping_arrays_with_tail_update_v2(
     )
     return _TimeframeMappingBuildResultV2(
         arrays=merged,
+        reused_prefix_bars=prefix_bar_count,
         rewritten_tail_bars=int(tail.bar_open_1m_idx.shape[0]),
     )
 
@@ -3356,12 +3432,299 @@ def _build_mapping_manifest_v2(
     )
 
 
+def _load_existing_hit_times_artifact_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
+    one_minute_manifest: ArtifactPriceTimeframeManifestV2,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+) -> _ExistingHitTimesArtifactV2 | None:
+    """
+    Load an existing inactive-slot `hit_times/1m` family when it is safe to reuse.
+
+    Args:
+        artifact_loader: Explicit-path artifact loader.
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Candidate inactive slot literal.
+        existing_manifest: Previously materialized inactive-slot root manifest, when present.
+        one_minute_manifest: Fresh current-build `prices/1m` manifest for start-alignment checks.
+        runtime_settings: Strict runtime settings carrying current TP/SL grids.
+    Returns:
+        _ExistingHitTimesArtifactV2 | None: Existing artifact snapshot eligible for prefix reuse,
+            otherwise `None` to trigger deterministic stage-local full rebuild.
+    Assumptions:
+        Missing files or reuse-precondition drift should not block the symbol root; the stage may
+        fall back to full rebuild instead.
+    Raises:
+        None.
+    Side Effects:
+        Reads existing hit-times manifest and arrays from the inactive slot when present.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+    """
+    if existing_manifest is None:
+        return None
+    expected_tp_values = np.ascontiguousarray(
+        np.asarray(
+            [value / 100.0 for value in runtime_settings.hit_times_tp_levels_pct],
+            dtype=np.float32,
+        )
+    )
+    expected_sl_values = np.ascontiguousarray(
+        np.asarray(
+            [value / 100.0 for value in runtime_settings.hit_times_sl_levels_pct],
+            dtype=np.float32,
+        )
+    )
+    existing_one_minute_manifest = _select_price_manifest_v2(
+        price_sections=existing_manifest.prices,
+        timeframe=_CANONICAL_PRICE_TIMEFRAME_LITERAL_V2,
+    )
+    if existing_one_minute_manifest is None:
+        return None
+    if (
+        existing_one_minute_manifest.coverage.open_time_start
+        != one_minute_manifest.coverage.open_time_start
+        or existing_one_minute_manifest.coverage.close_time_start
+        != one_minute_manifest.coverage.close_time_start
+    ):
+        return None
+
+    hit_times_paths = artifact_loader.resolve_hit_times_paths(coordinates, slot)
+    expected_manifest_path = _slot_relative_path_v2(
+        slot_root=hit_times_paths.manifest.parents[2],
+        absolute_path=hit_times_paths.manifest,
+    )
+    if existing_manifest.hit_times.manifest_path != expected_manifest_path:
+        return None
+    required_paths = (
+        hit_times_paths.manifest,
+        hit_times_paths.tp_values,
+        hit_times_paths.sl_values,
+        hit_times_paths.long_tp,
+        hit_times_paths.long_sl,
+        hit_times_paths.short_tp,
+        hit_times_paths.short_sl,
+    )
+    if not all(path.is_file() for path in required_paths):
+        return None
+    if existing_manifest.hit_times.manifest_sha256 != _file_sha256_hex_v2(hit_times_paths.manifest):
+        return None
+
+    try:
+        hit_times_manifest = artifact_loader.load_hit_times_manifest(coordinates, slot)
+        if (
+            hit_times_manifest.slot_generation != existing_manifest.slot_generation
+            or hit_times_manifest.asof_date != existing_manifest.asof_date
+        ):
+            return None
+        tp_values = np.ascontiguousarray(
+            _load_validated_array_v2(
+                metadata=hit_times_manifest.tp_values,
+                expected_path=hit_times_paths.tp_values,
+                expected_dtype=ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
+                expected_axis_order=ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
+                expected_shape=(int(hit_times_manifest.tp_values.shape[0]),),
+                location="existing hit_times.tp_values",
+            ),
+            dtype=np.float32,
+        )
+        sl_values = np.ascontiguousarray(
+            _load_validated_array_v2(
+                metadata=hit_times_manifest.sl_values,
+                expected_path=hit_times_paths.sl_values,
+                expected_dtype=ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
+                expected_axis_order=ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
+                expected_shape=(int(hit_times_manifest.sl_values.shape[0]),),
+                location="existing hit_times.sl_values",
+            ),
+            dtype=np.float32,
+        )
+        if not np.array_equal(tp_values, expected_tp_values):
+            return None
+        if not np.array_equal(sl_values, expected_sl_values):
+            return None
+        arrays = HitTimesArraysV2(
+            tp_values=tp_values,
+            sl_values=sl_values,
+            long_tp=np.ascontiguousarray(
+                _load_validated_array_v2(
+                    metadata=hit_times_manifest.long_tp.array,
+                    expected_path=hit_times_paths.long_tp,
+                    expected_dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+                    expected_axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+                    expected_shape=(
+                        int(hit_times_manifest.long_tp.array.shape[0]),
+                        hit_times_manifest.timeline_bar_count,
+                    ),
+                    location="existing hit_times.long_tp",
+                ),
+                dtype=np.uint32,
+            ),
+            long_sl=np.ascontiguousarray(
+                _load_validated_array_v2(
+                    metadata=hit_times_manifest.long_sl.array,
+                    expected_path=hit_times_paths.long_sl,
+                    expected_dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+                    expected_axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+                    expected_shape=(
+                        int(hit_times_manifest.long_sl.array.shape[0]),
+                        hit_times_manifest.timeline_bar_count,
+                    ),
+                    location="existing hit_times.long_sl",
+                ),
+                dtype=np.uint32,
+            ),
+            short_tp=np.ascontiguousarray(
+                _load_validated_array_v2(
+                    metadata=hit_times_manifest.short_tp.array,
+                    expected_path=hit_times_paths.short_tp,
+                    expected_dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+                    expected_axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+                    expected_shape=(
+                        int(hit_times_manifest.short_tp.array.shape[0]),
+                        hit_times_manifest.timeline_bar_count,
+                    ),
+                    location="existing hit_times.short_tp",
+                ),
+                dtype=np.uint32,
+            ),
+            short_sl=np.ascontiguousarray(
+                _load_validated_array_v2(
+                    metadata=hit_times_manifest.short_sl.array,
+                    expected_path=hit_times_paths.short_sl,
+                    expected_dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
+                    expected_axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
+                    expected_shape=(
+                        int(hit_times_manifest.short_sl.array.shape[0]),
+                        hit_times_manifest.timeline_bar_count,
+                    ),
+                    location="existing hit_times.short_sl",
+                ),
+                dtype=np.uint32,
+            ),
+            sentinel_index=hit_times_manifest.sentinel_index,
+        )
+    except (FileNotFoundError, ValueError):
+        return None
+    return _ExistingHitTimesArtifactV2(manifest=hit_times_manifest, arrays=arrays)
+
+
+def _build_hit_times_tail_plan_v2(
+    *,
+    one_minute_arrays: _CanonicalPriceArraysV2,
+    existing_hit_times_artifact: _ExistingHitTimesArtifactV2 | None,
+    hit_times_tail_bars_1m: int,
+) -> _HitTimesArtifactTailPlanV2:
+    """
+    Build deterministic prefix reuse bounds for bounded `hit_times/1m` rebuilds.
+
+    Args:
+        one_minute_arrays: Fresh canonical `prices/1m` arrays for the current export request.
+        existing_hit_times_artifact: Existing inactive-slot hit-times family, when reusable.
+        hit_times_tail_bars_1m: Configured bounded tail window in canonical `1m` bars.
+    Returns:
+        _HitTimesArtifactTailPlanV2: Prefix slice plus effective tail window.
+    Assumptions:
+        Reused prefix bars are preserved verbatim, while the tail overlap and any appended suffix
+        are rebuilt from current canonical `prices/1m`.
+    Raises:
+        ValueError: If the derived prefix slice indexes are inconsistent.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+    """
+    current_bar_count = int(one_minute_arrays.open_time.shape[0])
+    effective_tail_bars = min(current_bar_count, hit_times_tail_bars_1m)
+    if existing_hit_times_artifact is None or current_bar_count <= effective_tail_bars:
+        return _HitTimesArtifactTailPlanV2(
+            prefix=None,
+            prefix_bars=0,
+            effective_tail_bars=effective_tail_bars,
+        )
+    overlapping_bar_count = min(
+        current_bar_count,
+        existing_hit_times_artifact.manifest.timeline_bar_count,
+    )
+    if overlapping_bar_count <= effective_tail_bars:
+        return _HitTimesArtifactTailPlanV2(
+            prefix=None,
+            prefix_bars=0,
+            effective_tail_bars=effective_tail_bars,
+        )
+    prefix_bars = overlapping_bar_count - effective_tail_bars
+    if prefix_bars <= 0:
+        raise ValueError(f"hit-times prefix_bars must be > 0; got {prefix_bars!r}")
+    return _HitTimesArtifactTailPlanV2(
+        prefix=_slice_hit_times_prefix_v2(
+            hit_times=existing_hit_times_artifact.arrays,
+            end_idx=prefix_bars,
+        ),
+        prefix_bars=prefix_bars,
+        effective_tail_bars=effective_tail_bars,
+    )
+
+
+def _slice_hit_times_prefix_v2(
+    *,
+    hit_times: HitTimesArraysV2,
+    end_idx: int,
+) -> HitTimesArraysV2:
+    """
+    Slice one reusable hit-times prefix into a self-consistent standalone snapshot.
+
+    Args:
+        hit_times: Existing full hit-times arrays.
+        end_idx: Exclusive prefix end index on the time axis.
+    Returns:
+        HitTimesArraysV2: Prefix slice with `sentinel_index == end_idx`.
+    Assumptions:
+        Prefix reuse keeps TP/SL grids unchanged and preserves only the leading table columns.
+    Raises:
+        ValueError: If `end_idx` is outside the existing timeline bounds.
+    Side Effects:
+        Allocates fresh contiguous arrays for the prefix slice.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+    """
+    if end_idx <= 0:
+        raise ValueError(f"hit-times prefix end_idx must be > 0; got {end_idx!r}")
+    if end_idx > hit_times.sentinel_index:
+        raise ValueError(
+            "hit-times prefix end_idx must stay within the existing timeline; got "
+            f"{end_idx!r}, sentinel_index={hit_times.sentinel_index!r}"
+        )
+    return HitTimesArraysV2(
+        tp_values=np.ascontiguousarray(hit_times.tp_values, dtype=np.float32),
+        sl_values=np.ascontiguousarray(hit_times.sl_values, dtype=np.float32),
+        long_tp=np.ascontiguousarray(hit_times.long_tp[:, :end_idx], dtype=np.uint32),
+        long_sl=np.ascontiguousarray(hit_times.long_sl[:, :end_idx], dtype=np.uint32),
+        short_tp=np.ascontiguousarray(hit_times.short_tp[:, :end_idx], dtype=np.uint32),
+        short_sl=np.ascontiguousarray(hit_times.short_sl[:, :end_idx], dtype=np.uint32),
+        sentinel_index=end_idx,
+    )
+
+
 def _materialize_hit_times_artifacts_v2(
     *,
     artifact_loader: BacktestArtifactLoaderV2,
     coordinates: ArtifactCoordinatesV2,
     slot: str,
     slot_root: Path,
+    existing_manifest: ArtifactManifestDocumentV2 | None,
     request: ArtifactCanonicalPriceExportRequestV2,
     slot_generation: int,
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
@@ -3376,6 +3739,7 @@ def _materialize_hit_times_artifacts_v2(
         coordinates: Artifact coordinates selecting one symbol root.
         slot: Inactive slot literal receiving the hit-times files.
         slot_root: Absolute inactive-slot root directory.
+        existing_manifest: Previously materialized inactive-slot root manifest, when present.
         request: Explicit export request carrying slot identity and timestamps.
         slot_generation: Target inactive-slot generation assigned to the build.
         runtime_settings: Strict runtime settings carrying hit-times grids and guard budgets.
@@ -3398,11 +3762,30 @@ def _materialize_hit_times_artifacts_v2(
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
     hit_times_paths = artifact_loader.resolve_hit_times_paths(coordinates, slot)
-    hit_times_arrays = materialize_hit_times_from_ohlcv_v2(
-        ohlcv=one_minute_arrays.ohlcv,
+    existing_hit_times_artifact = _load_existing_hit_times_artifact_v2(
+        artifact_loader=artifact_loader,
+        coordinates=coordinates,
+        slot=slot,
+        existing_manifest=existing_manifest,
+        one_minute_manifest=one_minute_manifest,
+        runtime_settings=runtime_settings,
+    )
+    tail_plan = _build_hit_times_tail_plan_v2(
+        one_minute_arrays=one_minute_arrays,
+        existing_hit_times_artifact=existing_hit_times_artifact,
+        hit_times_tail_bars_1m=runtime_settings.hit_times_tail_bars_1m,
+    )
+    rebuilt_tail = materialize_hit_times_from_ohlcv_v2(
+        ohlcv=one_minute_arrays.ohlcv[tail_plan.prefix_bars :, :],
         tp_levels_pct=runtime_settings.hit_times_tp_levels_pct,
         sl_levels_pct=runtime_settings.hit_times_sl_levels_pct,
         max_hit_times_cells=runtime_settings.max_hit_times_cells,
+    )
+    hit_times_arrays = merge_hit_times_prefix_with_rebuilt_tail_v2(
+        prefix=tail_plan.prefix,
+        rebuilt_tail=rebuilt_tail,
+        prefix_bars=tail_plan.prefix_bars,
+        total_timeline_bars=int(one_minute_arrays.open_time.shape[0]),
     )
     _write_hit_times_arrays_atomically_v2(
         hit_times_paths=hit_times_paths,
@@ -3418,6 +3801,7 @@ def _materialize_hit_times_artifacts_v2(
         one_minute_manifest=one_minute_manifest,
         hit_times_paths=hit_times_paths,
         arrays=hit_times_arrays,
+        effective_tail_bars=tail_plan.effective_tail_bars,
     )
     _write_yaml_atomically_v2(
         path=hit_times_paths.manifest,
@@ -3433,7 +3817,8 @@ def _materialize_hit_times_artifacts_v2(
             ),
             manifest_sha256=_file_sha256_hex_v2(hit_times_paths.manifest),
         ),
-        rewritten_tail_bars=int(one_minute_arrays.open_time.shape[0]),
+        reused_prefix_bars=tail_plan.prefix_bars,
+        rewritten_tail_bars=int(hit_times_arrays.sentinel_index - tail_plan.prefix_bars),
     )
 
 
@@ -3481,6 +3866,7 @@ def _build_hit_times_manifest_v2(
     one_minute_manifest: ArtifactPriceTimeframeManifestV2,
     hit_times_paths: ArtifactHitTimesPathsV2,
     arrays: HitTimesArraysV2,
+    effective_tail_bars: int,
 ) -> ArtifactHitTimesManifestDocumentV2:
     """
     Build the strict typed `hit_times/1m/manifest.yaml` document for freshly written arrays.
@@ -3495,6 +3881,7 @@ def _build_hit_times_manifest_v2(
         one_minute_manifest: Fresh strict `prices/1m` manifest used for provenance hashing.
         hit_times_paths: Fixed hit-times file paths under the inactive slot.
         arrays: Freshly written strict hit-times arrays.
+        effective_tail_bars: Effective bounded `1m` tail overlap used for rebuild planning.
     Returns:
         ArtifactHitTimesManifestDocumentV2: Typed strict hit-times manifest.
     Assumptions:
@@ -3598,6 +3985,7 @@ def _build_hit_times_manifest_v2(
         runtime_settings=runtime_settings,
         one_minute_manifest=one_minute_manifest,
         arrays=arrays,
+        effective_tail_bars=effective_tail_bars,
     )
     payload = {
         "schema_version": HIT_TIMES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
@@ -3647,6 +4035,7 @@ def _build_hit_times_manifest_provenance_v2(
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
     one_minute_manifest: ArtifactPriceTimeframeManifestV2,
     arrays: HitTimesArraysV2,
+    effective_tail_bars: int,
 ) -> ArtifactManifestProvenanceV2:
     """
     Build deterministic provenance for one strict `hit_times/1m` manifest.
@@ -3658,6 +4047,7 @@ def _build_hit_times_manifest_provenance_v2(
         runtime_settings: Strict runtime settings contributing config hash and hit-times grids.
         one_minute_manifest: Fresh strict `prices/1m` manifest used as source-of-truth identity.
         arrays: Fresh hit-times arrays whose sentinel/timeline facts must be hashed.
+        effective_tail_bars: Effective bounded `1m` tail overlap used for this rebuild.
     Returns:
         ArtifactManifestProvenanceV2: Strict hit-times-manifest provenance payload.
     Assumptions:
@@ -3685,6 +4075,7 @@ def _build_hit_times_manifest_provenance_v2(
             runtime_settings=runtime_settings,
             one_minute_manifest=one_minute_manifest,
             arrays=arrays,
+            effective_tail_bars=effective_tail_bars,
         ),
     )
 
@@ -3697,6 +4088,7 @@ def _build_hit_times_manifest_inputs_sha256_v2(
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
     one_minute_manifest: ArtifactPriceTimeframeManifestV2,
     arrays: HitTimesArraysV2,
+    effective_tail_bars: int,
 ) -> str:
     """
     Hash normalized hit-times source identity into deterministic provenance.
@@ -3708,6 +4100,7 @@ def _build_hit_times_manifest_inputs_sha256_v2(
         runtime_settings: Strict runtime settings carrying hit-times grids and budgets.
         one_minute_manifest: Fresh strict `prices/1m` manifest used as source-of-truth identity.
         arrays: Fresh hit-times arrays whose sentinel/timeline facts must be hashed.
+        effective_tail_bars: Effective bounded `1m` tail overlap used for this rebuild.
     Returns:
         str: Lowercase SHA-256 hex digest.
     Assumptions:
@@ -3736,6 +4129,9 @@ def _build_hit_times_manifest_inputs_sha256_v2(
             "slot_generation": slot_generation,
             "asof_date": request.asof_date,
             "timeframe": HIT_TIMES_TIMEFRAME_LITERAL_V2,
+            "lookback_policy.hit_times_tail_bars_1m": runtime_settings.hit_times_tail_bars_1m,
+            "effective_target_tail_bars": effective_tail_bars,
+            "rebuild_strategy": "prefix + rebuilt_tail",
             "price_manifest_sha256": {
                 "open_time": one_minute_manifest.open_time.sha256,
                 "close_time": one_minute_manifest.close_time.sha256,

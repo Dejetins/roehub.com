@@ -158,6 +158,7 @@ def test_backtest_artifacts_runtime_config_to_precompute_runtime_settings_includ
     assert runtime_settings.price_tail_bars_1m == 20000
     assert runtime_settings.mapping_tail_bars_1m == 20000
     assert runtime_settings.signal_tail_bars_1m == 20000
+    assert runtime_settings.hit_times_tail_bars_1m == 20000
     assert runtime_settings.hit_times_tp_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
     assert runtime_settings.hit_times_sl_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
     assert runtime_settings.max_signal_rows_per_artifact == 5000000
@@ -429,6 +430,7 @@ def test_load_backtest_artifacts_runtime_config_derives_precompute_runtime_setti
         ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema"),
         ArtifactSignalValidationSpecV2(timeframe="1h", indicator_id="ma.sma"),
     )
+    assert settings.hit_times_tail_bars_1m == 400
     assert settings.max_signal_rows_per_artifact == 3000
 
 

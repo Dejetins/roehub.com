@@ -213,6 +213,7 @@ def build_artifact_precompute_fixture_v2(
     price_tail_bars_1m: int = 2,
     mapping_tail_bars_1m: int = 10,
     signal_tail_bars_1m: int = 10,
+    hit_times_tail_bars_1m: int = 10,
     validation_signal_artifacts: tuple[tuple[str, str], ...] = (),
     precompute_signal_artifacts: tuple[tuple[str, str], ...] = (),
     require_hit_times_manifest: bool = False,
@@ -230,6 +231,8 @@ def build_artifact_precompute_fixture_v2(
             bars.
         signal_tail_bars_1m: Strict positive `signals/<tf>/<indicator_id>` tail rebuild budget
             expressed in `1m` bars.
+        hit_times_tail_bars_1m: Strict positive `hit_times/1m` tail rebuild budget in canonical
+            `1m` bars.
         validation_signal_artifacts: Explicit `(timeframe, indicator_id)` targets written into
             `backtest_artifacts.validation_plan.signal_artifacts`.
         precompute_signal_artifacts: Explicit `(timeframe, indicator_id)` targets enabled for
@@ -303,7 +306,7 @@ def build_artifact_precompute_fixture_v2(
                         "price_tail_bars_1m": price_tail_bars_1m,
                         "mapping_tail_bars_1m": mapping_tail_bars_1m,
                         "signal_tail_bars_1m": signal_tail_bars_1m,
-                        "hit_times_tail_bars_1m": 10,
+                        "hit_times_tail_bars_1m": hit_times_tail_bars_1m,
                     },
                         "validation_budgets": {
                             "max_price_bars_per_timeframe": 1000000,
@@ -325,6 +328,7 @@ def build_artifact_precompute_fixture_v2(
             price_tail_bars_1m=runtime_config.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=runtime_config.lookback_policy.mapping_tail_bars_1m,
             signal_tail_bars_1m=runtime_config.lookback_policy.signal_tail_bars_1m,
+            hit_times_tail_bars_1m=runtime_config.lookback_policy.hit_times_tail_bars_1m,
             hit_times_tp_levels_pct=runtime_config.hit_times_grid.tp_levels_pct,
             hit_times_sl_levels_pct=runtime_config.hit_times_grid.sl_levels_pct,
             config_sha256=build_backtest_artifacts_runtime_config_hash(config=runtime_config),

@@ -15,11 +15,16 @@ from trading.contexts.backtest.application.services import (
     ArtifactPublishResultV2,
     ArtifactSlotPublishErrorV2,
     ArtifactSlotValidationSpecV2,
+    ArtifactStageRebuildStatsCollectionV2,
     ArtifactTailRebuildBarsV2,
     BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
     artifact_market_id_from_coordinates_v2,
     validate_current_pointer_published_at_utc_v2,
+)
+from trading.contexts.backtest.application.services.v2.contracts import (
+    validate_non_negative_manifest_int_v2,
+    validate_positive_manifest_int_v2,
 )
 from trading.contexts.market_data.application.ports.stores import CanonicalCandleIndexReader
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, TimeRange, UtcTimestamp
@@ -183,7 +188,72 @@ class PublishBacktestArtifactsV2Result:
     rewritten_tail_bars: int
     blocking_active_run_count: int
     validation: PublishBacktestArtifactsV2ValidationSummary
+    stage_rebuild_stats: ArtifactStageRebuildStatsCollectionV2 = field(
+        default_factory=ArtifactStageRebuildStatsCollectionV2
+    )
     tail_rebuild_bars: ArtifactTailRebuildBarsV2 = field(default_factory=ArtifactTailRebuildBarsV2)
+
+    def __post_init__(self) -> None:
+        """
+        Validate publish diagnostics counters exposed to CLI and scheduler integrations.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Legacy top-level `reused_prefix_bars` / `rewritten_tail_bars` stay aligned with the
+            canonical `prices` stage while stage-local stats expose the full pipeline breakdown.
+        Raises:
+            ValueError: If counts are negative, missing, or inconsistent with stage-local stats.
+        Side Effects:
+            Normalizes numeric counters through strict integer validation.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - apps/cli/commands/backtest_artifact_publish.py
+          - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+        """
+        object.__setattr__(
+            self,
+            "source_candle_count",
+            validate_positive_manifest_int_v2(self.source_candle_count),
+        )
+        object.__setattr__(
+            self,
+            "reused_prefix_bars",
+            validate_non_negative_manifest_int_v2(self.reused_prefix_bars),
+        )
+        object.__setattr__(
+            self,
+            "rewritten_tail_bars",
+            validate_positive_manifest_int_v2(self.rewritten_tail_bars),
+        )
+        object.__setattr__(
+            self,
+            "blocking_active_run_count",
+            validate_non_negative_manifest_int_v2(self.blocking_active_run_count),
+        )
+        if self.stage_rebuild_stats is None:  # type: ignore[truthy-bool]
+            raise ValueError("PublishBacktestArtifactsV2Result.stage_rebuild_stats is required")
+        if self.tail_rebuild_bars is None:  # type: ignore[truthy-bool]
+            raise ValueError("PublishBacktestArtifactsV2Result.tail_rebuild_bars is required")
+        if self.stage_rebuild_stats.prices.reused_prefix_bars != self.reused_prefix_bars:
+            raise ValueError(
+                "PublishBacktestArtifactsV2Result.reused_prefix_bars must match "
+                "stage_rebuild_stats.prices.reused_prefix_bars"
+            )
+        if self.stage_rebuild_stats.prices.rewritten_tail_bars != self.rewritten_tail_bars:
+            raise ValueError(
+                "PublishBacktestArtifactsV2Result.rewritten_tail_bars must match "
+                "stage_rebuild_stats.prices.rewritten_tail_bars"
+            )
+        if self.stage_rebuild_stats.tail_rebuild_bars() != self.tail_rebuild_bars:
+            raise ValueError(
+                "PublishBacktestArtifactsV2Result.tail_rebuild_bars must match "
+                "stage_rebuild_stats rewritten tail totals"
+            )
 
     def as_dict(self) -> Mapping[str, object]:
         """
@@ -228,6 +298,7 @@ class PublishBacktestArtifactsV2Result:
             "source_candle_count": self.source_candle_count,
             "reused_prefix_bars": self.reused_prefix_bars,
             "rewritten_tail_bars": self.rewritten_tail_bars,
+            "stage_rebuild_stats": self.stage_rebuild_stats.as_dict(),
             "tail_rebuild_bars": self.tail_rebuild_bars.as_dict(),
             "blocking_active_run_count": self.blocking_active_run_count,
             "validation": self.validation.as_dict(),
@@ -358,6 +429,7 @@ class PublishBacktestArtifactsV2UseCase:
             source_candle_count=build_result.source_candle_count,
             reused_prefix_bars=build_result.reused_prefix_bars,
             rewritten_tail_bars=build_result.rewritten_tail_bars,
+            stage_rebuild_stats=build_result.stage_rebuild_stats,
             tail_rebuild_bars=build_result.tail_rebuild_bars,
             blocking_active_run_count=precheck.blocking_active_run_count,
             validation=validation_summary,

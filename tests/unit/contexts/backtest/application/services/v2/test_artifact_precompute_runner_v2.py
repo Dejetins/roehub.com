@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
+from hashlib import sha256
 from itertools import product
 from pathlib import Path
 from typing import Iterator, Mapping, cast
@@ -25,13 +26,20 @@ from trading.contexts.backtest.application.services import (
     ArtifactCanonicalPriceExportResultV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotPublishErrorV2,
+    ArtifactStageRebuildStatsV2,
+    ArtifactTailRebuildBarsV2,
     BacktestArtifactManifestValidatorV2,
     BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
     BacktestSignalRulesEngineV2,
+    SignalRuleEvaluationRequestV2,
+)
+from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
+    indicator_primary_output_series_from_tensor_v1,
 )
 from trading.contexts.indicators.adapters.outbound.registry import YamlIndicatorRegistry
 from trading.contexts.indicators.application.dto import (
+    CandleArrays,
     ComputeRequest,
     EstimateResult,
     IndicatorTensor,
@@ -52,6 +60,7 @@ from trading.shared_kernel.primitives import (
     InstrumentId,
     MarketId,
     Symbol,
+    Timeframe,
     TimeRange,
     UtcTimestamp,
 )
@@ -437,6 +446,39 @@ def _build_signal_test_defaults_provider_v2() -> _PrecomputeSignalDefaultsProvid
     return _PrecomputeSignalDefaultsProvider(delegate=delegate, overrides=overrides)
 
 
+def _build_long_window_signal_test_defaults_provider_v2() -> _PrecomputeSignalDefaultsProvider:
+    """
+    Build a deterministic defaults provider with warmup-heavy signal windows for tail proofs.
+
+    Args:
+        None.
+    Returns:
+        _PrecomputeSignalDefaultsProvider: Wrapper forcing one long-window `ma.sma` grid.
+    Assumptions:
+        The long-window scenario must materially exceed the naive `signal_tail_bars_1m` budget.
+    Raises:
+        FileNotFoundError: If `configs/prod/indicators.yaml` is unavailable.
+    Side Effects:
+        Reads the repository-local prod defaults YAML.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+    delegate = YamlBacktestGridDefaultsProvider.from_yaml(
+        config_path=Path("configs/prod/indicators.yaml")
+    )
+    overrides = {
+        "ma.sma": GridSpec(
+            indicator_id=IndicatorId("ma.sma"),
+            params={"window": ExplicitValuesSpec(name="window", values=(40,))},
+            source=ExplicitValuesSpec(name="source", values=("close",)),
+        )
+    }
+    return _PrecomputeSignalDefaultsProvider(delegate=delegate, overrides=overrides)
+
+
 def _signal_grid_builder_v2() -> GridBuilder:
     """
     Build the shared grid builder used by small deterministic signal export tests.
@@ -464,6 +506,94 @@ def _signal_grid_builder_v2() -> GridBuilder:
         config_path=Path("configs/test/indicators.yaml"),
     )
     return GridBuilder(registry=registry)
+
+
+def _candle_arrays_from_loaded_prices_v2(
+    *,
+    timeframe: str,
+    open_time: np.ndarray,
+    close_time: np.ndarray,
+    ohlcv: np.ndarray,
+) -> CandleArrays:
+    """
+    Convert loaded strict price arrays into `CandleArrays` for deterministic test compute.
+
+    Args:
+        timeframe: Price timeframe literal represented by the arrays.
+        open_time: Epoch-millis open timestamps.
+        close_time: Epoch-millis close timestamps.
+        ohlcv: Strict `[T, 5]` float32 OHLCV matrix.
+    Returns:
+        CandleArrays: Dense candle arrays aligned to the provided timeline.
+    Assumptions:
+        Test fixtures use the same single instrument identity for all artifact exports.
+    Raises:
+        ValueError: If one provided array violates `CandleArrays` constructor invariants.
+    Side Effects:
+        Allocates contiguous arrays for test compute.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+    return CandleArrays(
+        market_id=MarketId(1),
+        symbol=Symbol("BTCUSDT"),
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime.fromtimestamp(int(open_time[0]) / 1000.0, timezone.utc)),
+            end=UtcTimestamp(datetime.fromtimestamp(int(close_time[-1]) / 1000.0, timezone.utc)),
+        ),
+        timeframe=Timeframe(timeframe),
+        ts_open=np.ascontiguousarray(open_time, dtype=np.int64),
+        open=np.ascontiguousarray(ohlcv[:, 0], dtype=np.float32),
+        high=np.ascontiguousarray(ohlcv[:, 1], dtype=np.float32),
+        low=np.ascontiguousarray(ohlcv[:, 2], dtype=np.float32),
+        close=np.ascontiguousarray(ohlcv[:, 3], dtype=np.float32),
+        volume=np.ascontiguousarray(ohlcv[:, 4], dtype=np.float32),
+    )
+
+
+def _time_axis_prefix_sha256_v2(*, array: np.ndarray, prefix_bars: int) -> str:
+    """
+    Hash the unchanged time-axis prefix of one artifact array for byte-stability proofs.
+
+    Args:
+        array: Artifact array whose time axis is the last dimension or the only dimension.
+        prefix_bars: Number of leading time bars to include in the digest.
+    Returns:
+        str: Lowercase SHA-256 digest of the selected prefix bytes.
+    Assumptions:
+        Artifact arrays in these proofs are either `[T]`, `[T, 5]`, or `[level, T]`/`[V, T]`.
+    Raises:
+        ValueError: If `prefix_bars` is outside the array time-axis bounds.
+    Side Effects:
+        Allocates one contiguous prefix slice before hashing.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+    if prefix_bars < 0:
+        raise ValueError(f"prefix_bars must be >= 0; got {prefix_bars!r}")
+    if array.ndim == 1:
+        time_axis_size = int(array.shape[0])
+    elif array.ndim == 2 and array.shape[1] == 5:
+        time_axis_size = int(array.shape[0])
+    else:
+        time_axis_size = int(array.shape[-1])
+    if prefix_bars > time_axis_size:
+        raise ValueError(
+            f"prefix_bars must be <= time axis size {time_axis_size}; got {prefix_bars!r}"
+        )
+    if array.ndim == 1:
+        prefix = np.ascontiguousarray(array[:prefix_bars])
+    elif array.ndim == 2 and array.shape[1] == 5:
+        prefix = np.ascontiguousarray(array[:prefix_bars, :])
+    else:
+        prefix = np.ascontiguousarray(array[..., :prefix_bars])
+    return sha256(prefix.tobytes()).hexdigest()
 
 
 def _axis_def_from_materialized_axis_v2(axis: object) -> AxisDef:
@@ -1441,6 +1571,466 @@ def test_backtest_artifact_precompute_runner_v2_signal_tail_rebuild_is_byte_stab
     assert len(second_compute.time_lengths) == 1
     assert 2 <= second_compute.time_lengths[0] < first_compute.time_lengths[0]
     assert first_bytes == second_bytes
+
+
+def test_backtest_artifact_precompute_runner_v2_proves_repeated_daily_run_rewrites_only_bounded_tail(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Prove a repeated daily run preserves unchanged prefixes and rewrites only the bounded tail.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        The second run extends source data by a bounded suffix and updates only the overlapping
+        tail for `prices`, `mappings`, `signals`, and `hit_times`.
+    Raises:
+        AssertionError: If stage stats drift, unchanged prefixes lose byte-stability, or full-slot
+            validation fails after the incremental run.
+    Side Effects:
+        Rewrites the inactive slot twice under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    initial_end_minute = _FULL_BUILD_MINUTES_V2
+    updated_end_minute = _FULL_BUILD_MINUTES_V2 + 60
+    signal_targets = (("15m", "ma.ema"),)
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        hit_times_tail_bars_1m=30,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=True,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    initial_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(initial_end_minute)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+    initial_runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=initial_end_minute)
+    )
+    initial_open_time, _, initial_ohlcv = _load_price_arrays_v2(fixture=fixture, timeframe="1m")
+    initial_signal_matrix = _load_signal_matrix_v2(
+        fixture=fixture,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+    initial_mapping_lengths = {
+        timeframe: _load_mapping_arrays_v2(fixture=fixture, timeframe=timeframe)[0].shape[0]
+        for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2
+    }
+    initial_one_hour_mapping_open, initial_one_hour_mapping_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="1h",
+    )
+    _, _, initial_long_tp, initial_long_sl, initial_short_tp, initial_short_sl = (
+        _load_hit_times_arrays_v2(fixture=fixture)
+    )
+
+    updated_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(
+                bar_indexes=tuple(range(initial_end_minute - 30, updated_end_minute)),
+                price_offset=1000.0,
+                volume_offset=50.0,
+            )
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+    result = updated_runner.export_canonical_price_1m(
+        _request_v2(
+            fixture=fixture,
+            end_minute=updated_end_minute,
+            asof_date="2026-03-29",
+            generated_at_utc="2026-03-29T03:00:00Z",
+        )
+    )
+    updated_open_time, _, updated_ohlcv = _load_price_arrays_v2(fixture=fixture, timeframe="1m")
+    updated_signal_matrix = _load_signal_matrix_v2(
+        fixture=fixture,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+    updated_one_hour_mapping_open, updated_one_hour_mapping_close = _load_mapping_arrays_v2(
+        fixture=fixture,
+        timeframe="1h",
+    )
+    updated_mapping_lengths = {
+        timeframe: _load_mapping_arrays_v2(fixture=fixture, timeframe=timeframe)[0].shape[0]
+        for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2
+    }
+    _, _, updated_long_tp, updated_long_sl, updated_short_tp, updated_short_sl = (
+        _load_hit_times_arrays_v2(fixture=fixture)
+    )
+    validation_result = BacktestArtifactManifestValidatorV2(
+        artifact_loader=fixture.loader
+    ).validate_slot(
+        coordinates=fixture.coordinates,
+        slot=fixture.inactive_slot,
+        validation_spec=fixture.runtime_config.to_validation_spec(),
+        expected_asof_date="2026-03-29",
+        expected_slot_generation=5,
+    )
+    expected_mapping_reused_prefix_bars = sum(initial_mapping_lengths.values())
+    expected_mapping_rewritten_bars = sum(
+        updated_mapping_lengths[timeframe] - initial_mapping_lengths[timeframe]
+        for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2
+    )
+
+    assert result.reused_prefix_bars == initial_end_minute - 30
+    assert result.rewritten_tail_bars == 90
+    assert result.stage_rebuild_stats.prices == ArtifactStageRebuildStatsV2(
+        reused_prefix_bars=initial_end_minute - 30,
+        rewritten_tail_bars=90,
+    )
+    assert result.stage_rebuild_stats.signals == ArtifactStageRebuildStatsV2(
+        reused_prefix_bars=286,
+        rewritten_tail_bars=6,
+    )
+    assert result.stage_rebuild_stats.hit_times == ArtifactStageRebuildStatsV2(
+        reused_prefix_bars=initial_end_minute - 30,
+        rewritten_tail_bars=90,
+    )
+    assert result.stage_rebuild_stats.mappings == ArtifactStageRebuildStatsV2(
+        reused_prefix_bars=expected_mapping_reused_prefix_bars,
+        rewritten_tail_bars=expected_mapping_rewritten_bars,
+    )
+    assert result.tail_rebuild_bars == ArtifactTailRebuildBarsV2(
+        prices=90,
+        mappings=expected_mapping_rewritten_bars,
+        signals=6,
+        hit_times=90,
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_open_time,
+        prefix_bars=result.stage_rebuild_stats.prices.reused_prefix_bars,
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_open_time,
+        prefix_bars=result.stage_rebuild_stats.prices.reused_prefix_bars,
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_ohlcv,
+        prefix_bars=result.stage_rebuild_stats.prices.reused_prefix_bars,
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_ohlcv,
+        prefix_bars=result.stage_rebuild_stats.prices.reused_prefix_bars,
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_one_hour_mapping_open,
+        prefix_bars=initial_one_hour_mapping_open.shape[0],
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_one_hour_mapping_open,
+        prefix_bars=initial_one_hour_mapping_open.shape[0],
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_one_hour_mapping_close,
+        prefix_bars=initial_one_hour_mapping_close.shape[0],
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_one_hour_mapping_close,
+        prefix_bars=initial_one_hour_mapping_close.shape[0],
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_signal_matrix,
+        prefix_bars=result.stage_rebuild_stats.signals.reused_prefix_bars,
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_signal_matrix,
+        prefix_bars=result.stage_rebuild_stats.signals.reused_prefix_bars,
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_long_tp,
+        prefix_bars=result.stage_rebuild_stats.hit_times.reused_prefix_bars,
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_long_tp,
+        prefix_bars=result.stage_rebuild_stats.hit_times.reused_prefix_bars,
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_long_sl,
+        prefix_bars=result.stage_rebuild_stats.hit_times.reused_prefix_bars,
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_long_sl,
+        prefix_bars=result.stage_rebuild_stats.hit_times.reused_prefix_bars,
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_short_tp,
+        prefix_bars=result.stage_rebuild_stats.hit_times.reused_prefix_bars,
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_short_tp,
+        prefix_bars=result.stage_rebuild_stats.hit_times.reused_prefix_bars,
+    )
+    assert _time_axis_prefix_sha256_v2(
+        array=updated_short_sl,
+        prefix_bars=result.stage_rebuild_stats.hit_times.reused_prefix_bars,
+    ) == _time_axis_prefix_sha256_v2(
+        array=initial_short_sl,
+        prefix_bars=result.stage_rebuild_stats.hit_times.reused_prefix_bars,
+    )
+    assert updated_open_time.shape[0] == initial_open_time.shape[0] + 60
+    assert updated_one_hour_mapping_open.shape[0] == initial_one_hour_mapping_open.shape[0] + 1
+    assert updated_signal_matrix.shape[1] == initial_signal_matrix.shape[1] + 4
+    assert updated_long_tp.shape[1] == initial_long_tp.shape[1] + 60
+    assert validation_result.diagnostics == ()
+
+
+def test_backtest_artifact_precompute_runner_v2_falls_back_to_full_hit_times_rebuild_on_grid_drift(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Verify `hit_times/1m` switches to deterministic full rebuild when grid reuse drifts.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Price reuse may still remain incremental while only the hit-times stage falls back.
+    Raises:
+        AssertionError: If hit-times drift is silently reused instead of forcing a full rebuild.
+    Side Effects:
+        Rewrites the inactive slot under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        hit_times_tail_bars_1m=30,
+        require_hit_times_manifest=True,
+    )
+    initial_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+    )
+    initial_runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    )
+
+    drifted_runtime_settings = replace(
+        fixture.runtime_settings,
+        hit_times_tp_levels_pct=(1.0, 2.0),
+        config_sha256="b" * 64,
+    )
+    drifted_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=drifted_runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(
+                bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2 - 30, _FULL_BUILD_MINUTES_V2))
+            )
+        ),
+    )
+    result = drifted_runner.export_canonical_price_1m(
+        _request_v2(
+            fixture=fixture,
+            end_minute=_FULL_BUILD_MINUTES_V2,
+            asof_date="2026-03-28",
+            generated_at_utc="2026-03-28T03:00:00Z",
+        )
+    )
+    tp_values, _, _, _, _, _ = _load_hit_times_arrays_v2(fixture=fixture)
+
+    assert result.stage_rebuild_stats.prices == ArtifactStageRebuildStatsV2(
+        reused_prefix_bars=_FULL_BUILD_MINUTES_V2 - 30,
+        rewritten_tail_bars=30,
+    )
+    assert result.stage_rebuild_stats.hit_times == ArtifactStageRebuildStatsV2(
+        reused_prefix_bars=0,
+        rewritten_tail_bars=_FULL_BUILD_MINUTES_V2,
+    )
+    np.testing.assert_allclose(tp_values, np.asarray([0.01, 0.02], dtype=np.float32))
+
+
+def test_backtest_artifact_precompute_runner_v2_keeps_long_window_signal_tail_correct_with_warmup(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Prove warmup-heavy signal tails match a full rebuild and fail under a naive tail cut.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `signal_tail_bars_1m=30` yields only two `15m` target bars, so a `window=40` signal needs
+        extra warmup context to stay correct.
+    Raises:
+        AssertionError: If the shipped warmup-aware rebuild diverges from a full rebuild or if the
+            naive short-context tail cut accidentally stays correct.
+    Side Effects:
+        Materializes one incremental slot and one full-reference slot under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    signal_targets = (("15m", "ma.sma"),)
+    initial_end_minute = _FULL_BUILD_MINUTES_V2
+    updated_end_minute = _FULL_BUILD_MINUTES_V2 + 60
+    defaults_provider = _build_long_window_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    incremental_fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path / "incremental",
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        hit_times_tail_bars_1m=30,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    initial_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=incremental_fixture.runtime_settings,
+        artifact_loader=incremental_fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(initial_end_minute)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+    initial_runner.export_canonical_price_1m(
+        _request_v2(fixture=incremental_fixture, end_minute=initial_end_minute)
+    )
+    updated_compute = _DeterministicSignalCompute(grid_builder=grid_builder)
+    updated_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=incremental_fixture.runtime_settings,
+        artifact_loader=incremental_fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(
+                bar_indexes=tuple(range(initial_end_minute - 30, updated_end_minute))
+            )
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=updated_compute,
+        indicator_grid_builder=grid_builder,
+    )
+    incremental_result = updated_runner.export_canonical_price_1m(
+        _request_v2(
+            fixture=incremental_fixture,
+            end_minute=updated_end_minute,
+            asof_date="2026-03-29",
+            generated_at_utc="2026-03-29T03:00:00Z",
+        )
+    )
+    incremental_matrix = _load_signal_matrix_v2(
+        fixture=incremental_fixture,
+        timeframe="15m",
+        indicator_id="ma.sma",
+    )
+
+    reference_fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path / "reference",
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        hit_times_tail_bars_1m=30,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    reference_runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=reference_fixture.runtime_settings,
+        artifact_loader=reference_fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(updated_end_minute)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+    reference_runner.export_canonical_price_1m(
+        _request_v2(
+            fixture=reference_fixture,
+            end_minute=updated_end_minute,
+            asof_date="2026-03-29",
+            generated_at_utc="2026-03-29T03:00:00Z",
+        )
+    )
+    reference_matrix = _load_signal_matrix_v2(
+        fixture=reference_fixture,
+        timeframe="15m",
+        indicator_id="ma.sma",
+    )
+    reference_open_time, reference_close_time, reference_ohlcv = _load_price_arrays_v2(
+        fixture=reference_fixture,
+        timeframe="15m",
+    )
+    naive_tail_bars = incremental_result.stage_rebuild_stats.signals.rewritten_tail_bars
+    tail_candles = _candle_arrays_from_loaded_prices_v2(
+        timeframe="15m",
+        open_time=reference_open_time[-naive_tail_bars:],
+        close_time=reference_close_time[-naive_tail_bars:],
+        ohlcv=reference_ohlcv[-naive_tail_bars:, :],
+    )
+    compute_grid = GridSpec(
+        indicator_id=IndicatorId("ma.sma"),
+        params={"window": ExplicitValuesSpec(name="window", values=(40,))},
+        source=ExplicitValuesSpec(name="source", values=("close",)),
+        layout_preference=Layout.VARIANT_MAJOR,
+    )
+    naive_tensor = _DeterministicSignalCompute(grid_builder=grid_builder).compute(
+        ComputeRequest(
+            candles=tail_candles,
+            grid=compute_grid,
+            max_variants_guard=incremental_fixture.runtime_settings.max_signal_rows_per_artifact,
+        )
+    )
+    naive_signal_codes = signal_rules_engine.evaluate(
+        request=SignalRuleEvaluationRequestV2(
+            indicator_id="ma.sma",
+            candles=tail_candles,
+            primary_output=indicator_primary_output_series_from_tensor_v1(
+                tensor=naive_tensor,
+                variant_index=0,
+            ),
+            inputs_source="close",
+            signal_params={},
+            dependency_outputs={},
+        )
+    ).signal_codes
+
+    assert incremental_result.stage_rebuild_stats.signals == ArtifactStageRebuildStatsV2(
+        reused_prefix_bars=286,
+        rewritten_tail_bars=6,
+    )
+    assert updated_compute.time_lengths == [46]
+    np.testing.assert_array_equal(incremental_matrix, reference_matrix)
+    assert not np.array_equal(naive_signal_codes, reference_matrix[0, -naive_tail_bars:])
 
 
 def test_backtest_artifact_precompute_runner_v2_rejects_drifted_existing_signal_artifact(

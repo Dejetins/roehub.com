@@ -317,6 +317,17 @@ Steady-state rebuild policy after the first successful publish:
 - `hit_times/1m` должны использовать bounded rebuild по
   `lookback_policy.hit_times_tail_bars_1m`; если reuse невозможен, rebuild переключается в
   deterministic full rebuild для этого symbol root;
+- после R11-03 operator diagnostics обязаны читать stage-level rebuild stats из shared publish
+  result:
+  - `prices.reused_prefix_bars` / `prices.rewritten_tail_bars`
+  - `mappings.reused_prefix_bars` / `mappings.rewritten_tail_bars`
+  - `signals.reused_prefix_bars` / `signals.rewritten_tail_bars`
+  - `hit_times.reused_prefix_bars` / `hit_times.rewritten_tail_bars`
+- proof strategy for repeated daily runs is explicit:
+  - unchanged prefix arrays must stay byte-stable;
+  - only the bounded suffix addressed by `prefix + rebuilt_tail` may change;
+  - warmup-heavy signal targets must still match a deterministic full rebuild even when naive
+    `effective_target_tail_bars` alone is smaller than the required `warmup`;
 - publish остаётся запрещённым, если active validation plan still expects later-stage artifacts.
 
 Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.
@@ -351,6 +362,9 @@ published_at_utc: "2026-03-26T03:04:05Z"
 - `backtest_artifact_publish_blocked_total{reason=~"lock_held|inactive_slot_pinned|validation_failed"}` не растёт неожиданно;
 - `backtest_artifact_tail_rebuild_bars_total{stage}` показывает ожидаемый bounded tail profile, а
   не скрытый full rebuild без причины.
+- per-stage `reused_prefix_bars` / `rewritten_tail_bars` из publish diagnostics согласованы с этим
+  profile и объясняют, почему `hit_times/1m` или long-window `signals.i8.npy` могли перейти в
+  full rebuild.
 
 ## R6-01 runtime bootstrap checks
 

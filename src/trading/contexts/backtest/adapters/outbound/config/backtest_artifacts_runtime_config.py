@@ -683,6 +683,7 @@ class BacktestArtifactsRuntimeConfig:
             price_tail_bars_1m=self.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=self.lookback_policy.mapping_tail_bars_1m,
             signal_tail_bars_1m=self.lookback_policy.signal_tail_bars_1m,
+            hit_times_tail_bars_1m=self.lookback_policy.hit_times_tail_bars_1m,
             hit_times_tp_levels_pct=self.hit_times_grid.tp_levels_pct,
             hit_times_sl_levels_pct=self.hit_times_grid.sl_levels_pct,
             config_sha256=config_sha256,

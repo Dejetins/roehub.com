@@ -13,6 +13,8 @@ from apps.scheduler.backtest_artifact_publisher.wiring.modules import (
 from trading.contexts.backtest.application.services import (
     ArtifactCoordinatesV2,
     ArtifactSlotPublishErrorV2,
+    ArtifactStageRebuildStatsCollectionV2,
+    ArtifactStageRebuildStatsV2,
     ArtifactTailRebuildBarsV2,
 )
 from trading.contexts.backtest.application.use_cases import (
@@ -216,7 +218,7 @@ def _successful_result(
         source_end_utc="2026-03-30T00:00:00Z",
         source_candle_count=1440,
         reused_prefix_bars=1438,
-        rewritten_tail_bars=2,
+        rewritten_tail_bars=tail_rebuild_bars.prices,
         blocking_active_run_count=0,
         validation=PublishBacktestArtifactsV2ValidationSummary(
             slot_manifest_path=None,
@@ -227,6 +229,24 @@ def _successful_result(
             signal_manifest_count=1,
             hit_times_manifest_present=True,
             diagnostics_count=0,
+        ),
+        stage_rebuild_stats=ArtifactStageRebuildStatsCollectionV2(
+            prices=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=1438,
+                rewritten_tail_bars=tail_rebuild_bars.prices,
+            ),
+            mappings=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=95,
+                rewritten_tail_bars=tail_rebuild_bars.mappings,
+            ),
+            signals=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=94,
+                rewritten_tail_bars=tail_rebuild_bars.signals,
+            ),
+            hit_times=ArtifactStageRebuildStatsV2(
+                reused_prefix_bars=1435,
+                rewritten_tail_bars=tail_rebuild_bars.hit_times,
+            ),
         ),
         tail_rebuild_bars=tail_rebuild_bars,
     )

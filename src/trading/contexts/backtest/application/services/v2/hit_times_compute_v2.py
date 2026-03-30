@@ -108,6 +108,112 @@ def materialize_hit_times_from_ohlcv_v2(
     return result
 
 
+def merge_hit_times_prefix_with_rebuilt_tail_v2(
+    *,
+    prefix: HitTimesArraysV2 | None,
+    rebuilt_tail: HitTimesArraysV2,
+    prefix_bars: int,
+    total_timeline_bars: int,
+) -> HitTimesArraysV2:
+    """
+    Merge a reused hit-times prefix with a freshly rebuilt tail in global timeline space.
+
+    Args:
+        prefix: Existing unchanged prefix slice, or `None` for full rebuild.
+        rebuilt_tail: Fresh tail arrays computed on the local tail-only `ohlcv` slice.
+        prefix_bars: Number of unchanged leading timeline bars preserved from the existing slot.
+        total_timeline_bars: Final global timeline length after merge.
+    Returns:
+        HitTimesArraysV2: Strict merged arrays with global indexes and sentinel bounds.
+    Assumptions:
+        `rebuilt_tail` indexes are local to its tail slice and must be rebased by `prefix_bars`
+        before concatenation.
+    Raises:
+        ValueError: If prefix/tail grids drift, prefix sizes are inconsistent, or the final merged
+            arrays violate the strict contract.
+    Side Effects:
+        Allocates fresh merged numpy arrays in memory.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if prefix_bars < 0:
+        raise ValueError(f"prefix_bars must be >= 0; got {prefix_bars!r}")
+    if total_timeline_bars <= 0:
+        raise ValueError(f"total_timeline_bars must be > 0; got {total_timeline_bars!r}")
+    expected_total_timeline_bars = prefix_bars + rebuilt_tail.sentinel_index
+    if expected_total_timeline_bars != total_timeline_bars:
+        raise ValueError(
+            "total_timeline_bars must equal prefix_bars + rebuilt_tail.sentinel_index; got "
+            f"{total_timeline_bars!r}, expected {expected_total_timeline_bars!r}"
+        )
+    if prefix is not None and prefix.sentinel_index != prefix_bars:
+        raise ValueError(
+            "prefix.sentinel_index must equal prefix_bars; got "
+            f"{prefix.sentinel_index!r}, expected {prefix_bars!r}"
+        )
+
+    rebased_tail = HitTimesArraysV2(
+        tp_values=np.ascontiguousarray(rebuilt_tail.tp_values, dtype=np.float32),
+        sl_values=np.ascontiguousarray(rebuilt_tail.sl_values, dtype=np.float32),
+        long_tp=_rebase_hit_times_table_indexes_v2(
+            values=rebuilt_tail.long_tp,
+            prefix_bars=prefix_bars,
+            tail_sentinel_index=rebuilt_tail.sentinel_index,
+            total_timeline_bars=total_timeline_bars,
+        ),
+        long_sl=_rebase_hit_times_table_indexes_v2(
+            values=rebuilt_tail.long_sl,
+            prefix_bars=prefix_bars,
+            tail_sentinel_index=rebuilt_tail.sentinel_index,
+            total_timeline_bars=total_timeline_bars,
+        ),
+        short_tp=_rebase_hit_times_table_indexes_v2(
+            values=rebuilt_tail.short_tp,
+            prefix_bars=prefix_bars,
+            tail_sentinel_index=rebuilt_tail.sentinel_index,
+            total_timeline_bars=total_timeline_bars,
+        ),
+        short_sl=_rebase_hit_times_table_indexes_v2(
+            values=rebuilt_tail.short_sl,
+            prefix_bars=prefix_bars,
+            tail_sentinel_index=rebuilt_tail.sentinel_index,
+            total_timeline_bars=total_timeline_bars,
+        ),
+        sentinel_index=total_timeline_bars,
+    )
+    if prefix is None or prefix_bars == 0:
+        _validate_materialized_hit_times_v2(hit_times=rebased_tail)
+        return rebased_tail
+
+    _require_matching_hit_times_grids_v2(prefix=prefix, rebuilt_tail=rebuilt_tail)
+    merged = HitTimesArraysV2(
+        tp_values=np.ascontiguousarray(prefix.tp_values, dtype=np.float32),
+        sl_values=np.ascontiguousarray(prefix.sl_values, dtype=np.float32),
+        long_tp=np.ascontiguousarray(
+            np.concatenate((prefix.long_tp, rebased_tail.long_tp), axis=1),
+            dtype=np.uint32,
+        ),
+        long_sl=np.ascontiguousarray(
+            np.concatenate((prefix.long_sl, rebased_tail.long_sl), axis=1),
+            dtype=np.uint32,
+        ),
+        short_tp=np.ascontiguousarray(
+            np.concatenate((prefix.short_tp, rebased_tail.short_tp), axis=1),
+            dtype=np.uint32,
+        ),
+        short_sl=np.ascontiguousarray(
+            np.concatenate((prefix.short_sl, rebased_tail.short_sl), axis=1),
+            dtype=np.uint32,
+        ),
+        sentinel_index=total_timeline_bars,
+    )
+    _validate_materialized_hit_times_v2(hit_times=merged)
+    return merged
+
+
 def _normalize_hit_times_ohlcv_v2(*, ohlcv: np.ndarray) -> np.ndarray:
     """
     Normalize the canonical `prices/1m.ohlcv` matrix for hit-times kernels.
@@ -479,6 +585,78 @@ def _validate_materialized_hit_times_v2(*, hit_times: HitTimesArraysV2) -> None:
         sentinel_index=hit_times.sentinel_index,
         field_name="short_sl",
     )
+
+
+def _rebase_hit_times_table_indexes_v2(
+    *,
+    values: np.ndarray,
+    prefix_bars: int,
+    tail_sentinel_index: int,
+    total_timeline_bars: int,
+) -> np.ndarray:
+    """
+    Translate one tail-local hit-times table into global timeline indexes.
+
+    Args:
+        values: Tail-local `uint32[level, time]` table.
+        prefix_bars: Number of unchanged leading timeline bars kept before the tail.
+        tail_sentinel_index: Tail-local sentinel equal to the local tail timeline length.
+        total_timeline_bars: Final global sentinel equal to the merged timeline length.
+    Returns:
+        np.ndarray: Rebasing result with indexes in the global timeline space.
+    Assumptions:
+        Non-sentinel cells are local bar indexes in `[0, tail_sentinel_index)`, while sentinel
+        cells must become the final global sentinel.
+    Raises:
+        ValueError: If the resulting table would overflow the global sentinel bound.
+    Side Effects:
+        Allocates one rebased contiguous `uint32` array.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    sentinel_mask = values == np.uint32(tail_sentinel_index)
+    rebased = np.asarray(values, dtype=np.uint64) + np.uint64(prefix_bars)
+    rebased[sentinel_mask] = np.uint64(total_timeline_bars)
+    if np.any(rebased > np.uint64(total_timeline_bars)):
+        raise ValueError(
+            "rebased hit-times values must stay within the merged sentinel bound; got "
+            f"max={int(np.max(rebased))}, total_timeline_bars={total_timeline_bars}"
+        )
+    return np.ascontiguousarray(rebased, dtype=np.uint32)
+
+
+def _require_matching_hit_times_grids_v2(
+    *,
+    prefix: HitTimesArraysV2,
+    rebuilt_tail: HitTimesArraysV2,
+) -> None:
+    """
+    Require reused prefix grids to match the freshly rebuilt tail grids exactly.
+
+    Args:
+        prefix: Existing prefix slice selected for reuse.
+        rebuilt_tail: Freshly rebuilt tail arrays.
+    Returns:
+        None.
+    Assumptions:
+        Prefix reuse is safe only when TP/SL level grids are byte-identical across both slices.
+    Raises:
+        ValueError: If TP or SL grids drift across the merge boundary.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if not np.array_equal(prefix.tp_values, rebuilt_tail.tp_values):
+        raise ValueError("hit-times prefix tp_values must match rebuilt tail tp_values")
+    if not np.array_equal(prefix.sl_values, rebuilt_tail.sl_values):
+        raise ValueError("hit-times prefix sl_values must match rebuilt tail sl_values")
 
 
 def _validate_hit_times_level_grid_v2(*, values: np.ndarray, field_name: str) -> None:

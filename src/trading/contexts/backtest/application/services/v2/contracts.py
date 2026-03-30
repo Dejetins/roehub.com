@@ -2474,6 +2474,152 @@ class ArtifactTailRebuildBarsV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactStageRebuildStatsV2:
+    """
+    Explicit prefix/tail rebuild counters for one artifact stage.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
+    """
+
+    reused_prefix_bars: int = 0
+    rewritten_tail_bars: int = 0
+
+    def __post_init__(self) -> None:
+        """
+        Validate explicit per-stage prefix/tail counters.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Counters are deterministic stage-local bar totals suitable for operator diagnostics.
+        Raises:
+            ValueError: If one counter is negative.
+        Side Effects:
+            Normalizes counters through strict non-negative integer validation.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        object.__setattr__(
+            self,
+            "reused_prefix_bars",
+            validate_non_negative_manifest_int_v2(self.reused_prefix_bars),
+        )
+        object.__setattr__(
+            self,
+            "rewritten_tail_bars",
+            validate_non_negative_manifest_int_v2(self.rewritten_tail_bars),
+        )
+
+    def as_dict(self) -> dict[str, int]:
+        """
+        Serialize one stage-local prefix/tail summary into a stable mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, int]: Stable `reused_prefix_bars` / `rewritten_tail_bars` mapping.
+        Assumptions:
+            Scheduler/CLI diagnostics may consume the same user-facing field names later.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
+        """
+        return {
+            "reused_prefix_bars": self.reused_prefix_bars,
+            "rewritten_tail_bars": self.rewritten_tail_bars,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactStageRebuildStatsCollectionV2:
+    """
+    Stage-level prefix/tail rebuild counters for the full artifact pipeline.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
+    """
+
+    prices: ArtifactStageRebuildStatsV2 = field(default_factory=ArtifactStageRebuildStatsV2)
+    mappings: ArtifactStageRebuildStatsV2 = field(default_factory=ArtifactStageRebuildStatsV2)
+    signals: ArtifactStageRebuildStatsV2 = field(default_factory=ArtifactStageRebuildStatsV2)
+    hit_times: ArtifactStageRebuildStatsV2 = field(default_factory=ArtifactStageRebuildStatsV2)
+
+    def as_dict(self) -> dict[str, dict[str, int]]:
+        """
+        Serialize the per-stage prefix/tail counters into a stable nested mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, dict[str, int]]: Stable stage-keyed nested mapping.
+        Assumptions:
+            Stage keys remain finite and aligned with shared scheduler metric labels.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
+        """
+        return {
+            "prices": self.prices.as_dict(),
+            "mappings": self.mappings.as_dict(),
+            "signals": self.signals.as_dict(),
+            "hit_times": self.hit_times.as_dict(),
+        }
+
+    def tail_rebuild_bars(self) -> ArtifactTailRebuildBarsV2:
+        """
+        Collapse stage-local stats into the shared rewritten-tail-only metric counters.
+
+        Args:
+            None.
+        Returns:
+            ArtifactTailRebuildBarsV2: Shared rewritten-tail counters keyed by stage.
+        Assumptions:
+            Prometheus aggregation currently consumes only rewritten-tail totals per stage.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+        """
+        return ArtifactTailRebuildBarsV2(
+            prices=self.prices.rewritten_tail_bars,
+            mappings=self.mappings.rewritten_tail_bars,
+            signals=self.signals.rewritten_tail_bars,
+            hit_times=self.hit_times.rewritten_tail_bars,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactCanonicalPriceExportResultV2:
     """
     Structured result payload for R3-02 price export into the inactive slot.
@@ -2498,6 +2644,9 @@ class ArtifactCanonicalPriceExportResultV2:
     source_candle_count: int
     reused_prefix_bars: int
     rewritten_tail_bars: int
+    stage_rebuild_stats: ArtifactStageRebuildStatsCollectionV2 = field(
+        default_factory=ArtifactStageRebuildStatsCollectionV2
+    )
     tail_rebuild_bars: ArtifactTailRebuildBarsV2 = field(
         default_factory=ArtifactTailRebuildBarsV2
     )
@@ -2554,8 +2703,25 @@ class ArtifactCanonicalPriceExportResultV2:
             "rewritten_tail_bars",
             validate_positive_manifest_int_v2(self.rewritten_tail_bars),
         )
+        if self.stage_rebuild_stats is None:  # type: ignore[truthy-bool]
+            raise ValueError("ArtifactCanonicalPriceExportResultV2.stage_rebuild_stats is required")
         if self.tail_rebuild_bars is None:  # type: ignore[truthy-bool]
             raise ValueError("ArtifactCanonicalPriceExportResultV2.tail_rebuild_bars is required")
+        if self.stage_rebuild_stats.prices.reused_prefix_bars != self.reused_prefix_bars:
+            raise ValueError(
+                "ArtifactCanonicalPriceExportResultV2.reused_prefix_bars must match "
+                "stage_rebuild_stats.prices.reused_prefix_bars"
+            )
+        if self.stage_rebuild_stats.prices.rewritten_tail_bars != self.rewritten_tail_bars:
+            raise ValueError(
+                "ArtifactCanonicalPriceExportResultV2.rewritten_tail_bars must match "
+                "stage_rebuild_stats.prices.rewritten_tail_bars"
+            )
+        if self.stage_rebuild_stats.tail_rebuild_bars() != self.tail_rebuild_bars:
+            raise ValueError(
+                "ArtifactCanonicalPriceExportResultV2.tail_rebuild_bars must match "
+                "stage_rebuild_stats rewritten tail totals"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -3329,6 +3495,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     price_tail_bars_1m: int
     mapping_tail_bars_1m: int
     signal_tail_bars_1m: int
+    hit_times_tail_bars_1m: int
     hit_times_tp_levels_pct: tuple[float, ...]
     hit_times_sl_levels_pct: tuple[float, ...]
     config_sha256: str
@@ -3371,6 +3538,11 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             self,
             "signal_tail_bars_1m",
             validate_positive_manifest_int_v2(self.signal_tail_bars_1m),
+        )
+        object.__setattr__(
+            self,
+            "hit_times_tail_bars_1m",
+            validate_positive_manifest_int_v2(self.hit_times_tail_bars_1m),
         )
         object.__setattr__(
             self,
