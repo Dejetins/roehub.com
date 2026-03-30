@@ -40,6 +40,7 @@ def test_prometheus_monitoring_contract_includes_required_jobs_and_targets() -> 
         "prometheus",
         "market-data-ws-worker",
         "market-data-scheduler",
+        "backtest-artifact-publisher",
         "node_exporter",
         "postgres_exporter",
         "redis_exporter",
@@ -47,6 +48,9 @@ def test_prometheus_monitoring_contract_includes_required_jobs_and_targets() -> 
 
     jobs_by_name = {job["job_name"]: job for job in payload["scrape_configs"]}
     assert jobs_by_name["api"]["static_configs"] == [{"targets": ["api:8000"]}]
+    assert jobs_by_name["backtest-artifact-publisher"]["static_configs"] == [
+        {"targets": ["backtest-artifact-publisher:9203"]}
+    ]
     assert jobs_by_name["node_exporter"]["static_configs"] == [
         {"targets": ["host.lima.internal:9100"]}
     ]

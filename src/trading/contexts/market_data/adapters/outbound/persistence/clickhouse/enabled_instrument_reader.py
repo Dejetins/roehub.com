@@ -51,7 +51,7 @@ class ClickHouseEnabledInstrumentReader(EnabledInstrumentReader):
 
     def list_enabled_tradable(self) -> Sequence[InstrumentId]:
         """
-        Fetch enabled tradable instruments from latest `ref_instruments` versions.
+        Fetch enabled tradable instruments from latest `market_data.ref_instruments` versions.
 
         Parameters:
         - None.
@@ -62,6 +62,7 @@ class ClickHouseEnabledInstrumentReader(EnabledInstrumentReader):
         Assumptions/Invariants:
         - For each `(market_id, symbol)` key only the latest row by `updated_at` is considered.
         - Latest-state filtering uses `LIMIT 1 BY market_id, symbol`.
+        - Returned rows are ordered deterministically by `(market_id, symbol)`.
 
         Errors/Exceptions:
         - Propagates storage/gateway errors.
@@ -86,6 +87,7 @@ class ClickHouseEnabledInstrumentReader(EnabledInstrumentReader):
         )
         WHERE status = 'ENABLED'
           AND is_tradable = 1
+        ORDER BY market_id ASC, symbol ASC
         """
         rows = self.gateway.select(query, {})
         out: list[InstrumentId] = []

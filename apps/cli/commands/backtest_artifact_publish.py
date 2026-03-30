@@ -422,6 +422,10 @@ def _render_report_v2(
             f"- source_candle_count: {result.source_candle_count}\n"
             f"- reused_prefix_bars: {result.reused_prefix_bars}\n"
             f"- rewritten_tail_bars: {result.rewritten_tail_bars}\n"
+            f"- tail_rebuild_bars: prices={result.tail_rebuild_bars.prices}, "
+            f"mappings={result.tail_rebuild_bars.mappings}, "
+            f"signals={result.tail_rebuild_bars.signals}, "
+            f"hit_times={result.tail_rebuild_bars.hit_times}\n"
             f"- signal_manifest_count: {result.validation.signal_manifest_count}\n"
             f"- hit_times_manifest_present: {result.validation.hit_times_manifest_present}\n"
         )

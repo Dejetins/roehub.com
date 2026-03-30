@@ -166,3 +166,23 @@ groups:
         annotations:
           summary: Market-data scheduler errors increased
           description: Scheduler job errors increased during the last 15 minutes.
+
+  - name: mac-studio-backtest-artifacts
+    rules:
+      - alert: BacktestArtifactPublisherDown
+        expr: max(up{job="backtest-artifact-publisher"}) == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backtest artifact publisher metrics endpoint is down
+          description: Prometheus cannot scrape backtest-artifact-publisher:9203 for 2 minutes.
+
+      - alert: BacktestArtifactPublisherNoRecentSuccess
+        expr: (max(backtest_artifact_publish_last_success_unixtime{job="backtest-artifact-publisher"}) > 0 and time() - max(backtest_artifact_publish_last_success_unixtime{job="backtest-artifact-publisher"}) > 108000) or (max(backtest_artifact_publish_last_success_unixtime{job="backtest-artifact-publisher"}) == 0 and time() - max(process_start_time_seconds{job="backtest-artifact-publisher"}) > 108000)
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backtest artifact publisher has no recent successful publish
+          description: The dedicated Mac Studio artifact publisher has not produced a successful publish within the expected 30-hour freshness window.

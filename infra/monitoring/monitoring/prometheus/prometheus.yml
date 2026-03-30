@@ -81,6 +81,10 @@ scrape_configs:
     static_configs:
       - targets: ["market-data-scheduler:9202"]
 
+  - job_name: backtest-artifact-publisher
+    static_configs:
+      - targets: ["backtest-artifact-publisher:9203"]
+
   - job_name: node_exporter
     static_configs:
       - targets: ["host.lima.internal:9100"]

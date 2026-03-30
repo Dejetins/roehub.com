@@ -55,6 +55,7 @@ Production:
 - `com.roehub.api` (`launchd`, `127.0.0.1:8000`)
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
+- `com.roehub.backtest-artifact-publisher` (`launchd`, metrics `127.0.0.1:9203`, daily `03:05 Europe/Moscow`)
 
 Test:
 
@@ -67,6 +68,7 @@ Test:
 - `com.roehub.test.api` (`127.0.0.1:18000`)
 - `com.roehub.test.market-data-ws-worker` (metrics `127.0.0.1:19201`)
 - `com.roehub.test.market-data-scheduler` (metrics `127.0.0.1:19202`)
+- `com.roehub.test.backtest-artifact-publisher` (metrics `127.0.0.1:19203`, daily `03:05 Europe/Moscow`)
 
 ## Common commands
 
@@ -138,6 +140,20 @@ set +a
 /opt/roehub/app/.venv/bin/python -m apps.cli.main backtest-artifact-publish --exchange binance --market-type spot --symbol BTCUSDT --full-rebuild
 ```
 
+Dedicated scheduled publisher service:
+
+- service label: `com.roehub.backtest-artifact-publisher`
+- timezone-explicit cadence: daily at `03:05 Europe/Moscow`
+- metrics endpoint: `http://127.0.0.1:9203/metrics`
+- host lock file: `/opt/roehub/state/backtest_artifacts/v2/.backtest_artifact_publisher.lock`
+- universe source-of-truth: `market_data.ref_instruments` with enabled+tradable rows
+- key health metrics:
+  - `backtest_artifact_publish_runs_total{status}`
+  - `backtest_artifact_publish_symbols_total{status}`
+  - `backtest_artifact_publish_blocked_total{reason}`
+  - `backtest_artifact_publish_last_success_unixtime`
+  - `backtest_artifact_tail_rebuild_bars_total{stage}`
+
 ## Manual health checks
 
 Production:
@@ -155,6 +171,7 @@ curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:9201/metrics | head
 curl -fsS http://127.0.0.1:9202/metrics | head
+curl -fsS http://127.0.0.1:9203/metrics | head
 /opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --query "SELECT 1"
 redis-cli -h 127.0.0.1 -p 6379 PING
 set -a
@@ -178,6 +195,7 @@ curl -I http://127.0.0.1:13000
 curl -I http://127.0.0.1:19090
 curl -fsS http://127.0.0.1:19201/metrics | head
 curl -fsS http://127.0.0.1:19202/metrics | head
+curl -fsS http://127.0.0.1:19203/metrics | head
 ```
 
 Проверка Prometheus targets после reboot:
@@ -205,6 +223,7 @@ tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/api.out.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/api.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/market-data-ws-worker.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/market-data-scheduler.err.log
+tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/backtest-artifact-publisher.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/blackbox-exporter.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/clickhouse-exporter.err.log
@@ -237,6 +256,31 @@ launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\
 
 - восстановите symlink `/etc/roehub/roehub.env` -> user env;
 - перезагрузите services: `bash scripts/macos/reload_launchd_services.sh prod`.
+
+`backtest-artifact-publisher` показывает `backtest_artifact_publish_blocked_total{reason="lock_held"}` или не публикует новые успехи:
+
+- убедитесь, что нет второго ручного процесса `python -m apps.scheduler.backtest_artifact_publisher.main.main`;
+- проверьте lock file `/opt/roehub/state/backtest_artifacts/v2/.backtest_artifact_publisher.lock`;
+- проверьте `launchctl list | grep backtest-artifact-publisher` и лог
+  `/Users/daniildegtyarev/Library/Logs/roehub/backtest-artifact-publisher.err.log`;
+- если сервис был остановлен после `03:05 Europe/Moscow`, перезапустите его до следующего окна или
+  выполните ручной publish нужного symbol root.
+
+`backtest-artifact-publisher` растит `backtest_artifact_publish_blocked_total{reason="inactive_slot_pinned"}`:
+
+- проверьте активные `background_auto` / `background_manual_legacy` runs, которые ещё pin'ят
+  inactive slot;
+- не удаляйте `current.yaml` и не переписывайте slot вручную;
+- дождитесь terminal transition run'ов или отмените stuck job штатным способом.
+
+`backtest-artifact-publisher` растит `backtest_artifact_publish_blocked_total{reason="validation_failed"}` или
+`backtest_artifact_publish_runs_total{status="unexpected_error"}`:
+
+- откройте `/Users/daniildegtyarev/Library/Logs/roehub/backtest-artifact-publisher.err.log`;
+- проверьте доступность ClickHouse, `STRATEGY_PG_DSN`, и содержимое
+  `/opt/roehub/config/prometheus.prod.yml`;
+- при необходимости выполните один ручной `backtest-artifact-publish` для конкретного symbol root,
+  чтобы локализовать проблему на одном инструменте.
 
 `api` падает с `STRATEGY_PG_DSN is required`:
 

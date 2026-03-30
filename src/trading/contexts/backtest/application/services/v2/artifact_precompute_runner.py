@@ -87,6 +87,7 @@ from .contracts import (
     ArtifactSignalPathsV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotLiteralV2,
+    ArtifactTailRebuildBarsV2,
     ArtifactTimelineCoverageV2,
     BacktestArtifactLoaderV2,
     SignalRuleEvaluationRequestV2,
@@ -210,6 +211,23 @@ class _SignalArtifactBuildResultV2:
 
     catalog: ArtifactSignalCatalogV2
     manifests: tuple[ArtifactSignalManifestDocumentV2, ...]
+    rewritten_tail_bars: int
+
+
+@dataclass(frozen=True, slots=True)
+class _SignalArtifactMaterializationResultV2:
+    """
+    Internal immutable output of one strict signal artifact materialization target.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    manifest: ArtifactSignalManifestDocumentV2
+    rewritten_tail_bars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -227,6 +245,39 @@ class _HitTimesArtifactBuildResultV2:
 
     manifest: ArtifactHitTimesManifestDocumentV2
     reference: ArtifactHitTimesReferenceV2
+    rewritten_tail_bars: int
+
+
+@dataclass(frozen=True, slots=True)
+class _MappingArtifactBuildResultV2:
+    """
+    Internal immutable output of one full mapping materialization pass.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    manifests: tuple[ArtifactMappingTimeframeManifestV2, ...]
+    rewritten_tail_bars: int
+
+
+@dataclass(frozen=True, slots=True)
+class _TimeframeMappingBuildResultV2:
+    """
+    Internal immutable output of one `mappings/<tf>` tail rebuild decision.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    arrays: _TimeframeMappingArraysV2
+    rewritten_tail_bars: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -447,7 +498,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             source_arrays=rollup_source_arrays,
             source_tail_time_range=tail_plan.source_time_range,
         )
-        mapping_manifests = _materialize_mapping_timeframes_v2(
+        mapping_build_result = _materialize_mapping_timeframes_v2(
             artifact_loader=self.artifact_loader,
             coordinates=request.coordinates,
             slot=inactive_slot,
@@ -504,7 +555,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             request=request,
             arrays=materialized_arrays,
             rolled_sections=rolled_price_manifests,
-            mapping_sections=mapping_manifests,
+            mapping_sections=mapping_build_result.manifests,
             signal_entries=root_signals.manifests,
             hit_times_reference=hit_times_build_result.reference,
         )
@@ -514,7 +565,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             slot_generation=target_slot_generation,
             root_scaffold=effective_scaffold,
             price_manifests=(one_minute_manifest, *rolled_price_manifests),
-            mapping_manifests=mapping_manifests,
+            mapping_manifests=mapping_build_result.manifests,
             provenance=provenance,
         )
         _write_yaml_atomically_v2(path=manifest_path, payload=root_manifest_payload)
@@ -533,6 +584,16 @@ class BacktestArtifactPrecomputeRunnerV2:
                 0 if tail_plan.prefix is None else int(tail_plan.prefix.open_time.shape[0])
             ),
             rewritten_tail_bars=int(tail_arrays.open_time.shape[0]),
+            tail_rebuild_bars=ArtifactTailRebuildBarsV2(
+                prices=int(tail_arrays.open_time.shape[0]),
+                mappings=mapping_build_result.rewritten_tail_bars,
+                signals=(
+                    0
+                    if signal_build_result is None
+                    else signal_build_result.rewritten_tail_bars
+                ),
+                hit_times=hit_times_build_result.rewritten_tail_bars,
+            ),
         )
 
 
@@ -641,6 +702,7 @@ def _materialize_signal_artifacts_v2(
 
     manifests: list[ArtifactSignalManifestDocumentV2] = []
     catalog_entries: list[ArtifactSignalCatalogEntryV2] = []
+    rewritten_tail_bars = 0
     for signal_target in signal_targets:
         price_manifest = price_manifest_by_timeframe.get(signal_target.timeframe)
         if price_manifest is None:
@@ -648,7 +710,7 @@ def _materialize_signal_artifacts_v2(
                 "signal target requires materialized prices for timeframe "
                 f"{signal_target.timeframe!r}"
             )
-        signal_manifest = _materialize_signal_artifact_v2(
+        signal_build_result = _materialize_signal_artifact_v2(
             artifact_loader=artifact_loader,
             coordinates=coordinates,
             slot=slot,
@@ -664,7 +726,9 @@ def _materialize_signal_artifacts_v2(
             indicator_compute=indicator_compute,
             indicator_grid_builder=indicator_grid_builder,
         )
+        signal_manifest = signal_build_result.manifest
         manifests.append(signal_manifest)
+        rewritten_tail_bars += signal_build_result.rewritten_tail_bars
         catalog_entries.append(
             ArtifactSignalCatalogEntryV2(
                 timeframe=signal_manifest.timeframe,
@@ -696,6 +760,7 @@ def _materialize_signal_artifacts_v2(
             manifests=ordered_catalog_entries,
         ),
         manifests=tuple(manifests),
+        rewritten_tail_bars=rewritten_tail_bars,
     )
 
 
@@ -715,7 +780,7 @@ def _materialize_signal_artifact_v2(
     signal_rules_engine: BacktestSignalRulesEngineV2,
     indicator_compute: IndicatorCompute,
     indicator_grid_builder: GridBuilder,
-) -> ArtifactSignalManifestDocumentV2:
+) -> _SignalArtifactMaterializationResultV2:
     """
     Materialize one strict per-timeframe/per-indicator signal artifact family.
 
@@ -734,8 +799,8 @@ def _materialize_signal_artifact_v2(
         indicator_compute: Indicator compute port used for primary/dependency tensors.
         indicator_grid_builder: Grid builder used for deterministic variant ordering.
     Returns:
-        ArtifactSignalManifestDocumentV2: Typed strict signal manifest describing the written
-            artifact family.
+        _SignalArtifactMaterializationResultV2: Typed strict signal-manifest result plus the
+            deterministic count of rebuilt target-timeframe bars.
     Assumptions:
         Signal rows reuse v1 variant-key semantics and the fixed `[variant, time]` matrix layout.
     Raises:
@@ -893,7 +958,10 @@ def _materialize_signal_artifact_v2(
         path=signal_paths.manifest,
         payload=_serialize_signal_manifest_v2(signal_manifest),
     )
-    return signal_manifest
+    return _SignalArtifactMaterializationResultV2(
+        manifest=signal_manifest,
+        rewritten_tail_bars=int(rebuilt_tail.shape[1]),
+    )
 
 
 def _candle_arrays_from_price_arrays_v2(
@@ -2873,7 +2941,7 @@ def _materialize_mapping_timeframes_v2(
     one_minute_arrays: _CanonicalPriceArraysV2,
     price_manifests: tuple[ArtifactPriceTimeframeManifestV2, ...],
     mapping_tail_bars_1m: int,
-) -> tuple[ArtifactMappingTimeframeManifestV2, ...]:
+) -> _MappingArtifactBuildResultV2:
     """
     Materialize deterministic `tf -> 1m` mapping arrays for all allowed request timeframes.
 
@@ -2887,7 +2955,8 @@ def _materialize_mapping_timeframes_v2(
         price_manifests: Fresh strict `prices/<tf>` manifest sections for allowed request TFs.
         mapping_tail_bars_1m: Effective `lookback_policy.mapping_tail_bars_1m`.
     Returns:
-        tuple[ArtifactMappingTimeframeManifestV2, ...]: Canonically ordered mapping sections.
+        _MappingArtifactBuildResultV2: Canonically ordered mapping sections plus total rewritten
+            tail bars across all request timeframes.
     Assumptions:
         Mapping build uses only materialized artifact-backed `prices/1m` plus `prices/<tf>`
         arrays and never rereads external sources.
@@ -2905,6 +2974,7 @@ def _materialize_mapping_timeframes_v2(
     """
     price_by_timeframe = {section.timeframe: section for section in price_manifests}
     mapping_sections: list[ArtifactMappingTimeframeManifestV2] = []
+    rewritten_tail_bars = 0
     for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2:
         price_manifest = price_by_timeframe.get(timeframe)
         if price_manifest is None:
@@ -2924,7 +2994,7 @@ def _materialize_mapping_timeframes_v2(
             existing_manifest=existing_manifest,
             timeframe=timeframe,
         )
-        mapping_arrays = _build_mapping_arrays_with_tail_update_v2(
+        mapping_build_result = _build_mapping_arrays_with_tail_update_v2(
             one_minute_arrays=one_minute_arrays,
             timeframe_arrays=timeframe_arrays,
             existing_arrays=existing_arrays,
@@ -2932,16 +3002,23 @@ def _materialize_mapping_timeframes_v2(
             mapping_tail_bars_1m=mapping_tail_bars_1m,
         )
         mapping_paths = artifact_loader.resolve_mapping_paths(coordinates, slot, timeframe)
-        _write_mapping_arrays_atomically_v2(mapping_paths=mapping_paths, arrays=mapping_arrays)
+        _write_mapping_arrays_atomically_v2(
+            mapping_paths=mapping_paths,
+            arrays=mapping_build_result.arrays,
+        )
         mapping_sections.append(
             _build_mapping_manifest_v2(
                 slot_root=slot_root,
                 timeframe=timeframe,
                 mapping_paths=mapping_paths,
-                arrays=mapping_arrays,
+                arrays=mapping_build_result.arrays,
             )
         )
-    return tuple(mapping_sections)
+        rewritten_tail_bars += mapping_build_result.rewritten_tail_bars
+    return _MappingArtifactBuildResultV2(
+        manifests=tuple(mapping_sections),
+        rewritten_tail_bars=rewritten_tail_bars,
+    )
 
 
 def _build_mapping_arrays_with_tail_update_v2(
@@ -2951,7 +3028,7 @@ def _build_mapping_arrays_with_tail_update_v2(
     existing_arrays: _TimeframeMappingArraysV2 | None,
     timeframe: str,
     mapping_tail_bars_1m: int,
-) -> _TimeframeMappingArraysV2:
+) -> _TimeframeMappingBuildResultV2:
     """
     Build one `tf -> 1m` mapping family using bounded tail rebuild plus deterministic prefix reuse.
 
@@ -2962,7 +3039,8 @@ def _build_mapping_arrays_with_tail_update_v2(
         timeframe: Target request timeframe literal.
         mapping_tail_bars_1m: Effective `lookback_policy.mapping_tail_bars_1m`.
     Returns:
-        _TimeframeMappingArraysV2: Final strict mapping arrays for the timeframe.
+        _TimeframeMappingBuildResultV2: Final strict mapping arrays plus the number of rebuilt
+            target-timeframe bars.
     Assumptions:
         A request-TF bar is unaffected when its `close_time` stays strictly before the first
         `1m` bar open included in the rebuilt tail window.
@@ -2979,18 +3057,26 @@ def _build_mapping_arrays_with_tail_update_v2(
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
     if existing_arrays is None:
-        return _build_mapping_arrays_from_price_timelines_v2(
+        arrays = _build_mapping_arrays_from_price_timelines_v2(
             one_minute_arrays=one_minute_arrays,
             timeframe_arrays=timeframe_arrays,
             timeframe=timeframe,
         )
+        return _TimeframeMappingBuildResultV2(
+            arrays=arrays,
+            rewritten_tail_bars=int(timeframe_arrays.open_time.shape[0]),
+        )
 
     one_minute_bar_count = int(one_minute_arrays.open_time.shape[0])
     if one_minute_bar_count <= mapping_tail_bars_1m:
-        return _build_mapping_arrays_from_price_timelines_v2(
+        arrays = _build_mapping_arrays_from_price_timelines_v2(
             one_minute_arrays=one_minute_arrays,
             timeframe_arrays=timeframe_arrays,
             timeframe=timeframe,
+        )
+        return _TimeframeMappingBuildResultV2(
+            arrays=arrays,
+            rewritten_tail_bars=int(timeframe_arrays.open_time.shape[0]),
         )
 
     affected_one_minute_start_idx = one_minute_bar_count - mapping_tail_bars_1m
@@ -3022,7 +3108,10 @@ def _build_mapping_arrays_with_tail_update_v2(
             timeframe=timeframe,
             label=f"mappings[{timeframe}]",
         )
-        return prefix
+        return _TimeframeMappingBuildResultV2(
+            arrays=prefix,
+            rewritten_tail_bars=0,
+        )
 
     tail_price_arrays = _slice_canonical_price_arrays_v2(
         arrays=timeframe_arrays,
@@ -3042,7 +3131,10 @@ def _build_mapping_arrays_with_tail_update_v2(
         timeframe=timeframe,
         label=f"mappings[{timeframe}]",
     )
-    return merged
+    return _TimeframeMappingBuildResultV2(
+        arrays=merged,
+        rewritten_tail_bars=int(tail.bar_open_1m_idx.shape[0]),
+    )
 
 
 def _build_mapping_arrays_from_price_timelines_v2(
@@ -3341,6 +3433,7 @@ def _materialize_hit_times_artifacts_v2(
             ),
             manifest_sha256=_file_sha256_hex_v2(hit_times_paths.manifest),
         ),
+        rewritten_tail_bars=int(one_minute_arrays.open_time.shape[0]),
     )
 
 

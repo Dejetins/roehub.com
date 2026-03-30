@@ -2399,6 +2399,81 @@ class ArtifactCanonicalPriceExportRequestV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactTailRebuildBarsV2:
+    """
+    Stage-level bounded tail rewrite counters emitted by the shared artifact precompute flow.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
+    """
+
+    prices: int = 0
+    mappings: int = 0
+    signals: int = 0
+    hit_times: int = 0
+
+    def __post_init__(self) -> None:
+        """
+        Validate non-negative bounded tail counters for every artifact stage.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Each counter represents a deterministic number of rewritten bars/items for the stage.
+        Raises:
+            ValueError: If one stage counter is negative.
+        Side Effects:
+            Normalizes counters through strict non-negative integer validation.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        object.__setattr__(self, "prices", validate_non_negative_manifest_int_v2(self.prices))
+        object.__setattr__(self, "mappings", validate_non_negative_manifest_int_v2(self.mappings))
+        object.__setattr__(self, "signals", validate_non_negative_manifest_int_v2(self.signals))
+        object.__setattr__(
+            self,
+            "hit_times",
+            validate_non_negative_manifest_int_v2(self.hit_times),
+        )
+
+    def as_dict(self) -> dict[str, int]:
+        """
+        Serialize stage-level tail counters into a stable JSON-friendly mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, int]: Deterministic stage-to-counter mapping.
+        Assumptions:
+            Scheduler metrics and CLI diagnostics consume the same stage names.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
+        """
+        return {
+            "prices": self.prices,
+            "mappings": self.mappings,
+            "signals": self.signals,
+            "hit_times": self.hit_times,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactCanonicalPriceExportResultV2:
     """
     Structured result payload for R3-02 price export into the inactive slot.
@@ -2423,6 +2498,9 @@ class ArtifactCanonicalPriceExportResultV2:
     source_candle_count: int
     reused_prefix_bars: int
     rewritten_tail_bars: int
+    tail_rebuild_bars: ArtifactTailRebuildBarsV2 = field(
+        default_factory=ArtifactTailRebuildBarsV2
+    )
 
     def __post_init__(self) -> None:
         """
@@ -2476,6 +2554,8 @@ class ArtifactCanonicalPriceExportResultV2:
             "rewritten_tail_bars",
             validate_positive_manifest_int_v2(self.rewritten_tail_bars),
         )
+        if self.tail_rebuild_bars is None:  # type: ignore[truthy-bool]
+            raise ValueError("ArtifactCanonicalPriceExportResultV2.tail_rebuild_bars is required")
 
 
 @dataclass(frozen=True, slots=True)

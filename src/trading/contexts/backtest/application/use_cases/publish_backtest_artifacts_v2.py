@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Literal, Mapping
@@ -15,6 +15,7 @@ from trading.contexts.backtest.application.services import (
     ArtifactPublishResultV2,
     ArtifactSlotPublishErrorV2,
     ArtifactSlotValidationSpecV2,
+    ArtifactTailRebuildBarsV2,
     BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
     artifact_market_id_from_coordinates_v2,
@@ -182,6 +183,7 @@ class PublishBacktestArtifactsV2Result:
     rewritten_tail_bars: int
     blocking_active_run_count: int
     validation: PublishBacktestArtifactsV2ValidationSummary
+    tail_rebuild_bars: ArtifactTailRebuildBarsV2 = field(default_factory=ArtifactTailRebuildBarsV2)
 
     def as_dict(self) -> Mapping[str, object]:
         """
@@ -226,6 +228,7 @@ class PublishBacktestArtifactsV2Result:
             "source_candle_count": self.source_candle_count,
             "reused_prefix_bars": self.reused_prefix_bars,
             "rewritten_tail_bars": self.rewritten_tail_bars,
+            "tail_rebuild_bars": self.tail_rebuild_bars.as_dict(),
             "blocking_active_run_count": self.blocking_active_run_count,
             "validation": self.validation.as_dict(),
         }
@@ -355,6 +358,7 @@ class PublishBacktestArtifactsV2UseCase:
             source_candle_count=build_result.source_candle_count,
             reused_prefix_bars=build_result.reused_prefix_bars,
             rewritten_tail_bars=build_result.rewritten_tail_bars,
+            tail_rebuild_bars=build_result.tail_rebuild_bars,
             blocking_active_run_count=precheck.blocking_active_run_count,
             validation=validation_summary,
         )

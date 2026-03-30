@@ -3,7 +3,7 @@
 Статус: рекомендованный production dashboard для Grafana (native runtime на `Mac Studio`).
 
 Назначение документа:
-- дать готовую структуру dashboard по контурам `worker/scheduler/ClickHouse/Redis/PostgreSQL/host`;
+- дать готовую структуру dashboard по контурам `worker/scheduler/backtest artifacts/ClickHouse/Redis/PostgreSQL/host`;
 - использовать английские названия панелей (Grafana UI на английском);
 - для каждой панели дать полный PromQL-запрос, тип визуализации, описание и интерпретацию.
 
@@ -27,19 +27,21 @@ Source of truth scrape-конфига:
 1. `Overview`
 2. `Worker`
 3. `Scheduler`
-4. `ClickHouse`
-5. `Redis`
-6. `PostgreSQL`
-7. `Host`
+4. `Backtest Artifacts`
+5. `ClickHouse`
+6. `Redis`
+7. `PostgreSQL`
+8. `Host`
 
 ## Row: Overview
 
 | Panel title (EN) | Metric name(s) | PromQL query (full) | Recommended visualization | Description (RU) | Expected behavior | Deviation |
 |---|---|---|---|---|---|---|
-| `Jobs Up` | `up` | `sum by (job) (up{job="market-data-ws-worker"} or up{job="market-data-scheduler"} or up{job="clickhouse-exporter"} or up{job="postgres-exporter"} or up{job="redis-exporter"} or up{job="node-exporter"})` | `Bar gauge` | Состояние ключевых jobs | Для каждого job значение `1` | Любой `0` = сервис down или scrape failed |
+| `Jobs Up` | `up` | `sum by (job) (up{job="market-data-ws-worker"} or up{job="market-data-scheduler"} or up{job="backtest-artifact-publisher"} or up{job="clickhouse-exporter"} or up{job="postgres-exporter"} or up{job="redis-exporter"} or up{job="node-exporter"})` | `Bar gauge` | Состояние ключевых jobs | Для каждого job значение `1` | Любой `0` = сервис down или scrape failed |
 | `Probe Success` | `probe_success` | `min by (job, instance) (probe_success{job="blackbox-http"} or probe_success{job="blackbox-tcp"})` | `Table` | Статус blackbox probes (HTTP/TCP) | Все строки `1` | `0` = endpoint недоступен или не проходит проверку |
 | `Worker E2E Latency p95` | `ws_closed_to_insert_done_seconds_bucket` | `histogram_quantile(0.95, sum(rate(ws_closed_to_insert_done_seconds_bucket{job="market-data-ws-worker"}[5m])) by (le))` | `Stat` | p95 latency от закрытой свечи до записи в raw | Стабильная, обычно < 1s | Рост p95 = деградация ingestion path |
 | `Scheduler Errors (15m)` | `scheduler_job_errors_total` | `sum(increase(scheduler_job_errors_total{job="market-data-scheduler"}[15m]))` | `Stat` | Ошибки scheduler за 15 минут | Обычно `0` | >0 = смотреть breakdown по `job` и логи scheduler |
+| `Artifact Publish Success Age` | `backtest_artifact_publish_last_success_unixtime` | `clamp_min(time() - max(backtest_artifact_publish_last_success_unixtime{job="backtest-artifact-publisher"}), 0)` | `Stat` | Возраст последнего успешного publish артефактов | После запуска сервиса держится ниже окна freshness и сбрасывается после daily run | Рост выше ожидаемого окна = сервис не публикует новые success |
 | `ClickHouse Inserted Rows/s` | `clickhouse_system_event_total{event="InsertedRows"}` | `sum(rate(clickhouse_system_event_total{job="clickhouse-exporter",event="InsertedRows"}[5m]))` | `Time series` | Скорость записи строк в ClickHouse | Положительная при живом ingestion | Падение к `0` при активном рынке = проблема pipeline/DB |
 | `Host CPU Busy %` | `node_cpu_seconds_total` | `100 * (1 - avg(rate(node_cpu_seconds_total{job="node-exporter",mode="idle"}[5m])))` | `Gauge` | Общая загрузка CPU хоста | Умеренная, без длинных пиков | Длительно высокая загрузка = риск роста latency |
 
@@ -70,6 +72,18 @@ Source of truth scrape-конфига:
 | `Catchup Instruments by Status (15m)` | `scheduler_rest_catchup_instruments_total` | `sum by (status) (increase(scheduler_rest_catchup_instruments_total{job="market-data-scheduler"}[15m]))` | `Bar chart` | Статус обработки инструментов periodic catchup | Рост `status="ok"` | Рост `failed` = смотреть REST/DB/логи |
 | `Gap Ranges Filled (15m)` | `scheduler_rest_catchup_gap_ranges_filled_total` | `increase(scheduler_rest_catchup_gap_ranges_filled_total{job="market-data-scheduler"}[15m])` | `Stat` | Закрытые gap-диапазоны | Растет при gap recovery | Длительный `0` при известных gaps = catchup stuck |
 | `Gap Rows Written (15m)` | `scheduler_rest_catchup_gap_rows_written_total` | `increase(scheduler_rest_catchup_gap_rows_written_total{job="market-data-scheduler"}[15m])` | `Stat` | Записанные строки по gaps | Положительный рост при догрузке | Ноль при активном catchup = нет реального прогресса |
+
+## Row: Backtest Artifacts
+
+| Panel title (EN) | Metric name(s) | PromQL query (full) | Recommended visualization | Description (RU) | Expected behavior | Deviation |
+|---|---|---|---|---|---|---|
+| `Publisher Up` | `up` | `max(up{job="backtest-artifact-publisher"})` | `Stat` | Доступность `/metrics` long-running publisher service | `1` | `0` = сервис down или Prometheus не может scrape'ить `:9203` |
+| `Publish Runs by Status (7d)` | `backtest_artifact_publish_runs_total` | `sum by (status) (increase(backtest_artifact_publish_runs_total{job="backtest-artifact-publisher"}[7d]))` | `Bar chart` | Итоговые scheduler runs по status | Основной рост у `status="succeeded"`; blocked/error остаются низкими | Рост `validation_failed`, `inactive_slot_pinned`, `lock_held` или `unexpected_error` = нужна разборка логов и lock state |
+| `Publish Duration p95` | `backtest_artifact_publish_duration_seconds_bucket` | `histogram_quantile(0.95, sum by (le) (rate(backtest_artifact_publish_duration_seconds_bucket{job="backtest-artifact-publisher"}[30d])))` | `Stat` | p95 длительности полного daily publish-цикла | Стабильный профиль в пределах окна nightly обработки | Рост p95 = расширение universe, деградация ClickHouse/Postgres/FS или hidden retries |
+| `Symbols by Status (7d)` | `backtest_artifact_publish_symbols_total` | `sum by (status) (increase(backtest_artifact_publish_symbols_total{job="backtest-artifact-publisher"}[7d]))` | `Bar chart` | Сколько symbol roots прошли через scheduler по итоговому status | Основная масса у `status="succeeded"`; `failed` и blocked-статусы остаются исключением | Рост degraded статусов = drift в universe, pinning или ошибки publish-пайплайна |
+| `Blocked Runs by Reason (7d)` | `backtest_artifact_publish_blocked_total` | `sum by (reason) (increase(backtest_artifact_publish_blocked_total{job="backtest-artifact-publisher"}[7d]))` | `Bar chart` | Разбиение блокировок по конечным причинам | Обычно `0`; допустим единичный `lock_held` при ручном overlap | Рост `inactive_slot_pinned` = зависшие background runs; `validation_failed` = broken slot; `unexpected_error` = разбирать stacktrace |
+| `Last Success Age` | `backtest_artifact_publish_last_success_unixtime` | `clamp_min(time() - max(backtest_artifact_publish_last_success_unixtime{job="backtest-artifact-publisher"}), 0)` | `Gauge` | Возраст последнего успешного publish в секундах | После `03:05 Europe/Moscow` метрика резко обновляется и остаётся ниже 30 часов | Длительное превышение freshness window = ночной publish не прошёл или сервис не жил в нужное окно |
+| `Tail Rebuild Bars by Stage (7d)` | `backtest_artifact_tail_rebuild_bars_total` | `sum by (stage) (increase(backtest_artifact_tail_rebuild_bars_total{job="backtest-artifact-publisher"}[7d]))` | `Bar chart` | Сколько баров scheduler переписал в bounded tail по stage | Значения растут пропорционально universe и tail budgets | Резкий скачок = массовый full rebuild fallback или неожиданное расширение lookback budgets |
 
 ## Row: ClickHouse
 
@@ -137,11 +151,13 @@ Source of truth scrape-конфига:
 - Для latency histogram панелей показывать p95; p99 можно добавить отдельной серией.
 - Для error panel использовать окна `15m` (как в таблицах) для одинаковой интерпретации.
 - Для label-зависимых панелей (`by job/reason/status`) серия может появиться только после первого события.
+- Для `Last Success Age` использовать unit `s` и threshold ниже 30 часов, чтобы отклонение совпадало с alert freshness window.
 
 ## Minimum done state for dashboard
 
 Dashboard считается operationally useful, когда одновременно выполняется всё ниже:
 - health панели (`Jobs Up`, `Probe Success`, `Up/Scrape Error`) показывают норму;
 - worker/scheduler latency панели без системной деградации;
+- backtest artifact publisher обновляет `Last Success Age` после nightly окна и не накапливает blocked/error series;
 - throughput панели (`Insert Rows/s`, `Commands/s`, `Commits/s`) отражают ожидаемый профиль нагрузки;
 - host ресурсы (`CPU`, `memory`, `disk`, `network`) не показывают saturation.

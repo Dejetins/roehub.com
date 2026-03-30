@@ -15,6 +15,7 @@ prod_services=(
   com.roehub.api.plist
   com.roehub.market-data-ws-worker.plist
   com.roehub.market-data-scheduler.plist
+  com.roehub.backtest-artifact-publisher.plist
 )
 
 test_services=(
@@ -27,6 +28,7 @@ test_services=(
   com.roehub.test.api.plist
   com.roehub.test.market-data-ws-worker.plist
   com.roehub.test.market-data-scheduler.plist
+  com.roehub.test.backtest-artifact-publisher.plist
 )
 
 case "$PROFILE" in
