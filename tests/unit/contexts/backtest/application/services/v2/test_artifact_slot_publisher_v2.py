@@ -182,6 +182,7 @@ backtest_artifacts:
     max_mapping_rows_per_timeframe: 1000
     max_signal_rows_per_artifact: 1000
     max_hit_times_cells: 10000
+    max_hit_times_cells_full_rebuild: 20000
 """.strip(),
         encoding="utf-8",
     )

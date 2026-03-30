@@ -98,3 +98,53 @@ def test_reader_uses_one_final_query_for_requested_range() -> None:
     assert parameters["symbol"] == "BTCUSDT"
     assert parameters["start"] == datetime(2026, 2, 4, 11, 0, tzinfo=timezone.utc)
     assert parameters["end"] == datetime(2026, 2, 4, 13, 0, tzinfo=timezone.utc)
+
+
+def test_reader_reads_columnar_arrays_for_precompute_fast_path() -> None:
+    clock = FixedClock(_ts(datetime(2026, 2, 5, 12, 0, tzinfo=timezone.utc)))
+    gw = StubGateway()
+    instrument = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+    tr = TimeRange(
+        _ts(datetime(2026, 2, 4, 11, 0, tzinfo=timezone.utc)),
+        _ts(datetime(2026, 2, 4, 13, 0, tzinfo=timezone.utc)),
+    )
+    gw.responses = [
+        [
+            {
+                "open_time_ms": 1738666800000,
+                "close_time_ms": 1738666860000,
+                "open_f32": 10.0,
+                "high_f32": 12.0,
+                "low_f32": 9.0,
+                "close_f32": 11.0,
+                "volume_base_f32": 1.0,
+            },
+            {
+                "open_time_ms": 1738666860000,
+                "close_time_ms": 1738666920000,
+                "open_f32": 11.0,
+                "high_f32": 13.0,
+                "low_f32": 10.0,
+                "close_f32": 12.0,
+                "volume_base_f32": 2.0,
+            },
+        ],
+    ]
+
+    reader = ClickHouseCanonicalCandleReader(gateway=gw, clock=clock)
+    batch = reader.read_1m_arrays(instrument, tr)
+
+    assert batch.row_count() == 2
+    assert batch.open_time_ms.tolist() == [1738666800000, 1738666860000]
+    assert batch.close_time_ms.tolist() == [1738666860000, 1738666920000]
+    assert batch.ohlcv_f32.tolist() == [
+        [10.0, 12.0, 9.0, 11.0, 1.0],
+        [11.0, 13.0, 10.0, 12.0, 2.0],
+    ]
+
+    assert len(gw.calls) == 1
+    query, parameters = gw.calls[0]
+    assert " FINAL" in query
+    assert "toUnixTimestamp64Milli" in query
+    assert parameters["market_id"] == 1
+    assert parameters["symbol"] == "BTCUSDT"

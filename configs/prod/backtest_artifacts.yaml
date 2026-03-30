@@ -97,3 +97,4 @@ backtest_artifacts:
     max_mapping_rows_per_timeframe: 5000000
     max_signal_rows_per_artifact: 5000000
     max_hit_times_cells: 50000000
+    max_hit_times_cells_full_rebuild: 150000000

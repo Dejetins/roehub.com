@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, cast
 
+import numpy as np
 import pytest
 
 from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 import (
@@ -26,7 +27,10 @@ from trading.contexts.backtest.application.services import (
     BacktestArtifactSlotPublisherV2,
     YamlBacktestArtifactLoaderV2,
 )
-from trading.contexts.market_data.application.dto import CandleWithMeta
+from trading.contexts.market_data.application.dto import (
+    CandleWithMeta,
+    CanonicalCandleBatch1m,
+)
 from trading.shared_kernel.primitives import (
     Candle,
     CandleMeta,
@@ -98,6 +102,62 @@ class _PrecomputeCanonicalReaderForLoaderTest:
                 for row in self._rows
                 if time_range.start.value <= row.candle.ts_open.value < time_range.end.value
             )
+        )
+
+    def read_1m_arrays(
+        self,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> CanonicalCandleBatch1m:
+        """
+        Return one strict columnar canonical batch for loader integration coverage.
+
+        Args:
+            instrument_id: Ignored shared-kernel identity passed by the production runner.
+            time_range: Source reread window requested by the runner.
+        Returns:
+            CanonicalCandleBatch1m: Filtered canonical candle batch.
+        Assumptions:
+            Integration coverage needs deterministic arrays, not transport-specific row DTOs.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        del instrument_id
+        rows = tuple(
+            row
+            for row in self._rows
+            if time_range.start.value <= row.candle.ts_open.value < time_range.end.value
+        )
+        if len(rows) == 0:
+            return CanonicalCandleBatch1m(
+                open_time_ms=np.empty(0, dtype=np.int64),
+                close_time_ms=np.empty(0, dtype=np.int64),
+                ohlcv_f32=np.empty((0, 5), dtype=np.float32),
+            )
+        return CanonicalCandleBatch1m(
+            open_time_ms=np.ascontiguousarray(
+                [int(row.candle.ts_open.value.timestamp() * 1000) for row in rows],
+                dtype=np.int64,
+            ),
+            close_time_ms=np.ascontiguousarray(
+                [int(row.candle.ts_close.value.timestamp() * 1000) for row in rows],
+                dtype=np.int64,
+            ),
+            ohlcv_f32=np.ascontiguousarray(
+                [
+                    [
+                        float(row.candle.open),
+                        float(row.candle.high),
+                        float(row.candle.low),
+                        float(row.candle.close),
+                        float(row.candle.volume_base),
+                    ]
+                    for row in rows
+                ],
+                dtype=np.float32,
+            ),
         )
 
 

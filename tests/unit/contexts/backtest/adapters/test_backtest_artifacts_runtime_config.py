@@ -42,6 +42,7 @@ backtest_artifacts:
     max_mapping_rows_per_timeframe: 2000
     max_signal_rows_per_artifact: 3000
     max_hit_times_cells: 4000
+    max_hit_times_cells_full_rebuild: 8000
 """.strip()
 
 
@@ -129,6 +130,7 @@ def test_load_backtest_artifacts_runtime_config_reads_yaml_values() -> None:
     assert config.lookback_policy.price_tail_bars_1m == 20000
     assert config.lookback_policy.signal_tail_bars_1m == 20000
     assert config.validation_budgets.max_hit_times_cells == 50000000
+    assert config.validation_budgets.max_hit_times_cells_full_rebuild == 150000000
     assert config.to_validation_spec().price_timeframes == config.validation_plan.price_timeframes
 
 
@@ -163,6 +165,7 @@ def test_backtest_artifacts_runtime_config_to_precompute_runtime_settings_includ
     assert runtime_settings.hit_times_sl_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
     assert runtime_settings.max_signal_rows_per_artifact == 5000000
     assert runtime_settings.max_hit_times_cells == 50000000
+    assert runtime_settings.max_hit_times_cells_full_rebuild == 150000000
 
 
 def test_resolve_backtest_artifacts_config_path_precedence() -> None:

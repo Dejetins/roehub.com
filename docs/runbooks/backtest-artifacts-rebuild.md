@@ -73,6 +73,12 @@ Path resolution precedence:
 - `lookback_policy`
 - `validation_budgets`
 
+Ключевые budget keys для `hit_times`:
+
+- `validation_budgets.max_hit_times_cells` для steady-state incremental rebuild;
+- `validation_budgets.max_hit_times_cells_full_rebuild` для bootstrap пустого symbol root и для
+  ручного `--full-rebuild`.
+
 Fail-fast loader обязан reject'ить:
 
 - missing/extra keys;
@@ -117,6 +123,30 @@ CLI result contract returns deterministic diagnostics with:
 - `publish_mode` = `bootstrap` | `incremental` | `full_rebuild`;
 - old/new slot identity and slot generation;
 - whole-slot validation summary.
+
+Для ручного операционного прогона удобнее сразу писать лог в файл:
+
+```bash
+uv run python -m apps.cli.main.main backtest-artifact-publish \
+  --config configs/prod/backtest_artifacts.yaml \
+  --exchange binance \
+  --market-type spot \
+  --symbol BTCUSDT \
+  --full-rebuild \
+  2>&1 | tee /tmp/backtest-artifact-publish-BTCUSDT.log
+```
+
+Manual progress checks:
+
+```bash
+rg "event=artifact_precompute_(stage_started|stage_finished|completed|failed)" /tmp/backtest-artifact-publish-BTCUSDT.log
+tail -f /tmp/backtest-artifact-publish-BTCUSDT.log
+```
+
+Operational note:
+
+- `http://127.0.0.1:9203/metrics` отражает long-running scheduled service;
+- manual CLI run не увеличивает scheduler Prometheus counters и наблюдается через shell log/stdout.
 
 Operational note:
 
@@ -195,6 +225,10 @@ Path contract by environment:
 - писать файлы по explicit deterministic paths;
 - не использовать directory scanning как способ discover'ить содержимое;
 - не изменять active slot contents.
+- canonical `prices/1m` source read выполняется через `market_data.canonical_candles_1m FINAL`
+  в columnar precompute path, чтобы bootstrap был устойчив к историческим дублям в ClickHouse.
+- independent `prices/<tf>` rollups и `mappings/<tf>` rebuilds могут исполняться параллельно;
+  это не меняет publish sequence и не разрешает partial publish.
 
 R3-01 / R3-02 / R3-03 exception boundary:
 
@@ -255,6 +289,9 @@ Steady-state rebuild policy after the first successful publish:
   `lookback_policy.signal_tail_bars_1m`;
 - `hit_times/1m` используют bounded reread/rewrite по
   `lookback_policy.hit_times_tail_bars_1m`;
+- `hit_times/1m` budget выбирается по режиму:
+  - bootstrap / `--full-rebuild` -> `validation_budgets.max_hit_times_cells_full_rebuild`
+  - steady-state incremental -> `validation_budgets.max_hit_times_cells`
 - если existing files/manifest reuse prerequisites нарушены для конкретного stage или symbol root,
   rebuild переключается на deterministic full rebuild для этого symbol root.
 

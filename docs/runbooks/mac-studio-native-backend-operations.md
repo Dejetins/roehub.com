@@ -140,6 +140,22 @@ set +a
 /opt/roehub/app/.venv/bin/python -m apps.cli.main.main backtest-artifact-publish --config /opt/roehub/app/configs/prod/backtest_artifacts.yaml --exchange binance --market-type spot --symbol BTCUSDT --full-rebuild
 ```
 
+Рекомендуемый вариант для первого bootstrap/publish с отдельным логом:
+
+```bash
+cd /opt/roehub/app
+set -a
+source /Users/daniildegtyarev/.config/roehub/roehub.env
+set +a
+/opt/roehub/app/.venv/bin/python -m apps.cli.main.main backtest-artifact-publish \
+  --config /opt/roehub/app/configs/prod/backtest_artifacts.yaml \
+  --exchange binance \
+  --market-type spot \
+  --symbol BTCUSDT \
+  --full-rebuild \
+  2>&1 | tee /tmp/backtest-artifact-publish-BTCUSDT.log
+```
+
 Dedicated scheduled publisher service:
 
 - service label: `com.roehub.backtest-artifact-publisher`
@@ -155,6 +171,8 @@ Dedicated scheduled publisher service:
   - `backtest_artifact_tail_rebuild_bars_total{stage}`
 - manual CLI is for one explicit symbol root; full enabled+tradable universe is executed by the
   scheduled service in the next `03:05 Europe/Moscow` window
+- `validation_budgets.max_hit_times_cells_full_rebuild` covers bootstrap/explicit full rebuild,
+  while steady-state scheduler runs keep `validation_budgets.max_hit_times_cells`
 
 ## Manual health checks
 
@@ -233,6 +251,20 @@ tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/redis-exporter.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/postgres-exporter.err.log
 tail -n 200 /Users/daniildegtyarev/Library/Logs/roehub/tailscale-runtime.err.log
 ```
+
+Manual CLI progress diagnostics:
+
+```bash
+tail -n 200 /tmp/backtest-artifact-publish-BTCUSDT.log
+rg "event=artifact_precompute_(stage_started|stage_finished|completed|failed)" /tmp/backtest-artifact-publish-BTCUSDT.log
+find /opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT \( -name current.yaml -o -name manifest.yaml -o -name '*.npy' \) | head -100
+```
+
+Важно:
+
+- `http://127.0.0.1:9203/metrics` показывает scheduled publisher service, а не разовый manual CLI;
+- если CLI идёт долго, проверяйте именно `/tmp/backtest-artifact-publish-BTCUSDT.log`, а не только
+  `backtest-artifact-publisher.err.log`.
 
 Проверка active launch agents:
 

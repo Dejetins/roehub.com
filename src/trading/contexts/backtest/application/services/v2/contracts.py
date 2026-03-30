@@ -3502,6 +3502,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     signal_artifacts: tuple[ArtifactSignalValidationSpecV2, ...] = ()
     max_signal_rows_per_artifact: int = 1_000_000
     max_hit_times_cells: int = 1_000_000
+    max_hit_times_cells_full_rebuild: int = 1_000_000
 
     def __post_init__(self) -> None:
         """
@@ -3580,6 +3581,16 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             "max_hit_times_cells",
             validate_positive_manifest_int_v2(self.max_hit_times_cells),
         )
+        object.__setattr__(
+            self,
+            "max_hit_times_cells_full_rebuild",
+            validate_positive_manifest_int_v2(self.max_hit_times_cells_full_rebuild),
+        )
+        if self.max_hit_times_cells_full_rebuild < self.max_hit_times_cells:
+            raise ValueError(
+                "ArtifactPrecomputeRuntimeSettingsV2.max_hit_times_cells_full_rebuild "
+                "must be >= max_hit_times_cells"
+            )
 
 
 def _normalize_positive_float_grid_v2(

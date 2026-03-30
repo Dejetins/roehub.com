@@ -59,6 +59,7 @@ _VALIDATION_BUDGETS_REQUIRED_KEYS = (
     "max_mapping_rows_per_timeframe",
     "max_signal_rows_per_artifact",
     "max_hit_times_cells",
+    "max_hit_times_cells_full_rebuild",
 )
 
 
@@ -498,6 +499,7 @@ class BacktestArtifactValidationBudgetsRuntimeConfig:
     max_mapping_rows_per_timeframe: int
     max_signal_rows_per_artifact: int
     max_hit_times_cells: int
+    max_hit_times_cells_full_rebuild: int
 
     def __post_init__(self) -> None:
         """
@@ -530,6 +532,15 @@ class BacktestArtifactValidationBudgetsRuntimeConfig:
             value=self.max_hit_times_cells,
             field_path="backtest_artifacts.validation_budgets.max_hit_times_cells",
         )
+        _require_positive_int(
+            value=self.max_hit_times_cells_full_rebuild,
+            field_path="backtest_artifacts.validation_budgets.max_hit_times_cells_full_rebuild",
+        )
+        if self.max_hit_times_cells_full_rebuild < self.max_hit_times_cells:
+            raise ValueError(
+                "backtest_artifacts.validation_budgets.max_hit_times_cells_full_rebuild "
+                "must be >= max_hit_times_cells"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -694,6 +705,9 @@ class BacktestArtifactsRuntimeConfig:
                 self.validation_budgets.max_signal_rows_per_artifact
             ),
             max_hit_times_cells=self.validation_budgets.max_hit_times_cells,
+            max_hit_times_cells_full_rebuild=(
+                self.validation_budgets.max_hit_times_cells_full_rebuild
+            ),
         )
 
 
@@ -925,6 +939,12 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
                 value=validation_budgets_map.get("max_hit_times_cells"),
                 field_path="backtest_artifacts.validation_budgets.max_hit_times_cells",
             ),
+            max_hit_times_cells_full_rebuild=_require_int(
+                value=validation_budgets_map.get("max_hit_times_cells_full_rebuild"),
+                field_path=(
+                    "backtest_artifacts.validation_budgets.max_hit_times_cells_full_rebuild"
+                ),
+            ),
         ),
     )
 
@@ -997,6 +1017,9 @@ def build_backtest_artifacts_runtime_config_hash(
                     config.validation_budgets.max_signal_rows_per_artifact
                 ),
                 "max_hit_times_cells": config.validation_budgets.max_hit_times_cells,
+                "max_hit_times_cells_full_rebuild": (
+                    config.validation_budgets.max_hit_times_cells_full_rebuild
+                ),
             },
         }
     }

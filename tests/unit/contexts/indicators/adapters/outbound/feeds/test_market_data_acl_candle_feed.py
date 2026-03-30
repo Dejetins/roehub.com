@@ -19,7 +19,10 @@ from trading.contexts.indicators.adapters.outbound.feeds.market_data_acl import 
     MarketDataCandleFeed,
 )
 from trading.contexts.indicators.domain.errors import GridValidationError
-from trading.contexts.market_data.application.dto import CandleWithMeta
+from trading.contexts.market_data.application.dto import (
+    CandleWithMeta,
+    CanonicalCandleBatch1m,
+)
 from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
 from trading.shared_kernel.primitives import (
     Candle,
@@ -90,6 +93,34 @@ class _CanonicalReaderStub(CanonicalCandleReader):
         self.last_instrument_id = instrument_id
         self.last_time_range = time_range
         return iter(self._rows)
+
+    def read_1m_arrays(
+        self,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> CanonicalCandleBatch1m:
+        """
+        Reject the precompute-only fast path in CandleFeed adapter tests.
+
+        Docs: docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md
+        Related:
+          src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py
+
+        Args:
+            instrument_id: Requested instrument identifier.
+            time_range: Requested half-open interval `[start, end)`.
+        Returns:
+            CanonicalCandleBatch1m: Never returns successfully.
+        Assumptions:
+            CandleFeed tests exercise only the row-oriented `read_1m(...)` contract.
+        Raises:
+            AssertionError: Always, because this precompute-only fast path should stay unused.
+        Side Effects:
+            Stores the latest call arguments for debugging symmetry with `read_1m(...)`.
+        """
+        self.last_instrument_id = instrument_id
+        self.last_time_range = time_range
+        raise AssertionError("read_1m_arrays() is not used by MarketDataCandleFeed tests")
 
 
 def _utc_ts(*, minute_offset: int, second: int = 0) -> UtcTimestamp:

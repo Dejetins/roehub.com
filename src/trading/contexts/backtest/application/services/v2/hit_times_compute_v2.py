@@ -441,7 +441,7 @@ def _hit_times_1level_v2(
             out_u32[start_index] = np.uint32(bar_index)
 
 
-@nb.njit(cache=True)
+@nb.njit(parallel=True, cache=True)
 def _compute_hit_times_tables_v2(
     *,
     open_f32: np.ndarray,
@@ -467,7 +467,7 @@ def _compute_hit_times_tables_v2(
     Raises:
         None.
     Side Effects:
-        Allocates the final tables and reusable heap buffers.
+        Allocates the final tables plus per-level scratch buffers.
     Docs:
       - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
     Related:
@@ -480,11 +480,10 @@ def _compute_hit_times_tables_v2(
     long_sl = np.empty((sl_level_count, timeline_bar_count), dtype=np.uint32)
     short_tp = np.empty((tp_level_count, timeline_bar_count), dtype=np.uint32)
     short_sl = np.empty((sl_level_count, timeline_bar_count), dtype=np.uint32)
-    heap_prices = np.empty(timeline_bar_count, dtype=np.float32)
-    heap_indexes = np.empty(timeline_bar_count, dtype=np.int32)
-    out_u32 = np.empty(timeline_bar_count, dtype=np.uint32)
-
-    for level_index in range(tp_level_count):
+    for level_index in nb.prange(tp_level_count):
+        heap_prices = np.empty(timeline_bar_count, dtype=np.float32)
+        heap_indexes = np.empty(timeline_bar_count, dtype=np.int32)
+        out_u32 = np.empty(timeline_bar_count, dtype=np.uint32)
         _hit_times_1level_v2(
             open_f32=open_f32,
             trigger_f32=high_f32,
@@ -495,6 +494,7 @@ def _compute_hit_times_tables_v2(
             heap_indexes=heap_indexes,
         )
         long_tp[level_index, :] = out_u32
+        out_u32 = np.empty(timeline_bar_count, dtype=np.uint32)
         _hit_times_1level_v2(
             open_f32=open_f32,
             trigger_f32=low_f32,
@@ -506,7 +506,10 @@ def _compute_hit_times_tables_v2(
         )
         short_tp[level_index, :] = out_u32
 
-    for level_index in range(sl_level_count):
+    for level_index in nb.prange(sl_level_count):
+        heap_prices = np.empty(timeline_bar_count, dtype=np.float32)
+        heap_indexes = np.empty(timeline_bar_count, dtype=np.int32)
+        out_u32 = np.empty(timeline_bar_count, dtype=np.uint32)
         _hit_times_1level_v2(
             open_f32=open_f32,
             trigger_f32=low_f32,
@@ -517,6 +520,7 @@ def _compute_hit_times_tables_v2(
             heap_indexes=heap_indexes,
         )
         long_sl[level_index, :] = out_u32
+        out_u32 = np.empty(timeline_bar_count, dtype=np.uint32)
         _hit_times_1level_v2(
             open_f32=open_f32,
             trigger_f32=high_f32,

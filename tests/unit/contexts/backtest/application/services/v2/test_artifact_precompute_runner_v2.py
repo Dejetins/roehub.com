@@ -53,7 +53,10 @@ from trading.contexts.indicators.domain.specifications import (
     GridParamSpec,
     GridSpec,
 )
-from trading.contexts.market_data.application.dto import CandleWithMeta
+from trading.contexts.market_data.application.dto import (
+    CandleWithMeta,
+    CanonicalCandleBatch1m,
+)
 from trading.shared_kernel.primitives import (
     Candle,
     CandleMeta,
@@ -363,6 +366,65 @@ class _FakeCanonicalCandleReader:
                 for row in self._rows
                 if time_range.start.value <= row.candle.ts_open.value < time_range.end.value
             )
+        )
+
+    def read_1m_arrays(
+        self,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> CanonicalCandleBatch1m:
+        """
+        Return one strict columnar batch for the requested `TimeRange [start, end)`.
+
+        Args:
+            instrument_id: Ignored shared-kernel identity passed by the production runner.
+            time_range: Source reread window requested by the runner.
+        Returns:
+            CanonicalCandleBatch1m: Filtered canonical candle batch aligned to the requested
+                half-open interval.
+        Assumptions:
+            Tests validate time-range behavior and precompute ordering, not transport shape.
+        Raises:
+            None.
+        Side Effects:
+            Appends the requested time range to the same in-memory call log as `read_1m(...)`.
+        """
+        del instrument_id
+        self.calls.append(time_range)
+        rows = tuple(
+            row
+            for row in self._rows
+            if time_range.start.value <= row.candle.ts_open.value < time_range.end.value
+        )
+        row_count = len(rows)
+        if row_count == 0:
+            return CanonicalCandleBatch1m(
+                open_time_ms=np.empty(0, dtype=np.int64),
+                close_time_ms=np.empty(0, dtype=np.int64),
+                ohlcv_f32=np.empty((0, 5), dtype=np.float32),
+            )
+        return CanonicalCandleBatch1m(
+            open_time_ms=np.ascontiguousarray(
+                [int(row.candle.ts_open.value.timestamp() * 1000) for row in rows],
+                dtype=np.int64,
+            ),
+            close_time_ms=np.ascontiguousarray(
+                [int(row.candle.ts_close.value.timestamp() * 1000) for row in rows],
+                dtype=np.int64,
+            ),
+            ohlcv_f32=np.ascontiguousarray(
+                [
+                    [
+                        float(row.candle.open),
+                        float(row.candle.high),
+                        float(row.candle.low),
+                        float(row.candle.close),
+                        float(row.candle.volume_base),
+                    ]
+                    for row in rows
+                ],
+                dtype=np.float32,
+            ),
         )
 
 
@@ -957,6 +1019,62 @@ def test_backtest_artifact_precompute_runner_v2_materializes_hit_times_and_full_
     assert validation_result.hit_times_manifest.timeline_bar_count == _FULL_BUILD_MINUTES_V2
     assert validation_result.signal_manifests == ()
     assert validation_result.diagnostics == ()
+
+
+def test_backtest_artifact_precompute_runner_v2_uses_full_rebuild_hit_times_budget_for_bootstrap(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify bootstrap/full-rebuild hit-times use the dedicated full-rebuild cell budget.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        First publish for one symbol root may need a larger hit-times budget than incremental
+        steady-state tail refreshes.
+    Raises:
+        AssertionError: If bootstrap still uses the tighter incremental hit-times budget.
+    Side Effects:
+        Writes a small strict hit-times family under the inactive slot in `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=(),
+        require_hit_times_manifest=True,
+        max_hit_times_cells=10_000,
+        max_hit_times_cells_full_rebuild=20_000,
+    )
+    timeline_bars = 3 * 24 * 60
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(timeline_bars)))
+        ),
+    )
+
+    result = runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=timeline_bars)
+    )
+    hit_times_manifest = fixture.loader.load_hit_times_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+    )
+
+    assert hit_times_manifest.timeline_bar_count == timeline_bars
+    assert result.stage_rebuild_stats.hit_times == ArtifactStageRebuildStatsV2(
+        reused_prefix_bars=0,
+        rewritten_tail_bars=timeline_bars,
+    )
 
 
 def test_backtest_artifact_precompute_runner_v2_uses_deterministic_tail_update(

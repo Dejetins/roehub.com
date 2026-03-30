@@ -218,6 +218,7 @@ def build_artifact_precompute_fixture_v2(
     precompute_signal_artifacts: tuple[tuple[str, str], ...] = (),
     require_hit_times_manifest: bool = False,
     max_hit_times_cells: int = 1_000_000,
+    max_hit_times_cells_full_rebuild: int | None = None,
 ) -> ArtifactPrecomputeFixtureV2:
     """
     Build a minimal strict R3-02 fixture with config and `current.yaml` only.
@@ -240,6 +241,8 @@ def build_artifact_precompute_fixture_v2(
         require_hit_times_manifest: Whether the generated runtime config should require real
             `hit_times/1m/manifest.yaml` during whole-slot validation.
         max_hit_times_cells: Strict positive upper bound for materialized hit-times table cells.
+        max_hit_times_cells_full_rebuild: Optional strict positive upper bound for full-rebuild
+            or bootstrap hit-times table cells. When omitted, uses `max_hit_times_cells`.
     Returns:
         ArtifactPrecomputeFixtureV2: Strict config/loader/path fixture for R3-02 runner tests.
     Assumptions:
@@ -274,6 +277,11 @@ def build_artifact_precompute_fixture_v2(
         "published_at_utc": "2026-03-25T02:00:00Z",
     }
     _write_yaml(builder.current_pointer_path(coordinates), current_pointer_payload)
+    effective_full_rebuild_budget = (
+        max_hit_times_cells
+        if max_hit_times_cells_full_rebuild is None
+        else max_hit_times_cells_full_rebuild
+    )
     config_path = tmp_path / "backtest_artifacts.yaml"
     config_path.write_text(
         yaml.safe_dump(
@@ -313,6 +321,9 @@ def build_artifact_precompute_fixture_v2(
                             "max_mapping_rows_per_timeframe": 1000000,
                             "max_signal_rows_per_artifact": 1000000,
                             "max_hit_times_cells": max_hit_times_cells,
+                            "max_hit_times_cells_full_rebuild": (
+                                effective_full_rebuild_budget
+                            ),
                         },
                     },
                 },
@@ -343,6 +354,9 @@ def build_artifact_precompute_fixture_v2(
                 runtime_config.validation_budgets.max_signal_rows_per_artifact
             ),
             max_hit_times_cells=runtime_config.validation_budgets.max_hit_times_cells,
+            max_hit_times_cells_full_rebuild=(
+                runtime_config.validation_budgets.max_hit_times_cells_full_rebuild
+            ),
         ),
         builder=builder,
         loader=loader,

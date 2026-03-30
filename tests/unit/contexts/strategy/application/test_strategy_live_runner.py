@@ -4,7 +4,10 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable, Mapping, Sequence
 from uuid import UUID
 
-from trading.contexts.market_data.application.dto import CandleWithMeta
+from trading.contexts.market_data.application.dto import (
+    CandleWithMeta,
+    CanonicalCandleBatch1m,
+)
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryStrategyRepository,
     InMemoryStrategyRunRepository,
@@ -225,6 +228,30 @@ class _CanonicalReaderStub:
         if not self._responses:
             return iter(())
         return iter(self._responses.pop(0))
+
+    def read_1m_arrays(
+        self,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> CanonicalCandleBatch1m:
+        """
+        Reject the precompute-only columnar read path in live-runner tests.
+
+        Args:
+            instrument_id: Instrument identifier.
+            time_range: Requested canonical time range.
+        Returns:
+            CanonicalCandleBatch1m: Never returns successfully.
+        Assumptions:
+            Strategy live runner still exercises only the row-oriented reader contract.
+        Raises:
+            AssertionError: Always, because this fast path is outside the tested behavior.
+        Side Effects:
+            Records the requested time range before failing for easier debugging.
+        """
+        _ = instrument_id
+        self.calls.append(time_range)
+        raise AssertionError("read_1m_arrays() is not used by StrategyLiveRunner tests")
 
 
 class _TrackingRunRepository(InMemoryStrategyRunRepository):

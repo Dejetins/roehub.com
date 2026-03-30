@@ -44,6 +44,11 @@ Precompute/publish слой читает strict `configs/<env>/backtest_artifact
 - `hit_times_grid` как source-of-truth TP/SL levels contract;
 - `slot_policy`, `publish_schedule`, `lookback_policy`, `validation_budgets` как fail-fast
   validated pipeline settings.
+- `validation_budgets.max_hit_times_cells` ограничивает steady-state incremental
+  `hit_times/1m` rebuild.
+- `validation_budgets.max_hit_times_cells_full_rebuild` используется для первого bootstrap пустого
+  symbol root и для explicit `--full-rebuild`, когда bounded incremental budget заведомо слишком
+  мал для full-history `hit_times`.
 
 R2-04 intentionally keeps these settings отдельно от `configs/<env>/backtest.yaml`, чтобы
 runtime request defaults и artifact pipeline knobs не смешивались в одном контракте.
@@ -61,10 +66,14 @@ runtime request defaults и artifact pipeline knobs не смешивались 
   daily scheduler must call the same use-case instead of wiring precompute/publish services
   separately.
 - Manual operator entrypoint is
-  `uv run python -m apps.cli.main backtest-artifact-publish --exchange <exchange> --market-type <market_type> --symbol <symbol> [--full-rebuild]`.
+  `uv run python -m apps.cli.main.main backtest-artifact-publish --exchange <exchange> --market-type <market_type> --symbol <symbol> [--full-rebuild]`.
 - The shared result contract returns deterministic per-target diagnostics with
   `publish_mode in {bootstrap, incremental, full_rebuild}`, old/new slot identity, and whole-slot
   validation summary.
+- Manual CLI additionally emits stage progress logs
+  `event=artifact_precompute_stage_started|artifact_precompute_stage_finished`, while Prometheus
+  counters on `backtest-artifact-publisher` remain service-level and do not count one-off CLI
+  executions.
 - Prod `artifact_root` must be a stable host data path outside repo checkout; relative
   checkout-local roots remain acceptable only for dev/test wiring.
 - Production wiring fixes `artifact_root` at `/opt/roehub/state/backtest_artifacts/v2`;
@@ -91,6 +100,10 @@ runtime request defaults и artifact pipeline knobs не смешивались 
   - `lookback_policy.signal_tail_bars_1m`
 - `hit_times/1m` должны использовать такой же bounded incremental rebuild по
   `lookback_policy.hit_times_tail_bars_1m`.
+- `hit_times/1m` budget policy разделяется по режимам:
+  - bootstrap пустого symbol root и explicit `full_rebuild` используют
+    `validation_budgets.max_hit_times_cells_full_rebuild`;
+  - steady-state incremental rebuild uses `validation_budgets.max_hit_times_cells`.
 - Runner result contract обязан публиковать explicit stage-level stats для `prices`, `mappings`,
   `signals`, `hit_times`:
   - `reused_prefix_bars`
@@ -207,6 +220,9 @@ artifact-backed `prices/1m.ohlcv`.
   - `prices/<tf>/ohlcv.f32.npy`
 - использовать source table `market_data.canonical_candles_1m` только для canonical `1m`
   export через existing `CanonicalCandleReader` contract;
+- precompute fast path читает `market_data.canonical_candles_1m FINAL` columnar arrays напрямую в
+  numeric numpy payload, чтобы не создавать миллионы `CandleWithMeta` / `datetime` объектов во
+  время full-history bootstrap;
 - строить rollup только из artifact-backed `prices/1m`, без ClickHouse reads на runtime hot path;
 - поддерживать deterministic tail update по
   `backtest_artifacts.lookback_policy.price_tail_bars_1m`;
@@ -216,6 +232,8 @@ artifact-backed `prices/1m.ohlcv`.
 - поддерживать deterministic tail update для mappings по
   `backtest_artifacts.lookback_policy.mapping_tail_bars_1m`;
 - никогда не мутировать active slot in place.
+- Independent `prices/<tf>` rollups и `mappings/<tf>` builds могут выполняться параллельно, но
+  manifest ordering и whole-slot publish contract остаются deterministic.
 
 Tail update semantics для R3-01 / R3-02 / R3-03:
 
