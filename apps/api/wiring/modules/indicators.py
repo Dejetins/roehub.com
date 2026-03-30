@@ -8,6 +8,8 @@ Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md,
 
 from __future__ import annotations
 
+import sys
+from dataclasses import replace
 from pathlib import Path
 from typing import Mapping
 
@@ -28,6 +30,7 @@ from trading.platform.config import (
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _CONFIG_PATH_KEY = "ROEHUB_INDICATORS_CONFIG"
 _ALLOWED_ENVS = ("dev", "prod", "test")
+_ARTIFACT_PRECOMPUTE_MAX_COMPUTE_BYTES_TOTAL = sys.maxsize
 
 
 def build_indicators_registry(*, environ: Mapping[str, str]) -> YamlIndicatorRegistry:
@@ -82,6 +85,40 @@ def build_indicators_compute(
     compute = NumbaIndicatorCompute(defs=all_defs(), config=compute_config)
     compute.warmup()
     return compute
+
+
+def build_artifact_precompute_indicators_compute(
+    *,
+    environ: Mapping[str, str],
+    config: IndicatorsComputeNumbaConfig | None = None,
+) -> NumbaIndicatorCompute:
+    """
+    Build a dedicated indicators compute adapter for offline artifact precompute.
+
+    Docs: docs/architecture/backtest/backtest-precompute-runner-v2.md
+
+    Args:
+        environ: Process environment mapping.
+        config: Optional preloaded runtime config to avoid duplicate disk/env reads.
+    Returns:
+        NumbaIndicatorCompute: Warmed-up compute adapter with an effectively unbounded total
+            compute-budget guard for offline artifact materialization.
+    Assumptions:
+        Artifact publish is an offline batch flow guarded by artifact-specific slot validation and
+        should not inherit the public API/runtime `max_compute_bytes_total` ceiling from
+        `configs/<env>/indicators.yaml`.
+    Raises:
+        FileNotFoundError: If indicators config path cannot be resolved/read.
+        ValueError: If runtime config is invalid or cache dir is not writable.
+    Side Effects:
+        Applies Numba runtime config and performs JIT warmup at startup.
+    """
+    base_config = config or load_indicators_compute_numba_config(environ=environ)
+    precompute_config = replace(
+        base_config,
+        max_compute_bytes_total=_ARTIFACT_PRECOMPUTE_MAX_COMPUTE_BYTES_TOTAL,
+    )
+    return build_indicators_compute(environ=environ, config=precompute_config)
 
 
 def build_indicators_candle_feed(

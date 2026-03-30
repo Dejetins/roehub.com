@@ -53,6 +53,10 @@ Precompute/publish слой читает strict `configs/<env>/backtest_artifact
 - `validation_budgets.max_hit_times_cells_full_rebuild` используется для первого bootstrap пустого
   symbol root и для explicit `--full-rebuild`, когда bounded incremental budget заведомо слишком
   мал для full-history `hit_times`.
+- signal artifact materialization intentionally does not inherit the public/runtime
+  `configs/<env>/indicators.yaml -> compute.numba.max_compute_bytes_total` ceiling; offline
+  precompute wiring uses a dedicated compute adapter with effectively-unbounded total compute
+  budget, while hot-path API/runtime guards stay unchanged.
 
 R2-04 intentionally keeps these settings отдельно от `configs/<env>/backtest.yaml`, чтобы
 runtime request defaults и artifact pipeline knobs не смешивались в одном контракте.
@@ -78,6 +82,9 @@ runtime request defaults и artifact pipeline knobs не смешивались 
   `event=artifact_precompute_stage_started|artifact_precompute_stage_finished`, while Prometheus
   counters on `backtest-artifact-publisher` remain service-level and do not count one-off CLI
   executions.
+- Manual CLI and the scheduled publisher both use the same artifact-precompute-only indicators
+  compute wiring, so full-registry signal materialization is not blocked by the public
+  `max_compute_bytes_total` guard from `indicators.yaml`.
 - Prod `artifact_root` must be a stable host data path outside repo checkout; relative
   checkout-local roots remain acceptable only for dev/test wiring.
 - Production wiring fixes `artifact_root` at `/opt/roehub/state/backtest_artifacts/v2`;

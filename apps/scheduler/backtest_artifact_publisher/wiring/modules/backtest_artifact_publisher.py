@@ -20,7 +20,7 @@ from prometheus_client import (
 )
 
 from apps.api.wiring.modules.indicators import (
-    build_indicators_compute,
+    build_artifact_precompute_indicators_compute,
     build_indicators_registry,
 )
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
@@ -871,7 +871,7 @@ def build_backtest_artifact_publisher_app(
 
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     indicator_registry = build_indicators_registry(environ=environ)
-    indicator_compute = build_indicators_compute(environ=environ)
+    indicator_compute = build_artifact_precompute_indicators_compute(environ=environ)
     artifact_config_hash = build_backtest_artifacts_runtime_config_hash(
         config=artifact_runtime_config
     )

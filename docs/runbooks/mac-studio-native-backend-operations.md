@@ -175,6 +175,9 @@ Dedicated scheduled publisher service:
   while steady-state scheduler runs keep `validation_budgets.max_hit_times_cells`
 - current prod/test/dev configs use `signal_artifacts: all_supported_v1`, so one publish must
   materialize the full signal registry for every symbol root
+- `configs/<env>/indicators.yaml -> compute.numba.max_compute_bytes_total` remains a public/runtime
+  guard only; artifact publisher wiring bypasses this ceiling with dedicated offline compute
+  config, so full-registry signal precompute must not fail with `ComputeBudgetExceeded`
 
 ## Manual health checks
 

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
 from apps.api.wiring.modules.indicators import (
-    build_indicators_compute,
+    build_artifact_precompute_indicators_compute,
     build_indicators_registry,
 )
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
@@ -339,7 +339,7 @@ def _build_publish_use_case_v2(
 
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     indicator_registry = build_indicators_registry(environ=environ)
-    indicator_compute = build_indicators_compute(environ=environ)
+    indicator_compute = build_artifact_precompute_indicators_compute(environ=environ)
     artifact_config_hash = build_backtest_artifacts_runtime_config_hash(
         config=artifact_runtime_config
     )

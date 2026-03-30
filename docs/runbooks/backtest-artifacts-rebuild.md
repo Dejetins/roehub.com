@@ -85,6 +85,16 @@ Path resolution precedence:
 - `validation_budgets.max_hit_times_cells_full_rebuild` для bootstrap пустого symbol root и для
   ручного `--full-rebuild`.
 
+Отдельно от этого:
+
+- public/runtime indicators memory guard продолжает жить в `configs/<env>/indicators.yaml ->
+  compute.numba.max_compute_bytes_total`;
+- artifact rebuild/publish intentionally does **not** use this ceiling during signal materialization;
+- manual CLI и scheduled publisher поднимают dedicated offline compute wiring with
+  effectively-unbounded total compute budget, потому что slot build остаётся batch/offline flow и
+  уже ограничен stage-specific artifact contracts (`max_signal_rows_per_artifact`,
+  `max_hit_times_cells*`, whole-slot validation).
+
 Fail-fast loader обязан reject'ить:
 
 - missing/extra keys;
@@ -153,6 +163,9 @@ Operational note:
 
 - `http://127.0.0.1:9203/metrics` отражает long-running scheduled service;
 - manual CLI run не увеличивает scheduler Prometheus counters и наблюдается через shell log/stdout.
+- если rebuild падает с `ComputeBudgetExceeded`, это означает, что используется не artifact
+  precompute wiring, а обычный public indicators/runtime compute path; для delivered R11 publish
+  contract это считается wiring regression.
 
 Operational note:
 
