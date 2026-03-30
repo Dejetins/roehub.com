@@ -15,6 +15,7 @@ Source of truth scrape-конфига:
 
 - `market-data-ws-worker` -> `127.0.0.1:9201/metrics`
 - `market-data-scheduler` -> `127.0.0.1:9202/metrics`
+- `backtest-artifact-publisher` -> `127.0.0.1:9203/metrics`
 - `clickhouse-exporter` -> `127.0.0.1:9116/metrics`
 - `postgres-exporter` -> `127.0.0.1:9187/metrics`
 - `redis-exporter` -> `127.0.0.1:9121/metrics`
@@ -37,6 +38,14 @@ Source of truth scrape-конфига:
 - `scheduler_job_errors_total`
 - `scheduler_tasks_enqueued_total`
 - `scheduler_rest_catchup_gap_rows_written_total`
+
+### Backtest Artifact Publisher (`backtest-artifact-publisher`)
+
+- `backtest_artifact_publish_runs_total`
+- `backtest_artifact_publish_symbols_total`
+- `backtest_artifact_publish_blocked_total`
+- `backtest_artifact_publish_last_success_unixtime`
+- `backtest_artifact_tail_rebuild_bars_total`
 
 ### Monitoring/infra
 
@@ -95,7 +104,18 @@ Source of truth scrape-конфига:
 | `scheduler_rest_catchup_gap_ranges_filled_total` | Закрытые gap-диапазоны |
 | `scheduler_rest_catchup_gap_rows_written_total` | Записанные строки по gaps |
 
-### 3) `clickhouse-exporter`
+### 3) `backtest-artifact-publisher`
+
+| Метрика | Краткий смысл |
+|---|---|
+| `backtest_artifact_publish_runs_total` | Итоговые daily publish-cycle runs по статусу |
+| `backtest_artifact_publish_duration_seconds` | Гистограмма длительности полного publish-цикла |
+| `backtest_artifact_publish_symbols_total` | Обработанные symbol roots по итоговому статусу |
+| `backtest_artifact_publish_blocked_total` | Блокировки publish-run по причинам |
+| `backtest_artifact_publish_last_success_unixtime` | Unix time последнего цикла с хотя бы одним успешным publish |
+| `backtest_artifact_tail_rebuild_bars_total` | Сколько баров реально переписано в bounded tail по stage |
+
+### 4) `clickhouse-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -105,7 +125,7 @@ Source of truth scrape-конфига:
 | `clickhouse_system_metric_value` | Текущие значения выбранных system.metrics |
 | `clickhouse_system_event_total` | Кумулятивные значения выбранных system.events |
 
-### 4) `postgres-exporter`
+### 5) `postgres-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -125,7 +145,7 @@ Source of truth scrape-конфига:
 | `pg_replication_is_replica` | Признак replica/primary |
 | `pg_replication_lag_seconds` | Lag репликации |
 
-### 5) `redis-exporter`
+### 6) `redis-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -150,7 +170,7 @@ Source of truth scrape-конфига:
 | `redis_total_writes_processed` | Write-операции |
 | `redis_instance_info` | Тех.информация об инстансе |
 
-### 6) `node-exporter`
+### 7) `node-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -172,7 +192,7 @@ Source of truth scrape-конфига:
 | `node_time_seconds` | Текущее время хоста |
 | `node_uname_info` | Информация об ОС/ядре |
 
-### 7) `blackbox-exporter`
+### 8) `blackbox-exporter`
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -182,7 +202,7 @@ Source of truth scrape-конфига:
 | `probe_http_duration_seconds` | Фазовая HTTP-латентность |
 | `probe_tcp_connect_duration_seconds` | Время TCP connect |
 
-### 8) `prometheus` self metrics
+### 9) `prometheus` self metrics
 
 | Метрика | Краткий смысл |
 |---|---|
@@ -205,6 +225,7 @@ Source of truth scrape-конфига:
 curl -fsS http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | "\(.labels.job)\t\(.health)\t\(.scrapeUrl)"' | sort
 curl -fsS http://127.0.0.1:9201/metrics | rg '^(ws_|insert_|rest_fill_|redis_publish_)'
 curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_'
+curl -fsS http://127.0.0.1:9203/metrics | rg '^backtest_artifact_'
 curl -fsS http://127.0.0.1:9116/metrics | rg '^clickhouse_'
 curl -fsS http://127.0.0.1:9187/metrics | rg '^pg_'
 curl -fsS http://127.0.0.1:9121/metrics | rg '^redis_'

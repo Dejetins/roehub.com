@@ -136,8 +136,8 @@ cd /opt/roehub/app
 set -a
 source /Users/daniildegtyarev/.config/roehub/roehub.env
 set +a
-/opt/roehub/app/.venv/bin/python -m apps.cli.main backtest-artifact-publish --exchange binance --market-type spot --symbol BTCUSDT
-/opt/roehub/app/.venv/bin/python -m apps.cli.main backtest-artifact-publish --exchange binance --market-type spot --symbol BTCUSDT --full-rebuild
+/opt/roehub/app/.venv/bin/python -m apps.cli.main.main backtest-artifact-publish --config /opt/roehub/app/configs/prod/backtest_artifacts.yaml --exchange binance --market-type spot --symbol BTCUSDT
+/opt/roehub/app/.venv/bin/python -m apps.cli.main.main backtest-artifact-publish --config /opt/roehub/app/configs/prod/backtest_artifacts.yaml --exchange binance --market-type spot --symbol BTCUSDT --full-rebuild
 ```
 
 Dedicated scheduled publisher service:
@@ -153,6 +153,8 @@ Dedicated scheduled publisher service:
   - `backtest_artifact_publish_blocked_total{reason}`
   - `backtest_artifact_publish_last_success_unixtime`
   - `backtest_artifact_tail_rebuild_bars_total{stage}`
+- manual CLI is for one explicit symbol root; full enabled+tradable universe is executed by the
+  scheduled service in the next `03:05 Europe/Moscow` window
 
 ## Manual health checks
 

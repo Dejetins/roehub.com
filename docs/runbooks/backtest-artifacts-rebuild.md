@@ -93,7 +93,8 @@ same strict sequence:
 Default manual mode stays incremental-ready for one explicit symbol root:
 
 ```bash
-uv run python -m apps.cli.main backtest-artifact-publish \
+uv run python -m apps.cli.main.main backtest-artifact-publish \
+  --config configs/prod/backtest_artifacts.yaml \
   --exchange binance \
   --market-type spot \
   --symbol BTCUSDT
@@ -102,7 +103,8 @@ uv run python -m apps.cli.main backtest-artifact-publish \
 Explicit deterministic full rebuild for one target:
 
 ```bash
-uv run python -m apps.cli.main backtest-artifact-publish \
+uv run python -m apps.cli.main.main backtest-artifact-publish \
+  --config configs/prod/backtest_artifacts.yaml \
   --exchange binance \
   --market-type spot \
   --symbol BTCUSDT \
@@ -115,6 +117,12 @@ CLI result contract returns deterministic diagnostics with:
 - `publish_mode` = `bootstrap` | `incremental` | `full_rebuild`;
 - old/new slot identity and slot generation;
 - whole-slot validation summary.
+
+Operational note:
+
+- manual CLI publishes one explicit symbol root;
+- the full enabled+tradable universe is handled by the dedicated scheduled publisher service at
+  `03:05 Europe/Moscow`.
 
 Path contract by environment:
 

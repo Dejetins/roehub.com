@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta, timezone
+from datetime import timezone
 from typing import Any, Iterator, Mapping, Sequence
 
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
@@ -26,10 +26,12 @@ class ClickHouseCanonicalCandleReader(CanonicalCandleReader):
     """
     Читает market_data.canonical_candles_1m.
 
-    Dedup rule:
-    - дедуп только на хвосте последних 24 часов относительно clock.now()
-    - без FINAL
-    - например: ORDER BY ingested_at DESC LIMIT 1 BY (market_id, symbol, ts_open)
+    Read contract:
+    - чтение идёт через `FINAL` по всему запрошенному диапазону;
+    - это сохраняет strict monotonic source contract для artifact precompute even when
+      `canonical_candles_1m` contains historical duplicates;
+    - hot-path runtime does not use this reader, so the heavier `FINAL` path stays confined to
+      offline/backfill/precompute workloads.
     """
 
     def __init__(self, gateway: ClickHouseGateway, clock: Clock, database: str = "market_data") -> None:  # noqa: E501
@@ -44,33 +46,60 @@ class ClickHouseCanonicalCandleReader(CanonicalCandleReader):
         self._clock = clock
         self._db = database.strip()
 
-    def read_1m(self, instrument_id: InstrumentId, time_range: TimeRange) -> Iterator[CandleWithMeta]:  # noqa: E501
-        cutoff = self._cutoff_utc()
-        start = time_range.start.value
-        end = time_range.end.value
+    def read_1m(
+        self,
+        instrument_id: InstrumentId,
+        time_range: TimeRange,
+    ) -> Iterator[CandleWithMeta]:
+        """
+        Read canonical 1m candles in one deterministic `FINAL` query.
 
-        old_end = min(end, cutoff)
-        tail_start = max(start, cutoff)
-
-        # 1) "Старая" часть — без дедупа
-        if start < old_end:
-            for row in self._select_no_dedup(instrument_id, start, old_end):
-                yield row
-
-        # 2) Хвост 24h — с дедупом
-        if tail_start < end:
-            for row in self._select_tail_dedup(instrument_id, tail_start, end):
-                yield row
-
-    def _cutoff_utc(self):
-        now = self._clock.now().value
-        now_utc = _ensure_tz_utc(now)
-        return (now_utc - timedelta(hours=24))
+        Args:
+            instrument_id: Explicit market/symbol identity to read.
+            time_range: Half-open UTC range `[start, end)` for requested candles.
+        Returns:
+            Iterator[CandleWithMeta]: Canonical candles ordered by strictly increasing `ts_open`.
+        Assumptions:
+            `canonical_candles_1m FINAL` is the source of truth for offline precompute and may be
+            heavier than non-`FINAL` reads.
+        Raises:
+            Exception: Propagates gateway/storage failures.
+        Side Effects:
+            Executes one ClickHouse `SELECT ... FINAL`.
+        """
+        for row in self._select_final(
+            instrument_id=instrument_id,
+            start_dt=time_range.start.value,
+            end_dt=time_range.end.value,
+        ):
+            yield row
 
     def _canonical_table(self) -> str:
         return f"{self._db}.canonical_candles_1m"
 
-    def _select_no_dedup(self, instrument_id: InstrumentId, start_dt, end_dt) -> Sequence[CandleWithMeta]: # noqa: E501
+    def _select_final(
+        self,
+        instrument_id: InstrumentId,
+        start_dt,
+        end_dt,
+    ) -> Sequence[CandleWithMeta]:
+        """
+        Execute one `FINAL` read against canonical 1m storage for the requested UTC range.
+
+        Args:
+            instrument_id: Explicit market/symbol identity to read.
+            start_dt: Inclusive UTC range start.
+            end_dt: Exclusive UTC range end.
+        Returns:
+            Sequence[CandleWithMeta]: Materialized canonical rows ordered by `ts_open`.
+        Assumptions:
+            Historical duplicates may still exist in storage, so artifact precompute must not rely
+            on tail-only dedup.
+        Raises:
+            Exception: Propagates gateway failures.
+        Side Effects:
+            Executes one ClickHouse `SELECT ... FINAL`.
+        """
         q = f"""
         SELECT
             market_id, symbol, instrument_key,
@@ -79,45 +108,11 @@ class ClickHouseCanonicalCandleReader(CanonicalCandleReader):
             volume_base, volume_quote,
             trades_count, taker_buy_volume_base, taker_buy_volume_quote,
             source, ingested_at, ingest_id
-        FROM {self._canonical_table()}
+        FROM {self._canonical_table()} FINAL
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
           AND ts_open >= %(start)s
           AND ts_open < %(end)s
-        ORDER BY ts_open
-        """
-        rows = self._gw.select(
-            q,
-            {
-                "market_id": int(instrument_id.market_id.value),
-                "symbol": str(instrument_id.symbol),
-                "start": _ensure_tz_utc(start_dt),
-                "end": _ensure_tz_utc(end_dt),
-            },
-        )
-        return [self._map_row(r) for r in rows]
-
-    def _select_tail_dedup(self, instrument_id: InstrumentId, start_dt, end_dt) -> Sequence[CandleWithMeta]: # noqa: E501
-        # Дедуп: берём последнюю версию по ingested_at на ключ (market_id, symbol, ts_open)
-        q = f"""
-        SELECT
-            market_id, symbol, instrument_key,
-            ts_open, ts_close,
-            open, high, low, close,
-            volume_base, volume_quote,
-            trades_count, taker_buy_volume_base, taker_buy_volume_quote,
-            source, ingested_at, ingest_id
-        FROM
-        (
-            SELECT *
-            FROM {self._canonical_table()}
-            WHERE market_id = %(market_id)s
-              AND symbol = %(symbol)s
-              AND ts_open >= %(start)s
-              AND ts_open < %(end)s
-            ORDER BY ingested_at DESC
-            LIMIT 1 BY market_id, symbol, ts_open
-        )
         ORDER BY ts_open
         """
         rows = self._gw.select(

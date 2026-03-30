@@ -58,23 +58,29 @@ def _canonical_row(ts_open: datetime, ingested_at: datetime) -> Mapping[str, Any
     }
 
 
-def test_reader_splits_old_and_tail_ranges_and_uses_dedup_query_on_tail() -> None:
-    # now = 2026-02-05 12:00 UTC => cutoff = 2026-02-04 12:00 UTC
+def test_reader_uses_one_final_query_for_requested_range() -> None:
+    # clock is retained for constructor compatibility but FINAL now handles historical duplicates
     clock = FixedClock(_ts(datetime(2026, 2, 5, 12, 0, tzinfo=timezone.utc)))
     gw = StubGateway()
 
     instrument = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
 
-    # time_range spans before and after cutoff
     tr = TimeRange(
         _ts(datetime(2026, 2, 4, 11, 0, tzinfo=timezone.utc)),
         _ts(datetime(2026, 2, 4, 13, 0, tzinfo=timezone.utc)),
     )
 
-    # gateway returns 1 row for old part and 1 row for tail part
     gw.responses = [
-        [_canonical_row(datetime(2026, 2, 4, 11, 0, tzinfo=timezone.utc), datetime(2026, 2, 5, 10, 0, tzinfo=timezone.utc))], # noqa: E501
-        [_canonical_row(datetime(2026, 2, 4, 12, 0, tzinfo=timezone.utc), datetime(2026, 2, 5, 11, 0, tzinfo=timezone.utc))], # noqa: E501
+        [
+            _canonical_row(
+                datetime(2026, 2, 4, 11, 0, tzinfo=timezone.utc),
+                datetime(2026, 2, 5, 10, 0, tzinfo=timezone.utc),
+            ),
+            _canonical_row(
+                datetime(2026, 2, 4, 12, 0, tzinfo=timezone.utc),
+                datetime(2026, 2, 5, 11, 0, tzinfo=timezone.utc),
+            ),
+        ],
     ]
 
     reader = ClickHouseCanonicalCandleReader(gateway=gw, clock=clock)
@@ -84,13 +90,11 @@ def test_reader_splits_old_and_tail_ranges_and_uses_dedup_query_on_tail() -> Non
     assert out[0].candle.ts_open.value == datetime(2026, 2, 4, 11, 0, tzinfo=timezone.utc)
     assert out[1].candle.ts_open.value == datetime(2026, 2, 4, 12, 0, tzinfo=timezone.utc)
 
-    assert len(gw.calls) == 2
-    q1, p1 = gw.calls[0]
-    q2, p2 = gw.calls[1]
-
-    # first query: no dedup
-    assert "LIMIT 1 BY" not in q1
-    # second query: tail dedup
-    assert "LIMIT 1 BY" in q2
-    assert p1["market_id"] == 1 and p2["market_id"] == 1
-    assert p1["symbol"] == "BTCUSDT" and p2["symbol"] == "BTCUSDT"
+    assert len(gw.calls) == 1
+    query, parameters = gw.calls[0]
+    assert " FINAL" in query
+    assert "LIMIT 1 BY" not in query
+    assert parameters["market_id"] == 1
+    assert parameters["symbol"] == "BTCUSDT"
+    assert parameters["start"] == datetime(2026, 2, 4, 11, 0, tzinfo=timezone.utc)
+    assert parameters["end"] == datetime(2026, 2, 4, 13, 0, tzinfo=timezone.utc)

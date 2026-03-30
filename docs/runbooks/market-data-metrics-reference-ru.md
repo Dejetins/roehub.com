@@ -15,6 +15,7 @@ Source of truth scrape-конфига:
 В production в этом документе покрываются jobs:
 - `market-data-ws-worker` (`127.0.0.1:9201`)
 - `market-data-scheduler` (`127.0.0.1:9202`)
+- `backtest-artifact-publisher` (`127.0.0.1:9203`)
 - `clickhouse-exporter` (`127.0.0.1:9116`)
 - `postgres-exporter` (`127.0.0.1:9187`)
 - `redis-exporter` (`127.0.0.1:9121`)
@@ -28,6 +29,7 @@ Source of truth scrape-конфига:
 |---|---|---|
 | `market-data-ws-worker` | `ws_connected`, `ws_messages_total`, `insert_errors_total`, `redis_publish_errors_total`, `ws_closed_to_insert_done_seconds` | Соединения есть, сообщения/вставки растут, ошибок за окно нет, p95 latency стабильна |
 | `market-data-scheduler` | `scheduler_job_errors_total`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total` | Ошибки не растут, enqueue идет по плану, gap-progress не стоит при необходимости catchup |
+| `backtest-artifact-publisher` | `backtest_artifact_publish_runs_total`, `backtest_artifact_publish_symbols_total`, `backtest_artifact_publish_blocked_total`, `backtest_artifact_publish_last_success_unixtime`, `backtest_artifact_tail_rebuild_bars_total` | Daily publish-cycle завершается success, blocked/error серии не растут, freshness обновляется после окна `03:05 Europe/Moscow`, tail bars остаются bounded |
 | `clickhouse-exporter` | `clickhouse_exporter_scrape_success`, `clickhouse_uptime_seconds`, `clickhouse_system_event_total{event="InsertedRows"}` | `scrape_success=1`, uptime растет, вставки есть при живом потоке |
 | `postgres-exporter` | `pg_up`, `pg_exporter_last_scrape_error`, `pg_stat_database_numbackends` | `pg_up=1`, scrape без ошибок, число коннектов в разумном диапазоне |
 | `redis-exporter` | `redis_up`, `redis_exporter_last_scrape_error`, `redis_commands_processed_total`, `redis_memory_used_bytes` | `redis_up=1`, команды обрабатываются, память без резких аномалий |
@@ -84,7 +86,18 @@ Source of truth scrape-конфига:
 | `scheduler_rest_catchup_gap_ranges_filled_total` | Counter | - | Закрытые gap-диапазоны | Рост в фазе восстановления |
 | `scheduler_rest_catchup_gap_rows_written_total` | Counter | - | Записанные строки по gaps | Ключевой индикатор реального прогресса |
 
-### 3) `clickhouse-exporter`
+### 3) `backtest-artifact-publisher`
+
+| Метрика | Тип | Labels | Описание | Норма/сигнал |
+|---|---|---|---|---|
+| `backtest_artifact_publish_runs_total` | Counter | `status` | Итоговые daily publish-cycle runs по финальному статусу | Основной рост у `status="succeeded"` |
+| `backtest_artifact_publish_duration_seconds` | Histogram | - | Длительность полного scheduler publish-cycle | Стабильный профиль в nightly окне |
+| `backtest_artifact_publish_symbols_total` | Counter | `status` | Обработанные symbol roots по итоговому статусу | Основной рост у `status="planned"` и `status="succeeded"` |
+| `backtest_artifact_publish_blocked_total` | Counter | `reason` | Блокировки publish-run по конечной причине | Обычно `0`, допустим редкий `lock_held` |
+| `backtest_artifact_publish_last_success_unixtime` | Gauge | - | Unix timestamp последнего scheduler cycle с хотя бы одним успешным publish | После daily run обновляется и остаётся внутри freshness window |
+| `backtest_artifact_tail_rebuild_bars_total` | Counter | `stage` | Сколько баров реально переписано в bounded tail по stage | Рост должен быть bounded; резкий скачок = массовый full rebuild fallback |
+
+### 4) `clickhouse-exporter`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -108,7 +121,7 @@ Source of truth scrape-конфига:
 - `SelectedBytes`
 - `SelectedRows`
 
-### 4) `postgres-exporter`
+### 5) `postgres-exporter`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -128,7 +141,7 @@ Source of truth scrape-конфига:
 | `pg_replication_is_replica` | Gauge | - | Признак replica (`1`) или primary (`0`) | Для текущего контура ожидается `0` |
 | `pg_replication_lag_seconds` | Gauge | - | Lag репликации в секундах | Для single-node/primary обычно `0` |
 
-### 5) `redis-exporter`
+### 6) `redis-exporter`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -153,7 +166,7 @@ Source of truth scrape-конфига:
 | `redis_total_writes_processed` | Counter | - | Количество write-операций | Нагрузка записи |
 | `redis_instance_info` | Gauge | `redis_version`,`role`,... | Техническая информация об инстансе | Для валидации роли/версии |
 
-### 6) `node-exporter`
+### 7) `node-exporter`
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -175,7 +188,7 @@ Source of truth scrape-конфига:
 | `node_time_seconds` | Gauge | - | Текущее время хоста | Тех.проверка времени |
 | `node_uname_info` | Gauge | `sysname`,`release`,... | Информация об ОС/ядре | Диагностика окружения |
 
-### 7) `blackbox-exporter` (`blackbox-http`, `blackbox-tcp`)
+### 8) `blackbox-exporter` (`blackbox-http`, `blackbox-tcp`)
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -185,7 +198,7 @@ Source of truth scrape-конфига:
 | `probe_http_duration_seconds` | Gauge | `phase`,`instance`,`job` | HTTP latency по фазам | Рост фаз = деградация сети/цели |
 | `probe_tcp_connect_duration_seconds` | Gauge | `instance`,`job` | Время TCP connect | Рост = сеть/порт/нагрузка |
 
-### 8) `prometheus` (self metrics)
+### 9) `prometheus` (self metrics)
 
 | Метрика | Тип | Labels | Описание | Норма/сигнал |
 |---|---|---|---|---|
@@ -221,6 +234,31 @@ Source of truth scrape-конфига:
 - `failed`
 - `skipped_no_seed`
 
+`backtest_artifact_publish_runs_total{status=...}`:
+- `succeeded`
+- `inactive_slot_pinned`
+- `validation_failed`
+- `lock_held`
+- `unexpected_error`
+
+`backtest_artifact_publish_symbols_total{status=...}`:
+- `planned`
+- `succeeded`
+- `inactive_slot_pinned`
+- `validation_failed`
+- `unexpected_error`
+
+`backtest_artifact_publish_blocked_total{reason=...}`:
+- `lock_held`
+- `inactive_slot_pinned`
+- `validation_failed`
+
+`backtest_artifact_tail_rebuild_bars_total{stage=...}`:
+- `prices`
+- `mappings`
+- `signals`
+- `hit_times`
+
 `clickhouse_system_metric_value{metric=...}`:
 - `BackgroundMergesAndMutationsPoolTask`
 - `HTTPConnection`
@@ -248,6 +286,7 @@ curl -fsS http://127.0.0.1:9090/api/v1/targets | jq -r '.data.activeTargets[] | 
 ```bash
 curl -fsS http://127.0.0.1:9201/metrics | rg '^(ws_|insert_|rest_fill_|redis_publish_)'
 curl -fsS http://127.0.0.1:9202/metrics | rg '^scheduler_'
+curl -fsS http://127.0.0.1:9203/metrics | rg '^backtest_artifact_'
 curl -fsS http://127.0.0.1:9116/metrics | rg '^clickhouse_'
 curl -fsS http://127.0.0.1:9187/metrics | rg '^pg_'
 curl -fsS http://127.0.0.1:9121/metrics | rg '^redis_'
