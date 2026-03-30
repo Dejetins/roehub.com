@@ -10,6 +10,9 @@ from trading.contexts.backtest.adapters.outbound.config import (
     resolve_backtest_artifacts_config_path,
 )
 from trading.contexts.backtest.application.services import ArtifactSignalValidationSpecV2
+from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
+    supported_indicator_ids_for_signals_v1,
+)
 
 _VALID_BACKTEST_ARTIFACTS_CONFIG = """
 version: 1
@@ -117,10 +120,29 @@ def test_load_backtest_artifacts_runtime_config_reads_yaml_values() -> None:
         "2d",
         "3d",
     )
+    expected_signal_targets = tuple(
+        (timeframe, indicator_id)
+        for timeframe in (
+            "15m",
+            "30m",
+            "1h",
+            "2h",
+            "4h",
+            "6h",
+            "8h",
+            "1d",
+            "2d",
+            "3d",
+        )
+        for indicator_id in supported_indicator_ids_for_signals_v1()
+    )
     assert config.validation_plan.signal_artifacts[0].timeframe == "15m"
-    assert config.validation_plan.signal_artifacts[0].indicator_id == "ma.ema"
+    assert config.validation_plan.signal_artifacts[0].indicator_id == "ma.dema"
     assert config.validation_plan.signal_artifacts[-1].timeframe == "3d"
-    assert config.validation_plan.signal_artifacts[-1].indicator_id == "ma.sma"
+    assert config.validation_plan.signal_artifacts[-1].indicator_id == "volume.vwap"
+    assert tuple(
+        (item.timeframe, item.indicator_id) for item in config.validation_plan.signal_artifacts
+    ) == expected_signal_targets
     assert config.validation_plan.require_hit_times_manifest is True
     assert config.hit_times_grid.tp_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
     assert config.hit_times_grid.sl_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
@@ -435,6 +457,48 @@ def test_load_backtest_artifacts_runtime_config_derives_precompute_runtime_setti
     )
     assert settings.hit_times_tail_bars_1m == 400
     assert settings.max_signal_rows_per_artifact == 3000
+
+
+def test_load_backtest_artifacts_runtime_config_expands_all_supported_signal_artifacts_literal(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify machine-readable `all_supported_v1` expands to the full signal registry.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Artifact configs may opt into full signal precompute coverage without enumerating every
+        `(timeframe, indicator_id)` pair in YAML.
+    Raises:
+        AssertionError: If expansion drifts from signal registry ordering.
+    Side Effects:
+        Writes one temporary YAML file.
+    """
+    config_path = _write_backtest_artifacts_config(
+        tmp_path,
+        body=_VALID_BACKTEST_ARTIFACTS_CONFIG.replace(
+            "signal_artifacts:\n"
+            "      - timeframe: 1h\n"
+            "        indicator_id: ma.sma\n"
+            "      - timeframe: 15m\n"
+            "        indicator_id: ma.ema",
+            "signal_artifacts: all_supported_v1",
+        ),
+    )
+
+    config = load_backtest_artifacts_runtime_config(config_path)
+
+    expected = tuple(
+        (timeframe, indicator_id)
+        for timeframe in ("15m", "30m", "1h", "2h", "4h", "6h", "8h", "1d", "2d", "3d")
+        for indicator_id in supported_indicator_ids_for_signals_v1()
+    )
+    assert tuple(
+        (item.timeframe, item.indicator_id) for item in config.validation_plan.signal_artifacts
+    ) == expected
 
 
 def test_load_backtest_artifacts_runtime_config_rejects_duplicate_yaml_keys(

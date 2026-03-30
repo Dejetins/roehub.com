@@ -25,47 +25,7 @@ backtest_artifacts:
       - 1d
       - 2d
       - 3d
-    signal_artifacts:
-      - timeframe: 15m
-        indicator_id: ma.ema
-      - timeframe: 15m
-        indicator_id: ma.sma
-      - timeframe: 30m
-        indicator_id: ma.ema
-      - timeframe: 30m
-        indicator_id: ma.sma
-      - timeframe: 1h
-        indicator_id: ma.ema
-      - timeframe: 1h
-        indicator_id: ma.sma
-      - timeframe: 2h
-        indicator_id: ma.ema
-      - timeframe: 2h
-        indicator_id: ma.sma
-      - timeframe: 4h
-        indicator_id: ma.ema
-      - timeframe: 4h
-        indicator_id: ma.sma
-      - timeframe: 6h
-        indicator_id: ma.ema
-      - timeframe: 6h
-        indicator_id: ma.sma
-      - timeframe: 8h
-        indicator_id: ma.ema
-      - timeframe: 8h
-        indicator_id: ma.sma
-      - timeframe: 1d
-        indicator_id: ma.ema
-      - timeframe: 1d
-        indicator_id: ma.sma
-      - timeframe: 2d
-        indicator_id: ma.ema
-      - timeframe: 2d
-        indicator_id: ma.sma
-      - timeframe: 3d
-        indicator_id: ma.ema
-      - timeframe: 3d
-        indicator_id: ma.sma
+    signal_artifacts: all_supported_v1
     require_hit_times_manifest: true
   hit_times_grid:
     tp_levels_pct:

@@ -173,6 +173,8 @@ Dedicated scheduled publisher service:
   scheduled service in the next `03:05 Europe/Moscow` window
 - `validation_budgets.max_hit_times_cells_full_rebuild` covers bootstrap/explicit full rebuild,
   while steady-state scheduler runs keep `validation_budgets.max_hit_times_cells`
+- current prod/test/dev configs use `signal_artifacts: all_supported_v1`, so one publish must
+  materialize the full signal registry for every symbol root
 
 ## Manual health checks
 

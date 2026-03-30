@@ -44,6 +44,10 @@ Precompute/publish слой читает strict `configs/<env>/backtest_artifact
 - `hit_times_grid` как source-of-truth TP/SL levels contract;
 - `slot_policy`, `publish_schedule`, `lookback_policy`, `validation_budgets` как fail-fast
   validated pipeline settings.
+- `validation_plan.signal_artifacts` может быть либо explicit list of
+  `{timeframe, indicator_id}`, либо machine-readable literal `all_supported_v1`, который
+  раскрывается в полный registry `supported_indicator_ids_for_signals_v1()` по всем
+  `ARTIFACT_SIGNAL_TIMEFRAMES_V2`.
 - `validation_budgets.max_hit_times_cells` ограничивает steady-state incremental
   `hit_times/1m` rebuild.
 - `validation_budgets.max_hit_times_cells_full_rebuild` используется для первого bootstrap пустого
@@ -148,6 +152,8 @@ Precompute runner v2 обязан:
   runner обязан писать:
   - `signals/<tf>/<indicator_id>/signals.i8.npy`
   - `signals/<tf>/<indicator_id>/manifest.yaml`
+- если config использует `signal_artifacts: all_supported_v1`, explicit target set равен полному
+  registry всех signal-capable indicators, а не сокращённому operator-curated subset;
 - root manifest обязан публиковать real `signals.supported_timeframes`,
   `signals.supported_indicator_ids` и `signals.manifests`;
 - после R4-03 rebuild обязан выводить bounded per-target signal window из

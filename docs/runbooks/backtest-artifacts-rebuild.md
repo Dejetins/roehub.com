@@ -73,6 +73,12 @@ Path resolution precedence:
 - `lookback_policy`
 - `validation_budgets`
 
+`validation_plan.signal_artifacts` contract:
+
+- explicit list of `{timeframe, indicator_id}` items, or
+- machine-readable literal `all_supported_v1` for full signal registry expansion across all
+  artifact signal timeframes.
+
 Ключевые budget keys для `hit_times`:
 
 - `validation_budgets.max_hit_times_cells` для steady-state incremental rebuild;
@@ -287,6 +293,8 @@ Steady-state rebuild policy after the first successful publish:
   `lookback_policy.mapping_tail_bars_1m`;
 - `signals` используют bounded reread/rewrite по
   `lookback_policy.signal_tail_bars_1m`;
+- если `validation_plan.signal_artifacts = all_supported_v1`, rebuild/publish обязан materialize'ить
+  весь signal-capable registry для каждого symbol root, а не operator-curated subset;
 - `hit_times/1m` используют bounded reread/rewrite по
   `lookback_policy.hit_times_tail_bars_1m`;
 - `hit_times/1m` budget выбирается по режиму:

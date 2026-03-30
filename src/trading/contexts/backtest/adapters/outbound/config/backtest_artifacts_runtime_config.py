@@ -17,6 +17,7 @@ from trading.contexts.backtest.application.services import (
     ArtifactSignalValidationSpecV2,
     ArtifactSlotValidationSpecV2,
     ordered_artifact_slots_v2,
+    supported_indicator_ids_for_signals_v1,
     validate_artifact_slot_v2,
     validate_indicator_id_v2,
     validate_mapping_timeframe_v2,
@@ -45,6 +46,7 @@ _VALIDATION_PLAN_REQUIRED_KEYS = (
     "require_hit_times_manifest",
 )
 _SIGNAL_ARTIFACT_REQUIRED_KEYS = ("timeframe", "indicator_id")
+_SIGNAL_ARTIFACTS_ALL_SUPPORTED_LITERAL = "all_supported_v1"
 _HIT_TIMES_GRID_REQUIRED_KEYS = ("tp_levels_pct", "sl_levels_pct")
 _SLOT_POLICY_REQUIRED_KEYS = ("slots",)
 _PUBLISH_SCHEDULE_REQUIRED_KEYS = ("full_rebuild_hour_utc", "full_rebuild_minute_utc")
@@ -1112,7 +1114,9 @@ def _load_signal_artifacts(
     Returns:
         tuple[BacktestArtifactSignalRuntimeConfig, ...]: Parsed signal artifact targets.
     Assumptions:
-        Each item must contain exactly `timeframe` and `indicator_id`.
+        YAML may either enumerate explicit `{timeframe, indicator_id}` items or use the special
+        literal `all_supported_v1` to expand every registry-backed signal indicator across all
+        allowed artifact signal timeframes.
     Raises:
         ValueError: If the sequence or one item violates the strict shape contract.
     Side Effects:
@@ -1124,7 +1128,15 @@ def _load_signal_artifacts(
       - configs/dev/backtest_artifacts.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
-    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+    if isinstance(value, str):
+        normalized_literal = value.strip().lower()
+        if normalized_literal != _SIGNAL_ARTIFACTS_ALL_SUPPORTED_LITERAL:
+            raise ValueError(
+                f"{field_path} string literal must be "
+                f"{_SIGNAL_ARTIFACTS_ALL_SUPPORTED_LITERAL!r}"
+            )
+        return _expand_all_supported_signal_artifacts()
+    if isinstance(value, bytes) or not isinstance(value, Sequence):
         raise ValueError(f"{field_path} must be sequence")
 
     parsed_items: list[BacktestArtifactSignalRuntimeConfig] = []
@@ -1149,6 +1161,37 @@ def _load_signal_artifacts(
             )
         )
     return tuple(parsed_items)
+
+
+def _expand_all_supported_signal_artifacts() -> tuple[BacktestArtifactSignalRuntimeConfig, ...]:
+    """
+    Expand the machine-readable `all_supported_v1` signal artifact literal.
+
+    Args:
+        None.
+    Returns:
+        tuple[BacktestArtifactSignalRuntimeConfig, ...]: Full deterministic signal artifact matrix.
+    Assumptions:
+        Every indicator returned by `supported_indicator_ids_for_signals_v1()` is publishable on
+        every artifact signal timeframe.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+    """
+    return tuple(
+        BacktestArtifactSignalRuntimeConfig(
+            timeframe=timeframe,
+            indicator_id=indicator_id,
+        )
+        for timeframe in ARTIFACT_SIGNAL_TIMEFRAMES_V2
+        for indicator_id in supported_indicator_ids_for_signals_v1()
+    )
 
 
 def _require_mapping(*, value: Any, field_path: str) -> Mapping[str, Any]:
