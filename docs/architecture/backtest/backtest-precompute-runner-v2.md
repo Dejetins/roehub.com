@@ -48,6 +48,53 @@ Precompute/publish слой читает strict `configs/<env>/backtest_artifact
 R2-04 intentionally keeps these settings отдельно от `configs/<env>/backtest.yaml`, чтобы
 runtime request defaults и artifact pipeline knobs не смешивались в одном контракте.
 
+## Operational execution topology
+
+- Precompute/publish orchestration lives in a dedicated artifact service on Mac Studio native
+  backend and is not triggered inline by API requests or by `backtest-job-runner`.
+- Scheduled mode is anchored to `Europe/Moscow` and runs daily at `03:05`.
+- Instrument universe source-of-truth is `market_data.ref_instruments`; scheduled mode processes
+  all enabled+tradable pairs from the latest snapshot.
+- Manual mode may target one explicit `(exchange, market_type, symbol)` or an explicit subset, but
+  must use the same inactive-slot build, whole-slot validation, and atomic `current.yaml` switch.
+- Shared orchestration entrypoint is `PublishBacktestArtifactsV2UseCase`; manual CLI and the later
+  daily scheduler must call the same use-case instead of wiring precompute/publish services
+  separately.
+- Manual operator entrypoint is
+  `uv run python -m apps.cli.main backtest-artifact-publish --exchange <exchange> --market-type <market_type> --symbol <symbol> [--full-rebuild]`.
+- The shared result contract returns deterministic per-target diagnostics with
+  `publish_mode in {bootstrap, incremental, full_rebuild}`, old/new slot identity, and whole-slot
+  validation summary.
+- Prod `artifact_root` must be a stable host data path outside repo checkout; relative
+  checkout-local roots remain acceptable only for dev/test wiring.
+- Production wiring fixes `artifact_root` at `/opt/roehub/state/backtest_artifacts/v2`;
+  dev/test may continue to use repo-local `artifacts/backtest/v2`.
+- Service execution must be protected by host-level locking so overlapping rebuild/publish runs do
+  not mutate the same inactive slot concurrently.
+- Service observability is part of the contract. Minimal Prometheus set:
+  - `backtest_artifact_publish_runs_total{status}`
+  - `backtest_artifact_publish_duration_seconds`
+  - `backtest_artifact_publish_symbols_total{status}`
+  - `backtest_artifact_publish_blocked_total{reason}`
+  - `backtest_artifact_publish_last_success_unixtime`
+  - `backtest_artifact_tail_rebuild_bars_total{stage}`
+
+## Bootstrap and incremental rebuild policy
+
+- Если для symbol root ещё нет valid `current.yaml` и published slot, runner обязан выполнить
+  bootstrap full build и создать initial published identity через обычный publish contract.
+- После bootstrap daily rebuild не должен по умолчанию выполнять full-history recompute для всех
+  стадий.
+- `prices`, `mappings`, `signals` используют bounded incremental rebuild по:
+  - `lookback_policy.price_tail_bars_1m`
+  - `lookback_policy.mapping_tail_bars_1m`
+  - `lookback_policy.signal_tail_bars_1m`
+- `hit_times/1m` должны использовать такой же bounded incremental rebuild по
+  `lookback_policy.hit_times_tail_bars_1m`.
+- Если reuse prerequisites нарушены для конкретного stage или symbol root, выполняется
+  deterministic full rebuild только для этого symbol root, после чего whole-slot validation и
+  publish semantics остаются неизменными.
+
 ## Область ответственности
 
 Precompute runner v2 обязан:
@@ -119,6 +166,11 @@ artifact-backed `prices/1m.ohlcv`.
 - root manifest больше не должен публиковать placeholder hash для `hit_times`, если slot построен
   этим R5-01 path;
 - runtime читает `hit_times/1m` только по strict manifest metadata, без recompute и discovery.
+- daily rebuild policy для `hit_times/1m` должна быть bounded, а не full-history by default:
+  - source-of-truth lookback: `lookback_policy.hit_times_tail_bars_1m`;
+  - merge strategy: `prefix + rebuilt_tail`;
+  - missing existing files, grid drift или manifest drift переводят symbol root в deterministic
+    full rebuild;
 - на этом boundary ответственность precompute слоя заканчивается: `signal timeline`,
   `execution timeline`, `compact trade list`, `fast TP/SL grid search`,
   `exact replay of best TP/SL cell` и `metrics over compact trades` описываются отдельно в

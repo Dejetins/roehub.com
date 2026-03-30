@@ -4,6 +4,7 @@ import logging
 import sys
 
 from apps.cli.commands.backfill_1m import Backfill1mCli
+from apps.cli.commands.backtest_artifact_publish import BacktestArtifactPublishCli
 from apps.cli.commands.rest_catchup_1m import RestCatchUp1mCli
 from apps.cli.commands.sync_instruments import SyncInstrumentsCli
 
@@ -25,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "Usage:\n"
             "  backfill-1m [args...]\n"
+            "  backtest-artifact-publish [args...]\n"
             "  sync-instruments [args...]\n"
             "  rest-catchup [args...]\n"
             "\n"
@@ -37,6 +39,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if cmd == "backfill-1m":
         return Backfill1mCli().run(rest)
+    if cmd == "backtest-artifact-publish":
+        return BacktestArtifactPublishCli().run(rest)
     if cmd == "sync-instruments":
         return SyncInstrumentsCli().run(rest)
     if cmd == "rest-catchup":

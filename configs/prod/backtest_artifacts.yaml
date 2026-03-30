@@ -1,6 +1,6 @@
 version: 1
 backtest_artifacts:
-  artifact_root: artifacts/backtest/v2
+  artifact_root: /opt/roehub/state/backtest_artifacts/v2
   validation_plan:
     price_timeframes:
       - 1m

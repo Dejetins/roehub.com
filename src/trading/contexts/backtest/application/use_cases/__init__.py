@@ -33,6 +33,13 @@ from .errors import (
     map_backtest_exception,
     validation_error,
 )
+from .publish_backtest_artifacts_v2 import (
+    PublishBacktestArtifactsModeV2,
+    PublishBacktestArtifactsV2Request,
+    PublishBacktestArtifactsV2Result,
+    PublishBacktestArtifactsV2UseCase,
+    PublishBacktestArtifactsV2ValidationSummary,
+)
 from .request_runtime_contract_v1 import (
     validate_signal_overrides_default_only,
     validate_template_runtime_contract,
@@ -63,6 +70,11 @@ __all__ = [
     "GetBacktestRunTopUseCase",
     "GetBacktestJobStatusUseCase",
     "GetBacktestJobTopUseCase",
+    "PublishBacktestArtifactsModeV2",
+    "PublishBacktestArtifactsV2Request",
+    "PublishBacktestArtifactsV2Result",
+    "PublishBacktestArtifactsV2UseCase",
+    "PublishBacktestArtifactsV2ValidationSummary",
     "ListBacktestRunsUseCase",
     "ListBacktestJobsUseCase",
     "RunBacktestJobRunnerV1",

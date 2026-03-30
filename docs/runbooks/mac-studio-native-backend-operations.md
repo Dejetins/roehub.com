@@ -18,6 +18,7 @@
 
 - app checkout/runtime: `/opt/roehub/app`
 - host config root: `/opt/roehub/config`
+- backtest artifact root: `/opt/roehub/state/backtest_artifacts/v2`
 - host binaries: `/opt/roehub/bin`, `/opt/clickhouse/clickhouse`
 - prod env: `/Users/daniildegtyarev/.config/roehub/roehub.env`
 - test env: `/Users/daniildegtyarev/.config/roehub/roehub.test.env`
@@ -124,6 +125,17 @@ bash scripts/macos/configure_tailscale_serve.sh
 ```bash
 sudo install -d -m 755 /etc/roehub
 sudo ln -sfn /Users/daniildegtyarev/.config/roehub/roehub.env /etc/roehub/roehub.env
+```
+
+Ручной publish backtest artifacts:
+
+```bash
+cd /opt/roehub/app
+set -a
+source /Users/daniildegtyarev/.config/roehub/roehub.env
+set +a
+/opt/roehub/app/.venv/bin/python -m apps.cli.main backtest-artifact-publish --exchange binance --market-type spot --symbol BTCUSDT
+/opt/roehub/app/.venv/bin/python -m apps.cli.main backtest-artifact-publish --exchange binance --market-type spot --symbol BTCUSDT --full-rebuild
 ```
 
 ## Manual health checks

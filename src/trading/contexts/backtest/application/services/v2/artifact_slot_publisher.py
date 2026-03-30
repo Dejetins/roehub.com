@@ -14,6 +14,7 @@ from .artifact_manifest_validator import BacktestArtifactManifestValidatorV2
 from .artifact_precompute_runner import BacktestArtifactPrecomputeRunnerV2
 from .contracts import (
     ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2,
+    ARTIFACT_SLOT_A_LITERAL_V2,
     CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
@@ -132,17 +133,51 @@ class BacktestArtifactSlotPublisherV2:
         Assumptions:
             Operators call this step before rebuilding the inactive slot in place.
         Raises:
-            FileNotFoundError: If the active `current.yaml` pointer is missing.
-            ValueError: If `current.yaml` violates the strict pointer contract.
+            ValueError: If `current.yaml` violates the strict pointer contract or bootstrap
+                preconditions are inconsistent.
         Side Effects:
             Reads `current.yaml` and, when present, the inactive slot `manifest.yaml`.
         Docs:
           - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
           - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
-        current_pointer = self.artifact_loader.load_current_pointer(coordinates)
+        current_pointer_path = self.artifact_loader.resolve_current_pointer_path(coordinates)
+        try:
+            current_pointer = self.artifact_loader.load_current_pointer(coordinates)
+        except FileNotFoundError:
+            bootstrap_manifest_path = self.artifact_loader.resolve_slot_manifest_path(
+                coordinates,
+                ARTIFACT_SLOT_A_LITERAL_V2,
+            )
+            alternate_manifest_path = self.artifact_loader.resolve_slot_manifest_path(
+                coordinates,
+                inactive_artifact_slot_v2(ARTIFACT_SLOT_A_LITERAL_V2),
+            )
+            conflicting_manifest_paths = tuple(
+                path
+                for path in (bootstrap_manifest_path, alternate_manifest_path)
+                if path.is_file()
+            )
+            if len(conflicting_manifest_paths) > 0:
+                raise ValueError(
+                    "bootstrap requires missing current.yaml and no pre-existing slot manifests; "
+                    f"found {conflicting_manifest_paths!r}"
+                )
+            return ArtifactPublishPrecheckV2(
+                coordinates=coordinates,
+                current_pointer_path=current_pointer_path,
+                current_pointer=None,
+                inactive_slot=ARTIFACT_SLOT_A_LITERAL_V2,
+                target_slot_generation=1,
+                inactive_manifest_path=bootstrap_manifest_path,
+                inactive_manifest_hash=None,
+                blocking_active_run_count=0,
+                ready=True,
+                bootstrap=True,
+            )
         inactive_slot = inactive_artifact_slot_v2(current_pointer.active_slot)
         inactive_manifest_path = self.artifact_loader.resolve_slot_manifest_path(
             coordinates,
@@ -167,8 +202,10 @@ class BacktestArtifactSlotPublisherV2:
             )
             return ArtifactPublishPrecheckV2(
                 coordinates=coordinates,
+                current_pointer_path=current_pointer.path,
                 current_pointer=current_pointer,
                 inactive_slot=inactive_slot,
+                target_slot_generation=current_pointer.slot_generation + 1,
                 inactive_manifest_path=inactive_manifest_path,
                 inactive_manifest_hash=inactive_manifest_hash,
                 blocking_active_run_count=blocking_active_run_count,
@@ -179,8 +216,10 @@ class BacktestArtifactSlotPublisherV2:
 
         return ArtifactPublishPrecheckV2(
             coordinates=coordinates,
+            current_pointer_path=current_pointer.path,
             current_pointer=current_pointer,
             inactive_slot=inactive_slot,
+            target_slot_generation=current_pointer.slot_generation + 1,
             inactive_manifest_path=inactive_manifest_path,
             inactive_manifest_hash=inactive_manifest_hash,
             blocking_active_run_count=0,
@@ -236,7 +275,17 @@ class BacktestArtifactSlotPublisherV2:
         stage_validation_spec = _ensure_prices_mappings_publish_validation_spec_v2(validation_spec)
         precheck = self.precheck_publish(request.coordinates)
         self._ensure_precheck_ready(precheck)
-        build_result = precompute_runner.export_canonical_price_1m(request)
+        build_result = precompute_runner.export_canonical_price_1m(
+            ArtifactCanonicalPriceExportRequestV2(
+                coordinates=request.coordinates,
+                time_range=request.time_range,
+                asof_date=request.asof_date,
+                generated_at_utc=request.generated_at_utc,
+                target_slot=precheck.inactive_slot,
+                target_slot_generation=precheck.target_slot_generation,
+                force_full_rebuild=request.force_full_rebuild,
+            )
+        )
         publish_result = self.publish(
             precheck=precheck,
             validation_spec=stage_validation_spec,
@@ -288,7 +337,7 @@ class BacktestArtifactSlotPublisherV2:
             slot=precheck.inactive_slot,
             validation_spec=validation_spec,
             expected_asof_date=expected_asof_date,
-            expected_slot_generation=precheck.current_pointer.slot_generation + 1,
+            expected_slot_generation=precheck.target_slot_generation,
         )
         if len(validation.diagnostics) > 0:
             first_diagnostic = validation.diagnostics[0]
@@ -344,7 +393,7 @@ class BacktestArtifactSlotPublisherV2:
                 diagnostics=validation.diagnostics,
             )
         published_at_utc = _utc_now_literal_v2(self.now_provider())
-        next_slot_generation = precheck.current_pointer.slot_generation + 1
+        next_slot_generation = precheck.target_slot_generation
         raw_pointer_payload = {
             "schema_version": CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
             "active_slot": precheck.inactive_slot,
@@ -354,7 +403,7 @@ class BacktestArtifactSlotPublisherV2:
             "published_at_utc": published_at_utc,
         }
         published_pointer = ArtifactCurrentPointerV2(
-            path=precheck.current_pointer.path,
+            path=precheck.current_pointer_path,
             active_slot=precheck.inactive_slot,
             raw_payload=raw_pointer_payload,
             schema_version=CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,

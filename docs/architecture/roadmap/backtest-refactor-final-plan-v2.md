@@ -168,6 +168,30 @@ Backtest signal в текущем контракте — это не бинар�
 - Если неактивный слот ещё pinned активными job-ами, publish блокируется и не начинается.
 - Старый активный слот не переписывается in-place.
 
+### 5.2A Operational execution model
+
+- Production rebuild/publish выполняется отдельным сервисом artifact precompute/publish, а не
+  inline внутри API или `backtest-job-runner`.
+- Deployment target этого сервиса: Mac Studio native backend.
+- Instrument universe source-of-truth: `market_data.ref_instruments`.
+- Scheduled daily run обходит все enabled+tradable trading pairs из актуального snapshot
+  `market_data.ref_instruments`.
+- Manual ad-hoc mode допускается для bootstrap initial slot и для точечного rebuild одного
+  инструмента, но использует тот же publish contract и тот же whole-slot validation.
+- Scheduled execution anchored to `Europe/Moscow` и запускается ежедневно в `03:05`.
+- Prod `artifact_root` должен быть стабильным host data path вне repo checkout; относительный
+  путь внутри checkout допускается только как dev/test convenience.
+- Сервис обязан держать host-level lock, исключающий concurrent rebuild/publish для одного и того
+  же symbol root.
+- Сервис обязан публиковать Prometheus metrics и structured logs, достаточные для ответов на
+  вопросы:
+  - был ли daily run запущен;
+  - сколько инструментов обработано/пропущено/упало;
+  - был ли publish blocked lock/pin/validation failure;
+  - когда был последний successful publish;
+  - сколько `1m` bars реально переписано в incremental mode по `prices`, `mappings`,
+    `signals`, `hit_times`.
+
 ### 5.3 Timeframes
 
 Backtest request timeframes:
@@ -1226,12 +1250,22 @@ History entry должна позволять:
 
 ### Этап 4. Precompute pipeline
 
+- bootstrap initial slot, если для symbol root ещё нет valid `current.yaml` и published slot;
 - daily load canonical `1m` candles;
 - rollup prices for allowed TF;
 - compute signals for remaining zoo;
 - build mappings;
 - build `1m hit-times`;
 - validate and publish.
+
+После bootstrap steady-state policy должна быть такой:
+
+- `prices`, `mappings`, `signals` не пересчитываются full-history по умолчанию, а используют
+  bounded incremental rebuild по explicit `lookback_policy.*_tail_bars_1m`;
+- `hit_times/1m` тоже должны использовать bounded incremental rebuild по
+  `lookback_policy.hit_times_tail_bars_1m`, а не обязательный full recompute на каждый daily run;
+- если reuse prerequisites нарушены (missing files, manifest drift, config drift, grid drift),
+  для конкретного symbol root выполняется deterministic full rebuild с тем же publish contract.
 
 ### Этап 5. Runtime kernels
 

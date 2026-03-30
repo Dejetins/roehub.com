@@ -236,6 +236,7 @@ def test_backtest_artifact_slot_publisher_v2_switches_current_yaml_after_strict_
     assert repository.last_call is not None
     assert repository.last_call["market_id"] == 1
     assert repository.last_call["symbol"] == "BTCUSDT"
+    assert result.previous_pointer is not None
     assert result.previous_pointer.active_slot == store.active_slot
     assert result.published_pointer.active_slot == store.inactive_slot
     assert result.published_pointer.slot_generation == 5

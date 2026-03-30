@@ -21,10 +21,32 @@ plan, strict manifest validation и R6-01 runtime bootstrap boundary.
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 
+## Scheduled service contract
+
+- Artifact rebuild/publish is executed by a dedicated service on Mac Studio native backend.
+- Scheduled mode is anchored to `Europe/Moscow` and runs daily at `03:05`.
+- Scheduled universe source-of-truth is `market_data.ref_instruments`; the service processes all
+  enabled+tradable pairs from its latest snapshot.
+- Manual mode may rebuild one explicit symbol root or a bounded subset, but still uses the same
+  inactive-slot build and whole-slot validation contract.
+- Service execution must be serialized with a host-level lock so overlapping rebuild/publish runs
+  do not target the same inactive slot concurrently.
+
+Minimal service metrics:
+
+- `backtest_artifact_publish_runs_total{status}`
+- `backtest_artifact_publish_duration_seconds`
+- `backtest_artifact_publish_symbols_total{status}`
+- `backtest_artifact_publish_blocked_total{reason}`
+- `backtest_artifact_publish_last_success_unixtime`
+- `backtest_artifact_tail_rebuild_bars_total{stage}`
+
 ## Предусловия
 
 - artifact pipeline contract загружен из strict `configs/<env>/backtest_artifacts.yaml`;
-- symbol root уже существует и содержит `current.yaml`, `slot_a/`, `slot_b/`;
+- prod `artifact_root` указывает на стабильный host data path вне repo checkout;
+- symbol root может либо уже содержать `current.yaml`, `slot_a/`, `slot_b/`, либо отсутствовать
+  целиком в bootstrap case;
 - опубликованный active slot не мутируется in place;
 - у оператора есть explicit validation plan для `prices`, `signals`, `mappings`, `hit_times`,
   полученный из `backtest_artifacts.validation_plan`;
@@ -59,6 +81,46 @@ Fail-fast loader обязан reject'ить:
 - duplicate sequence items;
 - non-positive lookbacks / validation budgets.
 
+## Manual CLI entrypoint
+
+Manual publish uses the same shared orchestration as the future scheduler service and keeps the
+same strict sequence:
+
+1. `build inactive slot`
+2. `validate whole slot`
+3. `atomically switch current.yaml`
+
+Default manual mode stays incremental-ready for one explicit symbol root:
+
+```bash
+uv run python -m apps.cli.main backtest-artifact-publish \
+  --exchange binance \
+  --market-type spot \
+  --symbol BTCUSDT
+```
+
+Explicit deterministic full rebuild for one target:
+
+```bash
+uv run python -m apps.cli.main backtest-artifact-publish \
+  --exchange binance \
+  --market-type spot \
+  --symbol BTCUSDT \
+  --full-rebuild
+```
+
+CLI result contract returns deterministic diagnostics with:
+
+- target coordinates;
+- `publish_mode` = `bootstrap` | `incremental` | `full_rebuild`;
+- old/new slot identity and slot generation;
+- whole-slot validation summary.
+
+Path contract by environment:
+
+- prod uses `/opt/roehub/state/backtest_artifacts/v2`;
+- dev/test may keep repo-local `artifacts/backtest/v2`.
+
 ## Обязательная publish sequence
 
 Порядок всегда один и тот же:
@@ -68,6 +130,19 @@ Fail-fast loader обязан reject'ить:
 3. `atomically switch current.yaml`
 
 Другой порядок запрещён.
+
+## Bootstrap exception
+
+Если для symbol root ещё нет valid `current.yaml` и published slot:
+
+- создать symbol root и два canonical slot roots;
+- выбрать `slot_a` как initial bootstrap target;
+- выполнить full build для этого symbol root;
+- выполнить whole-slot validation;
+- создать initial `current.yaml` с `active_slot=slot_a`;
+- дальше перейти к обычной steady-state модели `inactive slot -> validate -> switch`.
+
+Ручное создание "пустого active slot" вне publish contract запрещено.
 
 ## Шаг 1. Resolve pointer и inactive slot
 
@@ -162,6 +237,19 @@ R4-01 / R4-02 / R4-03 clarification:
 - R5-01 materialize'ит real `hit_times/1m`, поэтому rebuild теперь должен писать strict
   hit-times arrays и manifest в inactive slot по тем же deterministic paths.
 
+Steady-state rebuild policy after the first successful publish:
+
+- `prices` используют bounded reread/rewrite по
+  `lookback_policy.price_tail_bars_1m`;
+- `mappings` используют bounded reread/rewrite по
+  `lookback_policy.mapping_tail_bars_1m`;
+- `signals` используют bounded reread/rewrite по
+  `lookback_policy.signal_tail_bars_1m`;
+- `hit_times/1m` используют bounded reread/rewrite по
+  `lookback_policy.hit_times_tail_bars_1m`;
+- если existing files/manifest reuse prerequisites нарушены для конкретного stage или symbol root,
+  rebuild переключается на deterministic full rebuild для этого symbol root.
+
 Минимально ожидаемые пути:
 
 - `<slot>/manifest.yaml`
@@ -226,6 +314,9 @@ R4-01 / R4-02 / R4-03 clarification:
   - `signals.manifests`
   - `signals/<tf>/<indicator_id>/signals.i8.npy`
   - `signals/<tf>/<indicator_id>/manifest.yaml`
+- `hit_times/1m` должны использовать bounded rebuild по
+  `lookback_policy.hit_times_tail_bars_1m`; если reuse невозможен, rebuild переключается в
+  deterministic full rebuild для этого symbol root;
 - publish остаётся запрещённым, если active validation plan still expects later-stage artifacts.
 
 Если есть хотя бы один validator diagnostic, publish останавливается без изменения `current.yaml`.
@@ -250,6 +341,16 @@ published_at_utc: "2026-03-26T03:04:05Z"
 - записать payload в temp file в той же директории;
 - выполнить atomic rename/replace;
 - не делать partial overwrite существующего `current.yaml`.
+
+После switch оператор или scheduled service обязаны проверить observability invariants:
+
+- `backtest_artifact_publish_runs_total{status="succeeded"}` вырос;
+- `backtest_artifact_publish_last_success_unixtime` обновился;
+- `backtest_artifact_publish_symbols_total{status="failed"}` остаётся `0` или соответствует
+  известным degraded symbols;
+- `backtest_artifact_publish_blocked_total{reason=~"lock_held|inactive_slot_pinned|validation_failed"}` не растёт неожиданно;
+- `backtest_artifact_tail_rebuild_bars_total{stage}` показывает ожидаемый bounded tail profile, а
+  не скрытый full rebuild без причины.
 
 ## R6-01 runtime bootstrap checks
 

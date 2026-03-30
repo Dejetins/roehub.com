@@ -2204,6 +2204,7 @@ class ArtifactPublishPrecheckV2:
 
     Docs:
       - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -2211,14 +2212,70 @@ class ArtifactPublishPrecheckV2:
     """
 
     coordinates: ArtifactCoordinatesV2
-    current_pointer: ArtifactCurrentPointerV2
+    current_pointer_path: Path
+    current_pointer: ArtifactCurrentPointerV2 | None
     inactive_slot: ArtifactSlotLiteralV2
+    target_slot_generation: int
     inactive_manifest_path: Path
     inactive_manifest_hash: str | None
     blocking_active_run_count: int
     ready: bool
+    bootstrap: bool = False
     failure_code: str | None = None
     failure_message: str | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate bootstrap and steady-state precheck invariants.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Bootstrap prechecks target `slot_a` generation `1`, while steady-state prechecks
+            retain the resolved strict `current.yaml` identity.
+        Raises:
+            ValueError: If slot/generation fields are invalid or bootstrap/current-pointer state
+                is contradictory.
+        Side Effects:
+            Normalizes slot and generation literals.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+        """
+        object.__setattr__(self, "inactive_slot", validate_artifact_slot_v2(self.inactive_slot))
+        object.__setattr__(
+            self,
+            "target_slot_generation",
+            validate_current_pointer_slot_generation_v2(self.target_slot_generation),
+        )
+        object.__setattr__(
+            self,
+            "blocking_active_run_count",
+            validate_non_negative_manifest_int_v2(self.blocking_active_run_count),
+        )
+        if self.current_pointer is None:
+            if not self.bootstrap:
+                raise ValueError(
+                    "ArtifactPublishPrecheckV2.current_pointer is required outside bootstrap mode"
+                )
+            return
+        if self.bootstrap:
+            raise ValueError(
+                "ArtifactPublishPrecheckV2.bootstrap cannot be true when current_pointer exists"
+            )
+        if self.current_pointer.path != self.current_pointer_path:
+            raise ValueError(
+                "ArtifactPublishPrecheckV2.current_pointer_path must match current_pointer.path"
+            )
+        if self.target_slot_generation != self.current_pointer.slot_generation + 1:
+            raise ValueError(
+                "ArtifactPublishPrecheckV2.target_slot_generation must equal "
+                "current_pointer.slot_generation + 1"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2255,7 +2312,7 @@ class ArtifactPublishResultV2:
     """
 
     coordinates: ArtifactCoordinatesV2
-    previous_pointer: ArtifactCurrentPointerV2
+    previous_pointer: ArtifactCurrentPointerV2 | None
     published_pointer: ArtifactCurrentPointerV2
     precheck: ArtifactPublishPrecheckV2
     validation: ArtifactSlotValidationResultV2
@@ -2278,6 +2335,9 @@ class ArtifactCanonicalPriceExportRequestV2:
     time_range: TimeRange
     asof_date: str
     generated_at_utc: str
+    target_slot: ArtifactSlotLiteralV2 | None = None
+    target_slot_generation: int | None = None
+    force_full_rebuild: bool = False
 
     def __post_init__(self) -> None:
         """
@@ -2313,6 +2373,28 @@ class ArtifactCanonicalPriceExportRequestV2:
             self,
             "generated_at_utc",
             validate_current_pointer_published_at_utc_v2(self.generated_at_utc),
+        )
+        if self.target_slot is None and self.target_slot_generation is not None:
+            raise ValueError(
+                "ArtifactCanonicalPriceExportRequestV2.target_slot_generation requires target_slot"
+            )
+        if self.target_slot is not None and self.target_slot_generation is None:
+            raise ValueError(
+                "ArtifactCanonicalPriceExportRequestV2.target_slot requires "
+                "target_slot_generation"
+            )
+        if self.target_slot is None:
+            return
+        target_slot_generation = self.target_slot_generation
+        if target_slot_generation is None:
+            raise ValueError(
+                "ArtifactCanonicalPriceExportRequestV2.target_slot_generation is required"
+            )
+        object.__setattr__(self, "target_slot", validate_artifact_slot_v2(self.target_slot))
+        object.__setattr__(
+            self,
+            "target_slot_generation",
+            validate_current_pointer_slot_generation_v2(target_slot_generation),
         )
 
 

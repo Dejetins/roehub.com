@@ -86,6 +86,7 @@ from .contracts import (
     ArtifactSignalManifestDocumentV2,
     ArtifactSignalPathsV2,
     ArtifactSignalValidationSpecV2,
+    ArtifactSlotLiteralV2,
     ArtifactTimelineCoverageV2,
     BacktestArtifactLoaderV2,
     SignalRuleEvaluationRequestV2,
@@ -367,9 +368,10 @@ class BacktestArtifactPrecomputeRunnerV2:
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
-        current_pointer = self.artifact_loader.load_current_pointer(request.coordinates)
-        inactive_slot = inactive_artifact_slot_v2(current_pointer.active_slot)
-        target_slot_generation = current_pointer.slot_generation + 1
+        inactive_slot, target_slot_generation = _resolve_export_target_v2(
+            artifact_loader=self.artifact_loader,
+            request=request,
+        )
         price_paths = self.artifact_loader.resolve_price_paths(
             request.coordinates,
             inactive_slot,
@@ -380,18 +382,21 @@ class BacktestArtifactPrecomputeRunnerV2:
             inactive_slot,
         )
         slot_root = manifest_path.parent
-        existing_manifest = _load_existing_inactive_manifest_v2(
-            artifact_loader=self.artifact_loader,
-            coordinates=request.coordinates,
-            slot=inactive_slot,
-            manifest_path=manifest_path,
-        )
-        existing_arrays = _load_existing_canonical_price_arrays_v2(
-            artifact_loader=self.artifact_loader,
-            coordinates=request.coordinates,
-            slot=inactive_slot,
-            existing_manifest=existing_manifest,
-        )
+        existing_manifest = None
+        existing_arrays = None
+        if not request.force_full_rebuild:
+            existing_manifest = _load_existing_inactive_manifest_v2(
+                artifact_loader=self.artifact_loader,
+                coordinates=request.coordinates,
+                slot=inactive_slot,
+                manifest_path=manifest_path,
+            )
+            existing_arrays = _load_existing_canonical_price_arrays_v2(
+                artifact_loader=self.artifact_loader,
+                coordinates=request.coordinates,
+                slot=inactive_slot,
+                existing_manifest=existing_manifest,
+            )
         tail_plan = _build_tail_plan_v2(
             request=request,
             existing_arrays=existing_arrays,
@@ -529,6 +534,43 @@ class BacktestArtifactPrecomputeRunnerV2:
             ),
             rewritten_tail_bars=int(tail_arrays.open_time.shape[0]),
         )
+
+
+def _resolve_export_target_v2(
+    *,
+    artifact_loader: BacktestArtifactLoaderV2,
+    request: ArtifactCanonicalPriceExportRequestV2,
+) -> tuple[ArtifactSlotLiteralV2, int]:
+    """
+    Resolve the explicit inactive-slot target for one precompute export request.
+
+    Args:
+        artifact_loader: Artifact loader used when the request does not override target identity.
+        request: Export request that may carry an explicit target slot/generation override.
+    Returns:
+        tuple[ArtifactSlotLiteralV2, int]: Deterministic target slot and slot generation.
+    Assumptions:
+        Shared orchestration may pre-resolve bootstrap target identity, while legacy callers still
+        derive it from strict `current.yaml`.
+    Raises:
+        FileNotFoundError: If strict `current.yaml` is required but missing.
+        ValueError: If `current.yaml` or explicit target fields violate strict contracts.
+    Side Effects:
+        Reads `current.yaml` only when request does not already specify target identity.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    if request.target_slot is not None and request.target_slot_generation is not None:
+        return request.target_slot, request.target_slot_generation
+    current_pointer = artifact_loader.load_current_pointer(request.coordinates)
+    return (
+        inactive_artifact_slot_v2(current_pointer.active_slot),
+        current_pointer.slot_generation + 1,
+    )
 
 
 def _materialize_signal_artifacts_v2(

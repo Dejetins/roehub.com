@@ -33,6 +33,16 @@
 - Artifact store публикуется через два слота: `slot_a` / `slot_b` + pointer file `current.yaml`.
 - Published slot не переписывается in-place.
 - Если неактивный слот ещё pinned активными background run, новый publish не стартует.
+- Production rebuild/publish выполняется отдельным artifact precompute/publish service на Mac
+  Studio, а не inline внутри API или `backtest-job-runner`.
+- Scheduled service использует `market_data.ref_instruments` как source-of-truth universe и
+  ежедневно в `03:05 Europe/Moscow` проходит по всем enabled+tradable trading pairs.
+- Сервис обязан публиковать Prometheus metrics и structured logs для publish health/freshness,
+  instrument coverage, partial rebuild progress и pin/lock/validation failures.
+- Первый publish для symbol root допускает bootstrap full build без существующего
+  `current.yaml`; subsequent runs должны использовать bounded incremental rebuild для `prices`,
+  `mappings`, `signals`, `hit_times` с deterministic fallback на full rebuild при reuse/config
+  drift.
 - Backtest request TF ограничены списком:
   - `15m`
   - `30m`
@@ -459,6 +469,8 @@
   - publish schedule
   - lookback policy
   - validation budgets
+- `publish_schedule` должен быть executable operational contract, а не narrative-only заметкой:
+  initial production schedule фиксируется как daily `03:05 Europe/Moscow`;
 - загрузчик/валидатор должен fail-fast валидировать эти поля.
 
 **Non-goals:**
@@ -586,6 +598,8 @@
 
 **DoD:**
 - можно опубликовать слот, содержащий только validated prices+mappings stage.
+- bootstrap path для symbol root без `current.yaml` описан отдельно и не требует ручного
+  "создания пустого active slot" вне artifact contract.
 
 **Основные пути:**
 - `src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py`
@@ -1322,6 +1336,11 @@
   - artifact rebuild
   - background run troubleshooting
   - rollout / rollback guidance
+- observability closure:
+  - метрики daily artifact service
+  - freshness/last-success checks
+  - instrument coverage и skipped/failed symbol counters
+  - pin-block / lock-contention / validation-failure counters
 
 **Non-goals:**
 - абстрактная “надеемся, что быстро” без perf measurements;
