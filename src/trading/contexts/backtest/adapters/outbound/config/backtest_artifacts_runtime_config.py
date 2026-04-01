@@ -797,6 +797,8 @@ class BacktestArtifactsRuntimeConfig:
             hit_times_tail_bars_1m=self.lookback_policy.hit_times_tail_bars_1m,
             hit_times_tp_levels_pct=self.hit_times_grid.tp_levels_pct,
             hit_times_sl_levels_pct=self.hit_times_grid.sl_levels_pct,
+            price_timeframes=self.validation_plan.price_timeframes,
+            mapping_timeframes=self.validation_plan.mapping_timeframes,
             config_sha256=config_sha256,
             execution_policy=self.execution_policy.to_execution_policy(),
             signal_artifacts=tuple(

@@ -609,6 +609,39 @@ class _SignalChunkGridBlockV2:
 
 
 @dataclass(frozen=True, slots=True)
+class _SignalChunkWorkerBootstrapV2:
+    """
+    Immutable worker-bootstrap payload shared once per spawned chunk worker session.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    indicator_compute_worker_class: type[Any]
+    indicator_compute_worker_snapshot: Mapping[str, Any]
+    candles: CandleArrays
+
+
+@dataclass(frozen=True, slots=True)
+class _SignalChunkWorkerStateV2:
+    """
+    Worker-local runtime state reused across all chunk jobs inside one spawned process.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    indicator_compute: IndicatorCompute
+    candles: CandleArrays
+
+
+@dataclass(frozen=True, slots=True)
 class _SignalChunkWorkerResultV2:
     """
     Internal immutable summary returned by one completed chunk worker.
@@ -892,7 +925,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             signal_targets_by_timeframe = _group_signal_targets_by_timeframe_v2(
                 signal_targets=self.runtime_settings.signal_artifacts
             )
-            for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2:
+            for timeframe in self.runtime_settings.mapping_timeframes:
                 timeframe_signal_targets = signal_targets_by_timeframe.get(timeframe, ())
                 timeframe_stage_result: _TimeframeSessionBuildResultV2 | None = None
                 with coordinator.open_timeframe_session(
@@ -1365,6 +1398,16 @@ def _materialize_timeframe_session_v2(
         price_by_timeframe={timeframe: price_manifest},
         mapping_tail_bars_1m=runtime_settings.mapping_tail_bars_1m,
     )
+    session_price_arrays: _CanonicalPriceArraysV2 | None = None
+    if signal_targets != ():
+        session_price_arrays = _load_materialized_price_arrays_v2(
+            artifact_loader=artifact_loader,
+            coordinates=coordinates,
+            slot=slot,
+            timeframe=timeframe,
+            manifest_section=price_manifest,
+            location_prefix=f"materialized prices[{timeframe}] timeframe session",
+        )
     signal_manifests: list[ArtifactSignalManifestDocumentV2] = []
     reused_signal_prefix_bars = 0
     rewritten_signal_tail_bars = 0
@@ -1392,6 +1435,7 @@ def _materialize_timeframe_session_v2(
             runtime_settings=runtime_settings,
             signal_target=signal_target,
             price_manifest=price_manifest,
+            session_price_arrays=session_price_arrays,
             defaults_provider=defaults_provider,
             signal_rules_engine=signal_rules_engine,
             indicator_compute=indicator_compute,
@@ -1591,6 +1635,7 @@ def _materialize_signal_artifact_v2(
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
     signal_target: ArtifactSignalValidationSpecV2,
     price_manifest: ArtifactPriceTimeframeManifestV2,
+    session_price_arrays: _CanonicalPriceArraysV2 | None,
     defaults_provider: BacktestGridDefaultsProvider,
     signal_rules_engine: BacktestSignalRulesEngineV2,
     indicator_compute: IndicatorCompute,
@@ -1609,6 +1654,8 @@ def _materialize_signal_artifact_v2(
         runtime_settings: Strict runtime settings with signal guard budgets.
         signal_target: Explicit `(timeframe, indicator_id)` materialization target.
         price_manifest: Fresh materialized price section for the same timeframe.
+        session_price_arrays: Already loaded session-owned `prices/<tf>` arrays reused across
+            every signal target in the current timeframe session.
         defaults_provider: Runtime defaults provider for compute grids and signal defaults.
         signal_rules_engine: Startup-validated signal rules engine.
         indicator_compute: Indicator compute port used for primary/dependency tensors.
@@ -1622,7 +1669,8 @@ def _materialize_signal_artifact_v2(
         ValueError: If defaults, tensor shapes, value sets, or dependency alignment drift.
         OSError: If writing the signal matrix or manifest fails.
     Side Effects:
-        Loads price arrays for the target timeframe and writes signal files under the slot root.
+        Writes signal files under the slot root while reusing the already loaded timeframe-session
+        inputs.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/backtest/backtest-precompute-runner-v2.md
@@ -1631,17 +1679,18 @@ def _materialize_signal_artifact_v2(
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
-    price_arrays = _load_materialized_price_arrays_v2(
-        artifact_loader=artifact_loader,
-        coordinates=coordinates,
-        slot=slot,
-        timeframe=signal_target.timeframe,
-        manifest_section=price_manifest,
-        location_prefix=(
-            "materialized prices for signal export "
+    if price_manifest.timeframe != signal_target.timeframe:
+        raise ValueError(
+            "signal export requires timeframe-local prices aligned to the current target; got "
+            f"price_manifest.timeframe={price_manifest.timeframe!r} and "
+            f"signal_target.timeframe={signal_target.timeframe!r}"
+        )
+    if session_price_arrays is None:
+        raise ValueError(
+            "signal export requires session-owned price arrays for "
             f"{signal_target.timeframe}:{signal_target.indicator_id}"
-        ),
-    )
+        )
+    price_arrays = session_price_arrays
     defaults_grid = defaults_provider.compute_defaults(indicator_id=signal_target.indicator_id)
     if defaults_grid is None:
         raise ValueError(
@@ -2238,8 +2287,6 @@ def _write_signal_matrix_in_chunks_v2(
                     future = executor.submit(
                         _execute_signal_chunk_job_v2,
                         indicator_compute=indicator_compute,
-                        indicator_compute_worker_class=None,
-                        indicator_compute_worker_snapshot=None,
                         candles=candles,
                         chunk_job=chunk_job,
                         chunk_blocks=chunk_job_blocks,
@@ -2281,6 +2328,14 @@ def _write_signal_matrix_in_chunks_v2(
             with ProcessPoolExecutor(
                 max_workers=worker_count,
                 mp_context=get_context("spawn"),
+                initializer=_initialize_signal_chunk_worker_v2,
+                initargs=(
+                    _SignalChunkWorkerBootstrapV2(
+                        indicator_compute_worker_class=worker_class,
+                        indicator_compute_worker_snapshot=worker_snapshot,
+                        candles=candles,
+                    ),
+                ),
             ) as executor:
                 future_to_meta = {}
                 for chunk_job, chunk_job_blocks in zip(chunk_jobs, chunk_blocks, strict=True):
@@ -2297,9 +2352,7 @@ def _write_signal_matrix_in_chunks_v2(
                     future = executor.submit(
                         _execute_signal_chunk_job_v2,
                         indicator_compute=None,
-                        indicator_compute_worker_class=worker_class,
-                        indicator_compute_worker_snapshot=worker_snapshot,
-                        candles=candles,
+                        candles=None,
                         chunk_job=chunk_job,
                         chunk_blocks=chunk_job_blocks,
                         signal_rows=signal_rows,
@@ -2390,12 +2443,74 @@ def _resolve_indicator_compute_worker_factory_v2(
     return indicator_compute.__class__, snapshot_capable.to_signal_chunk_worker_snapshot_v2()
 
 
+_SIGNAL_CHUNK_WORKER_STATE_V2: _SignalChunkWorkerStateV2 | None = None
+
+
+def _initialize_signal_chunk_worker_v2(
+    worker_bootstrap: _SignalChunkWorkerBootstrapV2,
+) -> None:
+    """
+    Bootstrap one spawned chunk worker with session-local compute and candle inputs.
+
+    Args:
+        worker_bootstrap: Immutable worker bootstrap payload created once per process.
+    Returns:
+        None.
+    Assumptions:
+        macOS `spawn` requires explicit process-local reconstruction instead of sharing the live
+        parent process object graph.
+    Raises:
+        ValueError: If worker bootstrap cannot rebuild the compute adapter.
+    Side Effects:
+        Stores worker-local state in a private module global for later chunk jobs.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    global _SIGNAL_CHUNK_WORKER_STATE_V2
+    _SIGNAL_CHUNK_WORKER_STATE_V2 = _SignalChunkWorkerStateV2(
+        indicator_compute=cast(
+            IndicatorCompute,
+            worker_bootstrap.indicator_compute_worker_class.from_signal_chunk_worker_snapshot_v2(
+                snapshot=worker_bootstrap.indicator_compute_worker_snapshot
+            ),
+        ),
+        candles=worker_bootstrap.candles,
+    )
+
+
+def _require_signal_chunk_worker_state_v2() -> _SignalChunkWorkerStateV2:
+    """
+    Return the initialized spawned-worker state for one chunk execution.
+
+    Args:
+        None.
+    Returns:
+        _SignalChunkWorkerStateV2: Process-local chunk worker state.
+    Assumptions:
+        Spawned workers must run `_initialize_signal_chunk_worker_v2(...)` before accepting jobs.
+    Raises:
+        ValueError: If the worker was used before bootstrap finished.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if _SIGNAL_CHUNK_WORKER_STATE_V2 is None:
+        raise ValueError("signal chunk worker state is not initialized")
+    return _SIGNAL_CHUNK_WORKER_STATE_V2
+
+
 def _execute_signal_chunk_job_v2(
     *,
     indicator_compute: IndicatorCompute | None,
-    indicator_compute_worker_class: type[Any] | None,
-    indicator_compute_worker_snapshot: Mapping[str, Any] | None,
-    candles: CandleArrays,
+    candles: CandleArrays | None,
     chunk_job: ArtifactSignalChunkJobV2,
     chunk_blocks: tuple[_SignalChunkGridBlockV2, ...],
     signal_rows: tuple[_SignalVariantRowV2, ...],
@@ -2414,8 +2529,6 @@ def _execute_signal_chunk_job_v2(
 
     Args:
         indicator_compute: Live in-process compute adapter for thread-based execution.
-        indicator_compute_worker_class: Compute class used to rebuild spawned-worker adapters.
-        indicator_compute_worker_snapshot: Immutable worker snapshot for spawned execution.
         candles: Bounded compute-window candles shared by every block of the chunk.
         chunk_job: Deterministic row-range owner for this chunk.
         chunk_blocks: Explicit subgrids covering `chunk_job` in canonical order.
@@ -2444,17 +2557,12 @@ def _execute_signal_chunk_job_v2(
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
     """
-    if indicator_compute is None:
-        if indicator_compute_worker_class is None or indicator_compute_worker_snapshot is None:
-            raise ValueError(
-                "signal chunk worker requires either a live compute adapter or a worker snapshot"
-            )
-        indicator_compute = cast(
-            IndicatorCompute,
-            indicator_compute_worker_class.from_signal_chunk_worker_snapshot_v2(
-                snapshot=indicator_compute_worker_snapshot
-            ),
-        )
+    if indicator_compute is None or candles is None:
+        worker_state = _require_signal_chunk_worker_state_v2()
+        if indicator_compute is None:
+            indicator_compute = worker_state.indicator_compute
+        if candles is None:
+            candles = worker_state.candles
     signal_memmap: np.memmap = cast(
         np.memmap,
         np.load(output_path, mmap_mode="r+", allow_pickle=False),

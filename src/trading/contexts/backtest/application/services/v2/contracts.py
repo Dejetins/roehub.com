@@ -4290,6 +4290,8 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     hit_times_tail_bars_1m: int
     hit_times_tp_levels_pct: tuple[float, ...]
     hit_times_sl_levels_pct: tuple[float, ...]
+    price_timeframes: tuple[str, ...]
+    mapping_timeframes: tuple[str, ...]
     config_sha256: str
     execution_policy: ArtifactPrecomputeExecutionPolicyV2
     signal_artifacts: tuple[ArtifactSignalValidationSpecV2, ...] = ()
@@ -4356,6 +4358,26 @@ class ArtifactPrecomputeRuntimeSettingsV2:
         )
         object.__setattr__(
             self,
+            "price_timeframes",
+            _sorted_unique_timeframes_v2(
+                values=self.price_timeframes,
+                allowed_literals=ARTIFACT_PRICE_TIMEFRAMES_V2,
+                field_name="ArtifactPrecomputeRuntimeSettingsV2.price_timeframes",
+                validator=validate_price_timeframe_v2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "mapping_timeframes",
+            _sorted_unique_timeframes_v2(
+                values=self.mapping_timeframes,
+                allowed_literals=ARTIFACT_MAPPING_TIMEFRAMES_V2,
+                field_name="ArtifactPrecomputeRuntimeSettingsV2.mapping_timeframes",
+                validator=validate_mapping_timeframe_v2,
+            ),
+        )
+        object.__setattr__(
+            self,
             "config_sha256",
             validate_current_pointer_manifest_sha256_v2(self.config_sha256),
         )
@@ -4366,6 +4388,34 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             "signal_artifacts",
             _sorted_signal_validation_specs_v2(self.signal_artifacts),
         )
+        if self.price_timeframes == ():
+            raise ValueError(
+                "ArtifactPrecomputeRuntimeSettingsV2.price_timeframes must be non-empty"
+            )
+        if self.price_timeframes[0] != HIT_TIMES_TIMEFRAME_LITERAL_V2:
+            raise ValueError(
+                "ArtifactPrecomputeRuntimeSettingsV2.price_timeframes must start with "
+                f"{HIT_TIMES_TIMEFRAME_LITERAL_V2!r}"
+            )
+        expected_price_timeframes = (HIT_TIMES_TIMEFRAME_LITERAL_V2, *self.mapping_timeframes)
+        if self.price_timeframes != expected_price_timeframes:
+            raise ValueError(
+                "ArtifactPrecomputeRuntimeSettingsV2.price_timeframes must equal "
+                f"{expected_price_timeframes!r}; got {self.price_timeframes!r}"
+            )
+        configured_mapping_timeframes = set(self.mapping_timeframes)
+        signal_timeframes = {item.timeframe for item in self.signal_artifacts}
+        unexpected_signal_timeframes = tuple(
+            timeframe
+            for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2
+            if timeframe in signal_timeframes and timeframe not in configured_mapping_timeframes
+        )
+        if unexpected_signal_timeframes != ():
+            raise ValueError(
+                "ArtifactPrecomputeRuntimeSettingsV2.signal_artifacts timeframes must be "
+                "covered by mapping_timeframes; unexpected "
+                f"{unexpected_signal_timeframes!r}"
+            )
         object.__setattr__(
             self,
             "max_signal_rows_per_artifact",

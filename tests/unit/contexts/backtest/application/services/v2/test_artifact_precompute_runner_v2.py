@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from itertools import product
 from pathlib import Path
-from typing import Iterator, Mapping, cast
+from typing import Any, Callable, Iterator, Mapping, cast
 
 import numpy as np
 import pytest
@@ -319,6 +319,220 @@ class _DeterministicSignalCompute:
           - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
         """
         return None
+
+
+class _SnapshotRehydratingSignalComputeFactoryV2:
+    """
+    Rehydrate deterministic test compute from a same-process worker snapshot.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    @classmethod
+    def from_signal_chunk_worker_snapshot_v2(
+        cls,
+        *,
+        snapshot: Mapping[str, object],
+    ) -> _DeterministicSignalCompute:
+        """
+        Rebuild deterministic test compute from the captured grid-builder snapshot.
+
+        Args:
+            snapshot: Same-process worker snapshot containing the shared `GridBuilder`.
+        Returns:
+            _DeterministicSignalCompute: Deterministic compute adapter for fake worker execution.
+        Assumptions:
+            The fake process-pool test executes in one process and may reuse Python objects
+            directly.
+        Raises:
+            KeyError: If the snapshot omits `grid_builder`.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_artifact_precompute_runner_v2.py
+        """
+        del cls
+        return _DeterministicSignalCompute(
+            grid_builder=cast(GridBuilder, snapshot["grid_builder"])
+        )
+
+
+@dataclass(frozen=True, slots=True, eq=False)
+class _ImmediateFutureV2:
+    """
+    Resolved future stub used by fake spawned-worker tests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+
+    value: object
+
+    def result(self) -> object:
+        """
+        Return the already computed synchronous result.
+
+        Args:
+            None.
+        Returns:
+            object: Precomputed future payload.
+        Assumptions:
+            Fake executor tests run chunk work eagerly in the caller process.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_artifact_precompute_runner_v2.py
+        """
+        return self.value
+
+
+class _FakeProcessPoolExecutorV2:
+    """
+    Synchronous `ProcessPoolExecutor` stub capturing worker bootstrap and submit kwargs.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    submitted_kwargs: list[Mapping[str, object]] = []
+    initializer_bootstraps: list[object] = []
+
+    def __init__(
+        self,
+        *,
+        max_workers: int,
+        mp_context: object,
+        initializer: Callable[..., object] | None = None,
+        initargs: tuple[object, ...] = (),
+    ) -> None:
+        """
+        Store fake process-pool bootstrap inputs for later synchronous execution.
+
+        Args:
+            max_workers: Requested worker count, unused beyond interface compatibility.
+            mp_context: Requested multiprocessing context, unused in the fake executor.
+            initializer: Optional worker initializer callable.
+            initargs: Optional initializer arguments.
+        Returns:
+            None.
+        Assumptions:
+            The fake executor only needs interface compatibility and captured bootstrap payloads.
+        Raises:
+            None.
+        Side Effects:
+            Stores the initializer and its arguments in memory.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_artifact_precompute_runner_v2.py
+        """
+        del max_workers, mp_context
+        self._initializer = initializer
+        self._initargs = initargs
+
+    def __enter__(self) -> "_FakeProcessPoolExecutorV2":
+        """
+        Run the captured worker initializer once and return the fake executor.
+
+        Args:
+            None.
+        Returns:
+            _FakeProcessPoolExecutorV2: This fake executor instance.
+        Assumptions:
+            The regression test only needs one shared bootstrap event for the in-process stub.
+        Raises:
+            Exception: Propagates any initializer failure unchanged.
+        Side Effects:
+            Captures the bootstrap payload and initializes worker-local state in-process.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_artifact_precompute_runner_v2.py
+        """
+        if self._initializer is not None:
+            _FakeProcessPoolExecutorV2.initializer_bootstraps.append(self._initargs[0])
+            self._initializer(*self._initargs)
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        exc_tb: object | None,
+    ) -> bool:
+        """
+        Propagate exceptions from the fake executor context body unchanged.
+
+        Args:
+            exc_type: Exception type raised inside the context body, if any.
+            exc: Exception instance raised inside the context body, if any.
+            exc_tb: Traceback raised inside the context body, if any.
+        Returns:
+            bool: Always `False` so the caller still sees any failure.
+        Assumptions:
+            The fake executor should mirror the real context-manager propagation behavior.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_artifact_precompute_runner_v2.py
+        """
+        del exc_type, exc, exc_tb
+        return False
+
+    def submit(
+        self,
+        fn: object,
+        /,
+        *args: object,
+        **kwargs: object,
+    ) -> _ImmediateFutureV2:
+        """
+        Execute one submitted chunk job synchronously and capture the submitted kwargs.
+
+        Args:
+            fn: Submitted callable.
+            *args: Positional arguments for the callable.
+            **kwargs: Keyword arguments for the callable.
+        Returns:
+            _ImmediateFutureV2: Already resolved synchronous future stub.
+        Assumptions:
+            Regression coverage needs the exact submitted kwargs more than true multiprocessing.
+        Raises:
+            Exception: Propagates any submitted callable failure unchanged.
+        Side Effects:
+            Appends the submitted kwargs to the shared in-memory capture list.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_artifact_precompute_runner_v2.py
+        """
+        _FakeProcessPoolExecutorV2.submitted_kwargs.append(dict(kwargs))
+        return _ImmediateFutureV2(value=cast(Any, fn)(*args, **kwargs))
 
 
 class _FakeCanonicalCandleReader:
@@ -1967,6 +2181,291 @@ def test_backtest_artifact_precompute_runner_v2_reports_chunk_progress_and_sessi
     assert any('"completed_chunks_total":3' in message for message in chunk_finished)
 
 
+def test_backtest_artifact_precompute_runner_v2_reuses_one_timeframe_price_load_across_indicators(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify one timeframe session loads `prices/<tf>` once for mappings and once for shared reuse.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+        monkeypatch: pytest fixture used to wrap the internal price-array loader.
+    Returns:
+        None.
+    Assumptions:
+        Two indicators on the same timeframe should share one session-owned price payload instead
+        of reloading `prices/<tf>` per indicator target.
+    Raises:
+        AssertionError: If the same timeframe is reloaded once per indicator.
+    Side Effects:
+        Materializes one narrowed timeframe session under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    signal_targets = (("15m", "ma.ema"), ("15m", "ma.sma"))
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_price_timeframes=("1m", "15m"),
+        validation_mapping_timeframes=("15m",),
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+    recorded_loads: list[tuple[str, str]] = []
+    original_loader = artifact_precompute_runner_module._load_materialized_price_arrays_v2
+
+    def _record_loads(
+        *,
+        artifact_loader: Any,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        timeframe: str,
+        manifest_section: Any,
+        location_prefix: str,
+    ) -> object:
+        """
+        Record one price-array load call before delegating to the real helper.
+
+        Args:
+            artifact_loader: Original helper artifact loader dependency.
+            coordinates: Artifact coordinates for the load request.
+            slot: Inactive slot literal for the load request.
+            timeframe: Price timeframe being loaded.
+            manifest_section: Strict price-manifest section for the load request.
+            location_prefix: Human-readable loader location label.
+        Returns:
+            object: Real helper result.
+        Assumptions:
+            The wrapper preserves the helper behavior and only records call metadata.
+        Raises:
+            Exception: Propagates any real helper failure unchanged.
+        Side Effects:
+            Appends `(timeframe, location_prefix)` to the in-memory call log.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        recorded_loads.append(
+            (
+                timeframe,
+                location_prefix,
+            )
+        )
+        return original_loader(
+            artifact_loader=artifact_loader,
+            coordinates=coordinates,
+            slot=slot,
+            timeframe=timeframe,
+            manifest_section=manifest_section,
+            location_prefix=location_prefix,
+        )
+
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "_load_materialized_price_arrays_v2",
+        _record_loads,
+    )
+
+    result = runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    )
+    fifteen_minute_loads = [
+        location_prefix
+        for timeframe, location_prefix in recorded_loads
+        if timeframe == "15m"
+    ]
+    fifteen_minute_stage = next(
+        stage_result
+        for stage_result in result.stage_results
+        if stage_result.stage_output.current_timeframe == "15m"
+    )
+
+    assert fifteen_minute_loads == [
+        "materialized prices[15m] mapping target",
+        "materialized prices[15m] timeframe session",
+    ]
+    assert fifteen_minute_stage.stage_output.details["completed_indicators_total"] == 2
+
+
+def test_write_signal_matrix_in_chunks_v2_process_workers_do_not_receive_candles_per_submit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify spawned chunk jobs reuse worker-bootstrapped candles instead of per-submit payloads.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+        monkeypatch: pytest fixture used to replace process-pool internals with a synchronous stub.
+    Returns:
+        None.
+    Assumptions:
+        R12 process workers should receive the bounded candle payload once via pool bootstrap and
+        never in each `submit(...)` call.
+    Raises:
+        AssertionError: If per-chunk submit kwargs still contain full `CandleArrays`.
+    Side Effects:
+        Materializes one compact signal matrix under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    _FakeProcessPoolExecutorV2.submitted_kwargs = []
+    _FakeProcessPoolExecutorV2.initializer_bootstraps = []
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        validation_price_timeframes=("1m", "15m"),
+        validation_mapping_timeframes=("15m",),
+        signal_worker_processes=2,
+        signal_chunk_rows_min=2,
+        signal_chunk_rows_max=2,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    signal_target = ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema")
+    defaults_grid = defaults_provider.compute_defaults(indicator_id=signal_target.indicator_id)
+    assert defaults_grid is not None
+    compute_grid = artifact_precompute_runner_module._grid_with_layout_v2(
+        grid=defaults_grid,
+        indicator_id=signal_target.indicator_id,
+        layout=Layout.VARIANT_MAJOR,
+    )
+    materialized_grid = grid_builder.materialize_indicator(grid=compute_grid)
+    signal_rows = artifact_precompute_runner_module._build_signal_variant_rows_v2(
+        coordinates=fixture.coordinates,
+        timeframe=signal_target.timeframe,
+        materialized_grid=materialized_grid,
+    )
+    timeframe_millis = 15 * 60 * 1000
+    open_time = (
+        np.arange(20, dtype=np.int64) * timeframe_millis
+        + int(_BASE_TIME_UTC.timestamp() * 1000)
+    )
+    close_time = open_time + timeframe_millis
+    ohlcv = np.column_stack(
+        (
+            np.linspace(100.0, 119.0, num=20, dtype=np.float32),
+            np.linspace(101.0, 120.0, num=20, dtype=np.float32),
+            np.linspace(99.0, 118.0, num=20, dtype=np.float32),
+            np.linspace(100.5, 119.5, num=20, dtype=np.float32),
+            np.linspace(1000.0, 1019.0, num=20, dtype=np.float32),
+        )
+    )
+    candles = _candle_arrays_from_loaded_prices_v2(
+        timeframe="15m",
+        open_time=open_time,
+        close_time=close_time,
+        ohlcv=ohlcv,
+    )
+    signal_shape = (len(signal_rows), int(candles.close.shape[0]))
+    rule_spec = signal_rules_engine.rule_spec(indicator_id=signal_target.indicator_id)
+    chunk_jobs = artifact_precompute_runner_module._plan_signal_chunk_jobs_v2(
+        runtime_settings=fixture.runtime_settings,
+        signal_target=signal_target,
+        timeline_bar_count=signal_shape[1],
+        compute_bar_count=int(candles.close.shape[0]),
+        variant_count=signal_shape[0],
+        dependency_count=len(rule_spec.required_dependency_ids),
+    )
+    chunk_blocks = tuple(
+        artifact_precompute_runner_module._build_signal_chunk_blocks_v2(
+            materialized_grid=materialized_grid,
+            chunk_job=chunk_job,
+        )
+        for chunk_job in chunk_jobs
+    )
+    default_inputs_source, signal_params_defaults = signal_rules_engine.resolved_defaults(
+        indicator_id=signal_target.indicator_id
+    )
+    signal_paths = fixture.loader.resolve_signal_paths(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        signal_target.timeframe,
+        signal_target.indicator_id,
+    )
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "_resolve_indicator_compute_worker_factory_v2",
+        lambda *, indicator_compute: (
+            _SnapshotRehydratingSignalComputeFactoryV2,
+            {"grid_builder": grid_builder},
+        ),
+    )
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "ProcessPoolExecutor",
+        _FakeProcessPoolExecutorV2,
+    )
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "as_completed",
+        lambda futures: tuple(futures),
+    )
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "_SIGNAL_CHUNK_WORKER_STATE_V2",
+        None,
+    )
+
+    artifact_precompute_runner_module._write_signal_matrix_in_chunks_v2(
+        coordinates=fixture.coordinates,
+        slot=fixture.inactive_slot,
+        slot_generation=5,
+        force_full_rebuild=False,
+        signal_target=signal_target,
+        signal_paths=signal_paths,
+        signal_shape=signal_shape,
+        candles=candles,
+        signal_worker_processes=fixture.runtime_settings.execution_policy.signal_worker_processes,
+        chunk_jobs=chunk_jobs,
+        chunk_blocks=chunk_blocks,
+        signal_rows=signal_rows,
+        signal_tail_plan=artifact_precompute_runner_module._SignalArtifactTailPlanV2(
+            reused_prefix_bars=0,
+            compute_start_idx=0,
+            trim_prefix_bars=0,
+            effective_tail_bars=signal_shape[1],
+        ),
+        existing_signal_artifact=None,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        rule_spec=rule_spec,
+        default_inputs_source=default_inputs_source,
+        signal_params_defaults=signal_params_defaults,
+        max_signal_rows_per_artifact=fixture.runtime_settings.max_signal_rows_per_artifact,
+    )
+
+    assert len(_FakeProcessPoolExecutorV2.initializer_bootstraps) == 1
+    assert len(_FakeProcessPoolExecutorV2.submitted_kwargs) == len(chunk_jobs)
+    assert all(
+        submission["candles"] is None
+        for submission in _FakeProcessPoolExecutorV2.submitted_kwargs
+    )
+    assert np.load(signal_paths.signals, allow_pickle=False).shape == signal_shape
+
+
 def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_and_signal_order(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -2156,6 +2655,71 @@ def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_
     assert helper_order.index(("signals", "30m", "ma.sma")) < helper_order.index(
         ("rolled_prices", "1h")
     )
+
+
+def test_backtest_artifact_precompute_runner_v2_uses_runtime_configured_timeframe_set(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify timeframe sessions follow runtime-config timeframes instead of the hardcoded full set.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        A narrowed validation plan should materialize only its configured `prices/<tf>`,
+        `mappings/<tf>`, and signal targets.
+    Raises:
+        AssertionError: If the runner silently falls back to the full constant timeframe loop.
+    Side Effects:
+        Materializes one narrowed inactive slot under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+    """
+    signal_targets = (("15m", "ma.ema"), ("1h", "ma.sma"))
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        validation_price_timeframes=("1m", "15m", "1h"),
+        validation_mapping_timeframes=("15m", "1h"),
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    result = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    ).export_canonical_price_1m(_request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2))
+    slot_manifest = fixture.loader.load_slot_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+    )
+    stage_timeframes = tuple(
+        stage_result.stage_output.current_timeframe
+        for stage_result in result.stage_results
+        if stage_result.stage_output.stage == "timeframe_session"
+    )
+
+    assert stage_timeframes == ("15m", "1h")
+    assert tuple(item.timeframe for item in slot_manifest.prices) == ("1m", "15m", "1h")
+    assert tuple(item.timeframe for item in slot_manifest.mappings) == ("15m", "1h")
+    assert tuple(
+        (item.timeframe, item.indicator_id) for item in slot_manifest.signals.manifests
+    ) == signal_targets
 
 
 def test_backtest_artifact_precompute_runner_v2_reuses_signal_prefix_and_rebuilds_tail(

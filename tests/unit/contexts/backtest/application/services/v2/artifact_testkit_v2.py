@@ -214,6 +214,8 @@ def build_artifact_precompute_fixture_v2(
     mapping_tail_bars_1m: int = 10,
     signal_tail_bars_1m: int = 10,
     hit_times_tail_bars_1m: int = 10,
+    validation_price_timeframes: tuple[str, ...] = ARTIFACT_PRICE_TIMEFRAMES_V2,
+    validation_mapping_timeframes: tuple[str, ...] = ARTIFACT_MAPPING_TIMEFRAMES_V2,
     validation_signal_artifacts: tuple[tuple[str, str], ...] | str = (),
     precompute_signal_artifacts: tuple[tuple[str, str], ...] | str = (),
     require_hit_times_manifest: bool = False,
@@ -242,6 +244,8 @@ def build_artifact_precompute_fixture_v2(
         validation_signal_artifacts: Explicit `(timeframe, indicator_id)` targets or the
             machine-readable literal `all_supported_v1` written into
             `backtest_artifacts.validation_plan.signal_artifacts`.
+        validation_price_timeframes: Explicit `prices/<tf>` validation-plan timeframes.
+        validation_mapping_timeframes: Explicit `mappings/<tf>` validation-plan timeframes.
         precompute_signal_artifacts: Explicit `(timeframe, indicator_id)` targets or the same
             machine-readable literal `all_supported_v1` enabled for real R12 signal
             materialization by the runner.
@@ -307,8 +311,8 @@ def build_artifact_precompute_fixture_v2(
                 "backtest_artifacts": {
                     "artifact_root": str(builder.root),
                     "validation_plan": {
-                        "price_timeframes": list(ARTIFACT_PRICE_TIMEFRAMES_V2),
-                        "mapping_timeframes": list(ARTIFACT_MAPPING_TIMEFRAMES_V2),
+                        "price_timeframes": list(validation_price_timeframes),
+                        "mapping_timeframes": list(validation_mapping_timeframes),
                         "signal_artifacts": _serialize_signal_artifacts_config_v2(
                             signal_artifacts=validation_signal_artifacts
                         ),
@@ -364,6 +368,8 @@ def build_artifact_precompute_fixture_v2(
             hit_times_tail_bars_1m=runtime_config.lookback_policy.hit_times_tail_bars_1m,
             hit_times_tp_levels_pct=runtime_config.hit_times_grid.tp_levels_pct,
             hit_times_sl_levels_pct=runtime_config.hit_times_grid.sl_levels_pct,
+            price_timeframes=runtime_config.validation_plan.price_timeframes,
+            mapping_timeframes=runtime_config.validation_plan.mapping_timeframes,
             config_sha256=build_backtest_artifacts_runtime_config_hash(config=runtime_config),
             execution_policy=runtime_config.execution_policy.to_execution_policy(),
             signal_artifacts=_runtime_settings_signal_artifacts_v2(

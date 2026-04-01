@@ -497,6 +497,8 @@ def test_load_backtest_artifacts_runtime_config_derives_precompute_runtime_setti
 
     assert settings.price_tail_bars_1m == 100
     assert settings.mapping_tail_bars_1m == 200
+    assert settings.price_timeframes == ("1m", "15m", "1h")
+    assert settings.mapping_timeframes == ("15m", "1h")
     assert settings.signal_artifacts == (
         ArtifactSignalValidationSpecV2(timeframe="15m", indicator_id="ma.ema"),
         ArtifactSignalValidationSpecV2(timeframe="1h", indicator_id="ma.sma"),
