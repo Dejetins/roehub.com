@@ -29,7 +29,7 @@ Source of truth scrape-конфига:
 |---|---|---|
 | `market-data-ws-worker` | `ws_connected`, `ws_messages_total`, `insert_errors_total`, `redis_publish_errors_total`, `ws_closed_to_insert_done_seconds` | Соединения есть, сообщения/вставки растут, ошибок за окно нет, p95 latency стабильна |
 | `market-data-scheduler` | `scheduler_job_errors_total`, `scheduler_tasks_enqueued_total`, `scheduler_rest_catchup_gap_rows_written_total` | Ошибки не растут, enqueue идет по плану, gap-progress не стоит при необходимости catchup |
-| `backtest-artifact-publisher` | `backtest_artifact_publish_runs_total`, `backtest_artifact_publish_symbols_total`, `backtest_artifact_publish_blocked_total`, `backtest_artifact_publish_last_success_unixtime`, `backtest_artifact_tail_rebuild_bars_total` | Daily publish-cycle завершается success, blocked/error серии не растут, freshness обновляется после окна `03:05 Europe/Moscow`, tail bars остаются bounded |
+| `backtest-artifact-publisher` | `backtest_artifact_publish_runs_total`, `backtest_artifact_publish_symbols_total`, `backtest_artifact_publish_blocked_total`, `backtest_artifact_publish_last_success_unixtime`, `backtest_artifact_tail_rebuild_bars_total` | Daily publish-cycle завершается success, blocked/error серии не растут, freshness обновляется после окна `03:05 Europe/Moscow`, tail bars остаются bounded, а stage/timeframe/chunk progress читается из structured logs |
 | `clickhouse-exporter` | `clickhouse_exporter_scrape_success`, `clickhouse_uptime_seconds`, `clickhouse_system_event_total{event="InsertedRows"}` | `scrape_success=1`, uptime растет, вставки есть при живом потоке |
 | `postgres-exporter` | `pg_up`, `pg_exporter_last_scrape_error`, `pg_stat_database_numbackends` | `pg_up=1`, scrape без ошибок, число коннектов в разумном диапазоне |
 | `redis-exporter` | `redis_up`, `redis_exporter_last_scrape_error`, `redis_commands_processed_total`, `redis_memory_used_bytes` | `redis_up=1`, команды обрабатываются, память без резких аномалий |
@@ -96,6 +96,31 @@ Source of truth scrape-конфига:
 | `backtest_artifact_publish_blocked_total` | Counter | `reason` | Блокировки publish-run по конечной причине | Обычно `0`, допустим редкий `lock_held` |
 | `backtest_artifact_publish_last_success_unixtime` | Gauge | - | Unix timestamp последнего scheduler cycle с хотя бы одним успешным publish | После daily run обновляется и остаётся внутри freshness window |
 | `backtest_artifact_tail_rebuild_bars_total` | Counter | `stage` | Сколько баров реально переписано в bounded tail по stage | Рост должен быть bounded; резкий скачок = массовый full rebuild fallback |
+
+#### Structured progress fields for `backtest-artifact-publisher`
+
+Эти поля не являются отдельными Prometheus-метриками. Они обязательны в structured logs и нужны
+для интерпретации длинного bootstrap/full rebuild:
+
+| Field | Где смотреть | Что означает |
+|---|---|---|
+| `artifact_precompute_stage_started` | structured log event | Старт нового pipeline stage |
+| `artifact_precompute_stage_finished` | structured log event | Успешное завершение stage |
+| `current_timeframe` | log field | Какой timeframe session сейчас открыт |
+| `current_indicator` | log field | Какой signal target materialize'ится внутри session |
+| `chunk_index` | log field | Номер текущего chunk job |
+| `chunk_jobs_total` | log field | Сколько chunk jobs всего у текущего `(indicator_id, timeframe)` |
+| `reused_prefix_bars` | log field / diagnostics | Сколько баров stage переиспользовал без переписывания |
+| `rewritten_tail_bars` | log field / diagnostics | Сколько баров stage реально переписал |
+
+Интерпретация:
+
+- один `current_timeframe` одновременно = норма для `timeframe-scoped execution`;
+- рост `chunk_index` при стабильном `current_timeframe` = healthy progress;
+- отсутствие chunk progress при росте memory pressure = сигнал, что executor drift'нул к giant
+  in-memory behavior;
+- для daily rebuild ожидаемо `reused_prefix_bars >> rewritten_tail_bars`;
+- для bootstrap допустим `reused_prefix_bars = 0` и большой `rewritten_tail_bars`.
 
 ### 4) `clickhouse-exporter`
 

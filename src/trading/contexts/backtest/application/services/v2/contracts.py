@@ -163,6 +163,30 @@ ARTIFACT_SIGNAL_TIMEFRAMES_V2: tuple[str, ...] = (
 )
 ARTIFACT_MAPPING_TIMEFRAMES_V2: tuple[str, ...] = ARTIFACT_SIGNAL_TIMEFRAMES_V2
 ARTIFACT_HIT_TIMES_TIMEFRAMES_V2: tuple[str, ...] = (HIT_TIMES_TIMEFRAME_LITERAL_V2,)
+type ArtifactPrecomputeStageIdV2 = Literal[
+    "canonical_prices",
+    "timeframe_session",
+    "hit_times",
+    "root_manifest",
+]
+ARTIFACT_PRECOMPUTE_STAGE_ORDER_V2: tuple[ArtifactPrecomputeStageIdV2, ...] = (
+    "canonical_prices",
+    "timeframe_session",
+    "hit_times",
+    "root_manifest",
+)
+type ArtifactPrecomputeProgressEventNameV2 = Literal[
+    "artifact_precompute_stage_started",
+    "artifact_precompute_stage_finished",
+    "timeframe_started",
+    "timeframe_finished",
+]
+ARTIFACT_PRECOMPUTE_PROGRESS_EVENTS_V2: tuple[ArtifactPrecomputeProgressEventNameV2, ...] = (
+    "artifact_precompute_stage_started",
+    "artifact_precompute_stage_finished",
+    "timeframe_started",
+    "timeframe_finished",
+)
 
 type SignalRuleFamilyLiteralV2 = Literal[
     "compare_price_to_output",
@@ -847,6 +871,69 @@ def validate_hit_times_timeframe_v2(timeframe: str) -> str:
         allowed_literals=ARTIFACT_HIT_TIMES_TIMEFRAMES_V2,
     )
     return timeframe
+
+
+def validate_artifact_precompute_stage_id_v2(value: str) -> ArtifactPrecomputeStageIdV2:
+    """
+    Validate one stage identifier used by the R12 precompute coordinator.
+
+    Args:
+        value: Candidate precompute stage literal.
+    Returns:
+        ArtifactPrecomputeStageIdV2: Canonical stage identifier.
+    Assumptions:
+        R12 fixes the high-level stage order and allows repeated execution only for
+        `timeframe_session`.
+    Raises:
+        ValueError: If the literal is blank or outside the supported precompute stage set.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    normalized = value.strip().lower()
+    if normalized not in ARTIFACT_PRECOMPUTE_STAGE_ORDER_V2:
+        raise ValueError(
+            "artifact precompute stage must be one of "
+            f"{ARTIFACT_PRECOMPUTE_STAGE_ORDER_V2}, got {value!r}"
+        )
+    return cast(ArtifactPrecomputeStageIdV2, normalized)
+
+
+def validate_artifact_precompute_progress_event_name_v2(
+    value: str,
+) -> ArtifactPrecomputeProgressEventNameV2:
+    """
+    Validate one structured progress-event name emitted by the R12 coordinator.
+
+    Args:
+        value: Candidate progress-event literal.
+    Returns:
+        ArtifactPrecomputeProgressEventNameV2: Canonical event literal.
+    Assumptions:
+        R12 progress logs are limited to stage/timeframe lifecycle boundaries.
+    Raises:
+        ValueError: If the literal is blank or unsupported.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    normalized = value.strip().lower()
+    if normalized not in ARTIFACT_PRECOMPUTE_PROGRESS_EVENTS_V2:
+        raise ValueError(
+            "artifact precompute progress event must be one of "
+            f"{ARTIFACT_PRECOMPUTE_PROGRESS_EVENTS_V2}, got {value!r}"
+        )
+    return cast(ArtifactPrecomputeProgressEventNameV2, normalized)
 
 
 def freeze_artifact_payload_mapping_v2(payload: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -2474,6 +2561,443 @@ class ArtifactTailRebuildBarsV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactPrecomputeExecutionPolicyV2:
+    """
+    Strict R12 execution-policy contract for offline artifact precompute orchestration.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - configs/dev/backtest_artifacts.yaml
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+    """
+
+    max_open_timeframe_sessions: int
+    signal_worker_processes: int
+    signal_worker_memory_budget_bytes: int
+    signal_chunk_rows_min: int
+    signal_chunk_rows_max: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate deterministic worker/session/chunk limits for the offline runner.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            R12 exposes strict typed limits without host-derived defaults or loose maps.
+        Raises:
+            ValueError: If one limit is non-positive or chunk-row bounds are inverted.
+        Side Effects:
+            Normalizes integer fields through strict positive validation.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        object.__setattr__(
+            self,
+            "max_open_timeframe_sessions",
+            validate_positive_manifest_int_v2(self.max_open_timeframe_sessions),
+        )
+        object.__setattr__(
+            self,
+            "signal_worker_processes",
+            validate_positive_manifest_int_v2(self.signal_worker_processes),
+        )
+        object.__setattr__(
+            self,
+            "signal_worker_memory_budget_bytes",
+            validate_positive_manifest_int_v2(self.signal_worker_memory_budget_bytes),
+        )
+        object.__setattr__(
+            self,
+            "signal_chunk_rows_min",
+            validate_positive_manifest_int_v2(self.signal_chunk_rows_min),
+        )
+        object.__setattr__(
+            self,
+            "signal_chunk_rows_max",
+            validate_positive_manifest_int_v2(self.signal_chunk_rows_max),
+        )
+        if self.signal_chunk_rows_min > self.signal_chunk_rows_max:
+            raise ValueError(
+                "ArtifactPrecomputeExecutionPolicyV2.signal_chunk_rows_min must be <= "
+                "signal_chunk_rows_max"
+            )
+
+    def as_dict(self) -> dict[str, int]:
+        """
+        Serialize the execution-policy contract into a stable JSON-friendly mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, int]: Deterministic scalar limits for logs and diagnostics.
+        Assumptions:
+            CLI/scheduler consumers may eventually emit these values in structured diagnostics.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        return {
+            "max_open_timeframe_sessions": self.max_open_timeframe_sessions,
+            "signal_worker_processes": self.signal_worker_processes,
+            "signal_worker_memory_budget_bytes": self.signal_worker_memory_budget_bytes,
+            "signal_chunk_rows_min": self.signal_chunk_rows_min,
+            "signal_chunk_rows_max": self.signal_chunk_rows_max,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPrecomputeStageInputV2:
+    """
+    Structured start payload for one deterministic precompute stage invocation.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    stage: ArtifactPrecomputeStageIdV2
+    current_timeframe: str | None = None
+    details: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """
+        Validate the explicit input contract for one stage invocation.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            `current_timeframe` is populated only for one active timeframe session.
+        Raises:
+            ValueError: If stage id, timeframe, or details payload violates the strict contract.
+        Side Effects:
+            Freezes `details` into a stable key-sorted read-only mapping.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        object.__setattr__(self, "stage", validate_artifact_precompute_stage_id_v2(self.stage))
+        if self.current_timeframe is not None:
+            object.__setattr__(
+                self,
+                "current_timeframe",
+                validate_mapping_timeframe_v2(self.current_timeframe),
+            )
+        object.__setattr__(self, "details", freeze_artifact_payload_mapping_v2(self.details))
+
+    def as_dict(self) -> dict[str, object]:
+        """
+        Serialize the stage-input payload into a stable JSON-friendly mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, object]: Deterministic stage-start payload.
+        Assumptions:
+            Progress logging should preserve field names for operator grep/tail workflows.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        return {
+            "stage": self.stage,
+            "current_timeframe": self.current_timeframe,
+            "details": dict(self.details),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPrecomputeStageOutputV2:
+    """
+    Structured completion payload for one deterministic precompute stage invocation.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    stage: ArtifactPrecomputeStageIdV2
+    current_timeframe: str | None = None
+    reused_prefix_bars: int = 0
+    rewritten_tail_bars: int = 0
+    details: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """
+        Validate one structured stage-output payload.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Per-stage counters are deterministic summaries suitable for later metrics/logging.
+        Raises:
+            ValueError: If identifiers, timeframe, counters, or details are invalid.
+        Side Effects:
+            Freezes `details` into a stable key-sorted read-only mapping.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        object.__setattr__(self, "stage", validate_artifact_precompute_stage_id_v2(self.stage))
+        if self.current_timeframe is not None:
+            object.__setattr__(
+                self,
+                "current_timeframe",
+                validate_mapping_timeframe_v2(self.current_timeframe),
+            )
+        object.__setattr__(
+            self,
+            "reused_prefix_bars",
+            validate_non_negative_manifest_int_v2(self.reused_prefix_bars),
+        )
+        object.__setattr__(
+            self,
+            "rewritten_tail_bars",
+            validate_non_negative_manifest_int_v2(self.rewritten_tail_bars),
+        )
+        object.__setattr__(self, "details", freeze_artifact_payload_mapping_v2(self.details))
+
+    def as_dict(self) -> dict[str, object]:
+        """
+        Serialize the stage-output payload into a stable JSON-friendly mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, object]: Deterministic stage-finish payload.
+        Assumptions:
+            Later metrics/logging adapters may consume the same summarized field names.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        return {
+            "stage": self.stage,
+            "current_timeframe": self.current_timeframe,
+            "reused_prefix_bars": self.reused_prefix_bars,
+            "rewritten_tail_bars": self.rewritten_tail_bars,
+            "details": dict(self.details),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPrecomputeStageResultV2:
+    """
+    Deterministic result summary for one finished precompute stage invocation.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    stage_input: ArtifactPrecomputeStageInputV2
+    stage_output: ArtifactPrecomputeStageOutputV2
+    elapsed_seconds: float
+
+    def __post_init__(self) -> None:
+        """
+        Validate one finished stage summary and its timing metadata.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Stage input/output identifiers must stay aligned for deterministic logging.
+        Raises:
+            ValueError: If stage identifiers drift or `elapsed_seconds` is negative/non-numeric.
+        Side Effects:
+            Normalizes `elapsed_seconds` to builtin `float`.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        if self.stage_input.stage != self.stage_output.stage:
+            raise ValueError("ArtifactPrecomputeStageResultV2 stage input/output drift detected")
+        if self.stage_input.current_timeframe != self.stage_output.current_timeframe:
+            raise ValueError(
+                "ArtifactPrecomputeStageResultV2 current_timeframe input/output drift detected"
+            )
+        if isinstance(self.elapsed_seconds, bool) or not isinstance(
+            self.elapsed_seconds,
+            int | float,
+        ):
+            raise ValueError("ArtifactPrecomputeStageResultV2.elapsed_seconds must be numeric")
+        if float(self.elapsed_seconds) < 0.0:
+            raise ValueError("ArtifactPrecomputeStageResultV2.elapsed_seconds must be >= 0")
+        object.__setattr__(self, "elapsed_seconds", float(self.elapsed_seconds))
+
+    def as_dict(self) -> dict[str, object]:
+        """
+        Serialize the finished stage summary into a stable JSON-friendly mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, object]: Deterministic stage result payload.
+        Assumptions:
+            Structured completion logs should expose one compact stage summary record.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        return {
+            "stage": self.stage_output.stage,
+            "current_timeframe": self.stage_output.current_timeframe,
+            "elapsed_seconds": self.elapsed_seconds,
+            "input": self.stage_input.as_dict(),
+            "output": self.stage_output.as_dict(),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPrecomputeProgressEventV2:
+    """
+    Typed structured progress event emitted by the R12 precompute coordinator.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    event: ArtifactPrecomputeProgressEventNameV2
+    stage: ArtifactPrecomputeStageIdV2
+    current_timeframe: str | None = None
+    elapsed_seconds: float | None = None
+    details: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """
+        Validate the typed structured progress-event payload.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Progress events expose deterministic stage/timeframe identity and JSON-friendly
+            details.
+        Raises:
+            ValueError: If the event name, stage, timeframe, or elapsed time is invalid.
+        Side Effects:
+            Freezes `details` into a stable key-sorted read-only mapping.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        object.__setattr__(
+            self,
+            "event",
+            validate_artifact_precompute_progress_event_name_v2(self.event),
+        )
+        object.__setattr__(self, "stage", validate_artifact_precompute_stage_id_v2(self.stage))
+        if self.current_timeframe is not None:
+            object.__setattr__(
+                self,
+                "current_timeframe",
+                validate_mapping_timeframe_v2(self.current_timeframe),
+            )
+        if self.elapsed_seconds is not None:
+            if isinstance(self.elapsed_seconds, bool) or not isinstance(
+                self.elapsed_seconds,
+                int | float,
+            ):
+                raise ValueError(
+                    "ArtifactPrecomputeProgressEventV2.elapsed_seconds must be numeric when set"
+                )
+            if float(self.elapsed_seconds) < 0.0:
+                raise ValueError(
+                    "ArtifactPrecomputeProgressEventV2.elapsed_seconds must be >= 0"
+                )
+            object.__setattr__(self, "elapsed_seconds", float(self.elapsed_seconds))
+        object.__setattr__(self, "details", freeze_artifact_payload_mapping_v2(self.details))
+
+    def as_dict(self) -> dict[str, object]:
+        """
+        Serialize the progress-event payload into a stable JSON-friendly mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, object]: Deterministic progress-event payload.
+        Assumptions:
+            Structured logs must preserve the canonical field names from the R12 docs/runbooks.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+        """
+        return {
+            "event": self.event,
+            "stage": self.stage,
+            "current_timeframe": self.current_timeframe,
+            "elapsed_seconds": self.elapsed_seconds,
+            "details": dict(self.details),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactStageRebuildStatsV2:
     """
     Explicit prefix/tail rebuild counters for one artifact stage.
@@ -2644,6 +3168,7 @@ class ArtifactCanonicalPriceExportResultV2:
     source_candle_count: int
     reused_prefix_bars: int
     rewritten_tail_bars: int
+    stage_results: tuple[ArtifactPrecomputeStageResultV2, ...] = ()
     stage_rebuild_stats: ArtifactStageRebuildStatsCollectionV2 = field(
         default_factory=ArtifactStageRebuildStatsCollectionV2
     )
@@ -2707,6 +3232,7 @@ class ArtifactCanonicalPriceExportResultV2:
             raise ValueError("ArtifactCanonicalPriceExportResultV2.stage_rebuild_stats is required")
         if self.tail_rebuild_bars is None:  # type: ignore[truthy-bool]
             raise ValueError("ArtifactCanonicalPriceExportResultV2.tail_rebuild_bars is required")
+        object.__setattr__(self, "stage_results", tuple(self.stage_results))
         if self.stage_rebuild_stats.prices.reused_prefix_bars != self.reused_prefix_bars:
             raise ValueError(
                 "ArtifactCanonicalPriceExportResultV2.reused_prefix_bars must match "
@@ -3499,6 +4025,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     hit_times_tp_levels_pct: tuple[float, ...]
     hit_times_sl_levels_pct: tuple[float, ...]
     config_sha256: str
+    execution_policy: ArtifactPrecomputeExecutionPolicyV2
     signal_artifacts: tuple[ArtifactSignalValidationSpecV2, ...] = ()
     max_signal_rows_per_artifact: int = 1_000_000
     max_hit_times_cells: int = 1_000_000
@@ -3566,6 +4093,8 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             "config_sha256",
             validate_current_pointer_manifest_sha256_v2(self.config_sha256),
         )
+        if self.execution_policy is None:  # type: ignore[truthy-bool]
+            raise ValueError("ArtifactPrecomputeRuntimeSettingsV2.execution_policy is required")
         object.__setattr__(
             self,
             "signal_artifacts",

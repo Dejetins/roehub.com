@@ -91,6 +91,18 @@ Strict `backtest_artifacts` sections:
 - `lookback_policy`
 - `validation_budgets`
 
+R12 additive execution-model clarification:
+
+- follow-up implementation epics extend this config contract with
+  `backtest_artifacts.execution_policy`;
+- `execution_policy` governs only offline precompute orchestration
+  (`max_open_timeframe_sessions`, worker pool sizing, chunk sizing);
+- `execution_policy` must not change artifact layout, manifest schemas,
+  `signals/<tf>/<indicator_id>/signals.i8.npy`, `axis_order: [variant, time]`, or public
+  `/backtests*` contracts;
+- canonical details for this contract live in
+  `docs/architecture/backtest/backtest-precompute-runner-v2.md`.
+
 R2-04 guarantees:
 
 - `artifact_root` becomes source-of-truth root for `BacktestArtifactPathBuilderV2`;

@@ -92,7 +92,12 @@
 
 ## Принцип декомпозиции
 
-План делится на 11 milestone:
+Изначальный delivery plan покрывает 11 milestone `R0..R10`.
+Post-R10 follow-up work `R11..R12` остаётся additive: оно operationalizes dedicated artifact
+publisher и синхронизирует post-R11 execution model без reopening stable runtime/output
+contracts.
+
+Базовый план делится на 11 milestone:
 
 1. зафиксировать контракты, baseline docs и benchmark/parity baseline;
 2. очистить scope индикаторов и runtime-конфигов;
@@ -129,6 +134,13 @@
 9. Milestone R8 — Background execution cutover.
 10. Milestone R9 — Web UI/history/detail/strategy-save flows.
 11. Milestone R10 — Legacy cleanup, финальная синхронизация docs/runbooks/benchmarks.
+
+Post-R10 additive follow-up:
+
+12. Milestone R11 — Artifact publisher operationalization on Mac Studio
+    (bootstrap, scheduler, bounded tail rebuild proofs).
+13. Milestone R12 — Docs-first execution-model sync for stage-oriented, timeframe-scoped
+    precompute.
 
 Нельзя перепрыгивать через зависимые этапы.
 Например:
@@ -1363,6 +1375,59 @@
 **Основные документы:**
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
+
+---
+
+## Milestone R12 — Post-R11 precompute execution-model sync
+
+Цель: documentation-first закрепить корректную post-R11 архитектуру artifact precompute без
+изменения artifact output contract.
+
+### EPIC R12-00 — Stage-oriented, timeframe-scoped precompute docs
+
+**Цель:** убрать implicit tensor-first narrative и заменить его на operator-friendly execution
+model, который follow-up code epics смогут реализовать без догадок.
+
+**Scope:**
+- явно разделить:
+  - stable artifact layout/manifests/public runtime contracts;
+  - changed offline precompute execution model;
+  - unchanged public/runtime `indicators` compute semantics;
+- зафиксировать pipeline в порядке:
+  - load canonical `1m` once
+  - materialize `prices/1m`
+  - derive target TF prices
+  - open one timeframe session at a time
+  - build `mappings/<tf>` и `signals/<tf>/<indicator_id>` for that timeframe
+  - close timeframe session
+  - build `hit_times/1m`
+  - finalize manifests and publish `current.yaml`;
+- документировать strict `execution_policy` contract для
+  `configs/<env>/backtest_artifacts.yaml`;
+- документировать `ChunkPlanner`, memory ownership, worker model и progress observability для Mac
+  Studio.
+
+**Non-goals:**
+- менять layout `artifacts/backtest/v2`;
+- менять manifest schemas;
+- менять public `/backtests*` или `/indicators*` contracts;
+- возвращать giant in-memory dense tensor model как recommended future state.
+
+**DoD:**
+- roadmap, canonical architecture docs и runbooks описывают одну и ту же stage-oriented
+  `timeframe-scoped execution` model;
+- follow-up implementation получает strict contracts для `execution_policy` и `ChunkPlanner`;
+- operator docs объясняют, как читать `current_timeframe`, stage progress и chunk progress на
+  длинном bootstrap run.
+
+**Основные документы:**
+- `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- `docs/runbooks/backtest-artifacts-rebuild.md`
+- `docs/runbooks/mac-studio-native-backend-operations.md`
+- `docs/runbooks/market-data-metrics.md`
+- `docs/runbooks/market-data-metrics-reference-ru.md`
 
 ---
 

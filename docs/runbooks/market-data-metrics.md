@@ -47,6 +47,15 @@ Source of truth scrape-конфига:
 - `backtest_artifact_publish_last_success_unixtime`
 - `backtest_artifact_tail_rebuild_bars_total`
 
+Intra-run progress is intentionally split out of Prometheus and lives in structured logs:
+
+- `artifact_precompute_stage_started`
+- `artifact_precompute_stage_finished`
+- `current_timeframe`
+- `current_indicator`
+- `chunk_index`
+- `chunk_jobs_total`
+
 ### Monitoring/infra
 
 - `up{job=...}`
@@ -114,6 +123,15 @@ Source of truth scrape-конфига:
 | `backtest_artifact_publish_blocked_total` | Блокировки publish-run по причинам |
 | `backtest_artifact_publish_last_success_unixtime` | Unix time последнего цикла с хотя бы одним успешным publish |
 | `backtest_artifact_tail_rebuild_bars_total` | Сколько баров реально переписано в bounded tail по stage |
+
+Structured progress fields for this service are not separate Prometheus series. Operators should
+read them from logs:
+
+- `artifact_precompute_stage_started` / `artifact_precompute_stage_finished` tell which pipeline
+  stage is active;
+- `current_timeframe` and `current_indicator` show the currently open timeframe session and
+  indicator target;
+- `chunk_index` / `chunk_jobs_total` distinguish a healthy long bootstrap from a stuck worker pool.
 
 ### 4) `clickhouse-exporter`
 

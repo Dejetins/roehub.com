@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
@@ -24,6 +25,9 @@ from trading.contexts.backtest.application.services import (
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
+    ArtifactCoordinatesV2,
+    ArtifactPrecomputeCoordinatorV2,
+    ArtifactPrecomputeExecutionPolicyV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotPublishErrorV2,
     ArtifactStageRebuildStatsV2,
@@ -960,6 +964,139 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     np.testing.assert_allclose(
         three_day_ohlcv[0],
         _expected_bucket_ohlcv_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2))),
+    )
+
+
+def test_artifact_precompute_coordinator_v2_rejects_nested_timeframe_sessions_when_limited_to_one(
+) -> None:
+    """
+    Verify `max_open_timeframe_sessions=1` prevents accidental nested timeframe sessions.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        R12 keeps session ownership explicit even before chunked signal workers are introduced.
+    Raises:
+        AssertionError: If a nested second session does not raise ValueError.
+    Side Effects:
+        Emits in-memory coordinator logs during the context-manager lifecycle.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    coordinator = ArtifactPrecomputeCoordinatorV2(
+        coordinates=ArtifactCoordinatesV2(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        ),
+        slot="slot_a",
+        slot_generation=1,
+        force_full_rebuild=False,
+        execution_policy=ArtifactPrecomputeExecutionPolicyV2(
+            max_open_timeframe_sessions=1,
+            signal_worker_processes=4,
+            signal_worker_memory_budget_bytes=2_147_483_648,
+            signal_chunk_rows_min=32,
+            signal_chunk_rows_max=256,
+        ),
+    )
+
+    with coordinator.open_timeframe_session(timeframe="15m"):
+        with pytest.raises(ValueError, match="max_open_timeframe_sessions"):
+            with coordinator.open_timeframe_session(timeframe="1h"):
+                pass
+
+
+def test_backtest_artifact_precompute_runner_v2_emits_deterministic_stage_results_and_progress_events(  # noqa: E501
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """
+    Verify the R12 runner emits ordered stage results and structured progress events.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+        caplog: pytest log capture fixture.
+    Returns:
+        None.
+    Assumptions:
+        Progress events are emitted through structured logs while `stage_results` stay attached
+        to the internal export DTO.
+    Raises:
+        AssertionError: If stage order, timeframe order, or required progress events drift.
+    Side Effects:
+        Creates strict artifact files under `tmp_path` and captures runner logs.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        require_hit_times_manifest=True,
+    )
+    reader = _FakeCanonicalCandleReader(
+        rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+    )
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=reader,
+    )
+
+    with caplog.at_level(logging.INFO):
+        result = runner.export_canonical_price_1m(
+            _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+        )
+
+    stage_ids = tuple(stage_result.stage_output.stage for stage_result in result.stage_results)
+
+    assert len(result.stage_results) == 1 + len(ARTIFACT_MAPPING_TIMEFRAMES_V2) + 2
+    assert stage_ids[0] == "canonical_prices"
+    assert stage_ids[1 : 1 + len(ARTIFACT_MAPPING_TIMEFRAMES_V2)] == (
+        "timeframe_session",
+    ) * len(ARTIFACT_MAPPING_TIMEFRAMES_V2)
+    assert stage_ids[-2:] == ("hit_times", "root_manifest")
+    assert result.stage_results[1].stage_output.current_timeframe == "15m"
+    assert result.stage_results[len(ARTIFACT_MAPPING_TIMEFRAMES_V2)].stage_output.current_timeframe == "3d"  # noqa: E501
+    assert result.stage_results[-1].stage_output.details["manifest_path"] == str(
+        result.manifest_path
+    )
+
+    progress_messages = [record.getMessage() for record in caplog.records if "event=" in record.msg]
+
+    assert any(
+        "event=artifact_precompute_stage_started" in message
+        and "stage=canonical_prices" in message
+        for message in progress_messages
+    )
+    assert any(
+        "event=artifact_precompute_stage_finished" in message
+        and "stage=root_manifest" in message
+        for message in progress_messages
+    )
+    timeframe_started_messages = [
+        message for message in progress_messages if "event=timeframe_started" in message
+    ]
+    timeframe_finished_messages = [
+        message for message in progress_messages if "event=timeframe_finished" in message
+    ]
+    assert len(timeframe_started_messages) == len(ARTIFACT_MAPPING_TIMEFRAMES_V2)
+    assert len(timeframe_finished_messages) == len(ARTIFACT_MAPPING_TIMEFRAMES_V2)
+    assert "current_timeframe=15m" in timeframe_started_messages[0]
+    assert "current_timeframe=3d" in timeframe_finished_messages[-1]
+    assert any(
+        "event=artifact_precompute_finished" in message and "\"stage_results\"" in message
+        for message in progress_messages
     )
 
 

@@ -21,6 +21,9 @@
 - строит inactive slot в `artifacts/backtest/v2`;
 - пишет strict manifests для root / signals / hit_times;
 - выполняет fail-fast validation до switch `current.yaml`;
+- сохраняет published artifact layout stable, even when the internal execution model changes;
+- явно отделяет offline artifact-precompute execution semantics от публичных/runtime semantics
+  `indicators`;
 - оставляет runtime только fixed metadata reads без schema inference и без hash recomputation;
 - после R6-01 передаёт runtime достаточно metadata для shared `slot-pinned context` bootstrap в
   sync и background paths без filesystem discovery.
@@ -53,6 +56,10 @@ Precompute/publish слой читает strict `configs/<env>/backtest_artifact
 - `validation_budgets.max_hit_times_cells_full_rebuild` используется для первого bootstrap пустого
   symbol root и для explicit `--full-rebuild`, когда bounded incremental budget заведомо слишком
   мал для full-history `hit_times`.
+- R12 documentation contract добавляет к strict config shape additive subsection
+  `execution_policy`; checked-in R11 config files могут ещё не содержать эти keys, но follow-up
+  implementation epics обязаны wire'ить их именно в `configs/<env>/backtest_artifacts.yaml`
+  without changing artifact layout or public `/backtests*` contracts.
 - signal artifact materialization intentionally does not inherit the public/runtime
   `configs/<env>/indicators.yaml -> compute.numba.max_compute_bytes_total` ceiling; offline
   precompute wiring uses a dedicated compute adapter with effectively-unbounded total compute
@@ -60,6 +67,287 @@ Precompute/publish слой читает strict `configs/<env>/backtest_artifact
 
 R2-04 intentionally keeps these settings отдельно от `configs/<env>/backtest.yaml`, чтобы
 runtime request defaults и artifact pipeline knobs не смешивались в одном контракте.
+
+## R12 execution-model clarification
+
+R12 фиксирует, что precompute execution model меняется без изменения published artifact output
+contract.
+
+- Stable output contract:
+  - `signals/<tf>/<indicator_id>/signals.i8.npy` остаётся published signal path;
+  - `axis_order: [variant, time]` остаётся canonical signal matrix layout;
+  - root/signal/hit-times manifests, slot layout и `current.yaml` publish semantics не меняются.
+- Changed offline execution model:
+  - artifact precompute больше не должен трактоваться как giant tensor-first materialization для
+    каждого target timeframe/indicator pair;
+  - canonical model теперь stage-oriented и built around `timeframe-scoped execution`;
+  - один `current_timeframe` session открывается, полностью отрабатывается и закрывается до
+    перехода к следующему timeframe.
+- Unchanged public/runtime `indicators` semantics:
+  - public `IndicatorCompute.compute(...)` и его tensor-first guards остаются отдельным contract;
+  - offline artifact precompute может использовать другой bounded orchestration layer и не обязан
+    наследовать giant in-memory dense tensor model из runtime/API indicator compute.
+
+### Short glossary
+
+| Term | Meaning |
+| --- | --- |
+| `stage` | Крупный deterministic pipeline segment: `prices_1m`, `prices_tf`, `timeframe_session`, `hit_times`, `manifests`, `publish` |
+| `timeframe session` | Lifetime одного open target timeframe inside precompute: load derived prices once, process all indicators on that timeframe, flush writes, release memory |
+| `chunk` | Contiguous row range for one `(indicator_id, timeframe)` signal matrix |
+| `worker` | Один bounded signal worker process, владеющий только своим chunk-local compute buffers |
+| `publish` | Sequence `build inactive slot -> validate whole slot -> atomically switch current.yaml` |
+
+### Operator-friendly pipeline
+
+1. Load canonical `1m` once from `market_data.canonical_candles_1m FINAL`.
+2. Materialize `prices/1m`.
+3. Derive deterministic `prices/<tf>` rollups in canonical timeframe order.
+4. For one timeframe at a time open a `timeframe session`.
+5. Inside that session build `mappings/<tf>` and materialize all configured
+   `signals/<tf>/<indicator_id>/signals.i8.npy` targets, including `all_supported_v1`.
+6. Eagerly write signal chunks to disk via `np.memmap`, then close the timeframe session.
+7. After all timeframe sessions finish, build or update `hit_times/1m`, finalize manifests, and
+   run whole-slot validation.
+8. Publish by atomically switching `current.yaml`.
+
+### Architecture matrix
+
+| Stage | Inputs | Outputs | Memory owner | Parallelism scope |
+| --- | --- | --- | --- | --- |
+| `prices_1m` | canonical CH `1m` columns | `prices/1m/*` | runner process | single stage |
+| `prices_tf` | materialized `prices/1m` | `prices/<tf>/*` | runner process | bounded across TF derivation only until `timeframe session` opens |
+| `timeframe_session` | one `prices/<tf>` + canonical row order + signal target list | `mappings/<tf>/*`, `signals/<tf>/<indicator_id>/signals.i8.npy` | session owner for one `current_timeframe` | one open timeframe session at a time |
+| `signal_chunk` | one `(indicator_id, timeframe)` + contiguous variant rows | row slice inside `signals/<tf>/<indicator_id>/signals.i8.npy` | one worker process | bounded by `signal_worker_processes` |
+| `hit_times` | `prices/1m/ohlcv.f32.npy`, TP/SL grid | `hit_times/1m/*` | runner process | single stage |
+| `manifests_publish` | completed slot files | `manifest.yaml`, `current.yaml` | runner + publisher | no data parallelism |
+
+### Why the old tensor-first model is not recommended here
+
+The old narrative implicitly suggested reusing dense `IndicatorCompute` full-target tensors for each
+artifact target. That is not the recommended architecture for artifact precompute because it:
+
+- couples offline signal materialization to runtime/API memory guards that solve a different
+  problem;
+- keeps multiple large target-specific buffers alive longer than needed;
+- scales poorly on Mac Studio once `all_supported_v1` is combined with long histories and many
+  target timeframes;
+- hides ownership boundaries, which makes swap/compressed-memory incidents harder to diagnose.
+
+The recommended future state is bounded stage execution, not a bigger giant tensor.
+
+### `execution_policy` contract
+
+`execution_policy` is an additive subsection of `configs/<env>/backtest_artifacts.yaml` reserved for
+offline precompute orchestration only.
+
+```yaml
+backtest_artifacts:
+  execution_policy:
+    max_open_timeframe_sessions: 1
+    signal_worker_processes: 4
+    signal_worker_memory_budget_bytes: 2147483648
+    signal_chunk_rows_min: 32
+    signal_chunk_rows_max: 256
+```
+
+Field contract:
+
+- `max_open_timeframe_sessions`
+  - positive integer;
+  - deterministic default: `1`;
+  - meaning: upper bound on concurrently open target timeframe sessions;
+  - current canonical production meaning: only `1` is recommended, because R12 architecture is
+    explicitly one `current_timeframe` at a time;
+  - implementations that cannot preserve the same memory bounds for values `> 1` must fail-fast.
+- `signal_worker_processes`
+  - positive integer;
+  - deterministic default: `4`;
+  - meaning: fixed upper bound of concurrent signal worker processes inside one timeframe session;
+  - must never imply unbounded per-target fan-out.
+- `signal_worker_memory_budget_bytes`
+  - positive integer;
+  - deterministic default: `2147483648` (`2 GiB`);
+  - meaning: per-worker ceiling for one signal chunk compute job, including chunk-local scratch
+    buffers and the writable output slice.
+- `signal_chunk_rows_min`
+  - positive integer;
+  - deterministic default: `32`;
+  - meaning: smallest acceptable contiguous variant-row batch for a chunk job.
+- `signal_chunk_rows_max`
+  - positive integer;
+  - deterministic default: `256`;
+  - meaning: largest acceptable contiguous variant-row batch for a chunk job.
+
+Deterministic validation expectations:
+
+- `execution_policy` must reject missing required fields, extra keys, duplicates and non-integer
+  values.
+- `signal_chunk_rows_min <= signal_chunk_rows_max` is mandatory.
+- `max_open_timeframe_sessions >= 1`, `signal_worker_processes >= 1`,
+  `signal_worker_memory_budget_bytes >= 1` are mandatory.
+- No hidden host-derived defaults are allowed once the section is wired in code.
+- No other scalar knobs are required for R12; if more tuning is needed, the follow-up epic must
+  justify why the five fields above were insufficient.
+
+### R12-01 implementation contract surface
+
+R12-01 wires the docs contract into explicit code-level DTOs/classes without changing the published
+artifact layout or `PublishBacktestArtifactsV2UseCase` semantics.
+
+- Typed runtime config:
+  - `BacktestArtifactExecutionPolicyRuntimeConfig`
+  - `ArtifactPrecomputeExecutionPolicyV2`
+- Coordinator and lifecycle ownership:
+  - `ArtifactPrecomputeCoordinatorV2`
+  - `ArtifactTimeframeSessionV2`
+- Typed stage/progress DTOs:
+  - `ArtifactPrecomputeStageInputV2`
+  - `ArtifactPrecomputeStageOutputV2`
+  - `ArtifactPrecomputeStageResultV2`
+  - `ArtifactPrecomputeProgressEventV2`
+
+Deterministic stage order in code:
+
+1. `canonical_prices`
+2. repeated `timeframe_session` in canonical timeframe order (`15m` .. `3d`)
+3. `hit_times`
+4. `root_manifest`
+
+Contract expectations:
+
+- `ArtifactPrecomputeCoordinatorV2` is the single owner of stage ordering and structured progress
+  events.
+- `ArtifactTimeframeSessionV2` is the single owner of one open `current_timeframe`; when
+  `max_open_timeframe_sessions=1`, nested sessions must fail-fast.
+- `ArtifactCanonicalPriceExportResultV2` carries additive `stage_results` summaries for later
+  metrics/logging work, while existing publish diagnostics continue to aggregate into
+  `stage_rebuild_stats` / `tail_rebuild_bars`.
+
+### `ChunkPlanner` contract
+
+`ChunkPlanner` is the deterministic planner for signal materialization inside one timeframe session.
+
+Inputs:
+
+- `indicator_id`;
+- `timeframe`;
+- `rows_count` for that `(indicator_id, timeframe)` target;
+- `timeframe_bar_count`;
+- `estimated_bytes_per_row`;
+- `signal_worker_memory_budget_bytes`;
+- `signal_chunk_rows_min`;
+- `signal_chunk_rows_max`;
+- canonical variant row order for this target, as already fixed by manifest/grid contracts.
+
+Planning algorithm:
+
+1. Compute `budget_cap_rows = floor(signal_worker_memory_budget_bytes / estimated_bytes_per_row)`.
+2. Fail-fast if `estimated_bytes_per_row <= 0`.
+3. Fail-fast if `budget_cap_rows < signal_chunk_rows_min`, because the configured minimum chunk
+   size cannot fit in the worker budget.
+4. Set `chunk_rows = min(signal_chunk_rows_max, budget_cap_rows)`.
+5. Emit contiguous row ranges in canonical order:
+   - chunk `0` -> `[0, chunk_rows)`
+   - chunk `1` -> `[chunk_rows, 2 * chunk_rows)`
+   - ...
+   - final chunk may be shorter but must keep the same row ordering.
+
+Outputs:
+
+- ordered chunk jobs with:
+  - `indicator_id`
+  - `timeframe`
+  - `chunk_index`
+  - `row_start_inclusive`
+  - `row_end_exclusive`
+  - `chunk_rows`
+
+Determinism guarantees:
+
+- one chunk is always a bounded subset of variant rows for one `(indicator_id, timeframe)`;
+- chunks never mix multiple indicators or multiple timeframes;
+- chunk execution may complete out of order, but write ownership stays attached to the original
+  row range, so final matrix ordering and manifest ordering do not change;
+- reconstructing all chunks in `chunk_index` order yields the same `axis_order: [variant, time]`
+  matrix as a single non-chunked materialization.
+
+Worked example:
+
+- `rows_count = 1200`
+- `estimated_bytes_per_row` fits `budget_cap_rows = 96`
+- `signal_chunk_rows_min = 32`
+- `signal_chunk_rows_max = 64`
+- therefore `chunk_rows = min(64, 96) = 64`
+- number of jobs = `ceil(1200 / 64) = 19`
+- jobs `0..17` own `64` rows each, job `18` owns the final `48` rows.
+
+### Memory ownership and worker model
+
+Memory ownership is explicit and must be released in the same order on every run:
+
+- canonical source arrays:
+  - owned by the main runner;
+  - read-only;
+  - loaded once for the symbol root and reused across later stages.
+- one current timeframe session:
+  - owns derived `prices/<tf>` references, `mappings/<tf>` build state and the currently open
+    signal target descriptors for exactly one `current_timeframe`;
+  - must be closed before the next timeframe is opened.
+- per-worker chunk buffers:
+  - owned by exactly one worker process;
+  - may hold only chunk-local indicator values, scratch arrays and one writable output slice;
+  - must be released immediately after the chunk flushes.
+- on-disk signal destination:
+  - owned by `signals/<tf>/<indicator_id>/signals.i8.npy`;
+  - written eagerly through `np.memmap`;
+  - workers may touch only their assigned row range.
+
+Mac Studio worker model:
+
+- bounded worker pool only; no unbounded per-target parallelism;
+- `max_open_timeframe_sessions` must cap how many timeframe sessions are simultaneously alive;
+- `signal_worker_processes` must cap chunk workers inside that single session;
+- the intended optimization target is throughput without swap/compressed-memory blowups, not
+  maximal instantaneous fan-out;
+- mandatory close semantics before moving to the next timeframe:
+  - flush and close `np.memmap`
+  - join/stop signal workers
+  - release session-local arrays
+  - clear `current_timeframe`
+
+### Progress observability contract
+
+Operator-facing observability is split into coarse metrics and fine-grained structured logs.
+
+- Prometheus answers whether the overall publish cycle is healthy and whether `rewritten_tail_bars`
+  stay bounded.
+- Structured logs answer where the runner is currently spending time.
+
+Minimal structured log events:
+
+- `artifact_precompute_stage_started`
+- `artifact_precompute_stage_finished`
+- `artifact_precompute_chunk_started`
+- `artifact_precompute_chunk_finished`
+
+Minimal structured log fields:
+
+- `stage`
+- `current_timeframe`
+- `current_indicator`
+- `chunk_index`
+- `chunk_jobs_total`
+- `row_start_inclusive`
+- `row_end_exclusive`
+- `reused_prefix_bars`
+- `rewritten_tail_bars`
+
+These fields are mandatory for distinguishing a long bootstrap from a normal daily tail rebuild:
+
+- bootstrap should show long `prices_1m` / `prices_tf` stages and large `rewritten_tail_bars`;
+- steady-state rebuild should show one open `current_timeframe` at a time and bounded chunked
+  progress inside it.
 
 ## Operational execution topology
 

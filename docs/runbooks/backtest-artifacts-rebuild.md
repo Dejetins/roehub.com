@@ -41,6 +41,13 @@ Minimal service metrics:
 - `backtest_artifact_publish_last_success_unixtime`
 - `backtest_artifact_tail_rebuild_bars_total{stage}`
 
+R12-01 implementation-facing code surface near this runbook:
+
+- `ArtifactPrecomputeCoordinatorV2` owns stage order and structured progress logs.
+- `ArtifactTimeframeSessionV2` owns explicit open/close lifecycle for one `current_timeframe`.
+- `ArtifactPrecomputeProgressEventV2` and `ArtifactPrecomputeStageResultV2` define the payload
+  shape behind the structured logs and final `stage_results` completion summary.
+
 ## Предусловия
 
 - artifact pipeline contract загружен из strict `configs/<env>/backtest_artifacts.yaml`;
@@ -72,6 +79,18 @@ Path resolution precedence:
 - `publish_schedule`
 - `lookback_policy`
 - `validation_budgets`
+
+R12 additive execution-policy contract:
+
+- follow-up implementation extends the same YAML with `execution_policy`;
+- mandatory keys:
+  - `max_open_timeframe_sessions`
+  - `signal_worker_processes`
+  - `signal_worker_memory_budget_bytes`
+  - `signal_chunk_rows_min`
+  - `signal_chunk_rows_max`
+- этот section меняет только execution model и resource bounds;
+- layout/manifests/public runtime contracts не меняются.
 
 `validation_plan.signal_artifacts` contract:
 
@@ -158,6 +177,59 @@ Manual progress checks:
 rg "event=artifact_precompute_(stage_started|stage_finished|completed|failed)" /tmp/backtest-artifact-publish-BTCUSDT.log
 tail -f /tmp/backtest-artifact-publish-BTCUSDT.log
 ```
+
+## R12 progress model: как читать длинный publish
+
+Prometheus для `backtest-artifact-publisher` отвечает на вопрос "здоров ли цикл и остаётся ли
+tail bounded". Structured logs отвечают на вопрос "что runner делает прямо сейчас".
+
+Минимальные поля, которые оператор должен ожидать в structured progress logs:
+
+- `event=artifact_precompute_stage_started|artifact_precompute_stage_finished`
+- `stage`
+- `current_timeframe`
+- `current_indicator`
+- `chunk_index`
+- `chunk_jobs_total`
+- `row_start_inclusive`
+- `row_end_exclusive`
+- `reused_prefix_bars`
+- `rewritten_tail_bars`
+
+R12-01 additive completion detail:
+
+- final `event=artifact_precompute_finished` now carries `details.stage_results` in deterministic
+  execution order;
+- this does not change CLI/scheduler publish result shape, but gives operators and future metrics
+  adapters one canonical per-stage summary stream.
+
+Интерпретация:
+
+- если stage перешёл в `timeframe_session`, то одновременно должен быть открыт только один
+  `current_timeframe`;
+- если один и тот же `current_timeframe` держится долго, это нормально для bootstrap full build,
+  но требует chunk progress (`chunk_index` / `chunk_jobs_total`);
+- отсутствие chunk progress при растущем memory pressure означает, что executor drift'нул обратно
+  к giant in-memory behavior и должен считаться regression;
+- `reused_prefix_bars >> rewritten_tail_bars` ожидаемо для daily rebuild;
+- `reused_prefix_bars = 0` сразу на нескольких стадиях нормально только для bootstrap или
+  deterministic full rebuild fallback.
+
+### Operator checklist
+
+Полный bootstrap:
+
+1. Ожидайте длинные stages `prices_1m`, `prices_tf`, затем по очереди `current_timeframe=15m`,
+   `30m`, `1h`, ... в canonical order.
+2. Ожидайте крупные `rewritten_tail_bars` и почти нулевой reuse.
+3. Следите, чтобы не было нескольких одновременно открытых timeframe sessions.
+
+Daily tail rebuild:
+
+1. Ожидайте bounded `rewritten_tail_bars` по `prices`, `mappings`, `signals`, `hit_times`.
+2. Ожидайте заметный `reused_prefix_bars`.
+3. Если one-off target перешёл в full rebuild fallback, это должно быть видно либо по diagnostics,
+   либо по резкому росту `rewritten_tail_bars` только в одной стадии.
 
 Operational note:
 
@@ -248,6 +320,12 @@ Path contract by environment:
   в columnar precompute path, чтобы bootstrap был устойчив к историческим дублям в ClickHouse.
 - independent `prices/<tf>` rollups и `mappings/<tf>` rebuilds могут исполняться параллельно;
   это не меняет publish sequence и не разрешает partial publish.
+- R12 canonical execution model for steady-state signal materialization is `timeframe-scoped
+  execution`:
+  - открыть один `current_timeframe`;
+  - materialize all mappings/signals for that timeframe;
+  - eagerly flush `signals/<tf>/<indicator_id>/signals.i8.npy` through `np.memmap`;
+  - закрыть timeframe session before opening the next one.
 
 R3-01 / R3-02 / R3-03 exception boundary:
 

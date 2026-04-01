@@ -13,6 +13,7 @@ from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_TIMEFRAMES_V2,
+    ArtifactPrecomputeExecutionPolicyV2,
     ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotValidationSpecV2,
@@ -38,6 +39,7 @@ _ARTIFACTS_REQUIRED_KEYS = (
     "publish_schedule",
     "lookback_policy",
     "validation_budgets",
+    "execution_policy",
 )
 _VALIDATION_PLAN_REQUIRED_KEYS = (
     "price_timeframes",
@@ -62,6 +64,13 @@ _VALIDATION_BUDGETS_REQUIRED_KEYS = (
     "max_signal_rows_per_artifact",
     "max_hit_times_cells",
     "max_hit_times_cells_full_rebuild",
+)
+_EXECUTION_POLICY_REQUIRED_KEYS = (
+    "max_open_timeframe_sessions",
+    "signal_worker_processes",
+    "signal_worker_memory_budget_bytes",
+    "signal_chunk_rows_min",
+    "signal_chunk_rows_max",
 )
 
 
@@ -546,6 +555,92 @@ class BacktestArtifactValidationBudgetsRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestArtifactExecutionPolicyRuntimeConfig:
+    """
+    Strict execution-policy contract loaded from `backtest_artifacts.execution_policy`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - configs/dev/backtest_artifacts.yaml
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    max_open_timeframe_sessions: int
+    signal_worker_processes: int
+    signal_worker_memory_budget_bytes: int
+    signal_chunk_rows_min: int
+    signal_chunk_rows_max: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate strict R12 execution-policy scalars with fail-fast semantics.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Offline precompute orchestration must not guess session or worker limits.
+        Raises:
+            ValueError: If one scalar is non-positive or the chunk-row bounds are inverted.
+        Side Effects:
+            None.
+        """
+        _require_positive_int(
+            value=self.max_open_timeframe_sessions,
+            field_path="backtest_artifacts.execution_policy.max_open_timeframe_sessions",
+        )
+        _require_positive_int(
+            value=self.signal_worker_processes,
+            field_path="backtest_artifacts.execution_policy.signal_worker_processes",
+        )
+        _require_positive_int(
+            value=self.signal_worker_memory_budget_bytes,
+            field_path=(
+                "backtest_artifacts.execution_policy.signal_worker_memory_budget_bytes"
+            ),
+        )
+        _require_positive_int(
+            value=self.signal_chunk_rows_min,
+            field_path="backtest_artifacts.execution_policy.signal_chunk_rows_min",
+        )
+        _require_positive_int(
+            value=self.signal_chunk_rows_max,
+            field_path="backtest_artifacts.execution_policy.signal_chunk_rows_max",
+        )
+        if self.signal_chunk_rows_min > self.signal_chunk_rows_max:
+            raise ValueError(
+                "backtest_artifacts.execution_policy.signal_chunk_rows_min must be <= "
+                "signal_chunk_rows_max"
+            )
+
+    def to_execution_policy(self) -> ArtifactPrecomputeExecutionPolicyV2:
+        """
+        Translate runtime-config scalars into the typed service-layer execution policy.
+
+        Args:
+            None.
+        Returns:
+            ArtifactPrecomputeExecutionPolicyV2: Immutable execution-policy DTO for the runner.
+        Assumptions:
+            Translation is lossless because both contracts expose the same five strict fields.
+        Raises:
+            ValueError: If a stored scalar violates the service-layer contract.
+        Side Effects:
+            None.
+        """
+        return ArtifactPrecomputeExecutionPolicyV2(
+            max_open_timeframe_sessions=self.max_open_timeframe_sessions,
+            signal_worker_processes=self.signal_worker_processes,
+            signal_worker_memory_budget_bytes=self.signal_worker_memory_budget_bytes,
+            signal_chunk_rows_min=self.signal_chunk_rows_min,
+            signal_chunk_rows_max=self.signal_chunk_rows_max,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestArtifactsRuntimeConfig:
     """
     Strict artifact pipeline runtime config loaded from `configs/<env>/backtest_artifacts.yaml`.
@@ -566,6 +661,7 @@ class BacktestArtifactsRuntimeConfig:
     publish_schedule: BacktestArtifactPublishScheduleRuntimeConfig
     lookback_policy: BacktestArtifactLookbackPolicyRuntimeConfig
     validation_budgets: BacktestArtifactValidationBudgetsRuntimeConfig
+    execution_policy: BacktestArtifactExecutionPolicyRuntimeConfig
 
     def __post_init__(self) -> None:
         """
@@ -607,6 +703,8 @@ class BacktestArtifactsRuntimeConfig:
             raise ValueError("backtest_artifacts.lookback_policy section must be configured")
         if self.validation_budgets is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest_artifacts.validation_budgets section must be configured")
+        if self.execution_policy is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest_artifacts.execution_policy section must be configured")
 
     def artifact_root_path(self) -> Path:
         """
@@ -700,6 +798,7 @@ class BacktestArtifactsRuntimeConfig:
             hit_times_tp_levels_pct=self.hit_times_grid.tp_levels_pct,
             hit_times_sl_levels_pct=self.hit_times_grid.sl_levels_pct,
             config_sha256=config_sha256,
+            execution_policy=self.execution_policy.to_execution_policy(),
             signal_artifacts=tuple(
                 item.to_validation_spec() for item in self.validation_plan.signal_artifacts
             ),
@@ -853,6 +952,15 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
         expected_keys=_VALIDATION_BUDGETS_REQUIRED_KEYS,
         field_path="backtest_artifacts.validation_budgets",
     )
+    execution_policy_map = _require_mapping(
+        value=artifacts_map.get("execution_policy"),
+        field_path="backtest_artifacts.execution_policy",
+    )
+    _require_exact_keys(
+        data=execution_policy_map,
+        expected_keys=_EXECUTION_POLICY_REQUIRED_KEYS,
+        field_path="backtest_artifacts.execution_policy",
+    )
 
     signal_artifacts = _load_signal_artifacts(
         value=validation_plan_map.get("signal_artifacts"),
@@ -948,6 +1056,32 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
                 ),
             ),
         ),
+        execution_policy=BacktestArtifactExecutionPolicyRuntimeConfig(
+            max_open_timeframe_sessions=_require_int(
+                value=execution_policy_map.get("max_open_timeframe_sessions"),
+                field_path=(
+                    "backtest_artifacts.execution_policy.max_open_timeframe_sessions"
+                ),
+            ),
+            signal_worker_processes=_require_int(
+                value=execution_policy_map.get("signal_worker_processes"),
+                field_path="backtest_artifacts.execution_policy.signal_worker_processes",
+            ),
+            signal_worker_memory_budget_bytes=_require_int(
+                value=execution_policy_map.get("signal_worker_memory_budget_bytes"),
+                field_path=(
+                    "backtest_artifacts.execution_policy.signal_worker_memory_budget_bytes"
+                ),
+            ),
+            signal_chunk_rows_min=_require_int(
+                value=execution_policy_map.get("signal_chunk_rows_min"),
+                field_path="backtest_artifacts.execution_policy.signal_chunk_rows_min",
+            ),
+            signal_chunk_rows_max=_require_int(
+                value=execution_policy_map.get("signal_chunk_rows_max"),
+                field_path="backtest_artifacts.execution_policy.signal_chunk_rows_max",
+            ),
+        ),
     )
 
 
@@ -1022,6 +1156,17 @@ def build_backtest_artifacts_runtime_config_hash(
                 "max_hit_times_cells_full_rebuild": (
                     config.validation_budgets.max_hit_times_cells_full_rebuild
                 ),
+            },
+            "execution_policy": {
+                "max_open_timeframe_sessions": (
+                    config.execution_policy.max_open_timeframe_sessions
+                ),
+                "signal_worker_processes": config.execution_policy.signal_worker_processes,
+                "signal_worker_memory_budget_bytes": (
+                    config.execution_policy.signal_worker_memory_budget_bytes
+                ),
+                "signal_chunk_rows_min": config.execution_policy.signal_chunk_rows_min,
+                "signal_chunk_rows_max": config.execution_policy.signal_chunk_rows_max,
             },
         }
     }

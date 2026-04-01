@@ -183,6 +183,12 @@ backtest_artifacts:
     max_signal_rows_per_artifact: 1000
     max_hit_times_cells: 10000
     max_hit_times_cells_full_rebuild: 20000
+  execution_policy:
+    max_open_timeframe_sessions: 1
+    signal_worker_processes: 4
+    signal_worker_memory_budget_bytes: 2147483648
+    signal_chunk_rows_min: 32
+    signal_chunk_rows_max: 256
 """.strip(),
         encoding="utf-8",
     )

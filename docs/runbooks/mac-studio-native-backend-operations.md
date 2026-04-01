@@ -178,6 +178,14 @@ Dedicated scheduled publisher service:
 - `configs/<env>/indicators.yaml -> compute.numba.max_compute_bytes_total` remains a public/runtime
   guard only; artifact publisher wiring bypasses this ceiling with dedicated offline compute
   config, so full-registry signal precompute must not fail with `ComputeBudgetExceeded`
+- R12 target execution model for Mac Studio is bounded and `timeframe-scoped`:
+  - one open `current_timeframe` session at a time;
+  - bounded `signal_worker_processes` inside that session;
+  - per-worker budget via `signal_worker_memory_budget_bytes`;
+  - eager disk writes via `np.memmap`, not delayed giant in-memory signal tensors.
+- Practical operator rule:
+  - if logs suggest multiple simultaneous `current_timeframe` sessions or no chunk progress while
+    memory pressure grows, treat that as execution-policy drift.
 
 ## Manual health checks
 
@@ -262,6 +270,7 @@ Manual CLI progress diagnostics:
 ```bash
 tail -n 200 /tmp/backtest-artifact-publish-BTCUSDT.log
 rg "event=artifact_precompute_(stage_started|stage_finished|completed|failed)" /tmp/backtest-artifact-publish-BTCUSDT.log
+rg "current_timeframe|current_indicator|chunk_index|chunk_jobs_total|rewritten_tail_bars" /tmp/backtest-artifact-publish-BTCUSDT.log
 find /opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT \( -name current.yaml -o -name manifest.yaml -o -name '*.npy' \) | head -100
 ```
 
@@ -318,6 +327,11 @@ launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\
 - откройте `/Users/daniildegtyarev/Library/Logs/roehub/backtest-artifact-publisher.err.log`;
 - проверьте доступность ClickHouse, `STRATEGY_PG_DSN`, и содержимое
   `/opt/roehub/config/prometheus.prod.yml`;
+- проверьте structured progress fields `current_timeframe`, `current_indicator`,
+  `chunk_index/chunk_jobs_total` и сравните их с memory/disk pressure on host;
+- если сервис снова выглядит как giant tensor-first execution без bounded chunk progress,
+  уменьшайте future `signal_worker_processes` / chunk sizing в `execution_policy`, а не пытайтесь
+  лечить это ручной чисткой slot contents.
 - при необходимости выполните один ручной `backtest-artifact-publish` для конкретного symbol root,
   чтобы локализовать проблему на одном инструменте.
 

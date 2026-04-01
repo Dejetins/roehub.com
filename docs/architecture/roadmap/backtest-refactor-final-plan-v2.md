@@ -347,11 +347,16 @@ Client/UI
 Daily precompute worker
   -> read current.yaml
   -> choose inactive slot
-  -> load CH 1m candles
-  -> build/update prices
-  -> build TF rollups once
-  -> compute indicator signals once
-  -> build 1m hit-times
+  -> load canonical 1m once
+  -> materialize prices/1m
+  -> derive target timeframe prices deterministically
+  -> for one timeframe at a time:
+     -> open timeframe session
+     -> build mappings/<tf>
+     -> materialize signals/<tf>/<indicator_id> in bounded chunks
+     -> close timeframe session
+  -> build/update 1m hit-times
+  -> finalize manifests
   -> validate
   -> atomically switch current.yaml
 ```
@@ -361,6 +366,36 @@ Daily precompute worker
 - `market_data` и `indicators` нужны precompute pipeline;
 - runtime v2 должен обходиться без них в hot path;
 - `backtest` становится главным потребителем precomputed artifacts.
+
+### 6.1 R12 clarification: stable outputs, changed execution model
+
+R12 не меняет published artifact contract. Он уточняет, как именно эти артефакты должны
+строиться.
+
+- Stable outputs:
+  - layout `artifacts/backtest/v2/...` не меняется;
+  - `signals/<tf>/<indicator_id>/signals.i8.npy` не меняется;
+  - `axis_order: [variant, time]` не меняется;
+  - `current.yaml` / manifest schemas не меняются.
+- Changed execution model:
+  - artifact precompute должен быть stage-oriented, а не giant tensor-first;
+  - canonical model uses `timeframe-scoped execution`: один `current_timeframe` session, затем
+    детерминированный переход к следующему timeframe;
+  - bounded chunk execution is required for signal materialization;
+  - follow-up executor work must be driven by explicit `execution_policy` and `ChunkPlanner`
+    contracts.
+- Unchanged public/runtime semantics:
+  - public `indicators` runtime may keep its tensor-first contract and hot-path guards;
+  - offline artifact precompute must not inherit that giant in-memory dense tensor model as the
+    recommended architecture.
+
+### 6.2 Why tensor-first is not the target precompute model
+
+The old tensor-first narrative is not recommended for artifact precompute because it keeps too many
+large buffers alive at once and couples offline slot building to runtime-oriented indicator memory
+guards. The target state is bounded Mac Studio execution: load canonical `1m` once, process one
+timeframe session at a time, flush chunked writes eagerly, and only then move to the next
+timeframe.
 
 ## 7. Артефакты: структура хранения
 

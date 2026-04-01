@@ -46,6 +46,12 @@ backtest_artifacts:
     max_signal_rows_per_artifact: 3000
     max_hit_times_cells: 4000
     max_hit_times_cells_full_rebuild: 8000
+  execution_policy:
+    max_open_timeframe_sessions: 1
+    signal_worker_processes: 4
+    signal_worker_memory_budget_bytes: 2147483648
+    signal_chunk_rows_min: 32
+    signal_chunk_rows_max: 256
 """.strip()
 
 
@@ -153,6 +159,11 @@ def test_load_backtest_artifacts_runtime_config_reads_yaml_values() -> None:
     assert config.lookback_policy.signal_tail_bars_1m == 20000
     assert config.validation_budgets.max_hit_times_cells == 50000000
     assert config.validation_budgets.max_hit_times_cells_full_rebuild == 150000000
+    assert config.execution_policy.max_open_timeframe_sessions == 1
+    assert config.execution_policy.signal_worker_processes == 4
+    assert config.execution_policy.signal_worker_memory_budget_bytes == 2147483648
+    assert config.execution_policy.signal_chunk_rows_min == 32
+    assert config.execution_policy.signal_chunk_rows_max == 256
     assert config.to_validation_spec().price_timeframes == config.validation_plan.price_timeframes
 
 
@@ -185,6 +196,11 @@ def test_backtest_artifacts_runtime_config_to_precompute_runtime_settings_includ
     assert runtime_settings.hit_times_tail_bars_1m == 20000
     assert runtime_settings.hit_times_tp_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
     assert runtime_settings.hit_times_sl_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
+    assert runtime_settings.execution_policy.max_open_timeframe_sessions == 1
+    assert runtime_settings.execution_policy.signal_worker_processes == 4
+    assert runtime_settings.execution_policy.signal_worker_memory_budget_bytes == 2147483648
+    assert runtime_settings.execution_policy.signal_chunk_rows_min == 32
+    assert runtime_settings.execution_policy.signal_chunk_rows_max == 256
     assert runtime_settings.max_signal_rows_per_artifact == 5000000
     assert runtime_settings.max_hit_times_cells == 50000000
     assert runtime_settings.max_hit_times_cells_full_rebuild == 150000000
@@ -291,6 +307,36 @@ def test_load_backtest_artifacts_runtime_config_rejects_extra_keys(tmp_path: Pat
     )
 
     with pytest.raises(ValueError, match="contains unsupported keys"):
+        load_backtest_artifacts_runtime_config(config_path)
+
+
+def test_load_backtest_artifacts_runtime_config_rejects_inverted_execution_policy_chunk_bounds(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify `execution_policy` fails fast when chunk-row bounds drift into an invalid order.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        R12 keeps `signal_chunk_rows_min <= signal_chunk_rows_max` as a strict config invariant.
+    Raises:
+        AssertionError: If invalid chunk-row bounds do not raise ValueError.
+    Side Effects:
+        Writes one temporary YAML file.
+    """
+    config_path = _write_backtest_artifacts_config(
+        tmp_path,
+        body=_VALID_BACKTEST_ARTIFACTS_CONFIG.replace(
+            "    signal_chunk_rows_min: 32\n    signal_chunk_rows_max: 256",
+            "    signal_chunk_rows_min: 300\n    signal_chunk_rows_max: 256",
+            1,
+        ),
+    )
+
+    with pytest.raises(ValueError, match="signal_chunk_rows_min"):
         load_backtest_artifacts_runtime_config(config_path)
 
 
@@ -456,6 +502,11 @@ def test_load_backtest_artifacts_runtime_config_derives_precompute_runtime_setti
         ArtifactSignalValidationSpecV2(timeframe="1h", indicator_id="ma.sma"),
     )
     assert settings.hit_times_tail_bars_1m == 400
+    assert settings.execution_policy.max_open_timeframe_sessions == 1
+    assert settings.execution_policy.signal_worker_processes == 4
+    assert settings.execution_policy.signal_worker_memory_budget_bytes == 2147483648
+    assert settings.execution_policy.signal_chunk_rows_min == 32
+    assert settings.execution_policy.signal_chunk_rows_max == 256
     assert settings.max_signal_rows_per_artifact == 3000
 
 

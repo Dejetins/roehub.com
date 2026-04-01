@@ -10,7 +10,7 @@
 - `docs/runbooks/backtest-job-runner.md`
 - `docs/runbooks/backtest-rollout-rollback.md`
 
-## Backtest R5 / R6 / R7 / R9 Path
+## Backtest R5 / R6 / R7 / R9 / R12 Path
 
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
@@ -20,6 +20,9 @@
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
+- `docs/runbooks/mac-studio-native-backend-operations.md`
+- `docs/runbooks/market-data-metrics.md`
+- `docs/runbooks/market-data-metrics-reference-ru.md`
 - `docs/runbooks/backtest-job-runner.md`
 - `docs/runbooks/backtest-rollout-rollback.md`
 - `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`
@@ -51,3 +54,6 @@
   `execution_mode/market_id/symbol/timeframe/requested_top_n/ranking_*` metadata, summary-only
   top rows with `summary_metrics_json`, `best_tp_pct`, `best_sl_pct`, and transitional
   `report_table_md/trades_json = NULL`.
+- R12 boundary: stable artifact output contract plus stage-oriented `timeframe-scoped execution`,
+  explicit `execution_policy`, `ChunkPlanner`, one open `current_timeframe` session at a time,
+  eager `np.memmap` signal writes, and operator-facing stage/timeframe/chunk observability.

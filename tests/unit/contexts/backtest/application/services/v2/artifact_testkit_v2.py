@@ -219,6 +219,11 @@ def build_artifact_precompute_fixture_v2(
     require_hit_times_manifest: bool = False,
     max_hit_times_cells: int = 1_000_000,
     max_hit_times_cells_full_rebuild: int | None = None,
+    max_open_timeframe_sessions: int = 1,
+    signal_worker_processes: int = 4,
+    signal_worker_memory_budget_bytes: int = 2_147_483_648,
+    signal_chunk_rows_min: int = 32,
+    signal_chunk_rows_max: int = 256,
 ) -> ArtifactPrecomputeFixtureV2:
     """
     Build a minimal strict R3-02 fixture with config and `current.yaml` only.
@@ -243,6 +248,16 @@ def build_artifact_precompute_fixture_v2(
         max_hit_times_cells: Strict positive upper bound for materialized hit-times table cells.
         max_hit_times_cells_full_rebuild: Optional strict positive upper bound for full-rebuild
             or bootstrap hit-times table cells. When omitted, uses `max_hit_times_cells`.
+        max_open_timeframe_sessions: Strict upper bound for simultaneously open timeframe
+            sessions inside the R12 coordinator.
+        signal_worker_processes: Strict worker-process upper bound reserved for later chunked
+            signal execution.
+        signal_worker_memory_budget_bytes: Strict per-worker memory ceiling reserved for later
+            chunked signal execution.
+        signal_chunk_rows_min: Smallest acceptable signal chunk size reserved for later chunked
+            signal execution.
+        signal_chunk_rows_max: Largest acceptable signal chunk size reserved for later chunked
+            signal execution.
     Returns:
         ArtifactPrecomputeFixtureV2: Strict config/loader/path fixture for R3-02 runner tests.
     Assumptions:
@@ -316,7 +331,7 @@ def build_artifact_precompute_fixture_v2(
                         "signal_tail_bars_1m": signal_tail_bars_1m,
                         "hit_times_tail_bars_1m": hit_times_tail_bars_1m,
                     },
-                        "validation_budgets": {
+                    "validation_budgets": {
                             "max_price_bars_per_timeframe": 1000000,
                             "max_mapping_rows_per_timeframe": 1000000,
                             "max_signal_rows_per_artifact": 1000000,
@@ -325,6 +340,15 @@ def build_artifact_precompute_fixture_v2(
                                 effective_full_rebuild_budget
                             ),
                         },
+                    "execution_policy": {
+                        "max_open_timeframe_sessions": max_open_timeframe_sessions,
+                        "signal_worker_processes": signal_worker_processes,
+                        "signal_worker_memory_budget_bytes": (
+                            signal_worker_memory_budget_bytes
+                        ),
+                        "signal_chunk_rows_min": signal_chunk_rows_min,
+                        "signal_chunk_rows_max": signal_chunk_rows_max,
+                    },
                     },
                 },
             sort_keys=False,
@@ -343,6 +367,7 @@ def build_artifact_precompute_fixture_v2(
             hit_times_tp_levels_pct=runtime_config.hit_times_grid.tp_levels_pct,
             hit_times_sl_levels_pct=runtime_config.hit_times_grid.sl_levels_pct,
             config_sha256=build_backtest_artifacts_runtime_config_hash(config=runtime_config),
+            execution_policy=runtime_config.execution_policy.to_execution_policy(),
             signal_artifacts=tuple(
                 ArtifactSignalValidationSpecV2(
                     timeframe=timeframe,
