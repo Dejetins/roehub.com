@@ -190,10 +190,11 @@ Deterministic validation expectations:
 - No other scalar knobs are required for R12; if more tuning is needed, the follow-up epic must
   justify why the five fields above were insufficient.
 
-### R12-01 implementation contract surface
+### R12 implementation contract surface
 
-R12-01 wires the docs contract into explicit code-level DTOs/classes without changing the published
-artifact layout or `PublishBacktestArtifactsV2UseCase` semantics.
+R12-01 wires the coordinator/execution-policy foundation, and R12-02 completes the chunked
+artifact-only signal stage without changing the published artifact layout or
+`PublishBacktestArtifactsV2UseCase` semantics.
 
 - Typed runtime config:
   - `BacktestArtifactExecutionPolicyRuntimeConfig`
@@ -201,6 +202,11 @@ artifact layout or `PublishBacktestArtifactsV2UseCase` semantics.
 - Coordinator and lifecycle ownership:
   - `ArtifactPrecomputeCoordinatorV2`
   - `ArtifactTimeframeSessionV2`
+- Chunk planning and artifact-only signal execution:
+  - `ChunkPlannerV2`
+  - `ArtifactSignalChunkPlanningRequestV2`
+  - `ArtifactSignalChunkJobV2`
+  - `DeterministicSignalChunkPlannerV2`
 - Typed stage/progress DTOs:
   - `ArtifactPrecomputeStageInputV2`
   - `ArtifactPrecomputeStageOutputV2`
@@ -232,10 +238,10 @@ Inputs:
 
 - `indicator_id`;
 - `timeframe`;
-- `rows_count` for that `(indicator_id, timeframe)` target;
-- `timeframe_bar_count`;
+- `timeline_bar_count` for the final `signals/<tf>/<indicator_id>/signals.i8.npy`;
+- `variant_count` for that `(indicator_id, timeframe)` target;
 - `estimated_bytes_per_row`;
-- `signal_worker_memory_budget_bytes`;
+- `worker_memory_budget_bytes`;
 - `signal_chunk_rows_min`;
 - `signal_chunk_rows_max`;
 - canonical variant row order for this target, as already fixed by manifest/grid contracts.
@@ -244,10 +250,12 @@ Planning algorithm:
 
 1. Compute `budget_cap_rows = floor(signal_worker_memory_budget_bytes / estimated_bytes_per_row)`.
 2. Fail-fast if `estimated_bytes_per_row <= 0`.
-3. Fail-fast if `budget_cap_rows < signal_chunk_rows_min`, because the configured minimum chunk
+3. Compute `effective_chunk_rows_min = min(signal_chunk_rows_min, variant_count)`.
+4. Fail-fast if `budget_cap_rows < effective_chunk_rows_min`, because the configured minimum chunk
    size cannot fit in the worker budget.
-4. Set `chunk_rows = min(signal_chunk_rows_max, budget_cap_rows)`.
-5. Emit contiguous row ranges in canonical order:
+5. Set
+   `chunk_rows = min(signal_chunk_rows_max, variant_count, max(effective_chunk_rows_min, budget_cap_rows))`.
+6. Emit contiguous row ranges in canonical order:
    - chunk `0` -> `[0, chunk_rows)`
    - chunk `1` -> `[chunk_rows, 2 * chunk_rows)`
    - ...
@@ -259,6 +267,7 @@ Outputs:
   - `indicator_id`
   - `timeframe`
   - `chunk_index`
+  - `chunk_count`
   - `row_start_inclusive`
   - `row_end_exclusive`
   - `chunk_rows`
@@ -274,11 +283,11 @@ Determinism guarantees:
 
 Worked example:
 
-- `rows_count = 1200`
+- `variant_count = 1200`
 - `estimated_bytes_per_row` fits `budget_cap_rows = 96`
 - `signal_chunk_rows_min = 32`
 - `signal_chunk_rows_max = 64`
-- therefore `chunk_rows = min(64, 96) = 64`
+- therefore `chunk_rows = min(64, 1200, max(32, 96)) = 64`
 - number of jobs = `ceil(1200 / 64) = 19`
 - jobs `0..17` own `64` rows each, job `18` owns the final `48` rows.
 
@@ -323,6 +332,9 @@ Operator-facing observability is split into coarse metrics and fine-grained stru
 - Prometheus answers whether the overall publish cycle is healthy and whether `rewritten_tail_bars`
   stay bounded.
 - Structured logs answer where the runner is currently spending time.
+- `artifact_precompute_chunk_finished` adds `completed_chunks_total`, while the enclosing
+  `timeframe_session` stage result carries both `completed_chunks_total` and
+  `completed_indicator_targets_total`.
 
 Minimal structured log events:
 
@@ -335,13 +347,13 @@ Minimal structured log fields:
 
 - `stage`
 - `current_timeframe`
-- `current_indicator`
+- `current_indicator_id`
 - `chunk_index`
-- `chunk_jobs_total`
+- `chunk_count`
 - `row_start_inclusive`
 - `row_end_exclusive`
-- `reused_prefix_bars`
-- `rewritten_tail_bars`
+- `chunk_rows`
+- `completed_chunks_total`
 
 These fields are mandatory for distinguishing a long bootstrap from a normal daily tail rebuild:
 

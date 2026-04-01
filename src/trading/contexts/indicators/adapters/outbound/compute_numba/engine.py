@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import time
 from types import MappingProxyType
-from typing import Mapping, TypeVar, cast
+from typing import Any, Mapping, TypeVar, cast
 
 import numpy as np
 
@@ -277,6 +277,70 @@ class NumbaIndicatorCompute(IndicatorCompute):
             axes=axes,
             variants=variants,
             max_variants_guard=max_variants_guard,
+        )
+
+    def to_signal_chunk_worker_snapshot_v2(self) -> Mapping[str, Any]:
+        """
+        Serialize enough state to rebuild this compute adapter inside a spawned chunk worker.
+
+        Args:
+            None.
+        Returns:
+            Mapping[str, Any]: Pickle-safe snapshot for chunk-worker rehydration.
+        Assumptions:
+            Artifact-precompute workers may reconstruct the adapter from immutable definitions and
+            runtime config instead of sharing the live object graph across processes.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/indicators/indicators-compute-engine-core.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+          - src/trading/platform/config/indicators_compute_numba.py
+        """
+        return {
+            "defs": self._defs,
+            "config": self._config,
+            "workspace_factor": self._workspace_factor,
+            "workspace_fixed_bytes": self._workspace_fixed_bytes,
+        }
+
+    @classmethod
+    def from_signal_chunk_worker_snapshot_v2(
+        cls,
+        *,
+        snapshot: Mapping[str, Any],
+    ) -> "NumbaIndicatorCompute":
+        """
+        Rebuild the compute adapter from one immutable chunk-worker snapshot.
+
+        Args:
+            snapshot: Snapshot previously produced by
+                `to_signal_chunk_worker_snapshot_v2()`.
+        Returns:
+            NumbaIndicatorCompute: Rehydrated compute adapter for one spawned worker process.
+        Assumptions:
+            Snapshot payload comes only from trusted in-process runner wiring.
+        Raises:
+            KeyError: If one required snapshot key is missing.
+            ValueError: If reconstructed constructor arguments violate adapter invariants.
+        Side Effects:
+            Rebuilds the internal grid builder and warmup runner for the worker-local instance.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/indicators/indicators-compute-engine-core.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+          - src/trading/platform/config/indicators_compute_numba.py
+        """
+        return cls(
+            defs=tuple(cast(tuple[IndicatorDef, ...], snapshot["defs"])),
+            config=cast(IndicatorsComputeNumbaConfig, snapshot["config"]),
+            workspace_factor=float(snapshot["workspace_factor"]),
+            workspace_fixed_bytes=int(snapshot["workspace_fixed_bytes"]),
         )
 
     def compute(self, req: ComputeRequest) -> IndicatorTensor:

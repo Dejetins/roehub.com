@@ -8,19 +8,22 @@ import logging
 import os
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from functools import partial
 from itertools import product
+from multiprocessing import get_context
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Mapping, Protocol, cast
 
 import numpy as np
 import yaml
 
 from trading.contexts.backtest.application.ports import BacktestGridDefaultsProvider
 from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
+    IndicatorSignalEvaluationInputV1,
+    evaluate_indicator_signal_encoded_v1,
     indicator_primary_output_series_from_tensor_v1,
 )
 from trading.contexts.indicators.application.dto import CandleArrays, ComputeRequest
@@ -31,7 +34,7 @@ from trading.contexts.indicators.application.dto.variant_key import (
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.services import GridBuilder
 from trading.contexts.indicators.domain.entities import IndicatorId, Layout
-from trading.contexts.indicators.domain.specifications import GridSpec
+from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
 from trading.contexts.market_data.application.dto import CanonicalCandleBatch1m
 from trading.contexts.market_data.application.ports.stores import CanonicalCandleReader
 from trading.shared_kernel.primitives import (
@@ -88,6 +91,8 @@ from .contracts import (
     ArtifactPriceTimeframeManifestV2,
     ArtifactSignalCatalogEntryV2,
     ArtifactSignalCatalogV2,
+    ArtifactSignalChunkJobV2,
+    ArtifactSignalChunkPlanningRequestV2,
     ArtifactSignalEncodingContractV2,
     ArtifactSignalGridContractV2,
     ArtifactSignalManifestDocumentV2,
@@ -98,17 +103,23 @@ from .contracts import (
     ArtifactStageRebuildStatsV2,
     ArtifactTimelineCoverageV2,
     BacktestArtifactLoaderV2,
-    SignalRuleEvaluationRequestV2,
+    SignalRuleSpecV2,
     artifact_market_id_from_coordinates_v2,
     inactive_artifact_slot_v2,
     validate_artifact_slot_v2,
+    validate_signal_input_source_v2,
 )
 from .hit_times_compute_v2 import (
     HitTimesArraysV2,
     materialize_hit_times_from_ohlcv_v2,
     merge_hit_times_prefix_with_rebuilt_tail_v2,
 )
-from .signal_rules_engine_v2 import BacktestSignalRulesEngineV2
+from .signal_chunk_planner_v2 import DeterministicSignalChunkPlannerV2
+from .signal_rules_engine_v2 import (
+    BacktestSignalRulesEngineV2,
+    _indicator_inputs_mapping_v2,
+    _normalize_signal_codes_v2,
+)
 
 log = logging.getLogger(__name__)
 
@@ -234,6 +245,145 @@ def _log_precompute_stage_finished_v2(
         slot_generation,
         force_full_rebuild,
         time.perf_counter() - started_at,
+        json.dumps(details, sort_keys=True, separators=(",", ":"), ensure_ascii=True),
+    )
+
+
+class _SignalChunkWorkerSnapshotCapableV2(Protocol):
+    """
+    Internal protocol for compute adapters that can be rehydrated inside spawned chunk workers.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+    """
+
+    def to_signal_chunk_worker_snapshot_v2(self) -> Mapping[str, Any]:
+        """
+        Serialize immutable worker snapshot state.
+
+        Args:
+            None.
+        Returns:
+            Mapping[str, Any]: Pickle-safe adapter snapshot.
+        Assumptions:
+            Snapshot contents are trusted immutable constructor inputs.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        ...
+
+    @classmethod
+    def from_signal_chunk_worker_snapshot_v2(
+        cls,
+        *,
+        snapshot: Mapping[str, Any],
+    ) -> IndicatorCompute:
+        """
+        Rehydrate one compute adapter from a worker snapshot.
+
+        Args:
+            snapshot: Immutable snapshot mapping previously created by the live adapter.
+        Returns:
+            IndicatorCompute: Worker-local compute adapter.
+        Assumptions:
+            The worker uses the same code version as the parent runner process.
+        Raises:
+            ValueError: If snapshot contents violate adapter invariants.
+        Side Effects:
+            Reconstructs adapter-local runtime state.
+        """
+        ...
+
+
+def _log_signal_chunk_progress_v2(
+    *,
+    event: str,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_generation: int,
+    force_full_rebuild: bool,
+    current_timeframe: str,
+    current_indicator_id: str,
+    chunk_job: ArtifactSignalChunkJobV2,
+    completed_chunks_total: int | None = None,
+    elapsed_seconds: float | None = None,
+) -> None:
+    """
+    Emit one structured chunk-progress log entry for artifact signal execution.
+
+    Args:
+        event: Stable progress event literal for chunk start or finish.
+        coordinates: Artifact coordinates identifying the symbol root under build.
+        slot: Inactive slot literal receiving the current build.
+        slot_generation: Deterministic generation assigned to the inactive slot build.
+        force_full_rebuild: Whether this run rebuilds from scratch instead of reusing prefixes.
+        current_timeframe: Open timeframe session owning the chunk.
+        current_indicator_id: Indicator id currently being materialized.
+        chunk_job: Deterministic chunk job describing row ownership.
+        completed_chunks_total: Optional completed-chunk counter emitted on finish.
+        elapsed_seconds: Optional chunk wall-clock duration emitted on finish.
+    Returns:
+        None.
+    Assumptions:
+        Structured logs, not metrics, are the primary operator tool for per-indicator/per-chunk
+        progress during long bootstrap runs.
+    Raises:
+        None.
+    Side Effects:
+        Writes one INFO log record.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    details = {
+        "current_timeframe": current_timeframe,
+        "current_indicator_id": current_indicator_id,
+        "chunk_index": chunk_job.chunk_index,
+        "chunk_count": chunk_job.chunk_count,
+        "row_start_inclusive": chunk_job.row_start_inclusive,
+        "row_end_exclusive": chunk_job.row_end_exclusive,
+        "chunk_rows": chunk_job.chunk_rows,
+    }
+    if completed_chunks_total is not None:
+        details["completed_chunks_total"] = completed_chunks_total
+    if elapsed_seconds is None:
+        log.info(
+            "event=%s component=backtest-artifact-precompute-runner stage=%s exchange=%s "
+            "market_type=%s symbol=%s slot=%s slot_generation=%s force_full_rebuild=%s "
+            "current_timeframe=%s details=%s",
+            event,
+            "timeframe_session",
+            coordinates.exchange,
+            coordinates.market_type,
+            coordinates.symbol,
+            slot,
+            slot_generation,
+            force_full_rebuild,
+            current_timeframe,
+            json.dumps(details, sort_keys=True, separators=(",", ":"), ensure_ascii=True),
+        )
+        return
+    log.info(
+        "event=%s component=backtest-artifact-precompute-runner stage=%s exchange=%s "
+        "market_type=%s symbol=%s slot=%s slot_generation=%s force_full_rebuild=%s "
+        "current_timeframe=%s elapsed_seconds=%.3f details=%s",
+        event,
+        "timeframe_session",
+        coordinates.exchange,
+        coordinates.market_type,
+        coordinates.symbol,
+        slot,
+        slot_generation,
+        force_full_rebuild,
+        current_timeframe,
+        elapsed_seconds,
         json.dumps(details, sort_keys=True, separators=(",", ":"), ensure_ascii=True),
     )
 
@@ -376,6 +526,7 @@ class _SignalArtifactMaterializationResultV2:
     manifest: ArtifactSignalManifestDocumentV2
     reused_prefix_bars: int
     rewritten_tail_bars: int
+    completed_chunks_total: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -463,7 +614,7 @@ class _ExistingSignalArtifactV2:
 
     catalog_entry: ArtifactSignalCatalogEntryV2
     manifest: ArtifactSignalManifestDocumentV2
-    signal_matrix: np.ndarray
+    signals_path: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -495,10 +646,45 @@ class _SignalArtifactTailPlanV2:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
 
-    prefix_matrix: np.ndarray | None
+    reused_prefix_bars: int
     compute_start_idx: int
     trim_prefix_bars: int
     effective_tail_bars: int
+
+
+@dataclass(frozen=True, slots=True)
+class _SignalChunkGridBlockV2:
+    """
+    Internal immutable subgrid snapshot covering one contiguous row block inside a chunk.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/indicators/domain/specifications/grid_spec.py
+    """
+
+    row_start_inclusive: int
+    row_end_exclusive: int
+    source_values: tuple[str, ...] | None
+    param_values_by_name: tuple[tuple[str, tuple[int | float | str, ...]], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _SignalChunkWorkerResultV2:
+    """
+    Internal immutable summary returned by one completed chunk worker.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    chunk_job: ArtifactSignalChunkJobV2
+    signal_params_defaults: Mapping[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -538,6 +724,8 @@ class _TimeframeSessionBuildResultV2:
     rewritten_mapping_tail_bars: int
     reused_signal_prefix_bars: int
     rewritten_signal_tail_bars: int
+    completed_chunks_total: int
+    completed_indicator_targets_total: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -833,6 +1021,12 @@ class BacktestArtifactPrecomputeRunnerV2:
                                     "signal_rewritten_tail_bars": (
                                         stage_result.rewritten_signal_tail_bars
                                     ),
+                                    "completed_chunks_total": (
+                                        stage_result.completed_chunks_total
+                                    ),
+                                    "completed_indicator_targets_total": (
+                                        stage_result.completed_indicator_targets_total
+                                    ),
                                     "signal_manifest_count": len(
                                         stage_result.signal_manifests
                                     ),
@@ -857,6 +1051,12 @@ class BacktestArtifactPrecomputeRunnerV2:
                             ),
                             "signal_rewritten_tail_bars": (
                                 completed_session_result.rewritten_signal_tail_bars
+                            ),
+                            "completed_chunks_total": (
+                                completed_session_result.completed_chunks_total
+                            ),
+                            "completed_indicator_targets_total": (
+                                completed_session_result.completed_indicator_targets_total
                             ),
                             "signal_manifest_count": len(
                                 completed_session_result.signal_manifests
@@ -1231,6 +1431,8 @@ def _materialize_timeframe_session_v2(
     signal_manifests: list[ArtifactSignalManifestDocumentV2] = []
     reused_signal_prefix_bars = 0
     rewritten_signal_tail_bars = 0
+    completed_chunks_total = 0
+    completed_indicator_targets_total = 0
     for signal_target in signal_targets:
         if (
             defaults_provider is None
@@ -1261,6 +1463,8 @@ def _materialize_timeframe_session_v2(
         signal_manifests.append(signal_build_result.manifest)
         reused_signal_prefix_bars += signal_build_result.reused_prefix_bars
         rewritten_signal_tail_bars += signal_build_result.rewritten_tail_bars
+        completed_chunks_total += signal_build_result.completed_chunks_total
+        completed_indicator_targets_total += 1
     return _TimeframeSessionBuildResultV2(
         price_manifest=price_manifest,
         mapping_manifest=mapping_result.manifest,
@@ -1269,6 +1473,8 @@ def _materialize_timeframe_session_v2(
         rewritten_mapping_tail_bars=mapping_result.rewritten_tail_bars,
         reused_signal_prefix_bars=reused_signal_prefix_bars,
         rewritten_signal_tail_bars=rewritten_signal_tail_bars,
+        completed_chunks_total=completed_chunks_total,
+        completed_indicator_targets_total=completed_indicator_targets_total,
     )
 
 
@@ -1668,6 +1874,15 @@ def _materialize_signal_artifact_v2(
         expected_variant_keys_sha256=signal_variant_keys_sha256,
         expected_row_count=len(signal_rows),
     )
+    default_inputs_source, signal_params_defaults = signal_rules_engine.resolved_defaults(
+        indicator_id=signal_target.indicator_id
+    )
+    if existing_signal_artifact is not None:
+        _validate_existing_signal_defaults_for_reuse_v2(
+            existing_signal_artifact=existing_signal_artifact,
+            signal_target=signal_target,
+            signal_params_defaults=signal_params_defaults,
+        )
     signal_tail_plan = _build_signal_tail_plan_v2(
         price_arrays=price_arrays,
         existing_signal_artifact=existing_signal_artifact,
@@ -1684,64 +1899,50 @@ def _materialize_signal_artifact_v2(
         timeframe=signal_target.timeframe,
         arrays=signal_tail_price_arrays,
     )
-    primary_tensor = indicator_compute.compute(
-        ComputeRequest(
-            candles=candles,
-            grid=compute_grid,
-            max_variants_guard=runtime_settings.max_signal_rows_per_artifact,
-        )
-    )
-    if len(signal_rows) != primary_tensor.meta.variants:
-        raise ValueError(
-            "signal variant ordering drift detected for "
-            f"{signal_target.timeframe}:{signal_target.indicator_id}; "
-            f"grid rows={len(signal_rows)!r}, tensor variants={primary_tensor.meta.variants!r}"
-        )
-    dependency_tensors = _compute_signal_dependency_tensors_v2(
-        candles=candles,
-        compute_grid=compute_grid,
-        indicator_id=signal_target.indicator_id,
-        indicator_compute=indicator_compute,
-        max_signal_rows_per_artifact=runtime_settings.max_signal_rows_per_artifact,
-        signal_rules_engine=signal_rules_engine,
-        expected_variants=primary_tensor.meta.variants,
-        expected_t=primary_tensor.meta.t,
-    )
-    rebuilt_compute_window, signal_params_defaults = _evaluate_signal_matrix_v2(
-        candles=candles,
-        indicator_id=signal_target.indicator_id,
-        primary_tensor=primary_tensor,
-        dependency_tensors=dependency_tensors,
-        signal_rows=signal_rows,
-        signal_rules_engine=signal_rules_engine,
-    )
-    rebuilt_tail = _slice_signal_matrix_v2(
-        signal_matrix=rebuilt_compute_window,
-        start_idx=signal_tail_plan.trim_prefix_bars,
-        end_idx=int(rebuilt_compute_window.shape[1]),
-    )
-    if existing_signal_artifact is not None:
-        _validate_existing_signal_defaults_for_reuse_v2(
-            existing_signal_artifact=existing_signal_artifact,
-            signal_target=signal_target,
-            signal_params_defaults=signal_params_defaults,
-        )
-    signal_matrix = _merge_signal_matrices_v2(
-        prefix_matrix=signal_tail_plan.prefix_matrix,
-        rebuilt_tail=rebuilt_tail,
-    )
-    _validate_signal_matrix_v2(
-        signal_matrix=signal_matrix,
-        expected_shape=(len(signal_rows), int(price_arrays.open_time.shape[0])),
-        label=f"signals[{signal_target.timeframe}:{signal_target.indicator_id}]",
-    )
     signal_paths = artifact_loader.resolve_signal_paths(
         coordinates,
         slot,
         signal_target.timeframe,
         signal_target.indicator_id,
     )
-    _write_npy_atomically_v2(path=signal_paths.signals, array=signal_matrix)
+    signal_shape = (len(signal_rows), int(price_arrays.open_time.shape[0]))
+    rule_spec = signal_rules_engine.rule_spec(indicator_id=signal_target.indicator_id)
+    chunk_jobs = _plan_signal_chunk_jobs_v2(
+        runtime_settings=runtime_settings,
+        signal_target=signal_target,
+        timeline_bar_count=signal_shape[1],
+        compute_bar_count=int(candles.close.shape[0]),
+        variant_count=signal_shape[0],
+        dependency_count=len(rule_spec.required_dependency_ids),
+    )
+    chunk_blocks = tuple(
+        _build_signal_chunk_blocks_v2(
+            materialized_grid=materialized_grid,
+            chunk_job=chunk_job,
+        )
+        for chunk_job in chunk_jobs
+    )
+    _write_signal_matrix_in_chunks_v2(
+        coordinates=coordinates,
+        slot=slot,
+        slot_generation=slot_generation,
+        force_full_rebuild=request.force_full_rebuild,
+        signal_target=signal_target,
+        signal_paths=signal_paths,
+        signal_shape=signal_shape,
+        candles=candles,
+        signal_worker_processes=runtime_settings.execution_policy.signal_worker_processes,
+        chunk_jobs=chunk_jobs,
+        chunk_blocks=chunk_blocks,
+        signal_rows=signal_rows,
+        signal_tail_plan=signal_tail_plan,
+        existing_signal_artifact=existing_signal_artifact,
+        indicator_compute=indicator_compute,
+        rule_spec=rule_spec,
+        default_inputs_source=default_inputs_source,
+        signal_params_defaults=signal_params_defaults,
+        max_signal_rows_per_artifact=runtime_settings.max_signal_rows_per_artifact,
+    )
     signal_manifest = _build_signal_manifest_v2(
         coordinates=coordinates,
         slot=slot,
@@ -1751,7 +1952,7 @@ def _materialize_signal_artifact_v2(
         runtime_settings=runtime_settings,
         signal_target=signal_target,
         signal_paths=signal_paths,
-        signal_matrix=signal_matrix,
+        signal_shape=signal_shape,
         timeline=_timeline_coverage_from_arrays_v2(arrays=price_arrays),
         price_manifest=price_manifest,
         signal_rows=signal_rows,
@@ -1765,13 +1966,837 @@ def _materialize_signal_artifact_v2(
     )
     return _SignalArtifactMaterializationResultV2(
         manifest=signal_manifest,
-        reused_prefix_bars=(
-            0
-            if signal_tail_plan.prefix_matrix is None
-            else int(signal_tail_plan.prefix_matrix.shape[1])
-        ),
-        rewritten_tail_bars=int(rebuilt_tail.shape[1]),
+        reused_prefix_bars=signal_tail_plan.reused_prefix_bars,
+        rewritten_tail_bars=signal_shape[1] - signal_tail_plan.reused_prefix_bars,
+        completed_chunks_total=len(chunk_jobs),
     )
+
+
+def _plan_signal_chunk_jobs_v2(
+    *,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+    timeline_bar_count: int,
+    compute_bar_count: int,
+    variant_count: int,
+    dependency_count: int,
+) -> tuple[ArtifactSignalChunkJobV2, ...]:
+    """
+    Build deterministic chunk jobs for one signal artifact target.
+
+    Args:
+        runtime_settings: Strict runtime settings carrying execution-policy limits.
+        signal_target: Explicit `(timeframe, indicator_id)` signal target.
+        timeline_bar_count: Final target timeframe bar count for `signals/<tf>/<indicator_id>`.
+        compute_bar_count: Actual candle count of the bounded compute window.
+        variant_count: Deterministic total variant row count for the target.
+        dependency_count: Number of dependency tensors required by the signal rule family.
+    Returns:
+        tuple[ArtifactSignalChunkJobV2, ...]: Ordered non-overlapping row-range jobs.
+    Assumptions:
+        Planner sizing is conservative and may underutilize memory, but must never exceed the
+        configured worker budget.
+    Raises:
+        ValueError: If planner inputs or budgets are invalid.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    planner = DeterministicSignalChunkPlannerV2()
+    return planner.plan(
+        request=ArtifactSignalChunkPlanningRequestV2(
+            indicator_id=signal_target.indicator_id,
+            timeframe=signal_target.timeframe,
+            timeline_bar_count=timeline_bar_count,
+            variant_count=variant_count,
+            estimated_bytes_per_row=_estimate_signal_chunk_bytes_per_row_v2(
+                indicator_id=signal_target.indicator_id,
+                timeline_bar_count=timeline_bar_count,
+                compute_bar_count=compute_bar_count,
+                dependency_count=dependency_count,
+            ),
+            worker_memory_budget_bytes=(
+                runtime_settings.execution_policy.signal_worker_memory_budget_bytes
+            ),
+            signal_chunk_rows_min=runtime_settings.execution_policy.signal_chunk_rows_min,
+            signal_chunk_rows_max=runtime_settings.execution_policy.signal_chunk_rows_max,
+        )
+    )
+
+
+def _estimate_signal_chunk_bytes_per_row_v2(
+    *,
+    indicator_id: str,
+    timeline_bar_count: int,
+    compute_bar_count: int,
+    dependency_count: int,
+) -> int:
+    """
+    Estimate conservative per-row memory for ChunkPlanner sizing.
+
+    Args:
+        indicator_id: Indicator identifier currently being materialized.
+        timeline_bar_count: Final target timeframe bar count written to the artifact.
+        compute_bar_count: Candle count of the bounded compute window.
+        dependency_count: Number of dependency tensors required by the rule family.
+    Returns:
+        int: Conservative bytes-per-row estimate for one chunk worker.
+    Assumptions:
+        Estimate includes primary/dependency float32 rows plus compact signal/output ownership and
+        intentionally overestimates MA-family sources to stay below the worker budget.
+    Raises:
+        ValueError: If the time dimensions or dependency count are invalid.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+    """
+    if timeline_bar_count <= 0:
+        raise ValueError(
+            f"signal timeline_bar_count must be > 0; got {timeline_bar_count!r}"
+        )
+    if compute_bar_count <= 0:
+        raise ValueError(f"signal compute_bar_count must be > 0; got {compute_bar_count!r}")
+    if dependency_count < 0:
+        raise ValueError(f"signal dependency_count must be >= 0; got {dependency_count!r}")
+    compute_bytes = compute_bar_count * (4 * (1 + dependency_count) + 1)
+    output_bytes = timeline_bar_count
+    ma_family_workspace_bytes = compute_bar_count * 4 if indicator_id.startswith("ma.") else 0
+    return max(1, compute_bytes + output_bytes + ma_family_workspace_bytes)
+
+
+def _build_signal_chunk_blocks_v2(
+    *,
+    materialized_grid: Any,
+    chunk_job: ArtifactSignalChunkJobV2,
+) -> tuple[_SignalChunkGridBlockV2, ...]:
+    """
+    Decompose one contiguous row slice into deterministic explicit subgrids.
+
+    Args:
+        materialized_grid: Materialized grid defining canonical variant ordering.
+        chunk_job: Planned contiguous row range owned by the chunk.
+    Returns:
+        tuple[_SignalChunkGridBlockV2, ...]: Ordered subgrids covering the chunk rows exactly once.
+    Assumptions:
+        Contiguous row ranges may cross cartesian-product block boundaries and therefore need
+        decomposition into smaller explicit grids.
+    Raises:
+        ValueError: If one emitted block drifts from the requested row range.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    axis_names = tuple(str(axis.name) for axis in materialized_grid.axes)
+    axis_values = tuple(tuple(axis.values) for axis in materialized_grid.axes)
+    if len(axis_names) == 0:
+        return (
+            _SignalChunkGridBlockV2(
+                row_start_inclusive=chunk_job.row_start_inclusive,
+                row_end_exclusive=chunk_job.row_end_exclusive,
+                source_values=None,
+                param_values_by_name=(),
+            ),
+        )
+    suffix_products = _axis_suffix_products_v2(axis_values=axis_values)
+    blocks: list[_SignalChunkGridBlockV2] = []
+    _append_signal_chunk_blocks_recursive_v2(
+        axis_names=axis_names,
+        axis_values=axis_values,
+        suffix_products=suffix_products,
+        axis_index=0,
+        base_row_offset=0,
+        local_start=chunk_job.row_start_inclusive,
+        local_end=chunk_job.row_end_exclusive,
+        prefix_indices=(),
+        blocks=blocks,
+    )
+    if not blocks:
+        raise ValueError(
+            "signal chunk block decomposition produced no blocks for "
+            f"{chunk_job.indicator_id}:{chunk_job.timeframe} chunk_index={chunk_job.chunk_index}"
+        )
+    if blocks[0].row_start_inclusive != chunk_job.row_start_inclusive:
+        raise ValueError("signal chunk blocks must start at the requested row boundary")
+    if blocks[-1].row_end_exclusive != chunk_job.row_end_exclusive:
+        raise ValueError("signal chunk blocks must end at the requested row boundary")
+    return tuple(blocks)
+
+
+def _axis_suffix_products_v2(
+    *,
+    axis_values: tuple[tuple[Any, ...], ...],
+) -> tuple[int, ...]:
+    """
+    Compute mixed-radix suffix products for deterministic variant-index decomposition.
+
+    Args:
+        axis_values: Materialized axis value tuples in canonical order.
+    Returns:
+        tuple[int, ...]: Row span covered by each axis position.
+    Assumptions:
+        Variant flattening order is the same cartesian-product order used by `GridBuilder`.
+    Raises:
+        ValueError: If one axis is empty.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    running_product = 1
+    suffix_products = [1] * len(axis_values)
+    for axis_index in range(len(axis_values) - 1, -1, -1):
+        values = axis_values[axis_index]
+        if len(values) == 0:
+            raise ValueError(f"signal chunk axis {axis_index} must be non-empty")
+        suffix_products[axis_index] = running_product
+        running_product *= len(values)
+    return tuple(suffix_products)
+
+
+def _append_signal_chunk_blocks_recursive_v2(
+    *,
+    axis_names: tuple[str, ...],
+    axis_values: tuple[tuple[Any, ...], ...],
+    suffix_products: tuple[int, ...],
+    axis_index: int,
+    base_row_offset: int,
+    local_start: int,
+    local_end: int,
+    prefix_indices: tuple[int, ...],
+    blocks: list[_SignalChunkGridBlockV2],
+) -> None:
+    """
+    Recursively decompose one row interval into maximal explicit cartesian-product blocks.
+
+    Args:
+        axis_names: Canonical axis names from the materialized grid.
+        axis_values: Canonical axis values from the materialized grid.
+        suffix_products: Mixed-radix suffix products for variant flattening.
+        axis_index: Current recursion axis.
+        base_row_offset: Absolute global row offset of the current recursion subtree.
+        local_start: Inclusive row offset within the current recursion subtree.
+        local_end: Exclusive row offset within the current recursion subtree.
+        prefix_indices: Fixed axis-value indexes chosen by parent recursion frames.
+        blocks: Mutable result accumulator receiving ordered chunk blocks.
+    Returns:
+        None.
+    Assumptions:
+        Each full-covered subtree can be emitted as one explicit subgrid while partial overlaps
+        recurse to the next axis.
+    Raises:
+        ValueError: If one overlap interval is inconsistent.
+    Side Effects:
+        Appends deterministic block snapshots into `blocks`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if local_end <= local_start:
+        raise ValueError(
+            f"signal chunk recursion requires local_end > local_start; got {local_end!r} and "
+            f"{local_start!r}"
+        )
+    child_span = suffix_products[axis_index]
+    start_child = local_start // child_span
+    end_child = (local_end - 1) // child_span
+    for child_index in range(start_child, end_child + 1):
+        child_range_start = child_index * child_span
+        child_range_end = child_range_start + child_span
+        overlap_start = max(local_start, child_range_start)
+        overlap_end = min(local_end, child_range_end)
+        if overlap_end <= overlap_start:
+            raise ValueError("signal chunk recursion overlap must stay positive")
+        child_prefix = (*prefix_indices, child_index)
+        if overlap_start == child_range_start and overlap_end == child_range_end:
+            blocks.append(
+                _build_signal_chunk_grid_block_v2(
+                    axis_names=axis_names,
+                    axis_values=axis_values,
+                    prefix_indices=child_prefix,
+                    row_start_inclusive=base_row_offset + overlap_start,
+                    row_end_exclusive=base_row_offset + overlap_end,
+                )
+            )
+            continue
+        if axis_index + 1 >= len(axis_names):
+            blocks.append(
+                _build_signal_chunk_grid_block_v2(
+                    axis_names=axis_names,
+                    axis_values=axis_values,
+                    prefix_indices=child_prefix,
+                    row_start_inclusive=base_row_offset + overlap_start,
+                    row_end_exclusive=base_row_offset + overlap_end,
+                )
+            )
+            continue
+        _append_signal_chunk_blocks_recursive_v2(
+            axis_names=axis_names,
+            axis_values=axis_values,
+            suffix_products=suffix_products,
+            axis_index=axis_index + 1,
+            base_row_offset=base_row_offset + child_range_start,
+            local_start=overlap_start - child_range_start,
+            local_end=overlap_end - child_range_start,
+            prefix_indices=child_prefix,
+            blocks=blocks,
+        )
+
+
+def _build_signal_chunk_grid_block_v2(
+    *,
+    axis_names: tuple[str, ...],
+    axis_values: tuple[tuple[Any, ...], ...],
+    prefix_indices: tuple[int, ...],
+    row_start_inclusive: int,
+    row_end_exclusive: int,
+) -> _SignalChunkGridBlockV2:
+    """
+    Build one explicit chunk subgrid snapshot from fixed-prefix axis indexes.
+
+    Args:
+        axis_names: Canonical axis names from the materialized grid.
+        axis_values: Canonical axis values from the materialized grid.
+        prefix_indices: Fixed axis-value indexes for already-covered leading axes.
+        row_start_inclusive: Inclusive global row index covered by the block.
+        row_end_exclusive: Exclusive global row index covered by the block.
+    Returns:
+        _SignalChunkGridBlockV2: Snapshot describing one explicit subgrid.
+    Assumptions:
+        Leading axes addressed by `prefix_indices` are fixed to one value while the remaining
+        suffix axes keep their full canonical value order.
+    Raises:
+        ValueError: If the row range is invalid or one prefix index is out of bounds.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if row_end_exclusive <= row_start_inclusive:
+        raise ValueError(
+            "signal chunk grid block requires positive row range; got "
+            f"[{row_start_inclusive!r}, {row_end_exclusive!r})"
+        )
+    source_values: tuple[str, ...] | None = None
+    param_values: list[tuple[str, tuple[int | float | str, ...]]] = []
+    for axis_index, axis_name in enumerate(axis_names):
+        values = axis_values[axis_index]
+        if axis_index < len(prefix_indices):
+            fixed_index = prefix_indices[axis_index]
+            if fixed_index < 0 or fixed_index >= len(values):
+                raise ValueError(
+                    f"signal chunk fixed axis index out of bounds for {axis_name!r}: "
+                    f"{fixed_index!r}"
+                )
+            selected_values = (values[fixed_index],)
+        else:
+            selected_values = tuple(values)
+        if axis_name == "source":
+            source_values = tuple(str(value) for value in selected_values)
+            continue
+        param_values.append(
+            (
+                axis_name,
+                tuple(cast(tuple[int | float | str, ...], selected_values)),
+            )
+        )
+    return _SignalChunkGridBlockV2(
+        row_start_inclusive=row_start_inclusive,
+        row_end_exclusive=row_end_exclusive,
+        source_values=source_values,
+        param_values_by_name=tuple(param_values),
+    )
+
+
+def _write_signal_matrix_in_chunks_v2(
+    *,
+    coordinates: ArtifactCoordinatesV2,
+    slot: str,
+    slot_generation: int,
+    force_full_rebuild: bool,
+    signal_target: ArtifactSignalValidationSpecV2,
+    signal_paths: ArtifactSignalPathsV2,
+    signal_shape: tuple[int, int],
+    candles: CandleArrays,
+    signal_worker_processes: int,
+    chunk_jobs: tuple[ArtifactSignalChunkJobV2, ...],
+    chunk_blocks: tuple[tuple[_SignalChunkGridBlockV2, ...], ...],
+    signal_rows: tuple[_SignalVariantRowV2, ...],
+    signal_tail_plan: _SignalArtifactTailPlanV2,
+    existing_signal_artifact: _ExistingSignalArtifactV2 | None,
+    indicator_compute: IndicatorCompute,
+    rule_spec: SignalRuleSpecV2,
+    default_inputs_source: str | None,
+    signal_params_defaults: Mapping[str, Any],
+    max_signal_rows_per_artifact: int,
+) -> None:
+    """
+    Materialize one signal matrix through deterministic chunk-local `np.memmap` row writes.
+
+    Args:
+        coordinates: Artifact coordinates selecting one symbol root.
+        slot: Inactive slot literal receiving the signal artifact.
+        slot_generation: Deterministic generation assigned to the inactive slot build.
+        force_full_rebuild: Whether this run rebuilds from scratch instead of reusing prefixes.
+        signal_target: Explicit `(timeframe, indicator_id)` signal target.
+        signal_paths: Deterministic inactive-slot output paths for this target.
+        signal_shape: Final `[variant, time]` matrix shape.
+        candles: Bounded compute-window candles for chunk-local indicator compute.
+        signal_worker_processes: Configured upper bound of concurrent chunk workers.
+        chunk_jobs: Deterministic ordered chunk jobs for the target.
+        chunk_blocks: Explicit subgrids covering each chunk job in canonical order.
+        signal_rows: Ordered row descriptors for the full target matrix.
+        signal_tail_plan: Prefix-reuse/tail-rebuild plan for the current target.
+        existing_signal_artifact: Existing reusable signal artifact, when present.
+        indicator_compute: Compute adapter used for primary/dependency tensors.
+        rule_spec: Signal rule specification for the target indicator.
+        default_inputs_source: Default `inputs.source` literal resolved once per indicator.
+        signal_params_defaults: Default-only `signals.v1.params` mapping.
+        max_signal_rows_per_artifact: Strict compute guard forwarded into chunk-local requests.
+    Returns:
+        None.
+    Assumptions:
+        Chunk ownership is always a non-overlapping row slice, so direct `np.memmap` writes stay
+        deterministic even when chunks complete out of order.
+    Raises:
+        ValueError: If one chunk writes an inconsistent shape or signal defaults drift.
+        OSError: If temp-file creation, memmap writes, or atomic replace fail.
+    Side Effects:
+        Creates a temp `.npy`, writes row slices through `np.memmap`, and atomically replaces the
+        final `signals/<tf>/<indicator_id>/signals.i8.npy` path.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+    """
+    signal_paths.signals.parent.mkdir(parents=True, exist_ok=True)
+    file_descriptor, temp_name = tempfile.mkstemp(
+        prefix=f".{signal_paths.signals.name}.",
+        suffix=".tmp",
+        dir=signal_paths.signals.parent,
+    )
+    os.close(file_descriptor)
+    temp_path = Path(temp_name)
+    output_memmap: np.memmap = np.lib.format.open_memmap(
+        temp_path,
+        mode="w+",
+        dtype=np.int8,
+        shape=signal_shape,
+    )
+    output_memmap.flush()
+    del output_memmap
+
+    completed_chunks_total = 0
+    worker_count = max(1, min(len(chunk_jobs), signal_worker_processes))
+    compute_worker_factory = _resolve_indicator_compute_worker_factory_v2(
+        indicator_compute=indicator_compute
+    )
+    existing_signals_path = (
+        None if existing_signal_artifact is None else existing_signal_artifact.signals_path
+    )
+    try:
+        if compute_worker_factory is None or worker_count == 1:
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                future_to_meta = {}
+                for chunk_job, chunk_job_blocks in zip(chunk_jobs, chunk_blocks, strict=True):
+                    _log_signal_chunk_progress_v2(
+                        event="artifact_precompute_chunk_started",
+                        coordinates=coordinates,
+                        slot=slot,
+                        slot_generation=slot_generation,
+                        force_full_rebuild=force_full_rebuild,
+                        current_timeframe=signal_target.timeframe,
+                        current_indicator_id=signal_target.indicator_id,
+                        chunk_job=chunk_job,
+                    )
+                    future = executor.submit(
+                        _execute_signal_chunk_job_v2,
+                        indicator_compute=indicator_compute,
+                        indicator_compute_worker_class=None,
+                        indicator_compute_worker_snapshot=None,
+                        candles=candles,
+                        chunk_job=chunk_job,
+                        chunk_blocks=chunk_job_blocks,
+                        signal_rows=signal_rows,
+                        rule_spec=rule_spec,
+                        default_inputs_source=default_inputs_source,
+                        signal_params_defaults=signal_params_defaults,
+                        output_path=temp_path,
+                        output_shape=signal_shape,
+                        existing_signals_path=existing_signals_path,
+                        reused_prefix_bars=signal_tail_plan.reused_prefix_bars,
+                        trim_prefix_bars=signal_tail_plan.trim_prefix_bars,
+                        max_signal_rows_per_artifact=max_signal_rows_per_artifact,
+                    )
+                    future_to_meta[future] = (chunk_job, time.perf_counter())
+                for future in as_completed(future_to_meta):
+                    chunk_job, started_at = future_to_meta[future]
+                    chunk_result = future.result()
+                    if dict(chunk_result.signal_params_defaults) != dict(signal_params_defaults):
+                        raise ValueError(
+                            "signal chunk defaults drift detected for "
+                            f"{signal_target.timeframe}:{signal_target.indicator_id}"
+                        )
+                    completed_chunks_total += 1
+                    _log_signal_chunk_progress_v2(
+                        event="artifact_precompute_chunk_finished",
+                        coordinates=coordinates,
+                        slot=slot,
+                        slot_generation=slot_generation,
+                        force_full_rebuild=force_full_rebuild,
+                        current_timeframe=signal_target.timeframe,
+                        current_indicator_id=signal_target.indicator_id,
+                        chunk_job=chunk_job,
+                        completed_chunks_total=completed_chunks_total,
+                        elapsed_seconds=time.perf_counter() - started_at,
+                    )
+        else:
+            worker_class, worker_snapshot = compute_worker_factory
+            with ProcessPoolExecutor(
+                max_workers=worker_count,
+                mp_context=get_context("spawn"),
+            ) as executor:
+                future_to_meta = {}
+                for chunk_job, chunk_job_blocks in zip(chunk_jobs, chunk_blocks, strict=True):
+                    _log_signal_chunk_progress_v2(
+                        event="artifact_precompute_chunk_started",
+                        coordinates=coordinates,
+                        slot=slot,
+                        slot_generation=slot_generation,
+                        force_full_rebuild=force_full_rebuild,
+                        current_timeframe=signal_target.timeframe,
+                        current_indicator_id=signal_target.indicator_id,
+                        chunk_job=chunk_job,
+                    )
+                    future = executor.submit(
+                        _execute_signal_chunk_job_v2,
+                        indicator_compute=None,
+                        indicator_compute_worker_class=worker_class,
+                        indicator_compute_worker_snapshot=worker_snapshot,
+                        candles=candles,
+                        chunk_job=chunk_job,
+                        chunk_blocks=chunk_job_blocks,
+                        signal_rows=signal_rows,
+                        rule_spec=rule_spec,
+                        default_inputs_source=default_inputs_source,
+                        signal_params_defaults=signal_params_defaults,
+                        output_path=temp_path,
+                        output_shape=signal_shape,
+                        existing_signals_path=existing_signals_path,
+                        reused_prefix_bars=signal_tail_plan.reused_prefix_bars,
+                        trim_prefix_bars=signal_tail_plan.trim_prefix_bars,
+                        max_signal_rows_per_artifact=max_signal_rows_per_artifact,
+                    )
+                    future_to_meta[future] = (chunk_job, time.perf_counter())
+                for future in as_completed(future_to_meta):
+                    chunk_job, started_at = future_to_meta[future]
+                    chunk_result = future.result()
+                    if dict(chunk_result.signal_params_defaults) != dict(signal_params_defaults):
+                        raise ValueError(
+                            "signal chunk defaults drift detected for "
+                            f"{signal_target.timeframe}:{signal_target.indicator_id}"
+                        )
+                    completed_chunks_total += 1
+                    _log_signal_chunk_progress_v2(
+                        event="artifact_precompute_chunk_finished",
+                        coordinates=coordinates,
+                        slot=slot,
+                        slot_generation=slot_generation,
+                        force_full_rebuild=force_full_rebuild,
+                        current_timeframe=signal_target.timeframe,
+                        current_indicator_id=signal_target.indicator_id,
+                        chunk_job=chunk_job,
+                        completed_chunks_total=completed_chunks_total,
+                        elapsed_seconds=time.perf_counter() - started_at,
+                    )
+        if completed_chunks_total != len(chunk_jobs):
+            raise ValueError(
+                "signal chunk execution completed an unexpected number of chunks; got "
+                f"{completed_chunks_total!r}, expected {len(chunk_jobs)!r}"
+            )
+        _fsync_path_v2(path=temp_path)
+        os.replace(temp_path, signal_paths.signals)
+    except Exception:
+        if temp_path.exists():
+            temp_path.unlink(missing_ok=True)
+        raise
+
+
+def _resolve_indicator_compute_worker_factory_v2(
+    *,
+    indicator_compute: IndicatorCompute,
+) -> tuple[type[Any], Mapping[str, Any]] | None:
+    """
+    Resolve an optional spawned-worker factory for signal chunk compute.
+
+    Args:
+        indicator_compute: Live compute adapter owned by the runner.
+    Returns:
+        tuple[type[Any], Mapping[str, Any]] | None: Rehydration class plus snapshot when the
+            adapter supports spawned-worker reconstruction, otherwise `None`.
+    Assumptions:
+        Test doubles may remain thread-only, while production Numba compute can opt into real
+        process workers through an explicit snapshot contract.
+    Raises:
+        ValueError: If the adapter advertises an incomplete snapshot interface.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    snapshot_method = getattr(indicator_compute, "to_signal_chunk_worker_snapshot_v2", None)
+    factory_method = getattr(
+        indicator_compute.__class__,
+        "from_signal_chunk_worker_snapshot_v2",
+        None,
+    )
+    if snapshot_method is None and factory_method is None:
+        return None
+    if snapshot_method is None or factory_method is None:
+        raise ValueError(
+            "indicator_compute must expose both to_signal_chunk_worker_snapshot_v2 and "
+            "from_signal_chunk_worker_snapshot_v2"
+        )
+    snapshot_capable = cast(_SignalChunkWorkerSnapshotCapableV2, indicator_compute)
+    return indicator_compute.__class__, snapshot_capable.to_signal_chunk_worker_snapshot_v2()
+
+
+def _execute_signal_chunk_job_v2(
+    *,
+    indicator_compute: IndicatorCompute | None,
+    indicator_compute_worker_class: type[Any] | None,
+    indicator_compute_worker_snapshot: Mapping[str, Any] | None,
+    candles: CandleArrays,
+    chunk_job: ArtifactSignalChunkJobV2,
+    chunk_blocks: tuple[_SignalChunkGridBlockV2, ...],
+    signal_rows: tuple[_SignalVariantRowV2, ...],
+    rule_spec: SignalRuleSpecV2,
+    default_inputs_source: str | None,
+    signal_params_defaults: Mapping[str, Any],
+    output_path: Path,
+    output_shape: tuple[int, int],
+    existing_signals_path: Path | None,
+    reused_prefix_bars: int,
+    trim_prefix_bars: int,
+    max_signal_rows_per_artifact: int,
+) -> _SignalChunkWorkerResultV2:
+    """
+    Compute one chunk and write its owned row slice directly into the final memmap file.
+
+    Args:
+        indicator_compute: Live in-process compute adapter for thread-based execution.
+        indicator_compute_worker_class: Compute class used to rebuild spawned-worker adapters.
+        indicator_compute_worker_snapshot: Immutable worker snapshot for spawned execution.
+        candles: Bounded compute-window candles shared by every block of the chunk.
+        chunk_job: Deterministic row-range owner for this chunk.
+        chunk_blocks: Explicit subgrids covering `chunk_job` in canonical order.
+        signal_rows: Full ordered signal row catalog for the target matrix.
+        rule_spec: Signal rule specification for the target indicator.
+        default_inputs_source: Default `inputs.source` literal resolved once per indicator.
+        signal_params_defaults: Default-only `signals.v1.params` mapping.
+        output_path: Temp `.npy` path already preallocated to the final matrix shape.
+        output_shape: Final `[variant, time]` matrix shape.
+        existing_signals_path: Existing reusable signal file used for prefix copy, when present.
+        reused_prefix_bars: Number of leading time-axis bars copied unchanged from the old file.
+        trim_prefix_bars: Number of computed warmup bars trimmed from chunk-local outputs.
+        max_signal_rows_per_artifact: Strict compute guard forwarded to chunk-local requests.
+    Returns:
+        _SignalChunkWorkerResultV2: Completed chunk summary for progress aggregation.
+    Assumptions:
+        `chunk_blocks` cover only the rows owned by `chunk_job` and preserve their canonical order.
+    Raises:
+        ValueError: If a block compute drifts in row count, timeline length, or final slice width.
+        OSError: If opening or flushing the writable memmap fails.
+    Side Effects:
+        Writes this chunk's non-overlapping row slice inside the temp signal `.npy` file.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
+    """
+    if indicator_compute is None:
+        if indicator_compute_worker_class is None or indicator_compute_worker_snapshot is None:
+            raise ValueError(
+                "signal chunk worker requires either a live compute adapter or a worker snapshot"
+            )
+        indicator_compute = cast(
+            IndicatorCompute,
+            indicator_compute_worker_class.from_signal_chunk_worker_snapshot_v2(
+                snapshot=indicator_compute_worker_snapshot
+            ),
+        )
+    signal_memmap: np.memmap = cast(
+        np.memmap,
+        np.load(output_path, mmap_mode="r+", allow_pickle=False),
+    )
+    existing_memmap: np.memmap | None = None
+    try:
+        if existing_signals_path is not None and reused_prefix_bars > 0:
+            existing_memmap = cast(
+                np.memmap,
+                np.load(existing_signals_path, mmap_mode="r", allow_pickle=False),
+            )
+            signal_memmap[
+                chunk_job.row_start_inclusive : chunk_job.row_end_exclusive,
+                :reused_prefix_bars,
+            ] = existing_memmap[
+                chunk_job.row_start_inclusive : chunk_job.row_end_exclusive,
+                :reused_prefix_bars,
+            ]
+        expected_tail_bars = output_shape[1] - reused_prefix_bars
+        for chunk_block in chunk_blocks:
+            block_grid = _build_grid_from_signal_chunk_block_v2(
+                indicator_id=rule_spec.indicator_id,
+                chunk_block=chunk_block,
+            )
+            expected_variants = (
+                chunk_block.row_end_exclusive - chunk_block.row_start_inclusive
+            )
+            primary_tensor = indicator_compute.compute(
+                ComputeRequest(
+                    candles=candles,
+                    grid=block_grid,
+                    max_variants_guard=max_signal_rows_per_artifact,
+                )
+            )
+            if primary_tensor.meta.variants != expected_variants:
+                raise ValueError(
+                    "signal chunk primary tensor variants drift detected for "
+                    f"{rule_spec.indicator_id!r}; got {primary_tensor.meta.variants!r}, "
+                    f"expected {expected_variants!r}"
+                )
+            dependency_tensors = _compute_signal_dependency_tensors_v2(
+                candles=candles,
+                compute_grid=block_grid,
+                required_dependency_ids=rule_spec.required_dependency_ids,
+                indicator_id=rule_spec.indicator_id,
+                indicator_compute=indicator_compute,
+                max_signal_rows_per_artifact=max_signal_rows_per_artifact,
+                expected_variants=primary_tensor.meta.variants,
+                expected_t=primary_tensor.meta.t,
+            )
+            rebuilt_compute_window = _evaluate_signal_matrix_v2(
+                candles=candles,
+                indicator_id=rule_spec.indicator_id,
+                primary_tensor=primary_tensor,
+                dependency_tensors=dependency_tensors,
+                signal_rows=signal_rows[
+                    chunk_block.row_start_inclusive : chunk_block.row_end_exclusive
+                ],
+                rule_spec=rule_spec,
+                default_inputs_source=default_inputs_source,
+                signal_params_defaults=signal_params_defaults,
+            )
+            rebuilt_tail = rebuilt_compute_window[:, trim_prefix_bars:]
+            if rebuilt_tail.shape[1] != expected_tail_bars:
+                raise ValueError(
+                    "signal chunk rebuilt tail width drift detected for "
+                    f"{rule_spec.indicator_id!r}; got {rebuilt_tail.shape[1]!r}, "
+                    f"expected {expected_tail_bars!r}"
+                )
+            signal_memmap[
+                chunk_block.row_start_inclusive : chunk_block.row_end_exclusive,
+                reused_prefix_bars:,
+            ] = rebuilt_tail
+        signal_memmap.flush()
+    finally:
+        del signal_memmap
+        if existing_memmap is not None:
+            del existing_memmap
+    return _SignalChunkWorkerResultV2(
+        chunk_job=chunk_job,
+        signal_params_defaults=dict(signal_params_defaults),
+    )
+
+
+def _build_grid_from_signal_chunk_block_v2(
+    *,
+    indicator_id: str,
+    chunk_block: _SignalChunkGridBlockV2,
+) -> GridSpec:
+    """
+    Rebuild one explicit compute grid from a picklable chunk-block snapshot.
+
+    Args:
+        indicator_id: Indicator identifier to assign to the rebuilt grid.
+        chunk_block: Picklable chunk-block snapshot describing explicit axis values.
+    Returns:
+        GridSpec: Variant-major explicit grid covering only the block rows.
+    Assumptions:
+        Chunk blocks already preserve canonical per-axis value order.
+    Raises:
+        ValueError: If one explicit axis specification is invalid.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/indicators/domain/specifications/grid_spec.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    return GridSpec(
+        indicator_id=IndicatorId(indicator_id),
+        params={
+            axis_name: ExplicitValuesSpec(name=axis_name, values=values)
+            for axis_name, values in chunk_block.param_values_by_name
+        },
+        source=(
+            None
+            if chunk_block.source_values is None
+            else ExplicitValuesSpec(name="source", values=chunk_block.source_values)
+        ),
+        layout_preference=Layout.VARIANT_MAJOR,
+    )
+
+
+def _fsync_path_v2(*, path: Path) -> None:
+    """
+    Flush one fully written temp file to stable storage before atomic replace.
+
+    Args:
+        path: Temp file path to fsync.
+    Returns:
+        None.
+    Assumptions:
+        Temp files are created in the destination directory so `os.replace` remains atomic.
+    Raises:
+        OSError: If opening or fsyncing the file fails.
+    Side Effects:
+        Opens the file in binary mode and calls `os.fsync`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    with path.open("rb+") as handle:
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 def _candle_arrays_from_price_arrays_v2(
@@ -1921,10 +2946,10 @@ def _compute_signal_dependency_tensors_v2(
     *,
     candles: CandleArrays,
     compute_grid: GridSpec,
+    required_dependency_ids: tuple[str, ...],
     indicator_id: str,
     indicator_compute: IndicatorCompute,
     max_signal_rows_per_artifact: int,
-    signal_rules_engine: BacktestSignalRulesEngineV2,
     expected_variants: int,
     expected_t: int,
 ) -> Mapping[str, Any]:
@@ -1934,10 +2959,10 @@ def _compute_signal_dependency_tensors_v2(
     Args:
         candles: Dense candle arrays aligned to the target signal timeframe.
         compute_grid: Primary indicator grid used for the target indicator.
+        required_dependency_ids: Explicit dependency indicator ids required by the rule family.
         indicator_id: Primary indicator identifier.
         indicator_compute: Indicator compute port used for dependency tensors.
         max_signal_rows_per_artifact: Strict compute guard for dependency grids.
-        signal_rules_engine: Explicit signal rules engine used to resolve dependency ids.
         expected_variants: Expected variant count shared with the primary tensor.
         expected_t: Expected timeline length shared with the primary tensor.
     Returns:
@@ -1956,10 +2981,7 @@ def _compute_signal_dependency_tensors_v2(
       - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
     """
     dependency_tensors: dict[str, Any] = {}
-    dependency_ids = signal_rules_engine.rule_spec(
-        indicator_id=indicator_id
-    ).required_dependency_ids
-    for dependency_id in dependency_ids:
+    for dependency_id in required_dependency_ids:
         dependency_grid = _grid_with_layout_v2(
             grid=compute_grid,
             indicator_id=dependency_id,
@@ -1995,8 +3017,10 @@ def _evaluate_signal_matrix_v2(
     primary_tensor: Any,
     dependency_tensors: Mapping[str, Any],
     signal_rows: tuple[_SignalVariantRowV2, ...],
-    signal_rules_engine: BacktestSignalRulesEngineV2,
-) -> tuple[np.ndarray, Mapping[str, Any]]:
+    rule_spec: SignalRuleSpecV2,
+    default_inputs_source: str | None,
+    signal_params_defaults: Mapping[str, Any],
+) -> np.ndarray:
     """
     Evaluate compact `int8` signals for every row in the exported signal matrix.
 
@@ -2006,12 +3030,13 @@ def _evaluate_signal_matrix_v2(
         primary_tensor: Computed primary indicator tensor.
         dependency_tensors: Dependency tensors keyed by indicator id.
         signal_rows: Ordered row descriptors matching tensor variant order.
-        signal_rules_engine: Explicit signal rules engine preserving R4-01 semantics.
+        rule_spec: Explicit signal rule specification for the target indicator.
+        default_inputs_source: Default `inputs.source` literal resolved once per indicator.
+        signal_params_defaults: Default-only `signals.v1.params` mapping shared by every row.
     Returns:
-        tuple[np.ndarray, Mapping[str, Any]]: Export-ready signal matrix and the resolved
-            `signals.v1.params` default mapping serialized into the manifest grid section.
+        np.ndarray: Export-ready compact signal matrix for the chunk-local compute window.
     Assumptions:
-        Every row uses the same `signals.v1.params` defaults under the default-only contract.
+        Every row uses the same default-only signal params already resolved by the caller.
     Raises:
         ValueError: If one evaluated series shape or value set violates the strict matrix
             contract.
@@ -2027,7 +3052,6 @@ def _evaluate_signal_matrix_v2(
     row_count = int(primary_tensor.meta.variants)
     time_count = int(primary_tensor.meta.t)
     signal_matrix = np.empty((row_count, time_count), dtype=np.int8)
-    resolved_signal_params_defaults: Mapping[str, Any] | None = None
     for row_index, signal_row in enumerate(signal_rows):
         dependency_outputs = {
             dependency_id: indicator_primary_output_series_from_tensor_v1(
@@ -2036,28 +3060,76 @@ def _evaluate_signal_matrix_v2(
             )
             for dependency_id, dependency_tensor in dependency_tensors.items()
         }
-        evaluation_result = signal_rules_engine.evaluate(
-            request=SignalRuleEvaluationRequestV2(
-                indicator_id=indicator_id,
-                candles=candles,
-                primary_output=indicator_primary_output_series_from_tensor_v1(
-                    tensor=primary_tensor,
-                    variant_index=row_index,
+        v1_indicator_input = IndicatorSignalEvaluationInputV1(
+            indicator_id=indicator_id,
+            primary_output=indicator_primary_output_series_from_tensor_v1(
+                tensor=primary_tensor,
+                variant_index=row_index,
+            ),
+            indicator_inputs=_indicator_inputs_mapping_v2(
+                resolved_source=_resolve_signal_row_inputs_source_v2(
+                    signal_row=signal_row,
+                    rule_spec=rule_spec,
+                    default_inputs_source=default_inputs_source,
                 ),
-                inputs_source=signal_row.inputs_source,
-                signal_params={},
-                dependency_outputs=dependency_outputs,
-            )
+                spec=rule_spec,
+            ),
+            signal_params=signal_params_defaults,
+            dependency_outputs=dependency_outputs,
         )
-        signal_matrix[row_index, :] = evaluation_result.signal_codes
-        if resolved_signal_params_defaults is None:
-            resolved_signal_params_defaults = evaluation_result.signal_params
+        signal_matrix[row_index, :] = _normalize_signal_codes_v2(
+            indicator_id=indicator_id,
+            signal_codes=evaluate_indicator_signal_encoded_v1(
+                candles=candles,
+                indicator_input=v1_indicator_input,
+            ),
+        )
     _validate_signal_matrix_v2(
         signal_matrix=signal_matrix,
         expected_shape=(row_count, time_count),
         label=f"signals[{indicator_id}]",
     )
-    return signal_matrix, dict(resolved_signal_params_defaults or {})
+    return signal_matrix
+
+
+def _resolve_signal_row_inputs_source_v2(
+    *,
+    signal_row: _SignalVariantRowV2,
+    rule_spec: SignalRuleSpecV2,
+    default_inputs_source: str | None,
+) -> str | None:
+    """
+    Resolve the effective row-level `inputs.source` literal from explicit row data.
+
+    Args:
+        signal_row: One ordered signal row descriptor.
+        rule_spec: Explicit signal rule specification for the target indicator.
+        default_inputs_source: Default `inputs.source` literal resolved once per indicator.
+    Returns:
+        str | None: Effective row-level source literal or `None` when the rule family ignores it.
+    Assumptions:
+        `signal_row.inputs_source` already follows canonical grid ordering and is preferred over
+        the indicator-level default when present.
+    Raises:
+        ValueError: If a row requiring `inputs.source` has neither an explicit nor default value.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if signal_row.inputs_source is not None:
+        return validate_signal_input_source_v2(signal_row.inputs_source)
+    if not rule_spec.uses_inputs_source:
+        return None
+    if default_inputs_source is None:
+        raise ValueError(
+            f"{rule_spec.indicator_id}: chunked signal evaluation requires a default inputs.source"
+        )
+    return validate_signal_input_source_v2(default_inputs_source)
 
 
 def _validate_signal_matrix_v2(
@@ -2116,7 +3188,7 @@ def _build_signal_manifest_v2(
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
     signal_target: ArtifactSignalValidationSpecV2,
     signal_paths: ArtifactSignalPathsV2,
-    signal_matrix: np.ndarray,
+    signal_shape: tuple[int, int],
     timeline: ArtifactTimelineCoverageV2,
     price_manifest: ArtifactPriceTimeframeManifestV2,
     signal_rows: tuple[_SignalVariantRowV2, ...],
@@ -2135,7 +3207,7 @@ def _build_signal_manifest_v2(
         runtime_settings: Strict runtime settings contributing config hash and guards.
         signal_target: Explicit `(timeframe, indicator_id)` materialization target.
         signal_paths: Fixed signal file paths under the inactive slot.
-        signal_matrix: Freshly written compact signal matrix.
+        signal_shape: Freshly written compact signal matrix shape.
         timeline: Timeline coverage matching the target `prices/<tf>` manifest.
         price_manifest: Fresh target timeframe price section used for provenance hashing.
         signal_rows: Ordered signal row descriptors used for `variant_keys_sha256`.
@@ -2161,8 +3233,8 @@ def _build_signal_manifest_v2(
     validated_slot = validate_artifact_slot_v2(slot)
     signal_metadata = ArtifactArrayMetadataV2(
         path=_slot_relative_path_v2(slot_root=slot_root, absolute_path=signal_paths.signals),
-        dtype=signal_matrix.dtype.name,
-        shape=tuple(int(value) for value in signal_matrix.shape),
+        dtype=ARTIFACT_SIGNAL_DTYPE_LITERAL_V2,
+        shape=tuple(int(value) for value in signal_shape),
         axis_order=ARTIFACT_SIGNAL_AXIS_ORDER_V2,
         sha256=_file_sha256_hex_v2(signal_paths.signals),
     )
@@ -2193,7 +3265,7 @@ def _build_signal_manifest_v2(
         "indicator_id": signal_target.indicator_id,
         "timeframe": signal_target.timeframe,
         "signals": _serialize_array_metadata_v2(signal_metadata),
-        "rows_count": int(signal_matrix.shape[0]),
+        "rows_count": int(signal_shape[0]),
         "timeline": _serialize_timeline_coverage_v2(timeline),
         "signal_value_set": [int(value) for value in ARTIFACT_SIGNAL_VALUE_SET_V2],
         "grid": _serialize_signal_grid_contract_v2(grid_contract),
@@ -2210,7 +3282,7 @@ def _build_signal_manifest_v2(
         indicator_id=signal_target.indicator_id,
         timeframe=signal_target.timeframe,
         signals=signal_metadata,
-        rows_count=int(signal_matrix.shape[0]),
+        rows_count=int(signal_shape[0]),
         timeline=timeline,
         signal_value_set=ARTIFACT_SIGNAL_VALUE_SET_V2,
         grid=grid_contract,
@@ -2554,23 +3626,58 @@ def _load_existing_signal_artifact_v2(
         signal_target.timeframe,
         signal_target.indicator_id,
     )
-    signal_matrix = np.ascontiguousarray(
-        _load_validated_array_v2(
-            metadata=signal_manifest.signals,
-            expected_path=signal_paths.signals,
-            slot_root=signal_paths.signals.parents[3],
-            expected_dtype=ARTIFACT_SIGNAL_DTYPE_LITERAL_V2,
-            expected_axis_order=ARTIFACT_SIGNAL_AXIS_ORDER_V2,
-            expected_shape=(signal_manifest.rows_count, signal_manifest.timeline.bar_count),
-            location=f"existing signals[{signal_target.timeframe}:{signal_target.indicator_id}]",
-        ),
-        dtype=np.int8,
+    expected_signal_path = _slot_relative_path_v2(
+        slot_root=signal_paths.signals.parents[3],
+        absolute_path=signal_paths.signals,
     )
-    _validate_signal_matrix_v2(
-        signal_matrix=signal_matrix,
-        expected_shape=(signal_manifest.rows_count, signal_manifest.timeline.bar_count),
-        label=f"existing signals[{signal_target.timeframe}:{signal_target.indicator_id}]",
+    if signal_manifest.signals.path != expected_signal_path:
+        raise ValueError(
+            "existing signal manifest signals.path must match deterministic path for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.signals.path!r}, expected {expected_signal_path!r}"
+        )
+    if signal_manifest.signals.dtype != ARTIFACT_SIGNAL_DTYPE_LITERAL_V2:
+        raise ValueError(
+            "existing signal manifest signals.dtype must match the strict contract for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.signals.dtype!r}"
+        )
+    if signal_manifest.signals.axis_order != ARTIFACT_SIGNAL_AXIS_ORDER_V2:
+        raise ValueError(
+            "existing signal manifest signals.axis_order must match the strict contract for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.signals.axis_order!r}"
+        )
+    signal_matrix = cast(
+        np.memmap,
+        np.load(signal_paths.signals, mmap_mode="r", allow_pickle=False),
     )
+    actual_shape = tuple(int(value) for value in signal_matrix.shape)
+    if signal_manifest.signals.shape != actual_shape:
+        raise ValueError(
+            "existing signal manifest signals.shape must match the actual file for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.signals.shape!r}, expected {actual_shape!r}"
+        )
+    if actual_shape != (signal_manifest.rows_count, signal_manifest.timeline.bar_count):
+        raise ValueError(
+            "existing signal file shape must match manifest rows/timeline for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got {actual_shape!r}"
+        )
+    if signal_matrix.dtype.name != ARTIFACT_SIGNAL_DTYPE_LITERAL_V2:
+        raise ValueError(
+            "existing signal file dtype must match the strict contract for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_matrix.dtype.name!r}"
+        )
+    actual_signal_sha256 = _file_sha256_hex_v2(signal_paths.signals)
+    if signal_manifest.signals.sha256 != actual_signal_sha256:
+        raise ValueError(
+            "existing signal manifest signals.sha256 must match the actual file for "
+            f"{signal_target.timeframe}:{signal_target.indicator_id}; got "
+            f"{signal_manifest.signals.sha256!r}, expected {actual_signal_sha256!r}"
+        )
+    del signal_matrix
     if signal_manifest.slot_generation != existing_manifest.slot_generation:
         raise ValueError(
             "existing signal manifest slot_generation must match root manifest for "
@@ -2600,7 +3707,7 @@ def _load_existing_signal_artifact_v2(
     return _ExistingSignalArtifactV2(
         catalog_entry=existing_entry,
         manifest=signal_manifest,
-        signal_matrix=signal_matrix,
+        signals_path=signal_paths.signals,
     )
 
 
@@ -2639,7 +3746,7 @@ def _build_signal_tail_plan_v2(
     bounded_tail_bars = min(current_bar_count, effective_tail_bars)
     if existing_signal_artifact is None:
         return _SignalArtifactTailPlanV2(
-            prefix_matrix=None,
+            reused_prefix_bars=0,
             compute_start_idx=0,
             trim_prefix_bars=0,
             effective_tail_bars=bounded_tail_bars,
@@ -2650,7 +3757,7 @@ def _build_signal_tail_plan_v2(
         or existing_timeline.close_time_start != current_timeline.close_time_start
     ):
         return _SignalArtifactTailPlanV2(
-            prefix_matrix=None,
+            reused_prefix_bars=0,
             compute_start_idx=0,
             trim_prefix_bars=0,
             effective_tail_bars=bounded_tail_bars,
@@ -2658,7 +3765,7 @@ def _build_signal_tail_plan_v2(
     overlapping_bar_count = min(current_bar_count, existing_timeline.bar_count)
     if overlapping_bar_count <= bounded_tail_bars:
         return _SignalArtifactTailPlanV2(
-            prefix_matrix=None,
+            reused_prefix_bars=0,
             compute_start_idx=0,
             trim_prefix_bars=0,
             effective_tail_bars=bounded_tail_bars,
@@ -2666,11 +3773,7 @@ def _build_signal_tail_plan_v2(
     prefix_bar_count = overlapping_bar_count - bounded_tail_bars
     compute_start_idx = max(0, prefix_bar_count - rebuild_context_bars)
     return _SignalArtifactTailPlanV2(
-        prefix_matrix=_slice_signal_matrix_v2(
-            signal_matrix=existing_signal_artifact.signal_matrix,
-            start_idx=0,
-            end_idx=prefix_bar_count,
-        ),
+        reused_prefix_bars=prefix_bar_count,
         compute_start_idx=compute_start_idx,
         trim_prefix_bars=prefix_bar_count - compute_start_idx,
         effective_tail_bars=bounded_tail_bars,

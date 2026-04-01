@@ -107,6 +107,8 @@ from .contracts import (
     ArtifactPublishResultV2,
     ArtifactSignalCatalogEntryV2,
     ArtifactSignalCatalogV2,
+    ArtifactSignalChunkJobV2,
+    ArtifactSignalChunkPlanningRequestV2,
     ArtifactSignalEncodingContractV2,
     ArtifactSignalGridContractV2,
     ArtifactSignalManifestDocumentV2,
@@ -128,6 +130,7 @@ from .contracts import (
     BacktestArtifactSlotResolverV2,
     BacktestPriceArraysLoaderV2,
     BacktestSignalMatrixLoaderV2,
+    ChunkPlannerV2,
     SignalRuleEvaluationRequestV2,
     SignalRuleEvaluationResultV2,
     SignalRuleFamilyLiteralV2,
@@ -178,6 +181,7 @@ from .risk_exit_kernel_1m import (
     slice_hit_times_to_execution_window_v2,
 )
 from .signal_aggregator_kernel import aggregate_final_signal_rows_v2
+from .signal_chunk_planner_v2 import DeterministicSignalChunkPlannerV2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .signal_rules_engine_v2 import (
     BacktestSignalRulesEngineV2,
@@ -273,6 +277,8 @@ __all__ = [
     "ArtifactPrecomputeCoordinatorV2",
     "ArtifactPrecomputeExecutionPolicyV2",
     "ArtifactPrecomputeProgressEventV2",
+    "ArtifactSignalChunkJobV2",
+    "ArtifactSignalChunkPlanningRequestV2",
     "ArtifactPrecomputeStageInputV2",
     "ArtifactPrecomputeStageOutputV2",
     "ArtifactPrecomputeStageResultV2",
@@ -329,6 +335,8 @@ __all__ = [
     "BacktestPriceArraysLoaderV2",
     "BacktestRiskVariantV2",
     "BacktestSignalMatrixLoaderV2",
+    "ChunkPlannerV2",
+    "DeterministicSignalChunkPlannerV2",
     "BacktestSignalAxisPlanV2",
     "BacktestStageABaseVariantV2",
     "BacktestStageAScoredVariantV2",

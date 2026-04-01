@@ -23,11 +23,13 @@ from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
+    ARTIFACT_SIGNAL_TIMEFRAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
     ArtifactCoordinatesV2,
     ArtifactPrecomputeCoordinatorV2,
     ArtifactPrecomputeExecutionPolicyV2,
+    ArtifactSignalChunkPlanningRequestV2,
     ArtifactSignalValidationSpecV2,
     ArtifactSlotPublishErrorV2,
     ArtifactStageRebuildStatsV2,
@@ -36,7 +38,9 @@ from trading.contexts.backtest.application.services import (
     BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
     BacktestSignalRulesEngineV2,
+    DeterministicSignalChunkPlannerV2,
     SignalRuleEvaluationRequestV2,
+    supported_indicator_ids_for_signals_v1,
 )
 from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
     indicator_primary_output_series_from_tensor_v1,
@@ -199,6 +203,7 @@ class _DeterministicSignalCompute:
 
     grid_builder: GridBuilder
     time_lengths: list[int] = field(default_factory=list, compare=False)
+    variant_counts: list[int] = field(default_factory=list, compare=False)
 
     def estimate(self, grid: GridSpec, *, max_variants_guard: int) -> EstimateResult:
         """
@@ -247,7 +252,7 @@ class _DeterministicSignalCompute:
         Raises:
             ValueError: If one source series cannot be resolved or the guard is exceeded.
         Side Effects:
-            Allocates one small in-memory tensor and records requested timeline lengths.
+            Allocates one small in-memory tensor and records requested timeline/variant sizes.
         Docs:
           - docs/architecture/backtest/backtest-precompute-runner-v2.md
           - docs/architecture/indicators/indicators-overview.md
@@ -259,9 +264,10 @@ class _DeterministicSignalCompute:
             raise ValueError(
                 "variants exceed guard: "
                 f"variants={materialized.variants}, max_variants_guard={req.max_variants_guard}"
-        )
+            )
         bar_count = int(req.candles.close.shape[0])
         self.time_lengths.append(bar_count)
+        self.variant_counts.append(materialized.variants)
         values = np.empty((materialized.variants, bar_count), dtype=np.float32)
         axes = tuple(_axis_def_from_materialized_axis_v2(axis) for axis in materialized.axes)
         axis_values = tuple(axis.values for axis in materialized.axes)
@@ -718,37 +724,31 @@ def _source_series_for_compute_v2(*, candles: object, source_name: str) -> np.nd
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
     """
     normalized_source = source_name.strip().lower()
-    candle_arrays = cast("object", candles)
+    candle_arrays = candles
     if normalized_source == "close":
-        return np.ascontiguousarray(cast(np.ndarray, getattr(candle_arrays, "close")))
-    if normalized_source == "open":
-        return np.ascontiguousarray(cast(np.ndarray, getattr(candle_arrays, "open")))
-    if normalized_source == "high":
-        return np.ascontiguousarray(cast(np.ndarray, getattr(candle_arrays, "high")))
-    if normalized_source == "low":
-        return np.ascontiguousarray(cast(np.ndarray, getattr(candle_arrays, "low")))
-    if normalized_source == "hlc3":
-        return np.ascontiguousarray(
-            (
-                cast(np.ndarray, getattr(candle_arrays, "high"))
-                + cast(np.ndarray, getattr(candle_arrays, "low"))
-                + cast(np.ndarray, getattr(candle_arrays, "close"))
-            )
-            / np.float32(3.0),
-            dtype=np.float32,
-        )
-    if normalized_source == "ohlc4":
-        return np.ascontiguousarray(
-            (
-                cast(np.ndarray, getattr(candle_arrays, "open"))
-                + cast(np.ndarray, getattr(candle_arrays, "high"))
-                + cast(np.ndarray, getattr(candle_arrays, "low"))
-                + cast(np.ndarray, getattr(candle_arrays, "close"))
-            )
-            / np.float32(4.0),
-            dtype=np.float32,
-    )
-    raise ValueError(f"unsupported synthetic source literal: {normalized_source!r}")
+        source = cast(np.ndarray, getattr(candle_arrays, "close"))
+    elif normalized_source == "open":
+        source = cast(np.ndarray, getattr(candle_arrays, "open"))
+    elif normalized_source == "high":
+        source = cast(np.ndarray, getattr(candle_arrays, "high"))
+    elif normalized_source == "low":
+        source = cast(np.ndarray, getattr(candle_arrays, "low"))
+    elif normalized_source == "hlc3":
+        source = (
+            cast(np.ndarray, getattr(candle_arrays, "high"))
+            + cast(np.ndarray, getattr(candle_arrays, "low"))
+            + cast(np.ndarray, getattr(candle_arrays, "close"))
+        ) / np.float32(3.0)
+    elif normalized_source == "ohlc4":
+        source = (
+            cast(np.ndarray, getattr(candle_arrays, "open"))
+            + cast(np.ndarray, getattr(candle_arrays, "high"))
+            + cast(np.ndarray, getattr(candle_arrays, "low"))
+            + cast(np.ndarray, getattr(candle_arrays, "close"))
+        ) / np.float32(4.0)
+    else:
+        raise ValueError(f"unsupported synthetic source literal: {normalized_source!r}")
+    return np.ascontiguousarray(source, dtype=np.float32)
 
 
 def _rolling_mean_series_for_compute_v2(*, source: np.ndarray, window: int) -> np.ndarray:
@@ -786,6 +786,109 @@ def _rolling_mean_series_for_compute_v2(*, source: np.ndarray, window: int) -> n
         window_sum = cumulative[index] - (0.0 if start == 0 else cumulative[start - 1])
         output[index] = np.float32(window_sum / float(window))
     return output
+
+
+def test_deterministic_signal_chunk_planner_v2_uses_expected_chunk_count_and_ranges() -> None:
+    """
+    Verify ChunkPlanner emits stable contiguous row ranges for a bounded worker budget.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        A `64`-row worker budget for `1200` variants should produce `ceil(1200 / 64) = 19`
+        deterministic chunk jobs.
+    Raises:
+        AssertionError: If chunk count, row coverage, or stable ordering drifts.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    planner = DeterministicSignalChunkPlannerV2()
+
+    jobs = planner.plan(
+        request=ArtifactSignalChunkPlanningRequestV2(
+            indicator_id="ma.ema",
+            timeframe="15m",
+            timeline_bar_count=288,
+            variant_count=1200,
+            estimated_bytes_per_row=1024,
+            worker_memory_budget_bytes=64 * 1024,
+            signal_chunk_rows_min=32,
+            signal_chunk_rows_max=256,
+        )
+    )
+
+    assert len(jobs) == 19
+    assert jobs[0].chunk_index == 0
+    assert jobs[0].chunk_count == 19
+    assert jobs[0].row_start_inclusive == 0
+    assert jobs[0].row_end_exclusive == 64
+    assert jobs[0].chunk_rows == 64
+    assert jobs[1].row_start_inclusive == 64
+    assert jobs[1].row_end_exclusive == 128
+    assert jobs[-1].chunk_index == 18
+    assert jobs[-1].chunk_count == 19
+    assert jobs[-1].row_start_inclusive == 1152
+    assert jobs[-1].row_end_exclusive == 1200
+    assert jobs[-1].chunk_rows == 48
+    assert tuple(
+        (job.row_start_inclusive, job.row_end_exclusive) for job in jobs
+    ) == tuple(
+        (index * 64, min(1200, (index + 1) * 64))
+        for index in range(19)
+    )
+    assert sum(job.chunk_rows for job in jobs) == 1200
+
+
+def test_build_artifact_precompute_fixture_v2_expands_all_supported_v1_signal_targets(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify synthetic fixtures preserve full-registry `all_supported_v1` target expansion.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Fixture helpers should reuse the real config loader's deterministic expansion order.
+    Raises:
+        AssertionError: If validation-plan or runtime-settings signal targets drift.
+    Side Effects:
+        Writes one strict config under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        validation_signal_artifacts="all_supported_v1",
+        precompute_signal_artifacts="all_supported_v1",
+    )
+    expected_targets = tuple(
+        ArtifactSignalValidationSpecV2(timeframe=timeframe, indicator_id=indicator_id)
+        for timeframe in ARTIFACT_SIGNAL_TIMEFRAMES_V2
+        for indicator_id in supported_indicator_ids_for_signals_v1()
+    )
+
+    assert (
+        tuple(
+            item.to_validation_spec()
+            for item in fixture.runtime_config.validation_plan.signal_artifacts
+        )
+        == expected_targets
+    )
+    assert fixture.runtime_settings.signal_artifacts == expected_targets
 
 
 def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_export(
@@ -1642,6 +1745,205 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
     assert validation_result.diagnostics == ()
 
 
+def test_backtest_artifact_precompute_runner_v2_chunked_signal_output_matches_single_chunk_reference(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Verify chunked signal materialization matches the single-chunk reference semantics.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        A `2`-row chunk size splits the small MA grid into bounded chunk-local compute calls.
+    Raises:
+        AssertionError: If chunked output, manifest hashes, or per-call variant counts drift.
+    Side Effects:
+        Materializes one chunked slot and one reference slot under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+    """
+    signal_targets = (("15m", "ma.ema"),)
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    chunked_fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path / "chunked",
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+        signal_worker_processes=2,
+        signal_chunk_rows_min=2,
+        signal_chunk_rows_max=2,
+    )
+    reference_fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path / "reference",
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    chunked_compute = _DeterministicSignalCompute(grid_builder=grid_builder)
+    reference_compute = _DeterministicSignalCompute(grid_builder=grid_builder)
+    rows = _build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+
+    BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=chunked_fixture.runtime_settings,
+        artifact_loader=chunked_fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(rows=rows),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=chunked_compute,
+        indicator_grid_builder=grid_builder,
+    ).export_canonical_price_1m(
+        _request_v2(fixture=chunked_fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    )
+    BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=reference_fixture.runtime_settings,
+        artifact_loader=reference_fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(rows=rows),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=reference_compute,
+        indicator_grid_builder=grid_builder,
+    ).export_canonical_price_1m(
+        _request_v2(fixture=reference_fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    )
+
+    chunked_matrix = _load_signal_matrix_v2(
+        fixture=chunked_fixture,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+    reference_matrix = _load_signal_matrix_v2(
+        fixture=reference_fixture,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+    chunked_manifest = chunked_fixture.loader.load_signal_manifest(
+        chunked_fixture.coordinates,
+        chunked_fixture.inactive_slot,
+        "15m",
+        "ma.ema",
+    )
+    reference_manifest = reference_fixture.loader.load_signal_manifest(
+        reference_fixture.coordinates,
+        reference_fixture.inactive_slot,
+        "15m",
+        "ma.ema",
+    )
+
+    assert chunked_compute.variant_counts == [1, 1, 1, 1, 1, 1]
+    assert chunked_compute.time_lengths == [288, 288, 288, 288, 288, 288]
+    assert reference_compute.variant_counts == [3, 3]
+    np.testing.assert_array_equal(chunked_matrix, reference_matrix)
+    assert chunked_manifest.grid.variant_keys_sha256 == reference_manifest.grid.variant_keys_sha256
+    assert chunked_manifest.signals.sha256 == reference_manifest.signals.sha256
+    assert chunked_manifest.signals.axis_order == ("variant", "time")
+
+
+def test_backtest_artifact_precompute_runner_v2_reports_chunk_progress_and_session_totals(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """
+    Verify chunked signal execution exposes structured per-chunk progress and session totals.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+        caplog: pytest log capture fixture.
+    Returns:
+        None.
+    Assumptions:
+        One `15m` MA target with `2`-row chunks should emit exactly three chunk start/finish
+        pairs.
+    Raises:
+        AssertionError: If structured logs or stage-result counters drift.
+    Side Effects:
+        Materializes one chunked signal artifact under `tmp_path` and captures INFO logs.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
+    """
+    signal_targets = (("15m", "ma.ema"),)
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+        signal_worker_processes=2,
+        signal_chunk_rows_min=2,
+        signal_chunk_rows_max=2,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+
+    with caplog.at_level(logging.INFO):
+        result = runner.export_canonical_price_1m(
+            _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+        )
+
+    fifteen_minute_stage = next(
+        stage_result
+        for stage_result in result.stage_results
+        if stage_result.stage_output.current_timeframe == "15m"
+    )
+    progress_messages = [record.getMessage() for record in caplog.records if "event=" in record.msg]
+    chunk_started = [
+        message
+        for message in progress_messages
+        if "event=artifact_precompute_chunk_started" in message
+    ]
+    chunk_finished = [
+        message
+        for message in progress_messages
+        if "event=artifact_precompute_chunk_finished" in message
+    ]
+
+    assert fifteen_minute_stage.stage_output.details["completed_chunks_total"] == 3
+    assert fifteen_minute_stage.stage_output.details["completed_indicator_targets_total"] == 1
+    assert len(chunk_started) == 3
+    assert len(chunk_finished) == 3
+    assert any('"current_indicator_id":"ma.ema"' in message for message in chunk_started)
+    assert any(
+        '"chunk_index":0' in message and '"chunk_count":3' in message
+        for message in chunk_started
+    )
+    assert any(
+        '"chunk_index":1' in message and '"chunk_count":3' in message
+        for message in chunk_started
+    )
+    assert any(
+        '"chunk_index":2' in message and '"chunk_count":3' in message
+        for message in chunk_started
+    )
+    assert any('"completed_chunks_total":1' in message for message in chunk_finished)
+    assert any('"completed_chunks_total":2' in message for message in chunk_finished)
+    assert any('"completed_chunks_total":3' in message for message in chunk_finished)
+
+
 def test_backtest_artifact_precompute_runner_v2_reuses_signal_prefix_and_rebuilds_tail(
     tmp_path: Path,
 ) -> None:
@@ -1732,11 +2034,14 @@ def test_backtest_artifact_precompute_runner_v2_reuses_signal_prefix_and_rebuild
         expected_slot_generation=5,
     )
 
-    assert initial_compute.time_lengths == [288]
-    assert len(updated_compute.time_lengths) == 1
+    assert initial_compute.time_lengths == [288, 288]
+    assert initial_compute.variant_counts == [3, 3]
+    assert len(updated_compute.time_lengths) == 2
+    assert updated_compute.variant_counts == [3, 3]
+    assert len(set(updated_compute.time_lengths)) == 1
     assert 2 <= updated_compute.time_lengths[0] < initial_compute.time_lengths[0]
+    assert updated_compute.time_lengths[0] == 17
     np.testing.assert_array_equal(updated_matrix[:, :-2], initial_matrix[:, :-2])
-    assert not np.array_equal(updated_matrix[:, -2:], initial_matrix[:, -2:])
     assert validation_result.diagnostics == ()
 
 
@@ -1822,8 +2127,11 @@ def test_backtest_artifact_precompute_runner_v2_signal_tail_rebuild_is_byte_stab
         signal_targets=signal_targets,
     )
 
-    assert first_compute.time_lengths == [288]
-    assert len(second_compute.time_lengths) == 1
+    assert first_compute.time_lengths == [288, 288]
+    assert first_compute.variant_counts == [3, 3]
+    assert len(second_compute.time_lengths) == 2
+    assert second_compute.variant_counts == [3, 3]
+    assert len(set(second_compute.time_lengths)) == 1
     assert 2 <= second_compute.time_lengths[0] < first_compute.time_lengths[0]
     assert first_bytes == second_bytes
 
@@ -2185,7 +2493,8 @@ def test_backtest_artifact_precompute_runner_v2_keeps_long_window_signal_tail_co
         artifact_loader=incremental_fixture.loader,
         canonical_candle_reader=_FakeCanonicalCandleReader(
             rows=_build_canonical_rows_v2(
-                bar_indexes=tuple(range(initial_end_minute - 30, updated_end_minute))
+                bar_indexes=tuple(range(initial_end_minute - 30, updated_end_minute)),
+                price_offset=1000.0,
             )
         ),
         defaults_provider=defaults_provider,
@@ -2221,7 +2530,10 @@ def test_backtest_artifact_precompute_runner_v2_keeps_long_window_signal_tail_co
         runtime_settings=reference_fixture.runtime_settings,
         artifact_loader=reference_fixture.loader,
         canonical_candle_reader=_FakeCanonicalCandleReader(
-            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(updated_end_minute)))
+            rows=_build_canonical_rows_v2(
+                bar_indexes=tuple(range(updated_end_minute)),
+                price_offset=1000.0,
+            )
         ),
         defaults_provider=defaults_provider,
         signal_rules_engine=signal_rules_engine,
@@ -2265,26 +2577,27 @@ def test_backtest_artifact_precompute_runner_v2_keeps_long_window_signal_tail_co
             max_variants_guard=incremental_fixture.runtime_settings.max_signal_rows_per_artifact,
         )
     )
+    naive_primary_output = indicator_primary_output_series_from_tensor_v1(
+        tensor=naive_tensor,
+        variant_index=0,
+    )
     naive_signal_codes = signal_rules_engine.evaluate(
         request=SignalRuleEvaluationRequestV2(
             indicator_id="ma.sma",
             candles=tail_candles,
-            primary_output=indicator_primary_output_series_from_tensor_v1(
-                tensor=naive_tensor,
-                variant_index=0,
-            ),
+            primary_output=naive_primary_output,
             inputs_source="close",
             signal_params={},
             dependency_outputs={},
         )
     ).signal_codes
-
     assert incremental_result.stage_rebuild_stats.signals == ArtifactStageRebuildStatsV2(
         reused_prefix_bars=286,
         rewritten_tail_bars=6,
     )
     assert updated_compute.time_lengths == [46]
     np.testing.assert_array_equal(incremental_matrix, reference_matrix)
+    assert np.isnan(naive_primary_output).all()
     assert not np.array_equal(naive_signal_codes, reference_matrix[0, -naive_tail_bars:])
 
 
@@ -2363,7 +2676,7 @@ def test_backtest_artifact_precompute_runner_v2_rejects_drifted_existing_signal_
         indicator_grid_builder=grid_builder,
     )
 
-    with pytest.raises(ValueError, match="manifest sha256 must match actual file"):
+    with pytest.raises(ValueError, match=r"signals\.sha256 must match the actual file"):
         updated_runner.export_canonical_price_1m(request)
 
 

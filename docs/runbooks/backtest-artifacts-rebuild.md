@@ -41,7 +41,7 @@ Minimal service metrics:
 - `backtest_artifact_publish_last_success_unixtime`
 - `backtest_artifact_tail_rebuild_bars_total{stage}`
 
-R12-01 implementation-facing code surface near this runbook:
+R12 implementation-facing code surface near this runbook:
 
 - `ArtifactPrecomputeCoordinatorV2` owns stage order and structured progress logs.
 - `ArtifactTimeframeSessionV2` owns explicit open/close lifecycle for one `current_timeframe`.
@@ -80,9 +80,9 @@ Path resolution precedence:
 - `lookback_policy`
 - `validation_budgets`
 
-R12 additive execution-policy contract:
+R12 execution-policy contract:
 
-- follow-up implementation extends the same YAML with `execution_policy`;
+- `execution_policy` is part of the checked-in `configs/dev|test|prod/backtest_artifacts.yaml`;
 - mandatory keys:
   - `max_open_timeframe_sessions`
   - `signal_worker_processes`
@@ -174,7 +174,7 @@ uv run python -m apps.cli.main.main backtest-artifact-publish \
 Manual progress checks:
 
 ```bash
-rg "event=artifact_precompute_(stage_started|stage_finished|completed|failed)" /tmp/backtest-artifact-publish-BTCUSDT.log
+rg "event=artifact_precompute_(stage_started|stage_finished|chunk_started|chunk_finished|completed|failed)" /tmp/backtest-artifact-publish-BTCUSDT.log
 tail -f /tmp/backtest-artifact-publish-BTCUSDT.log
 ```
 
@@ -188,18 +188,21 @@ tail bounded". Structured logs отвечают на вопрос "что runner
 - `event=artifact_precompute_stage_started|artifact_precompute_stage_finished`
 - `stage`
 - `current_timeframe`
-- `current_indicator`
+- `current_indicator_id`
 - `chunk_index`
-- `chunk_jobs_total`
+- `chunk_count`
 - `row_start_inclusive`
 - `row_end_exclusive`
-- `reused_prefix_bars`
-- `rewritten_tail_bars`
+- `chunk_rows`
+- `completed_chunks_total`
+- `completed_indicator_targets_total`
 
-R12-01 additive completion detail:
+R12 additive completion detail:
 
 - final `event=artifact_precompute_finished` now carries `details.stage_results` in deterministic
   execution order;
+- each `timeframe_session` summary now carries `completed_chunks_total` and
+  `completed_indicator_targets_total`;
 - this does not change CLI/scheduler publish result shape, but gives operators and future metrics
   adapters one canonical per-stage summary stream.
 
@@ -208,7 +211,7 @@ R12-01 additive completion detail:
 - если stage перешёл в `timeframe_session`, то одновременно должен быть открыт только один
   `current_timeframe`;
 - если один и тот же `current_timeframe` держится долго, это нормально для bootstrap full build,
-  но требует chunk progress (`chunk_index` / `chunk_jobs_total`);
+  но требует chunk progress (`chunk_index` / `chunk_count`);
 - отсутствие chunk progress при растущем memory pressure означает, что executor drift'нул обратно
   к giant in-memory behavior и должен считаться regression;
 - `reused_prefix_bars >> rewritten_tail_bars` ожидаемо для daily rebuild;

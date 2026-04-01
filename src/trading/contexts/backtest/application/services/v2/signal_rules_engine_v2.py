@@ -253,6 +253,50 @@ class BacktestSignalRulesEngineV2:
         """
         return signal_rule_spec_v2(indicator_id=indicator_id)
 
+    def resolved_defaults(
+        self,
+        *,
+        indicator_id: str,
+    ) -> tuple[str | None, Mapping[str, SignalRuleScalarV2]]:
+        """
+        Resolve deterministic default-only inputs required for chunked signal execution.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            tuple[str | None, Mapping[str, SignalRuleScalarV2]]: Default `inputs.source`
+                literal and the materialized `signals.v1.params` mapping.
+        Assumptions:
+            Artifact-precompute chunk workers must avoid re-reading mutable startup state and may
+            reuse this resolved contract across every chunk of the same indicator target.
+        Raises:
+            ValueError: If the indicator is blank, unsupported, or defaults drift from startup
+                validation invariants.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+          - configs/prod/indicators.yaml
+        """
+        spec = signal_rule_spec_v2(indicator_id=indicator_id)
+        return (
+            _default_inputs_source_from_defaults_v2(
+                indicator_id=spec.indicator_id,
+                defaults_provider=self.defaults_provider,
+                spec=spec,
+            ),
+            dict(
+                _materialize_default_signal_params_v2(
+                    indicator_id=spec.indicator_id,
+                    defaults_provider=self.defaults_provider,
+                    spec=spec,
+                )
+            ),
+        )
+
     def evaluate(
         self,
         *,

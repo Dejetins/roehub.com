@@ -178,12 +178,16 @@ ARTIFACT_PRECOMPUTE_STAGE_ORDER_V2: tuple[ArtifactPrecomputeStageIdV2, ...] = (
 type ArtifactPrecomputeProgressEventNameV2 = Literal[
     "artifact_precompute_stage_started",
     "artifact_precompute_stage_finished",
+    "artifact_precompute_chunk_started",
+    "artifact_precompute_chunk_finished",
     "timeframe_started",
     "timeframe_finished",
 ]
 ARTIFACT_PRECOMPUTE_PROGRESS_EVENTS_V2: tuple[ArtifactPrecomputeProgressEventNameV2, ...] = (
     "artifact_precompute_stage_started",
     "artifact_precompute_stage_finished",
+    "artifact_precompute_chunk_started",
+    "artifact_precompute_chunk_finished",
     "timeframe_started",
     "timeframe_finished",
 )
@@ -2658,6 +2662,268 @@ class ArtifactPrecomputeExecutionPolicyV2:
             "signal_chunk_rows_min": self.signal_chunk_rows_min,
             "signal_chunk_rows_max": self.signal_chunk_rows_max,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalChunkPlanningRequestV2:
+    """
+    Explicit ChunkPlanner request for one `(indicator_id, timeframe)` signal target.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    indicator_id: str
+    timeframe: str
+    timeline_bar_count: int
+    variant_count: int
+    estimated_bytes_per_row: int
+    worker_memory_budget_bytes: int
+    signal_chunk_rows_min: int
+    signal_chunk_rows_max: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one deterministic ChunkPlanner request.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            One request always describes exactly one `(indicator_id, timeframe)` target.
+        Raises:
+            ValueError: If indicator/timeframe identity or memory/chunk limits are invalid.
+        Side Effects:
+            Normalizes identifier fields and strict positive integer bounds.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+        """
+        object.__setattr__(self, "indicator_id", validate_indicator_id_v2(self.indicator_id))
+        object.__setattr__(self, "timeframe", validate_signal_timeframe_v2(self.timeframe))
+        object.__setattr__(
+            self,
+            "timeline_bar_count",
+            validate_positive_manifest_int_v2(self.timeline_bar_count),
+        )
+        object.__setattr__(
+            self,
+            "variant_count",
+            validate_positive_manifest_int_v2(self.variant_count),
+        )
+        object.__setattr__(
+            self,
+            "estimated_bytes_per_row",
+            validate_positive_manifest_int_v2(self.estimated_bytes_per_row),
+        )
+        object.__setattr__(
+            self,
+            "worker_memory_budget_bytes",
+            validate_positive_manifest_int_v2(self.worker_memory_budget_bytes),
+        )
+        object.__setattr__(
+            self,
+            "signal_chunk_rows_min",
+            validate_positive_manifest_int_v2(self.signal_chunk_rows_min),
+        )
+        object.__setattr__(
+            self,
+            "signal_chunk_rows_max",
+            validate_positive_manifest_int_v2(self.signal_chunk_rows_max),
+        )
+        if self.signal_chunk_rows_min > self.signal_chunk_rows_max:
+            raise ValueError(
+                "ArtifactSignalChunkPlanningRequestV2.signal_chunk_rows_min must be <= "
+                "signal_chunk_rows_max"
+            )
+
+    def as_dict(self) -> dict[str, int | str]:
+        """
+        Serialize the ChunkPlanner request into a stable JSON-friendly mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, int | str]: Deterministic planner payload for logs/tests.
+        Assumptions:
+            Operator diagnostics should expose the same field names as the docs contract.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+        """
+        return {
+            "indicator_id": self.indicator_id,
+            "timeframe": self.timeframe,
+            "timeline_bar_count": self.timeline_bar_count,
+            "variant_count": self.variant_count,
+            "estimated_bytes_per_row": self.estimated_bytes_per_row,
+            "worker_memory_budget_bytes": self.worker_memory_budget_bytes,
+            "signal_chunk_rows_min": self.signal_chunk_rows_min,
+            "signal_chunk_rows_max": self.signal_chunk_rows_max,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalChunkJobV2:
+    """
+    Deterministic ChunkPlanner output for one non-overlapping variant-row slice.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    indicator_id: str
+    timeframe: str
+    chunk_index: int
+    chunk_count: int
+    row_start_inclusive: int
+    row_end_exclusive: int
+    chunk_rows: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one deterministic chunk-job row-range contract.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Chunks are emitted in canonical ascending row order and never overlap.
+        Raises:
+            ValueError: If identity, indexes, or `chunk_rows` drift from the row range.
+        Side Effects:
+            Normalizes identifiers and integer fields through strict validation.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+        """
+        object.__setattr__(self, "indicator_id", validate_indicator_id_v2(self.indicator_id))
+        object.__setattr__(self, "timeframe", validate_signal_timeframe_v2(self.timeframe))
+        object.__setattr__(
+            self,
+            "chunk_index",
+            validate_non_negative_manifest_int_v2(self.chunk_index),
+        )
+        object.__setattr__(
+            self,
+            "chunk_count",
+            validate_positive_manifest_int_v2(self.chunk_count),
+        )
+        object.__setattr__(
+            self,
+            "row_start_inclusive",
+            validate_non_negative_manifest_int_v2(self.row_start_inclusive),
+        )
+        object.__setattr__(
+            self,
+            "row_end_exclusive",
+            validate_positive_manifest_int_v2(self.row_end_exclusive),
+        )
+        object.__setattr__(
+            self,
+            "chunk_rows",
+            validate_positive_manifest_int_v2(self.chunk_rows),
+        )
+        if self.chunk_index >= self.chunk_count:
+            raise ValueError(
+                "ArtifactSignalChunkJobV2.chunk_index must be < chunk_count; got "
+                f"{self.chunk_index!r} and {self.chunk_count!r}"
+            )
+        if self.row_end_exclusive <= self.row_start_inclusive:
+            raise ValueError(
+                "ArtifactSignalChunkJobV2 row range must be positive; got "
+                f"[{self.row_start_inclusive!r}, {self.row_end_exclusive!r})"
+            )
+        if self.chunk_rows != self.row_end_exclusive - self.row_start_inclusive:
+            raise ValueError(
+                "ArtifactSignalChunkJobV2.chunk_rows must match the explicit row range; got "
+                f"{self.chunk_rows!r} and "
+                f"{self.row_end_exclusive - self.row_start_inclusive!r}"
+            )
+
+    def as_dict(self) -> dict[str, int | str]:
+        """
+        Serialize one chunk job into a stable JSON-friendly mapping.
+
+        Args:
+            None.
+        Returns:
+            dict[str, int | str]: Deterministic chunk-job payload for logs/tests.
+        Assumptions:
+            Structured progress logs expose chunk ownership through these exact field names.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+        """
+        return {
+            "indicator_id": self.indicator_id,
+            "timeframe": self.timeframe,
+            "chunk_index": self.chunk_index,
+            "chunk_count": self.chunk_count,
+            "row_start_inclusive": self.row_start_inclusive,
+            "row_end_exclusive": self.row_end_exclusive,
+            "chunk_rows": self.chunk_rows,
+        }
+
+
+class ChunkPlannerV2(Protocol):
+    """
+    ChunkPlanner contract for deterministic artifact-only signal row planning.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+
+    def plan(
+        self,
+        *,
+        request: ArtifactSignalChunkPlanningRequestV2,
+    ) -> tuple[ArtifactSignalChunkJobV2, ...]:
+        """
+        Build deterministic chunk jobs for one `(indicator_id, timeframe)` signal target.
+
+        Args:
+            request: Typed planner request including row count and memory budget.
+        Returns:
+            tuple[ArtifactSignalChunkJobV2, ...]: Ordered non-overlapping chunk jobs.
+        Assumptions:
+            Reconstructing jobs in `chunk_index` order must preserve canonical row ordering.
+        Raises:
+            ValueError: If the planner cannot satisfy the configured chunk-size budget.
+        Side Effects:
+            None.
+        """
+        ...
 
 
 @dataclass(frozen=True, slots=True)

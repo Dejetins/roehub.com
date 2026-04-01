@@ -214,8 +214,8 @@ def build_artifact_precompute_fixture_v2(
     mapping_tail_bars_1m: int = 10,
     signal_tail_bars_1m: int = 10,
     hit_times_tail_bars_1m: int = 10,
-    validation_signal_artifacts: tuple[tuple[str, str], ...] = (),
-    precompute_signal_artifacts: tuple[tuple[str, str], ...] = (),
+    validation_signal_artifacts: tuple[tuple[str, str], ...] | str = (),
+    precompute_signal_artifacts: tuple[tuple[str, str], ...] | str = (),
     require_hit_times_manifest: bool = False,
     max_hit_times_cells: int = 1_000_000,
     max_hit_times_cells_full_rebuild: int | None = None,
@@ -239,10 +239,12 @@ def build_artifact_precompute_fixture_v2(
             expressed in `1m` bars.
         hit_times_tail_bars_1m: Strict positive `hit_times/1m` tail rebuild budget in canonical
             `1m` bars.
-        validation_signal_artifacts: Explicit `(timeframe, indicator_id)` targets written into
+        validation_signal_artifacts: Explicit `(timeframe, indicator_id)` targets or the
+            machine-readable literal `all_supported_v1` written into
             `backtest_artifacts.validation_plan.signal_artifacts`.
-        precompute_signal_artifacts: Explicit `(timeframe, indicator_id)` targets enabled for
-            real R4-02 signal materialization by the runner.
+        precompute_signal_artifacts: Explicit `(timeframe, indicator_id)` targets or the same
+            machine-readable literal `all_supported_v1` enabled for real R12 signal
+            materialization by the runner.
         require_hit_times_manifest: Whether the generated runtime config should require real
             `hit_times/1m/manifest.yaml` during whole-slot validation.
         max_hit_times_cells: Strict positive upper bound for materialized hit-times table cells.
@@ -307,13 +309,9 @@ def build_artifact_precompute_fixture_v2(
                     "validation_plan": {
                         "price_timeframes": list(ARTIFACT_PRICE_TIMEFRAMES_V2),
                         "mapping_timeframes": list(ARTIFACT_MAPPING_TIMEFRAMES_V2),
-                        "signal_artifacts": [
-                            {
-                                "timeframe": timeframe,
-                                "indicator_id": indicator_id,
-                            }
-                            for timeframe, indicator_id in validation_signal_artifacts
-                        ],
+                        "signal_artifacts": _serialize_signal_artifacts_config_v2(
+                            signal_artifacts=validation_signal_artifacts
+                        ),
                         "require_hit_times_manifest": require_hit_times_manifest,
                     },
                     "hit_times_grid": {
@@ -368,12 +366,9 @@ def build_artifact_precompute_fixture_v2(
             hit_times_sl_levels_pct=runtime_config.hit_times_grid.sl_levels_pct,
             config_sha256=build_backtest_artifacts_runtime_config_hash(config=runtime_config),
             execution_policy=runtime_config.execution_policy.to_execution_policy(),
-            signal_artifacts=tuple(
-                ArtifactSignalValidationSpecV2(
-                    timeframe=timeframe,
-                    indicator_id=indicator_id,
-                )
-                for timeframe, indicator_id in precompute_signal_artifacts
+            signal_artifacts=_runtime_settings_signal_artifacts_v2(
+                runtime_config=runtime_config,
+                precompute_signal_artifacts=precompute_signal_artifacts,
             ),
             max_signal_rows_per_artifact=(
                 runtime_config.validation_budgets.max_signal_rows_per_artifact
@@ -388,6 +383,98 @@ def build_artifact_precompute_fixture_v2(
         coordinates=coordinates,
         active_slot=active_slot,
         inactive_slot=inactive_slot,
+    )
+
+
+def _serialize_signal_artifacts_config_v2(
+    *,
+    signal_artifacts: tuple[tuple[str, str], ...] | str,
+) -> str | list[Mapping[str, str]]:
+    """
+    Serialize fixture signal-target inputs into the strict YAML config shape.
+
+    Args:
+        signal_artifacts: Explicit `(timeframe, indicator_id)` targets or the literal
+            `all_supported_v1`.
+    Returns:
+        str | list[Mapping[str, str]]: YAML-ready literal or explicit target list.
+    Assumptions:
+        Fixture helpers need to cover both explicit small test target sets and full-registry
+        `all_supported_v1` expansion through the real config loader.
+    Raises:
+        ValueError: If the literal value is unsupported.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+      - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
+    """
+    if isinstance(signal_artifacts, str):
+        normalized_literal = signal_artifacts.strip().lower()
+        if normalized_literal != "all_supported_v1":
+            raise ValueError(
+                "signal_artifacts literal must be 'all_supported_v1'; got "
+                f"{signal_artifacts!r}"
+            )
+        return normalized_literal
+    return [
+        {
+            "timeframe": timeframe,
+            "indicator_id": indicator_id,
+        }
+        for timeframe, indicator_id in signal_artifacts
+    ]
+
+
+def _runtime_settings_signal_artifacts_v2(
+    *,
+    runtime_config: BacktestArtifactsRuntimeConfig,
+    precompute_signal_artifacts: tuple[tuple[str, str], ...] | str,
+) -> tuple[ArtifactSignalValidationSpecV2, ...]:
+    """
+    Resolve fixture precompute targets into runner runtime settings.
+
+    Args:
+        runtime_config: Loaded strict runtime config used as source-of-truth for literal
+            expansion.
+        precompute_signal_artifacts: Explicit `(timeframe, indicator_id)` targets or the literal
+            `all_supported_v1`.
+    Returns:
+        tuple[ArtifactSignalValidationSpecV2, ...]: Runner-ready deterministic target tuple.
+    Assumptions:
+        Explicit precompute targets may intentionally differ from the full validation plan in
+        tests, while the `all_supported_v1` literal should reuse the config loader's canonical
+        expansion order.
+    Raises:
+        ValueError: If the literal value is unsupported.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
+      - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
+    """
+    if isinstance(precompute_signal_artifacts, str):
+        normalized_literal = precompute_signal_artifacts.strip().lower()
+        if normalized_literal != "all_supported_v1":
+            raise ValueError(
+                "precompute_signal_artifacts literal must be 'all_supported_v1'; got "
+                f"{precompute_signal_artifacts!r}"
+            )
+        return tuple(
+            item.to_validation_spec() for item in runtime_config.validation_plan.signal_artifacts
+        )
+    return tuple(
+        ArtifactSignalValidationSpecV2(
+            timeframe=timeframe,
+            indicator_id=indicator_id,
+        )
+        for timeframe, indicator_id in precompute_signal_artifacts
     )
 
 
