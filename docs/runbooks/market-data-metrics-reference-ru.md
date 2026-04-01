@@ -107,9 +107,11 @@ Source of truth scrape-конфига:
 | `artifact_precompute_stage_started` | structured log event | Старт нового pipeline stage |
 | `artifact_precompute_stage_finished` | structured log event | Успешное завершение stage |
 | `current_timeframe` | log field | Какой timeframe session сейчас открыт |
-| `current_indicator` | log field | Какой signal target materialize'ится внутри session |
+| `current_indicator_id` | log field | Какой signal target materialize'ится внутри session |
 | `chunk_index` | log field | Номер текущего chunk job |
-| `chunk_jobs_total` | log field | Сколько chunk jobs всего у текущего `(indicator_id, timeframe)` |
+| `chunk_count` | log field | Сколько chunk jobs всего у текущего `(indicator_id, timeframe)` |
+| `completed_chunks_total` | log field | Сколько chunk jobs уже завершено в текущем timeframe session |
+| `completed_indicators_total` | log field | Сколько indicator targets полностью завершено в текущем timeframe session |
 | `reused_prefix_bars` | log field / diagnostics | Сколько баров stage переиспользовал без переписывания |
 | `rewritten_tail_bars` | log field / diagnostics | Сколько баров stage реально переписал |
 

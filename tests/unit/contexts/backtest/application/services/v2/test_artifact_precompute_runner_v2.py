@@ -45,6 +45,9 @@ from trading.contexts.backtest.application.services import (
 from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
     indicator_primary_output_series_from_tensor_v1,
 )
+from trading.contexts.backtest.application.services.v2 import (
+    artifact_precompute_runner as artifact_precompute_runner_module,
+)
 from trading.contexts.indicators.adapters.outbound.registry import YamlIndicatorRegistry
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
@@ -1163,14 +1166,15 @@ def test_backtest_artifact_precompute_runner_v2_emits_deterministic_stage_result
 
     stage_ids = tuple(stage_result.stage_output.stage for stage_result in result.stage_results)
 
-    assert len(result.stage_results) == 1 + len(ARTIFACT_MAPPING_TIMEFRAMES_V2) + 2
+    assert len(result.stage_results) == len(ARTIFACT_MAPPING_TIMEFRAMES_V2) + 3
     assert stage_ids[0] == "canonical_prices"
-    assert stage_ids[1 : 1 + len(ARTIFACT_MAPPING_TIMEFRAMES_V2)] == (
+    assert stage_ids[1] == "hit_times"
+    assert stage_ids[2 : 2 + len(ARTIFACT_MAPPING_TIMEFRAMES_V2)] == (
         "timeframe_session",
     ) * len(ARTIFACT_MAPPING_TIMEFRAMES_V2)
-    assert stage_ids[-2:] == ("hit_times", "root_manifest")
-    assert result.stage_results[1].stage_output.current_timeframe == "15m"
-    assert result.stage_results[len(ARTIFACT_MAPPING_TIMEFRAMES_V2)].stage_output.current_timeframe == "3d"  # noqa: E501
+    assert stage_ids[-1] == "root_manifest"
+    assert result.stage_results[2].stage_output.current_timeframe == "15m"
+    assert result.stage_results[-2].stage_output.current_timeframe == "3d"
     assert result.stage_results[-1].stage_output.details["manifest_path"] == str(
         result.manifest_path
     )
@@ -1197,6 +1201,25 @@ def test_backtest_artifact_precompute_runner_v2_emits_deterministic_stage_result
     assert len(timeframe_finished_messages) == len(ARTIFACT_MAPPING_TIMEFRAMES_V2)
     assert "current_timeframe=15m" in timeframe_started_messages[0]
     assert "current_timeframe=3d" in timeframe_finished_messages[-1]
+    assert all('"open_timeframe_sessions":1' in message for message in timeframe_started_messages)
+    assert all('"open_timeframe_sessions":0' in message for message in timeframe_finished_messages)
+    assert all(
+        '"max_open_timeframe_sessions":1' in message for message in timeframe_started_messages
+    )
+    assert all(
+        '"max_open_timeframe_sessions":1' in message for message in timeframe_finished_messages
+    )
+    hit_times_finished_index = next(
+        index
+        for index, message in enumerate(progress_messages)
+        if "event=artifact_precompute_stage_finished" in message and "stage=hit_times" in message
+    )
+    first_timeframe_started_index = next(
+        index
+        for index, message in enumerate(progress_messages)
+        if "event=timeframe_started" in message
+    )
+    assert hit_times_finished_index < first_timeframe_started_index
     assert any(
         "event=artifact_precompute_finished" in message and "\"stage_results\"" in message
         for message in progress_messages
@@ -1923,7 +1946,7 @@ def test_backtest_artifact_precompute_runner_v2_reports_chunk_progress_and_sessi
     ]
 
     assert fifteen_minute_stage.stage_output.details["completed_chunks_total"] == 3
-    assert fifteen_minute_stage.stage_output.details["completed_indicator_targets_total"] == 1
+    assert fifteen_minute_stage.stage_output.details["completed_indicators_total"] == 1
     assert len(chunk_started) == 3
     assert len(chunk_finished) == 3
     assert any('"current_indicator_id":"ma.ema"' in message for message in chunk_started)
@@ -1942,6 +1965,197 @@ def test_backtest_artifact_precompute_runner_v2_reports_chunk_progress_and_sessi
     assert any('"completed_chunks_total":1' in message for message in chunk_finished)
     assert any('"completed_chunks_total":2' in message for message in chunk_finished)
     assert any('"completed_chunks_total":3' in message for message in chunk_finished)
+
+
+def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_and_signal_order(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify R12-03 no longer executes old broad stage batches across all target timeframes.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+        monkeypatch: pytest fixture used to wrap internal stage helpers.
+    Returns:
+        None.
+    Assumptions:
+        The delivered pipeline keeps `hit_times/1m` in canonical scope, then interleaves
+        `rolled_prices -> mappings -> signals` inside each timeframe session before moving on.
+    Raises:
+        AssertionError: If helper execution drifts back to `all rolled prices -> all mappings ->
+            all signals`.
+    Side Effects:
+        Materializes strict artifacts under `tmp_path` while recording internal helper order.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    signal_targets = (("15m", "ma.ema"), ("30m", "ma.sma"))
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=2,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=True,
+    )
+    defaults_provider = _build_signal_test_defaults_provider_v2()
+    grid_builder = _signal_grid_builder_v2()
+    signal_rules_engine = BacktestSignalRulesEngineV2(defaults_provider=defaults_provider)
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=signal_rules_engine,
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    )
+    helper_order: list[tuple[str, ...]] = []
+
+    original_hit_times = artifact_precompute_runner_module._materialize_hit_times_artifacts_v2
+    original_rolled_prices = (
+        artifact_precompute_runner_module._materialize_rolled_price_timeframe_v2
+    )
+    original_mappings = artifact_precompute_runner_module._materialize_mapping_timeframe_v2
+    original_signals = artifact_precompute_runner_module._materialize_signal_artifact_v2
+
+    def _record_hit_times(**kwargs):
+        """
+        Record the canonical-scope `hit_times/1m` execution before delegating to the real helper.
+
+        Args:
+            **kwargs: Original helper keyword arguments.
+        Returns:
+            _HitTimesArtifactBuildResultV2: Real helper result.
+        Assumptions:
+            The wrapper preserves the original helper behavior and only records call ordering.
+        Raises:
+            Exception: Propagates any real helper failure unchanged.
+        Side Effects:
+            Appends one `("hit_times", "1m")` marker to the in-memory order log.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        helper_order.append(("hit_times", "1m"))
+        return original_hit_times(**kwargs)
+
+    def _record_rolled_prices(timeframe: str, **kwargs):
+        """
+        Record one `rolled_prices/<tf>` materialization before calling the real helper.
+
+        Args:
+            timeframe: Target rolled timeframe literal.
+            **kwargs: Original helper keyword arguments.
+        Returns:
+            ArtifactPriceTimeframeManifestV2: Real helper result.
+        Assumptions:
+            Recording does not change the deterministic per-timeframe build behavior.
+        Raises:
+            Exception: Propagates any real helper failure unchanged.
+        Side Effects:
+            Appends one `("rolled_prices", timeframe)` marker to the in-memory order log.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        helper_order.append(("rolled_prices", timeframe))
+        return original_rolled_prices(timeframe, **kwargs)
+
+    def _record_mappings(timeframe: str, **kwargs):
+        """
+        Record one `mappings/<tf>` materialization before calling the real helper.
+
+        Args:
+            timeframe: Target mapping timeframe literal.
+            **kwargs: Original helper keyword arguments.
+        Returns:
+            _MappingArtifactMaterializationResultV2: Real helper result.
+        Assumptions:
+            Recording does not change the deterministic per-timeframe build behavior.
+        Raises:
+            Exception: Propagates any real helper failure unchanged.
+        Side Effects:
+            Appends one `("mappings", timeframe)` marker to the in-memory order log.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        helper_order.append(("mappings", timeframe))
+        return original_mappings(timeframe, **kwargs)
+
+    def _record_signals(*, signal_target: ArtifactSignalValidationSpecV2, **kwargs):
+        """
+        Record one `signals/<tf>/<indicator_id>` materialization before delegating.
+
+        Args:
+            signal_target: Explicit signal target being materialized.
+            **kwargs: Original helper keyword arguments.
+        Returns:
+            _SignalArtifactMaterializationResultV2: Real helper result.
+        Assumptions:
+            Recording does not change the deterministic per-target signal build behavior.
+        Raises:
+            Exception: Propagates any real helper failure unchanged.
+        Side Effects:
+            Appends one `("signals", timeframe, indicator_id)` marker to the in-memory order log.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+        """
+        helper_order.append(("signals", signal_target.timeframe, signal_target.indicator_id))
+        return original_signals(signal_target=signal_target, **kwargs)
+
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "_materialize_hit_times_artifacts_v2",
+        _record_hit_times,
+    )
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "_materialize_rolled_price_timeframe_v2",
+        _record_rolled_prices,
+    )
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "_materialize_mapping_timeframe_v2",
+        _record_mappings,
+    )
+    monkeypatch.setattr(
+        artifact_precompute_runner_module,
+        "_materialize_signal_artifact_v2",
+        _record_signals,
+    )
+
+    runner.export_canonical_price_1m(
+        _request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2)
+    )
+
+    assert helper_order[0] == ("hit_times", "1m")
+    assert helper_order.index(("hit_times", "1m")) < helper_order.index(("rolled_prices", "15m"))
+    assert helper_order.index(("rolled_prices", "15m")) < helper_order.index(("mappings", "15m"))
+    assert helper_order.index(("mappings", "15m")) < helper_order.index(
+        ("signals", "15m", "ma.ema")
+    )
+    assert helper_order.index(("signals", "15m", "ma.ema")) < helper_order.index(
+        ("rolled_prices", "30m")
+    )
+    assert helper_order.index(("rolled_prices", "30m")) < helper_order.index(("mappings", "30m"))
+    assert helper_order.index(("mappings", "30m")) < helper_order.index(
+        ("signals", "30m", "ma.sma")
+    )
+    assert helper_order.index(("signals", "30m", "ma.sma")) < helper_order.index(
+        ("rolled_prices", "1h")
+    )
 
 
 def test_backtest_artifact_precompute_runner_v2_reuses_signal_prefix_and_rebuilds_tail(

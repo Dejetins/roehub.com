@@ -270,7 +270,7 @@ Manual CLI progress diagnostics:
 ```bash
 tail -n 200 /tmp/backtest-artifact-publish-BTCUSDT.log
 rg "event=artifact_precompute_(stage_started|stage_finished|completed|failed)" /tmp/backtest-artifact-publish-BTCUSDT.log
-rg "current_timeframe|current_indicator|chunk_index|chunk_jobs_total|rewritten_tail_bars" /tmp/backtest-artifact-publish-BTCUSDT.log
+rg "current_timeframe|current_indicator_id|chunk_index|chunk_count|completed_chunks_total|completed_indicators_total|rewritten_tail_bars" /tmp/backtest-artifact-publish-BTCUSDT.log
 find /opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT \( -name current.yaml -o -name manifest.yaml -o -name '*.npy' \) | head -100
 ```
 
@@ -327,8 +327,9 @@ launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\
 - откройте `/Users/daniildegtyarev/Library/Logs/roehub/backtest-artifact-publisher.err.log`;
 - проверьте доступность ClickHouse, `STRATEGY_PG_DSN`, и содержимое
   `/opt/roehub/config/prometheus.prod.yml`;
-- проверьте structured progress fields `current_timeframe`, `current_indicator`,
-  `chunk_index/chunk_jobs_total` и сравните их с memory/disk pressure on host;
+- проверьте structured progress fields `current_timeframe`, `current_indicator_id`,
+  `chunk_index/chunk_count`, `completed_chunks_total/completed_indicators_total` и сравните их с
+  memory/disk pressure on host;
 - если сервис снова выглядит как giant tensor-first execution без bounded chunk progress,
   уменьшайте future `signal_worker_processes` / chunk sizing в `execution_policy`, а не пытайтесь
   лечить это ручной чисткой slot contents.

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from typing import cast
 
+import pytest
 from prometheus_client import CollectorRegistry
 
 from apps.scheduler.backtest_artifact_publisher.wiring.modules import (
@@ -377,6 +379,59 @@ def test_run_cycle_uses_sorted_enabled_tradable_universe() -> None:
         app.metrics.backtest_artifact_publish_symbols_total.labels(status="planned")._value.get()
         == 3
     )
+
+
+def test_run_cycle_logs_stage_rebuild_stats_for_successful_symbol(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """
+    Ensure successful scheduler logs include stage-level rebuild stats alongside tail totals.
+
+    Args:
+        caplog: pytest log capture fixture.
+    Returns:
+        None.
+    Assumptions:
+        Operators inspect scheduler logs directly when validating the final stage breakdown.
+    Raises:
+        AssertionError: If the success log omits `stage_rebuild_stats`.
+    Side Effects:
+        Executes one in-memory scheduler cycle and captures INFO logs.
+    Docs:
+      - docs/runbooks/backtest-artifacts-rebuild.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+    """
+    fake_use_case = _FakePublishUseCase(
+        results=[_result(exchange="binance", market_type="spot", symbol="BTCUSDT")]
+    )
+    app = BacktestArtifactPublisherApp(
+        publish_use_case=cast(PublishBacktestArtifactsV2UseCase, fake_use_case),
+        instrument_reader=_FakeInstrumentReader(
+            instruments=(InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),)
+        ),
+        metrics=BacktestArtifactPublisherMetrics(registry=CollectorRegistry()),
+        host_lock=_FakeHostLock(acquired=True),
+        metrics_port=9203,
+        now_provider=lambda: datetime(2026, 3, 30, 0, 5, tzinfo=timezone.utc),
+    )
+
+    with caplog.at_level(logging.INFO):
+        app._run_publish_cycle(
+            stop_requested=lambda: False,
+            scheduled_for_utc=datetime(2026, 3, 30, 0, 5, tzinfo=timezone.utc),
+        )
+
+    success_messages = [
+        record.getMessage()
+        for record in caplog.records
+        if "event=symbol_publish_succeeded" in record.msg
+    ]
+
+    assert len(success_messages) == 1
+    assert "stage_rebuild_stats=" in success_messages[0]
+    assert "tail_rebuild_bars=" in success_messages[0]
 
 
 def test_app_starts_metrics_and_exits_cleanly_when_stop_already_set(

@@ -391,7 +391,8 @@ def _render_report_v2(
         str: Rendered CLI report body.
     Assumptions:
         JSON remains the default because later scheduler integration expects machine-readable
-        diagnostics.
+        diagnostics, while text mode should still expose stage-level rebuild breakdowns for manual
+        operators.
     Raises:
         ValueError: If report format is unsupported.
     Side Effects:
@@ -422,6 +423,10 @@ def _render_report_v2(
             f"- source_candle_count: {result.source_candle_count}\n"
             f"- reused_prefix_bars: {result.reused_prefix_bars}\n"
             f"- rewritten_tail_bars: {result.rewritten_tail_bars}\n"
+            f"- stage_rebuild_stats: prices(reused={result.stage_rebuild_stats.prices.reused_prefix_bars}, rewritten={result.stage_rebuild_stats.prices.rewritten_tail_bars}), "  # noqa: E501
+            f"mappings(reused={result.stage_rebuild_stats.mappings.reused_prefix_bars}, rewritten={result.stage_rebuild_stats.mappings.rewritten_tail_bars}), "  # noqa: E501
+            f"signals(reused={result.stage_rebuild_stats.signals.reused_prefix_bars}, rewritten={result.stage_rebuild_stats.signals.rewritten_tail_bars}), "  # noqa: E501
+            f"hit_times(reused={result.stage_rebuild_stats.hit_times.reused_prefix_bars}, rewritten={result.stage_rebuild_stats.hit_times.rewritten_tail_bars})\n"  # noqa: E501
             f"- tail_rebuild_bars: prices={result.tail_rebuild_bars.prices}, "
             f"mappings={result.tail_rebuild_bars.mappings}, "
             f"signals={result.tail_rebuild_bars.signals}, "

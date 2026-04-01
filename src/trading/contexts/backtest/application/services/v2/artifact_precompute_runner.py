@@ -11,7 +11,6 @@ import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from functools import partial
 from itertools import product
 from multiprocessing import get_context
 from pathlib import Path
@@ -129,33 +128,6 @@ _CANONICAL_CANDLE_SOURCE_LITERAL_V2 = "market_data.canonical_candles_1m"
 _PRECOMPUTE_GENERATOR_LITERAL_V2 = "backtest-artifact-precompute-runner-v2"
 _PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r5-01"
 _ONE_MINUTE_MILLIS_V2 = 60 * 1000
-_ROLLED_PRICE_TIMEFRAME_LITERALS_V2 = tuple(
-    timeframe
-    for timeframe in ARTIFACT_PRICE_TIMEFRAMES_V2
-    if timeframe != _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2
-)
-
-
-def _resolve_precompute_parallel_workers_v2(*, total_tasks: int) -> int:
-    """
-    Resolve the bounded worker count used for independent precompute stage fan-out.
-
-    Args:
-        total_tasks: Number of independent stage tasks that may run concurrently.
-    Returns:
-        int: Deterministic bounded worker count.
-    Assumptions:
-        Price/mapping stages are independent per timeframe, while worker count should stay below
-        full logical CPU count to reduce contention with filesystem and later Numba stages.
-    Raises:
-        ValueError: If `total_tasks` is not positive.
-    Side Effects:
-        Reads `os.cpu_count()`.
-    """
-    if total_tasks <= 0:
-        raise ValueError(f"total_tasks must be > 0; got {total_tasks!r}")
-    cpu_count = os.cpu_count() or 1
-    return max(1, min(total_tasks, max(1, min(cpu_count, 8))))
 
 
 def _log_precompute_stage_started_v2(
@@ -494,24 +466,6 @@ class _SignalVariantRowV2:
 
 
 @dataclass(frozen=True, slots=True)
-class _SignalArtifactBuildResultV2:
-    """
-    Internal immutable output of one full R4-02 signal materialization pass.
-
-    Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-    Related:
-      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
-    """
-
-    catalog: ArtifactSignalCatalogV2
-    manifests: tuple[ArtifactSignalManifestDocumentV2, ...]
-    reused_prefix_bars: int
-    rewritten_tail_bars: int
-
-
-@dataclass(frozen=True, slots=True)
 class _SignalArtifactMaterializationResultV2:
     """
     Internal immutable output of one strict signal artifact materialization target.
@@ -544,23 +498,6 @@ class _HitTimesArtifactBuildResultV2:
 
     manifest: ArtifactHitTimesManifestDocumentV2
     reference: ArtifactHitTimesReferenceV2
-    reused_prefix_bars: int
-    rewritten_tail_bars: int
-
-
-@dataclass(frozen=True, slots=True)
-class _MappingArtifactBuildResultV2:
-    """
-    Internal immutable output of one full mapping materialization pass.
-
-    Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-    Related:
-      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
-    """
-
-    manifests: tuple[ArtifactMappingTimeframeManifestV2, ...]
     reused_prefix_bars: int
     rewritten_tail_bars: int
 
@@ -725,7 +662,7 @@ class _TimeframeSessionBuildResultV2:
     reused_signal_prefix_bars: int
     rewritten_signal_tail_bars: int
     completed_chunks_total: int
-    completed_indicator_targets_total: int
+    completed_indicators_total: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -806,7 +743,7 @@ class BacktestArtifactPrecomputeRunnerV2:
         request: ArtifactCanonicalPriceExportRequestV2,
     ) -> ArtifactCanonicalPriceExportResultV2:
         """
-        Export canonical `1m`, rolled `prices/<tf>`, `tf -> 1m` mappings, and `hit_times/1m`
+        Export canonical `1m`, `hit_times/1m`, and timeframe-local `rolled_prices` sessions
         into the inactive slot.
 
         Args:
@@ -814,9 +751,9 @@ class BacktestArtifactPrecomputeRunnerV2:
         Returns:
             ArtifactCanonicalPriceExportResultV2: Structured write result for the inactive slot.
         Assumptions:
-            Public API stays rooted in canonical `1m`, while R3-03 also materializes every
-            allowed request timeframe, deterministic `tf -> 1m` mapping arrays, and the strict
-            R5-01 `hit_times/1m` family under the same root manifest update.
+            Public API stays rooted in canonical `1m`, while R12-03 keeps both
+            `canonical_prices` and `hit_times` in the canonical `1m` scope before the explicit
+            per-timeframe `rolled_prices -> mappings -> signals` loop begins.
         Raises:
             FileNotFoundError: If strict `current.yaml` is missing for the symbol root.
             ValueError: If existing inactive-slot metadata, source candles, or derived
@@ -904,6 +841,43 @@ class BacktestArtifactPrecomputeRunnerV2:
                         "timeline_bar_count": int(
                             stage_result.materialized_arrays.open_time.shape[0]
                         ),
+                    },
+                ),
+            )
+
+            hit_times_budget = _resolve_hit_times_cell_budget_v2(
+                runtime_settings=self.runtime_settings,
+                force_full_rebuild=request.force_full_rebuild,
+                has_existing_slot_manifest=existing_manifest is not None,
+            )
+            hit_times_build_result = coordinator.run_stage(
+                stage_input=ArtifactPrecomputeStageInputV2(
+                    stage="hit_times",
+                    details={
+                        "hit_times_tail_bars_1m": self.runtime_settings.hit_times_tail_bars_1m,
+                        "max_hit_times_cells": hit_times_budget,
+                    },
+                ),
+                execute=lambda: _materialize_hit_times_artifacts_v2(
+                    artifact_loader=self.artifact_loader,
+                    coordinates=request.coordinates,
+                    slot=inactive_slot,
+                    slot_root=slot_root,
+                    existing_manifest=existing_manifest,
+                    request=request,
+                    slot_generation=target_slot_generation,
+                    runtime_settings=self.runtime_settings,
+                    one_minute_arrays=canonical_stage_result.rollup_source_arrays,
+                    one_minute_manifest=canonical_stage_result.one_minute_manifest,
+                    max_hit_times_cells=hit_times_budget,
+                ),
+                build_output=lambda stage_result: ArtifactPrecomputeStageOutputV2(
+                    stage="hit_times",
+                    reused_prefix_bars=stage_result.reused_prefix_bars,
+                    rewritten_tail_bars=stage_result.rewritten_tail_bars,
+                    details={
+                        "reused_prefix_bars": stage_result.reused_prefix_bars,
+                        "rewritten_tail_bars": stage_result.rewritten_tail_bars,
                     },
                 ),
             )
@@ -1024,8 +998,8 @@ class BacktestArtifactPrecomputeRunnerV2:
                                     "completed_chunks_total": (
                                         stage_result.completed_chunks_total
                                     ),
-                                    "completed_indicator_targets_total": (
-                                        stage_result.completed_indicator_targets_total
+                                    "completed_indicators_total": (
+                                        stage_result.completed_indicators_total
                                     ),
                                     "signal_manifest_count": len(
                                         stage_result.signal_manifests
@@ -1055,8 +1029,8 @@ class BacktestArtifactPrecomputeRunnerV2:
                             "completed_chunks_total": (
                                 completed_session_result.completed_chunks_total
                             ),
-                            "completed_indicator_targets_total": (
-                                completed_session_result.completed_indicator_targets_total
+                            "completed_indicators_total": (
+                                completed_session_result.completed_indicators_total
                             ),
                             "signal_manifest_count": len(
                                 completed_session_result.signal_manifests
@@ -1075,43 +1049,6 @@ class BacktestArtifactPrecomputeRunnerV2:
                 mapping_rewritten_tail_bars += timeframe_stage_result.rewritten_mapping_tail_bars
                 signal_reused_prefix_bars += timeframe_stage_result.reused_signal_prefix_bars
                 signal_rewritten_tail_bars += timeframe_stage_result.rewritten_signal_tail_bars
-
-            hit_times_budget = _resolve_hit_times_cell_budget_v2(
-                runtime_settings=self.runtime_settings,
-                force_full_rebuild=request.force_full_rebuild,
-                has_existing_slot_manifest=existing_manifest is not None,
-            )
-            hit_times_build_result = coordinator.run_stage(
-                stage_input=ArtifactPrecomputeStageInputV2(
-                    stage="hit_times",
-                    details={
-                        "hit_times_tail_bars_1m": self.runtime_settings.hit_times_tail_bars_1m,
-                        "max_hit_times_cells": hit_times_budget,
-                    },
-                ),
-                execute=lambda: _materialize_hit_times_artifacts_v2(
-                    artifact_loader=self.artifact_loader,
-                    coordinates=request.coordinates,
-                    slot=inactive_slot,
-                    slot_root=slot_root,
-                    existing_manifest=existing_manifest,
-                    request=request,
-                    slot_generation=target_slot_generation,
-                    runtime_settings=self.runtime_settings,
-                    one_minute_arrays=canonical_stage_result.rollup_source_arrays,
-                    one_minute_manifest=canonical_stage_result.one_minute_manifest,
-                    max_hit_times_cells=hit_times_budget,
-                ),
-                build_output=lambda stage_result: ArtifactPrecomputeStageOutputV2(
-                    stage="hit_times",
-                    reused_prefix_bars=stage_result.reused_prefix_bars,
-                    rewritten_tail_bars=stage_result.rewritten_tail_bars,
-                    details={
-                        "reused_prefix_bars": stage_result.reused_prefix_bars,
-                        "rewritten_tail_bars": stage_result.rewritten_tail_bars,
-                    },
-                ),
-            )
 
             scaffold = _build_root_manifest_scaffold_v2(existing_manifest=existing_manifest)
             root_signals = (
@@ -1370,7 +1307,7 @@ def _materialize_timeframe_session_v2(
     indicator_grid_builder: GridBuilder | None,
 ) -> _TimeframeSessionBuildResultV2:
     """
-    Materialize one explicit R12 timeframe session from rolled prices through signals.
+    Materialize one explicit R12 timeframe session from `rolled_prices` through `signals`.
 
     Args:
         artifact_loader: Explicit-path artifact loader used to resolve fixed output paths.
@@ -1432,7 +1369,7 @@ def _materialize_timeframe_session_v2(
     reused_signal_prefix_bars = 0
     rewritten_signal_tail_bars = 0
     completed_chunks_total = 0
-    completed_indicator_targets_total = 0
+    completed_indicators_total = 0
     for signal_target in signal_targets:
         if (
             defaults_provider is None
@@ -1464,7 +1401,7 @@ def _materialize_timeframe_session_v2(
         reused_signal_prefix_bars += signal_build_result.reused_prefix_bars
         rewritten_signal_tail_bars += signal_build_result.rewritten_tail_bars
         completed_chunks_total += signal_build_result.completed_chunks_total
-        completed_indicator_targets_total += 1
+        completed_indicators_total += 1
     return _TimeframeSessionBuildResultV2(
         price_manifest=price_manifest,
         mapping_manifest=mapping_result.manifest,
@@ -1474,7 +1411,7 @@ def _materialize_timeframe_session_v2(
         reused_signal_prefix_bars=reused_signal_prefix_bars,
         rewritten_signal_tail_bars=rewritten_signal_tail_bars,
         completed_chunks_total=completed_chunks_total,
-        completed_indicator_targets_total=completed_indicator_targets_total,
+        completed_indicators_total=completed_indicators_total,
     )
 
 
@@ -1639,139 +1576,6 @@ def _resolve_export_target_v2(
     return (
         inactive_artifact_slot_v2(current_pointer.active_slot),
         current_pointer.slot_generation + 1,
-    )
-
-
-def _materialize_signal_artifacts_v2(
-    *,
-    artifact_loader: BacktestArtifactLoaderV2,
-    coordinates: ArtifactCoordinatesV2,
-    slot: str,
-    slot_root: Path,
-    existing_manifest: ArtifactManifestDocumentV2 | None,
-    request: ArtifactCanonicalPriceExportRequestV2,
-    slot_generation: int,
-    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
-    signal_targets: tuple[ArtifactSignalValidationSpecV2, ...],
-    price_manifest_by_timeframe: Mapping[str, ArtifactPriceTimeframeManifestV2],
-    defaults_provider: BacktestGridDefaultsProvider | None,
-    signal_rules_engine: BacktestSignalRulesEngineV2 | None,
-    indicator_compute: IndicatorCompute | None,
-    indicator_grid_builder: GridBuilder | None,
-) -> _SignalArtifactBuildResultV2 | None:
-    """
-    Materialize all configured R4-02 signal artifacts for the current inactive slot.
-
-    Args:
-        artifact_loader: Explicit-path artifact loader used to resolve signal and price paths.
-        coordinates: Artifact coordinates selecting one symbol root.
-        slot: Inactive slot literal receiving the signal artifacts.
-        slot_root: Absolute inactive-slot root directory.
-        existing_manifest: Previously materialized inactive-slot root manifest, when present.
-        request: Explicit export request carrying slot identity and timestamps.
-        runtime_settings: Strict runner runtime settings with signal target and guard budgets.
-        signal_targets: Canonically ordered `(timeframe, indicator_id)` signal targets.
-        price_manifest_by_timeframe: Fresh materialized price sections keyed by timeframe.
-        defaults_provider: Runtime defaults provider for compute grids and signal defaults.
-        signal_rules_engine: Startup-validated signal rules engine.
-        indicator_compute: Indicator compute port used for tensor materialization.
-        indicator_grid_builder: Grid builder used for deterministic variant ordering.
-    Returns:
-        _SignalArtifactBuildResultV2 | None: Real signal catalog/manifests when targets are
-            configured, otherwise `None`.
-    Assumptions:
-        R4-02 owns only explicitly configured signal targets and must not discover directories.
-    Raises:
-        ValueError: If one signal dependency is missing, one target lacks a price manifest, or one
-            materialized signal artifact violates the strict contract.
-        OSError: If writing signal arrays or manifests fails.
-    Side Effects:
-        Writes `signals/<tf>/<indicator_id>/signals.i8.npy` and `manifest.yaml` files.
-    Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-    Related:
-      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
-      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
-    """
-    if len(signal_targets) == 0:
-        return None
-    if (
-        defaults_provider is None
-        or signal_rules_engine is None
-        or indicator_compute is None
-        or indicator_grid_builder is None
-    ):
-        raise ValueError(
-            "R4-02 signal materialization requires defaults_provider, "
-            "signal_rules_engine, indicator_compute, and indicator_grid_builder"
-        )
-
-    manifests: list[ArtifactSignalManifestDocumentV2] = []
-    catalog_entries: list[ArtifactSignalCatalogEntryV2] = []
-    reused_prefix_bars = 0
-    rewritten_tail_bars = 0
-    for signal_target in signal_targets:
-        price_manifest = price_manifest_by_timeframe.get(signal_target.timeframe)
-        if price_manifest is None:
-            raise ValueError(
-                "signal target requires materialized prices for timeframe "
-                f"{signal_target.timeframe!r}"
-            )
-        signal_build_result = _materialize_signal_artifact_v2(
-            artifact_loader=artifact_loader,
-            coordinates=coordinates,
-            slot=slot,
-            slot_root=slot_root,
-            existing_manifest=existing_manifest,
-            request=request,
-            slot_generation=slot_generation,
-            runtime_settings=runtime_settings,
-            signal_target=signal_target,
-            price_manifest=price_manifest,
-            defaults_provider=defaults_provider,
-            signal_rules_engine=signal_rules_engine,
-            indicator_compute=indicator_compute,
-            indicator_grid_builder=indicator_grid_builder,
-        )
-        signal_manifest = signal_build_result.manifest
-        manifests.append(signal_manifest)
-        reused_prefix_bars += signal_build_result.reused_prefix_bars
-        rewritten_tail_bars += signal_build_result.rewritten_tail_bars
-        catalog_entries.append(
-            ArtifactSignalCatalogEntryV2(
-                timeframe=signal_manifest.timeframe,
-                indicator_id=signal_manifest.indicator_id,
-                manifest_path=_slot_relative_path_v2(
-                    slot_root=slot_root,
-                    absolute_path=signal_manifest.path,
-                ),
-                manifest_sha256=_file_sha256_hex_v2(signal_manifest.path),
-            )
-        )
-    timeframe_order = {
-        literal: index for index, literal in enumerate(ARTIFACT_SIGNAL_TIMEFRAMES_V2)
-    }
-    ordered_catalog_entries = tuple(
-        sorted(
-            catalog_entries,
-            key=lambda entry: (timeframe_order[entry.timeframe], entry.indicator_id),
-        )
-    )
-    return _SignalArtifactBuildResultV2(
-        catalog=ArtifactSignalCatalogV2(
-            supported_timeframes=tuple(
-                dict.fromkeys(entry.timeframe for entry in ordered_catalog_entries)
-            ),
-            supported_indicator_ids=tuple(
-                sorted({entry.indicator_id for entry in ordered_catalog_entries})
-            ),
-            manifests=ordered_catalog_entries,
-        ),
-        manifests=tuple(manifests),
-        reused_prefix_bars=reused_prefix_bars,
-        rewritten_tail_bars=rewritten_tail_bars,
     )
 
 
@@ -4681,69 +4485,6 @@ def _load_existing_price_timeframe_arrays_v2(
     )
 
 
-def _materialize_rolled_price_timeframes_v2(
-    *,
-    artifact_loader: BacktestArtifactLoaderV2,
-    coordinates: ArtifactCoordinatesV2,
-    slot: str,
-    slot_root: Path,
-    existing_manifest: ArtifactManifestDocumentV2 | None,
-    source_arrays: _CanonicalPriceArraysV2,
-    source_tail_time_range: TimeRange,
-) -> tuple[ArtifactPriceTimeframeManifestV2, ...]:
-    """
-    Materialize deterministic rolled price arrays for all allowed request timeframes.
-
-    Args:
-        artifact_loader: Explicit-path artifact loader.
-        coordinates: Artifact coordinates selecting one symbol root.
-        slot: Inactive slot receiving the rolled arrays.
-        slot_root: Absolute inactive-slot root directory.
-        existing_manifest: Existing inactive-slot root manifest when present.
-        source_arrays: Canonical `prices/1m` arrays loaded back from the materialized artifact.
-        source_tail_time_range: Effective canonical source reread window used for the `1m` build.
-    Returns:
-        tuple[ArtifactPriceTimeframeManifestV2, ...]: Canonically ordered rolled price sections.
-    Assumptions:
-        R3-02 owns every request-level timeframe listed in `ARTIFACT_PRICE_TIMEFRAMES_V2`
-        except canonical `1m`.
-    Raises:
-        ValueError: If source arrays, reused prefixes, or rolled outputs violate strict contracts.
-        OSError: If one `.npy` write or hash read fails.
-    Side Effects:
-        Atomically writes `prices/<tf>/*.npy` files for every rolled timeframe.
-    Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-    Related:
-      - src/trading/shared_kernel/primitives/timeframe.py
-      - src/trading/contexts/backtest/application/services/v2/contracts.py
-    """
-    worker_count = _resolve_precompute_parallel_workers_v2(
-        total_tasks=len(_ROLLED_PRICE_TIMEFRAME_LITERALS_V2)
-    )
-    materialize_timeframe = partial(
-        _materialize_rolled_price_timeframe_v2,
-        artifact_loader=artifact_loader,
-        coordinates=coordinates,
-        slot=slot,
-        slot_root=slot_root,
-        existing_manifest=existing_manifest,
-        source_arrays=source_arrays,
-        source_tail_time_range=source_tail_time_range,
-    )
-    if worker_count == 1:
-        return tuple(
-            materialize_timeframe(timeframe)
-            for timeframe in _ROLLED_PRICE_TIMEFRAME_LITERALS_V2
-        )
-    with ThreadPoolExecutor(
-        max_workers=worker_count,
-        thread_name_prefix="artifact-price-rollup",
-    ) as executor:
-        return tuple(executor.map(materialize_timeframe, _ROLLED_PRICE_TIMEFRAME_LITERALS_V2))
-
-
 def _materialize_rolled_price_timeframe_v2(
     timeframe: str,
     *,
@@ -4770,7 +4511,9 @@ def _materialize_rolled_price_timeframe_v2(
     Returns:
         ArtifactPriceTimeframeManifestV2: Strict manifest section for the rolled timeframe.
     Assumptions:
-        Per-timeframe rolled price materialization is independent and safe to run concurrently.
+        R12-03 intentionally calls this helper inside one active `timeframe_session` at a time so
+        only the current target `rolled_prices` arrays stay live before mappings/signals consume
+        them.
     Raises:
         ValueError: If source arrays or prefix reuse violate strict contracts.
         OSError: If writing one timeframe artifact family fails.
@@ -4906,84 +4649,6 @@ def _load_existing_mapping_arrays_v2(
     return arrays
 
 
-def _materialize_mapping_timeframes_v2(
-    *,
-    artifact_loader: BacktestArtifactLoaderV2,
-    coordinates: ArtifactCoordinatesV2,
-    slot: str,
-    slot_root: Path,
-    existing_manifest: ArtifactManifestDocumentV2 | None,
-    one_minute_arrays: _CanonicalPriceArraysV2,
-    price_manifests: tuple[ArtifactPriceTimeframeManifestV2, ...],
-    mapping_tail_bars_1m: int,
-) -> _MappingArtifactBuildResultV2:
-    """
-    Materialize deterministic `tf -> 1m` mapping arrays for all allowed request timeframes.
-
-    Args:
-        artifact_loader: Explicit-path artifact loader.
-        coordinates: Artifact coordinates selecting one symbol root.
-        slot: Inactive slot receiving the mapping arrays.
-        slot_root: Absolute inactive-slot root directory.
-        existing_manifest: Existing inactive-slot root manifest when present.
-        one_minute_arrays: Materialized artifact-backed canonical `prices/1m` arrays.
-        price_manifests: Fresh strict `prices/<tf>` manifest sections for allowed request TFs.
-        mapping_tail_bars_1m: Effective `lookback_policy.mapping_tail_bars_1m`.
-    Returns:
-        _MappingArtifactBuildResultV2: Canonically ordered mapping sections plus total rewritten
-            tail bars across all request timeframes.
-    Assumptions:
-        Mapping build uses only materialized artifact-backed `prices/1m` plus `prices/<tf>`
-        arrays and never rereads external sources.
-    Raises:
-        ValueError: If price arrays or reused mapping prefixes violate strict mapping contracts.
-        OSError: If one `.npy` write or hash read fails.
-    Side Effects:
-        Atomically writes `mappings/<tf>/*.npy` files for every allowed request timeframe.
-    Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-    Related:
-      - src/trading/contexts/backtest/application/services/v2/contracts.py
-      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
-    """
-    price_by_timeframe = {section.timeframe: section for section in price_manifests}
-    worker_count = _resolve_precompute_parallel_workers_v2(
-        total_tasks=len(ARTIFACT_MAPPING_TIMEFRAMES_V2)
-    )
-    materialize_timeframe = partial(
-        _materialize_mapping_timeframe_v2,
-        artifact_loader=artifact_loader,
-        coordinates=coordinates,
-        slot=slot,
-        slot_root=slot_root,
-        existing_manifest=existing_manifest,
-        one_minute_arrays=one_minute_arrays,
-        price_by_timeframe=price_by_timeframe,
-        mapping_tail_bars_1m=mapping_tail_bars_1m,
-    )
-    if worker_count == 1:
-        timeframe_results = tuple(
-            materialize_timeframe(timeframe) for timeframe in ARTIFACT_MAPPING_TIMEFRAMES_V2
-        )
-    else:
-        with ThreadPoolExecutor(
-            max_workers=worker_count,
-            thread_name_prefix="artifact-mappings",
-        ) as executor:
-            timeframe_results = tuple(
-                executor.map(materialize_timeframe, ARTIFACT_MAPPING_TIMEFRAMES_V2)
-            )
-    mapping_sections = tuple(result.manifest for result in timeframe_results)
-    reused_prefix_bars = sum(result.reused_prefix_bars for result in timeframe_results)
-    rewritten_tail_bars = sum(result.rewritten_tail_bars for result in timeframe_results)
-    return _MappingArtifactBuildResultV2(
-        manifests=mapping_sections,
-        reused_prefix_bars=reused_prefix_bars,
-        rewritten_tail_bars=rewritten_tail_bars,
-    )
-
-
 def _materialize_mapping_timeframe_v2(
     timeframe: str,
     *,
@@ -5012,7 +4677,8 @@ def _materialize_mapping_timeframe_v2(
     Returns:
         _MappingArtifactMaterializationResultV2: Strict manifest plus per-timeframe rebuild stats.
     Assumptions:
-        Per-timeframe mapping materialization is independent and safe to run concurrently.
+        R12-03 keeps mapping work inside the current `timeframe_session` so one target timeframe
+        fully completes before the next `rolled_prices` family is opened.
     Raises:
         ValueError: If target price arrays or prefix reuse violate strict mapping contracts.
         OSError: If writing one mapping family fails.

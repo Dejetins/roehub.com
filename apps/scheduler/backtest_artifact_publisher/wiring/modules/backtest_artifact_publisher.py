@@ -707,7 +707,7 @@ class BacktestArtifactPublisherApp:
         Raises:
             None. Publish failures are converted into status labels, logs, and metrics.
         Side Effects:
-            Updates per-symbol counters and tail rebuild metrics.
+            Updates per-symbol counters/tail metrics and emits one final stage-level rebuild log.
         Docs:
           - docs/architecture/backtest/backtest-precompute-runner-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
@@ -750,13 +750,14 @@ class BacktestArtifactPublisherApp:
         log.info(
             "event=symbol_publish_succeeded component=backtest-artifact-publisher "
             "exchange=%s market_type=%s symbol=%s publish_mode=%s "
-            "active_slot=%s tail_rebuild_bars=%s",
+            "active_slot=%s tail_rebuild_bars=%s stage_rebuild_stats=%s",
             coordinate.exchange,
             coordinate.market_type,
             coordinate.symbol,
             result.publish_mode,
             result.published_active_slot,
             result.tail_rebuild_bars.as_dict(),
+            result.stage_rebuild_stats.as_dict(),
         )
         return "succeeded"
 

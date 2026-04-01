@@ -59,6 +59,10 @@ backtest_artifacts:
     max_hit_times_cells: 50000000
     max_hit_times_cells_full_rebuild: 150000000
   execution_policy:
+    # R12-03 timeframe-local order:
+    # canonical_prices -> hit_times -> rolled_prices/timeframe_session per target timeframe.
+    # Progress is emitted via structured logs: current_timeframe, current_indicator_id,
+    # completed_chunks_total, completed_indicators_total.
     max_open_timeframe_sessions: 1
     signal_worker_processes: 4
     signal_worker_memory_budget_bytes: 2147483648

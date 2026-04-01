@@ -349,13 +349,13 @@ Daily precompute worker
   -> choose inactive slot
   -> load canonical 1m once
   -> materialize prices/1m
-  -> derive target timeframe prices deterministically
+  -> build/update 1m hit-times
   -> for one timeframe at a time:
+     -> derive/write rolled_prices as prices/<tf>
      -> open timeframe session
      -> build mappings/<tf>
      -> materialize signals/<tf>/<indicator_id> in bounded chunks
      -> close timeframe session
-  -> build/update 1m hit-times
   -> finalize manifests
   -> validate
   -> atomically switch current.yaml

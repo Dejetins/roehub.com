@@ -171,8 +171,8 @@ type ArtifactPrecomputeStageIdV2 = Literal[
 ]
 ARTIFACT_PRECOMPUTE_STAGE_ORDER_V2: tuple[ArtifactPrecomputeStageIdV2, ...] = (
     "canonical_prices",
-    "timeframe_session",
     "hit_times",
+    "timeframe_session",
     "root_manifest",
 )
 type ArtifactPrecomputeProgressEventNameV2 = Literal[

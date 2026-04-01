@@ -92,7 +92,8 @@ contract.
 
 | Term | Meaning |
 | --- | --- |
-| `stage` | Крупный deterministic pipeline segment: `prices_1m`, `prices_tf`, `timeframe_session`, `hit_times`, `manifests`, `publish` |
+| `stage` | Крупный deterministic pipeline segment with stable code ids: `canonical_prices`, `hit_times`, repeated `timeframe_session`, `root_manifest`, `publish` |
+| `rolled_prices` | Deterministic per-timeframe `prices/<tf>` family derived once immediately before that timeframe enters `timeframe_session` |
 | `timeframe session` | Lifetime одного open target timeframe inside precompute: load derived prices once, process all indicators on that timeframe, flush writes, release memory |
 | `chunk` | Contiguous row range for one `(indicator_id, timeframe)` signal matrix |
 | `worker` | Один bounded signal worker process, владеющий только своим chunk-local compute buffers |
@@ -102,24 +103,24 @@ contract.
 
 1. Load canonical `1m` once from `market_data.canonical_candles_1m FINAL`.
 2. Materialize `prices/1m`.
-3. Derive deterministic `prices/<tf>` rollups in canonical timeframe order.
-4. For one timeframe at a time open a `timeframe session`.
-5. Inside that session build `mappings/<tf>` and materialize all configured
+3. Build or update `hit_times/1m` while only canonical `1m` scope is live.
+4. For one timeframe at a time derive and write `rolled_prices` as `prices/<tf>`.
+5. Open a `timeframe session` for that `current_timeframe`.
+6. Inside that session build `mappings/<tf>` and materialize all configured
    `signals/<tf>/<indicator_id>/signals.i8.npy` targets, including `all_supported_v1`.
-6. Eagerly write signal chunks to disk via `np.memmap`, then close the timeframe session.
-7. After all timeframe sessions finish, build or update `hit_times/1m`, finalize manifests, and
-   run whole-slot validation.
-8. Publish by atomically switching `current.yaml`.
+7. Eagerly write signal chunks to disk via `np.memmap`, then close the timeframe session.
+8. After all timeframe sessions finish, finalize manifests and run whole-slot validation.
+9. Publish by atomically switching `current.yaml`.
 
 ### Architecture matrix
 
 | Stage | Inputs | Outputs | Memory owner | Parallelism scope |
 | --- | --- | --- | --- | --- |
-| `prices_1m` | canonical CH `1m` columns | `prices/1m/*` | runner process | single stage |
-| `prices_tf` | materialized `prices/1m` | `prices/<tf>/*` | runner process | bounded across TF derivation only until `timeframe session` opens |
-| `timeframe_session` | one `prices/<tf>` + canonical row order + signal target list | `mappings/<tf>/*`, `signals/<tf>/<indicator_id>/signals.i8.npy` | session owner for one `current_timeframe` | one open timeframe session at a time |
+| `canonical_prices` | canonical CH `1m` columns | `prices/1m/*` | runner process | single stage |
+| `hit_times` | materialized `prices/1m/ohlcv.f32.npy`, TP/SL grid | `hit_times/1m/*` | runner process | single stage in canonical scope |
+| `rolled_prices` | materialized `prices/1m` + one target timeframe | `prices/<tf>/*` | owner of the soon-to-open timeframe session | one timeframe at a time |
+| `timeframe_session` | one `rolled_prices` target + signal target list | `mappings/<tf>/*`, `signals/<tf>/<indicator_id>/signals.i8.npy` | session owner for one `current_timeframe` | one open timeframe session at a time |
 | `signal_chunk` | one `(indicator_id, timeframe)` + contiguous variant rows | row slice inside `signals/<tf>/<indicator_id>/signals.i8.npy` | one worker process | bounded by `signal_worker_processes` |
-| `hit_times` | `prices/1m/ohlcv.f32.npy`, TP/SL grid | `hit_times/1m/*` | runner process | single stage |
 | `manifests_publish` | completed slot files | `manifest.yaml`, `current.yaml` | runner + publisher | no data parallelism |
 
 ### Why the old tensor-first model is not recommended here
@@ -216,8 +217,8 @@ artifact-only signal stage without changing the published artifact layout or
 Deterministic stage order in code:
 
 1. `canonical_prices`
-2. repeated `timeframe_session` in canonical timeframe order (`15m` .. `3d`)
-3. `hit_times`
+2. `hit_times`
+3. repeated `timeframe_session` in canonical timeframe order (`15m` .. `3d`)
 4. `root_manifest`
 
 Contract expectations:
@@ -334,7 +335,7 @@ Operator-facing observability is split into coarse metrics and fine-grained stru
 - Structured logs answer where the runner is currently spending time.
 - `artifact_precompute_chunk_finished` adds `completed_chunks_total`, while the enclosing
   `timeframe_session` stage result carries both `completed_chunks_total` and
-  `completed_indicator_targets_total`.
+  `completed_indicators_total`.
 
 Minimal structured log events:
 
@@ -354,10 +355,12 @@ Minimal structured log fields:
 - `row_end_exclusive`
 - `chunk_rows`
 - `completed_chunks_total`
+- `completed_indicators_total` (in `timeframe_session` completion details)
 
 These fields are mandatory for distinguishing a long bootstrap from a normal daily tail rebuild:
 
-- bootstrap should show long `prices_1m` / `prices_tf` stages and large `rewritten_tail_bars`;
+- bootstrap should show long `canonical_prices`, `hit_times`, and repeated
+  `timeframe_session current_timeframe=<tf>` progress with large `rewritten_tail_bars`;
 - steady-state rebuild should show one open `current_timeframe` at a time and bounded chunked
   progress inside it.
 

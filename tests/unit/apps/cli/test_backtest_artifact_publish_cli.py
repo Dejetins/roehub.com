@@ -217,6 +217,55 @@ def test_backtest_artifact_publish_cli_returns_one_on_invalid_config_factory_err
     assert exit_code == 1
 
 
+def test_backtest_artifact_publish_cli_renders_text_stage_breakdown(capsys) -> None:
+    """
+    Verify text output includes the stage-level rebuild breakdown for manual operators.
+
+    Args:
+        capsys: pytest stdout/stderr capture fixture.
+    Returns:
+        None.
+    Assumptions:
+        Text mode should stay compact but still surface `stage_rebuild_stats` explicitly.
+    Raises:
+        AssertionError: If text rendering drops the stage-level rebuild summary.
+    Side Effects:
+        Writes one text report to captured stdout.
+    Docs:
+      - docs/runbooks/backtest-artifacts-rebuild.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - apps/cli/commands/backtest_artifact_publish.py
+    """
+    fake_use_case = _FakePublishUseCaseV2(result=_sample_publish_result_v2())
+    cli = BacktestArtifactPublishCli(
+        environ={"ROEHUB_ENV": "test"},
+        use_case_factory=lambda config_path, environ: cast(
+            PublishBacktestArtifactsV2UseCase,
+            fake_use_case,
+        ),
+    )
+
+    exit_code = cli.run(
+        [
+            "--exchange",
+            "binance",
+            "--market-type",
+            "spot",
+            "--symbol",
+            "BTCUSDT",
+            "--report-format",
+            "text",
+        ]
+    )
+    stdout = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "stage_rebuild_stats:" in stdout
+    assert "prices(reused=4300, rewritten=20)" in stdout
+    assert "hit_times(reused=4290, rewritten=20)" in stdout
+
+
 def test_cli_main_dispatches_backtest_artifact_publish_command(monkeypatch) -> None:
     """
     Verify `apps.cli.main` routes the explicit command to `BacktestArtifactPublishCli`.

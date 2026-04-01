@@ -1396,11 +1396,11 @@ model, который follow-up code epics смогут реализовать �
 - зафиксировать pipeline в порядке:
   - load canonical `1m` once
   - materialize `prices/1m`
-  - derive target TF prices
+  - build `hit_times/1m`
+  - derive one target TF `rolled_prices` at a time
   - open one timeframe session at a time
   - build `mappings/<tf>` и `signals/<tf>/<indicator_id>` for that timeframe
   - close timeframe session
-  - build `hit_times/1m`
   - finalize manifests and publish `current.yaml`;
 - документировать strict `execution_policy` contract для
   `configs/<env>/backtest_artifacts.yaml`;

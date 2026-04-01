@@ -195,14 +195,14 @@ tail bounded". Structured logs отвечают на вопрос "что runner
 - `row_end_exclusive`
 - `chunk_rows`
 - `completed_chunks_total`
-- `completed_indicator_targets_total`
+- `completed_indicators_total`
 
 R12 additive completion detail:
 
 - final `event=artifact_precompute_finished` now carries `details.stage_results` in deterministic
   execution order;
 - each `timeframe_session` summary now carries `completed_chunks_total` and
-  `completed_indicator_targets_total`;
+  `completed_indicators_total`;
 - this does not change CLI/scheduler publish result shape, but gives operators and future metrics
   adapters one canonical per-stage summary stream.
 
@@ -222,8 +222,8 @@ R12 additive completion detail:
 
 Полный bootstrap:
 
-1. Ожидайте длинные stages `prices_1m`, `prices_tf`, затем по очереди `current_timeframe=15m`,
-   `30m`, `1h`, ... в canonical order.
+1. Ожидайте `canonical_prices`, затем `hit_times`, затем по очереди
+   `current_timeframe=15m`, `30m`, `1h`, ... в canonical order.
 2. Ожидайте крупные `rewritten_tail_bars` и почти нулевой reuse.
 3. Следите, чтобы не было нескольких одновременно открытых timeframe sessions.
 
@@ -321,10 +321,10 @@ Path contract by environment:
 - не изменять active slot contents.
 - canonical `prices/1m` source read выполняется через `market_data.canonical_candles_1m FINAL`
   в columnar precompute path, чтобы bootstrap был устойчив к историческим дублям в ClickHouse.
-- independent `prices/<tf>` rollups и `mappings/<tf>` rebuilds могут исполняться параллельно;
-  это не меняет publish sequence и не разрешает partial publish.
 - R12 canonical execution model for steady-state signal materialization is `timeframe-scoped
   execution`:
+  - в canonical scope materialize'ить `canonical_prices` и `hit_times/1m`;
+  - затем детерминированно открыть `rolled_prices` ровно для одного target timeframe;
   - открыть один `current_timeframe`;
   - materialize all mappings/signals for that timeframe;
   - eagerly flush `signals/<tf>/<indicator_id>/signals.i8.npy` through `np.memmap`;

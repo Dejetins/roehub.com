@@ -52,9 +52,11 @@ Intra-run progress is intentionally split out of Prometheus and lives in structu
 - `artifact_precompute_stage_started`
 - `artifact_precompute_stage_finished`
 - `current_timeframe`
-- `current_indicator`
+- `current_indicator_id`
 - `chunk_index`
-- `chunk_jobs_total`
+- `chunk_count`
+- `completed_chunks_total`
+- `completed_indicators_total`
 
 ### Monitoring/infra
 
@@ -129,9 +131,11 @@ read them from logs:
 
 - `artifact_precompute_stage_started` / `artifact_precompute_stage_finished` tell which pipeline
   stage is active;
-- `current_timeframe` and `current_indicator` show the currently open timeframe session and
+- `current_timeframe` and `current_indicator_id` show the currently open timeframe session and
   indicator target;
-- `chunk_index` / `chunk_jobs_total` distinguish a healthy long bootstrap from a stuck worker pool.
+- `chunk_index` / `chunk_count` distinguish a healthy long bootstrap from a stuck worker pool;
+- `completed_chunks_total` / `completed_indicators_total` show real end-to-end progress inside the
+  current timeframe-local session.
 
 ### 4) `clickhouse-exporter`
 
