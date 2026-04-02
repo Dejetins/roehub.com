@@ -198,15 +198,21 @@ defaults:
   trend.adx:
     params:
       smoothing:
-        mode: range
-        start: 5
-        stop_incl: 100
-        step: 1
+        mode: explicit
+        values:
+        - 7
+        - 14
+        - 21
+        - 28
       window:
-        mode: range
-        start: 5
-        stop_incl: 200
-        step: 1
+        mode: explicit
+        values:
+        - 7
+        - 14
+        - 21
+        - 28
+        - 42
+        - 56
     signals:
       v1:
         params:
@@ -247,30 +253,38 @@ defaults:
         - open
     params:
       window:
-        mode: range
-        start: 5
-        stop_incl: 300
-        step: 1
+        mode: explicit
+        values:
+        - 10
+        - 14
+        - 20
+        - 28
+        - 42
+        - 56
+        - 84
+        - 126
     signals:
       v1:
         params: {}
   trend.psar:
     params:
       accel_max:
-        mode: range
-        start: 0.1
-        stop_incl: 1.0
-        step: 0.01
+        mode: explicit
+        values:
+        - 0.1
+        - 0.2
+        - 0.3
+        - 0.4
       accel_start:
-        mode: range
-        start: 0.005
-        stop_incl: 0.05
-        step: 0.001
+        mode: explicit
+        values:
+        - 0.01
+        - 0.02
       accel_step:
-        mode: range
-        start: 0.005
-        stop_incl: 0.05
-        step: 0.001
+        mode: explicit
+        values:
+        - 0.01
+        - 0.02
     signals:
       v1:
         params: {}
@@ -315,10 +329,16 @@ defaults:
         - 252
         - 365
       window:
-        mode: range
-        start: 5
-        stop_incl: 200
-        step: 1
+        mode: explicit
+        values:
+        - 10
+        - 14
+        - 20
+        - 28
+        - 42
+        - 63
+        - 84
+        - 126
     signals:
       v1:
         params:
@@ -337,10 +357,16 @@ defaults:
         - open
     params:
       window:
-        mode: range
-        start: 5
-        stop_incl: 200
-        step: 1
+        mode: explicit
+        values:
+        - 10
+        - 14
+        - 20
+        - 28
+        - 42
+        - 56
+        - 84
+        - 126
     signals:
       v1:
         params:
@@ -365,10 +391,16 @@ defaults:
         - open
     params:
       window:
-        mode: range
-        start: 5
-        stop_incl: 200
-        step: 1
+        mode: explicit
+        values:
+        - 10
+        - 14
+        - 20
+        - 28
+        - 42
+        - 56
+        - 84
+        - 126
     signals:
       v1:
         params:
@@ -409,10 +441,18 @@ defaults:
         - open
     params:
       window:
-        mode: range
-        start: 3
-        stop_incl: 200
-        step: 1
+        mode: explicit
+        values:
+        - 5
+        - 7
+        - 10
+        - 14
+        - 21
+        - 28
+        - 42
+        - 63
+        - 84
+        - 126
     signals:
       v1:
         params: {}
@@ -429,10 +469,18 @@ defaults:
         - open
     params:
       window:
-        mode: range
-        start: 3
-        stop_incl: 200
-        step: 1
+        mode: explicit
+        values:
+        - 5
+        - 7
+        - 10
+        - 14
+        - 21
+        - 28
+        - 42
+        - 63
+        - 84
+        - 126
     signals:
       v1:
         params:
@@ -441,20 +489,24 @@ defaults:
   momentum.stoch:
     params:
       d_window:
-        mode: range
-        start: 2
-        stop_incl: 20
-        step: 1
+        mode: explicit
+        values:
+        - 3
+        - 5
       k_window:
-        mode: range
-        start: 5
-        stop_incl: 200
-        step: 1
+        mode: explicit
+        values:
+        - 9
+        - 14
+        - 21
+        - 34
+        - 55
       smoothing:
-        mode: range
-        start: 2
-        stop_incl: 20
-        step: 1
+        mode: explicit
+        values:
+        - 2
+        - 3
+        - 5
     signals:
       v1:
         params:
@@ -473,15 +525,23 @@ defaults:
         - open
     params:
       signal_window:
-        mode: range
-        start: 3
-        stop_incl: 30
-        step: 1
+        mode: explicit
+        values:
+        - 3
+        - 5
+        - 7
+        - 9
       window:
-        mode: range
-        start: 5
-        stop_incl: 200
-        step: 1
+        mode: explicit
+        values:
+        - 10
+        - 14
+        - 20
+        - 28
+        - 42
+        - 63
+        - 84
+        - 126
     signals:
       v1:
         params: {}
@@ -582,10 +642,16 @@ defaults:
         - open
     params:
       window:
-        mode: range
-        start: 5
-        stop_incl: 300
-        step: 1
+        mode: explicit
+        values:
+        - 10
+        - 14
+        - 20
+        - 28
+        - 42
+        - 56
+        - 84
+        - 126
     signals:
       v1:
         params:
@@ -604,10 +670,16 @@ defaults:
         - open
     params:
       window:
-        mode: range
-        start: 5
-        stop_incl: 300
-        step: 1
+        mode: explicit
+        values:
+        - 10
+        - 14
+        - 20
+        - 28
+        - 42
+        - 56
+        - 84
+        - 126
     signals:
       v1:
         params:
@@ -616,15 +688,21 @@ defaults:
   structure.pivots:
     params:
       left:
-        mode: range
-        start: 2
-        stop_incl: 30
-        step: 1
+        mode: explicit
+        values:
+        - 2
+        - 3
+        - 5
+        - 8
+        - 13
       right:
-        mode: range
-        start: 2
-        stop_incl: 30
-        step: 1
+        mode: explicit
+        values:
+        - 2
+        - 3
+        - 5
+        - 8
+        - 13
     signals:
       v1:
         params: {}
@@ -641,10 +719,16 @@ defaults:
         - open
     params:
       window:
-        mode: range
-        start: 5
-        stop_incl: 300
-        step: 1
+        mode: explicit
+        values:
+        - 10
+        - 14
+        - 20
+        - 28
+        - 42
+        - 56
+        - 84
+        - 126
     signals:
       v1:
         params:

@@ -178,6 +178,17 @@ Dedicated scheduled publisher service:
 - `configs/<env>/indicators.yaml -> compute.numba.max_compute_bytes_total` remains a public/runtime
   guard only; artifact publisher wiring bypasses this ceiling with dedicated offline compute
   config, so full-registry signal precompute must not fail with `ComputeBudgetExceeded`
+- indicators-config resolution for artifact precompute is deterministic:
+  `ROEHUB_INDICATORS_CONFIG` -> sibling of the explicit artifact config
+  (for example `/opt/roehub/app/configs/prod/backtest_artifacts.yaml` ->
+  `/opt/roehub/app/configs/prod/indicators.yaml`) -> `ROEHUB_ENV` -> final `dev` default
+- this means manual CLI and the scheduled publisher do not require a separate
+  `ROEHUB_ENV=prod` export when they already run against the explicit production artifact config;
+  only `ROEHUB_INDICATORS_CONFIG` can intentionally override that match
+- R13-01 narrows only the heaviest non-`ma.*` signal defaults in `configs/<env>/indicators.yaml`;
+  operator expectation should be smaller signal matrices for `momentum.trix`, `momentum.stoch`,
+  `trend.adx`, `volatility.hv`, and the other targeted variant-heavy families without changing
+  `all_supported_v1` coverage or `ma.*` defaults
 - R12 target execution model for Mac Studio is bounded and `timeframe-scoped`:
   - one open `current_timeframe` session at a time;
   - bounded `signal_worker_processes` inside that session;

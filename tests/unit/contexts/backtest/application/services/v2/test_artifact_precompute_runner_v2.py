@@ -82,6 +82,72 @@ from trading.shared_kernel.primitives import (
 _BASE_TIME_UTC = datetime(2026, 3, 26, 0, 0, tzinfo=timezone.utc)
 _FULL_BUILD_DAYS_V2 = 3
 _FULL_BUILD_MINUTES_V2 = _FULL_BUILD_DAYS_V2 * 24 * 60
+_TARGET_VARIANT_CEILINGS_V2 = {
+    "momentum.trix": 1000,
+    "momentum.stoch": 150,
+    "trend.adx": 300,
+    "volatility.hv": 350,
+    "momentum.roc": 250,
+    "momentum.rsi": 250,
+    "volatility.stddev": 250,
+    "volatility.variance": 250,
+    "trend.psar": 50,
+    "structure.pivots": 30,
+    "trend.linreg_slope": 350,
+    "structure.distance_to_ma_norm": 350,
+    "structure.percent_rank": 350,
+    "structure.zscore": 350,
+}
+_EXPECTED_VARIANT_COUNTS_BY_ENV_V2 = {
+    "dev": {
+        "momentum.roc": 60,
+        "momentum.rsi": 60,
+        "momentum.stoch": 30,
+        "momentum.trix": 192,
+        "structure.distance_to_ma_norm": 48,
+        "structure.percent_rank": 48,
+        "structure.pivots": 25,
+        "structure.zscore": 48,
+        "trend.adx": 24,
+        "trend.linreg_slope": 48,
+        "trend.psar": 16,
+        "volatility.hv": 96,
+        "volatility.stddev": 48,
+        "volatility.variance": 48,
+    },
+    "prod": {
+        "momentum.roc": 60,
+        "momentum.rsi": 60,
+        "momentum.stoch": 30,
+        "momentum.trix": 192,
+        "structure.distance_to_ma_norm": 48,
+        "structure.percent_rank": 48,
+        "structure.pivots": 25,
+        "structure.zscore": 48,
+        "trend.adx": 24,
+        "trend.linreg_slope": 48,
+        "trend.psar": 16,
+        "volatility.hv": 96,
+        "volatility.stddev": 48,
+        "volatility.variance": 48,
+    },
+    "test": {
+        "momentum.roc": 6,
+        "momentum.rsi": 6,
+        "momentum.stoch": 1,
+        "momentum.trix": 6,
+        "structure.distance_to_ma_norm": 6,
+        "structure.percent_rank": 6,
+        "structure.pivots": 1,
+        "structure.zscore": 6,
+        "trend.adx": 1,
+        "trend.linreg_slope": 6,
+        "trend.psar": 1,
+        "volatility.hv": 6,
+        "volatility.stddev": 6,
+        "volatility.variance": 6,
+    },
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -795,6 +861,45 @@ def _signal_grid_builder_v2() -> GridBuilder:
         config_path=Path("configs/test/indicators.yaml"),
     )
     return GridBuilder(registry=registry)
+
+
+def _variant_counts_for_env_v2(*, env_name: str) -> dict[str, int]:
+    """
+    Materialize real compute-grid variant counts for the narrowed indicator families.
+
+    Args:
+        env_name: Environment name under `configs/<env>/indicators.yaml`.
+    Returns:
+        dict[str, int]: Deterministic indicator-id -> materialized variant count mapping.
+    Assumptions:
+        The checked-in indicators YAML is valid for both defaults-provider and registry loading.
+    Raises:
+        FileNotFoundError: If the env-specific indicators YAML is missing.
+        ValueError: If one grid cannot be materialized deterministically.
+    Side Effects:
+        Reads the repository-local config file and materializes indicator grids in memory.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/prod/indicators.yaml
+      - configs/test/indicators.yaml
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+    """
+    config_path = Path(f"configs/{env_name}/indicators.yaml")
+    defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(config_path=config_path)
+    grid_builder = GridBuilder(
+        registry=YamlIndicatorRegistry.from_yaml(defs=all_defs(), config_path=config_path)
+    )
+    counts: dict[str, int] = {}
+    for indicator_id in _TARGET_VARIANT_CEILINGS_V2:
+        compute_grid = defaults_provider.compute_defaults(indicator_id=indicator_id)
+        assert compute_grid is not None
+        materialized_grid = grid_builder.materialize_indicator(grid=compute_grid)
+        counts[indicator_id] = materialized_grid.variants
+    return counts
 
 
 def _candle_arrays_from_loaded_prices_v2(
@@ -4294,3 +4399,61 @@ def _read_export_bytes_v2(
         )
     )
     return tuple(payloads)
+
+
+def test_target_indicator_variant_counts_match_narrowed_catalog_per_env_v2() -> None:
+    """
+    Verify real defaults-provider plus grid-builder materialize the narrowed target counts.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `prod` and `dev` catalogs should stay aligned, while `test` keeps a documented compact
+        subset with the same targeted families present.
+    Raises:
+        AssertionError: If one env drifts from the locked materialized counts.
+    Side Effects:
+        Reads checked-in config files and materializes indicator grids in memory.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/prod/indicators.yaml
+      - configs/test/indicators.yaml
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+    """
+    for env_name, expected_counts in _EXPECTED_VARIANT_COUNTS_BY_ENV_V2.items():
+        assert _variant_counts_for_env_v2(env_name=env_name) == expected_counts
+
+
+def test_target_indicator_variant_counts_stay_within_operational_ceilings_v2() -> None:
+    """
+    Verify narrowed heavy families stay below the R13-01 operational ceilings.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Ceiling checks must use the real defaults-provider and shared grid-builder path.
+    Raises:
+        AssertionError: If one targeted indicator exceeds its accepted ceiling.
+    Side Effects:
+        Reads checked-in config files and materializes indicator grids in memory.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/prod/indicators.yaml
+      - configs/test/indicators.yaml
+      - src/trading/contexts/indicators/application/services/grid_builder.py
+    """
+    for env_name in ("dev", "prod", "test"):
+        counts = _variant_counts_for_env_v2(env_name=env_name)
+        for indicator_id, ceiling in _TARGET_VARIANT_CEILINGS_V2.items():
+            assert counts[indicator_id] <= ceiling

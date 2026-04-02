@@ -70,6 +70,14 @@ Path resolution precedence:
 1. `ROEHUB_BACKTEST_ARTIFACTS_CONFIG`
 2. `configs/<ROEHUB_ENV>/backtest_artifacts.yaml`
 
+Artifact-precompute indicators config precedence:
+
+1. `ROEHUB_INDICATORS_CONFIG`
+2. sibling `indicators.yaml` of the explicitly selected artifact config
+   example: `configs/prod/backtest_artifacts.yaml` -> `configs/prod/indicators.yaml`
+3. `configs/<ROEHUB_ENV>/indicators.yaml`
+4. final default `configs/dev/indicators.yaml`
+
 Обязательные секции config contract:
 
 - `artifact_root`
@@ -113,6 +121,11 @@ R12 execution-policy contract:
   effectively-unbounded total compute budget, потому что slot build остаётся batch/offline flow и
   уже ограничен stage-specific artifact contracts (`max_signal_rows_per_artifact`,
   `max_hit_times_cells*`, whole-slot validation).
+- R13-01 additionally narrows the heaviest non-`ma.*` defaults in
+  `configs/<env>/indicators.yaml` so one `all_supported_v1` publish keeps full indicator coverage
+  without operationally oversized signal matrices.
+- Canonical `inputs.source` catalogs remain required for source-aware narrowed families:
+  `close`, `hlc3`, `ohlc4`, `low`, `high`, `open`.
 
 Fail-fast loader обязан reject'ить:
 
@@ -140,6 +153,13 @@ uv run python -m apps.cli.main.main backtest-artifact-publish \
   --market-type spot \
   --symbol BTCUSDT
 ```
+
+Operational note:
+
+- explicit `--config configs/prod/backtest_artifacts.yaml` is now sufficient to force the matching
+  `configs/prod/indicators.yaml` for artifact precompute, even when `ROEHUB_ENV` is unset;
+- `ROEHUB_INDICATORS_CONFIG` still wins over the artifact-config-derived path and should be used
+  only for deliberate operator overrides.
 
 Explicit deterministic full rebuild for one target:
 

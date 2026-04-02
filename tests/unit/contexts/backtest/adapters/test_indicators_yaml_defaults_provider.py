@@ -1,13 +1,98 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
 
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
 from trading.contexts.backtest.application.services.v2 import (
     supported_indicator_ids_for_signal_rules_v2,
 )
+
+_TARGET_SOURCE_CAPABLE_INDICATOR_IDS = (
+    "momentum.roc",
+    "momentum.rsi",
+    "momentum.trix",
+    "structure.distance_to_ma_norm",
+    "structure.percent_rank",
+    "structure.zscore",
+    "trend.linreg_slope",
+    "volatility.hv",
+    "volatility.stddev",
+    "volatility.variance",
+)
+_CANONICAL_SOURCE_VALUES = ("close", "hlc3", "ohlc4", "low", "high", "open")
+_MA_DEFAULTS_SHA256_BY_ENV = {
+    "dev": "72f71f253d66b20938b5422dcd0c7f402adae05243cc5fb8ab6c958ecc0bad57",
+    "prod": "72f71f253d66b20938b5422dcd0c7f402adae05243cc5fb8ab6c958ecc0bad57",
+    "test": "7c22043877347c251adf133cdbaceb893a163383ef81a42da1297713820d0f09",
+}
+
+
+def _indicator_defaults_payload(*, env_name: str) -> dict[str, Any]:
+    """
+    Load one checked-in indicators YAML defaults payload for deterministic assertions.
+
+    Args:
+        env_name: Environment name under `configs/<env>/indicators.yaml`.
+    Returns:
+        dict[str, object]: Parsed top-level defaults mapping.
+    Assumptions:
+        Repository-local config file exists and contains a `defaults` mapping.
+    Raises:
+        KeyError: If the YAML payload misses `defaults`.
+        TypeError: If the YAML payload shape is not mapping-like.
+    Side Effects:
+        Reads one repository-local YAML file from disk.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/prod/indicators.yaml
+      - configs/test/indicators.yaml
+    """
+    payload = yaml.safe_load(
+        Path(f"configs/{env_name}/indicators.yaml").read_text(encoding="utf-8")
+    )
+    return payload["defaults"]
+
+
+def _ma_defaults_sha256(*, env_name: str) -> str:
+    """
+    Hash the parsed `ma.*` defaults subtree to detect accidental scope drift.
+
+    Args:
+        env_name: Environment name under `configs/<env>/indicators.yaml`.
+    Returns:
+        str: Deterministic SHA-256 digest of the parsed `ma.*` subtree.
+    Assumptions:
+        Parsed JSON serialization with sorted keys is stable for this repository contract.
+    Raises:
+        KeyError: If the YAML defaults mapping is missing.
+    Side Effects:
+        Reads one repository-local YAML file from disk.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/prod/indicators.yaml
+      - configs/test/indicators.yaml
+    """
+    defaults = _indicator_defaults_payload(env_name=env_name)
+    ma_defaults = {
+        indicator_id: defaults[indicator_id]
+        for indicator_id in defaults
+        if indicator_id.startswith("ma.")
+    }
+    return hashlib.sha256(
+        json.dumps(ma_defaults, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
 
 def test_yaml_backtest_grid_defaults_provider_reads_compute_and_signal_defaults(
@@ -132,3 +217,58 @@ def test_yaml_defaults_provider_matches_v2_signal_catalog_for_all_target_envs() 
             config_path=Path(f"configs/{env_name}/indicators.yaml")
         )
         assert provider.supported_indicator_ids() == expected_indicator_ids
+
+
+def test_target_source_capable_indicators_keep_canonical_source_catalog_in_yaml() -> None:
+    """
+    Verify narrowed source-capable indicator defaults keep the full canonical source catalog.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Source-catalog ordering in YAML is part of the deterministic config contract.
+    Raises:
+        AssertionError: If one targeted indicator loses or reorders canonical sources.
+    Side Effects:
+        Reads checked-in indicators YAML files.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/prod/indicators.yaml
+      - configs/test/indicators.yaml
+    """
+    for env_name in ("dev", "prod", "test"):
+        defaults = _indicator_defaults_payload(env_name=env_name)
+        for indicator_id in _TARGET_SOURCE_CAPABLE_INDICATOR_IDS:
+            indicator_payload = defaults[indicator_id]
+            assert indicator_payload["inputs"]["source"]["values"] == list(_CANONICAL_SOURCE_VALUES)
+
+
+def test_ma_family_defaults_snapshot_remains_unchanged_for_all_target_envs() -> None:
+    """
+    Verify this prompt scope does not mutate any `ma.*` defaults subtree.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Parsed subtree hashes are sufficient to detect accidental `ma.*` config edits.
+    Raises:
+        AssertionError: If one environment drifts from the frozen `ma.*` snapshot.
+    Side Effects:
+        Reads checked-in indicators YAML files.
+    Docs:
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/prod/indicators.yaml
+      - configs/test/indicators.yaml
+    """
+    for env_name, expected_sha256 in _MA_DEFAULTS_SHA256_BY_ENV.items():
+        assert _ma_defaults_sha256(env_name=env_name) == expected_sha256

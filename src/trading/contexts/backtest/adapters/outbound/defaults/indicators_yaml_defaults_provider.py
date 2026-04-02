@@ -15,10 +15,7 @@ from trading.contexts.indicators.domain.specifications import (
     GridSpec,
     RangeValuesSpec,
 )
-
-_ENV_NAME_KEY = "ROEHUB_ENV"
-_CONFIG_PATH_KEY = "ROEHUB_INDICATORS_CONFIG"
-_ALLOWED_ENVS = ("dev", "prod", "test")
+from trading.platform.config import resolve_indicators_config_path
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,24 +138,34 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
         )
 
     @classmethod
-    def from_environ(cls, *, environ: Mapping[str, str]) -> YamlBacktestGridDefaultsProvider:
+    def from_environ(
+        cls,
+        *,
+        environ: Mapping[str, str],
+        artifact_config_path: str | Path | None = None,
+    ) -> YamlBacktestGridDefaultsProvider:
         """
         Build defaults provider from environment-aware indicators YAML path resolution.
 
         Args:
             environ: Runtime environment mapping.
+            artifact_config_path: Optional explicit artifact-config path used to derive the
+                matching sibling `indicators.yaml` when `ROEHUB_INDICATORS_CONFIG` is absent.
         Returns:
             YamlBacktestGridDefaultsProvider: Loaded defaults provider.
         Assumptions:
-            Path precedence is `ROEHUB_INDICATORS_CONFIG`
-            then `configs/<ROEHUB_ENV>/indicators.yaml`.
+            Path precedence is `ROEHUB_INDICATORS_CONFIG`, then the explicit artifact-config
+            sibling, then `configs/<ROEHUB_ENV>/indicators.yaml`.
         Raises:
             FileNotFoundError: If resolved indicators YAML path does not exist.
             ValueError: If YAML payload shape is invalid.
         Side Effects:
             Reads indicators YAML file from filesystem.
         """
-        config_path = _resolve_indicators_config_path(environ=environ)
+        config_path = resolve_indicators_config_path(
+            environ=environ,
+            artifact_config_path=artifact_config_path,
+        )
         return cls.from_yaml(config_path=config_path)
 
     @classmethod
@@ -310,33 +317,6 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
         if not normalized_indicator_id:
             raise ValueError("allowed_source_values requires non-empty indicator_id")
         return self.source_values_by_indicator_id.get(normalized_indicator_id, ())
-
-
-def _resolve_indicators_config_path(*, environ: Mapping[str, str]) -> Path:
-    """
-    Resolve indicators YAML path from override env or environment-specific default path.
-
-    Args:
-        environ: Runtime environment mapping.
-    Returns:
-        Path: Resolved indicators YAML path.
-    Assumptions:
-        Missing `ROEHUB_ENV` defaults to `dev`.
-    Raises:
-        ValueError: If environment name is unsupported.
-    Side Effects:
-        None.
-    """
-    override = environ.get(_CONFIG_PATH_KEY, "").strip()
-    if override:
-        return Path(override)
-
-    raw_env = environ.get(_ENV_NAME_KEY, "dev").strip().lower()
-    if raw_env not in _ALLOWED_ENVS:
-        raise ValueError(f"{_ENV_NAME_KEY} must be one of {_ALLOWED_ENVS}, got {raw_env!r}")
-    return Path("configs") / raw_env / "indicators.yaml"
-
-
 def _compute_defaults_grid(
     *,
     indicator_id: str,

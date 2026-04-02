@@ -4,7 +4,8 @@ import asyncio
 import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
-from typing import cast
+from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from prometheus_client import CollectorRegistry
@@ -13,6 +14,9 @@ from apps.scheduler.backtest_artifact_publisher.wiring.modules import (
     BacktestArtifactPublisherApp,
     BacktestArtifactPublisherMetrics,
     BacktestArtifactPublisherSchedule,
+)
+from apps.scheduler.backtest_artifact_publisher.wiring.modules import (
+    backtest_artifact_publisher as publisher_module,
 )
 from trading.contexts.backtest.application.services import (
     ArtifactCoordinatesV2,
@@ -320,6 +324,315 @@ def test_schedule_does_not_trigger_twice_after_restart_within_same_minute() -> N
 
     assert restarted == datetime(2026, 3, 31, 0, 5, tzinfo=timezone.utc)
     assert same_day_already_processed == datetime(2026, 3, 31, 0, 5, tzinfo=timezone.utc)
+
+
+def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolution(
+    monkeypatch,
+) -> None:
+    """
+    Verify scheduler wiring forwards the selected artifact config to all
+    indicators-resolution hooks.
+
+    Args:
+        monkeypatch: pytest fixture used to replace heavy runtime dependencies with fakes.
+    Returns:
+        None.
+    Assumptions:
+        Scheduler wiring must not fall back to `configs/dev/indicators.yaml` when it already uses
+        `configs/prod/backtest_artifacts.yaml`.
+    Raises:
+        AssertionError: If scheduler wiring drops the explicit artifact-config path.
+    Side Effects:
+        Monkeypatches the scheduler wiring module in memory.
+    """
+    captured: dict[str, Any] = {}
+
+    class _FakeArtifactRuntimeConfig:
+        """
+        Minimal artifact runtime config stub for scheduler wiring tests.
+
+        Docs:
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+        """
+
+        def artifact_root_path(self) -> Path:
+            """
+            Return a deterministic artifact root path.
+
+            Args:
+                None.
+            Returns:
+                Path: Fixed artifact root path.
+            Assumptions:
+                Path shape is irrelevant to the indicators-resolution assertion.
+            Raises:
+                None.
+            Side Effects:
+                None.
+            """
+            return Path("/tmp/artifacts")
+
+        def to_precompute_runtime_settings(self, *, config_sha256: str) -> object:
+            """
+            Return a deterministic runtime settings sentinel.
+
+            Args:
+                config_sha256: Stable artifact-config hash from wiring.
+            Returns:
+                object: Sentinel runtime settings object.
+            Assumptions:
+                The scheduler test only needs the call to succeed.
+            Raises:
+                None.
+            Side Effects:
+                Stores the hash for later assertions.
+            """
+            captured["config_sha256"] = config_sha256
+            return object()
+
+        def to_validation_spec(self) -> object:
+            """
+            Return a deterministic validation spec sentinel.
+
+            Args:
+                None.
+            Returns:
+                object: Sentinel validation spec.
+            Assumptions:
+                Validation details are outside the scope of this wiring test.
+            Raises:
+                None.
+            Side Effects:
+                None.
+            """
+            return object()
+
+    class _FakeClickHouseSettingsLoader:
+        """
+        Minimal ClickHouse settings loader stub for scheduler wiring tests.
+
+        Docs:
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+        """
+
+        def __init__(self, environ: dict[str, str]) -> None:
+            """
+            Store the provided environment mapping for parity with production signature.
+
+            Args:
+                environ: Environment mapping forwarded by scheduler wiring.
+            Returns:
+                None.
+            Assumptions:
+                The fake loader only needs to preserve constructor compatibility.
+            Raises:
+                None.
+            Side Effects:
+                Stores the environment mapping in memory.
+            """
+            self._environ = dict(environ)
+
+        def load(self) -> object:
+            """
+            Return a deterministic settings object with a database attribute.
+
+            Args:
+                None.
+            Returns:
+                object: Simple namespace-like settings object.
+            Assumptions:
+                Downstream fake dependencies only read the `database` attribute.
+            Raises:
+                None.
+            Side Effects:
+                None.
+            """
+            return type("Settings", (), {"database": "test_db"})()
+
+    def _capture_defaults_provider(_cls, *, environ, artifact_config_path=None):
+        """
+        Capture defaults-provider wiring inputs and return a sentinel provider.
+
+        Args:
+            _cls: Provider class forwarded by the classmethod descriptor.
+            environ: Environment mapping forwarded by scheduler wiring.
+            artifact_config_path: Explicit artifact-config path forwarded by scheduler wiring.
+        Returns:
+            object: Sentinel defaults provider.
+        Assumptions:
+            The test verifies resolution wiring, not defaults parsing.
+        Raises:
+            None.
+        Side Effects:
+            Stores call arguments in memory.
+        """
+        captured["defaults_artifact_config_path"] = artifact_config_path
+        return object()
+
+    def _capture_registry(*, environ, artifact_config_path=None):
+        """
+        Capture registry wiring inputs and return a sentinel registry.
+
+        Args:
+            environ: Environment mapping forwarded by scheduler wiring.
+            artifact_config_path: Explicit artifact-config path forwarded by scheduler wiring.
+        Returns:
+            object: Sentinel registry.
+        Assumptions:
+            Registry construction itself is outside this wiring test's scope.
+        Raises:
+            None.
+        Side Effects:
+            Stores call arguments in memory.
+        """
+        captured["registry_artifact_config_path"] = artifact_config_path
+        return object()
+
+    def _capture_compute(*, environ, artifact_config_path=None, config=None):
+        """
+        Capture compute wiring inputs and return a sentinel compute adapter.
+
+        Args:
+            environ: Environment mapping forwarded by scheduler wiring.
+            artifact_config_path: Explicit artifact-config path forwarded by scheduler wiring.
+            config: Optional preloaded config, unused in this test.
+        Returns:
+            object: Sentinel compute adapter.
+        Assumptions:
+            Offline compute construction itself is outside this test's scope.
+        Raises:
+            None.
+        Side Effects:
+            Stores call arguments in memory.
+        """
+        del config
+        captured["compute_artifact_config_path"] = artifact_config_path
+        return object()
+
+    monkeypatch.setattr(
+        publisher_module,
+        "load_backtest_artifacts_runtime_config",
+        lambda path: _FakeArtifactRuntimeConfig(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "BacktestArtifactPathBuilderV2",
+        lambda root: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "YamlBacktestArtifactLoaderV2",
+        lambda path_resolver: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "AtomicArtifactCurrentPointerWriterV2",
+        lambda path_resolver: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "ClickHouseSettingsLoader",
+        _FakeClickHouseSettingsLoader,
+    )
+    monkeypatch.setattr(publisher_module, "_clickhouse_client", lambda settings: object())
+    monkeypatch.setattr(
+        publisher_module,
+        "ThreadLocalClickHouseConnectGateway",
+        lambda client_factory: object(),
+    )
+    monkeypatch.setattr(publisher_module, "SystemClock", lambda: object())
+    monkeypatch.setattr(
+        publisher_module.YamlBacktestGridDefaultsProvider,
+        "from_environ",
+        classmethod(_capture_defaults_provider),
+    )
+    monkeypatch.setattr(publisher_module, "build_indicators_registry", _capture_registry)
+    monkeypatch.setattr(
+        publisher_module,
+        "build_artifact_precompute_indicators_compute",
+        _capture_compute,
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "build_backtest_artifacts_runtime_config_hash",
+        lambda config: "artifact-hash",
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "ClickHouseCanonicalCandleReader",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "BacktestSignalRulesEngineV2",
+        lambda defaults_provider: object(),
+    )
+    monkeypatch.setattr(publisher_module, "GridBuilder", lambda registry: object())
+    monkeypatch.setattr(
+        publisher_module,
+        "BacktestArtifactPrecomputeRunnerV2",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "PsycopgBacktestPostgresGateway",
+        lambda dsn: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "PostgresBacktestJobRepository",
+        lambda gateway: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "BacktestArtifactSlotPublisherV2",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "ClickHouseCanonicalCandleIndexReader",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "PublishBacktestArtifactsV2UseCase",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "ClickHouseEnabledInstrumentReader",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "BacktestArtifactPublisherMetrics",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "FileBacktestArtifactPublisherHostLock",
+        lambda path: object(),
+    )
+    monkeypatch.setattr(
+        publisher_module,
+        "BacktestArtifactPublisherApp",
+        lambda **kwargs: object(),
+    )
+
+    result = publisher_module.build_backtest_artifact_publisher_app(
+        config_path="configs/prod/backtest_artifacts.yaml",
+        environ={"STRATEGY_PG_DSN": "postgresql://test"},
+        metrics_port=9203,
+    )
+
+    assert result is not None
+    assert captured["defaults_artifact_config_path"] == "configs/prod/backtest_artifacts.yaml"
+    assert captured["registry_artifact_config_path"] == "configs/prod/backtest_artifacts.yaml"
+    assert captured["compute_artifact_config_path"] == "configs/prod/backtest_artifacts.yaml"
 
 
 def test_run_cycle_uses_sorted_enabled_tradable_universe() -> None:

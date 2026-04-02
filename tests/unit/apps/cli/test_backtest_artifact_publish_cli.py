@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Mapping, cast
+from pathlib import Path
+from typing import Any, Mapping, cast
 
+import apps.cli.commands.backtest_artifact_publish as publish_module
 import apps.cli.main.main as cli_main_module
 from apps.cli.commands.backtest_artifact_publish import BacktestArtifactPublishCli
 from trading.contexts.backtest.application.services import (
@@ -345,6 +347,314 @@ def test_cli_main_dispatches_backtest_artifact_publish_command(monkeypatch) -> N
             "BTCUSDT",
         ]
     ]
+
+
+def test_build_publish_use_case_v2_uses_explicit_artifact_config_for_indicators_resolution(
+    monkeypatch,
+) -> None:
+    """
+    Verify CLI wiring forwards explicit artifact config to all indicators-resolution entrypoints.
+
+    Args:
+        monkeypatch: pytest fixture used to replace heavy runtime dependencies with fakes.
+    Returns:
+        None.
+    Assumptions:
+        Manual `--config configs/prod/backtest_artifacts.yaml` must resolve the matching
+        production indicators catalog even when `ROEHUB_ENV` is unset.
+    Raises:
+        AssertionError: If CLI wiring drops the explicit artifact-config path.
+    Side Effects:
+        Monkeypatches the CLI wiring module in memory.
+    """
+    captured: dict[str, Any] = {}
+
+    class _FakeArtifactRuntimeConfig:
+        """
+        Minimal artifact runtime config stub for CLI wiring tests.
+
+        Docs:
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - apps/cli/commands/backtest_artifact_publish.py
+        """
+
+        def artifact_root_path(self) -> Path:
+            """
+            Return a deterministic artifact root path.
+
+            Args:
+                None.
+            Returns:
+                Path: Fixed artifact root path.
+            Assumptions:
+                Path shape is irrelevant to the indicators-resolution assertion.
+            Raises:
+                None.
+            Side Effects:
+                None.
+            """
+            return Path("/tmp/artifacts")
+
+        def to_precompute_runtime_settings(self, *, config_sha256: str) -> object:
+            """
+            Return a deterministic runtime settings sentinel.
+
+            Args:
+                config_sha256: Stable artifact-config hash from wiring.
+            Returns:
+                object: Sentinel runtime settings object.
+            Assumptions:
+                The CLI test only needs the call to succeed.
+            Raises:
+                None.
+            Side Effects:
+                Stores the hash for later assertions.
+            """
+            captured["config_sha256"] = config_sha256
+            return object()
+
+        def to_validation_spec(self) -> object:
+            """
+            Return a deterministic validation spec sentinel.
+
+            Args:
+                None.
+            Returns:
+                object: Sentinel validation spec.
+            Assumptions:
+                Validation details are outside the scope of this wiring test.
+            Raises:
+                None.
+            Side Effects:
+                None.
+            """
+            return object()
+
+    class _FakeClickHouseSettingsLoader:
+        """
+        Minimal ClickHouse settings loader stub for CLI wiring tests.
+
+        Docs:
+          - docs/runbooks/backtest-artifacts-rebuild.md
+        Related:
+          - apps/cli/commands/backtest_artifact_publish.py
+        """
+
+        def __init__(self, environ: Mapping[str, str]) -> None:
+            """
+            Store the provided environment mapping for parity with production signature.
+
+            Args:
+                environ: Environment mapping forwarded by CLI wiring.
+            Returns:
+                None.
+            Assumptions:
+                The fake loader only needs to preserve constructor compatibility.
+            Raises:
+                None.
+            Side Effects:
+                Stores the environment mapping in memory.
+            """
+            self._environ = dict(environ)
+
+        def load(self) -> object:
+            """
+            Return a deterministic settings object with a database attribute.
+
+            Args:
+                None.
+            Returns:
+                object: Simple namespace-like settings object.
+            Assumptions:
+                Downstream fake dependencies only read the `database` attribute.
+            Raises:
+                None.
+            Side Effects:
+                None.
+            """
+            return type("Settings", (), {"database": "test_db"})()
+
+    def _capture_defaults_provider(_cls, *, environ, artifact_config_path=None):
+        """
+        Capture defaults-provider wiring inputs and return a sentinel provider.
+
+        Args:
+            _cls: Provider class forwarded by the classmethod descriptor.
+            environ: Environment mapping forwarded by CLI wiring.
+            artifact_config_path: Explicit artifact-config path forwarded by CLI wiring.
+        Returns:
+            object: Sentinel defaults provider.
+        Assumptions:
+            The test verifies resolution wiring, not defaults parsing.
+        Raises:
+            None.
+        Side Effects:
+            Stores call arguments in memory.
+        """
+        captured["defaults_artifact_config_path"] = artifact_config_path
+        captured["defaults_environ"] = dict(environ)
+        return object()
+
+    def _capture_registry(*, environ, artifact_config_path=None):
+        """
+        Capture registry wiring inputs and return a sentinel registry.
+
+        Args:
+            environ: Environment mapping forwarded by CLI wiring.
+            artifact_config_path: Explicit artifact-config path forwarded by CLI wiring.
+        Returns:
+            object: Sentinel registry.
+        Assumptions:
+            Registry construction itself is outside the scope of this wiring test.
+        Raises:
+            None.
+        Side Effects:
+            Stores call arguments in memory.
+        """
+        captured["registry_artifact_config_path"] = artifact_config_path
+        captured["registry_environ"] = dict(environ)
+        return object()
+
+    def _capture_compute(*, environ, artifact_config_path=None, config=None):
+        """
+        Capture compute wiring inputs and return a sentinel compute adapter.
+
+        Args:
+            environ: Environment mapping forwarded by CLI wiring.
+            artifact_config_path: Explicit artifact-config path forwarded by CLI wiring.
+            config: Optional preloaded config, unused in this test.
+        Returns:
+            object: Sentinel compute adapter.
+        Assumptions:
+            Offline compute construction itself is outside this test's scope.
+        Raises:
+            None.
+        Side Effects:
+            Stores call arguments in memory.
+        """
+        del config
+        captured["compute_artifact_config_path"] = artifact_config_path
+        captured["compute_environ"] = dict(environ)
+        return object()
+
+    def _capture_grid_builder(*, registry):
+        """
+        Capture grid-builder input and return a sentinel grid builder.
+
+        Args:
+            registry: Registry instance forwarded by CLI wiring.
+        Returns:
+            object: Sentinel grid builder.
+        Assumptions:
+            The grid-builder constructor is not under test here.
+        Raises:
+            None.
+        Side Effects:
+            Stores the registry object in memory.
+        """
+        captured["grid_builder_registry"] = registry
+        return object()
+
+    monkeypatch.setattr(
+        publish_module,
+        "load_backtest_artifacts_runtime_config",
+        lambda path: _FakeArtifactRuntimeConfig(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "BacktestArtifactPathBuilderV2",
+        lambda root: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "YamlBacktestArtifactLoaderV2",
+        lambda path_resolver: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "AtomicArtifactCurrentPointerWriterV2",
+        lambda path_resolver: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "ClickHouseSettingsLoader",
+        _FakeClickHouseSettingsLoader,
+    )
+    monkeypatch.setattr(publish_module, "_clickhouse_client", lambda settings: object())
+    monkeypatch.setattr(
+        publish_module,
+        "ClickHouseConnectGateway",
+        lambda client: object(),
+    )
+    monkeypatch.setattr(publish_module, "SystemClock", lambda: object())
+    monkeypatch.setattr(
+        publish_module.YamlBacktestGridDefaultsProvider,
+        "from_environ",
+        classmethod(_capture_defaults_provider),
+    )
+    monkeypatch.setattr(publish_module, "build_indicators_registry", _capture_registry)
+    monkeypatch.setattr(
+        publish_module,
+        "build_artifact_precompute_indicators_compute",
+        _capture_compute,
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "build_backtest_artifacts_runtime_config_hash",
+        lambda config: "artifact-hash",
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "ClickHouseCanonicalCandleReader",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "BacktestSignalRulesEngineV2",
+        lambda defaults_provider: object(),
+    )
+    monkeypatch.setattr(publish_module, "GridBuilder", _capture_grid_builder)
+    monkeypatch.setattr(
+        publish_module,
+        "BacktestArtifactPrecomputeRunnerV2",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "PsycopgBacktestPostgresGateway",
+        lambda dsn: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "PostgresBacktestJobRepository",
+        lambda gateway: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "BacktestArtifactSlotPublisherV2",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "ClickHouseCanonicalCandleIndexReader",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        publish_module,
+        "PublishBacktestArtifactsV2UseCase",
+        lambda **kwargs: object(),
+    )
+
+    result = publish_module._build_publish_use_case_v2(
+        "configs/prod/backtest_artifacts.yaml",
+        {"STRATEGY_PG_DSN": "postgresql://test"},
+    )
+
+    assert result is not None
+    assert captured["defaults_artifact_config_path"] == "configs/prod/backtest_artifacts.yaml"
+    assert captured["registry_artifact_config_path"] == "configs/prod/backtest_artifacts.yaml"
+    assert captured["compute_artifact_config_path"] == "configs/prod/backtest_artifacts.yaml"
 
 
 def _sample_publish_result_v2() -> PublishBacktestArtifactsV2Result:

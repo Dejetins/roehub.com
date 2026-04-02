@@ -25,15 +25,17 @@ from trading.contexts.market_data.application.ports.stores import CanonicalCandl
 from trading.platform.config import (
     IndicatorsComputeNumbaConfig,
     load_indicators_compute_numba_config,
+    resolve_indicators_config_path,
 )
 
-_ENV_NAME_KEY = "ROEHUB_ENV"
-_CONFIG_PATH_KEY = "ROEHUB_INDICATORS_CONFIG"
-_ALLOWED_ENVS = ("dev", "prod", "test")
 _ARTIFACT_PRECOMPUTE_MAX_COMPUTE_BYTES_TOTAL = sys.maxsize
 
 
-def build_indicators_registry(*, environ: Mapping[str, str]) -> YamlIndicatorRegistry:
+def build_indicators_registry(
+    *,
+    environ: Mapping[str, str],
+    artifact_config_path: str | Path | None = None,
+) -> YamlIndicatorRegistry:
     """
     Build fail-fast indicators registry from environment-aware YAML config.
 
@@ -41,6 +43,8 @@ def build_indicators_registry(*, environ: Mapping[str, str]) -> YamlIndicatorReg
 
     Args:
         environ: Process environment mapping.
+        artifact_config_path: Optional explicit artifact-config path used to derive the matching
+            sibling `indicators.yaml` for artifact-aware wiring.
     Returns:
         YamlIndicatorRegistry: Ready-to-use merged registry adapter.
     Assumptions:
@@ -51,7 +55,10 @@ def build_indicators_registry(*, environ: Mapping[str, str]) -> YamlIndicatorReg
     Side Effects:
         Reads defaults YAML from filesystem.
     """
-    config_path = _resolve_indicators_config_path(environ=environ)
+    config_path = resolve_indicators_config_path(
+        environ=environ,
+        artifact_config_path=artifact_config_path,
+    )
     return YamlIndicatorRegistry.from_yaml(
         defs=all_defs(),
         config_path=config_path,
@@ -91,6 +98,7 @@ def build_artifact_precompute_indicators_compute(
     *,
     environ: Mapping[str, str],
     config: IndicatorsComputeNumbaConfig | None = None,
+    artifact_config_path: str | Path | None = None,
 ) -> NumbaIndicatorCompute:
     """
     Build a dedicated indicators compute adapter for offline artifact precompute.
@@ -100,6 +108,8 @@ def build_artifact_precompute_indicators_compute(
     Args:
         environ: Process environment mapping.
         config: Optional preloaded runtime config to avoid duplicate disk/env reads.
+        artifact_config_path: Optional explicit artifact-config path used to derive the matching
+            sibling `indicators.yaml` when no explicit override is provided.
     Returns:
         NumbaIndicatorCompute: Warmed-up compute adapter with an effectively unbounded total
             compute-budget guard for offline artifact materialization.
@@ -113,7 +123,10 @@ def build_artifact_precompute_indicators_compute(
     Side Effects:
         Applies Numba runtime config and performs JIT warmup at startup.
     """
-    base_config = config or load_indicators_compute_numba_config(environ=environ)
+    base_config = config or load_indicators_compute_numba_config(
+        environ=environ,
+        artifact_config_path=artifact_config_path,
+    )
     precompute_config = replace(
         base_config,
         max_compute_bytes_total=_ARTIFACT_PRECOMPUTE_MAX_COMPUTE_BYTES_TOTAL,
@@ -178,49 +191,3 @@ def bind_indicators_runtime_dependencies(
         raise ValueError("bind_indicators_runtime_dependencies requires compute")
     setattr(app_state, "indicators_compute", compute)
     setattr(app_state, "indicators_candle_feed", candle_feed)
-
-
-def _resolve_indicators_config_path(*, environ: Mapping[str, str]) -> Path:
-    """
-    Resolve indicators defaults config path from environment.
-
-    Args:
-        environ: Process environment mapping.
-    Returns:
-        Path: Path to `indicators.yaml`.
-    Assumptions:
-        Override env var has priority over derived `configs/<env>/...` path.
-    Raises:
-        ValueError: If env name is unsupported or override path is blank.
-    Side Effects:
-        None.
-    """
-    override = environ.get(_CONFIG_PATH_KEY, "").strip()
-    if override:
-        return Path(override)
-
-    env_name = _resolve_env_name(environ=environ)
-    return Path("configs") / env_name / "indicators.yaml"
-
-
-def _resolve_env_name(*, environ: Mapping[str, str]) -> str:
-    """
-    Resolve runtime environment name for indicators config selection.
-
-    Args:
-        environ: Process environment mapping.
-    Returns:
-        str: One of `dev`, `prod`, `test`.
-    Assumptions:
-        Missing env variable defaults to `dev`.
-    Raises:
-        ValueError: If env value is not in allowed list.
-    Side Effects:
-        None.
-    """
-    raw_env = environ.get(_ENV_NAME_KEY, "dev").strip().lower()
-    if raw_env not in _ALLOWED_ENVS:
-        raise ValueError(
-            f"{_ENV_NAME_KEY} must be one of {_ALLOWED_ENVS}, got {raw_env!r}"
-        )
-    return raw_env

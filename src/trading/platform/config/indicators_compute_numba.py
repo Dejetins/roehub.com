@@ -18,6 +18,8 @@ import yaml
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _CONFIG_PATH_KEY = "ROEHUB_INDICATORS_CONFIG"
 _ALLOWED_ENVS = ("dev", "prod", "test")
+_ARTIFACT_CONFIG_FILE_NAME = "backtest_artifacts.yaml"
+_INDICATORS_CONFIG_FILE_NAME = "indicators.yaml"
 
 _THREADS_ENV_KEYS = ("ROEHUB_NUMBA_NUM_THREADS", "NUMBA_NUM_THREADS")
 _CACHE_DIR_ENV_KEYS = ("ROEHUB_NUMBA_CACHE_DIR", "NUMBA_CACHE_DIR")
@@ -83,12 +85,15 @@ class IndicatorsComputeNumbaConfig:
 def load_indicators_compute_numba_config(
     *,
     environ: Mapping[str, str],
+    artifact_config_path: str | Path | None = None,
 ) -> IndicatorsComputeNumbaConfig:
     """
     Load indicators Numba runtime config from YAML and env overrides.
 
     Args:
         environ: Environment mapping used to resolve env and override values.
+        artifact_config_path: Optional explicit artifact-config path used to derive the matching
+            sibling `indicators.yaml` when no explicit override is provided.
     Returns:
         IndicatorsComputeNumbaConfig: Validated runtime settings.
     Assumptions:
@@ -99,7 +104,10 @@ def load_indicators_compute_numba_config(
     Side Effects:
         Reads one YAML file from disk.
     """
-    config_path = _resolve_indicators_config_path(environ=environ)
+    config_path = resolve_indicators_config_path(
+        environ=environ,
+        artifact_config_path=artifact_config_path,
+    )
     file_payload = _load_optional_numba_payload(path=config_path)
 
     numba_num_threads = _resolve_int_setting(
@@ -139,16 +147,22 @@ def load_indicators_compute_numba_config(
     )
 
 
-def _resolve_indicators_config_path(*, environ: Mapping[str, str]) -> Path:
+def resolve_indicators_config_path(
+    *,
+    environ: Mapping[str, str],
+    artifact_config_path: str | Path | None = None,
+) -> Path:
     """
-    Resolve indicators YAML path using explicit override or `ROEHUB_ENV`.
+    Resolve indicators YAML path using explicit override, explicit artifact config, or `ROEHUB_ENV`.
 
     Args:
         environ: Environment mapping.
+        artifact_config_path: Optional explicit artifact-config path used to derive the matching
+            sibling `indicators.yaml` when no explicit override is provided.
     Returns:
         Path: Indicators YAML path.
     Assumptions:
-        `ROEHUB_INDICATORS_CONFIG` has priority over env-derived path.
+        `ROEHUB_INDICATORS_CONFIG` has priority over artifact-config-derived and env-derived paths.
     Raises:
         ValueError: If env value is invalid.
     Side Effects:
@@ -158,8 +172,36 @@ def _resolve_indicators_config_path(*, environ: Mapping[str, str]) -> Path:
     if override:
         return Path(override)
 
+    if artifact_config_path is not None:
+        return _derive_indicators_config_path_from_artifact_config(
+            path=Path(artifact_config_path)
+        )
+
     env_name = _resolve_env_name(environ=environ)
-    return Path("configs") / env_name / "indicators.yaml"
+    return Path("configs") / env_name / _INDICATORS_CONFIG_FILE_NAME
+
+
+def _derive_indicators_config_path_from_artifact_config(*, path: Path) -> Path:
+    """
+    Derive the matching indicators config path from one explicit artifact-config path.
+
+    Args:
+        path: Explicit `backtest_artifacts.yaml` path selected by wiring.
+    Returns:
+        Path: Derived sibling `indicators.yaml` path.
+    Assumptions:
+        `configs/<env>/backtest_artifacts.yaml` and `configs/<env>/indicators.yaml` stay colocated.
+    Raises:
+        ValueError: If the provided path is blank.
+    Side Effects:
+        None.
+    """
+    normalized = str(path).strip()
+    if not normalized:
+        raise ValueError("artifact_config_path must be non-empty when provided")
+    if path.name == _ARTIFACT_CONFIG_FILE_NAME:
+        return path.with_name(_INDICATORS_CONFIG_FILE_NAME)
+    return path.parent / _INDICATORS_CONFIG_FILE_NAME
 
 
 def _resolve_env_name(*, environ: Mapping[str, str]) -> str:
@@ -344,4 +386,5 @@ def _parse_positive_int(raw: str, *, key: str) -> int:
 __all__ = [
     "IndicatorsComputeNumbaConfig",
     "load_indicators_compute_numba_config",
+    "resolve_indicators_config_path",
 ]

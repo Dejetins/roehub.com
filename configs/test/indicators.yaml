@@ -181,6 +181,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       window:
         mode: explicit
@@ -233,6 +238,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       annualization:
         mode: explicit
@@ -253,6 +263,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       window:
         mode: explicit
@@ -275,6 +290,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       window:
         mode: explicit
@@ -311,6 +331,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       window:
         mode: explicit
@@ -325,6 +350,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       window:
         mode: explicit
@@ -360,6 +390,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       signal_window:
         mode: explicit
@@ -456,6 +491,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       window:
         mode: explicit
@@ -472,6 +512,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       window:
         mode: explicit
@@ -501,6 +546,11 @@ defaults:
         mode: explicit
         values:
         - close
+        - hlc3
+        - ohlc4
+        - low
+        - high
+        - open
     params:
       window:
         mode: explicit

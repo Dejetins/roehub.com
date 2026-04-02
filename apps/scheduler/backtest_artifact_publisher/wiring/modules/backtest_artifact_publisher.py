@@ -870,9 +870,18 @@ def build_backtest_artifact_publisher_app(
     if not strategy_postgres_dsn:
         raise ValueError("STRATEGY_PG_DSN is required for backtest-artifact-publisher scheduler")
 
-    defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
-    indicator_registry = build_indicators_registry(environ=environ)
-    indicator_compute = build_artifact_precompute_indicators_compute(environ=environ)
+    defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(
+        environ=environ,
+        artifact_config_path=config_path,
+    )
+    indicator_registry = build_indicators_registry(
+        environ=environ,
+        artifact_config_path=config_path,
+    )
+    indicator_compute = build_artifact_precompute_indicators_compute(
+        environ=environ,
+        artifact_config_path=config_path,
+    )
     artifact_config_hash = build_backtest_artifacts_runtime_config_hash(
         config=artifact_runtime_config
     )

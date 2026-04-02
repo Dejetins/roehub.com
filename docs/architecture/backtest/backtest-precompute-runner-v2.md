@@ -68,6 +68,29 @@ Precompute/publish слой читает strict `configs/<env>/backtest_artifact
 R2-04 intentionally keeps these settings отдельно от `configs/<env>/backtest.yaml`, чтобы
 runtime request defaults и artifact pipeline knobs не смешивались в одном контракте.
 
+## R13-01 signal-defaults right-sizing
+
+R13-01 narrows only the heaviest non-`ma.*` artifact-precompute grids in
+`configs/<env>/indicators.yaml`.
+
+- `all_supported_v1` remains the canonical signal target literal; no indicator ids are removed.
+- `signals.v1.params` stay `default-only`.
+- `ma.*` defaults stay frozen.
+- If an indicator already supports `inputs.source`, artifact defaults must keep the full canonical
+  source catalog: `close`, `hlc3`, `ohlc4`, `low`, `high`, `open`.
+- `prod` and `dev` should stay aligned; `test` may stay smaller only for deterministic unit-test
+  speed, but must keep the same targeted indicator ids and canonical source catalog where source is
+  already supported.
+
+Compact before/after guidance for the worst offenders:
+
+| indicator_id | previous compute variants | narrowed compute variants |
+| --- | ---: | ---: |
+| `momentum.trix` | `12528` | `192` |
+| `momentum.stoch` | `9396` | `30` |
+| `trend.adx` | `5336` | `24` |
+| `volatility.hv` | `1392` | `96` |
+
 ## R12 execution-model clarification
 
 R12 фиксирует, что precompute execution model меняется без изменения published artifact output
