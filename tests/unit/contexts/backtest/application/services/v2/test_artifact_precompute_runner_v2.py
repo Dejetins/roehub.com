@@ -148,6 +148,12 @@ _EXPECTED_VARIANT_COUNTS_BY_ENV_V2 = {
         "volatility.variance": 6,
     },
 }
+_ZERO_AXIS_SIGNAL_TARGETS_V2 = (
+    ("15m", "structure.candle_stats"),
+    ("15m", "volatility.tr"),
+    ("15m", "volume.ad_line"),
+    ("15m", "volume.obv"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,6 +259,114 @@ class _PrecomputeSignalDefaultsProvider:
           - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+        """
+        return self.delegate.allowed_source_values(indicator_id=indicator_id)
+
+
+@dataclass(frozen=True, slots=True)
+class _MissingComputeDefaultsProviderV2:
+    """
+    Provider wrapper hiding selected compute defaults while preserving all other contracts.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+      - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
+    """
+
+    delegate: YamlBacktestGridDefaultsProvider
+    hidden_indicator_ids: tuple[str, ...]
+
+    def compute_defaults(self, *, indicator_id: str) -> GridSpec | None:
+        """
+        Hide compute defaults for the selected indicator ids.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            GridSpec | None: `None` for hidden ids, otherwise the delegate-provided defaults.
+        Assumptions:
+            Hidden ids are normalized lower-case literals selected by the test case.
+        Raises:
+            ValueError: Propagated from the delegate provider.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/defaults/
+            indicators_yaml_defaults_provider.py
+        """
+        normalized_indicator_id = indicator_id.strip().lower()
+        if normalized_indicator_id in self.hidden_indicator_ids:
+            return None
+        return self.delegate.compute_defaults(indicator_id=normalized_indicator_id)
+
+    def signal_param_defaults(self, *, indicator_id: str) -> Mapping[str, GridParamSpec]:
+        """
+        Delegate signal default resolution unchanged.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            Mapping[str, GridParamSpec]: Canonical signal defaults mapping.
+        Assumptions:
+            Tests modify only compute-default availability.
+        Raises:
+            ValueError: Propagated from the delegate provider.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/defaults/
+            indicators_yaml_defaults_provider.py
+        """
+        return self.delegate.signal_param_defaults(indicator_id=indicator_id)
+
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return the unchanged supported indicator catalog.
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Canonical supported indicator ids.
+        Assumptions:
+            Signal registry membership must remain unchanged while compute defaults are hidden.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+        """
+        return self.delegate.supported_indicator_ids()
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Delegate allowed-source lookup unchanged.
+
+        Args:
+            indicator_id: Indicator identifier.
+        Returns:
+            tuple[str, ...]: Canonical allowed source literals.
+        Assumptions:
+            Hiding compute defaults must not alter source catalogs.
+        Raises:
+            ValueError: Propagated from the delegate provider.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/defaults/
+            indicators_yaml_defaults_provider.py
         """
         return self.delegate.allowed_source_values(indicator_id=indicator_id)
 
@@ -3784,6 +3898,140 @@ def test_backtest_artifact_precompute_runner_v2_full_validation_spec_still_rejec
     assert error_info.value.diagnostics[0].code == "root_manifest_signal_targets_mismatch"
     assert current_pointer.active_slot == fixture.active_slot
     assert current_pointer.slot_generation == 4
+
+
+def test_backtest_artifact_precompute_runner_v2_materializes_zero_axis_signal_targets_without_yaml_compute_defaults(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Verify the four approved zero-axis signal targets materialize via hard-definition fallback.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        These targets intentionally keep `compute_defaults(...) is None` in YAML-backed providers.
+    Raises:
+        AssertionError: If export raises, variant ordering drifts, or matrices stop being
+            single-row.
+    Side Effects:
+        Writes a small inactive-slot fixture under the pytest temp directory.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        hit_times_tail_bars_1m=30,
+        validation_signal_artifacts=_ZERO_AXIS_SIGNAL_TARGETS_V2,
+        precompute_signal_artifacts=_ZERO_AXIS_SIGNAL_TARGETS_V2,
+        require_hit_times_manifest=False,
+    )
+    delegate = YamlBacktestGridDefaultsProvider.from_yaml(
+        config_path=Path("configs/test/indicators.yaml")
+    )
+    defaults_provider = _MissingComputeDefaultsProviderV2(
+        delegate=delegate,
+        hidden_indicator_ids=tuple(
+            indicator_id for _, indicator_id in _ZERO_AXIS_SIGNAL_TARGETS_V2
+        ),
+    )
+    grid_builder = _signal_grid_builder_v2()
+
+    BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+        defaults_provider=defaults_provider,
+        signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
+        indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+        indicator_grid_builder=grid_builder,
+    ).export_canonical_price_1m(_request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2))
+
+    for timeframe, indicator_id in _ZERO_AXIS_SIGNAL_TARGETS_V2:
+        manifest = fixture.loader.load_signal_manifest(
+            fixture.coordinates,
+            fixture.inactive_slot,
+            timeframe,
+            indicator_id,
+        )
+        matrix = _load_signal_matrix_v2(
+            fixture=fixture,
+            timeframe=timeframe,
+            indicator_id=indicator_id,
+        )
+        assert manifest.rows_count == 1
+        assert manifest.signals.axis_order == ("variant", "time")
+        assert matrix.shape[0] == 1
+        assert matrix.dtype == np.int8
+
+
+def test_backtest_artifact_precompute_runner_v2_keeps_fail_fast_for_axis_bearing_signal_target_without_defaults(  # noqa: E501
+    tmp_path: Path,
+) -> None:
+    """
+    Verify missing compute defaults still fail fast for signal targets with real compute axes.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `trend.adx` remains axis-bearing and therefore must not use the zero-axis fallback.
+    Raises:
+        AssertionError: If the export unexpectedly succeeds or raises the wrong error.
+    Side Effects:
+        Allocates a temporary inactive-slot fixture.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/indicators/domain/definitions/volatility.py
+    """
+    signal_targets = (("15m", "trend.adx"),)
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        price_tail_bars_1m=30,
+        mapping_tail_bars_1m=30,
+        signal_tail_bars_1m=30,
+        hit_times_tail_bars_1m=30,
+        validation_signal_artifacts=signal_targets,
+        precompute_signal_artifacts=signal_targets,
+        require_hit_times_manifest=False,
+    )
+    delegate = YamlBacktestGridDefaultsProvider.from_yaml(
+        config_path=Path("configs/test/indicators.yaml")
+    )
+    defaults_provider = _MissingComputeDefaultsProviderV2(
+        delegate=delegate,
+        hidden_indicator_ids=("trend.adx",),
+    )
+    grid_builder = _signal_grid_builder_v2()
+
+    with pytest.raises(
+        ValueError,
+        match="signal target requires compute defaults for indicator_id 'trend\\.adx'",
+    ):
+        BacktestArtifactPrecomputeRunnerV2(
+            runtime_settings=fixture.runtime_settings,
+            artifact_loader=fixture.loader,
+            canonical_candle_reader=_FakeCanonicalCandleReader(
+                rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+            ),
+            defaults_provider=defaults_provider,
+            signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
+            indicator_compute=_DeterministicSignalCompute(grid_builder=grid_builder),
+            indicator_grid_builder=grid_builder,
+        ).export_canonical_price_1m(_request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2))
 
 
 def _load_signal_matrix_v2(

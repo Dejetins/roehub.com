@@ -126,6 +126,10 @@ R12 execution-policy contract:
   without operationally oversized signal matrices.
 - Canonical `inputs.source` catalogs remain required for source-aware narrowed families:
   `close`, `hlc3`, `ohlc4`, `low`, `high`, `open`.
+- Zero-axis signal targets `structure.candle_stats`, `volatility.tr`, `volume.ad_line`,
+  `volume.obv` intentionally may keep `compute_defaults(...) = None` in YAML; precompute derives
+  their deterministic single-variant grid from hard definitions, but missing defaults for
+  axis-bearing indicators remain a fail-fast misconfiguration.
 
 Fail-fast loader обязан reject'ить:
 

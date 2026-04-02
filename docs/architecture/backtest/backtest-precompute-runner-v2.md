@@ -481,6 +481,10 @@ Precompute runner v2 обязан:
 - `inputs.source` трактуется явно для rule families, где price сравнивается с indicator output;
 - `signals.v1.params` остаются strictly `default-only` и берутся только из
   `configs/<env>/indicators.yaml`;
+- zero-axis signal targets `structure.candle_stats`, `volatility.tr`, `volume.ad_line`,
+  `volume.obv` are valid even when `compute_defaults(...)` is absent in YAML:
+  runner derives a deterministic single-row `GridSpec` from the hard indicator definition with
+  `Layout.VARIANT_MAJOR`, while axis-bearing indicators still fail fast on missing defaults;
 - для каждого explicit target из `backtest_artifacts.validation_plan.signal_artifacts`
   runner обязан писать:
   - `signals/<tf>/<indicator_id>/signals.i8.npy`

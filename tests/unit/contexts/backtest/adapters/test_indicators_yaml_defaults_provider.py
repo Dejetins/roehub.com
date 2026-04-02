@@ -26,6 +26,12 @@ _TARGET_SOURCE_CAPABLE_INDICATOR_IDS = (
     "volatility.variance",
 )
 _CANONICAL_SOURCE_VALUES = ("close", "hlc3", "ohlc4", "low", "high", "open")
+_ZERO_AXIS_SIGNAL_TARGET_IDS = (
+    "structure.candle_stats",
+    "volatility.tr",
+    "volume.ad_line",
+    "volume.obv",
+)
 _MA_DEFAULTS_SHA256_BY_ENV = {
     "dev": "72f71f253d66b20938b5422dcd0c7f402adae05243cc5fb8ab6c958ecc0bad57",
     "prod": "72f71f253d66b20938b5422dcd0c7f402adae05243cc5fb8ab6c958ecc0bad57",
@@ -246,6 +252,36 @@ def test_target_source_capable_indicators_keep_canonical_source_catalog_in_yaml(
         for indicator_id in _TARGET_SOURCE_CAPABLE_INDICATOR_IDS:
             indicator_payload = defaults[indicator_id]
             assert indicator_payload["inputs"]["source"]["values"] == list(_CANONICAL_SOURCE_VALUES)
+
+
+def test_zero_axis_signal_targets_keep_missing_yaml_compute_defaults_in_all_envs() -> None:
+    """
+    Verify the approved zero-axis signal targets intentionally keep `compute_defaults(...) is None`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        These signal targets derive their single-variant grid from hard definitions, not YAML axes.
+    Raises:
+        AssertionError: If one env starts exposing synthetic compute defaults for these targets.
+    Side Effects:
+        Reads checked-in indicators YAML files.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - configs/dev/indicators.yaml
+      - configs/test/indicators.yaml
+      - configs/prod/indicators.yaml
+    """
+    for env_name in ("dev", "prod", "test"):
+        provider = YamlBacktestGridDefaultsProvider.from_yaml(
+            config_path=Path(f"configs/{env_name}/indicators.yaml")
+        )
+        for indicator_id in _ZERO_AXIS_SIGNAL_TARGET_IDS:
+            assert provider.compute_defaults(indicator_id=indicator_id) is None
 
 
 def test_ma_family_defaults_snapshot_remains_unchanged_for_all_target_envs() -> None:

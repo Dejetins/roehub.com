@@ -135,6 +135,39 @@ def signal_rules_engine_v2(
     return BacktestSignalRulesEngineV2(defaults_provider=prod_defaults_provider)
 
 
+def test_signal_rules_engine_v2_keeps_zero_axis_signal_targets_in_supported_catalog() -> None:
+    """
+    Verify the approved zero-axis signal targets remain present in the explicit v2 rules catalog.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Precompute compatibility must not remove these indicators from the v1/v2 signal catalog.
+    Raises:
+        AssertionError: If one target disappears or its rule family drifts.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
+      - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
+    """
+    registry = dict(list_signal_rule_registry_v2())
+
+    assert registry["structure.candle_stats"] == "candle_body_direction"
+    assert registry["volatility.tr"] == "delta_sign"
+    assert registry["volume.ad_line"] == "delta_sign"
+    assert registry["volume.obv"] == "delta_sign"
+    assert "structure.candle_stats" in supported_indicator_ids_for_signal_rules_v2()
+    assert "volatility.tr" in supported_indicator_ids_for_signal_rules_v2()
+    assert "volume.ad_line" in supported_indicator_ids_for_signal_rules_v2()
+    assert "volume.obv" in supported_indicator_ids_for_signal_rules_v2()
+
+
 @dataclass(frozen=True, slots=True)
 class _MissingCatalogIndicatorProvider:
     """

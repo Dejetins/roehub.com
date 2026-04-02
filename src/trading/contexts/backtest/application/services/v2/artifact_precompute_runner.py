@@ -32,6 +32,7 @@ from trading.contexts.indicators.application.dto.variant_key import (
 )
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.services import GridBuilder
+from trading.contexts.indicators.domain.definitions import all_defs
 from trading.contexts.indicators.domain.entities import IndicatorId, Layout
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
 from trading.contexts.market_data.application.dto import CanonicalCandleBatch1m
@@ -128,6 +129,15 @@ _CANONICAL_CANDLE_SOURCE_LITERAL_V2 = "market_data.canonical_candles_1m"
 _PRECOMPUTE_GENERATOR_LITERAL_V2 = "backtest-artifact-precompute-runner-v2"
 _PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2 = "r5-01"
 _ONE_MINUTE_MILLIS_V2 = 60 * 1000
+_ZERO_AXIS_SIGNAL_TARGET_IDS_V2 = (
+    "structure.candle_stats",
+    "volatility.tr",
+    "volume.ad_line",
+    "volume.obv",
+)
+_INDICATOR_AXES_BY_ID_V2 = {
+    definition.indicator_id.value: tuple(definition.axes) for definition in all_defs()
+}
 
 
 def _log_precompute_stage_started_v2(
@@ -1691,16 +1701,9 @@ def _materialize_signal_artifact_v2(
             f"{signal_target.timeframe}:{signal_target.indicator_id}"
         )
     price_arrays = session_price_arrays
-    defaults_grid = defaults_provider.compute_defaults(indicator_id=signal_target.indicator_id)
-    if defaults_grid is None:
-        raise ValueError(
-            "signal target requires compute defaults for indicator_id "
-            f"{signal_target.indicator_id!r}"
-        )
-    compute_grid = _grid_with_layout_v2(
-        grid=defaults_grid,
+    compute_grid = _resolve_signal_target_compute_grid_v2(
+        defaults_provider=defaults_provider,
         indicator_id=signal_target.indicator_id,
-        layout=Layout.VARIANT_MAJOR,
     )
     materialized_grid = indicator_grid_builder.materialize_indicator(grid=compute_grid)
     signal_rows = _build_signal_variant_rows_v2(
@@ -2789,6 +2792,89 @@ def _grid_with_layout_v2(
         params=grid.params,
         source=grid.source,
         layout_preference=layout,
+    )
+
+
+def _resolve_signal_target_compute_grid_v2(
+    *,
+    defaults_provider: BacktestGridDefaultsProvider,
+    indicator_id: str,
+) -> GridSpec:
+    """
+    Resolve a variant-major compute grid for one signal target with explicit zero-axis fallback.
+
+    Args:
+        defaults_provider: Startup-validated defaults provider used by signal artifact precompute.
+        indicator_id: Signal target indicator identifier.
+    Returns:
+        GridSpec: Deterministic variant-major compute grid for the target indicator.
+    Assumptions:
+        Only the four approved zero-axis signal targets may omit YAML compute defaults.
+    Raises:
+        ValueError: If compute defaults are missing for a non-approved or non-zero-axis signal
+            target.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/defaults/
+        indicators_yaml_defaults_provider.py
+      - src/trading/contexts/indicators/domain/specifications/grid_spec.py
+    """
+    defaults_grid = defaults_provider.compute_defaults(indicator_id=indicator_id)
+    if defaults_grid is not None:
+        return _grid_with_layout_v2(
+            grid=defaults_grid,
+            indicator_id=indicator_id,
+            layout=Layout.VARIANT_MAJOR,
+        )
+    return _zero_axis_signal_target_grid_v2(indicator_id=indicator_id)
+
+
+def _zero_axis_signal_target_grid_v2(*, indicator_id: str) -> GridSpec:
+    """
+    Build the deterministic single-variant `GridSpec` for approved zero-axis signal targets.
+
+    Args:
+        indicator_id: Signal target indicator identifier.
+    Returns:
+        GridSpec: Empty-axis `Layout.VARIANT_MAJOR` grid producing one deterministic variant row.
+    Assumptions:
+        Hard indicator definitions are the source of truth for zero-axis eligibility.
+    Raises:
+        ValueError: If the indicator is not one of the approved zero-axis signal targets or if its
+            hard definition exposes axes.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/runbooks/backtest-artifacts-rebuild.md
+    Related:
+      - src/trading/contexts/indicators/domain/definitions/structure.py
+      - src/trading/contexts/indicators/domain/definitions/volatility.py
+      - src/trading/contexts/indicators/domain/definitions/volume.py
+    """
+    normalized_indicator_id = indicator_id.strip().lower()
+    if normalized_indicator_id not in _ZERO_AXIS_SIGNAL_TARGET_IDS_V2:
+        raise ValueError(
+            "signal target requires compute defaults for indicator_id "
+            f"{normalized_indicator_id!r}"
+        )
+    hard_axes = _INDICATOR_AXES_BY_ID_V2.get(normalized_indicator_id)
+    if hard_axes is None:
+        raise ValueError(f"unknown hard definition for indicator_id {normalized_indicator_id!r}")
+    if len(hard_axes) != 0:
+        raise ValueError(
+            "signal target requires compute defaults for indicator_id "
+            f"{normalized_indicator_id!r}"
+        )
+    return GridSpec(
+        indicator_id=IndicatorId(normalized_indicator_id),
+        params={},
+        source=None,
+        layout_preference=Layout.VARIANT_MAJOR,
     )
 
 
