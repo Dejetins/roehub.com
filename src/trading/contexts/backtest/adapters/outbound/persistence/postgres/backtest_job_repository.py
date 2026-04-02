@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Mapping, cast
 from uuid import UUID
 
@@ -744,16 +744,40 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
             required=False,
         )
         artifact_pin = _parse_artifact_pin(row=row)
+        created_at = _normalize_storage_datetime_utc(
+            value=row["created_at"],
+            field_name="created_at",
+        )
+        updated_at = _normalize_storage_datetime_utc(
+            value=row["updated_at"],
+            field_name="updated_at",
+        )
+        if created_at is None or updated_at is None:
+            raise BacktestStorageError(
+                "backtest_jobs.created_at/updated_at must be non-null UTC datetimes"
+            )
         return BacktestJob(
             job_id=UUID(str(row["job_id"])),
             user_id=UserId.from_string(str(row["user_id"])),
             mode=_parse_job_mode(value=row["mode"]),
             state=_parse_job_state(value=row["state"]),
-            created_at=row["created_at"],
-            updated_at=row["updated_at"],
-            started_at=row.get("started_at"),
-            finished_at=row.get("finished_at"),
-            cancel_requested_at=row.get("cancel_requested_at"),
+            created_at=created_at,
+            updated_at=updated_at,
+            started_at=_normalize_storage_datetime_utc(
+                value=row.get("started_at"),
+                field_name="started_at",
+                required=False,
+            ),
+            finished_at=_normalize_storage_datetime_utc(
+                value=row.get("finished_at"),
+                field_name="finished_at",
+                required=False,
+            ),
+            cancel_requested_at=_normalize_storage_datetime_utc(
+                value=row.get("cancel_requested_at"),
+                field_name="cancel_requested_at",
+                required=False,
+            ),
             request_json=request_payload,
             request_hash=str(row["request_hash"]),
             spec_hash=str(row["spec_hash"]).strip() if row.get("spec_hash") is not None else None,
@@ -777,11 +801,27 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
             stage=_parse_job_stage(value=row["stage"]),
             processed_units=int(row["processed_units"]),
             total_units=int(row["total_units"]),
-            progress_updated_at=row.get("progress_updated_at"),
+            progress_updated_at=_normalize_storage_datetime_utc(
+                value=row.get("progress_updated_at"),
+                field_name="progress_updated_at",
+                required=False,
+            ),
             locked_by=str(row["locked_by"]) if row.get("locked_by") is not None else None,
-            locked_at=row.get("locked_at"),
-            lease_expires_at=row.get("lease_expires_at"),
-            heartbeat_at=row.get("heartbeat_at"),
+            locked_at=_normalize_storage_datetime_utc(
+                value=row.get("locked_at"),
+                field_name="locked_at",
+                required=False,
+            ),
+            lease_expires_at=_normalize_storage_datetime_utc(
+                value=row.get("lease_expires_at"),
+                field_name="lease_expires_at",
+                required=False,
+            ),
+            heartbeat_at=_normalize_storage_datetime_utc(
+                value=row.get("heartbeat_at"),
+                field_name="heartbeat_at",
+                required=False,
+            ),
             attempt=int(row["attempt"]),
             last_error=str(row["last_error"]) if row.get("last_error") is not None else None,
             last_error_json=last_error_payload,
@@ -1000,6 +1040,43 @@ def _parse_json_object(
     raise BacktestStorageError(
         f"backtest_jobs.{field_name} has unsupported type {type(value).__name__}"
     )
+
+
+def _normalize_storage_datetime_utc(
+    *,
+    value: Any,
+    field_name: str,
+    required: bool = True,
+) -> datetime | None:
+    """
+    Normalize one storage `timestamptz` value into timezone-aware UTC datetime.
+
+    Args:
+        value: Raw storage value from psycopg row mapping.
+        field_name: Storage column name for diagnostic errors.
+        required: Whether the column must be present and non-null.
+    Returns:
+        datetime | None: UTC-normalized datetime or `None` for nullable fields.
+    Assumptions:
+        Storage layer may deserialize `timestamptz` in session timezone rather than UTC.
+    Raises:
+        BacktestStorageError: If value is missing, null for required columns, or not datetime-like.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        if required:
+            raise BacktestStorageError(f"backtest_jobs.{field_name} must be non-null datetime")
+        return None
+    if not isinstance(value, datetime):
+        raise BacktestStorageError(
+            f"backtest_jobs.{field_name} must be datetime, got {type(value).__name__}"
+        )
+    if value.tzinfo is None:
+        raise BacktestStorageError(
+            f"backtest_jobs.{field_name} must be timezone-aware datetime"
+        )
+    return value.astimezone(timezone.utc)
 
 
 def _parse_job_mode(*, value: Any) -> BacktestJobMode:

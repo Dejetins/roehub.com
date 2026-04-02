@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -607,6 +607,57 @@ def test_job_repository_get_accepts_legacy_rows_with_null_persisted_run_metadata
     assert row.requested_top_n is None
     assert row.ranking_primary_metric is None
     assert row.ranking_secondary_metric is None
+
+
+def test_job_repository_get_normalizes_storage_timestamptz_rows_to_utc() -> None:
+    """
+    Verify storage row mapping converts non-UTC `timestamptz` values into UTC datetimes.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Psycopg may deserialize `timestamptz` using the active PostgreSQL session timezone.
+    Raises:
+        AssertionError: If repository leaks non-UTC datetimes into the domain aggregate.
+    Side Effects:
+        None.
+    """
+    localized_row = dict(_build_job_row(state="running"))
+    msk = timezone(timedelta(hours=3))
+    localized_row["created_at"] = datetime(2026, 2, 22, 21, 0, tzinfo=msk)
+    localized_row["updated_at"] = datetime(2026, 2, 22, 21, 1, tzinfo=msk)
+    localized_row["started_at"] = datetime(2026, 2, 22, 21, 0, 10, tzinfo=msk)
+    localized_row["progress_updated_at"] = datetime(2026, 2, 22, 21, 1, tzinfo=msk)
+    localized_row["locked_at"] = datetime(2026, 2, 22, 21, 0, 10, tzinfo=msk)
+    localized_row["lease_expires_at"] = datetime(2026, 2, 22, 21, 2, tzinfo=msk)
+    localized_row["heartbeat_at"] = datetime(2026, 2, 22, 21, 1, tzinfo=msk)
+    gateway = _FakeGateway(fetch_one_results=[localized_row])
+    repository = PostgresBacktestJobRepository(gateway=gateway)
+
+    row = repository.get(job_id=UUID("00000000-0000-0000-0000-000000000810"))
+
+    assert row is not None
+    assert row.created_at.tzinfo is timezone.utc
+    assert row.created_at == datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc)
+    assert row.updated_at.tzinfo is timezone.utc
+    assert row.updated_at == datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc)
+    assert row.started_at is not None
+    assert row.started_at.tzinfo is timezone.utc
+    assert row.started_at == datetime(2026, 2, 22, 18, 0, 10, tzinfo=timezone.utc)
+    assert row.progress_updated_at is not None
+    assert row.progress_updated_at.tzinfo is timezone.utc
+    assert row.progress_updated_at == datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc)
+    assert row.locked_at is not None
+    assert row.locked_at.tzinfo is timezone.utc
+    assert row.locked_at == datetime(2026, 2, 22, 18, 0, 10, tzinfo=timezone.utc)
+    assert row.lease_expires_at is not None
+    assert row.lease_expires_at.tzinfo is timezone.utc
+    assert row.lease_expires_at == datetime(2026, 2, 22, 18, 2, tzinfo=timezone.utc)
+    assert row.heartbeat_at is not None
+    assert row.heartbeat_at.tzinfo is timezone.utc
+    assert row.heartbeat_at == datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc)
 
 
 def test_results_repository_list_top_variants_maps_legacy_rows_to_summary_only_shape() -> None:

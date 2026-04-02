@@ -126,6 +126,13 @@
   - `last_error text null`
   - `last_error_json jsonb null` (RoehubError-like object: `code/message/details`)
 
+Storage adapter contract:
+
+- repository mappers normalize all fetched `timestamptz` fields to timezone-aware UTC datetimes
+  before constructing domain aggregates;
+- PostgreSQL session timezone therefore must not affect readability of persisted `backtest_jobs`
+  rows through `PostgresBacktestJobRepository`.
+
 Минимальные constraints/indexes:
 
 - checks:
