@@ -205,7 +205,6 @@ def test_numba_trend_kernels_match_numpy_oracle_with_nan_holes() -> None:
             {
                 "high": source_map["high"],
                 "low": source_map["low"],
-                "close": source_map["close"],
                 "windows": windows_i64,
             },
         ),
@@ -214,7 +213,6 @@ def test_numba_trend_kernels_match_numpy_oracle_with_nan_holes() -> None:
             {
                 "high": source_map["high"],
                 "low": source_map["low"],
-                "close": source_map["close"],
                 "windows": windows_i64,
             },
         ),

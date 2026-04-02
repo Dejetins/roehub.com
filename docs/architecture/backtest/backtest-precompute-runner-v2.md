@@ -481,6 +481,9 @@ Precompute runner v2 обязан:
 - `inputs.source` трактуется явно для rule families, где price сравнивается с indicator output;
 - `signals.v1.params` остаются strictly `default-only` и берутся только из
   `configs/<env>/indicators.yaml`;
+- required candle-series for each signal target still come from the indicators compute contract;
+  catalog-wide tests must keep hard definitions aligned with the real compute path so precompute
+  never requests undeclared fixed inputs;
 - zero-axis signal targets `structure.candle_stats`, `volatility.tr`, `volume.ad_line`,
   `volume.obv` are valid even when `compute_defaults(...)` is absent in YAML:
   runner derives a deterministic single-row `GridSpec` from the hard indicator definition with

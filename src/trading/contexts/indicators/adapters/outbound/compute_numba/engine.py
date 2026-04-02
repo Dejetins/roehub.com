@@ -1646,12 +1646,11 @@ def _compute_trend_variant_matrix(
                 precision=precision,
             )
 
-        close = _require_series(
-            available_series=available_series,
-            name=InputSeries.CLOSE.value,
-        )
-
         if indicator_id == "trend.adx":
+            close = _require_series(
+                available_series=available_series,
+                name=InputSeries.CLOSE.value,
+            )
             windows_i64 = np.ascontiguousarray(
                 np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
             )
@@ -1676,7 +1675,6 @@ def _compute_trend_variant_matrix(
                 indicator_id=indicator_id,
                 high=high,
                 low=low,
-                close=close,
                 windows=windows_i64,
                 precision=precision,
             )
@@ -1689,12 +1687,15 @@ def _compute_trend_variant_matrix(
                 indicator_id=indicator_id,
                 high=high,
                 low=low,
-                close=close,
                 windows=windows_i64,
                 precision=precision,
             )
 
         if indicator_id == "trend.vortex":
+            close = _require_series(
+                available_series=available_series,
+                name=InputSeries.CLOSE.value,
+            )
             windows_i64 = np.ascontiguousarray(
                 np.asarray(_variant_int_values(axes=axes, axis_name="window"), dtype=np.int64)
             )

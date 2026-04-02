@@ -1687,10 +1687,9 @@ def compute_trend_grid_f32(
         )
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
 
-    close_f64 = _prepare_series(name="close", values=close, dtype=core_dtype)
-    _ensure_same_length(high=high_f64, low=low_f64, close=close_f64)
-
     if normalized_id == "trend.adx":
+        close_f64 = _prepare_series(name="close", values=close, dtype=core_dtype)
+        _ensure_same_length(high=high_f64, low=low_f64, close=close_f64)
         windows_i64 = _prepare_int_variants(name="windows", values=windows)
         smoothings_i64 = _prepare_int_variants(
             name="smoothings",
@@ -1716,6 +1715,8 @@ def compute_trend_grid_f32(
         out_f64 = _donchian_variants_f64(high_f64, low_f64, windows_i64)
         return np.ascontiguousarray(out_f64.astype(np.float32, copy=False))
     if normalized_id == "trend.vortex":
+        close_f64 = _prepare_series(name="close", values=close, dtype=core_dtype)
+        _ensure_same_length(high=high_f64, low=low_f64, close=close_f64)
         windows_i64 = _prepare_int_variants(name="windows", values=windows)
         out_f64 = _vortex_variants_f64(
             high_f64,

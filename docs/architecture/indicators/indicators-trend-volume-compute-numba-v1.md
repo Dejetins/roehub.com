@@ -116,6 +116,11 @@ Batch — отдельная orchestration задача (не в EPIC-08).
 - kernel вызывается отдельно по каждой source-группе и subset параметров;
 - group-результаты scatter’ятся в исходные global variant indexes без изменения порядка.
 
+Hard definitions in `src/trading/contexts/indicators/domain/definitions/*.py` remain the
+authoritative source contract for required candle series. Trend/volume compute wrappers and engine
+must not require extra fixed series beyond that contract for non-source-axis indicators; this is
+guarded by catalog-wide unit tests.
+
 ### 3) In-place heavy kernels (phase 4)
 
 Для наиболее тяжёлых trend/volume kernels в variant-циклах включён in-place write path:
@@ -206,12 +211,14 @@ Policy не меняет внешние API/DTO: `IndicatorTensor.values` по-�
 **Формула:** `trend.aroon`.
 - rolling_time_since_max/min → aroon_up/down → aroon_osc
 - NaN дырки → NaN propagation через rolling ops.
+- Fixed candle-series contract: `high`, `low` only.
 
 **Primary output:** `aroon_osc`.
 
 ### D) `trend.donchian(window)`
 **Формула:** `trend.donchian`.
 - upper = rolling_max(high), lower = rolling_min(low), mid = (upper+lower)/2
+- Fixed candle-series contract: `high`, `low` only.
 
 **Primary output:** `donchian_mid`.
 

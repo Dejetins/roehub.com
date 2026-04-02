@@ -84,13 +84,10 @@ def test_numpy_oracle_donchian_mid_uses_window_warmup() -> None:
     """
     high = np.asarray([2, 3, 4, 5, 6], dtype=np.float32)
     low = np.asarray([1, 2, 3, 4, 5], dtype=np.float32)
-    close = np.asarray([1.5, 2.5, 3.5, 4.5, 5.5], dtype=np.float32)
-
     out = compute_trend_grid_f32(
         indicator_id="trend.donchian",
         high=high,
         low=low,
-        close=close,
         windows=np.asarray([3], dtype=np.int64),
     )
 

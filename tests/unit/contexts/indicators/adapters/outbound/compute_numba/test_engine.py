@@ -7,7 +7,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from trading.contexts.indicators.adapters.outbound.compute_numba import NumbaIndicatorCompute
+from trading.contexts.indicators.adapters.outbound.compute_numba import (
+    NumbaIndicatorCompute,
+)
 from trading.contexts.indicators.adapters.outbound.compute_numba import (
     engine as numba_engine,
 )
@@ -31,6 +33,7 @@ from trading.contexts.indicators.application.dto import (
 from trading.contexts.indicators.domain.definitions import all_defs
 from trading.contexts.indicators.domain.entities import (
     AxisDef,
+    IndicatorDef,
     IndicatorId,
     InputSeries,
     Layout,
@@ -265,6 +268,78 @@ def _definition_by_id(*, indicator_id: str):
         definition
         for definition in all_defs()
         if definition.indicator_id.value == indicator_id
+    )
+
+
+def _minimal_grid_for_definition(*, definition: IndicatorDef) -> GridSpec:
+    """
+    Build one deterministic single-variant grid directly from one hard indicator definition.
+
+    Args:
+        definition: Hard indicator definition under verification.
+    Returns:
+        GridSpec: Single-variant grid using definition-default parameter values.
+    Assumptions:
+        Source-axis indicators can be exercised with one deterministic fallback source, while
+        non-source axes use `ParamDef.default` values.
+    Raises:
+        StopIteration: If one declared axis is missing from `definition.params`.
+        ValueError: If the resulting `GridSpec` violates domain invariants.
+    Side Effects:
+        None.
+    """
+    params: dict[str, ExplicitValuesSpec] = {}
+    source_spec: ExplicitValuesSpec | None = None
+    for axis_name in definition.axes:
+        if axis_name == "source":
+            source_spec = ExplicitValuesSpec(
+                name="source",
+                values=(numba_engine._fallback_source(definition=definition),),
+            )
+            continue
+        param_def = next(param for param in definition.params if param.name == axis_name)
+        default_value = param_def.default
+        if default_value is None:
+            raise ValueError(
+                "hard indicator definition axis must provide default value: "
+                f"indicator_id={definition.indicator_id.value}, axis={axis_name}"
+            )
+        params[axis_name] = ExplicitValuesSpec(
+            name=axis_name,
+            values=(default_value,),
+        )
+    return GridSpec(
+        indicator_id=definition.indicator_id,
+        params=params,
+        source=source_spec,
+        layout_preference=Layout.VARIANT_MAJOR,
+    )
+
+
+def _minimal_compute_request_for_definition(
+    *,
+    definition: IndicatorDef,
+    candles: CandleArrays,
+) -> ComputeRequest:
+    """
+    Build one public compute request from a hard indicator definition.
+
+    Args:
+        definition: Hard indicator definition under verification.
+        candles: Deterministic candle payload used by compute-engine tests.
+    Returns:
+        ComputeRequest: Public compute request with exactly one deterministic variant.
+    Assumptions:
+        One variant is sufficient to validate source-contract alignment without stressing guards.
+    Raises:
+        ValueError: If the derived `GridSpec` violates DTO invariants.
+    Side Effects:
+        None.
+    """
+    return ComputeRequest(
+        candles=candles,
+        grid=_minimal_grid_for_definition(definition=definition),
+        max_variants_guard=16,
     )
 
 
@@ -737,6 +812,107 @@ def test_variant_axis_expansion_functions_use_vectorized_repeat_tile_path() -> N
         numba_engine._variant_source_labels,
     ):
         assert "np.ndindex" not in inspect.getsource(function)
+
+
+def test_single_variant_public_compute_succeeds_for_every_hard_indicator_definition(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify every hard indicator definition can execute one deterministic public compute request.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        A full OHLCV candle payload plus definition-default params is enough to validate
+        source-contract alignment for every indicator family.
+    Raises:
+        AssertionError: If one indicator drifts and public compute fails.
+    Side Effects:
+        Triggers lightweight single-variant compute calls across the full indicator catalog.
+    """
+    engine = _compute_engine(cache_dir=tmp_path / "numba-cache")
+    candles = _candles(t_size=64)
+
+    for definition in all_defs():
+        tensor = engine.compute(
+            _minimal_compute_request_for_definition(
+                definition=definition,
+                candles=candles,
+            )
+        )
+        assert tensor.meta.variants == 1
+        assert tensor.layout is Layout.VARIANT_MAJOR
+        assert tensor.values.dtype == np.float32
+        assert tensor.values.shape == (1, 64)
+
+
+def test_every_hard_indicator_definition_matches_request_level_required_sources_contract(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify every hard indicator definition stays aligned with request-level required sources.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Hard definitions, fallback-source policy, and explicit fixed-series helper together define
+        the minimal source contract for one compute request.
+    Raises:
+        AssertionError: If one indicator definition drifts from the real compute contract.
+    Side Effects:
+        Materializes one single-variant grid per hard definition.
+    """
+    engine = _compute_engine(cache_dir=tmp_path / "numba-cache")
+    candles = _candles(t_size=64)
+    dynamic_price_sources = {
+        InputSeries.OPEN.value,
+        InputSeries.HIGH.value,
+        InputSeries.LOW.value,
+        InputSeries.CLOSE.value,
+        InputSeries.HL2.value,
+        InputSeries.HLC3.value,
+        InputSeries.OHLC4.value,
+    }
+
+    for definition in all_defs():
+        request = _minimal_compute_request_for_definition(
+            definition=definition,
+            candles=candles,
+        )
+        materialized = engine._grid_builder.materialize_indicator(grid=request.grid)
+        axes = numba_engine._axis_defs_from_materialized_axes(axes=materialized.axes)
+        actual = numba_engine._required_sources_for_request(
+            definition=definition,
+            axes=axes,
+        )
+        expected: set[str] = set()
+        axis_names = [axis.name for axis in axes]
+
+        if "source" in axis_names:
+            source_axis = axes[axis_names.index("source")]
+            source_values = source_axis.values_enum
+            assert source_values is not None
+            expected.update(str(value).strip().lower() for value in source_values)
+            expected.update(
+                input_series.value
+                for input_series in definition.inputs
+                if input_series.value not in dynamic_price_sources
+            )
+            expected.update(
+                numba_engine._required_fixed_series_for_indicator_id(
+                    indicator_id=definition.indicator_id.value
+                )
+            )
+        else:
+            expected.update(series.value for series in definition.inputs)
+            if len(expected) == 0:
+                expected.add(numba_engine._fallback_source(definition=definition))
+
+        assert actual == tuple(sorted(expected)), definition.indicator_id.value
 
 
 def test_group_variant_indexes_by_source_preserves_first_seen_source_order() -> None:
