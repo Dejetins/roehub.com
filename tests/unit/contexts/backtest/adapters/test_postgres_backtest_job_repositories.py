@@ -717,6 +717,62 @@ def test_results_repository_list_top_variants_maps_legacy_rows_to_summary_only_s
     assert rows[0].trades_json is None
 
 
+def test_results_repository_list_top_variants_normalizes_localized_updated_at_to_utc() -> None:
+    """
+    Verify persisted top rows normalize storage-local `updated_at` to `timezone.utc`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+      - apps/api/routes/backtest_runs.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Psycopg may deserialize `timestamptz` using the active PostgreSQL session timezone.
+    Raises:
+        AssertionError: If repository leaks non-UTC datetimes into `BacktestJobTopVariant`.
+    Side Effects:
+        None.
+    """
+    msk = timezone(timedelta(hours=3))
+    gateway = _FakeGateway(
+        fetch_all_results=[
+            (
+                {
+                    "job_id": "00000000-0000-0000-0000-000000000810",
+                    "rank": 1,
+                    "variant_key": "a" * 64,
+                    "indicator_variant_key": "b" * 64,
+                    "variant_index": 0,
+                    "total_return_pct": 12.34,
+                    "payload_json": {"schema_version": 1},
+                    "summary_metrics_json": {"total_return_pct": 12.34},
+                    "best_tp_pct": 4.0,
+                    "best_sl_pct": 2.0,
+                    "updated_at": datetime(2026, 2, 22, 22, 2, tzinfo=msk),
+                },
+            )
+        ]
+    )
+    repository = PostgresBacktestJobResultsRepository(gateway=gateway)
+
+    rows = repository.list_top_variants(
+        job_id=UUID("00000000-0000-0000-0000-000000000810"),
+        limit=10,
+    )
+
+    assert len(rows) == 1
+    assert rows[0].updated_at.tzinfo is timezone.utc
+    assert rows[0].updated_at == datetime(2026, 2, 22, 19, 2, tzinfo=timezone.utc)
+    assert "ORDER BY rank ASC, variant_key ASC" in gateway.fetch_all_queries[0]
+
+
 def test_results_repository_save_stage_a_shortlist_uses_lease_guarded_upsert() -> None:
     """
     Verify Stage-A shortlist SQL uses lease guard and deterministic ON CONFLICT upsert.

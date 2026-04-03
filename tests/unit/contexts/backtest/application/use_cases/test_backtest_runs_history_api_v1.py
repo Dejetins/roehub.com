@@ -617,6 +617,85 @@ def test_get_top_use_case_validates_limit_and_reads_rows_for_run() -> None:
     assert error_info.value.code == "validation_error"
 
 
+def test_get_top_use_case_returns_persisted_rows_in_repository_order() -> None:
+    """
+    Verify persisted `/top` rows are returned unchanged in `rank ASC, variant_key ASC` order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+      - apps/api/routes/backtest_runs.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Repository already applies canonical persisted ordering for
+        `GET /backtests/runs/{run_id}/top`.
+    Raises:
+        AssertionError: If use-case changes ordering or default persisted limit semantics.
+    Side Effects:
+        None.
+    """
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
+    owner_run = _queued_run(
+        run_id=UUID("00000000-0000-0000-0000-000000000962"),
+        user_id=owner_user_id,
+    )
+    first_row = BacktestJobTopVariant(
+        job_id=owner_run.job_id,
+        rank=1,
+        variant_key="a" * 64,
+        indicator_variant_key="b" * 64,
+        variant_index=0,
+        total_return_pct=10.0,
+        payload_json={"schema_version": 1},
+        summary_metrics_json={"total_return_pct": 10.0, "profit_factor": 1.2},
+        best_tp_pct=4.0,
+        best_sl_pct=2.0,
+        report_table_md=None,
+        trades_json=None,
+        updated_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+    )
+    second_row = BacktestJobTopVariant(
+        job_id=owner_run.job_id,
+        rank=2,
+        variant_key="c" * 64,
+        indicator_variant_key="d" * 64,
+        variant_index=1,
+        total_return_pct=8.5,
+        payload_json={"schema_version": 1, "variant": "second"},
+        summary_metrics_json={"total_return_pct": 8.5, "profit_factor": 1.1},
+        best_tp_pct=3.5,
+        best_sl_pct=1.5,
+        report_table_md=None,
+        trades_json=None,
+        updated_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+    )
+
+    repository = _FakeJobRepository(jobs_by_id={owner_run.job_id: owner_run})
+    results_repository = _FakeResultsRepository(rows=(first_row, second_row))
+    use_case = GetBacktestRunTopUseCase(
+        job_repository=repository,
+        results_repository=results_repository,
+        top_k_persisted_default=2,
+    )
+
+    result = use_case.execute(
+        run_id=owner_run.job_id,
+        current_user=CurrentUser(user_id=owner_user_id),
+        limit=None,
+    )
+
+    assert result.job == owner_run
+    assert result.rows == (first_row, second_row)
+    assert results_repository.last_limit == 2
+
+
 def test_cancel_use_case_returns_updated_owner_run_snapshot() -> None:
     """
     Verify cancel use-case returns idempotent status payload after owner validation.

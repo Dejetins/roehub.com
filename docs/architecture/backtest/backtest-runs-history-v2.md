@@ -16,6 +16,9 @@
   - persisted top rows contract fields: `payload_json`, `summary_metrics_json`,
     `best_tp_pct`, `best_sl_pct`;
   - `report_table_md` и `trades_json` не входят в public runs contract и остаются `NULL`-only.
+  - storage mapper for `GET /backtests/runs/{run_id}/top` normalizes persisted
+    `updated_at` from PostgreSQL `timestamptz` to UTC before creating
+    `BacktestJobTopVariant`, so read-path behavior does not depend on session timezone.
 - R7-04 additive note:
   - public lazy detail endpoint `POST /backtests/runs/{run_id}/variant-report` пересчитывает
     ровно один выбранный вариант по persisted `run_id` и explicit `variant` payload;

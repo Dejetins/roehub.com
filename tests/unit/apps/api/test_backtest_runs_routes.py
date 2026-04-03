@@ -436,6 +436,80 @@ def test_get_backtest_run_top_returns_summary_only_rows_with_persisted_metrics()
     ]
 
 
+def test_get_backtest_run_top_returns_persisted_rows_in_deterministic_order() -> None:
+    """
+    Verify `GET /backtests/runs/{run_id}/top` returns persisted rows in canonical order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - apps/api/routes/backtest_runs.py
+      - apps/api/dto/backtest_runs.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Use-case result is already backed by persisted storage rows ordered as
+        `rank ASC, variant_key ASC`.
+    Raises:
+        AssertionError: If route wiring changes payload order or status code for owner runs.
+    Side Effects:
+        None.
+    """
+    run = _queued_run(run_id=UUID("00000000-0000-0000-0000-000000000936"))
+    result = BacktestRunTopReadResult(
+        job=run,
+        rows=(
+            BacktestJobTopVariant(
+                job_id=run.job_id,
+                rank=1,
+                variant_key="a" * 64,
+                indicator_variant_key="b" * 64,
+                variant_index=0,
+                total_return_pct=10.0,
+                payload_json={"schema_version": 1, "label": "first"},
+                summary_metrics_json={"total_return_pct": 10.0, "profit_factor": 1.5},
+                best_tp_pct=4.0,
+                best_sl_pct=2.0,
+                report_table_md=None,
+                trades_json=None,
+                updated_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+            ),
+            BacktestJobTopVariant(
+                job_id=run.job_id,
+                rank=2,
+                variant_key="c" * 64,
+                indicator_variant_key="d" * 64,
+                variant_index=1,
+                total_return_pct=8.0,
+                payload_json={"schema_version": 1, "label": "second"},
+                summary_metrics_json={"total_return_pct": 8.0, "profit_factor": 1.2},
+                best_tp_pct=3.0,
+                best_sl_pct=1.5,
+                report_table_md=None,
+                trades_json=None,
+                updated_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+            ),
+        ),
+    )
+    client, _, _ = _build_client(top_use_case=_TopUseCaseFake(result=result))
+
+    response = client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000936/top",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["rank"] for item in body["items"]] == [1, 2]
+    assert [item["variant_key"] for item in body["items"]] == ["a" * 64, "c" * 64]
+    assert body["items"][0]["payload"] == {"schema_version": 1, "label": "first"}
+    assert body["items"][1]["payload"] == {"schema_version": 1, "label": "second"}
+
+
 def test_post_backtest_run_cancel_returns_updated_status_snapshot() -> None:
     """
     Verify `POST /backtests/runs/{run_id}/cancel` returns updated public status payload.

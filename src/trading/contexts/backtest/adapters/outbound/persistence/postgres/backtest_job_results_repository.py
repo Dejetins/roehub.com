@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -436,7 +436,9 @@ def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
     Returns:
         BacktestJobTopVariant: Mapped top-variant snapshot.
     Assumptions:
-        Row schema follows additive summary-only persisted top-row storage contract.
+        Row schema follows additive summary-only persisted top-row storage contract and normalizes
+        storage `updated_at` to `timezone.utc` before crossing the `BacktestJobTopVariant`
+        boundary.
     Raises:
         BacktestStorageError: If row cannot be mapped.
     Side Effects:
@@ -455,6 +457,14 @@ def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
             field_name="summary_metrics_json",
             required=False,
         ) or {}
+        updated_at = _normalize_storage_datetime_utc(
+            value=row.get("updated_at"),
+            field_name="updated_at",
+        )
+        if updated_at is None:
+            raise BacktestStorageError(
+                "backtest_job_top_variants.updated_at must be non-null UTC datetime"
+            )
 
         return BacktestJobTopVariant(
             job_id=UUID(str(row["job_id"])),
@@ -483,7 +493,7 @@ def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
             ),
             report_table_md=None,
             trades_json=None,
-            updated_at=row["updated_at"],
+            updated_at=updated_at,
         )
     except Exception as error:  # noqa: BLE001
         if isinstance(error, BacktestStorageError):
@@ -491,6 +501,56 @@ def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
         raise BacktestStorageError(
             "PostgresBacktestJobResultsRepository cannot map top variant row"
         ) from error
+
+
+def _normalize_storage_datetime_utc(
+    *,
+    value: Any,
+    field_name: str,
+    required: bool = True,
+) -> datetime | None:
+    """
+    Normalize one storage `timestamptz` value into timezone-aware UTC datetime.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/roadmap/base_refactor_plan.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_repository.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+    Args:
+        value: Raw storage value from psycopg row mapping.
+        field_name: Storage column name for deterministic error messages.
+        required: Whether the column must be present and non-null.
+    Returns:
+        datetime | None: UTC-normalized datetime or `None` for nullable fields.
+    Assumptions:
+        Storage layer may deserialize `timestamptz` in session-local timezone instead of UTC.
+    Raises:
+        BacktestStorageError: If value is missing, null for required columns, or not datetime-like.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        if required:
+            raise BacktestStorageError(
+                f"backtest_job_top_variants.{field_name} must be non-null datetime"
+            )
+        return None
+    if not isinstance(value, datetime):
+        raise BacktestStorageError(
+            "backtest_job_top_variants."
+            f"{field_name} must be datetime, got {type(value).__name__}"
+        )
+    if value.tzinfo is None:
+        raise BacktestStorageError(
+            f"backtest_job_top_variants.{field_name} must be timezone-aware datetime"
+        )
+    return value.astimezone(timezone.utc)
 
 
 
