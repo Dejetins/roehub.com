@@ -16,6 +16,11 @@
     closure only;
   - R10-03 uses this document as the canonical benchmark protocol for legacy R0 reference,
     artifact-backed v2 perf gates, and rollout evidence.
+- Milestone A / EPIC A3 adds one additive rollout corpus on top of this baseline:
+  - `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`
+  - `tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json`
+  - exact baseline slices in A3 reuse the approved R0 scenarios and R5 Stage B golden manifest
+    from this document instead of introducing a second exact reference set.
 
 ## Цель
 
@@ -186,6 +191,8 @@ R10-03 не меняет runtime/API contract. Closure фиксируется ч
   `tests/perf_smoke/contexts/backtest/fixtures/r0_benchmark_scenarios.json`
 - Parity scope manifest:
   `tests/perf_smoke/contexts/backtest/fixtures/r0_parity_scope.json`
+- Runtime-acceleration benchmark corpus for later exact/hybrid/plugin rollout work:
+  `tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json`
 - Executable local baseline:
   `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py`
 - Notebook references:

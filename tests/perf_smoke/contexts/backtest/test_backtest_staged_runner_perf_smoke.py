@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import numpy as np
 
 from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunBacktestTemplate
 from trading.contexts.backtest.application.services import (
+    BacktestRuntimeBenchmarkSliceV2,
+    BacktestRuntimeBenchmarkSyntheticRunSpecV2,
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
 )
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
@@ -29,6 +33,10 @@ from trading.shared_kernel.primitives import (
 )
 
 _CATASTROPHIC_UPPER_BOUND_SECONDS = 60.0
+_FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+_BENCHMARK_CORPUS_FIXTURE_PATH = (
+    _FIXTURES_DIR / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
+)
 
 
 class _PerfSmokeIndicatorCompute:
@@ -189,7 +197,11 @@ def test_backtest_staged_runner_perf_smoke_small_sync_grid() -> None:
     Side Effects:
         None.
     """
-    candles = _build_hourly_candles(bars=512)
+    small_grid_slice = _load_small_grid_overhead_slice()
+    spec = small_grid_slice.synthetic_run_spec
+    assert spec is not None
+
+    candles = _build_hourly_candles(bars=spec.total_candles_bars)
     indicator_compute = _PerfSmokeIndicatorCompute()
     scorer = CloseFillBacktestStagedScorerV1(
         indicator_compute=indicator_compute,
@@ -201,7 +213,7 @@ def test_backtest_staged_runner_perf_smoke_small_sync_grid() -> None:
             "slippage_pct": 0.0,
         },
         market_id=1,
-        target_slice=slice(32, 512),
+        target_slice=slice(spec.warmup_bars, spec.total_candles_bars),
         init_cash_quote_default=1000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -211,23 +223,25 @@ def test_backtest_staged_runner_perf_smoke_small_sync_grid() -> None:
 
     started = time.perf_counter()
     result = runner.run(
-        template=_perf_smoke_template(),
+        template=_perf_smoke_template(spec=spec),
         candles=candles,
-        preselect=4,
-        top_k=5,
+        preselect=spec.preselect,
+        top_k=spec.top_k,
         indicator_compute=indicator_compute,
         scorer=scorer,
         requested_time_range=candles.time_range,
-        top_trades_n=2,
+        top_trades_n=spec.top_trades_n,
         max_variants_per_compute=2_000,
         max_compute_bytes_total=1 * 1024**3,
     )
     elapsed = time.perf_counter() - started
 
+    assert small_grid_slice.execution_profile_mode == "exact_small"
+    assert small_grid_slice.candidate_execution_profile_mode == "hybrid_conservative"
     assert elapsed < _CATASTROPHIC_UPPER_BOUND_SECONDS
-    assert result.stage_a_variants_total == 6
-    assert result.stage_b_variants_total == 16
-    assert len(result.variants) == 5
+    assert result.stage_a_variants_total == spec.expected_stage_a_variants_total
+    assert result.stage_b_variants_total == spec.expected_stage_b_variants_total
+    assert len(result.variants) == spec.top_k
     assert indicator_compute.compute_calls == 1
     assert indicator_compute.requested_layout_preferences == [Layout.VARIANT_MAJOR]
     assert len({item.variant_key for item in result.variants}) == len(result.variants)
@@ -238,16 +252,20 @@ def test_backtest_staged_runner_perf_smoke_small_sync_grid() -> None:
         assert variant.report is None
 
 
-def _perf_smoke_template() -> RunBacktestTemplate:
+def _perf_smoke_template(
+    *,
+    spec: BacktestRuntimeBenchmarkSyntheticRunSpecV2,
+) -> RunBacktestTemplate:
     """
-    Build deterministic small staged template for backtest perf-smoke.
+    Build deterministic small-grid staged template from the committed A3 benchmark corpus.
 
     Args:
-        None.
+        spec: Synthetic benchmark slice spec for the staged-runner small-grid harness.
     Returns:
         RunBacktestTemplate: Guard-safe template with compact Stage A and Stage B cardinalities.
     Assumptions:
-        Stage A uses six indicator variants; Stage B expands shortlist by four risk variants.
+        The committed `small_grid_overhead` corpus slice stays lightweight and mirrors the
+        existing staged-runner perf-smoke shape.
     Raises:
         ValueError: If fixture payload violates DTO invariants.
     Side Effects:
@@ -261,15 +279,18 @@ def _perf_smoke_template() -> RunBacktestTemplate:
                 indicator_id=IndicatorId("momentum.roc"),
                 source=ExplicitValuesSpec(name="source", values=("close",)),
                 params={
-                    "window": ExplicitValuesSpec(name="window", values=(5, 10, 15, 20, 25, 30)),
+                    "window": ExplicitValuesSpec(
+                        name="window",
+                        values=spec.indicator_windows,
+                    ),
                 },
             ),
         ),
         risk_grid=BacktestRiskGridSpec(
             sl_enabled=True,
             tp_enabled=True,
-            sl=ExplicitValuesSpec(name="sl", values=(1.0, 2.0)),
-            tp=ExplicitValuesSpec(name="tp", values=(2.0, 4.0)),
+            sl=ExplicitValuesSpec(name="sl", values=spec.sl_values),
+            tp=ExplicitValuesSpec(name="tp", values=spec.tp_values),
         ),
         execution_params={
             "init_cash_quote": 1000.0,
@@ -277,6 +298,29 @@ def _perf_smoke_template() -> RunBacktestTemplate:
             "slippage_pct": 0.0,
         },
     )
+
+
+def _load_small_grid_overhead_slice() -> BacktestRuntimeBenchmarkSliceV2:
+    """
+    Load the committed `small_grid_overhead` benchmark slice for staged-runner perf-smoke.
+
+    Args:
+        None.
+    Returns:
+        BacktestRuntimeBenchmarkSliceV2: Parsed `small_grid_overhead` corpus slice.
+    Assumptions:
+        The staged-runner perf-smoke should reuse the A3 corpus instead of maintaining a separate
+        hardcoded small-grid benchmark shape.
+    Raises:
+        ValueError: If the benchmark corpus fixture violates its typed contract.
+        KeyError: If the `small_grid_overhead` slice is missing.
+    Side Effects:
+        Reads one committed JSON fixture from repository.
+    """
+    corpus = load_backtest_runtime_acceleration_benchmark_corpus_v2(
+        path=_BENCHMARK_CORPUS_FIXTURE_PATH
+    )
+    return corpus.slice_for_id(slice_id="small_grid_overhead")
 
 
 def _build_hourly_candles(*, bars: int) -> CandleArrays:

@@ -47,6 +47,8 @@
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
 - Follow-up runtime acceleration roadmap after the artifact-backed cutover:
   `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
+- Runtime-acceleration benchmark corpus and lightweight rollout harness:
+  `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`
 - Artifact store v2 layout/publish/pinning/validator/config contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
 - Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices, R3-03 `mappings/<tf>`, R3-04 publish-ready prices+mappings stage, R4-02 real `signals/<tf>/<indicator_id>` artifacts, R4-03 bounded `prefix + rebuilt_tail` signal rebuild, R5-01 real `hit_times/1m` и R12 stage-oriented `timeframe-scoped execution` with `execution_policy` + `ChunkPlanner`: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Signal rules catalog and R4-01 semantic source-of-truth: `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
@@ -170,6 +172,13 @@
     `grid_builder_v1.py`, `staged_core_runner_v1.py`, `staged_runner_v1.py`;
   - silent legacy fallback запрещён; `background_manual_legacy` остаётся только совместимым
     persisted/public literal.
+- Milestone A / EPIC A3 фиксирует один rollout corpus для runtime acceleration:
+  - slice ids:
+    `exact_baseline`, `low_activity`, `high_correlation`, `small_grid_overhead`,
+    `memory_footprint`;
+  - corpus fixture:
+    `tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json`;
+  - exact baseline продолжает переиспользовать approved R0/R5 fixtures, а не дублирует их.
 - После R10-01 вне scope остаются R10-02 docs synchronization и R10-03 perf/runbook closure.
 - R10-02 закрывает docs synchronization:
   - canonical v2 docs и runbooks описывают active production semantics без silent legacy fallback;

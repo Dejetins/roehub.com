@@ -1,0 +1,263 @@
+{
+  "schema_version": 1,
+  "fixture_contract": "backtest_runtime_acceleration_benchmark_corpus_v1",
+  "milestone_id": "A",
+  "epic_id": "A3",
+  "status": "active",
+  "reference_docs": [
+    "docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md",
+    "docs/architecture/backtest/backtest-v2-benchmarks.md",
+    "docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md"
+  ],
+  "source_fixtures": {
+    "r0_benchmark_scenarios": "tests/perf_smoke/contexts/backtest/fixtures/r0_benchmark_scenarios.json",
+    "r5_stage_b_manifest": "tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json",
+    "stage_b_golden_fixture": "tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json"
+  },
+  "slice_order": [
+    "exact_baseline",
+    "low_activity",
+    "high_correlation",
+    "small_grid_overhead",
+    "memory_footprint"
+  ],
+  "slices": [
+    {
+      "slice_id": "exact_baseline",
+      "title": "Exact baseline anchor for R0 representative scenarios and R5 Stage B golden validation",
+      "execution_profile_mode": "exact_parallel",
+      "candidate_execution_profile_mode": null,
+      "rollout_scope": "exact_only",
+      "stage_focus": [
+        "stage_a",
+        "stage_b",
+        "finalizing"
+      ],
+      "evaluation_focus": [
+        "exact_baseline",
+        "wall_clock_seconds",
+        "cpu_time_seconds",
+        "peak_traced_memory_bytes"
+      ],
+      "r0_scenario_ids": [
+        "sync-small-run",
+        "large-run",
+        "background-run"
+      ],
+      "r5_stage_b_case_ids": [
+        "entry_mapping_request_tf_to_1m",
+        "earliest_signal_exit_mapping",
+        "tp_sl_earliest_hit",
+        "signal_exit_wins_equal_bar_over_tp_sl_tie",
+        "sl_wins_tp_tie",
+        "exact_best_cell_replay_metrics"
+      ],
+      "synthetic_run_spec": null,
+      "notes": "Use the shipped exact scorer as the canonical baseline before any hybrid or plugin rollout."
+    },
+    {
+      "slice_id": "low_activity",
+      "title": "Sparse confirmation slice for low-activity recall protection",
+      "execution_profile_mode": "exact_parallel",
+      "candidate_execution_profile_mode": "hybrid_conservative",
+      "rollout_scope": "hybrid_rollout",
+      "stage_focus": [
+        "stage_a",
+        "stage_b"
+      ],
+      "evaluation_focus": [
+        "low_activity",
+        "recall",
+        "survivor_overlap"
+      ],
+      "r0_scenario_ids": [
+        "sync-small-run"
+      ],
+      "r5_stage_b_case_ids": [
+        "earliest_signal_exit_mapping"
+      ],
+      "synthetic_run_spec": {
+        "timeframe": "1h",
+        "target_bars": 336,
+        "warmup_bars": 32,
+        "total_candles_bars": 368,
+        "indicator_windows": [
+          20,
+          40,
+          80
+        ],
+        "tp_values": [
+          2.0,
+          4.0
+        ],
+        "sl_values": [
+          1.0,
+          2.0
+        ],
+        "top_k": 5,
+        "preselect": 4,
+        "top_trades_n": 2,
+        "expected_stage_a_variants_total": 3,
+        "expected_stage_b_variants_total": 12
+      },
+      "notes": "Future shortlist rollouts must prove they do not prune away sparse but valuable confirmations."
+    },
+    {
+      "slice_id": "high_correlation",
+      "title": "Correlated family slice for diversity pressure and future plugin evidence",
+      "execution_profile_mode": "exact_parallel",
+      "candidate_execution_profile_mode": "hybrid_family",
+      "rollout_scope": "plugin_rollout",
+      "stage_focus": [
+        "stage_a",
+        "stage_b"
+      ],
+      "evaluation_focus": [
+        "high_correlation",
+        "diversity",
+        "family_overlap"
+      ],
+      "r0_scenario_ids": [
+        "large-run"
+      ],
+      "r5_stage_b_case_ids": [
+        "exact_best_cell_replay_metrics"
+      ],
+      "synthetic_run_spec": {
+        "timeframe": "15m",
+        "target_bars": 960,
+        "warmup_bars": 64,
+        "total_candles_bars": 1024,
+        "indicator_windows": [
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ],
+        "tp_values": [
+          1.5,
+          3.0,
+          4.5
+        ],
+        "sl_values": [
+          1.0,
+          2.0
+        ],
+        "top_k": 8,
+        "preselect": 6,
+        "top_trades_n": 2,
+        "expected_stage_a_variants_total": 6,
+        "expected_stage_b_variants_total": 36
+      },
+      "notes": "Use close indicator families to measure whether future plugins retain diversity instead of duplicating near-identical survivors."
+    },
+    {
+      "slice_id": "small_grid_overhead",
+      "title": "Small-grid overhead slice for hybrid planning cost on guard-safe sync runs",
+      "execution_profile_mode": "exact_small",
+      "candidate_execution_profile_mode": "hybrid_conservative",
+      "rollout_scope": "hybrid_rollout",
+      "stage_focus": [
+        "stage_a",
+        "stage_b"
+      ],
+      "evaluation_focus": [
+        "small_grid_overhead",
+        "planning_budget_ms",
+        "wall_clock_seconds"
+      ],
+      "r0_scenario_ids": [
+        "sync-small-run"
+      ],
+      "r5_stage_b_case_ids": [],
+      "synthetic_run_spec": {
+        "timeframe": "1h",
+        "target_bars": 480,
+        "warmup_bars": 32,
+        "total_candles_bars": 512,
+        "indicator_windows": [
+          5,
+          10,
+          15,
+          20,
+          25,
+          30
+        ],
+        "tp_values": [
+          2.0,
+          4.0
+        ],
+        "sl_values": [
+          1.0,
+          2.0
+        ],
+        "top_k": 5,
+        "preselect": 4,
+        "top_trades_n": 2,
+        "expected_stage_a_variants_total": 6,
+        "expected_stage_b_variants_total": 16
+      },
+      "notes": "Keep this slice lightweight so contributors can compare exact_small against future hybrid planning overhead without machine-specific fail thresholds."
+    },
+    {
+      "slice_id": "memory_footprint",
+      "title": "Memory-footprint slice for wide retained-survivor pressure",
+      "execution_profile_mode": "exact_parallel",
+      "candidate_execution_profile_mode": "hybrid_conservative",
+      "rollout_scope": "hybrid_rollout",
+      "stage_focus": [
+        "stage_a",
+        "stage_b",
+        "finalizing"
+      ],
+      "evaluation_focus": [
+        "memory_footprint",
+        "retained_candidates",
+        "peak_traced_memory_bytes"
+      ],
+      "r0_scenario_ids": [
+        "background-run"
+      ],
+      "r5_stage_b_case_ids": [
+        "tp_sl_earliest_hit",
+        "exact_best_cell_replay_metrics"
+      ],
+      "synthetic_run_spec": {
+        "timeframe": "1h",
+        "target_bars": 720,
+        "warmup_bars": 48,
+        "total_candles_bars": 768,
+        "indicator_windows": [
+          5,
+          10,
+          15,
+          20,
+          25,
+          30,
+          35,
+          40,
+          45,
+          50
+        ],
+        "tp_values": [
+          1.5,
+          3.0,
+          4.5
+        ],
+        "sl_values": [
+          1.0,
+          2.0,
+          3.0
+        ],
+        "top_k": 10,
+        "preselect": 10,
+        "top_trades_n": 1,
+        "expected_stage_a_variants_total": 10,
+        "expected_stage_b_variants_total": 90
+      },
+      "notes": "Use wider retained survivors and richer risk axes to track allocation pressure before beam-search or feature-cache growth."
+    }
+  ]
+}

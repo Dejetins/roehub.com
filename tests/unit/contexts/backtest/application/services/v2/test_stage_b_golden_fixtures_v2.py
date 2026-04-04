@@ -10,6 +10,7 @@ from trading.contexts.backtest.application.services.v2 import (
     StageBTradeExitCaseV2,
     StageBTradeListCaseV2,
     execute_stage_b_golden_case_v2,
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
     load_stage_b_golden_fixture_catalog_v2,
     map_bar_close_1m_idx_to_entry_exec_v2,
     read_stage_b_golden_fixture_payload_v2,
@@ -25,6 +26,14 @@ _PERF_MANIFEST_PATH = (
     / "backtest"
     / "fixtures"
     / "r5_stage_b_golden_cases.json"
+)
+_BENCHMARK_CORPUS_PATH = (
+    Path(__file__).resolve().parents[6]
+    / "perf_smoke"
+    / "contexts"
+    / "backtest"
+    / "fixtures"
+    / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
 )
 
 
@@ -92,6 +101,45 @@ def test_stage_b_golden_fixture_catalog_serialization_is_byte_stable() -> None:
 
     assert canonical_bytes == _FIXTURE_PATH.read_bytes()
     assert sha256(canonical_bytes).hexdigest() == perf_manifest["contract_fixture_sha256"]
+
+
+def test_stage_b_golden_fixture_catalog_is_referenced_by_runtime_acceleration_corpus() -> None:
+    """
+    Verify the A3 benchmark corpus points at the canonical Stage B fixture order and manifest.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        A3 exact-baseline coverage must stay aligned with the shipped R5-03 Stage B golden
+        fixture catalog instead of duplicating a second Stage B reference surface.
+    Raises:
+        AssertionError: If the benchmark corpus drifts from the canonical Stage B fixture order.
+    Side Effects:
+        Reads the committed benchmark corpus and Stage B fixture catalog from repository.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/fixtures/
+        backtest_runtime_acceleration_benchmark_corpus_v1.json
+      - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
+      - src/trading/contexts/backtest/application/services/v2/benchmark_corpus_v2.py
+    """
+    corpus = load_backtest_runtime_acceleration_benchmark_corpus_v2(
+        path=_BENCHMARK_CORPUS_PATH
+    )
+    catalog = load_stage_b_golden_fixture_catalog_v2(path=_FIXTURE_PATH)
+    exact_baseline = corpus.slice_for_id(slice_id="exact_baseline")
+
+    assert corpus.source_fixtures.r5_stage_b_manifest == (
+        "tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json"
+    )
+    assert corpus.source_fixtures.stage_b_golden_fixture == (
+        "tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json"
+    )
+    assert exact_baseline.r5_stage_b_case_ids == catalog.case_order
 
 
 def test_validate_stage_b_golden_fixture_payload_v2_rejects_unknown_schema_version() -> None:

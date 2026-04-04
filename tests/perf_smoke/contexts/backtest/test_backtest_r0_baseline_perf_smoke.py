@@ -30,6 +30,9 @@ from trading.contexts.backtest.application.services import (
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
     YamlBacktestArtifactLoaderV2,
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
+    read_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
+    serialize_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
 )
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.indicators.application.dto import (
@@ -52,6 +55,9 @@ from trading.shared_kernel.primitives import (
 )
 
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
+_BENCHMARK_CORPUS_FIXTURE_PATH = (
+    _FIXTURES_DIR / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
+)
 _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _ONE_MINUTE = timedelta(minutes=1)
 _PRINT_ENV_KEY = "ROEHUB_R0_BASELINE_PRINT"
@@ -527,16 +533,16 @@ def test_r0_baseline_perf_smoke_collects_metric_snapshots() -> None:
     Side Effects:
         Optionally prints canonical JSON measurements when `ROEHUB_R0_BASELINE_PRINT=1`.
     """
+    corpus = _load_runtime_acceleration_benchmark_corpus()
+    exact_baseline = corpus.slice_for_id(slice_id="exact_baseline")
     scenarios = _load_benchmark_scenarios()
     measurements = [
         _collect_legacy_scenario_measurement(scenario=scenario) for scenario in scenarios
     ]
 
-    assert [scenario.scenario_id for scenario in scenarios] == [
-        "sync-small-run",
-        "large-run",
-        "background-run",
-    ]
+    assert [scenario.scenario_id for scenario in scenarios] == list(
+        exact_baseline.r0_scenario_ids
+    )
     for scenario, measurement in zip(scenarios, measurements, strict=True):
         assert measurement["scenario_id"] == scenario.scenario_id
         assert measurement["execution_class"] == scenario.execution_class
@@ -581,7 +587,13 @@ def test_r10_artifact_v2_perf_gates_reduce_hot_path_cost_vs_r0_baseline() -> Non
     Side Effects:
         Creates temporary strict artifact trees and executes artifact-backed v2 runtime locally.
     """
+    corpus = _load_runtime_acceleration_benchmark_corpus()
+    exact_baseline = corpus.slice_for_id(slice_id="exact_baseline")
     scenarios = _load_benchmark_scenarios()
+
+    assert [scenario.scenario_id for scenario in scenarios] == list(
+        exact_baseline.r0_scenario_ids
+    )
 
     for scenario in scenarios:
         baseline = _collect_legacy_scenario_measurement(scenario=scenario)
@@ -690,6 +702,8 @@ def test_r5_stage_b_golden_fixture_manifest_tracks_contract_fixture_bytes() -> N
     Side Effects:
         Reads fixture JSON files from repository.
     """
+    corpus = _load_runtime_acceleration_benchmark_corpus()
+    exact_baseline = corpus.slice_for_id(slice_id="exact_baseline")
     payload = json.loads(
         (_FIXTURES_DIR / "r5_stage_b_golden_cases.json").read_text(encoding="utf-8")
     )
@@ -697,17 +711,8 @@ def test_r5_stage_b_golden_fixture_manifest_tracks_contract_fixture_bytes() -> N
     assert payload["scope_id"] == "stage_b_signal_tf_1m_risk_reference"
     assert payload["status"] == "validation-baseline"
     assert payload["semantics"] == "signal_tf + 1m_risk"
-    assert payload["contract_fixture"] == (
-        "tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json"
-    )
-    assert payload["case_order"] == [
-        "entry_mapping_request_tf_to_1m",
-        "earliest_signal_exit_mapping",
-        "tp_sl_earliest_hit",
-        "signal_exit_wins_equal_bar_over_tp_sl_tie",
-        "sl_wins_tp_tie",
-        "exact_best_cell_replay_metrics",
-    ]
+    assert payload["contract_fixture"] == corpus.source_fixtures.stage_b_golden_fixture
+    assert payload["case_order"] == list(exact_baseline.r5_stage_b_case_ids)
     assert payload["coverage"] == [
         "signal_tf + 1m_risk",
         "entry mapping request TF -> 1m",
@@ -726,6 +731,130 @@ def test_r5_stage_b_golden_fixture_manifest_tracks_contract_fixture_bytes() -> N
     assert sha256(contract_fixture_path.read_bytes()).hexdigest() == payload[
         "contract_fixture_sha256"
     ]
+
+
+def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None:
+    """
+    Verify the A3 benchmark corpus publishes deterministic exact and edge-case rollout slices.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - tests/perf_smoke/contexts/backtest/fixtures/
+        backtest_runtime_acceleration_benchmark_corpus_v1.json
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_staged_runner_perf_smoke.py
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        A3 keeps one explicit deterministic corpus for exact baseline, recall/diversity edge
+        cases, small-grid overhead, and memory-footprint pressure without introducing CI SLA
+        thresholds.
+    Raises:
+        AssertionError: If one required slice, cross-reference, or synthetic harness contract is
+            missing.
+    Side Effects:
+        Reads committed benchmark fixtures from repository.
+    """
+    corpus = _load_runtime_acceleration_benchmark_corpus()
+    r0_scenario_ids = tuple(
+        scenario.scenario_id for scenario in _load_benchmark_scenarios()
+    )
+    r5_manifest = json.loads(
+        (_FIXTURES_DIR / "r5_stage_b_golden_cases.json").read_text(encoding="utf-8")
+    )
+
+    assert corpus.source_fixtures.r0_benchmark_scenarios == (
+        "tests/perf_smoke/contexts/backtest/fixtures/r0_benchmark_scenarios.json"
+    )
+    assert corpus.source_fixtures.r5_stage_b_manifest == (
+        "tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json"
+    )
+    assert corpus.source_fixtures.stage_b_golden_fixture == (
+        "tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json"
+    )
+    assert corpus.slice_order == (
+        "exact_baseline",
+        "low_activity",
+        "high_correlation",
+        "small_grid_overhead",
+        "memory_footprint",
+    )
+
+    exact_baseline = corpus.slice_for_id(slice_id="exact_baseline")
+    assert exact_baseline.execution_profile_mode == "exact_parallel"
+    assert exact_baseline.candidate_execution_profile_mode is None
+    assert exact_baseline.rollout_scope == "exact_only"
+    assert exact_baseline.stage_focus == ("stage_a", "stage_b", "finalizing")
+    assert exact_baseline.r0_scenario_ids == r0_scenario_ids
+    assert exact_baseline.r5_stage_b_case_ids == tuple(r5_manifest["case_order"])
+
+    low_activity = corpus.slice_for_id(slice_id="low_activity")
+    assert low_activity.candidate_execution_profile_mode == "hybrid_conservative"
+    assert low_activity.rollout_scope == "hybrid_rollout"
+    assert "low_activity" in low_activity.evaluation_focus
+    assert low_activity.synthetic_run_spec is not None
+    assert low_activity.synthetic_run_spec.expected_stage_a_variants_total == 3
+    assert low_activity.synthetic_run_spec.expected_stage_b_variants_total == 12
+
+    high_correlation = corpus.slice_for_id(slice_id="high_correlation")
+    assert high_correlation.candidate_execution_profile_mode == "hybrid_family"
+    assert high_correlation.rollout_scope == "plugin_rollout"
+    assert "high_correlation" in high_correlation.evaluation_focus
+    assert high_correlation.synthetic_run_spec is not None
+    assert high_correlation.synthetic_run_spec.expected_stage_b_variants_total == 36
+
+    small_grid_overhead = corpus.slice_for_id(slice_id="small_grid_overhead")
+    assert small_grid_overhead.execution_profile_mode == "exact_small"
+    assert small_grid_overhead.candidate_execution_profile_mode == "hybrid_conservative"
+    assert "small_grid_overhead" in small_grid_overhead.evaluation_focus
+    assert small_grid_overhead.synthetic_run_spec is not None
+    assert small_grid_overhead.synthetic_run_spec.total_candles_bars == 512
+    assert small_grid_overhead.synthetic_run_spec.expected_stage_a_variants_total == 6
+    assert small_grid_overhead.synthetic_run_spec.expected_stage_b_variants_total == 16
+
+    memory_footprint = corpus.slice_for_id(slice_id="memory_footprint")
+    assert memory_footprint.candidate_execution_profile_mode == "hybrid_conservative"
+    assert "memory_footprint" in memory_footprint.evaluation_focus
+    assert memory_footprint.synthetic_run_spec is not None
+    assert memory_footprint.synthetic_run_spec.expected_stage_a_variants_total == 10
+    assert memory_footprint.synthetic_run_spec.expected_stage_b_variants_total == 90
+
+
+def test_a3_runtime_acceleration_benchmark_corpus_serialization_is_byte_stable() -> None:
+    """
+    Verify the committed A3 benchmark corpus keeps canonical byte-stable JSON formatting.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - tests/perf_smoke/contexts/backtest/fixtures/
+        backtest_runtime_acceleration_benchmark_corpus_v1.json
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/benchmark_corpus_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical formatting is part of the reviewable benchmark-corpus contract.
+    Raises:
+        AssertionError: If canonical serialization drifts from the committed fixture bytes.
+    Side Effects:
+        Reads one committed JSON fixture from repository.
+    """
+    raw_payload = read_backtest_runtime_acceleration_benchmark_corpus_payload_v2(
+        path=_BENCHMARK_CORPUS_FIXTURE_PATH
+    )
+    canonical_bytes = serialize_backtest_runtime_acceleration_benchmark_corpus_payload_v2(
+        payload=raw_payload
+    )
+
+    assert canonical_bytes == _BENCHMARK_CORPUS_FIXTURE_PATH.read_bytes()
 
 
 def _load_benchmark_scenarios() -> tuple[_R0BenchmarkScenario, ...]:
@@ -787,6 +916,35 @@ def _load_benchmark_scenarios() -> tuple[_R0BenchmarkScenario, ...]:
             )
         )
     return tuple(scenarios)
+
+
+def _load_runtime_acceleration_benchmark_corpus():
+    """
+    Load the committed A3 benchmark corpus for exact and future rollout perf-smoke coverage.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - tests/perf_smoke/contexts/backtest/fixtures/
+        backtest_runtime_acceleration_benchmark_corpus_v1.json
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_staged_runner_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/benchmark_corpus_v2.py
+    Args:
+        None.
+    Returns:
+        BacktestRuntimeAccelerationBenchmarkCorpusV2: Parsed benchmark corpus contract.
+    Assumptions:
+        The corpus is lightweight enough to load in every benchmark/perf-smoke test that needs
+        deterministic slice metadata.
+    Raises:
+        ValueError: If the committed benchmark corpus violates its typed contract.
+    Side Effects:
+        Reads one committed JSON fixture from repository.
+    """
+    return load_backtest_runtime_acceleration_benchmark_corpus_v2(
+        path=_BENCHMARK_CORPUS_FIXTURE_PATH
+    )
 
 
 def _collect_legacy_scenario_measurement(

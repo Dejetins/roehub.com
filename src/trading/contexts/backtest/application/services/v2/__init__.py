@@ -36,6 +36,23 @@ from .artifact_slot_publisher import (
     BacktestArtifactSlotPublisherV2,
 )
 from .artifact_slot_resolver import ArtifactSlotResolverV2
+from .benchmark_corpus_v2 import (
+    BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_EPIC_ID_V2,
+    BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_KIND_V2,
+    BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_MILESTONE_ID_V2,
+    BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_SCHEMA_VERSION_V2,
+    BacktestRuntimeAccelerationBenchmarkCorpusV2,
+    BacktestRuntimeBenchmarkSliceV2,
+    BacktestRuntimeBenchmarkSourceFixturesV2,
+    BacktestRuntimeBenchmarkSyntheticRunSpecV2,
+    BenchmarkCorpusRolloutScopeLiteralV2,
+    BenchmarkCorpusSliceIdLiteralV2,
+    BenchmarkCorpusStageLiteralV2,
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
+    read_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
+    serialize_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
+    validate_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
+)
 from .contracts import (
     ALLOWED_ARTIFACT_SLOTS_V2,
     ARTIFACT_HIT_TIMES_TIMEFRAMES_V2,
@@ -247,6 +264,10 @@ from .trade_compactor_kernel import (
 )
 
 __all__ = [
+    "BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_EPIC_ID_V2",
+    "BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_KIND_V2",
+    "BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_MILESTONE_ID_V2",
+    "BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_SCHEMA_VERSION_V2",
     "ALLOWED_EXECUTION_PROFILE_MODES_V2",
     "ALLOWED_ARTIFACT_SLOTS_V2",
     "ARTIFACT_HIT_TIMES_TIMEFRAMES_V2",
@@ -350,12 +371,19 @@ __all__ = [
     "BacktestSignalMatrixLoaderV2",
     "ChunkPlannerV2",
     "DeterministicSignalChunkPlannerV2",
+    "BenchmarkCorpusRolloutScopeLiteralV2",
+    "BenchmarkCorpusSliceIdLiteralV2",
+    "BenchmarkCorpusStageLiteralV2",
     "ExecutionProfileFeatureFlagsV2",
     "ExecutionProfileModeLiteralV2",
     "ExecutionProfileParallelismConfigV2",
     "ExecutionProfileShortlistConfigV2",
     "ExecutionProfileV2",
     "ExecutionProfilesCatalogV2",
+    "BacktestRuntimeAccelerationBenchmarkCorpusV2",
+    "BacktestRuntimeBenchmarkSliceV2",
+    "BacktestRuntimeBenchmarkSourceFixturesV2",
+    "BacktestRuntimeBenchmarkSyntheticRunSpecV2",
     "BacktestSignalAxisPlanV2",
     "BacktestStageABaseVariantV2",
     "BacktestStageAScoredVariantV2",
@@ -416,6 +444,7 @@ __all__ = [
     "freeze_artifact_payload_mapping_v2",
     "inactive_artifact_slot_v2",
     "list_signal_rule_registry_v2",
+    "load_backtest_runtime_acceleration_benchmark_corpus_v2",
     "ordered_artifact_slots_v2",
     "default_execution_profiles_catalog_v2",
     "signal_rule_spec_v2",
@@ -464,6 +493,9 @@ __all__ = [
     "map_signal_bars_to_entry_exec_v2",
     "read_stage_b_golden_fixture_payload_v2",
     "replay_stage_b_best_cell_v2",
+    "read_backtest_runtime_acceleration_benchmark_corpus_payload_v2",
     "serialize_stage_b_golden_fixture_payload_v2",
+    "serialize_backtest_runtime_acceleration_benchmark_corpus_payload_v2",
+    "validate_backtest_runtime_acceleration_benchmark_corpus_payload_v2",
     "validate_stage_b_golden_fixture_payload_v2",
 ]
