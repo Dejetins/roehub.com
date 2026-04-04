@@ -157,6 +157,93 @@ class BacktestRuntimeExecutionContractResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     risk_model: str
+    default_execution_profile: str
+    available_execution_profiles: list["BacktestRuntimeExecutionProfileResponse"]
+
+
+class BacktestRuntimeExecutionProfileShortlistResponse(BaseModel):
+    """
+    API response model for typed execution-profile shortlist knobs.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool
+    max_candidates: int | None = None
+
+
+class BacktestRuntimeExecutionProfileParallelismResponse(BaseModel):
+    """
+    API response model for typed execution-profile parallelism knobs.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    stage_a_workers: int
+    stage_b_workers: int
+
+
+class BacktestRuntimeExecutionProfileFeatureFlagsResponse(BaseModel):
+    """
+    API response model for typed execution-profile feature flags.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    runtime_enabled: bool
+    heuristic_shortlist_enabled: bool
+    parallel_stage_b_enabled: bool
+    family_plugin_enabled: bool
+
+
+class BacktestRuntimeExecutionProfileResponse(BaseModel):
+    """
+    API response model for one typed execution profile in runtime-defaults discovery payload.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str
+    shortlist_config: BacktestRuntimeExecutionProfileShortlistResponse
+    parallelism: BacktestRuntimeExecutionProfileParallelismResponse
+    feature_flags: BacktestRuntimeExecutionProfileFeatureFlagsResponse
+    planning_budget_ms: int
 
 
 class BacktestRuntimeLaunchContractResponse(BaseModel):
@@ -232,6 +319,11 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
     contracts: BacktestRuntimeContractsResponse
 
 
+BacktestRuntimeExecutionContractResponse.model_rebuild()
+BacktestRuntimeContractsResponse.model_rebuild()
+BacktestRuntimeDefaultsResponse.model_rebuild()
+
+
 def build_backtest_runtime_defaults_response(
     *,
     config: BacktestRuntimeConfig,
@@ -278,6 +370,29 @@ def build_backtest_runtime_defaults_response(
         if defaults_provider is not None
         else {}
     )
+    available_execution_profiles = [
+        BacktestRuntimeExecutionProfileResponse(
+            mode=profile.mode,
+            shortlist_config=BacktestRuntimeExecutionProfileShortlistResponse(
+                enabled=profile.shortlist_config.enabled,
+                max_candidates=profile.shortlist_config.max_candidates,
+            ),
+            parallelism=BacktestRuntimeExecutionProfileParallelismResponse(
+                stage_a_workers=profile.parallelism.stage_a_workers,
+                stage_b_workers=profile.parallelism.stage_b_workers,
+            ),
+            feature_flags=BacktestRuntimeExecutionProfileFeatureFlagsResponse(
+                runtime_enabled=profile.feature_flags.runtime_enabled,
+                heuristic_shortlist_enabled=(
+                    profile.feature_flags.heuristic_shortlist_enabled
+                ),
+                parallel_stage_b_enabled=profile.feature_flags.parallel_stage_b_enabled,
+                family_plugin_enabled=profile.feature_flags.family_plugin_enabled,
+            ),
+            planning_budget_ms=profile.planning_budget_ms,
+        )
+        for profile in config.execution_profiles.available_profiles
+    ]
     return BacktestRuntimeDefaultsResponse(
         warmup_bars_default=config.warmup_bars_default,
         top_k_default=config.top_k_default,
@@ -314,6 +429,8 @@ def build_backtest_runtime_defaults_response(
             ),
             execution=BacktestRuntimeExecutionContractResponse(
                 risk_model=config.contracts.risk_model,
+                default_execution_profile=config.execution_profiles.default_mode,
+                available_execution_profiles=available_execution_profiles,
             ),
             launch=BacktestRuntimeLaunchContractResponse(
                 execution_mode=config.contracts.execution_mode,
@@ -333,6 +450,10 @@ __all__ = [
     "BacktestRuntimeDefaultsResponse",
     "BacktestRuntimeExecutionDefaultsResponse",
     "BacktestRuntimeExecutionContractResponse",
+    "BacktestRuntimeExecutionProfileFeatureFlagsResponse",
+    "BacktestRuntimeExecutionProfileParallelismResponse",
+    "BacktestRuntimeExecutionProfileResponse",
+    "BacktestRuntimeExecutionProfileShortlistResponse",
     "BacktestRuntimeJobsDefaultsResponse",
     "BacktestRuntimeLaunchContractResponse",
     "BacktestRuntimeRankingDefaultsResponse",

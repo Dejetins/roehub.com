@@ -38,6 +38,7 @@ from trading.contexts.backtest.application.ports import (
 )
 from trading.contexts.backtest.application.services import (
     ArtifactSlotResolverV2,
+    BacktestArtifactRuntimePlannerV2,
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.backtest.application.use_cases import (
@@ -336,6 +337,14 @@ def build_backtest_job_runner_app(
     """
     Build fully wired Backtest job-runner worker app with fail-fast dependencies.
 
+    Docs:
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+
     Args:
         config_path: Path to `backtest.yaml` runtime config.
         environ: Process environment mapping.
@@ -375,6 +384,9 @@ def build_backtest_job_runner_app(
         )
     )
     artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
+    runtime_planner = BacktestArtifactRuntimePlannerV2(
+        execution_profiles=runtime_config.execution_profiles,
+    )
 
     runner_use_case = RunBacktestJobRunnerV1(
         job_repository=job_repository,
@@ -405,6 +417,7 @@ def build_backtest_job_runner_app(
         allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
         artifact_slot_resolver=artifact_slot_resolver,
+        runtime_planner=runtime_planner,
     )
     return BacktestJobRunnerApp(
         claim_poll_seconds=runtime_config.jobs.claim_poll_seconds,

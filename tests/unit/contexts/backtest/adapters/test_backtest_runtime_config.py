@@ -119,6 +119,18 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.contracts.execution_mode == "auto"
     assert config.contracts.auto_preflight_enabled is True
     assert config.contracts.auto_fallback_to_background_enabled is True
+    assert config.execution_profiles.default_mode == "exact_small"
+    assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
+        "exact_small",
+        "exact_parallel",
+        "hybrid_conservative",
+        "hybrid_family",
+    )
+    assert config.execution_profiles.default_profile().feature_flags.runtime_enabled is True
+    assert (
+        config.execution_profiles.default_profile().planning_budget_ms
+        == 25
+    )
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5368709120
     assert config.cpu.max_numba_threads == 4
@@ -205,6 +217,13 @@ backtest:
     assert config.contracts.execution_mode == "auto"
     assert config.contracts.auto_preflight_enabled is True
     assert config.contracts.auto_fallback_to_background_enabled is True
+    assert config.execution_profiles.default_mode == "exact_small"
+    assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
+        "exact_small",
+        "exact_parallel",
+        "hybrid_conservative",
+        "hybrid_family",
+    )
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5 * 1024**3
     assert config.cpu.max_numba_threads > 0
@@ -439,6 +458,59 @@ backtest:
       execution_mode: auto
       auto_preflight_enabled: true
       auto_fallback_to_background_enabled: true
+  execution_profiles:
+    default: exact_small
+    profiles:
+      - mode: exact_small
+        planning_budget_ms: 15
+        shortlist:
+          enabled: false
+        parallelism:
+          stage_a_workers: 1
+          stage_b_workers: 1
+        feature_flags:
+          runtime_enabled: true
+          heuristic_shortlist_enabled: false
+          parallel_stage_b_enabled: false
+          family_plugin_enabled: false
+      - mode: exact_parallel
+        planning_budget_ms: 35
+        shortlist:
+          enabled: false
+        parallelism:
+          stage_a_workers: 1
+          stage_b_workers: 3
+        feature_flags:
+          runtime_enabled: false
+          heuristic_shortlist_enabled: false
+          parallel_stage_b_enabled: false
+          family_plugin_enabled: false
+      - mode: hybrid_conservative
+        planning_budget_ms: 55
+        shortlist:
+          enabled: true
+          max_candidates: 1500
+        parallelism:
+          stage_a_workers: 1
+          stage_b_workers: 3
+        feature_flags:
+          runtime_enabled: false
+          heuristic_shortlist_enabled: false
+          parallel_stage_b_enabled: false
+          family_plugin_enabled: false
+      - mode: hybrid_family
+        planning_budget_ms: 65
+        shortlist:
+          enabled: true
+          max_candidates: 750
+        parallelism:
+          stage_a_workers: 1
+          stage_b_workers: 2
+        feature_flags:
+          runtime_enabled: false
+          heuristic_shortlist_enabled: false
+          parallel_stage_b_enabled: false
+          family_plugin_enabled: false
   reporting:
     top_trades_n_default: 5
   guards:
@@ -486,6 +558,19 @@ backtest:
         "total_return_pct",
         "best_tp_pct",
     )
+    assert config.execution_profiles.default_mode == "exact_small"
+    assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
+        "exact_small",
+        "exact_parallel",
+        "hybrid_conservative",
+        "hybrid_family",
+    )
+    assert config.execution_profiles.available_profiles[1].parallelism.stage_b_workers == 3
+    assert (
+        config.execution_profiles.available_profiles[2].shortlist_config.max_candidates
+        == 1500
+    )
+    assert config.execution_profiles.available_profiles[3].planning_budget_ms == 65
     assert config.guards.max_variants_per_compute == 1200
     assert config.guards.max_compute_bytes_total == 1234567
     assert config.cpu.max_numba_threads == 6
@@ -585,6 +670,57 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="top_n_default"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_non_exact_default_execution_profile(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when default execution profile drifts to hybrid mode in A1.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Milestone A1 keeps current runtime behavior exact-only even though hybrid literals are
+        already published additively.
+    Raises:
+        AssertionError: If invalid default execution profile does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  execution_profiles:
+    default: hybrid_conservative
+    profiles:
+      - mode: exact_small
+        planning_budget_ms: 25
+      - mode: exact_parallel
+        planning_budget_ms: 50
+      - mode: hybrid_conservative
+        planning_budget_ms: 75
+      - mode: hybrid_family
+        planning_budget_ms: 100
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="default_mode"):
         load_backtest_runtime_config(config_path)
 
 

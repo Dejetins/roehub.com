@@ -83,6 +83,13 @@ deterministic `422` ошибками.
   - `signals.v1.params` are `default-only`;
   - launch semantics move to auto-preflight + auto-fallback;
   - additive `top_n_default` / `top_n_max` naming is published via runtime defaults, while current request/response still keep `top_k`.
+- A1 additive execution-profile note:
+  - runtime-defaults now also publish `contracts.execution.default_execution_profile` and
+    ordered `contracts.execution.available_execution_profiles`,
+  - source config for that discovery surface lives in `backtest.execution_profiles`,
+  - `POST /backtests` launch branches remain unchanged in A1:
+    no new profile-based routing, no change to `sync_inline` vs `background_auto`, and no
+    hybrid activation yet.
 
 ## Цель
 
@@ -102,6 +109,10 @@ deterministic `422` ошибками.
   - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_timeline_v2.py`
   - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py`
   - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py`
+- A1 runtime-profile foundation adds one explicit typed `ExecutionProfile` surface in
+  `src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py`, but current
+  launch orchestration still resolves only the exact baseline profile and does not alter
+  request acceptance, fallback, or scoring semantics.
 - Варианты детерминированы, guards применяются в sync режиме:
   - `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md`
 - Execution engine v1: close-fill + fee/slippage + sizing + SL/TP:

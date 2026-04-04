@@ -25,6 +25,12 @@
   - endpoint publishes additive `contracts.*` fields for target-v2 semantics,
   - request TF restrictions and `signals.v1.params = default-only` are enforced in backend,
   - launch form can be driven from backend indicator/source catalog without YAML parsing in browser.
+- A1 additive contract:
+  - endpoint also publishes additive execution-profile discovery fields:
+    `contracts.execution.default_execution_profile` and ordered
+    `contracts.execution.available_execution_profiles`,
+  - source config for this catalog lives in `backtest.execution_profiles`,
+  - A1 keeps current launch routing unchanged; the new profile surface is discovery-only for now.
 
 ## Цель
 
@@ -108,7 +114,82 @@
       "params_policy": "default-only"
     },
     "execution": {
-      "risk_model": "signal_tf + 1m_risk"
+      "risk_model": "signal_tf + 1m_risk",
+      "default_execution_profile": "exact_small",
+      "available_execution_profiles": [
+        {
+          "mode": "exact_small",
+          "shortlist_config": {
+            "enabled": false,
+            "max_candidates": null
+          },
+          "parallelism": {
+            "stage_a_workers": 1,
+            "stage_b_workers": 1
+          },
+          "feature_flags": {
+            "runtime_enabled": true,
+            "heuristic_shortlist_enabled": false,
+            "parallel_stage_b_enabled": false,
+            "family_plugin_enabled": false
+          },
+          "planning_budget_ms": 25
+        },
+        {
+          "mode": "exact_parallel",
+          "shortlist_config": {
+            "enabled": false,
+            "max_candidates": null
+          },
+          "parallelism": {
+            "stage_a_workers": 1,
+            "stage_b_workers": 4
+          },
+          "feature_flags": {
+            "runtime_enabled": false,
+            "heuristic_shortlist_enabled": false,
+            "parallel_stage_b_enabled": false,
+            "family_plugin_enabled": false
+          },
+          "planning_budget_ms": 50
+        },
+        {
+          "mode": "hybrid_conservative",
+          "shortlist_config": {
+            "enabled": true,
+            "max_candidates": 5000
+          },
+          "parallelism": {
+            "stage_a_workers": 1,
+            "stage_b_workers": 4
+          },
+          "feature_flags": {
+            "runtime_enabled": false,
+            "heuristic_shortlist_enabled": false,
+            "parallel_stage_b_enabled": false,
+            "family_plugin_enabled": false
+          },
+          "planning_budget_ms": 75
+        },
+        {
+          "mode": "hybrid_family",
+          "shortlist_config": {
+            "enabled": true,
+            "max_candidates": 2000
+          },
+          "parallelism": {
+            "stage_a_workers": 1,
+            "stage_b_workers": 4
+          },
+          "feature_flags": {
+            "runtime_enabled": false,
+            "heuristic_shortlist_enabled": false,
+            "parallel_stage_b_enabled": false,
+            "family_plugin_enabled": false
+          },
+          "planning_budget_ms": 100
+        }
+      ]
     },
     "launch": {
       "execution_mode": "auto",
@@ -147,6 +228,19 @@
 - `contracts.signals.params_path` <- `backtest.contracts.signals.params_path`
 - `contracts.signals.params_policy` <- `backtest.contracts.signals.params_policy`
 - `contracts.execution.risk_model` <- `backtest.contracts.execution.risk_model`
+- `contracts.execution.default_execution_profile` <- `backtest.execution_profiles.default`
+- `contracts.execution.available_execution_profiles[]` <- ordered `backtest.execution_profiles.profiles`
+  with nested fields:
+  - `mode`
+  - `shortlist_config.enabled`
+  - `shortlist_config.max_candidates`
+  - `parallelism.stage_a_workers`
+  - `parallelism.stage_b_workers`
+  - `feature_flags.runtime_enabled`
+  - `feature_flags.heuristic_shortlist_enabled`
+  - `feature_flags.parallel_stage_b_enabled`
+  - `feature_flags.family_plugin_enabled`
+  - `planning_budget_ms`
 - `contracts.launch.execution_mode` <- `backtest.contracts.launch.execution_mode`
 - `contracts.launch.auto_preflight_enabled` <- `backtest.contracts.launch.auto_preflight_enabled`
 - `contracts.launch.auto_fallback_to_background_enabled` <- `backtest.contracts.launch.auto_fallback_to_background_enabled`
@@ -157,6 +251,8 @@
 
 - `fee_pct_default_by_market_id` сериализуется в key-sorted порядке по market id.
 - массивы `contracts.*` сериализуются в YAML-defined order; порядок является частью frozen contract surface.
+- `contracts.execution.available_execution_profiles` сериализуется в YAML-defined profile order;
+  этот порядок является частью browser/runtime discovery contract.
 - `contracts.launch.supported_indicator_ids` сериализуется в детерминированном `indicator_id` порядке.
 - `contracts.launch.source_values_by_indicator_id` сериализует ключи в том же порядке, значения `source` — в детерминированном literal order.
 - Payload содержит только non-secret значения, нужные для browser prefill/validation hints.

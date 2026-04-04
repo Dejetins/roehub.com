@@ -520,6 +520,81 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
             },
             "execution": {
                 "risk_model": "signal_tf + 1m_risk",
+                "default_execution_profile": "exact_small",
+                "available_execution_profiles": [
+                    {
+                        "mode": "exact_small",
+                        "shortlist_config": {
+                            "enabled": False,
+                            "max_candidates": None,
+                        },
+                        "parallelism": {
+                            "stage_a_workers": 1,
+                            "stage_b_workers": 1,
+                        },
+                        "feature_flags": {
+                            "runtime_enabled": True,
+                            "heuristic_shortlist_enabled": False,
+                            "parallel_stage_b_enabled": False,
+                            "family_plugin_enabled": False,
+                        },
+                        "planning_budget_ms": 25,
+                    },
+                    {
+                        "mode": "exact_parallel",
+                        "shortlist_config": {
+                            "enabled": False,
+                            "max_candidates": None,
+                        },
+                        "parallelism": {
+                            "stage_a_workers": 1,
+                            "stage_b_workers": 4,
+                        },
+                        "feature_flags": {
+                            "runtime_enabled": False,
+                            "heuristic_shortlist_enabled": False,
+                            "parallel_stage_b_enabled": False,
+                            "family_plugin_enabled": False,
+                        },
+                        "planning_budget_ms": 50,
+                    },
+                    {
+                        "mode": "hybrid_conservative",
+                        "shortlist_config": {
+                            "enabled": True,
+                            "max_candidates": 5000,
+                        },
+                        "parallelism": {
+                            "stage_a_workers": 1,
+                            "stage_b_workers": 4,
+                        },
+                        "feature_flags": {
+                            "runtime_enabled": False,
+                            "heuristic_shortlist_enabled": False,
+                            "parallel_stage_b_enabled": False,
+                            "family_plugin_enabled": False,
+                        },
+                        "planning_budget_ms": 75,
+                    },
+                    {
+                        "mode": "hybrid_family",
+                        "shortlist_config": {
+                            "enabled": True,
+                            "max_candidates": 2000,
+                        },
+                        "parallelism": {
+                            "stage_a_workers": 1,
+                            "stage_b_workers": 4,
+                        },
+                        "feature_flags": {
+                            "runtime_enabled": False,
+                            "heuristic_shortlist_enabled": False,
+                            "parallel_stage_b_enabled": False,
+                            "family_plugin_enabled": False,
+                        },
+                        "planning_budget_ms": 100,
+                    },
+                ],
             },
             "launch": {
                 "execution_mode": "auto",
@@ -537,6 +612,17 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
     assert list(
         response_one.json()["execution"]["fee_pct_default_by_market_id"].keys()
     ) == ["1", "2", "3", "4"]
+    assert [
+        profile["mode"]
+        for profile in response_one.json()["contracts"]["execution"][
+            "available_execution_profiles"
+        ]
+    ] == [
+        "exact_small",
+        "exact_parallel",
+        "hybrid_conservative",
+        "hybrid_family",
+    ]
 
 
 def test_get_backtests_runtime_defaults_returns_401_when_unauthenticated() -> None:

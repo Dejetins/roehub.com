@@ -17,6 +17,16 @@ from trading.contexts.backtest.application.dto import (
     BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
     normalize_backtest_ranking_metric_literal,
 )
+from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+    DEFAULT_EXECUTION_PROFILE_MODE_V2,
+    ExecutionProfileFeatureFlagsV2,
+    ExecutionProfileParallelismConfigV2,
+    ExecutionProfilesCatalogV2,
+    ExecutionProfileShortlistConfigV2,
+    ExecutionProfileV2,
+    default_execution_profiles_catalog_v2,
+    validate_execution_profile_mode_v2,
+)
 from trading.contexts.indicators.application.services.grid_builder import (
     MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     MAX_VARIANTS_PER_COMPUTE_DEFAULT,
@@ -76,6 +86,7 @@ _RISK_MODEL_CONTRACT_DEFAULT = "signal_tf + 1m_risk"
 _EXECUTION_MODE_CONTRACT_DEFAULT = "auto"
 _AUTO_PREFLIGHT_ENABLED_CONTRACT_DEFAULT = True
 _AUTO_FALLBACK_TO_BACKGROUND_ENABLED_CONTRACT_DEFAULT = True
+_EXECUTION_PROFILES_DEFAULT_MODE = DEFAULT_EXECUTION_PROFILE_MODE_V2
 
 _INIT_CASH_QUOTE_DEFAULT = 10000.0
 _FIXED_QUOTE_DEFAULT = 100.0
@@ -558,6 +569,9 @@ class BacktestRuntimeConfig:
     contracts: BacktestFrozenContractRuntimeConfig = field(
         default_factory=BacktestFrozenContractRuntimeConfig
     )
+    execution_profiles: ExecutionProfilesCatalogV2 = field(
+        default_factory=default_execution_profiles_catalog_v2
+    )
     warmup_bars_default: int = _WARMUP_BARS_DEFAULT
     top_k_default: int = _TOP_K_DEFAULT
     preselect_default: int = _PRESELECT_DEFAULT
@@ -576,6 +590,14 @@ class BacktestRuntimeConfig:
     def __post_init__(self) -> None:
         """
         Validate runtime config invariants for fail-fast startup behavior.
+
+        Docs:
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - apps/api/wiring/modules/backtest.py
 
         Args:
             None.
@@ -612,6 +634,8 @@ class BacktestRuntimeConfig:
             raise ValueError("backtest.sync section must be configured")
         if self.contracts is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest.contracts section must be configured")
+        if self.execution_profiles is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.execution_profiles section must be configured")
 
 
 
@@ -690,6 +714,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     guards_map = _get_mapping(backtest_map, "guards", required=False)
     cpu_map = _get_mapping(backtest_map, "cpu", required=False)
     contracts_map = _get_mapping(backtest_map, "contracts", required=False)
+    execution_profiles_map = _get_mapping(backtest_map, "execution_profiles", required=False)
     jobs_map = _get_mapping(backtest_map, "jobs", required=True)
     sync_map = _get_mapping(backtest_map, "sync", required=True)
     contracts_request_timeframes_map = _get_mapping(
@@ -862,12 +887,16 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
             default=_AUTO_FALLBACK_TO_BACKGROUND_ENABLED_CONTRACT_DEFAULT,
         ),
     )
+    execution_profiles = _parse_execution_profiles_catalog(
+        data=execution_profiles_map,
+    )
 
     return BacktestRuntimeConfig(
         version=version,
         jobs=jobs,
         sync=sync,
         contracts=contracts,
+        execution_profiles=execution_profiles,
         warmup_bars_default=warmup_bars_default,
         top_k_default=top_k_default,
         preselect_default=preselect_default,
@@ -898,8 +927,8 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
         str: Canonical SHA-256 hash string.
     Assumptions:
         Hash includes result-affecting defaults (ranking/execution/reporting/persisted top-k)
-        and excludes operational-only knobs plus additive R0 contract-freeze fields that do
-        not affect current v1 execution.
+        and excludes operational-only knobs plus additive `contracts` / `execution_profiles`
+        fields that do not affect current exact runtime semantics in A1.
     Raises:
         TypeError: If payload normalization fails for unsupported node type.
     Side Effects:
@@ -1388,6 +1417,154 @@ def _get_float_with_default(data: Mapping[str, Any], key: str, *, default: float
         return default
     return _get_float(data, key, required=True)
 
+
+
+def _get_mapping_sequence(
+    data: Mapping[str, Any],
+    key: str,
+) -> tuple[Mapping[str, Any], ...]:
+    """
+    Read one ordered YAML sequence of mappings while preserving author-defined order.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - apps/api/dto/backtest_runtime_defaults.py
+
+    Args:
+        data: Source mapping that may contain a sequence field.
+        key: Sequence key name.
+    Returns:
+        tuple[Mapping[str, Any], ...]: Ordered mapping items preserving YAML order.
+    Assumptions:
+        Execution-profile ordering is part of the public browser/runtime contract.
+    Raises:
+        ValueError: If the field is present but not a sequence of mappings.
+    Side Effects:
+        None.
+    """
+    if key not in data:
+        return ()
+    value = data[key]
+    if isinstance(value, str) or not isinstance(value, Sequence):
+        raise ValueError(
+            f"expected sequence[mapping] at key '{key}', got {type(value).__name__}"
+        )
+    normalized_items: list[Mapping[str, Any]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            raise ValueError(
+                "expected sequence[mapping] at key "
+                f"'{key}', got item type {type(item).__name__}"
+            )
+        normalized_items.append(item)
+    return tuple(normalized_items)
+
+
+def _parse_execution_profiles_catalog(
+    *,
+    data: Mapping[str, Any],
+) -> ExecutionProfilesCatalogV2:
+    """
+    Parse ordered execution-profile catalog from runtime YAML into typed v2 contracts.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - apps/api/dto/backtest_runtime_defaults.py
+
+    Args:
+        data: Raw `backtest.execution_profiles` mapping from YAML.
+    Returns:
+        ExecutionProfilesCatalogV2: Parsed ordered catalog ready for planner/DTO reuse.
+    Assumptions:
+        Missing section falls back to the additive A1 default catalog with all approved modes.
+    Raises:
+        ValueError: If one profile mapping violates typed contract or ordering invariants.
+    Side Effects:
+        None.
+    """
+    if len(data) == 0:
+        return default_execution_profiles_catalog_v2()
+
+    default_mode = validate_execution_profile_mode_v2(
+        value=_get_str_with_default(
+            data,
+            "default",
+            default=_EXECUTION_PROFILES_DEFAULT_MODE,
+        )
+    )
+    profiles_payload = _get_mapping_sequence(data, "profiles")
+    if len(profiles_payload) == 0:
+        raise ValueError("backtest.execution_profiles.profiles must be non-empty")
+
+    available_profiles: list[ExecutionProfileV2] = []
+    for index, profile_map in enumerate(profiles_payload):
+        shortlist_map = _get_mapping(profile_map, "shortlist", required=False)
+        parallelism_map = _get_mapping(profile_map, "parallelism", required=False)
+        feature_flags_map = _get_mapping(profile_map, "feature_flags", required=False)
+        available_profiles.append(
+            ExecutionProfileV2(
+                mode=validate_execution_profile_mode_v2(
+                    value=_get_str(profile_map, "mode", required=True)
+                ),
+                shortlist_config=ExecutionProfileShortlistConfigV2(
+                    enabled=_get_bool_with_default(
+                        shortlist_map,
+                        "enabled",
+                        default=False,
+                    ),
+                    max_candidates=_get_optional_int(shortlist_map, "max_candidates"),
+                ),
+                parallelism=ExecutionProfileParallelismConfigV2(
+                    stage_a_workers=_get_int_with_default(
+                        parallelism_map,
+                        "stage_a_workers",
+                        default=1,
+                    ),
+                    stage_b_workers=_get_int_with_default(
+                        parallelism_map,
+                        "stage_b_workers",
+                        default=1,
+                    ),
+                ),
+                feature_flags=ExecutionProfileFeatureFlagsV2(
+                    runtime_enabled=_get_bool_with_default(
+                        feature_flags_map,
+                        "runtime_enabled",
+                        default=index == 0,
+                    ),
+                    heuristic_shortlist_enabled=_get_bool_with_default(
+                        feature_flags_map,
+                        "heuristic_shortlist_enabled",
+                        default=False,
+                    ),
+                    parallel_stage_b_enabled=_get_bool_with_default(
+                        feature_flags_map,
+                        "parallel_stage_b_enabled",
+                        default=False,
+                    ),
+                    family_plugin_enabled=_get_bool_with_default(
+                        feature_flags_map,
+                        "family_plugin_enabled",
+                        default=False,
+                    ),
+                ),
+                planning_budget_ms=_get_int(profile_map, "planning_budget_ms", required=True),
+            )
+        )
+
+    return ExecutionProfilesCatalogV2(
+        default_mode=default_mode,
+        available_profiles=tuple(available_profiles),
+    )
 
 
 def _parse_market_fee_defaults(*, data: Mapping[str, Any]) -> Mapping[int, float]:

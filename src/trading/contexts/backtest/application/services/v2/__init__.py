@@ -167,6 +167,18 @@ from .contracts import (
     validate_signal_rule_family_v2,
     validate_signal_timeframe_v2,
 )
+from .execution_profile_v2 import (
+    ALLOWED_EXECUTION_PROFILE_MODES_V2,
+    DEFAULT_EXECUTION_PROFILE_MODE_V2,
+    ExecutionProfileFeatureFlagsV2,
+    ExecutionProfileModeLiteralV2,
+    ExecutionProfileParallelismConfigV2,
+    ExecutionProfilesCatalogV2,
+    ExecutionProfileShortlistConfigV2,
+    ExecutionProfileV2,
+    default_execution_profiles_catalog_v2,
+    validate_execution_profile_mode_v2,
+)
 from .metrics_kernel import (
     build_execution_outcome_from_replay_v2,
     compute_stage_b_metrics_v2,
@@ -235,6 +247,7 @@ from .trade_compactor_kernel import (
 )
 
 __all__ = [
+    "ALLOWED_EXECUTION_PROFILE_MODES_V2",
     "ALLOWED_ARTIFACT_SLOTS_V2",
     "ARTIFACT_HIT_TIMES_TIMEFRAMES_V2",
     "ARTIFACT_MANIFEST_FILENAME_V2",
@@ -337,6 +350,12 @@ __all__ = [
     "BacktestSignalMatrixLoaderV2",
     "ChunkPlannerV2",
     "DeterministicSignalChunkPlannerV2",
+    "ExecutionProfileFeatureFlagsV2",
+    "ExecutionProfileModeLiteralV2",
+    "ExecutionProfileParallelismConfigV2",
+    "ExecutionProfileShortlistConfigV2",
+    "ExecutionProfileV2",
+    "ExecutionProfilesCatalogV2",
     "BacktestSignalAxisPlanV2",
     "BacktestStageABaseVariantV2",
     "BacktestStageAScoredVariantV2",
@@ -348,6 +367,7 @@ __all__ = [
     "CURRENT_ARTIFACT_POINTER_FILENAME_V2",
     "CURRENT_ARTIFACT_POINTER_REQUIRED_KEYS_V2",
     "CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2",
+    "DEFAULT_EXECUTION_PROFILE_MODE_V2",
     "HIT_TIMES_DIRECTORY_LITERAL_V2",
     "HIT_TIMES_TIMEFRAME_LITERAL_V2",
     "MAPPINGS_DIRECTORY_LITERAL_V2",
@@ -397,6 +417,7 @@ __all__ = [
     "inactive_artifact_slot_v2",
     "list_signal_rule_registry_v2",
     "ordered_artifact_slots_v2",
+    "default_execution_profiles_catalog_v2",
     "signal_rule_spec_v2",
     "supported_indicator_ids_for_signal_rules_v2",
     "validate_artifact_precompute_progress_event_name_v2",
@@ -408,6 +429,7 @@ __all__ = [
     "validate_current_pointer_published_at_utc_v2",
     "validate_current_pointer_schema_version_v2",
     "validate_current_pointer_slot_generation_v2",
+    "validate_execution_profile_mode_v2",
     "validate_hit_times_timeframe_v2",
     "validate_indicator_id_v2",
     "validate_mapping_timeframe_v2",

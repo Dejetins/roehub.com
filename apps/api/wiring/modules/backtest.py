@@ -38,6 +38,7 @@ from trading.contexts.backtest.adapters.outbound import (
 )
 from trading.contexts.backtest.application.services import (
     ArtifactSlotResolverV2,
+    BacktestArtifactRuntimePlannerV2,
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.backtest.application.use_cases import (
@@ -199,6 +200,9 @@ def build_backtest_router(
         )
     )
     artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
+    runtime_planner = BacktestArtifactRuntimePlannerV2(
+        execution_profiles=runtime_config.execution_profiles,
+    )
 
     run_use_case_kwargs: dict[str, Any] = dict(
         candle_feed=None,
@@ -221,6 +225,7 @@ def build_backtest_router(
         allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
         artifact_slot_resolver=artifact_slot_resolver,
+        runtime_planner=runtime_planner,
     )
     sync_run_use_case = RunBacktestUseCase(
         max_variants_per_compute=max(

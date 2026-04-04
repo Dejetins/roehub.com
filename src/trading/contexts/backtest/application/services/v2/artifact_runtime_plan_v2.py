@@ -27,6 +27,12 @@ from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId
 from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 from trading.platform.errors import RoehubError
 
+from .execution_profile_v2 import (
+    ExecutionProfilesCatalogV2,
+    ExecutionProfileV2,
+    default_execution_profiles_catalog_v2,
+)
+
 STAGE_A_LITERAL_V2 = "stage_a"
 STAGE_B_LITERAL_V2 = "stage_b"
 
@@ -208,6 +214,7 @@ class BacktestArtifactRuntimePlanV2:
     indicator_plans: tuple[BacktestIndicatorPlanV2, ...]
     signal_axes: tuple[BacktestSignalAxisPlanV2, ...]
     risk_variants: tuple[BacktestRiskVariantV2, ...]
+    execution_profile: ExecutionProfileV2
     instrument_id_literal: str
     timeframe_code: str
     direction_mode: str
@@ -221,6 +228,14 @@ class BacktestArtifactRuntimePlanV2:
     def __post_init__(self) -> None:
         """
         Validate and freeze deterministic plan invariants.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
 
         Args:
             None.
@@ -237,6 +252,8 @@ class BacktestArtifactRuntimePlanV2:
             raise ValueError(
                 "BacktestArtifactRuntimePlanV2.instrument_id_literal must be non-empty"
             )
+        if self.execution_profile is None:  # type: ignore[truthy-bool]
+            raise ValueError("BacktestArtifactRuntimePlanV2.execution_profile is required")
         if not self.timeframe_code.strip():
             raise ValueError("BacktestArtifactRuntimePlanV2.timeframe_code must be non-empty")
         if self.stage_a_variants_total <= 0:
@@ -336,6 +353,74 @@ class BacktestArtifactRuntimePlannerV2:
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
     """
 
+    def __init__(
+        self,
+        *,
+        execution_profiles: ExecutionProfilesCatalogV2 | None = None,
+    ) -> None:
+        """
+        Store typed execution-profile catalog used by additive A1 runtime planning.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+
+        Args:
+            execution_profiles: Optional startup-validated execution-profile catalog.
+        Returns:
+            None.
+        Assumptions:
+            Missing dependency falls back to the additive default catalog while current runtime
+            behavior stays exact and launch-policy-neutral.
+        Raises:
+            ValueError: If resolved catalog is missing.
+        Side Effects:
+            None.
+        """
+        resolved_execution_profiles = (
+            execution_profiles or default_execution_profiles_catalog_v2()
+        )
+        if resolved_execution_profiles is None:  # type: ignore[truthy-bool]
+            raise ValueError("BacktestArtifactRuntimePlannerV2 requires execution_profiles")
+        self._execution_profiles = resolved_execution_profiles
+
+    def resolve_execution_profile(
+        self,
+        *,
+        stage_a_variants_total: int | None = None,
+        stage_b_variants_total: int | None = None,
+    ) -> ExecutionProfileV2:
+        """
+        Resolve the current effective execution profile without changing launch/runtime policy.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - apps/api/wiring/modules/backtest.py
+
+        Args:
+            stage_a_variants_total: Optional prepared Stage A variants count for future policy.
+            stage_b_variants_total: Optional prepared Stage B variants count for future policy.
+        Returns:
+            ExecutionProfileV2: Current exact baseline profile from the ordered catalog.
+        Assumptions:
+            A1 only establishes typed profile discovery/plumbing; later EPICs may use the
+            prepared variant counts for classification without changing this method signature.
+        Raises:
+            ValueError: If configured default profile cannot be resolved from the catalog.
+        Side Effects:
+            None.
+        """
+        _ = stage_a_variants_total, stage_b_variants_total
+        return self._execution_profiles.default_profile()
+
     def build(
         self,
         *,
@@ -349,6 +434,14 @@ class BacktestArtifactRuntimePlannerV2:
     ) -> BacktestArtifactRuntimePlanV2:
         """
         Build deterministic artifact-backed runtime plan with guard checks.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
 
         Args:
             template: Resolved backtest template payload.
@@ -417,11 +510,16 @@ class BacktestArtifactRuntimePlannerV2:
                 total_variants=stage_b_variants_total,
                 max_variants_per_compute=max_variants_per_compute,
             )
+        execution_profile = self.resolve_execution_profile(
+            stage_a_variants_total=stage_a_variants_total,
+            stage_b_variants_total=stage_b_variants_total,
+        )
 
         return BacktestArtifactRuntimePlanV2(
             indicator_plans=indicator_plans,
             signal_axes=signal_axes,
             risk_variants=risk_variants,
+            execution_profile=execution_profile,
             instrument_id_literal=_instrument_id_literal_v2(template=template),
             timeframe_code=template.timeframe.code,
             direction_mode=template.direction_mode,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from typing import cast
+from typing import Any, cast
 
 import pytest
 from fastapi import APIRouter
@@ -587,14 +587,47 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     assert captured_run_use_case_kwargs[0]["max_compute_bytes_total"] == 500
     assert captured_run_use_case_kwargs[0]["max_numba_threads"] == 7
     assert captured_run_use_case_kwargs[0]["eager_top_reports_enabled"] is False
+    assert (
+        cast(
+            Any,
+            captured_run_use_case_kwargs[0]["runtime_planner"],
+        ).resolve_execution_profile().mode
+        == "exact_small"
+    )
     assert captured_run_use_case_kwargs[1]["candle_feed"] is None
     assert captured_run_use_case_kwargs[1]["max_variants_per_compute"] == 101
     assert captured_run_use_case_kwargs[1]["max_compute_bytes_total"] == 1001
+    assert (
+        cast(
+            Any,
+            captured_run_use_case_kwargs[1]["runtime_planner"],
+        ).resolve_execution_profile().mode
+        == "exact_small"
+    )
     assert captured_sync_inline_kwargs["backtest_runtime_config_hash"] == "f" * 64
     assert captured_sync_inline_kwargs["engine_version"] == "signal_tf + 1m_risk"
     assert captured_auto_fallback_kwargs["engine_version"] == "signal_tf + 1m_risk"
     assert captured_backtests_router_kwargs["sync_deadline_seconds"] == 42.5
     assert captured_backtests_router_kwargs["eager_top_reports_enabled"] is False
+    assert (
+        cast(
+            Any,
+            captured_backtests_router_kwargs["runtime_defaults_response"],
+        ).contracts.execution.default_execution_profile
+        == "exact_small"
+    )
+    assert [
+        profile.mode
+        for profile in cast(
+            Any,
+            captured_backtests_router_kwargs["runtime_defaults_response"],
+        ).contracts.execution.available_execution_profiles
+    ] == [
+        "exact_small",
+        "exact_parallel",
+        "hybrid_conservative",
+        "hybrid_family",
+    ]
 
 
 

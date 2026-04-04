@@ -54,6 +54,59 @@ backtest:
       execution_mode: auto
       auto_preflight_enabled: true
       auto_fallback_to_background_enabled: true
+  execution_profiles:
+    default: exact_small
+    profiles:
+      - mode: exact_small
+        planning_budget_ms: 25
+        shortlist:
+          enabled: false
+        parallelism:
+          stage_a_workers: 1
+          stage_b_workers: 1
+        feature_flags:
+          runtime_enabled: true
+          heuristic_shortlist_enabled: false
+          parallel_stage_b_enabled: false
+          family_plugin_enabled: false
+      - mode: exact_parallel
+        planning_budget_ms: 50
+        shortlist:
+          enabled: false
+        parallelism:
+          stage_a_workers: 1
+          stage_b_workers: 4
+        feature_flags:
+          runtime_enabled: false
+          heuristic_shortlist_enabled: false
+          parallel_stage_b_enabled: false
+          family_plugin_enabled: false
+      - mode: hybrid_conservative
+        planning_budget_ms: 75
+        shortlist:
+          enabled: true
+          max_candidates: 5000
+        parallelism:
+          stage_a_workers: 1
+          stage_b_workers: 4
+        feature_flags:
+          runtime_enabled: false
+          heuristic_shortlist_enabled: false
+          parallel_stage_b_enabled: false
+          family_plugin_enabled: false
+      - mode: hybrid_family
+        planning_budget_ms: 100
+        shortlist:
+          enabled: true
+          max_candidates: 2000
+        parallelism:
+          stage_a_workers: 1
+          stage_b_workers: 4
+        feature_flags:
+          runtime_enabled: false
+          heuristic_shortlist_enabled: false
+          parallel_stage_b_enabled: false
+          family_plugin_enabled: false
   guards:
     max_variants_per_compute: 600000
     max_compute_bytes_total: 5368709120
