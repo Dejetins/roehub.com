@@ -53,6 +53,17 @@
     run-scoped `POST /backtests/runs/{run_id}/variant-report`
     (`POST /api/backtests/runs/{run_id}/variant-report` на browser/API boundary);
   - detail/save UX не добавляет новых persisted report/trades storage surfaces.
+- A2 additive progress note:
+  - public `/backtests/runs*` payloads теперь добавляют
+    `progress_percent`, `eta_seconds`, `execution_profile_mode`;
+  - `progress_percent` считается детерминированно из
+    `stage + processed_units + total_units + execution-profile stage weights`,
+    а не из client-side spinner/эвристики;
+  - `eta_seconds` строится только из текущего run timeline и возвращает `null`,
+    если defensible throughput signal ещё нет;
+  - read path может брать `execution_profile_mode` из persisted `request_json`, если он там есть;
+    иначе до будущего profile-aware launch persistence используется configured default exact
+    profile.
 
 ## Цель
 
@@ -197,7 +208,10 @@ Response (`200 OK`):
 - `stage`
 - `created_at`, `updated_at`, `started_at`, `finished_at`, `cancel_requested_at`
 - `processed_units`, `total_units`
+- `progress_percent`
+- `eta_seconds`
 - `execution_mode`
+- `execution_profile_mode`
 - `market_id`, `symbol`, `timeframe`
 - `requested_top_n`
 - `ranking_primary_metric`, `ranking_secondary_metric`
@@ -209,6 +223,10 @@ Response (`200 OK`):
 
 - полный status/progress snapshot run;
 - key metadata из history list;
+- additive progress fields:
+  - `progress_percent`
+  - `eta_seconds`
+  - `execution_profile_mode`
 - для `failed` дополнительно:
   - `last_error`
   - `last_error_json` (`code/message/details`)

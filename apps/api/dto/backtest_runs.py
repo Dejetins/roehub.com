@@ -10,12 +10,15 @@ Docs:
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, cast
+from typing import Any, Literal, Mapping, cast
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from trading.contexts.backtest.application.use_cases import BacktestRunTopReadResult
+from trading.contexts.backtest.application.use_cases import (
+    BacktestRunProgressSnapshot,
+    BacktestRunTopReadResult,
+)
 from trading.contexts.backtest.domain.entities import BacktestJob
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
@@ -32,6 +35,12 @@ from .backtests import BacktestVariantPayloadRequest
 
 BacktestRunsStateLiteral = BacktestJobsStateLiteral
 BacktestRunsStageLiteral = Literal["stage_a", "stage_b", "finalizing"]
+BacktestRunExecutionProfileModeLiteral = Literal[
+    "exact_small",
+    "exact_parallel",
+    "hybrid_conservative",
+    "hybrid_family",
+]
 
 
 class BacktestRunErrorResponse(BaseModel):
@@ -81,7 +90,10 @@ class BacktestRunStatusResponse(BaseModel):
     progress_updated_at: datetime | None = None
     processed_units: int
     total_units: int
+    progress_percent: int
+    eta_seconds: int | None = None
     execution_mode: BacktestJobExecutionModeLiteral | None = None
+    execution_profile_mode: BacktestRunExecutionProfileModeLiteral
     market_id: int | None = None
     symbol: str | None = None
     timeframe: str | None = None
@@ -122,7 +134,10 @@ class BacktestRunsListItemResponse(BaseModel):
     cancel_requested_at: datetime | None = None
     processed_units: int
     total_units: int
+    progress_percent: int
+    eta_seconds: int | None = None
     execution_mode: BacktestJobExecutionModeLiteral | None = None
+    execution_profile_mode: BacktestRunExecutionProfileModeLiteral
     market_id: int | None = None
     symbol: str | None = None
     timeframe: str | None = None
@@ -221,7 +236,11 @@ class BacktestRunVariantReportPostRequest(BaseModel):
     include_trades: bool = False
 
 
-def build_backtest_run_status_response(*, run: BacktestJob) -> BacktestRunStatusResponse:
+def build_backtest_run_status_response(
+    *,
+    run: BacktestJob,
+    progress: BacktestRunProgressSnapshot,
+) -> BacktestRunStatusResponse:
     """
     Convert persisted-run aggregate into strict public status response payload.
 
@@ -234,6 +253,7 @@ def build_backtest_run_status_response(*, run: BacktestJob) -> BacktestRunStatus
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
     Args:
         run: Persisted run aggregate backed by unified jobs storage.
+        progress: Additive weighted progress/ETA projection for the same run.
     Returns:
         BacktestRunStatusResponse: Strict public status payload using `run_id` vocabulary.
     Assumptions:
@@ -264,7 +284,10 @@ def build_backtest_run_status_response(*, run: BacktestJob) -> BacktestRunStatus
         progress_updated_at=run.progress_updated_at,
         processed_units=run.processed_units,
         total_units=run.total_units,
+        progress_percent=progress.progress_percent,
+        eta_seconds=progress.eta_seconds,
         execution_mode=run.execution_mode,
+        execution_profile_mode=progress.execution_profile_mode,
         market_id=run.market_id,
         symbol=run.symbol,
         timeframe=run.timeframe,
@@ -290,6 +313,7 @@ def build_backtest_runs_list_response(
     *,
     items: tuple[BacktestJob, ...],
     next_cursor: BacktestJobListCursor | None,
+    progress_by_run_id: Mapping[UUID, BacktestRunProgressSnapshot],
 ) -> BacktestRunsListResponse:
     """
     Build strict public history response from deterministic repository page payload.
@@ -304,6 +328,7 @@ def build_backtest_runs_list_response(
     Args:
         items: Deterministically ordered persisted runs page items.
         next_cursor: Optional keyset cursor for the next page.
+        progress_by_run_id: Additive progress/ETA snapshots keyed by persisted `run_id`.
     Returns:
         BacktestRunsListResponse: Strict public history payload.
     Assumptions:
@@ -327,7 +352,19 @@ def build_backtest_runs_list_response(
                 cancel_requested_at=item.cancel_requested_at,
                 processed_units=item.processed_units,
                 total_units=item.total_units,
+                progress_percent=_require_progress_snapshot(
+                    progress_by_run_id=progress_by_run_id,
+                    run_id=item.job_id,
+                ).progress_percent,
+                eta_seconds=_require_progress_snapshot(
+                    progress_by_run_id=progress_by_run_id,
+                    run_id=item.job_id,
+                ).eta_seconds,
                 execution_mode=item.execution_mode,
+                execution_profile_mode=_require_progress_snapshot(
+                    progress_by_run_id=progress_by_run_id,
+                    run_id=item.job_id,
+                ).execution_profile_mode,
                 market_id=item.market_id,
                 symbol=item.symbol,
                 timeframe=item.timeframe,
@@ -355,6 +392,39 @@ def build_backtest_runs_list_response(
         ],
         next_cursor=encode_backtest_runs_cursor(cursor=next_cursor),
     )
+
+
+def _require_progress_snapshot(
+    *,
+    progress_by_run_id: Mapping[UUID, BacktestRunProgressSnapshot],
+    run_id: UUID,
+) -> BacktestRunProgressSnapshot:
+    """
+    Read the additive progress projection for one persisted run or fail fast.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - apps/api/dto/backtest_runs.py
+      - apps/api/routes/backtest_runs.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+    Args:
+        progress_by_run_id: Progress snapshots keyed by persisted run identifier.
+        run_id: Target persisted run identifier.
+    Returns:
+        BacktestRunProgressSnapshot: Additive progress projection for `run_id`.
+    Assumptions:
+        Route/use-case wiring precomputes progress for every run included in the response page.
+    Raises:
+        ValueError: If the required progress snapshot is missing.
+    Side Effects:
+        None.
+    """
+    progress = progress_by_run_id.get(run_id)
+    if progress is None:  # pragma: no cover - guarded by route wiring
+        raise ValueError(f"missing progress snapshot for run_id={run_id}")
+    return progress
 
 
 def build_backtest_run_top_response(*, result: BacktestRunTopReadResult) -> BacktestRunTopResponse:

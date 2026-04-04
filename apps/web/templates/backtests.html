@@ -35,7 +35,10 @@
       Browser requests are sent to <code>/api/*</code> with credentials, while server-side
       <code>auto_preflight_enabled</code> may return explicit <code>202 Accepted</code>
       <code>background_auto</code> fallback metadata and persisted <code>run_id</code> for
-      history/runs navigation.
+      history/runs navigation. Persisted <code>/backtests/runs/{run_id}</code> pages render the
+      stage, <code>execution_profile_mode</code>, real <code>0..100%</code> progress bar, and
+      approximate <code>eta_seconds</code> after the launch response returns. This page does not
+      stream mid-request sync progress because the current transport remains request/response only.
     </p>
 
     <div id="backtest-error-banner" class="error-banner hidden" role="alert"></div>

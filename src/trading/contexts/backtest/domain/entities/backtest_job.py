@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field, replace
 from datetime import date, datetime
+from math import ceil
 from types import MappingProxyType
 from typing import Any, Literal, Mapping, Sequence, cast
 from uuid import UUID
@@ -209,6 +210,109 @@ class BacktestJobArtifactPin:
             self,
             "artifact_manifest_hash",
             self.artifact_manifest_hash.strip().lower(),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestJobStageWeights:
+    """
+    Deterministic `stage_a/stage_b/finalizing` weights for persisted run progress read models.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - apps/api/dto/backtest_runs.py
+    """
+
+    stage_a: int
+    stage_b: int
+    finalizing: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate deterministic stage-weight invariants for `0..100%` progress projection.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Public progress percent is expressed in integer percent points summing to `100`.
+        Raises:
+            BacktestJobTransitionError: If one weight is non-positive or the total is not `100`.
+        Side Effects:
+            None.
+        """
+        for field_name, field_value in (
+            ("stage_a", self.stage_a),
+            ("stage_b", self.stage_b),
+            ("finalizing", self.finalizing),
+        ):
+            if isinstance(field_value, bool) or not isinstance(field_value, int):
+                raise BacktestJobTransitionError(
+                    f"BacktestJobStageWeights.{field_name} must be integer"
+                )
+            if field_value <= 0:
+                raise BacktestJobTransitionError(
+                    f"BacktestJobStageWeights.{field_name} must be > 0"
+                )
+        if self.stage_a + self.stage_b + self.finalizing != 100:
+            raise BacktestJobTransitionError(
+                "BacktestJobStageWeights must sum to 100"
+            )
+
+    def completed_weight_before(self, *, stage: BacktestJobStage) -> int:
+        """
+        Return the cumulative completed weight before the requested stage starts.
+
+        Args:
+            stage: Target progress stage literal.
+        Returns:
+            int: Deterministic completed weight in percent points before `stage`.
+        Assumptions:
+            Stage ordering is fixed to `stage_a -> stage_b -> finalizing`.
+        Raises:
+            BacktestJobTransitionError: If stage literal is unsupported.
+        Side Effects:
+            None.
+        """
+        if stage == "stage_a":
+            return 0
+        if stage == "stage_b":
+            return self.stage_a
+        if stage == "finalizing":
+            return self.stage_a + self.stage_b
+        raise BacktestJobTransitionError(
+            f"BacktestJobStageWeights stage is unsupported: {stage!r}"
+        )
+
+    def current_stage_weight(self, *, stage: BacktestJobStage) -> int:
+        """
+        Return the deterministic weight assigned to one active progress stage.
+
+        Args:
+            stage: Target progress stage literal.
+        Returns:
+            int: Weight in percent points for the current stage.
+        Assumptions:
+            Stage literals reuse the persisted run lifecycle vocabulary.
+        Raises:
+            BacktestJobTransitionError: If stage literal is unsupported.
+        Side Effects:
+            None.
+        """
+        if stage == "stage_a":
+            return self.stage_a
+        if stage == "stage_b":
+            return self.stage_b
+        if stage == "finalizing":
+            return self.finalizing
+        raise BacktestJobTransitionError(
+            f"BacktestJobStageWeights stage is unsupported: {stage!r}"
         )
 
 
@@ -669,6 +773,123 @@ class BacktestJob:
             None.
         """
         return next_state in _ALLOWED_JOB_STATE_TRANSITIONS[self.state]
+
+    def stage_progress_ratio(self) -> float:
+        """
+        Return the normalized completion ratio of the currently persisted stage counters.
+
+        Docs:
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+        Related:
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+          - apps/api/dto/backtest_runs.py
+        Args:
+            None.
+        Returns:
+            float: Clamped ratio in `[0.0, 1.0]` for `processed_units / total_units`.
+        Assumptions:
+            Missing or zero `total_units` means current-stage completion is not observable yet.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self.total_units <= 0:
+            return 0.0
+        return min(max(self.processed_units / self.total_units, 0.0), 1.0)
+
+    def progress_percent(
+        self,
+        *,
+        stage_weights: BacktestJobStageWeights,
+    ) -> int:
+        """
+        Project persisted run counters onto a deterministic weighted `0..100%` progress scale.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+          - apps/api/dto/backtest_runs.py
+        Args:
+            stage_weights: Deterministic stage weights for the effective execution profile.
+        Returns:
+            int: Weighted integer progress percent in `[0, 100]`.
+        Assumptions:
+            Successful terminal runs are rendered as complete even if finalizing counters remain
+            at `0/1` because storage persists the last in-flight snapshot before finishing.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self.state == "succeeded":
+            return 100
+        weighted_value = stage_weights.completed_weight_before(
+            stage=self.stage
+        ) + (
+            stage_weights.current_stage_weight(stage=self.stage) * self.stage_progress_ratio()
+        )
+        return int(round(min(max(weighted_value, 0.0), 100.0)))
+
+    def eta_seconds(
+        self,
+        *,
+        stage_weights: BacktestJobStageWeights,
+        now: datetime,
+    ) -> int | None:
+        """
+        Estimate remaining runtime from current-run progress only, or return `None`.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runs-history-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/domain/entities/backtest_job.py
+          - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+          - apps/api/dto/backtest_runs.py
+        Args:
+            stage_weights: Deterministic stage weights for the effective execution profile.
+            now: Read-model reference timestamp in UTC.
+        Returns:
+            int | None: Conservative remaining seconds estimate, or `None` when the signal is
+                not defensible yet.
+        Assumptions:
+            ETA is published only for active running jobs with non-zero weighted progress derived
+            from the current run itself; benchmark-history fallbacks are out of scope here.
+        Raises:
+            BacktestJobTransitionError: If `now` is not a UTC-aware timestamp.
+        Side Effects:
+            None.
+        """
+        _ensure_utc_datetime(name="now", value=now)
+        if self.state != "running" or self.started_at is None or self.progress_updated_at is None:
+            return None
+
+        progress_percent = self.progress_percent(stage_weights=stage_weights)
+        if progress_percent <= 0 or progress_percent >= 100:
+            return None
+
+        reference_time = now
+        if self.progress_updated_at > reference_time:
+            reference_time = self.progress_updated_at
+        if reference_time <= self.started_at:
+            return None
+
+        elapsed_seconds = (reference_time - self.started_at).total_seconds()
+        if elapsed_seconds < 1.0:
+            return None
+
+        remaining_seconds = elapsed_seconds * ((100 - progress_percent) / progress_percent)
+        if remaining_seconds <= 0.0:
+            return None
+        return max(1, ceil(remaining_seconds))
 
     def claim(
         self,

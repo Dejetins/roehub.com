@@ -14,7 +14,10 @@ from apps.api.dto import (
     decode_backtest_runs_state,
     encode_backtest_runs_cursor,
 )
-from trading.contexts.backtest.application.use_cases import BacktestRunTopReadResult
+from trading.contexts.backtest.application.use_cases import (
+    BacktestRunProgressSnapshot,
+    BacktestRunTopReadResult,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
@@ -118,11 +121,21 @@ def test_build_backtest_run_status_response_uses_run_vocabulary_without_hashes()
     """
     run = _failed_run(run_id=UUID("00000000-0000-0000-0000-000000000992"))
 
-    response = build_backtest_run_status_response(run=run)
+    response = build_backtest_run_status_response(
+        run=run,
+        progress=BacktestRunProgressSnapshot(
+            execution_profile_mode="exact_small",
+            progress_percent=0,
+            eta_seconds=None,
+        ),
+    )
     dumped = response.model_dump(mode="json")
 
     assert dumped["run_id"] == "00000000-0000-0000-0000-000000000992"
     assert dumped["execution_mode"] == "sync_inline"
+    assert dumped["execution_profile_mode"] == "exact_small"
+    assert dumped["progress_percent"] == 0
+    assert dumped["eta_seconds"] is None
     assert dumped["market_id"] == 1
     assert dumped["artifact_slot"] == "slot_b"
     assert dumped["last_error_json"]["code"] == "unexpected_error"
@@ -152,11 +165,19 @@ def test_build_backtest_run_status_response_keeps_running_background_cancel_mark
         changed_at=datetime(2026, 3, 29, 12, 0, 30, tzinfo=timezone.utc)
     )
 
-    response = build_backtest_run_status_response(run=run)
+    response = build_backtest_run_status_response(
+        run=run,
+        progress=BacktestRunProgressSnapshot(
+            execution_profile_mode="exact_small",
+            progress_percent=0,
+            eta_seconds=None,
+        ),
+    )
     dumped = response.model_dump(mode="json")
 
     assert dumped["state"] == "running"
     assert dumped["execution_mode"] == "background_auto"
+    assert dumped["execution_profile_mode"] == "exact_small"
     assert dumped["cancel_requested_at"] == "2026-03-29T12:00:30Z"
     assert dumped["finished_at"] is None
 

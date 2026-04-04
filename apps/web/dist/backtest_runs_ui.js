@@ -117,18 +117,14 @@ function initHistoryPage(pageRoot) {
 
       row.appendChild(buildCell(runId));
       row.appendChild(buildBadgeCell(String(record.state || "")));
-      row.appendChild(buildCell(formatValue(record.execution_mode)));
+      row.appendChild(buildCell(buildHistoryExecutionModeSummary(record)));
       row.appendChild(buildCell(formatValue(record.market_id)));
       row.appendChild(buildCell(formatValue(record.symbol)));
       row.appendChild(buildCell(formatValue(record.timeframe)));
       row.appendChild(buildCell(formatValue(record.requested_top_n)));
       row.appendChild(buildCell(formatValue(record.created_at)));
       row.appendChild(buildCell(formatValue(record.updated_at)));
-      row.appendChild(
-        buildCell(
-          `${formatValue(record.processed_units)}/${formatValue(record.total_units)}`,
-        ),
-      );
+      row.appendChild(buildCell(buildHistoryProgressSummary(record)));
       tableBody.appendChild(row);
     });
   };
@@ -279,8 +275,10 @@ function initRunSummaryPage(pageRoot) {
   const summaryNote = pageRoot.querySelector("#run-summary-note");
   const tableHead = pageRoot.querySelector("#run-summary-table-head");
   const tableBody = pageRoot.querySelector("#run-summary-table-body");
+  const progressTrack = pageRoot.querySelector(".job-progress-track[role=\"progressbar\"]");
   const progressBar = pageRoot.querySelector("#run-progress-bar");
   const progressCaption = pageRoot.querySelector("#run-progress-caption");
+  const progressMeta = pageRoot.querySelector("#run-progress-meta");
 
   if (
     copyIdButton === null
@@ -291,8 +289,10 @@ function initRunSummaryPage(pageRoot) {
     || summaryNote === null
     || tableHead === null
     || tableBody === null
+    || progressTrack === null
     || progressBar === null
     || progressCaption === null
+    || progressMeta === null
   ) {
     return;
   }
@@ -302,6 +302,7 @@ function initRunSummaryPage(pageRoot) {
     state: pageRoot.querySelector("#run-field-state"),
     stage: pageRoot.querySelector("#run-field-stage"),
     executionMode: pageRoot.querySelector("#run-field-execution-mode"),
+    executionProfileMode: pageRoot.querySelector("#run-field-execution-profile-mode"),
     marketId: pageRoot.querySelector("#run-field-market-id"),
     symbol: pageRoot.querySelector("#run-field-symbol"),
     timeframe: pageRoot.querySelector("#run-field-timeframe"),
@@ -312,6 +313,8 @@ function initRunSummaryPage(pageRoot) {
     finishedAt: pageRoot.querySelector("#run-field-finished-at"),
     cancelRequestedAt: pageRoot.querySelector("#run-field-cancel-requested-at"),
     progress: pageRoot.querySelector("#run-field-progress"),
+    progressPercent: pageRoot.querySelector("#run-field-progress-percent"),
+    etaSeconds: pageRoot.querySelector("#run-field-eta-seconds"),
     rankingPrimaryMetric: pageRoot.querySelector("#run-field-ranking-primary-metric"),
     rankingSecondaryMetric: pageRoot.querySelector("#run-field-ranking-secondary-metric"),
   };
@@ -396,12 +399,18 @@ function initRunSummaryPage(pageRoot) {
 
     const processedUnits = Number(status.processed_units || 0);
     const totalUnits = Number(status.total_units || 0);
-    const ratio = totalUnits > 0 ? Math.min(Math.max(processedUnits / totalUnits, 0), 1) : 0;
+    const progressPercent = readProgressPercent(status, {
+      processedUnits,
+      totalUnits,
+    });
+    const executionProfileMode = formatValue(status.execution_profile_mode);
+    const etaSeconds = readFiniteInteger(status.eta_seconds);
 
     setTextContent(fieldMap.mode, formatValue(status.mode));
     setBadgeContent(fieldMap.state, String(status.state || ""));
     setTextContent(fieldMap.stage, formatValue(status.stage));
     setTextContent(fieldMap.executionMode, formatValue(status.execution_mode));
+    setTextContent(fieldMap.executionProfileMode, executionProfileMode);
     setTextContent(fieldMap.marketId, formatValue(status.market_id));
     setTextContent(fieldMap.symbol, formatValue(status.symbol));
     setTextContent(fieldMap.timeframe, formatValue(status.timeframe));
@@ -412,11 +421,19 @@ function initRunSummaryPage(pageRoot) {
     setTextContent(fieldMap.finishedAt, formatValue(status.finished_at));
     setTextContent(fieldMap.cancelRequestedAt, formatValue(status.cancel_requested_at));
     setTextContent(fieldMap.progress, `${processedUnits}/${totalUnits}`);
+    setTextContent(fieldMap.progressPercent, formatPercentValue(progressPercent));
+    setTextContent(fieldMap.etaSeconds, formatEtaSeconds(etaSeconds));
     setTextContent(fieldMap.rankingPrimaryMetric, formatValue(status.ranking_primary_metric));
     setTextContent(fieldMap.rankingSecondaryMetric, formatValue(status.ranking_secondary_metric));
 
-    progressBar.style.width = `${Math.round(ratio * 100)}%`;
-    progressCaption.textContent = `Progress: ${Math.round(ratio * 100)}% (${processedUnits}/${totalUnits})`;
+    progressTrack.setAttribute("aria-valuenow", String(progressPercent));
+    progressBar.style.width = `${progressPercent}%`;
+    progressCaption.textContent = `Progress: ${progressPercent}% (${processedUnits}/${totalUnits})`;
+    progressMeta.textContent = [
+      `Stage: ${formatValue(status.stage)}`,
+      `Profile: ${executionProfileMode}`,
+      `ETA: ${etaSeconds === null ? "-" : `~${formatEtaSeconds(etaSeconds)}`}`,
+    ].join(" | ");
   };
 
   const buildVisibleColumns = () => {
@@ -1275,6 +1292,83 @@ function readRenderedMetric(row, column) {
 function readFiniteNumber(value) {
   const numberValue = Number(value);
   return Number.isFinite(numberValue) ? numberValue : null;
+}
+
+function readFiniteInteger(value) {
+  const numberValue = Number(value);
+  return Number.isInteger(numberValue) ? numberValue : null;
+}
+
+function clampProgressPercent(value) {
+  const numberValue = readFiniteNumber(value);
+  if (numberValue === null) {
+    return 0;
+  }
+  return Math.min(Math.max(Math.round(numberValue), 0), 100);
+}
+
+function readProgressPercent(status, { processedUnits, totalUnits }) {
+  const explicitPercent = readFiniteNumber(asRecord(status).progress_percent);
+  if (explicitPercent !== null) {
+    return clampProgressPercent(explicitPercent);
+  }
+  if (totalUnits <= 0) {
+    return 0;
+  }
+  return clampProgressPercent((processedUnits / totalUnits) * 100);
+}
+
+function formatPercentValue(value) {
+  const normalizedValue = readFiniteNumber(value);
+  if (normalizedValue === null) {
+    return "-";
+  }
+  return `${clampProgressPercent(normalizedValue)}%`;
+}
+
+function formatEtaSeconds(value) {
+  const totalSeconds = readFiniteInteger(value);
+  if (totalSeconds === null || totalSeconds < 0) {
+    return "-";
+  }
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  }
+  if (minutes > 0 && seconds === 0) {
+    return `${minutes}m`;
+  }
+  return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+}
+
+function buildHistoryExecutionModeSummary(record) {
+  const executionMode = formatValue(record.execution_mode);
+  const executionProfileMode = formatValue(record.execution_profile_mode);
+  if (executionProfileMode === "-") {
+    return executionMode;
+  }
+  return `${executionMode} / ${executionProfileMode}`;
+}
+
+function buildHistoryProgressSummary(record) {
+  const processedUnits = Number(record.processed_units || 0);
+  const totalUnits = Number(record.total_units || 0);
+  const progressPercent = readProgressPercent(record, {
+    processedUnits,
+    totalUnits,
+  });
+  const etaSeconds = readFiniteInteger(record.eta_seconds);
+  return [
+    formatValue(record.stage),
+    `${progressPercent}%`,
+    `${formatValue(record.processed_units)}/${formatValue(record.total_units)}`,
+    etaSeconds === null ? null : `ETA ~${formatEtaSeconds(etaSeconds)}`,
+  ].filter((item) => item !== null).join(" | ");
 }
 
 function formatValue(value) {

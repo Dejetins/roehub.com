@@ -29,8 +29,11 @@
     <p>
       Status metadata comes from <code>/api/backtests/runs/{run_id}</code>, while summary rows come
       from <code>/api/backtests/runs/{run_id}/top</code>. The table remains summary-only and local
-      sorting reorders already-loaded rows without triggering server recompute. Per-variant chart,
-      trades, and detailed metrics live on <code>/backtests/runs/{run_id}/variants/{variant_key}</code>.
+      sorting reorders already-loaded rows without triggering server recompute. Status payloads add
+      <code>progress_percent</code>, <code>eta_seconds</code>, and
+      <code>execution_profile_mode</code> for a real <code>0..100%</code> progress bar.
+      Per-variant chart, trades, and detailed metrics live on
+      <code>/backtests/runs/{run_id}/variants/{variant_key}</code>.
     </p>
 
     <div id="run-summary-error-banner" class="error-banner hidden" role="alert"></div>
@@ -76,6 +79,9 @@
         <dt>execution_mode</dt>
         <dd id="run-field-execution-mode"></dd>
 
+        <dt>execution_profile_mode</dt>
+        <dd id="run-field-execution-profile-mode"></dd>
+
         <dt>market_id</dt>
         <dd id="run-field-market-id"></dd>
 
@@ -106,6 +112,12 @@
         <dt>processed_units / total_units</dt>
         <dd id="run-field-progress"></dd>
 
+        <dt>progress_percent</dt>
+        <dd id="run-field-progress-percent"></dd>
+
+        <dt>eta_seconds</dt>
+        <dd id="run-field-eta-seconds"></dd>
+
         <dt>ranking_primary_metric</dt>
         <dd id="run-field-ranking-primary-metric"></dd>
 
@@ -113,10 +125,18 @@
         <dd id="run-field-ranking-secondary-metric"></dd>
       </dl>
 
-      <div class="job-progress-track" role="progressbar" aria-label="Run progress">
+      <div
+        class="job-progress-track"
+        role="progressbar"
+        aria-label="Run progress 0..100%"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
         <div id="run-progress-bar" class="job-progress-bar"></div>
       </div>
       <p id="run-progress-caption" class="muted-text">Progress: 0%</p>
+      <p id="run-progress-meta" class="muted-text"></p>
     </section>
 
     <section class="panel panel--soft">

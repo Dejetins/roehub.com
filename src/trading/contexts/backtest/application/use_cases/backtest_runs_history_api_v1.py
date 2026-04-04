@@ -21,11 +21,16 @@ from trading.contexts.backtest.application.services import (
     ArtifactPinnedIdentityV2,
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactSlotResolverV2,
+    ExecutionProfileModeLiteralV2,
+    ExecutionProfilesCatalogV2,
     artifact_coordinates_from_market_id_v2,
+    default_execution_profiles_catalog_v2,
+    validate_execution_profile_mode_v2,
 )
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
+    BacktestJobStageWeights,
     BacktestJobState,
     BacktestJobTopVariant,
 )
@@ -48,6 +53,128 @@ NowProvider = Callable[[], datetime]
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestRunProgressSnapshot:
+    """
+    Additive persisted-run progress read model for public status/history responses.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - apps/api/dto/backtest_runs.py
+      - apps/api/routes/backtest_runs.py
+    """
+
+    execution_profile_mode: ExecutionProfileModeLiteralV2
+    progress_percent: int
+    eta_seconds: int | None
+
+
+class BacktestRunProgressSnapshotBuilder:
+    """
+    Project persisted run counters onto additive progress/ETA fields for public runs read paths.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - apps/api/dto/backtest_runs.py
+    """
+
+    def __init__(
+        self,
+        *,
+        execution_profiles: ExecutionProfilesCatalogV2 | None = None,
+        now_provider: NowProvider | None = None,
+    ) -> None:
+        """
+        Store the execution-profile catalog and clock used for conservative ETA projection.
+
+        Args:
+            execution_profiles: Optional startup-validated execution-profile catalog.
+            now_provider: Optional UTC clock provider for deterministic tests/read models.
+        Returns:
+            None.
+        Assumptions:
+            Current A2 contract keeps persisted run profile resolution additive and may fall back
+            to the configured default profile when the run snapshot has no explicit profile field.
+        Raises:
+            ValueError: If the resolved execution-profile catalog is missing.
+        Side Effects:
+            None.
+        """
+        resolved_execution_profiles = (
+            execution_profiles or default_execution_profiles_catalog_v2()
+        )
+        if resolved_execution_profiles is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestRunProgressSnapshotBuilder requires execution_profiles"
+            )
+        self._execution_profiles = resolved_execution_profiles
+        self._now = now_provider or _utc_now
+
+    def build(self, *, run: BacktestJob) -> BacktestRunProgressSnapshot:
+        """
+        Build additive `progress_percent/eta_seconds/execution_profile_mode` for one run.
+
+        Args:
+            run: Persisted run aggregate read from unified storage.
+        Returns:
+            BacktestRunProgressSnapshot: Additive progress read model for public API/UI.
+        Assumptions:
+            ETA relies only on current-run timestamps and weighted progress; benchmark-history
+            fallbacks stay out of scope for this milestone.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        execution_profile_mode = self._resolve_execution_profile_mode(run=run)
+        stage_weights = _stage_weights_for_execution_profile_mode(
+            execution_profile_mode=execution_profile_mode
+        )
+        return BacktestRunProgressSnapshot(
+            execution_profile_mode=execution_profile_mode,
+            progress_percent=run.progress_percent(stage_weights=stage_weights),
+            eta_seconds=run.eta_seconds(stage_weights=stage_weights, now=self._now()),
+        )
+
+    def _resolve_execution_profile_mode(
+        self,
+        *,
+        run: BacktestJob,
+    ) -> ExecutionProfileModeLiteralV2:
+        """
+        Resolve the effective execution-profile mode for a persisted run status projection.
+
+        Args:
+            run: Persisted run aggregate read from unified storage.
+        Returns:
+            ExecutionProfileModeLiteralV2: Stable execution-profile mode literal for UI rendering.
+        Assumptions:
+            Current A2 rollout may fall back to the configured default profile because launch
+            policy/classification has not yet started persisting profile decisions separately.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        raw_mode = run.request_json.get("execution_profile_mode")
+        if isinstance(raw_mode, str) and raw_mode.strip():
+            try:
+                normalized_mode = validate_execution_profile_mode_v2(value=raw_mode)
+                self._execution_profiles.profile_for_mode(mode=normalized_mode)
+                return normalized_mode
+            except ValueError:
+                pass
+        return self._execution_profiles.default_mode
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestRunTopReadResult:
     """
     Public runs `/top` payload over persisted summary-only rows.
@@ -63,6 +190,44 @@ class BacktestRunTopReadResult:
 
     job: BacktestJob
     rows: tuple[BacktestJobTopVariant, ...]
+
+
+def _stage_weights_for_execution_profile_mode(
+    *,
+    execution_profile_mode: ExecutionProfileModeLiteralV2,
+) -> BacktestJobStageWeights:
+    """
+    Map one execution-profile mode to deterministic stage weights for `0..100%` progress.
+
+    Args:
+        execution_profile_mode: Stable execution-profile mode literal.
+    Returns:
+        BacktestJobStageWeights: Deterministic stage-weight tuple summing to `100`.
+    Assumptions:
+        Current A2 rollout keeps one conservative fixed weight set per profile family instead of
+        using benchmark-history or dynamic calibration.
+    Raises:
+        ValueError: If the execution-profile mode literal is unsupported.
+    Side Effects:
+        None.
+    """
+    weights_by_mode: dict[ExecutionProfileModeLiteralV2, BacktestJobStageWeights] = {
+        "exact_small": BacktestJobStageWeights(stage_a=25, stage_b=70, finalizing=5),
+        "exact_parallel": BacktestJobStageWeights(stage_a=35, stage_b=60, finalizing=5),
+        "hybrid_conservative": BacktestJobStageWeights(
+            stage_a=50,
+            stage_b=45,
+            finalizing=5,
+        ),
+        "hybrid_family": BacktestJobStageWeights(stage_a=60, stage_b=35, finalizing=5),
+    }
+    try:
+        return weights_by_mode[execution_profile_mode]
+    except KeyError as error:  # pragma: no cover - guarded by validated literal type
+        raise ValueError(
+            f"Unsupported execution profile mode for progress weights: "
+            f"{execution_profile_mode!r}"
+        ) from error
 
 
 class BuildBacktestRunVariantReportUseCase:

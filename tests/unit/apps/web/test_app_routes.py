@@ -282,6 +282,9 @@ def test_backtests_page_renders_required_backtest_ui_hooks() -> None:
     assert "auto_preflight_enabled" in response.text
     assert "202 Accepted" in response.text
     assert "background_auto" in response.text
+    assert "execution_profile_mode" in response.text
+    assert "eta_seconds" in response.text
+    assert "0..100%" in response.text
 
 
 def test_backtest_variant_detail_page_renders_required_runs_detail_hooks() -> None:
@@ -411,6 +414,9 @@ def test_backtest_run_summary_page_renders_required_runs_summary_literals() -> N
     assert "rank ASC, variant_key ASC" in response.text
     assert "summary-only" in response.text
     assert "already-loaded rows without triggering server recompute" in response.text
+    assert "progress_percent" in response.text
+    assert "eta_seconds" in response.text
+    assert "execution_profile_mode" in response.text
 
 
 def test_backtest_jobs_list_page_renders_required_jobs_ui_hooks() -> None:

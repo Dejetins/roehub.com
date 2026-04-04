@@ -15,6 +15,8 @@ from .backtest_runs_api_v1 import (
     LaunchBacktestRunWithAutoFallbackUseCase,
 )
 from .backtest_runs_history_api_v1 import (
+    BacktestRunProgressSnapshot,
+    BacktestRunProgressSnapshotBuilder,
     BacktestRunTopReadResult,
     BuildBacktestRunVariantReportUseCase,
     CancelBacktestRunUseCase,
@@ -54,6 +56,8 @@ from .run_backtest_job_runner_v1 import (
 __all__ = [
     "BacktestRunsApiUseCase",
     "BacktestRunPreflightUseCase",
+    "BacktestRunProgressSnapshot",
+    "BacktestRunProgressSnapshotBuilder",
     "BacktestBackgroundJobCreateUseCase",
     "BacktestRunTopReadResult",
     "BuildBacktestRunVariantReportUseCase",

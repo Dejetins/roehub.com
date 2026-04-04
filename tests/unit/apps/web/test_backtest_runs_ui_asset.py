@@ -47,7 +47,10 @@ def test_backtest_runs_ui_asset_uses_public_runs_history_contract() -> None:
     assert "renderPathTemplate" in source
     assert "run_id" in source
     assert "execution_mode" in source
+    assert "execution_profile_mode" in source
     assert "requested_top_n" in source
+    assert "progress_percent" in source
+    assert "eta_seconds" in source
 
 
 def test_backtest_runs_ui_asset_reads_runtime_defaults_sortable_columns() -> None:
@@ -71,6 +74,8 @@ def test_backtest_runs_ui_asset_reads_runtime_defaults_sortable_columns() -> Non
     assert "sortable_columns" in source
     assert "buildSortableColumnsFromRuntime" in source
     assert "server_order" in source
+    assert "formatEtaSeconds" in source
+    assert "readProgressPercent" in source
 
 
 def test_backtest_runs_ui_asset_adds_summary_actions_for_detail_and_strategy_prefill() -> None:

@@ -1985,7 +1985,7 @@ function initBacktestPage(pageRoot) {
     const variants = Array.isArray(response.variants) ? response.variants : [];
     if (variants.length === 0) {
       const emptyMessage = String(response.execution_mode || "").trim() === "background_auto"
-        ? "No inline variants yet. background_auto launch is queued."
+        ? "No inline variants yet. background_auto launch is queued. Open the persisted run page for progress_percent, eta_seconds, and stage updates."
         : "No variants returned.";
       variantsBody.innerHTML = `<tr><td colspan="6">${escapeHtml(emptyMessage)}</td></tr>`;
     } else {
@@ -2245,6 +2245,7 @@ function initBacktestPage(pageRoot) {
           "Server auto-preflight queued this launch in background_auto.",
           `run_id=${runId || "-"}.`,
           `state=${stateValue || "queued"}.`,
+          "Open the persisted run page for stage, progress_percent, eta_seconds, and execution_profile_mode.",
         ].join(" "),
         linkHref: primaryRunLink,
         linkLabel: primaryRunLabel,
@@ -2259,6 +2260,7 @@ function initBacktestPage(pageRoot) {
           `execution_mode=sync_inline.`,
           `run_id=${runId || "-"}.`,
           `state=${stateValue || "-"}.`,
+          "Mid-request sync progress is not streamed before the response returns; use the persisted run page for post-response progress and ETA.",
         ].join(" "),
         linkHref: primaryRunLink,
         linkLabel: primaryRunLabel,

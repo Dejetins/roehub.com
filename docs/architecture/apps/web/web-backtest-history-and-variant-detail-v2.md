@@ -25,6 +25,18 @@ lazy detail page для одного persisted variant.
   - `/backtests/runs/{run_id}` stays summary-only and never depends on persisted
     `report_table_md` or `trades_json`;
   - one-variant detail lives only on `/backtests/runs/{run_id}/variants/{variant_key}`.
+- A2 additive progress note:
+  - history and summary pages continue polling `/api/backtests/runs*`, but now render a real
+    `0..100%` progress bar from additive status fields instead of inferring percent from raw
+    counters only;
+  - active run summary page shows:
+    - current `stage`
+    - `progress_percent`
+    - `eta_seconds` when non-null
+    - `execution_profile_mode`;
+  - launch page still does not show true sync-inline in-flight progress before response return,
+    because this EPIC explicitly keeps request/response transport and does not introduce
+    SSE/WebSocket.
 
 ## Цель
 
@@ -56,16 +68,22 @@ lazy detail page для одного persisted variant.
   - `run_id`
   - `state`
   - `execution_mode`
+  - `execution_profile_mode`
   - `market_id`, `symbol`, `timeframe`
   - `requested_top_n`
   - timestamps
-  - progress counters
+  - progress counters + additive `progress_percent/eta_seconds`
 - Не показывает и не кэширует internal hashes (`request_hash`, `engine_params_hash`, etc.).
 
 ### 3) Run details page
 
 - Загружает status snapshot через `GET /api/backtests/runs/{run_id}`.
 - Загружает summary rows через `GET /api/backtests/runs/{run_id}/top`.
+- Показывает additive progress UX:
+  - weighted `progress_percent`
+  - `eta_seconds`, when available
+  - `execution_profile_mode`
+  - raw `processed_units/total_units` as supporting counters
 - Показывает действия per row:
   - `Open detail` -> `/backtests/runs/{run_id}/variants/{variant_key}`
   - `Save as Strategy` -> existing strategy builder prefill flow
@@ -162,10 +180,12 @@ python -m tools.docs.generate_docs_index --check
 Manual smoke:
 
 1. Открыть history page и перейти в persisted run details.
-2. Убедиться, что summary table грузится через `/api/backtests/runs/{run_id}/top`.
-3. Нажать `Open detail` у строки top table.
-4. Проверить, что detail page вызывает `/api/backtests/runs/{run_id}/variant-report` и не шлёт
+2. Убедиться, что active run summary page показывает `stage`, `progress_percent`,
+   `execution_profile_mode` и `eta_seconds` (если estimate уже есть).
+3. Убедиться, что summary table грузится через `/api/backtests/runs/{run_id}/top`.
+4. Нажать `Open detail` у строки top table.
+5. Проверить, что detail page вызывает `/api/backtests/runs/{run_id}/variant-report` и не шлёт
    full run envelope.
-5. Проверить, что `include_trades=true` возвращает `trades`, а `false` — нет.
-6. Нажать `Save as Strategy` на summary и detail page и проверить редирект на
+6. Проверить, что `include_trades=true` возвращает `trades`, а `false` — нет.
+7. Нажать `Save as Strategy` на summary и detail page и проверить редирект на
    `/strategies/new?prefill=...`.

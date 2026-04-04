@@ -21,6 +21,7 @@ from trading.contexts.backtest.application.ports import (
 )
 from trading.contexts.backtest.application.services import ArtifactPinnedIdentityV2
 from trading.contexts.backtest.application.use_cases import (
+    BacktestRunProgressSnapshotBuilder,
     BuildBacktestRunVariantReportUseCase,
     CancelBacktestRunUseCase,
     GetBacktestRunStatusUseCase,
@@ -694,6 +695,107 @@ def test_get_top_use_case_returns_persisted_rows_in_repository_order() -> None:
     assert result.job == owner_run
     assert result.rows == (first_row, second_row)
     assert results_repository.last_limit == 2
+
+
+def test_run_progress_snapshot_builder_uses_request_profile_override_for_weights() -> None:
+    """
+    Verify additive progress builder honors persisted `execution_profile_mode` override.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_history_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Persisted runs may later carry explicit profile literals in `request_json` without
+        changing the public route shape or storage schema.
+    Raises:
+        AssertionError: If profile resolution, weighted progress, or ETA projection drifts.
+    Side Effects:
+        None.
+    """
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000963"),
+        user_id=owner_user_id,
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 55, tzinfo=timezone.utc),
+        request_json={
+            "mode": "template",
+            "top_k": 25,
+            "execution_profile_mode": "exact_parallel",
+        },
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+    running = queued.claim(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        locked_by="worker-test-1",
+        lease_expires_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+    ).update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=10,
+        total_units=20,
+    )
+
+    progress = BacktestRunProgressSnapshotBuilder(
+        now_provider=lambda: datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc)
+    ).build(run=running)
+
+    assert progress.execution_profile_mode == "exact_parallel"
+    assert progress.progress_percent == 65
+    assert progress.eta_seconds == 33
+
+
+def test_run_progress_snapshot_builder_falls_back_to_catalog_default_mode() -> None:
+    """
+    Verify additive progress builder falls back to the configured default profile when missing.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_history_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        A2 does not require persisted profile selection on every historical row.
+    Raises:
+        AssertionError: If default-profile fallback drifts from the execution-profile catalog.
+    Side Effects:
+        None.
+    """
+    owner_run = _queued_run(
+        run_id=UUID("00000000-0000-0000-0000-000000000964"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+    )
+
+    progress = BacktestRunProgressSnapshotBuilder().build(run=owner_run)
+
+    assert progress.execution_profile_mode == "exact_small"
+    assert progress.progress_percent == 0
+    assert progress.eta_seconds is None
 
 
 def test_cancel_use_case_returns_updated_owner_run_snapshot() -> None:

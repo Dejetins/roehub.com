@@ -9,6 +9,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobErrorPayload,
+    BacktestJobStageWeights,
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import (
@@ -558,6 +559,94 @@ def test_backtest_job_update_progress_rejects_backward_stage_transition() -> Non
             processed_units=11,
             total_units=100,
         )
+
+
+def test_backtest_job_progress_percent_uses_stage_weights_and_marks_success_as_complete() -> None:
+    """
+    Verify weighted progress percent follows stage weights and succeeded runs clamp to `100`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/domain/entities/test_backtest_job_entities.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public persisted-run progress is projected onto a deterministic weighted `0..100%` scale.
+    Raises:
+        AssertionError: If stage-weight projection or succeeded terminal override drifts.
+    Side Effects:
+        None.
+    """
+    weights = BacktestJobStageWeights(stage_a=25, stage_b=70, finalizing=5)
+    running = _build_queued_job().claim(
+        changed_at=datetime(2026, 2, 22, 18, 0, 1, tzinfo=timezone.utc),
+        locked_by="worker-a-123",
+        lease_expires_at=datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc),
+    )
+    stage_b = running.update_progress(
+        changed_at=datetime(2026, 2, 22, 18, 0, 30, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=10,
+        total_units=20,
+    )
+    succeeded = stage_b.finish(
+        next_state="succeeded",
+        changed_at=datetime(2026, 2, 22, 18, 0, 40, tzinfo=timezone.utc),
+    )
+
+    assert stage_b.progress_percent(stage_weights=weights) == 60
+    assert succeeded.progress_percent(stage_weights=weights) == 100
+
+
+def test_backtest_job_eta_seconds_requires_signal_and_estimates_from_weighted_progress() -> None:
+    """
+    Verify ETA returns `None` without signal and uses weighted progress once it is defensible.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/domain/entities/test_backtest_job_entities.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        ETA uses only the current run timeline and weighted progress, without benchmark fallback.
+    Raises:
+        AssertionError: If nullability or remaining-seconds projection drifts.
+    Side Effects:
+        None.
+    """
+    weights = BacktestJobStageWeights(stage_a=25, stage_b=70, finalizing=5)
+    running = _build_queued_job().claim(
+        changed_at=datetime(2026, 2, 22, 18, 0, 1, tzinfo=timezone.utc),
+        locked_by="worker-a-123",
+        lease_expires_at=datetime(2026, 2, 22, 18, 1, tzinfo=timezone.utc),
+    )
+    progressed = running.update_progress(
+        changed_at=datetime(2026, 2, 22, 18, 1, 1, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=10,
+        total_units=20,
+    )
+
+    assert running.eta_seconds(
+        stage_weights=weights,
+        now=datetime(2026, 2, 22, 18, 0, 30, tzinfo=timezone.utc),
+    ) is None
+    assert progressed.eta_seconds(
+        stage_weights=weights,
+        now=datetime(2026, 2, 22, 18, 1, 1, tzinfo=timezone.utc),
+    ) == 40
 
 
 

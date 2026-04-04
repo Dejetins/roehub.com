@@ -31,6 +31,7 @@ from apps.api.dto import (
 from trading.contexts.backtest.application.ports import CurrentUser
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.application.use_cases import (
+    BacktestRunProgressSnapshotBuilder,
     BuildBacktestRunVariantReportUseCase,
     CancelBacktestRunUseCase,
     GetBacktestRunStatusUseCase,
@@ -54,6 +55,7 @@ def build_backtest_runs_router(
     variant_report_use_case: BuildBacktestRunVariantReportUseCase,
     current_user_dependency: CurrentUserDependency,
     sync_deadline_seconds: float,
+    run_progress_builder: BacktestRunProgressSnapshotBuilder | None = None,
 ) -> APIRouter:
     """
     Build public runs router exposing history/status/top/cancel endpoints.
@@ -74,6 +76,7 @@ def build_backtest_runs_router(
         variant_report_use_case: Run-scoped lazy detail use-case implementation.
         current_user_dependency: Identity dependency resolving authenticated principal.
         sync_deadline_seconds: Hard wall-time deadline for cooperative detail cancellation.
+        run_progress_builder: Optional additive progress/ETA projector for public runs payloads.
     Returns:
         APIRouter: Configured public runs router.
     Assumptions:
@@ -99,6 +102,9 @@ def build_backtest_runs_router(
         raise ValueError("build_backtest_runs_router requires sync_deadline_seconds > 0")
 
     router = APIRouter(tags=["backtest"])
+    resolved_run_progress_builder = (
+        run_progress_builder or BacktestRunProgressSnapshotBuilder()
+    )
 
     @router.get("/backtests/runs/{run_id}", response_model=BacktestRunStatusResponse)
     def get_backtest_run_status(
@@ -133,7 +139,10 @@ def build_backtest_runs_router(
                 run_id=run_id,
                 current_user=CurrentUser(user_id=principal.user_id),
             )
-            return build_backtest_run_status_response(run=run)
+            return build_backtest_run_status_response(
+                run=run,
+                progress=resolved_run_progress_builder.build(run=run),
+            )
         except RoehubError:
             raise
         except Exception as error:  # noqa: BLE001
@@ -222,9 +231,14 @@ def build_backtest_runs_router(
                 limit=limit,
                 cursor=cursor_value,
             )
+            progress_by_run_id = {
+                item.job_id: resolved_run_progress_builder.build(run=item)
+                for item in page.items
+            }
             return build_backtest_runs_list_response(
                 items=page.items,
                 next_cursor=page.next_cursor,
+                progress_by_run_id=progress_by_run_id,
             )
         except RoehubError:
             raise
@@ -264,7 +278,10 @@ def build_backtest_runs_router(
                 run_id=run_id,
                 current_user=CurrentUser(user_id=principal.user_id),
             )
-            return build_backtest_run_status_response(run=run)
+            return build_backtest_run_status_response(
+                run=run,
+                progress=resolved_run_progress_builder.build(run=run),
+            )
         except RoehubError:
             raise
         except Exception as error:  # noqa: BLE001

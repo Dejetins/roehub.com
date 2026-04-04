@@ -90,6 +90,14 @@ deterministic `422` ошибками.
   - `POST /backtests` launch branches remain unchanged in A1:
     no new profile-based routing, no change to `sync_inline` vs `background_auto`, and no
     hybrid activation yet.
+- A2 additive persisted-progress note:
+  - persisted `/backtests/runs*` status/history payloads now add
+    `progress_percent`, `eta_seconds`, and `execution_profile_mode` for browser rendering;
+  - this does not change `POST /backtests` transport: launch remains request/response only,
+    without SSE/WebSocket/streaming progress;
+  - sync-inline launch page therefore still cannot show true in-flight progress before the HTTP
+    response returns; real progress/ETA appears only after opening the persisted run page by
+    `run_id`.
 
 ## Цель
 

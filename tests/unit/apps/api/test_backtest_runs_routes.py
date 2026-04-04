@@ -11,6 +11,7 @@ from apps.api.routes import build_backtest_runs_router
 from trading.contexts.backtest.application.dto import BacktestMetricRowV1, BacktestReportV1
 from trading.contexts.backtest.application.ports import BacktestJobListPage
 from trading.contexts.backtest.application.use_cases import (
+    BacktestRunProgressSnapshotBuilder,
     BacktestRunTopReadResult,
     backtest_run_forbidden,
     backtest_run_not_found,
@@ -258,15 +259,24 @@ def _build_client(
     list_use_case: _ListUseCaseFake | None = None,
     cancel_use_case: _CancelUseCaseFake | None = None,
     variant_report_use_case: _VariantReportUseCaseFake | None = None,
+    run_progress_builder: BacktestRunProgressSnapshotBuilder | None = None,
 ) -> tuple[TestClient, _ListUseCaseFake, _VariantReportUseCaseFake]:
     """
     Build minimal FastAPI TestClient with public runs router and shared error handlers.
 
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/apps/api/test_backtest_runs_routes.py
+      - apps/api/routes/backtest_runs.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
     Args:
         status_use_case: Optional status use-case fake.
         top_use_case: Optional top use-case fake.
         list_use_case: Optional list use-case fake.
         cancel_use_case: Optional cancel use-case fake.
+        run_progress_builder: Optional deterministic progress/ETA builder for payload tests.
     Returns:
         tuple[TestClient, _ListUseCaseFake, _VariantReportUseCaseFake]:
             Configured client and resolved fake dependencies.
@@ -284,6 +294,9 @@ def _build_client(
     resolved_variant_report_use_case = variant_report_use_case or _VariantReportUseCaseFake(
         report=_variant_report()
     )
+    resolved_progress_builder = run_progress_builder or BacktestRunProgressSnapshotBuilder(
+        now_provider=lambda: datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc)
+    )
 
     app = FastAPI()
     register_api_error_handlers(app=app)
@@ -297,6 +310,7 @@ def _build_client(
             variant_report_use_case=resolved_variant_report_use_case,  # type: ignore[arg-type]
             current_user_dependency=_HeaderCurrentUserDependency(),
             sync_deadline_seconds=55.0,
+            run_progress_builder=resolved_progress_builder,
         )
     )
     return TestClient(app), resolved_list_use_case, resolved_variant_report_use_case
@@ -344,9 +358,12 @@ def test_get_backtest_runs_returns_history_page_with_public_run_metadata() -> No
     body = response.json()
     assert body["items"][0]["run_id"] == "00000000-0000-0000-0000-000000000932"
     assert body["items"][0]["execution_mode"] == "sync_inline"
+    assert body["items"][0]["execution_profile_mode"] == "exact_small"
     assert body["items"][0]["market_id"] == 1
     assert body["items"][0]["symbol"] == "BTCUSDT"
     assert body["items"][0]["requested_top_n"] == 25
+    assert body["items"][0]["progress_percent"] == 0
+    assert body["items"][0]["eta_seconds"] is None
     assert body["next_cursor"] == encode_backtest_runs_cursor(cursor=cursor)
     assert resolved_list_fake.last_state == "running"
     assert resolved_list_fake.last_cursor == cursor
@@ -380,6 +397,9 @@ def test_get_backtest_run_status_returns_failed_payload_with_public_fields() -> 
     assert body["run_id"] == "00000000-0000-0000-0000-000000000933"
     assert body["state"] == "failed"
     assert body["execution_mode"] == "sync_inline"
+    assert body["execution_profile_mode"] == "exact_small"
+    assert body["progress_percent"] == 0
+    assert body["eta_seconds"] is None
     assert body["artifact_slot"] == "slot_b"
     assert body["artifact_slot_generation"] == 11
     assert body["artifact_asof_date"] == "2026-03-29"
@@ -434,6 +454,92 @@ def test_get_backtest_run_top_returns_summary_only_rows_with_persisted_metrics()
             "best_sl_pct": 2.0,
         }
     ]
+
+
+def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_fields() -> None:
+    """
+    Verify running status payload exposes additive weighted progress, ETA, and profile fields.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/apps/api/test_backtest_runs_routes.py
+      - apps/api/routes/backtest_runs.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public runs status remains backward-compatible while adding UI-facing progress metadata.
+    Raises:
+        AssertionError: If additive fields or their deterministic values drift.
+    Side Effects:
+        None.
+    """
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000938"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 30, tzinfo=timezone.utc),
+        request_json={
+            "time_range": {
+                "start": "2026-03-28T00:00:00+00:00",
+                "end": "2026-03-28T01:00:00+00:00",
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1h",
+            },
+            "top_k": 25,
+            "execution_profile_mode": "exact_parallel",
+        },
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-29",
+        ),
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+    running = queued.claim(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        locked_by="worker-a-1",
+        lease_expires_at=datetime(2026, 3, 29, 12, 5, tzinfo=timezone.utc),
+    ).update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=10,
+        total_units=20,
+    )
+    client, _, _ = _build_client(status_use_case=_StatusUseCaseFake(run=running))
+
+    response = client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000938",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["state"] == "running"
+    assert body["stage"] == "stage_b"
+    assert body["processed_units"] == 10
+    assert body["total_units"] == 20
+    assert body["execution_profile_mode"] == "exact_parallel"
+    assert body["progress_percent"] == 65
+    assert body["eta_seconds"] == 33
 
 
 def test_get_backtest_run_top_returns_persisted_rows_in_deterministic_order() -> None:
@@ -580,9 +686,11 @@ def test_get_backtest_runs_returns_background_modes_and_cancel_marker() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["items"][0]["execution_mode"] == "background_manual_legacy"
+    assert body["items"][0]["execution_profile_mode"] == "exact_small"
     assert body["items"][0]["state"] == "running"
     assert body["items"][0]["cancel_requested_at"] == "2026-03-29T12:00:30Z"
     assert body["items"][1]["execution_mode"] == "background_auto"
+    assert body["items"][1]["execution_profile_mode"] == "exact_small"
     assert body["items"][1]["state"] == "queued"
 
 

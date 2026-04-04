@@ -42,6 +42,7 @@ from trading.contexts.backtest.application.services import (
     YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.backtest.application.use_cases import (
+    BacktestRunProgressSnapshotBuilder,
     BuildBacktestRunVariantReportUseCase,
     CancelBacktestJobUseCase,
     CancelBacktestRunUseCase,
@@ -309,6 +310,9 @@ def build_backtest_router(
         ),
         current_user_dependency=current_user_dependency,
         sync_deadline_seconds=runtime_config.sync.sync_deadline_seconds,
+        run_progress_builder=BacktestRunProgressSnapshotBuilder(
+            execution_profiles=runtime_config.execution_profiles,
+        ),
     )
     backtests_router.include_router(runs_router)
     if not runtime_config.jobs.enabled:
