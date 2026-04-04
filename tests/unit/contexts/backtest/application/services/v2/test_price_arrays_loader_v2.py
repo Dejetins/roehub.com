@@ -74,6 +74,9 @@ def test_price_arrays_loader_v2_loads_prices_mappings_and_hit_times_with_mmap(
     one_minute_prices = loader.load_price_arrays(context=context, timeframe="1m")
     mapping_arrays = loader.load_mapping_arrays(context=context, timeframe="15m")
     hit_times_arrays = loader.load_hit_times_arrays(context=context)
+    repeated_prices = loader.load_price_arrays(context=context, timeframe="1m")
+    repeated_mappings = loader.load_mapping_arrays(context=context, timeframe="15m")
+    repeated_hit_times = loader.load_hit_times_arrays(context=context)
 
     assert isinstance(one_minute_prices.open_time, np.memmap)
     assert isinstance(one_minute_prices.ohlcv, np.memmap)
@@ -87,6 +90,9 @@ def test_price_arrays_loader_v2_loads_prices_mappings_and_hit_times_with_mmap(
     assert tuple(int(value) for value in mapping_arrays.bar_close_1m_idx) == (1, 3)
     assert hit_times_arrays.manifest.sentinel_index == 4
     assert isinstance(hit_times_arrays.long_tp, np.memmap)
+    assert repeated_prices is one_minute_prices
+    assert repeated_mappings is mapping_arrays
+    assert repeated_hit_times is hit_times_arrays
 
 
 def test_price_arrays_loader_v2_rejects_price_manifest_path_drift(

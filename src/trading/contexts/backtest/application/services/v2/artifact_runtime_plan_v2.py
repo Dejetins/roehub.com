@@ -291,16 +291,27 @@ class BacktestArtifactRuntimePlanV2:
         Raises:
             ValueError: If mixed-radix coordinates drift outside valid bounds.
         Side Effects:
-            None.
+            Reuses indicator-selection and `signal_params` payloads across repeated exact-path
+            groups that share the same `compute_index` or `signal_index`.
         """
         signal_variants_total = _product_v2(
             values=tuple(len(axis.values) for axis in self.signal_axes)
         )
+        signal_params_cache = tuple(
+            _signal_params_from_variant_index_v2(
+                signal_axes=self.signal_axes,
+                variant_index=signal_index,
+            )
+            for signal_index in range(signal_variants_total)
+        )
         indicator_radices = tuple(plan.variants for plan in self.indicator_plans)
-        for stage_a_index in range(self.stage_a_variants_total):
-            compute_index = stage_a_index // signal_variants_total
-            signal_index = stage_a_index % signal_variants_total
-
+        compute_variants_total = self.stage_a_variants_total // signal_variants_total
+        if compute_variants_total * signal_variants_total != self.stage_a_variants_total:
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.stage_a_variants_total must stay aligned with "
+                "indicator and signal mixed-radix products"
+            )
+        for compute_index in range(compute_variants_total):
             indicator_variant_indexes = _decode_mixed_radix_v2(
                 flat_index=compute_index,
                 radices=indicator_radices,
@@ -318,25 +329,24 @@ class BacktestArtifactRuntimePlanV2:
                 timeframe=self.timeframe_code,
                 indicators=indicator_selections,
             )
-            signal_params = _signal_params_from_variant_index_v2(
-                signal_axes=self.signal_axes,
-                variant_index=signal_index,
-            )
-            base_variant_key = build_backtest_variant_key_v1(
-                indicator_variant_key=indicator_variant_key,
-                direction_mode=self.direction_mode,
-                sizing_mode=self.sizing_mode,
-                signals=signal_params,
-                risk_params=_STAGE_A_DISABLED_RISK_PARAMS_V2,
-                execution_params=self.execution_params,
-            )
-            yield BacktestStageABaseVariantV2(
-                stage_a_index=stage_a_index,
-                indicator_selections=indicator_selections,
-                signal_params=signal_params,
-                indicator_variant_key=indicator_variant_key,
-                base_variant_key=base_variant_key,
-            )
+            stage_a_index_base = compute_index * signal_variants_total
+            for signal_index, signal_params in enumerate(signal_params_cache):
+                stage_a_index = stage_a_index_base + signal_index
+                base_variant_key = build_backtest_variant_key_v1(
+                    indicator_variant_key=indicator_variant_key,
+                    direction_mode=self.direction_mode,
+                    sizing_mode=self.sizing_mode,
+                    signals=signal_params,
+                    risk_params=_STAGE_A_DISABLED_RISK_PARAMS_V2,
+                    execution_params=self.execution_params,
+                )
+                yield BacktestStageABaseVariantV2(
+                    stage_a_index=stage_a_index,
+                    indicator_selections=indicator_selections,
+                    signal_params=signal_params,
+                    indicator_variant_key=indicator_variant_key,
+                    base_variant_key=base_variant_key,
+                )
 
 
 class BacktestArtifactRuntimePlannerV2:

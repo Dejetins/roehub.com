@@ -375,7 +375,7 @@ class BacktestStageAShortlistBuilderV2:
                 cancel_checker(STAGE_A_LITERAL_V2)
             self._score_chunk_into_heap(
                 row_plans=row_plans,
-                chunk_variants=tuple(chunk_variants),
+                chunk_variants=chunk_variants,
                 grid_context=grid_context,
                 artifact_context=artifact_context,
                 signal_target_slice=signal_target_slice,
@@ -494,7 +494,7 @@ class BacktestStageAShortlistBuilderV2:
         self,
         *,
         row_plans: Sequence[PreparedIndicatorRowPlanV2],
-        chunk_variants: tuple[BacktestStageABaseVariantV2, ...],
+        chunk_variants: Sequence[BacktestStageABaseVariantV2],
         grid_context: BacktestArtifactRuntimePlanV2,
         artifact_context: ArtifactSlotPinnedRuntimeContextV2,
         signal_target_slice: slice,
@@ -541,8 +541,8 @@ class BacktestStageAShortlistBuilderV2:
         """
         selected_signal_rows: dict[str, np.ndarray] = {}
         for plan_position, row_plan in enumerate(row_plans):
-            indicator_row_indexes = np.asarray(
-                [
+            indicator_row_indexes = np.fromiter(
+                (
                     row_plan.row_index_for_selection(
                         selection=_indicator_selection_for_plan_v2(
                             base_variant=base_variant,
@@ -551,22 +551,17 @@ class BacktestStageAShortlistBuilderV2:
                         )
                     )
                     for base_variant in chunk_variants
-                ],
+                ),
                 dtype=np.int64,
+                count=len(chunk_variants),
             )
-            unique_row_indexes, inverse_indexes = np.unique(
-                indicator_row_indexes,
-                return_inverse=True,
-            )
-            loaded_rows = self.signal_matrix_loader.load_signal_rows(
-                context=artifact_context,
+            selected_signal_rows[row_plan.indicator_id] = _load_chunk_signal_rows_v2(
+                signal_matrix_loader=self.signal_matrix_loader,
+                artifact_context=artifact_context,
                 timeframe=grid_context.timeframe_code,
                 indicator_id=row_plan.indicator_id,
-                row_selection=tuple(int(index) for index in unique_row_indexes),
-            )
-            selected_signal_rows[row_plan.indicator_id] = np.asarray(
-                loaded_rows[inverse_indexes, signal_target_slice],
-                dtype=np.int8,
+                indicator_row_indexes=indicator_row_indexes,
+                signal_target_slice=signal_target_slice,
             )
 
         final_signal = aggregate_final_signal_rows_v2(selected_signal_rows=selected_signal_rows)
@@ -803,6 +798,70 @@ def rebase_bar_close_mapping_v2(
             "bar_close_1m_idx values must stay inside the local execution window after rebasing"
         )
     return rebased
+
+
+def _load_chunk_signal_rows_v2(
+    *,
+    signal_matrix_loader: BacktestSignalMatrixLoaderV2,
+    artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+    timeframe: str,
+    indicator_id: str,
+    indicator_row_indexes: np.ndarray,
+    signal_target_slice: slice,
+) -> np.ndarray:
+    """
+    Load one chunk of selected signal rows with exact-preserving locality-oriented fast paths.
+
+    Args:
+        signal_matrix_loader: Strict runtime signal loader.
+        artifact_context: Slot-pinned runtime context resolved once at startup.
+        timeframe: Canonical request timeframe literal.
+        indicator_id: Canonical indicator identifier.
+        indicator_row_indexes: Deterministic row indexes for the current Stage A chunk.
+        signal_target_slice: Local signal-timeline window selected for the run.
+    Returns:
+        np.ndarray: Chunk-aligned `int8` signal rows preserving the caller's deterministic order.
+    Assumptions:
+        When every variant in the chunk references the same artifact row, exact semantics allow
+        broadcasting one mmap-backed slice instead of reindexing repeated copies.
+    Raises:
+        ValueError: If the chunk is empty or the loader rejects the explicit row selection.
+    Side Effects:
+        Reads one deterministic signal-row subset from the pinned artifact store.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py
+    """
+    chunk_rows = int(indicator_row_indexes.shape[0])
+    if chunk_rows <= 0:
+        raise ValueError("Stage A signal chunk must contain at least one row index")
+    if bool(np.all(indicator_row_indexes == indicator_row_indexes[0])):
+        loaded_rows = signal_matrix_loader.load_signal_rows(
+            context=artifact_context,
+            timeframe=timeframe,
+            indicator_id=indicator_id,
+            row_selection=(int(indicator_row_indexes[0]),),
+        )
+        windowed_rows = np.asarray(loaded_rows[:, signal_target_slice], dtype=np.int8)
+        if chunk_rows == 1:
+            return windowed_rows
+        return np.broadcast_to(windowed_rows, (chunk_rows, windowed_rows.shape[1]))
+
+    unique_row_indexes, inverse_indexes = np.unique(
+        indicator_row_indexes,
+        return_inverse=True,
+    )
+    loaded_rows = signal_matrix_loader.load_signal_rows(
+        context=artifact_context,
+        timeframe=timeframe,
+        indicator_id=indicator_id,
+        row_selection=tuple(int(index) for index in unique_row_indexes),
+    )
+    windowed_rows = loaded_rows[:, signal_target_slice]
+    return np.asarray(windowed_rows[inverse_indexes, :], dtype=np.int8)
 
 
 def _indicator_selection_for_plan_v2(

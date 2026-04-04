@@ -21,6 +21,11 @@
   - `tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json`
   - exact baseline slices in A3 reuse the approved R0 scenarios and R5 Stage B golden manifest
     from this document instead of introducing a second exact reference set.
+- Milestone B / EPIC B1 exact-core acceleration reuses the same benchmark surface:
+  - `exact_baseline` remains the canonical exact evidence anchor;
+  - `small_grid_overhead` remains the lightweight small-run overhead check;
+  - neither slice changes active default profile selection or implies rollout of `exact_parallel`
+    launch policy by itself.
 
 ## Цель
 
@@ -48,6 +53,8 @@ R6-04 фиксирует полный runtime ranking contract и summary-only t
   `sharpe_trades`, `win_rate_pct`.
 - deterministic Stage B `1m hit-times` risk exits, fast TP/SL search и exact best-cell replay без
   runtime recompute hit-times.
+- exact-core orchestration cleanup may reduce loader/task/object overhead, but it must keep the
+  same finalists, ranking order, and `variant_key` semantics as the approved exact baseline.
 - summary-only runtime rows: ranking payload определяет inclusion в `top_n`, а report/trades тела
   не materialize'ятся в sync/jobs summary paths.
 

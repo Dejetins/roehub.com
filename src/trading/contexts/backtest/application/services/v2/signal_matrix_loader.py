@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -36,6 +36,10 @@ class MmapSignalMatrixLoaderV2(BacktestSignalMatrixLoaderV2):
     """
 
     artifact_loader: BacktestArtifactLoaderV2
+    _signal_matrix_cache: dict[
+        tuple[Path, int, str, str],
+        ArtifactSignalMatrixV2,
+    ] = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def load_signal_matrix(
         self,
@@ -52,7 +56,8 @@ class MmapSignalMatrixLoaderV2(BacktestSignalMatrixLoaderV2):
             timeframe: Requested signal timeframe.
             indicator_id: Requested indicator identifier.
         Returns:
-            ArtifactSignalMatrixV2: Memory-mapped signal matrix and strict manifest metadata.
+            ArtifactSignalMatrixV2: Cached-or-new memory-mapped signal matrix and strict manifest
+                metadata.
         Assumptions:
             Runtime must read signals only from root-manifest catalog entries and explicit paths
             under the already pinned slot.
@@ -60,7 +65,8 @@ class MmapSignalMatrixLoaderV2(BacktestSignalMatrixLoaderV2):
             FileNotFoundError: If signal manifest or `signals.i8.npy` is missing.
             ValueError: If manifest path/dtype/shape/axis/timeline metadata drifts from files.
         Side Effects:
-            Reads one strict signal manifest and memory-maps one `.npy` file from disk.
+            Reads one strict signal manifest and may memory-map one `.npy` file from disk on the
+            first access for this pinned matrix.
         Docs:
           - docs/architecture/backtest/backtest-artifact-store-v2.md
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
@@ -70,6 +76,14 @@ class MmapSignalMatrixLoaderV2(BacktestSignalMatrixLoaderV2):
         """
         validated_timeframe = validate_signal_timeframe_v2(timeframe)
         validated_indicator_id = validate_indicator_id_v2(indicator_id)
+        cache_key = _signal_matrix_cache_key_v2(
+            context=context,
+            timeframe=validated_timeframe,
+            indicator_id=validated_indicator_id,
+        )
+        cached = self._signal_matrix_cache.get(cache_key)
+        if cached is not None:
+            return cached
         catalog_entry = _signal_catalog_entry(
             context=context,
             timeframe=validated_timeframe,
@@ -118,12 +132,14 @@ class MmapSignalMatrixLoaderV2(BacktestSignalMatrixLoaderV2):
             expected_shape=(signal_manifest.rows_count, price_manifest.coverage.bar_count),
             location=f"signals/{validated_timeframe}/{validated_indicator_id}/signals.i8.npy",
         )
-        return ArtifactSignalMatrixV2(
+        loaded = ArtifactSignalMatrixV2(
             timeframe=validated_timeframe,
             indicator_id=validated_indicator_id,
             manifest=signal_manifest,
             matrix=matrix,
         )
+        self._signal_matrix_cache[cache_key] = loaded
+        return loaded
 
     def load_signal_rows(
         self,
@@ -144,13 +160,15 @@ class MmapSignalMatrixLoaderV2(BacktestSignalMatrixLoaderV2):
         Returns:
             np.ndarray: Selected signal rows preserving deterministic caller ordering.
         Assumptions:
-            Basic slices may return mmap-backed views, while explicit row tuples return stable
-            advanced-index selections without loading unrelated artifact families.
+            Basic slices and contiguous explicit row tuples may return mmap-backed views, while
+            non-contiguous explicit row tuples return stable advanced-index selections without
+            loading unrelated artifact families.
         Raises:
             FileNotFoundError: If the underlying signal matrix file is missing.
             ValueError: If the row selection or manifest/file contract is invalid.
         Side Effects:
-            Memory-maps one `.npy` file from disk and returns a slice or indexed selection.
+            May memory-map one `.npy` file from disk on first access and returns a slice or
+            indexed selection from the cached strict matrix.
         Docs:
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
           - docs/architecture/backtest/backtest-artifact-store-v2.md
@@ -391,4 +409,74 @@ def _normalize_row_selection(
             )
         normalized.append(index)
         previous_index = index
+    if len(normalized) == 0:
+        return tuple()
+    if _row_selection_is_contiguous_v2(indexes=normalized):
+        return slice(normalized[0], normalized[-1] + 1, 1)
     return tuple(normalized)
+
+
+def _signal_matrix_cache_key_v2(
+    *,
+    context: ArtifactSlotPinnedRuntimeContextV2,
+    timeframe: str,
+    indicator_id: str,
+) -> tuple[Path, int, str, str]:
+    """
+    Build a run-local cache key for one validated signal matrix inside a pinned slot.
+
+    Args:
+        context: Shared slot-pinned runtime context resolved at startup.
+        timeframe: Canonical signal timeframe literal.
+        indicator_id: Canonical indicator identifier.
+    Returns:
+        tuple[Path, int, str, str]: Hashable key unique to one pinned signal matrix.
+    Assumptions:
+        Published signal matrices stay immutable once the slot is pinned for one run.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+    """
+    return (
+        context.slot_root_path,
+        context.slot_generation,
+        context.artifact_manifest_hash,
+        f"{timeframe}/{indicator_id}",
+    )
+
+
+def _row_selection_is_contiguous_v2(*, indexes: list[int]) -> bool:
+    """
+    Check whether explicit row indexes form one contiguous increasing range.
+
+    Args:
+        indexes: Validated strictly increasing row indexes.
+    Returns:
+        bool: `True` when the selection can be losslessly represented as one `slice`.
+    Assumptions:
+        Converting contiguous tuples into slices lets runtime keep memmap views for exact-path
+        locality-sensitive reads.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+    previous_index = indexes[0]
+    for index in indexes[1:]:
+        if index != previous_index + 1:
+            return False
+        previous_index = index
+    return True

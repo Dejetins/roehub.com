@@ -4722,7 +4722,7 @@ class BacktestPriceArraysLoaderV2(Protocol):
         context: ArtifactSlotPinnedRuntimeContextV2,
         timeframe: str,
     ) -> ArtifactPriceArraysV2:
-        """Load one explicit `prices/<tf>` family via `np.load(..., mmap_mode='r')`."""
+        """Load or reuse one validated `prices/<tf>` mmap family for the pinned runtime slot."""
         ...
 
     def load_mapping_arrays(
@@ -4731,7 +4731,7 @@ class BacktestPriceArraysLoaderV2(Protocol):
         context: ArtifactSlotPinnedRuntimeContextV2,
         timeframe: str,
     ) -> ArtifactMappingArraysV2:
-        """Load one explicit `mappings/<tf>` family via `np.load(..., mmap_mode='r')`."""
+        """Load or reuse one validated `mappings/<tf>` mmap family for the pinned runtime slot."""
         ...
 
     def load_hit_times_arrays(
@@ -4739,7 +4739,7 @@ class BacktestPriceArraysLoaderV2(Protocol):
         *,
         context: ArtifactSlotPinnedRuntimeContextV2,
     ) -> ArtifactHitTimesArraysV2:
-        """Load strict `hit_times/1m` arrays via explicit manifest-driven paths."""
+        """Load or reuse strict `hit_times/1m` mmap arrays via explicit manifest-driven paths."""
         ...
 
 
@@ -4761,7 +4761,7 @@ class BacktestSignalMatrixLoaderV2(Protocol):
         timeframe: str,
         indicator_id: str,
     ) -> ArtifactSignalMatrixV2:
-        """Load one explicit signal matrix via `np.load(..., mmap_mode='r')`."""
+        """Load or reuse one validated signal matrix via `np.load(..., mmap_mode='r')`."""
         ...
 
     def load_signal_rows(
@@ -4772,7 +4772,7 @@ class BacktestSignalMatrixLoaderV2(Protocol):
         indicator_id: str,
         row_selection: slice | tuple[int, ...],
     ) -> np.ndarray:
-        """Load one deterministic subset of signal rows without runtime discovery."""
+        """Load one deterministic signal-row subset, reusing memmap views when possible."""
         ...
 
 

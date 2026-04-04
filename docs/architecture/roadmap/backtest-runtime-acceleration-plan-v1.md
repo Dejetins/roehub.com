@@ -208,6 +208,13 @@ POST /backtests
 - short-term throughput estimate;
 - historical benchmark fallback для ETA, если run только стартовал.
 
+Важно для следующих milestone:
+
+- stage weights не должны надолго остаться отдельной read-model таблицей вне
+  `ExecutionProfile`;
+- до включения benchmark-based ETA нужно свести progress/ETA semantics к одному source of truth,
+  чтобы profile weights не жили отдельно от profile contract/config.
+
 ### Какие файлы и документы трогаем
 
 Ожидаемые кодовые точки:
@@ -352,6 +359,72 @@ class ExecutionProfile:
 - новый doc `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`
 - новые tests/perf fixtures рядом с существующими benchmark fixtures
 - [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-v2-benchmarks.md)
+
+### Зафиксированные follow-up constraints после фактического Milestone A
+
+После реализации A1/A2/A3 нужно считать явно открытыми два follow-up пункта.
+
+#### A-Follow-up-1. Progress/ETA profile weights должны вернуться в единый profile contract
+
+Что фактически получилось сейчас:
+
+- typed `ExecutionProfile` уже есть;
+- но stage weights для `progress_percent` / `eta_seconds` живут отдельной таблицей в read path.
+
+Почему это важно:
+
+- сейчас появились два semantic source of truth для profile behavior:
+  - сам `ExecutionProfile`;
+  - отдельная mapping-таблица progress weights;
+- пока это допустимо для Milestone A, но в `Milestone B` и особенно в `Milestone F` это начнёт
+  мешать adaptive selector, benchmark-based ETA и profile rollout.
+
+Что обязательно учесть дальше:
+
+- в одном из следующих exact/foundation EPIC нужно перенести stage weights в profile contract
+  или в другой единый config-driven source of truth;
+- benchmark/history ETA fallback нельзя строить на постоянной основе поверх второй независимой
+  таблицы весов;
+- любые новые profile literals или adaptive policy не должны требовать отдельного ручного
+  обновления progress mapping вне profile layer.
+
+Куда это относится:
+
+- [backtest_runs_history_api_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py)
+- [execution_profile_v2.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py)
+- [backtest_runtime_config.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py)
+
+#### A-Follow-up-2. Benchmark `exact_baseline` и active runtime exact default пока не совпадают
+
+Что фактически получилось сейчас:
+
+- benchmark corpus использует `exact_parallel` как `exact_baseline` evidence anchor;
+- active runtime-enabled default profile пока остаётся `exact_small`.
+
+Почему это важно:
+
+- это не bug, пока corpus используется как evidence surface;
+- но в `Milestone B/F` это может стать источником путаницы между:
+  - benchmark baseline;
+  - current active default exact mode;
+  - future adaptive selector decisions.
+
+Что обязательно учесть дальше:
+
+- до rollout benchmark-based ETA, adaptive selector и automatic profile promotion нужно явно
+  решить одно из двух:
+  - либо `exact_parallel` остаётся benchmark baseline независимо от active default,
+    и это продолжает документироваться как intentional distinction;
+  - либо corpus baseline и runtime default realign-ятся вместе одним изменением;
+- нельзя молча смешивать benchmark evidence anchor и текущий active exact mode в одном и том же
+  decision path.
+
+Куда это относится:
+
+- [backtest-runtime-acceleration-benchmarks-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md)
+- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-v2-benchmarks.md)
+- [backtest_runtime_acceleration_benchmark_corpus_v1.json](/Users/daniildegtyarev/Projects/roehub.com/tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json)
+- [backtest.yaml](/Users/daniildegtyarev/Projects/roehub.com/configs/prod/backtest.yaml)
 
 ### Milestone B. Universal exact acceleration
 
@@ -673,6 +746,9 @@ class FamilyAccelerationPlugin(Protocol):
    - один exact scorer,
    - одна runtime orchestration surface,
    - plugins только proposal-layer.
+7. Progress/ETA weights и profile semantics не живут в двух независимых местах.
+8. Benchmark baseline и active exact default различаются только если это явно задокументировано и
+   осознанно используется в rollout logic.
 
 ## 10. Anti-patterns, которых надо избежать
 
@@ -683,6 +759,9 @@ class FamilyAccelerationPlugin(Protocol):
 - Не смешивать request-shape validation с безусловным reject heavy runs.
 - Не перегружать existing exact Stage A builder approximate-логикой; для hybrid path нужен
   отдельный shortlist builder.
+- Не держать profile semantics в двух разных таблицах, если обе влияют на rollout, ETA или
+  adaptive selector.
+- Не смешивать benchmark evidence anchor и active runtime default без явного решения в docs/config.
 
 ## 11. Простой итог
 

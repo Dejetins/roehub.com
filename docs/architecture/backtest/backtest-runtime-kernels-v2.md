@@ -102,6 +102,11 @@ artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kerne
   `BacktestStageAShortlistBuilderV2`, не переоткрывая artifact identity ad hoc;
 - subset row loading для `signals/<tf>/<indicator_id>/signals.i8.npy` используется по
   выбранным variant rows, а не через full matrix materialization;
+- runtime loaders могут переиспользовать уже валидированные mmap payloads для
+  `prices/<tf>`, `mappings/<tf>`, `hit_times/1m` и `signals/<tf>/<indicator_id>` внутри одного
+  pinned run вместо повторного `np.load(...)` на каждый internal call;
+- contiguous explicit signal row tuples могут быть internal-normalized до slice-view, если это
+  не меняет deterministic row ordering и subset semantics;
 - `chunked variant processing` обязано давать тот же shortlist result, что и non-chunked path.
 - `risk_exit_kernel_1m.py` резолвит one-trade exits по `entry_exec_idx`,
   `sig_exit_exec_idx`, `sentinel_index` и shipped `1m hit-times`;
@@ -110,11 +115,29 @@ artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kerne
 - `exact replay of best TP/SL cell` ограничен только выбранной winning cell;
 - `metrics_kernel.py` считает deterministic Stage B ranking/summary fields и строит
   details-compatible outcome только для retained exact replay;
+- exact Stage B runner может stream'ить task enumeration в canonical order и не обязан
+  materialize'ить весь intermediate task tuple заранее, если winner ordering и `variant_key`
+  semantics не меняются;
 - artifact-backed Stage B scorer после R10-01 является mandatory production runtime contract для
   sync launch, claimed background execution и run-scoped lazy detail при валидном
   `slot-pinned context`;
 - production orchestration больше не возвращается к legacy close-fill fallback и не строит live
   candle timelines через ClickHouse.
+
+## Milestone B / EPIC B1 exact-core acceleration note
+
+B1 не меняет финальную exact semantics и не включает process-parallel Stage B или request
+classification.
+
+Разрешённые exact-only internal optimizations для этого этапа:
+
+- reuse deterministic row/array plans across repeated `compute_index` / `signal_index` groups;
+- reuse already validated mmap payloads inside one pinned runtime instance;
+- сокращать transient Python allocations в Stage A / Stage B orchestration, если winner ordering,
+  `variant_key` semantics и финальные metrics остаются byte-stable по существующим fixtures;
+- использовать existing `exact_baseline` и `small_grid_overhead` benchmark vocabulary как
+  evidence surface, не меняя active runtime default и не conflating `exact_baseline` anchor with
+  rollout policy.
 
 Что остаётся вне scope после R10-01:
 

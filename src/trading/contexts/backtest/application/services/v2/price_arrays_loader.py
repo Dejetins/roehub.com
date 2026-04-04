@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -48,6 +48,18 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
     """
 
     artifact_loader: BacktestArtifactLoaderV2
+    _price_cache: dict[
+        tuple[Path, int, str, str],
+        ArtifactPriceArraysV2,
+    ] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _mapping_cache: dict[
+        tuple[Path, int, str, str],
+        ArtifactMappingArraysV2,
+    ] = field(default_factory=dict, init=False, repr=False, compare=False)
+    _hit_times_cache: dict[
+        tuple[Path, int, str, str],
+        ArtifactHitTimesArraysV2,
+    ] = field(default_factory=dict, init=False, repr=False, compare=False)
 
     def load_price_arrays(
         self,
@@ -62,7 +74,8 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             context: Shared slot-pinned context resolved at runtime start.
             timeframe: Requested artifact price timeframe.
         Returns:
-            ArtifactPriceArraysV2: Memory-mapped price arrays and strict manifest metadata.
+            ArtifactPriceArraysV2: Cached-or-new memory-mapped price arrays and strict manifest
+                metadata.
         Assumptions:
             Runtime must read price arrays only from root-manifest metadata and deterministic
             paths under the already pinned slot.
@@ -70,7 +83,8 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             FileNotFoundError: If one explicit `prices/<tf>` file is missing.
             ValueError: If manifest path/dtype/shape/axis/timeline metadata drifts from files.
         Side Effects:
-            Memory-maps three `.npy` files from the pinned slot.
+            May memory-map three `.npy` files from the pinned slot on first access and reuse the
+            validated payload afterwards.
         Docs:
           - docs/architecture/backtest/backtest-artifact-store-v2.md
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
@@ -79,6 +93,14 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
         validated_timeframe = validate_price_timeframe_v2(timeframe)
+        cache_key = _artifact_family_cache_key_v2(
+            context=context,
+            family_literal="prices",
+            member_literal=validated_timeframe,
+        )
+        cached = self._price_cache.get(cache_key)
+        if cached is not None:
+            return cached
         manifest = _price_manifest_for_timeframe(
             context=context,
             timeframe=validated_timeframe,
@@ -123,13 +145,15 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             close_time=close_time,
             ohlcv=ohlcv,
         )
-        return ArtifactPriceArraysV2(
+        loaded = ArtifactPriceArraysV2(
             timeframe=validated_timeframe,
             manifest=manifest,
             open_time=open_time,
             close_time=close_time,
             ohlcv=ohlcv,
         )
+        self._price_cache[cache_key] = loaded
+        return loaded
 
     def load_mapping_arrays(
         self,
@@ -144,7 +168,8 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             context: Shared slot-pinned context resolved at runtime start.
             timeframe: Requested artifact mapping timeframe.
         Returns:
-            ArtifactMappingArraysV2: Memory-mapped mapping arrays and strict manifest metadata.
+            ArtifactMappingArraysV2: Cached-or-new memory-mapped mapping arrays and strict
+                manifest metadata.
         Assumptions:
             Mapping arrays are rooted in already pinned slot metadata and must not be discovered
             by filesystem scanning.
@@ -152,7 +177,8 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             FileNotFoundError: If one explicit `mappings/<tf>` file is missing.
             ValueError: If manifest path/dtype/shape/axis/timeline metadata drifts from files.
         Side Effects:
-            Memory-maps two `.npy` files from the pinned slot.
+            May memory-map two `.npy` files from the pinned slot on first access and reuse the
+            validated payload afterwards.
         Docs:
           - docs/architecture/backtest/backtest-artifact-store-v2.md
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
@@ -161,6 +187,14 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
         """
         validated_timeframe = validate_mapping_timeframe_v2(timeframe)
+        cache_key = _artifact_family_cache_key_v2(
+            context=context,
+            family_literal="mappings",
+            member_literal=validated_timeframe,
+        )
+        cached = self._mapping_cache.get(cache_key)
+        if cached is not None:
+            return cached
         manifest = _mapping_manifest_for_timeframe(
             context=context,
             timeframe=validated_timeframe,
@@ -201,12 +235,14 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             bar_open_1m_idx=bar_open_1m_idx,
             bar_close_1m_idx=bar_close_1m_idx,
         )
-        return ArtifactMappingArraysV2(
+        loaded = ArtifactMappingArraysV2(
             timeframe=validated_timeframe,
             manifest=manifest,
             bar_open_1m_idx=bar_open_1m_idx,
             bar_close_1m_idx=bar_close_1m_idx,
         )
+        self._mapping_cache[cache_key] = loaded
+        return loaded
 
     def load_hit_times_arrays(
         self,
@@ -219,7 +255,8 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
         Args:
             context: Shared slot-pinned context resolved at runtime start.
         Returns:
-            ArtifactHitTimesArraysV2: Memory-mapped hit-times arrays and strict manifest metadata.
+            ArtifactHitTimesArraysV2: Cached-or-new memory-mapped hit-times arrays and strict
+                manifest metadata.
         Assumptions:
             Runtime must consume shipped `hit_times/1m` artifacts only by explicit manifest path
             and fixed metadata; no recompute or directory discovery is allowed.
@@ -227,7 +264,8 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             FileNotFoundError: If hit-times manifest or one referenced `.npy` file is missing.
             ValueError: If manifest path/dtype/shape/axis/timeline metadata drifts from files.
         Side Effects:
-            Memory-maps six `.npy` files from the pinned slot.
+            May memory-map six `.npy` files from the pinned slot on first access and reuse the
+            validated payload afterwards.
         Docs:
           - docs/architecture/backtest/backtest-precompute-runner-v2.md
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
@@ -235,6 +273,14 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
           - src/trading/contexts/backtest/application/services/v2/contracts.py
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
+        cache_key = _artifact_family_cache_key_v2(
+            context=context,
+            family_literal="hit_times",
+            member_literal="1m",
+        )
+        cached = self._hit_times_cache.get(cache_key)
+        if cached is not None:
+            return cached
         hit_times_manifest_path = (
             context.slot_root_path / context.slot_manifest.hit_times.manifest_path
         )
@@ -310,7 +356,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             short_tp=short_tp,
             short_sl=short_sl,
         )
-        return ArtifactHitTimesArraysV2(
+        loaded = ArtifactHitTimesArraysV2(
             manifest=hit_times_manifest,
             tp_values=tp_values,
             sl_values=sl_values,
@@ -319,6 +365,45 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             short_tp=short_tp,
             short_sl=short_sl,
         )
+        self._hit_times_cache[cache_key] = loaded
+        return loaded
+
+
+def _artifact_family_cache_key_v2(
+    *,
+    context: ArtifactSlotPinnedRuntimeContextV2,
+    family_literal: str,
+    member_literal: str,
+) -> tuple[Path, int, str, str]:
+    """
+    Build a run-local cache key for one validated artifact family inside a pinned slot.
+
+    Args:
+        context: Shared slot-pinned runtime context resolved at startup.
+        family_literal: Stable artifact family literal such as `prices` or `signals`.
+        member_literal: Family member discriminator such as timeframe or indicator id.
+    Returns:
+        tuple[Path, int, str, str]: Hashable key unique to one pinned family payload.
+    Assumptions:
+        Published slots are immutable once pinned, so reusing already validated mmap objects is
+        safe within one loader instance.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+      - src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py
+    """
+    return (
+        context.slot_root_path,
+        context.slot_generation,
+        context.artifact_manifest_hash,
+        f"{family_literal}/{member_literal}",
+    )
 
 
 def _price_manifest_for_timeframe(

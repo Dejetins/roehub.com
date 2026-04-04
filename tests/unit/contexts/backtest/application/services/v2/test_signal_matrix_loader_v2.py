@@ -76,6 +76,11 @@ def test_signal_matrix_loader_v2_loads_full_matrix_and_subset_rows(
         timeframe="15m",
         indicator_id="ma.ema",
     )
+    repeated_matrix = loader.load_signal_matrix(
+        context=context,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
     slice_rows = loader.load_signal_rows(
         context=context,
         timeframe="15m",
@@ -96,9 +101,11 @@ def test_signal_matrix_loader_v2_loads_full_matrix_and_subset_rows(
     )
 
     assert isinstance(signal_matrix.matrix, np.memmap)
+    assert repeated_matrix is signal_matrix
     assert tuple(int(value) for value in signal_matrix.matrix[0]) == (-1, 0)
     assert isinstance(slice_rows, np.memmap)
     assert slice_rows.shape == (1, 2)
+    assert isinstance(first_read, np.memmap)
     assert np.array_equal(first_read, second_read)
 
 

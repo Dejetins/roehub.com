@@ -305,7 +305,7 @@ class BacktestArtifactRuntimeRunnerV2:
         score_variant_metric = resolve_score_variant_metric_fn_v2(scorer=scorer)
         top_heap: list[StageBHeapEntryV2] = []
         processed = 0
-        for task in iter_stage_b_tasks_v2(
+        for task in _iter_stage_b_tasks_stream_v2(
             template=template,
             runtime_plan=runtime_plan,
             shortlist=shortlist,
@@ -592,27 +592,61 @@ def iter_stage_b_tasks_v2(
     Side Effects:
         None.
     """
+    return tuple(
+        _iter_stage_b_tasks_stream_v2(
+            template=template,
+            runtime_plan=runtime_plan,
+            shortlist=shortlist,
+        )
+    )
+
+
+def _iter_stage_b_tasks_stream_v2(
+    *,
+    template: RunBacktestTemplate,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+    shortlist: tuple[BacktestStageAScoredVariantV2, ...],
+):
+    """
+    Stream deterministic Stage B tasks without materializing the full exact-task tuple up front.
+
+    Args:
+        template: Effective run template.
+        runtime_plan: Deterministic artifact-backed runtime plan.
+        shortlist: Stage A shortlist rows.
+    Returns:
+        Iterator[BacktestStageBTaskV2]: Deterministic Stage B task iterator.
+    Assumptions:
+        Streaming preserves the canonical `(shortlist_index * risk_total) + risk_index` ordering
+        while reducing transient Python object churn on the exact path.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
     risk_variants = runtime_plan.risk_variants
     risk_total = len(risk_variants)
     direction_mode = template.direction_mode
     sizing_mode = template.sizing_mode
     execution_params = template.execution_params or {}
-    tasks: list[BacktestStageBTaskV2] = []
     for shortlist_index, stage_a_row in enumerate(shortlist):
         base_variant = stage_a_row.base_variant
         for risk_variant in risk_variants:
-            tasks.append(
-                _stage_b_task_from_variant_v2(
-                    base_variant=base_variant,
-                    risk_variant=risk_variant,
-                    shortlist_index=shortlist_index,
-                    risk_total=risk_total,
-                    direction_mode=direction_mode,
-                    sizing_mode=sizing_mode,
-                    execution_params=execution_params,
-                )
+            yield _stage_b_task_from_variant_v2(
+                base_variant=base_variant,
+                risk_variant=risk_variant,
+                shortlist_index=shortlist_index,
+                risk_total=risk_total,
+                direction_mode=direction_mode,
+                sizing_mode=sizing_mode,
+                execution_params=execution_params,
             )
-    return tuple(tasks)
 
 
 def _stage_b_task_from_variant_v2(
