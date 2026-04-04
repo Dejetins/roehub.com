@@ -30,7 +30,6 @@ from trading.contexts.backtest.application.services import (
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
-    BacktestJobStageWeights,
     BacktestJobState,
     BacktestJobTopVariant,
 )
@@ -134,9 +133,9 @@ class BacktestRunProgressSnapshotBuilder:
             None.
         """
         execution_profile_mode = self._resolve_execution_profile_mode(run=run)
-        stage_weights = _stage_weights_for_execution_profile_mode(
-            execution_profile_mode=execution_profile_mode
-        )
+        stage_weights = self._execution_profiles.profile_for_mode(
+            mode=execution_profile_mode
+        ).progress_weights
         return BacktestRunProgressSnapshot(
             execution_profile_mode=execution_profile_mode,
             progress_percent=run.progress_percent(stage_weights=stage_weights),
@@ -156,8 +155,9 @@ class BacktestRunProgressSnapshotBuilder:
         Returns:
             ExecutionProfileModeLiteralV2: Stable execution-profile mode literal for UI rendering.
         Assumptions:
-            Current A2 rollout may fall back to the configured default profile because launch
-            policy/classification has not yet started persisting profile decisions separately.
+            Profile-aware launch now persists effective profile selection in `request_json` for
+            `/backtests` runs, while older rows or unrelated legacy rows may still fall back to
+            the configured default exact profile.
         Raises:
             None.
         Side Effects:
@@ -190,44 +190,6 @@ class BacktestRunTopReadResult:
 
     job: BacktestJob
     rows: tuple[BacktestJobTopVariant, ...]
-
-
-def _stage_weights_for_execution_profile_mode(
-    *,
-    execution_profile_mode: ExecutionProfileModeLiteralV2,
-) -> BacktestJobStageWeights:
-    """
-    Map one execution-profile mode to deterministic stage weights for `0..100%` progress.
-
-    Args:
-        execution_profile_mode: Stable execution-profile mode literal.
-    Returns:
-        BacktestJobStageWeights: Deterministic stage-weight tuple summing to `100`.
-    Assumptions:
-        Current A2 rollout keeps one conservative fixed weight set per profile family instead of
-        using benchmark-history or dynamic calibration.
-    Raises:
-        ValueError: If the execution-profile mode literal is unsupported.
-    Side Effects:
-        None.
-    """
-    weights_by_mode: dict[ExecutionProfileModeLiteralV2, BacktestJobStageWeights] = {
-        "exact_small": BacktestJobStageWeights(stage_a=25, stage_b=70, finalizing=5),
-        "exact_parallel": BacktestJobStageWeights(stage_a=35, stage_b=60, finalizing=5),
-        "hybrid_conservative": BacktestJobStageWeights(
-            stage_a=50,
-            stage_b=45,
-            finalizing=5,
-        ),
-        "hybrid_family": BacktestJobStageWeights(stage_a=60, stage_b=35, finalizing=5),
-    }
-    try:
-        return weights_by_mode[execution_profile_mode]
-    except KeyError as error:  # pragma: no cover - guarded by validated literal type
-        raise ValueError(
-            f"Unsupported execution profile mode for progress weights: "
-            f"{execution_profile_mode!r}"
-        ) from error
 
 
 class BuildBacktestRunVariantReportUseCase:

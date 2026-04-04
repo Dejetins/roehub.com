@@ -1,6 +1,6 @@
 # Backtest Runtime Acceleration Benchmarks v1
 
-Статус: active benchmark corpus for Milestone A / EPIC A3  
+Статус: active benchmark corpus for Milestone A / EPIC A3 and later exact-profile milestones  
 Область: `backtest` runtime follow-up after A1/A2  
 Связанные документы:
 - `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
@@ -47,6 +47,9 @@ plugin rollout на одном и том же наборе deterministic slices.
 ## Как корпус используется сейчас
 
 - `exact_baseline` переиспользует approved R0/R5 baseline вместо создания второго exact reference.
+- `exact_baseline=exact_parallel` остаётся benchmark evidence anchor и не должен silently
+  подменять runtime `default_execution_profile=exact_small`, который используется launch/runtime
+  defaults в production B3 classification.
 - `small_grid_overhead` уже читает committed corpus metadata из
   `test_backtest_staged_runner_perf_smoke.py`, поэтому small sync harness больше не держит
   отдельный hardcoded shape.
@@ -60,6 +63,7 @@ plugin rollout на одном и том же наборе deterministic slices.
 - не вводит heuristic shortlist logic;
 - не вводит family plugin execution;
 - не вводит benchmark pass/fail thresholds по абсолютным wall-clock numbers;
+- не меняет active production default exact profile и не управляет `POST /backtests` routing;
 - не меняет public runtime API или persisted storage contracts.
 
 То есть текущий CI проверяет shape, ordering, fixture linkage и уже существующие zero-call gates,

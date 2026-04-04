@@ -16,6 +16,7 @@ from trading.contexts.backtest.application.ports import BacktestJobRepository, C
 from trading.contexts.backtest.application.services import (
     BacktestJobTopVariantCandidateV1,
     build_finalized_snapshot_rows,
+    validate_execution_profile_mode_v2,
 )
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.domain.entities import (
@@ -37,10 +38,11 @@ from .backtest_jobs_api_v1 import (
 NowProvider = Callable[[], datetime]
 RunIdFactory = Callable[[], UUID]
 _SYNC_INLINE_LOCKED_BY = "sync-inline"
-_AUTO_FALLBACK_GUARD_ERRORS = frozenset(
+_AUTO_FALLBACK_ELIGIBLE_ERRORS = frozenset(
     {
         "max_compute_bytes_total_exceeded",
         "max_variants_per_compute_exceeded",
+        "background_auto_required",
     }
 )
 
@@ -309,6 +311,7 @@ class LaunchBacktestRunWithAutoFallbackUseCase:
                 "LaunchBacktestRunWithAutoFallbackUseCase.execute requires request_payload"
             )
 
+        background_execution_profile_mode: str | None = None
         try:
             return self._sync_inline_use_case.execute(
                 request=request,
@@ -317,8 +320,11 @@ class LaunchBacktestRunWithAutoFallbackUseCase:
                 run_control=run_control,
             )
         except RoehubError as error:
-            if not _is_auto_fallback_guard_overflow(error=error):
+            if not _is_auto_fallback_eligible_error(error=error):
                 raise
+            background_execution_profile_mode = _execution_profile_mode_from_error(
+                error=error
+            )
 
         self._background_preflight_use_case.preflight(
             request=request,
@@ -330,6 +336,7 @@ class LaunchBacktestRunWithAutoFallbackUseCase:
                 run_request=request,
                 request_payload=request_payload,
                 execution_mode="background_auto",
+                execution_profile_mode=background_execution_profile_mode,
             ),
             current_user=current_user,
         )
@@ -597,9 +604,9 @@ class CreateAndRunBacktestSyncInlineUseCase:
         )
 
 
-def _is_auto_fallback_guard_overflow(*, error: RoehubError) -> bool:
+def _is_auto_fallback_eligible_error(*, error: RoehubError) -> bool:
     """
-    Classify deterministic sync guard overflow errors eligible for `background_auto` fallback.
+    Classify deterministic sync launch errors eligible for `background_auto` routing.
 
     Docs:
       - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -612,9 +619,9 @@ def _is_auto_fallback_guard_overflow(*, error: RoehubError) -> bool:
     Args:
         error: Canonical API/domain error raised by the sync-inline launch path.
     Returns:
-        bool: `True` only for structured staged guard overflow errors.
+        bool: `True` only for structured guard-overflow or sync-launch-budget routing errors.
     Assumptions:
-        Structured guard details use the stable `details.error` literal contract.
+        Structured launch details use the stable `details.error` literal contract.
     Raises:
         None.
     Side Effects:
@@ -625,7 +632,43 @@ def _is_auto_fallback_guard_overflow(*, error: RoehubError) -> bool:
     detail_error = error.details.get("error")
     if not isinstance(detail_error, str):
         return False
-    return detail_error in _AUTO_FALLBACK_GUARD_ERRORS
+    return detail_error in _AUTO_FALLBACK_ELIGIBLE_ERRORS
+
+
+def _execution_profile_mode_from_error(*, error: RoehubError) -> str | None:
+    """
+    Read additive effective execution-profile hint from one auto-fallback-eligible error.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+    Args:
+        error: Canonical planner/launch error considered for `background_auto` routing.
+    Returns:
+        str | None: Normalized execution-profile literal, or `None` when the error carries no
+            additive profile hint.
+    Assumptions:
+        Heavy-but-valid sync launch rejections and staged guard overflows may include
+        `details.execution_profile_mode` to keep persisted progress semantics truthful.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if error.details is None:
+        return None
+    raw_mode = error.details.get("execution_profile_mode")
+    if not isinstance(raw_mode, str) or not raw_mode.strip():
+        return None
+    try:
+        return validate_execution_profile_mode_v2(value=raw_mode)
+    except ValueError:
+        return None
 
 
 def _build_background_auto_launch_response(
@@ -692,6 +735,9 @@ def _build_background_auto_launch_response(
         run_id=created_run.job_id,
         state=created_run.state,
         execution_mode=created_run.execution_mode,
+        execution_profile_mode=_require_execution_profile_mode_request_json(
+            request_json=created_run.request_json
+        ),
         engine_version=engine_version,
         artifact_slot=artifact_pin.artifact_slot,
         artifact_slot_generation=artifact_pin.artifact_slot_generation,
@@ -749,6 +795,46 @@ def _require_positive_int_request_json(
             f"persisted run request_json requires positive integer field {field_name!r}"
         )
     return raw_value
+
+
+def _require_execution_profile_mode_request_json(
+    *,
+    request_json: Mapping[str, Any],
+) -> str:
+    """
+    Read one persisted effective execution-profile mode from canonical `request_json`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - apps/api/dto/backtests.py
+    Args:
+        request_json: Persisted canonical request payload.
+    Returns:
+        str: Normalized execution-profile mode literal.
+    Assumptions:
+        Profile-aware launch persistence stores the effective profile mode additively on every
+        `/backtests` persisted run row.
+    Raises:
+        BacktestValidationError: If the field is missing or invalid.
+    Side Effects:
+        None.
+    """
+    raw_mode = request_json.get("execution_profile_mode")
+    if not isinstance(raw_mode, str) or not raw_mode.strip():
+        raise BacktestValidationError(
+            "persisted run request_json requires execution_profile_mode"
+        )
+    try:
+        return validate_execution_profile_mode_v2(value=raw_mode)
+    except ValueError as error:
+        raise BacktestValidationError(
+            "persisted run request_json requires valid execution_profile_mode"
+        ) from error
 
 
 def _require_job_market_id(*, created_run: BacktestJob) -> int:
@@ -889,6 +975,9 @@ def _build_request_json_payload(
     normalized_payload["top_k"] = response.top_k
     normalized_payload["preselect"] = response.preselect
     normalized_payload["top_trades_n"] = response.top_trades_n
+    normalized_payload["execution_profile_mode"] = _require_response_execution_profile_mode(
+        response=response
+    )
 
     direction_mode = _require_direction_mode(response=response)
     sizing_mode = _require_sizing_mode(response=response)
@@ -918,6 +1007,43 @@ def _build_request_json_payload(
         normalized_payload["strategy_id"] = str(request.strategy_id)
     normalized_payload.pop("template", None)
     return normalized_payload
+
+
+def _require_response_execution_profile_mode(*, response: RunBacktestResponse) -> str:
+    """
+    Require effective exact execution profile mode on completed sync `/backtests` responses.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+    Args:
+        response: Completed sync response carrying resolved runtime metadata.
+    Returns:
+        str: Normalized execution-profile mode literal.
+    Assumptions:
+        Profile-aware exact classification always resolves one effective profile before
+        persisted-run sync storage is written.
+    Raises:
+        BacktestValidationError: If the sync response lacks a valid effective profile literal.
+    Side Effects:
+        None.
+    """
+    raw_mode = response.execution_profile_mode
+    if raw_mode is None or not raw_mode.strip():
+        raise BacktestValidationError(
+            "sync_inline persisted run requires execution_profile_mode"
+        )
+    try:
+        return validate_execution_profile_mode_v2(value=raw_mode)
+    except ValueError as error:
+        raise BacktestValidationError(
+            "sync_inline persisted run requires valid execution_profile_mode"
+        ) from error
 
 
 def _build_engine_params_hash(*, response: RunBacktestResponse) -> str:

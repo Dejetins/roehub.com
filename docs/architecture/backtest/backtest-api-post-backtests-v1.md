@@ -98,6 +98,16 @@ deterministic `422` ошибками.
   - sync-inline launch page therefore still cannot show true in-flight progress before the HTTP
     response returns; real progress/ETA appears only after opening the persisted run page by
     `run_id`.
+- B3 exact-classification note:
+  - `POST /backtests` now classifies valid exact requests deterministically into
+    `exact_small`, `exact_parallel`, or earlier queued `background_auto`;
+  - classification uses planner cost evidence only:
+    `stage_a_variants_total`, `stage_b_variants_total`, `estimated_memory_bytes`,
+    and startup-validated execution-profile launch budgets;
+  - heavy-but-valid exact requests are queued instead of being hard-rejected, while true full-budget
+    guard violations still return canonical deterministic `422`;
+  - effective `execution_profile_mode` is persisted into unified run storage for later
+    `/backtests/runs*` progress/history rendering.
 
 ## Цель
 
@@ -117,10 +127,18 @@ deterministic `422` ошибками.
   - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_timeline_v2.py`
   - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py`
   - `src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py`
-- A1 runtime-profile foundation adds one explicit typed `ExecutionProfile` surface in
-  `src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py`, but current
-  launch orchestration still resolves only the exact baseline profile and does not alter
-  request acceptance, fallback, or scoring semantics.
+- B3 runtime-profile routing uses one explicit typed `ExecutionProfile` surface in
+  `src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py` as the shared
+  source of truth for:
+  - exact launch-budget classification,
+  - runtime-defaults discovery payloads,
+  - persisted-run `execution_profile_mode`,
+  - deterministic progress/ETA stage weights in `/backtests/runs*`.
+- Current exact runtime-enabled launch profiles are:
+  - `exact_small`
+  - `exact_parallel`
+- Hybrid profiles remain discovery/config artifacts only in this milestone and do not participate
+  in public `POST /backtests` routing yet.
 - Варианты детерминированы, guards применяются в sync режиме:
   - `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md`
 - Execution engine v1: close-fill + fee/slippage + sizing + SL/TP:
@@ -255,11 +273,17 @@ R9-01 launch UX note:
 
 - Branch A: sync budgets проходят
   - backend исполняет inline compute,
+  - valid exact request детерминированно получает effective profile
+    `exact_small` или `exact_parallel` до execution,
   - persist'ит terminal row с `execution_mode=sync_inline`,
   - возвращает `200 OK` и ranked `variants[]`.
-- Branch B: sync budgets не проходят по canonical guard overflow, но full budgets проходят
+- Branch B: sync exact launch budgets не проходят, но full budgets/worker contract проходят
   - backend не делает hidden mode switch,
+  - planner-aware exact classification может отправить heavy-but-valid request в этот branch
+    ещё до legacy overflow-style fallback reject,
   - выполняет full-budget preflight и создаёт queued row с `execution_mode=background_auto`,
+  - persist'ит effective `execution_profile_mode` в `request_json`, чтобы history/progress read path
+    не терял реальный selected profile,
   - возвращает `202 Accepted`,
   - `variants[]` остаётся пустым, потому что ranking summary ещё не materialize'ился.
 - Branch C: full budgets тоже не проходят
@@ -308,6 +332,16 @@ R9-01 launch UX note:
   - half-budgets -> `sync_inline`,
   - half overflow + full pass -> `background_auto`,
   - full overflow -> canonical `422`.
+- C 2026-04-04 B3 добавляет deterministic exact-profile classification поверх этого split:
+  - planner сначала считает `stage_a_variants_total`, `stage_b_variants_total`,
+    `estimated_memory_bytes`;
+  - затем startup-configured `backtest.execution_profiles.profiles[*].launch_budget`
+    классифицирует request в `exact_small` или `exact_parallel`;
+  - если request остаётся exact-valid, но уже не помещается в sync exact budgets,
+    launch branch отвечает explicit `202 Accepted` + `execution_mode=background_auto`,
+    а не hard reject;
+  - public launch response shape не меняется, но effective `execution_profile_mode`
+    сохраняется для persisted `/backtests/runs*` contract.
 
 ### 10) CPU knob через Numba threads
 
@@ -392,6 +426,9 @@ Response содержит:
   - для `execution_mode=sync_inline`: length `<= top_k`, отсортировано по выбранному ranking
     contract и tie-break `variant_key ASC`,
   - для `execution_mode=background_auto`: пустой список до materialized background result.
+- `execution_profile_mode` не добавляется в public launch response, чтобы сохранить backward
+  compatibility shape; effective profile instead persists in unified run storage and читается через
+  additive `/backtests/runs*` fields.
 
 Каждый `variants[i]` содержит:
 

@@ -699,6 +699,7 @@ class RunBacktestResponse:
     run_id: UUID | None = None
     state: BacktestJobState | None = None
     execution_mode: BacktestJobExecutionMode | None = None
+    execution_profile_mode: str | None = None
     engine_version: str | None = None
     artifact_slot: BacktestArtifactSlotLiteral | None = None
     artifact_slot_generation: int | None = None
@@ -767,6 +768,16 @@ class RunBacktestResponse:
                 self,
                 "execution_params",
                 MappingProxyType(_normalize_scalar_mapping(values=self.execution_params)),
+            )
+        if self.execution_profile_mode is not None:
+            from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+                validate_execution_profile_mode_v2,
+            )
+
+            object.__setattr__(
+                self,
+                "execution_profile_mode",
+                validate_execution_profile_mode_v2(value=self.execution_profile_mode),
             )
 
         variant_indexes = tuple(item.variant_index for item in self.variants)

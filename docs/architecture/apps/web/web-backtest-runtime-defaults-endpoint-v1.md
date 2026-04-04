@@ -30,7 +30,15 @@
     `contracts.execution.default_execution_profile` and ordered
     `contracts.execution.available_execution_profiles`,
   - source config for this catalog lives in `backtest.execution_profiles`,
-  - A1 keeps current launch routing unchanged; the new profile surface is discovery-only for now.
+  - A1 introduced the typed catalog as discovery-only surface.
+- B3 additive contract:
+  - the same startup-validated execution-profile catalog now drives exact request classification,
+    persisted-run `execution_profile_mode`, and `/backtests/runs*` progress/ETA weights;
+  - each profile payload now also exposes additive `launch_budget` and `progress_weights`,
+    so browser/debug tooling can inspect the same source of truth used by launch/history;
+  - active runtime exact default remains `exact_small`, while benchmark corpus may still keep
+    `exact_baseline=exact_parallel` as evidence anchor; these roles must stay explicit and
+    non-interchangeable.
 
 ## Цель
 
@@ -133,6 +141,16 @@
             "parallel_stage_b_enabled": false,
             "family_plugin_enabled": false
           },
+          "launch_budget": {
+            "max_stage_a_variants_total": 1500,
+            "max_stage_b_variants_total": 12000,
+            "max_estimated_memory_bytes": 268435456
+          },
+          "progress_weights": {
+            "stage_a": 25,
+            "stage_b": 70,
+            "finalizing": 5
+          },
           "planning_budget_ms": 25
         },
         {
@@ -146,10 +164,20 @@
             "stage_b_workers": 4
           },
           "feature_flags": {
-            "runtime_enabled": false,
+            "runtime_enabled": true,
             "heuristic_shortlist_enabled": false,
-            "parallel_stage_b_enabled": false,
+            "parallel_stage_b_enabled": true,
             "family_plugin_enabled": false
+          },
+          "launch_budget": {
+            "max_stage_a_variants_total": 25000,
+            "max_stage_b_variants_total": 180000,
+            "max_estimated_memory_bytes": 1610612736
+          },
+          "progress_weights": {
+            "stage_a": 35,
+            "stage_b": 60,
+            "finalizing": 5
           },
           "planning_budget_ms": 50
         },
@@ -169,6 +197,16 @@
             "parallel_stage_b_enabled": false,
             "family_plugin_enabled": false
           },
+          "launch_budget": {
+            "max_stage_a_variants_total": 50000,
+            "max_stage_b_variants_total": 250000,
+            "max_estimated_memory_bytes": 2147483648
+          },
+          "progress_weights": {
+            "stage_a": 50,
+            "stage_b": 45,
+            "finalizing": 5
+          },
           "planning_budget_ms": 75
         },
         {
@@ -186,6 +224,16 @@
             "heuristic_shortlist_enabled": false,
             "parallel_stage_b_enabled": false,
             "family_plugin_enabled": false
+          },
+          "launch_budget": {
+            "max_stage_a_variants_total": 75000,
+            "max_stage_b_variants_total": 300000,
+            "max_estimated_memory_bytes": 2684354560
+          },
+          "progress_weights": {
+            "stage_a": 60,
+            "stage_b": 35,
+            "finalizing": 5
           },
           "planning_budget_ms": 100
         }
@@ -240,6 +288,12 @@
   - `feature_flags.heuristic_shortlist_enabled`
   - `feature_flags.parallel_stage_b_enabled`
   - `feature_flags.family_plugin_enabled`
+  - `launch_budget.max_stage_a_variants_total`
+  - `launch_budget.max_stage_b_variants_total`
+  - `launch_budget.max_estimated_memory_bytes`
+  - `progress_weights.stage_a`
+  - `progress_weights.stage_b`
+  - `progress_weights.finalizing`
   - `planning_budget_ms`
 - `contracts.launch.execution_mode` <- `backtest.contracts.launch.execution_mode`
 - `contracts.launch.auto_preflight_enabled` <- `backtest.contracts.launch.auto_preflight_enabled`
@@ -253,6 +307,8 @@
 - массивы `contracts.*` сериализуются в YAML-defined order; порядок является частью frozen contract surface.
 - `contracts.execution.available_execution_profiles` сериализуется в YAML-defined profile order;
   этот порядок является частью browser/runtime discovery contract.
+- `launch_budget` и `progress_weights` публикуют reviewable server-side hints, но browser не
+  выбирает `execution_profile_mode` самостоятельно; launch classification остаётся server-owned.
 - `contracts.launch.supported_indicator_ids` сериализуется в детерминированном `indicator_id` порядке.
 - `contracts.launch.source_values_by_indicator_id` сериализует ключи в том же порядке, значения `source` — в детерминированном literal order.
 - Payload содержит только non-secret значения, нужные для browser prefill/validation hints.
@@ -274,6 +330,8 @@
   - префилл user-facing `top_n` и кап `top_n_max`, затем явно маппит `top_n -> top_k`;
   - обновление `execution.fee_pct` при смене market, пока поле не стало user-dirty;
   - чтение frozen target-v2 literals из `contracts.*` без изменения текущего v1 request shape;
+  - при необходимости показывает explanatory hints about `exact_small`, `exact_parallel`, and
+    explicit queued `background_auto`, but не принимает profile decision на client side;
   - построение indicator/source selectors из `contracts.launch.supported_indicator_ids` и
     `contracts.launch.source_values_by_indicator_id`.
 

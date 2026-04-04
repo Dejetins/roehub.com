@@ -61,6 +61,14 @@ backtest:
         planning_budget_ms: 25
         shortlist:
           enabled: false
+        launch_budget:
+          max_stage_a_variants_total: 1500
+          max_stage_b_variants_total: 12000
+          max_estimated_memory_bytes: 268435456
+        progress:
+          stage_a: 25
+          stage_b: 70
+          finalizing: 5
         parallelism:
           stage_a_workers: 1
           stage_b_workers: 1
@@ -73,19 +81,35 @@ backtest:
         planning_budget_ms: 50
         shortlist:
           enabled: false
+        launch_budget:
+          max_stage_a_variants_total: 25000
+          max_stage_b_variants_total: 180000
+          max_estimated_memory_bytes: 1610612736
+        progress:
+          stage_a: 35
+          stage_b: 60
+          finalizing: 5
         parallelism:
           stage_a_workers: 1
           stage_b_workers: 4
         feature_flags:
-          runtime_enabled: false
+          runtime_enabled: true
           heuristic_shortlist_enabled: false
-          parallel_stage_b_enabled: false
+          parallel_stage_b_enabled: true
           family_plugin_enabled: false
       - mode: hybrid_conservative
         planning_budget_ms: 75
         shortlist:
           enabled: true
           max_candidates: 5000
+        launch_budget:
+          max_stage_a_variants_total: 50000
+          max_stage_b_variants_total: 250000
+          max_estimated_memory_bytes: 2147483648
+        progress:
+          stage_a: 50
+          stage_b: 45
+          finalizing: 5
         parallelism:
           stage_a_workers: 1
           stage_b_workers: 4
@@ -99,6 +123,14 @@ backtest:
         shortlist:
           enabled: true
           max_candidates: 2000
+        launch_budget:
+          max_stage_a_variants_total: 75000
+          max_stage_b_variants_total: 300000
+          max_estimated_memory_bytes: 2684354560
+        progress:
+          stage_a: 60
+          stage_b: 35
+          finalizing: 5
         parallelism:
           stage_a_workers: 1
           stage_b_workers: 4

@@ -223,6 +223,48 @@ class BacktestRuntimeExecutionProfileFeatureFlagsResponse(BaseModel):
     family_plugin_enabled: bool
 
 
+class BacktestRuntimeExecutionProfileLaunchBudgetResponse(BaseModel):
+    """
+    API response model for deterministic execution-profile launch-budget hints.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_stage_a_variants_total: int
+    max_stage_b_variants_total: int
+    max_estimated_memory_bytes: int
+
+
+class BacktestRuntimeExecutionProfileProgressWeightsResponse(BaseModel):
+    """
+    API response model for deterministic progress/ETA stage weights per execution profile.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    stage_a: int
+    stage_b: int
+    finalizing: int
+
+
 class BacktestRuntimeExecutionProfileResponse(BaseModel):
     """
     API response model for one typed execution profile in runtime-defaults discovery payload.
@@ -243,6 +285,8 @@ class BacktestRuntimeExecutionProfileResponse(BaseModel):
     shortlist_config: BacktestRuntimeExecutionProfileShortlistResponse
     parallelism: BacktestRuntimeExecutionProfileParallelismResponse
     feature_flags: BacktestRuntimeExecutionProfileFeatureFlagsResponse
+    launch_budget: BacktestRuntimeExecutionProfileLaunchBudgetResponse
+    progress_weights: BacktestRuntimeExecutionProfileProgressWeightsResponse
     planning_budget_ms: int
 
 
@@ -389,6 +433,22 @@ def build_backtest_runtime_defaults_response(
                 parallel_stage_b_enabled=profile.feature_flags.parallel_stage_b_enabled,
                 family_plugin_enabled=profile.feature_flags.family_plugin_enabled,
             ),
+            launch_budget=BacktestRuntimeExecutionProfileLaunchBudgetResponse(
+                max_stage_a_variants_total=(
+                    profile.launch_budget.max_stage_a_variants_total
+                ),
+                max_stage_b_variants_total=(
+                    profile.launch_budget.max_stage_b_variants_total
+                ),
+                max_estimated_memory_bytes=(
+                    profile.launch_budget.max_estimated_memory_bytes
+                ),
+            ),
+            progress_weights=BacktestRuntimeExecutionProfileProgressWeightsResponse(
+                stage_a=profile.progress_weights.stage_a,
+                stage_b=profile.progress_weights.stage_b,
+                finalizing=profile.progress_weights.finalizing,
+            ),
             planning_budget_ms=profile.planning_budget_ms,
         )
         for profile in config.execution_profiles.available_profiles
@@ -451,6 +511,8 @@ __all__ = [
     "BacktestRuntimeExecutionDefaultsResponse",
     "BacktestRuntimeExecutionContractResponse",
     "BacktestRuntimeExecutionProfileFeatureFlagsResponse",
+    "BacktestRuntimeExecutionProfileLaunchBudgetResponse",
+    "BacktestRuntimeExecutionProfileProgressWeightsResponse",
     "BacktestRuntimeExecutionProfileParallelismResponse",
     "BacktestRuntimeExecutionProfileResponse",
     "BacktestRuntimeExecutionProfileShortlistResponse",

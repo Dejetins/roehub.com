@@ -57,13 +57,19 @@
   - public `/backtests/runs*` payloads теперь добавляют
     `progress_percent`, `eta_seconds`, `execution_profile_mode`;
   - `progress_percent` считается детерминированно из
-    `stage + processed_units + total_units + execution-profile stage weights`,
+    `stage + processed_units + total_units + execution-profile progress_weights`,
     а не из client-side spinner/эвристики;
   - `eta_seconds` строится только из текущего run timeline и возвращает `null`,
     если defensible throughput signal ещё нет;
-  - read path может брать `execution_profile_mode` из persisted `request_json`, если он там есть;
-    иначе до будущего profile-aware launch persistence используется configured default exact
-    profile.
+  - read path берёт `execution_profile_mode` из persisted `request_json`, если B3 profile-aware
+    launch уже сохранил effective profile;
+  - для старых rows или unrelated legacy rows fallback остаётся configured default exact profile,
+    чтобы public contract был backward compatible.
+- B3 additive exact-profile note:
+  - `POST /backtests` now persists effective `execution_profile_mode` for both
+    `sync_inline` and earlier queued `background_auto` exact runs;
+  - `/backtests/runs*` progress/ETA semantics now read stage weights from the same execution-profile
+    catalog used by launch classification, without a second out-of-band mapping table.
 
 ## Цель
 
@@ -81,6 +87,10 @@
   - `backtest_job_stage_a_shortlist`
 - R7-02 перевел `POST /backtests` на persisted `sync_inline` flow.
 - R8-02 добавил explicit `background_auto` launch branch в тот же persisted-run storage.
+- B3 сделал этот branch profile-aware:
+  - medium exact runs can persist as `execution_mode=sync_inline` + `execution_profile_mode=exact_parallel`;
+  - heavy-but-valid exact runs can be queued earlier with `execution_mode=background_auto`
+    while keeping exact semantics and persisted effective profile metadata.
 - R7-03 поверх этого storage добавляет public history/status/top/cancel contract.
 
 ## Ключевые решения

@@ -32,6 +32,8 @@ from .artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlanV2,
 )
 from .contracts import (
+    ArtifactCoordinatesV2,
+    ArtifactSlotLiteralV2,
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactLoaderV2,
     BacktestArtifactSlotResolverV2,
@@ -120,6 +122,63 @@ class _ExactStageBCellCacheV2:
     metrics: StageBMetricsV2
 
 
+@dataclass(frozen=True, slots=True)
+class _ParallelStageBScorerSnapshotV2:
+    """
+    Picklable scorer snapshot used to rehydrate readonly Stage B workers under `spawn`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+    """
+
+    artifact_loader: BacktestArtifactLoaderV2
+    coordinates: ArtifactCoordinatesV2
+    artifact_slot: ArtifactSlotLiteralV2
+    slot_generation: int
+    artifact_asof_date: str
+    artifact_manifest_hash: str
+    target_time_range: TimeRange
+    report_target_slice: slice
+    direction_mode: str
+    sizing_mode: str
+    execution_params: Mapping[str, BacktestVariantScalar]
+    market_id: int
+    signal_timeframe: str
+    prepared_row_plans: tuple["_PreparedIndicatorRowPlanSnapshotV2", ...]
+    init_cash_quote_default: float
+    fixed_quote_default: float
+    safe_profit_percent_default: float
+    slippage_pct_default: float
+    fee_pct_default_by_market_id: Mapping[int, float]
+    close_on_end: bool
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedIndicatorRowPlanSnapshotV2:
+    """
+    Picklable row-plan snapshot for spawned Stage B workers using readonly artifacts.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+
+    indicator_id: str
+    axis_names: tuple[str, ...]
+    axis_radices: tuple[int, ...]
+    axis_positions: tuple[
+        tuple[str, tuple[tuple[int | float | str, int], ...]],
+        ...,
+    ]
+
+
 class BacktestArtifactBackedStageBScorerV2(
     BacktestStagedVariantScorer,
     BacktestStagedVariantMetricScorer,
@@ -202,13 +261,32 @@ class BacktestArtifactBackedStageBScorerV2(
         self._price_arrays_loader = price_arrays_loader
         self._signal_matrix_loader = signal_matrix_loader
         self._artifact_context = artifact_context
+        self._target_time_range = target_time_range
+        self._direction_mode = direction_mode
+        self._sizing_mode = sizing_mode
+        self._market_id = int(market_id)
         self._signal_timeframe = signal_timeframe
         self._report_target_slice = report_target_slice
         self._close_on_end = bool(close_on_end)
+        self._indicator_grids = tuple(
+            sorted(indicator_grids, key=lambda item: str(item.indicator_id))
+        )
         self._indicator_grids_by_id = {
             str(grid.indicator_id): grid
-            for grid in sorted(indicator_grids, key=lambda item: str(item.indicator_id))
+            for grid in self._indicator_grids
         }
+        self._init_cash_quote_default = float(init_cash_quote_default)
+        self._fixed_quote_default = float(fixed_quote_default)
+        self._safe_profit_percent_default = float(safe_profit_percent_default)
+        self._slippage_pct_default = float(slippage_pct_default)
+        self._fee_pct_default_by_market_id = MappingProxyType(
+            dict(
+                sorted(
+                    (int(key), float(value))
+                    for key, value in fee_pct_default_by_market_id.items()
+                )
+            )
+        )
         self._execution_params = _resolve_execution_params_v2(
             direction_mode=direction_mode,
             sizing_mode=sizing_mode,
@@ -344,6 +422,151 @@ class BacktestArtifactBackedStageBScorerV2(
         """
         self._ranking_primary_by_stage[stage] = primary_metric
         self._ranking_secondary_by_stage[stage] = secondary_metric
+
+    def to_parallel_stage_b_worker_snapshot_v2(self) -> _ParallelStageBScorerSnapshotV2:
+        """
+        Build a picklable readonly scorer snapshot for spawned exact-parallel Stage B workers.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+        Args:
+            None.
+        Returns:
+            _ParallelStageBScorerSnapshotV2: Picklable scorer bootstrap payload.
+        Assumptions:
+            Workers reopen artifact families through the same explicit-path loader contract instead
+            of inheriting parent-process mmap state.
+        Raises:
+            ValueError: If the configured mmap loaders do not expose a shared artifact loader.
+        Side Effects:
+            None.
+        """
+        artifact_loader = getattr(self._price_arrays_loader, "artifact_loader", None)
+        signal_artifact_loader = getattr(self._signal_matrix_loader, "artifact_loader", None)
+        if artifact_loader is None or signal_artifact_loader is None:
+            raise ValueError(
+                "parallel Stage B requires mmap loaders exposing shared artifact_loader"
+            )
+        if artifact_loader is not signal_artifact_loader:
+            raise ValueError(
+                "parallel Stage B requires price and signal loaders to share artifact_loader"
+            )
+        prepared_row_plans = tuple(
+            _prepared_indicator_row_plan_snapshot_v2(
+                plan=self._row_plan_for_indicator_v2(indicator_id=indicator_id)
+            )
+            for indicator_id in sorted(
+                {
+                    *self._prepared_row_plans_by_indicator.keys(),
+                    *self._indicator_grids_by_id.keys(),
+                }
+            )
+        )
+        return _ParallelStageBScorerSnapshotV2(
+            artifact_loader=cast(BacktestArtifactLoaderV2, artifact_loader),
+            coordinates=self._artifact_context.coordinates,
+            artifact_slot=self._artifact_context.artifact_slot,
+            slot_generation=self._artifact_context.slot_generation,
+            artifact_asof_date=self._artifact_context.artifact_asof_date,
+            artifact_manifest_hash=self._artifact_context.artifact_manifest_hash,
+            target_time_range=self._target_time_range,
+            report_target_slice=self._report_target_slice,
+            direction_mode=self._direction_mode,
+            sizing_mode=self._sizing_mode,
+            execution_params=dict(self._execution_params_mapping),
+            market_id=self._market_id,
+            signal_timeframe=self._signal_timeframe,
+            prepared_row_plans=prepared_row_plans,
+            init_cash_quote_default=self._init_cash_quote_default,
+            fixed_quote_default=self._fixed_quote_default,
+            safe_profit_percent_default=self._safe_profit_percent_default,
+            slippage_pct_default=self._slippage_pct_default,
+            fee_pct_default_by_market_id=dict(self._fee_pct_default_by_market_id),
+            close_on_end=self._close_on_end,
+        )
+
+    @classmethod
+    def from_parallel_stage_b_worker_snapshot_v2(
+        cls,
+        *,
+        snapshot: _ParallelStageBScorerSnapshotV2,
+    ) -> BacktestArtifactBackedStageBScorerV2:
+        """
+        Rehydrate one readonly artifact-backed scorer inside a spawned Stage B worker process.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+        Args:
+            snapshot: Picklable scorer bootstrap payload built in the coordinator process.
+        Returns:
+            BacktestArtifactBackedStageBScorerV2: Rehydrated readonly scorer instance.
+        Assumptions:
+            Worker processes must rebuild their own mmap-backed loaders under `spawn`.
+        Raises:
+            ValueError: Propagated from scorer construction on artifact contract drift.
+        Side Effects:
+            Reopens strict artifact families inside the worker process.
+        """
+        slot_manifest_path = snapshot.artifact_loader.resolve_slot_manifest_path(
+            snapshot.coordinates,
+            snapshot.artifact_slot,
+        )
+        artifact_context = ArtifactSlotPinnedRuntimeContextV2(
+            coordinates=snapshot.coordinates,
+            artifact_slot=snapshot.artifact_slot,
+            slot_generation=snapshot.slot_generation,
+            artifact_asof_date=snapshot.artifact_asof_date,
+            artifact_manifest_hash=snapshot.artifact_manifest_hash,
+            slot_root_path=slot_manifest_path.parent,
+            slot_manifest_path=slot_manifest_path,
+            slot_manifest=snapshot.artifact_loader.load_slot_manifest(
+                snapshot.coordinates,
+                snapshot.artifact_slot,
+            ),
+        )
+        scorer = cls(
+            price_arrays_loader=MmapPriceArraysLoaderV2(
+                artifact_loader=snapshot.artifact_loader
+            ),
+            signal_matrix_loader=MmapSignalMatrixLoaderV2(
+                artifact_loader=snapshot.artifact_loader
+            ),
+            artifact_context=artifact_context,
+            target_time_range=snapshot.target_time_range,
+            report_target_slice=snapshot.report_target_slice,
+            direction_mode=snapshot.direction_mode,
+            sizing_mode=snapshot.sizing_mode,
+            execution_params=snapshot.execution_params,
+            market_id=snapshot.market_id,
+            signal_timeframe=snapshot.signal_timeframe,
+            indicator_grids=(),
+            init_cash_quote_default=snapshot.init_cash_quote_default,
+            fixed_quote_default=snapshot.fixed_quote_default,
+            safe_profit_percent_default=snapshot.safe_profit_percent_default,
+            slippage_pct_default=snapshot.slippage_pct_default,
+            fee_pct_default_by_market_id=snapshot.fee_pct_default_by_market_id,
+            close_on_end=snapshot.close_on_end,
+        )
+        scorer._prepared_row_plans_by_indicator = {
+            row_plan.indicator_id: row_plan
+            for row_plan in (
+                _prepared_indicator_row_plan_from_snapshot_v2(snapshot=row_plan_snapshot)
+                for row_plan_snapshot in snapshot.prepared_row_plans
+            )
+        }
+        return scorer
 
     def score_variant_metric(
         self,
@@ -869,6 +1092,88 @@ class BacktestArtifactBackedStageBScorerV2(
             self._ranking_primary_by_stage.get(STAGE_B_LITERAL_V2) == "total_return_pct"
             and self._ranking_secondary_by_stage.get(STAGE_B_LITERAL_V2) is None
         )
+
+
+def _prepared_indicator_row_plan_snapshot_v2(
+    *,
+    plan: PreparedIndicatorRowPlanV2,
+) -> _PreparedIndicatorRowPlanSnapshotV2:
+    """
+    Convert one prepared row plan into a fully picklable spawned-worker snapshot.
+
+    Args:
+        plan: In-process prepared row-addressing plan.
+    Returns:
+        _PreparedIndicatorRowPlanSnapshotV2: Picklable row-plan snapshot.
+    Assumptions:
+        Snapshot ordering must remain stable, so axis-position mappings are serialized by sorted
+        keys for deterministic `spawn` payloads.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+    return _PreparedIndicatorRowPlanSnapshotV2(
+        indicator_id=plan.indicator_id,
+        axis_names=plan.axis_names,
+        axis_radices=plan.axis_radices,
+        axis_positions=tuple(
+            (
+                axis_name,
+                tuple(
+                    sorted(
+                        (value, int(position))
+                        for value, position in axis_lookup.items()
+                    )
+                ),
+            )
+            for axis_name, axis_lookup in sorted(plan.axis_positions.items())
+        ),
+    )
+
+
+def _prepared_indicator_row_plan_from_snapshot_v2(
+    *,
+    snapshot: _PreparedIndicatorRowPlanSnapshotV2,
+) -> PreparedIndicatorRowPlanV2:
+    """
+    Rebuild one prepared row plan from a picklable spawned-worker snapshot.
+
+    Args:
+        snapshot: Picklable row-plan snapshot built in the coordinator process.
+    Returns:
+        PreparedIndicatorRowPlanV2: Rehydrated prepared row-addressing plan.
+    Assumptions:
+        Worker processes only need readonly row-addressing metadata and may restore mapping
+        proxies locally after deserialization.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+    return PreparedIndicatorRowPlanV2(
+        indicator_id=snapshot.indicator_id,
+        axis_names=snapshot.axis_names,
+        axis_radices=snapshot.axis_radices,
+        axis_positions=MappingProxyType(
+            {
+                axis_name: MappingProxyType(dict(axis_lookup))
+                for axis_name, axis_lookup in snapshot.axis_positions
+            }
+        ),
+    )
 
 
 def build_default_artifact_backed_stage_b_scorer_v2(

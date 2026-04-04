@@ -11,6 +11,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+from trading.contexts.backtest.domain.entities import BacktestJobStageWeights
+
 type ExecutionProfileModeLiteralV2 = Literal[
     "exact_small",
     "exact_parallel",
@@ -29,6 +31,96 @@ _EXACT_EXECUTION_PROFILE_MODES_V2: tuple[ExecutionProfileModeLiteralV2, ...] = (
     "exact_small",
     "exact_parallel",
 )
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionProfileLaunchBudgetV2:
+    """
+    Deterministic request-shape budget used for exact profile selection and sync launch routing.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    max_stage_a_variants_total: int
+    max_stage_b_variants_total: int
+    max_estimated_memory_bytes: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate strict-positive launch-budget thresholds for deterministic profile routing.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Thresholds are explicit reviewable sync-launch budgets, not adaptive heuristics.
+        Raises:
+            ValueError: If one threshold is non-positive.
+        Side Effects:
+            None.
+        """
+        for field_name, field_value in (
+            ("max_stage_a_variants_total", self.max_stage_a_variants_total),
+            ("max_stage_b_variants_total", self.max_stage_b_variants_total),
+            ("max_estimated_memory_bytes", self.max_estimated_memory_bytes),
+        ):
+            if field_value <= 0:
+                raise ValueError(
+                    f"ExecutionProfileLaunchBudgetV2.{field_name} must be > 0"
+                )
+
+    def allows(
+        self,
+        *,
+        stage_a_variants_total: int,
+        stage_b_variants_total: int,
+        estimated_memory_bytes: int,
+    ) -> bool:
+        """
+        Return whether one prepared exact request fits this profile's explicit launch budget.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - apps/api/dto/backtest_runtime_defaults.py
+
+        Args:
+            stage_a_variants_total: Deterministic prepared Stage A variants count.
+            stage_b_variants_total: Deterministic prepared Stage B variants count.
+            estimated_memory_bytes: Deterministic estimated runtime memory footprint.
+        Returns:
+            bool: `True` when the request fits all configured budget thresholds.
+        Assumptions:
+            Inputs were already validated by planner guard calculations and are deterministic.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return (
+            stage_a_variants_total <= self.max_stage_a_variants_total
+            and stage_b_variants_total <= self.max_stage_b_variants_total
+            and estimated_memory_bytes <= self.max_estimated_memory_bytes
+        )
 
 
 def validate_execution_profile_mode_v2(
@@ -150,7 +242,8 @@ class ExecutionProfileParallelismConfigV2:
         Returns:
             None.
         Assumptions:
-            Worker counts are strict-positive integers; current milestone only publishes them.
+            Worker counts are strict-positive integers; resolved exact profiles may now activate
+            process-based Stage B according to these limits.
         Raises:
             ValueError: If one worker count is non-positive.
         Side Effects:
@@ -198,7 +291,8 @@ class ExecutionProfileFeatureFlagsV2:
         Returns:
             None.
         Assumptions:
-            Current milestone only publishes flags and keeps launch/runtime behavior unchanged.
+            Exact profiles may now activate process-based Stage B through this feature-flag
+            contract when runtime planning resolves them explicitly.
         Raises:
             ValueError: If one field is not boolean.
         Side Effects:
@@ -235,6 +329,8 @@ class ExecutionProfileV2:
     shortlist_config: ExecutionProfileShortlistConfigV2
     parallelism: ExecutionProfileParallelismConfigV2
     feature_flags: ExecutionProfileFeatureFlagsV2
+    launch_budget: ExecutionProfileLaunchBudgetV2
+    progress_weights: BacktestJobStageWeights
     planning_budget_ms: int
 
     def __post_init__(self) -> None:
@@ -271,6 +367,10 @@ class ExecutionProfileV2:
             raise ValueError("ExecutionProfileV2.parallelism is required")
         if self.feature_flags is None:  # type: ignore[truthy-bool]
             raise ValueError("ExecutionProfileV2.feature_flags is required")
+        if self.launch_budget is None:  # type: ignore[truthy-bool]
+            raise ValueError("ExecutionProfileV2.launch_budget is required")
+        if self.progress_weights is None:  # type: ignore[truthy-bool]
+            raise ValueError("ExecutionProfileV2.progress_weights is required")
         if self.planning_budget_ms <= 0:
             raise ValueError("ExecutionProfileV2.planning_budget_ms must be > 0")
 
@@ -407,10 +507,172 @@ class ExecutionProfilesCatalogV2:
                 return profile
         raise ValueError(f"ExecutionProfilesCatalogV2 does not contain mode {mode!r}")
 
+    def runtime_enabled_exact_profiles(self) -> tuple[ExecutionProfileV2, ...]:
+        """
+        Return ordered runtime-enabled exact profiles available for current rollout decisions.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - apps/api/dto/backtest_runtime_defaults.py
+
+        Args:
+            None.
+        Returns:
+            tuple[ExecutionProfileV2, ...]: Ordered runtime-enabled exact profiles only.
+        Assumptions:
+            Exact-only rollout may activate multiple exact profiles before hybrid rollout exists.
+        Raises:
+            ValueError: If no runtime-enabled exact profiles remain in the catalog.
+        Side Effects:
+            None.
+        """
+        exact_profiles = tuple(
+            profile
+            for profile in self.available_profiles
+            if profile.mode in _EXACT_EXECUTION_PROFILE_MODES_V2
+            and profile.feature_flags.runtime_enabled
+        )
+        if len(exact_profiles) == 0:
+            raise ValueError(
+                "ExecutionProfilesCatalogV2 must include at least one runtime-enabled exact "
+                "profile"
+            )
+        return exact_profiles
+
+    def background_exact_profile(self) -> ExecutionProfileV2:
+        """
+        Return the heaviest runtime-enabled exact profile used for heavy background execution.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - apps/api/wiring/modules/backtest.py
+
+        Args:
+            None.
+        Returns:
+            ExecutionProfileV2: The last runtime-enabled exact profile in configured order.
+        Assumptions:
+            Catalog order reflects progressively heavier exact runtime profiles.
+        Raises:
+            ValueError: If there are no runtime-enabled exact profiles.
+        Side Effects:
+            None.
+        """
+        return self.runtime_enabled_exact_profiles()[-1]
+
+
+def _default_launch_budget_for_mode_v2(
+    *,
+    mode: ExecutionProfileModeLiteralV2,
+) -> ExecutionProfileLaunchBudgetV2:
+    """
+    Return default deterministic launch-budget thresholds for one approved profile literal.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - configs/prod/backtest.yaml
+
+    Args:
+        mode: Stable execution-profile mode literal.
+    Returns:
+        ExecutionProfileLaunchBudgetV2: Default launch budget for the requested profile.
+    Assumptions:
+        Exact profiles use explicit reviewable thresholds; hybrid defaults stay inert until
+        runtime rollout activates them.
+    Raises:
+        ValueError: If the mode literal is unsupported.
+    Side Effects:
+        None.
+    """
+    budgets_by_mode: dict[ExecutionProfileModeLiteralV2, ExecutionProfileLaunchBudgetV2] = {
+        "exact_small": ExecutionProfileLaunchBudgetV2(
+            max_stage_a_variants_total=1500,
+            max_stage_b_variants_total=12000,
+            max_estimated_memory_bytes=268435456,
+        ),
+        "exact_parallel": ExecutionProfileLaunchBudgetV2(
+            max_stage_a_variants_total=25000,
+            max_stage_b_variants_total=180000,
+            max_estimated_memory_bytes=1610612736,
+        ),
+        "hybrid_conservative": ExecutionProfileLaunchBudgetV2(
+            max_stage_a_variants_total=50000,
+            max_stage_b_variants_total=250000,
+            max_estimated_memory_bytes=2147483648,
+        ),
+        "hybrid_family": ExecutionProfileLaunchBudgetV2(
+            max_stage_a_variants_total=75000,
+            max_stage_b_variants_total=300000,
+            max_estimated_memory_bytes=2684354560,
+        ),
+    }
+    try:
+        return budgets_by_mode[mode]
+    except KeyError as error:  # pragma: no cover - guarded by validated literal type
+        raise ValueError(
+            f"Unsupported execution profile mode for launch budget: {mode!r}"
+        ) from error
+
+
+def _default_progress_weights_for_mode_v2(
+    *,
+    mode: ExecutionProfileModeLiteralV2,
+) -> BacktestJobStageWeights:
+    """
+    Return default deterministic progress weights for one approved execution profile literal.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - configs/prod/backtest.yaml
+
+    Args:
+        mode: Stable execution-profile mode literal.
+    Returns:
+        BacktestJobStageWeights: Deterministic progress weights summing to `100`.
+    Assumptions:
+        Progress weights live inside the profile contract once profile selection becomes active.
+    Raises:
+        ValueError: If the mode literal is unsupported.
+    Side Effects:
+        None.
+    """
+    weights_by_mode: dict[ExecutionProfileModeLiteralV2, BacktestJobStageWeights] = {
+        "exact_small": BacktestJobStageWeights(stage_a=25, stage_b=70, finalizing=5),
+        "exact_parallel": BacktestJobStageWeights(stage_a=35, stage_b=60, finalizing=5),
+        "hybrid_conservative": BacktestJobStageWeights(
+            stage_a=50,
+            stage_b=45,
+            finalizing=5,
+        ),
+        "hybrid_family": BacktestJobStageWeights(stage_a=60, stage_b=35, finalizing=5),
+    }
+    try:
+        return weights_by_mode[mode]
+    except KeyError as error:  # pragma: no cover - guarded by validated literal type
+        raise ValueError(
+            f"Unsupported execution profile mode for progress weights: {mode!r}"
+        ) from error
+
 
 def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
     """
-    Build the default ordered execution-profile catalog for additive A1 rollout.
+    Build the default ordered execution-profile catalog for executable exact parallel rollout.
 
     Docs:
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
@@ -426,8 +688,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
         ExecutionProfilesCatalogV2: Default catalog with all known profile literals in
             deterministic order.
     Assumptions:
-        Current milestone keeps `exact_small` as the default runtime-enabled baseline while
-        future profiles remain explicitly represented for later EPICs.
+        `exact_small` remains the active default exact baseline, while `exact_parallel` is also
+        runtime-enabled and may activate process-based Stage B when later runtime selection
+        resolves that profile explicitly.
     Raises:
         ValueError: If one default profile literal violates catalog invariants.
     Side Effects:
@@ -452,6 +715,8 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     parallel_stage_b_enabled=False,
                     family_plugin_enabled=False,
                 ),
+                launch_budget=_default_launch_budget_for_mode_v2(mode="exact_small"),
+                progress_weights=_default_progress_weights_for_mode_v2(mode="exact_small"),
                 planning_budget_ms=25,
             ),
             ExecutionProfileV2(
@@ -465,11 +730,13 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     stage_b_workers=4,
                 ),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
-                    runtime_enabled=False,
+                    runtime_enabled=True,
                     heuristic_shortlist_enabled=False,
-                    parallel_stage_b_enabled=False,
+                    parallel_stage_b_enabled=True,
                     family_plugin_enabled=False,
                 ),
+                launch_budget=_default_launch_budget_for_mode_v2(mode="exact_parallel"),
+                progress_weights=_default_progress_weights_for_mode_v2(mode="exact_parallel"),
                 planning_budget_ms=50,
             ),
             ExecutionProfileV2(
@@ -487,6 +754,12 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     heuristic_shortlist_enabled=False,
                     parallel_stage_b_enabled=False,
                     family_plugin_enabled=False,
+                ),
+                launch_budget=_default_launch_budget_for_mode_v2(
+                    mode="hybrid_conservative"
+                ),
+                progress_weights=_default_progress_weights_for_mode_v2(
+                    mode="hybrid_conservative"
                 ),
                 planning_budget_ms=75,
             ),
@@ -506,6 +779,10 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     parallel_stage_b_enabled=False,
                     family_plugin_enabled=False,
                 ),
+                launch_budget=_default_launch_budget_for_mode_v2(mode="hybrid_family"),
+                progress_weights=_default_progress_weights_for_mode_v2(
+                    mode="hybrid_family"
+                ),
                 planning_budget_ms=100,
             ),
         ),
@@ -516,6 +793,7 @@ __all__ = [
     "ALLOWED_EXECUTION_PROFILE_MODES_V2",
     "DEFAULT_EXECUTION_PROFILE_MODE_V2",
     "ExecutionProfileFeatureFlagsV2",
+    "ExecutionProfileLaunchBudgetV2",
     "ExecutionProfileModeLiteralV2",
     "ExecutionProfileParallelismConfigV2",
     "ExecutionProfileShortlistConfigV2",

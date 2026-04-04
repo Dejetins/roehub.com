@@ -464,6 +464,7 @@ class RunBacktestUseCase:
                 artifact_manifest_hash=resolved.artifact_context.artifact_manifest_hash,
                 spec_hash=resolved.spec_hash,
                 spec_payload_json=resolved.spec_payload_json,
+                execution_profile_mode=runtime_plan.execution_profile.mode,
             )
         except RoehubError:
             raise

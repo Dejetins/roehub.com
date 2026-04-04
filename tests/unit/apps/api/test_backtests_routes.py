@@ -538,6 +538,16 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "parallel_stage_b_enabled": False,
                             "family_plugin_enabled": False,
                         },
+                        "launch_budget": {
+                            "max_stage_a_variants_total": 1500,
+                            "max_stage_b_variants_total": 12000,
+                            "max_estimated_memory_bytes": 268435456,
+                        },
+                        "progress_weights": {
+                            "stage_a": 25,
+                            "stage_b": 70,
+                            "finalizing": 5,
+                        },
                         "planning_budget_ms": 25,
                     },
                     {
@@ -551,10 +561,20 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "stage_b_workers": 4,
                         },
                         "feature_flags": {
-                            "runtime_enabled": False,
+                            "runtime_enabled": True,
                             "heuristic_shortlist_enabled": False,
-                            "parallel_stage_b_enabled": False,
+                            "parallel_stage_b_enabled": True,
                             "family_plugin_enabled": False,
+                        },
+                        "launch_budget": {
+                            "max_stage_a_variants_total": 25000,
+                            "max_stage_b_variants_total": 180000,
+                            "max_estimated_memory_bytes": 1610612736,
+                        },
+                        "progress_weights": {
+                            "stage_a": 35,
+                            "stage_b": 60,
+                            "finalizing": 5,
                         },
                         "planning_budget_ms": 50,
                     },
@@ -574,6 +594,16 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "parallel_stage_b_enabled": False,
                             "family_plugin_enabled": False,
                         },
+                        "launch_budget": {
+                            "max_stage_a_variants_total": 50000,
+                            "max_stage_b_variants_total": 250000,
+                            "max_estimated_memory_bytes": 2147483648,
+                        },
+                        "progress_weights": {
+                            "stage_a": 50,
+                            "stage_b": 45,
+                            "finalizing": 5,
+                        },
                         "planning_budget_ms": 75,
                     },
                     {
@@ -591,6 +621,16 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "heuristic_shortlist_enabled": False,
                             "parallel_stage_b_enabled": False,
                             "family_plugin_enabled": False,
+                        },
+                        "launch_budget": {
+                            "max_stage_a_variants_total": 75000,
+                            "max_stage_b_variants_total": 300000,
+                            "max_estimated_memory_bytes": 2684354560,
+                        },
+                        "progress_weights": {
+                            "stage_a": 60,
+                            "stage_b": 35,
+                            "finalizing": 5,
                         },
                         "planning_budget_ms": 100,
                     },

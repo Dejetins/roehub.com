@@ -124,17 +124,28 @@ artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kerne
 - production orchestration больше не возвращается к legacy close-fill fallback и не строит live
   candle timelines через ClickHouse.
 
-## Milestone B / EPIC B1 exact-core acceleration note
+## Milestone B exact acceleration note
 
-B1 не меняет финальную exact semantics и не включает process-parallel Stage B или request
-classification.
+B1 оставляет финальную exact semantics неизменной и ограничивается in-process exact-core
+оптимизациями без request classification.
 
-Разрешённые exact-only internal optimizations для этого этапа:
+B2 активирует executable `exact_parallel` semantics для уже resolved execution profiles:
+
+- Stage B может исполняться через `spawn`-based worker processes;
+- каждый worker заново открывает pinned artifacts readonly через mmap и не делит mutable runtime
+  state с coordinator process;
+- coordinator merge происходит в canonical chunk order, поэтому completion order worker'ов не
+  влияет на winners, persisted ordering или checkpoint frontier;
+- `exact_small` остаётся serial exact path;
+- active runtime default по-прежнему не меняется автоматически и request classification для
+  `exact_parallel` остаётся вне scope до следующего EPIC.
+
+Разрешённые exact-only internal optimizations для B1/B2:
 
 - reuse deterministic row/array plans across repeated `compute_index` / `signal_index` groups;
 - reuse already validated mmap payloads inside one pinned runtime instance;
-- сокращать transient Python allocations в Stage A / Stage B orchestration, если winner ordering,
-  `variant_key` semantics и финальные metrics остаются byte-stable по существующим fixtures;
+- process-parallel Stage B только для уже resolved profiles с
+  `feature_flags.parallel_stage_b_enabled = true`;
 - использовать existing `exact_baseline` и `small_grid_overhead` benchmark vocabulary как
   evidence surface, не меняя active runtime default и не conflating `exact_baseline` anchor with
   rollout policy.

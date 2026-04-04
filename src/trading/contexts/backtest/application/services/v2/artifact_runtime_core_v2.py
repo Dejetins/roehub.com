@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, wait
 from dataclasses import dataclass
 from heapq import heappush, heapreplace
+from multiprocessing import get_context
 from numbers import Real
 from types import MappingProxyType
 from typing import Any, Callable, Mapping, cast
@@ -111,6 +113,142 @@ StageBHeapEntryV2 = tuple[
     "BacktestStageBScoredVariantV2",
     "BacktestStageBTaskV2",
 ]
+
+
+@dataclass(frozen=True, slots=True)
+class _StageBParallelIndicatorSelectionSnapshotV2:
+    """
+    Picklable indicator-selection snapshot used by spawned Stage B workers.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/indicators/application/dto/variant_key.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+    """
+
+    indicator_id: str
+    inputs: tuple[tuple[str, int | float | str], ...]
+    params: tuple[tuple[str, int | float | str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _StageBParallelTaskSnapshotV2:
+    """
+    Picklable Stage B task snapshot for spawned exact-parallel chunk workers.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+    """
+
+    variant_index: int
+    indicator_variant_key: str
+    variant_key: str
+    indicator_selections: tuple[_StageBParallelIndicatorSelectionSnapshotV2, ...]
+    signal_params: tuple[tuple[str, tuple[tuple[str, BacktestVariantScalar], ...]], ...]
+    risk_params: tuple[tuple[str, BacktestVariantScalar], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _StageBParallelChunkV2:
+    """
+    Canonically ordered Stage B chunk submitted to one spawned process worker.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+
+    chunk_index: int
+    task_count: int
+    tasks: tuple[_StageBParallelTaskSnapshotV2, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _StageBParallelHeapEntrySnapshotV2:
+    """
+    Picklable bounded-top-k entry returned by one spawned Stage B worker chunk.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+
+    primary_component: float
+    secondary_component: float
+    descending_variant_key: tuple[int, ...]
+    variant_index: int
+    indicator_variant_key: str
+    variant_key: str
+    total_return_pct: float
+    summary_metrics_json: tuple[tuple[str, float], ...]
+    best_tp_pct: float | None
+    best_sl_pct: float | None
+    task: _StageBParallelTaskSnapshotV2
+
+
+@dataclass(frozen=True, slots=True)
+class _StageBParallelChunkResultV2:
+    """
+    Deterministic per-chunk Stage B result merged by the coordinator in chunk order.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+
+    chunk_index: int
+    task_count: int
+    entries: tuple[_StageBParallelHeapEntrySnapshotV2, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _StageBParallelWorkerBootstrapV2:
+    """
+    Immutable bootstrap payload rehydrating one Stage B scorer per spawned worker process.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+
+    scorer_worker_class: type[Any]
+    scorer_worker_snapshot: object
+    candles: CandleArrays
+
+
+@dataclass(frozen=True, slots=True)
+class _StageBParallelWorkerStateV2:
+    """
+    Process-local worker state reused across every Stage B chunk handled by that process.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+
+    scorer: MetricScorerV2
+    candles: CandleArrays
 
 
 @dataclass(frozen=True, slots=True)
@@ -259,7 +397,7 @@ class BacktestArtifactRuntimeRunnerV2:
         on_checkpoint: StageBCheckpointCallbackV2 | None = None,
     ) -> tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
         """
-        Score Stage B variants with bounded top-k heap and optional checkpoint hooks.
+        Score Stage B variants through serial or process-parallel exact execution.
 
         Args:
             template: Effective run template used for deterministic variant-key build.
@@ -278,11 +416,21 @@ class BacktestArtifactRuntimeRunnerV2:
             tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
                 Deterministically ranked Stage B rows and task mapping by `variant_key`.
         Assumptions:
-            Final deterministic tie-break for Stage B remains `variant_key ASC`.
+            Final deterministic tie-break for Stage B remains `variant_key ASC`, while
+            `exact_parallel` may activate process-based chunk scoring only when the resolved
+            execution profile explicitly enables it.
         Raises:
             ValueError: If limits/batch-size are invalid or scorer payload is malformed.
         Side Effects:
-            None.
+            May spawn process workers for deterministic exact-parallel Stage B scoring.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
         """
         if top_k_limit <= 0:
             raise ValueError("BacktestArtifactRuntimeRunnerV2 top_k_limit must be > 0")
@@ -301,7 +449,82 @@ class BacktestArtifactRuntimeRunnerV2:
         total = int(runtime_plan.stage_b_variants_total)
         if cancel_checker is not None:
             cancel_checker(STAGE_B_LITERAL_V2)
+        if self._should_run_stage_b_parallel_v2(runtime_plan=runtime_plan):
+            return self._run_stage_b_parallel_v2(
+                template=template,
+                runtime_plan=runtime_plan,
+                shortlist=shortlist,
+                candles=candles,
+                scorer=scorer,
+                top_k_limit=top_k_limit,
+                ranking_plan=ranking_plan,
+                effective_batch=effective_batch,
+                total=total,
+                cancel_checker=cancel_checker,
+                on_checkpoint=on_checkpoint,
+            )
+        return self._run_stage_b_serial_v2(
+            template=template,
+            runtime_plan=runtime_plan,
+            shortlist=shortlist,
+            candles=candles,
+            scorer=scorer,
+            top_k_limit=top_k_limit,
+            ranking_plan=ranking_plan,
+            effective_batch=effective_batch,
+            total=total,
+            cancel_checker=cancel_checker,
+            on_checkpoint=on_checkpoint,
+        )
 
+    def _run_stage_b_serial_v2(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        shortlist: tuple[BacktestStageAScoredVariantV2, ...],
+        candles: CandleArrays,
+        scorer: MetricScorerV2,
+        top_k_limit: int,
+        ranking_plan: ResolvedRankingPlanV2,
+        effective_batch: int,
+        total: int,
+        cancel_checker: CancelCheckerV2 | None,
+        on_checkpoint: StageBCheckpointCallbackV2 | None,
+    ) -> tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+        """
+        Execute the canonical in-process Stage B loop with bounded deterministic top-k state.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+
+        Args:
+            template: Effective run template used for deterministic variant-key build.
+            runtime_plan: Deterministic artifact-backed runtime plan.
+            shortlist: Deterministically ranked Stage A shortlist rows.
+            candles: Warmup-inclusive request-timeframe candles.
+            scorer: Artifact-backed Stage B scorer contract implementation.
+            top_k_limit: Maximum number of Stage B rows retained in memory.
+            ranking_plan: Pre-resolved ranking plan.
+            effective_batch: Positive checkpoint cadence in processed units.
+            total: Total Stage B variants expected from `runtime_plan`.
+            cancel_checker: Optional cooperative cancellation callback by stage.
+            on_checkpoint: Optional checkpoint callback with lazy frontier materializers.
+        Returns:
+            tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+                Deterministically ranked Stage B rows and task mapping by `variant_key`.
+        Assumptions:
+            Final deterministic tie-break for Stage B remains `variant_key ASC`.
+        Raises:
+            ValueError: If scorer payload is malformed.
+        Side Effects:
+            None.
+        """
         score_variant_metric = resolve_score_variant_metric_fn_v2(scorer=scorer)
         top_heap: list[StageBHeapEntryV2] = []
         processed = 0
@@ -317,54 +540,357 @@ class BacktestArtifactRuntimeRunnerV2:
                 candles=candles,
                 score_variant_metric=score_variant_metric,
             )
-            heap_entry = stage_b_heap_entry_v2(
-                row=row,
-                task=task,
-                metrics=metrics,
-                ranking_plan=ranking_plan,
+            self._merge_stage_b_heap_entry_v2(
+                heap=top_heap,
+                entry=stage_b_heap_entry_v2(
+                    row=row,
+                    task=task,
+                    metrics=metrics,
+                    ranking_plan=ranking_plan,
+                ),
+                top_k_limit=top_k_limit,
             )
-            if len(top_heap) < top_k_limit:
-                heappush(top_heap, heap_entry)
-            elif heap_entry_outranks_v2(candidate=heap_entry, baseline=top_heap[0]):
-                heapreplace(top_heap, heap_entry)
 
             processed += 1
             if processed % effective_batch != 0 and processed != total:
                 continue
-            if cancel_checker is not None:
-                cancel_checker(STAGE_B_LITERAL_V2)
-            if on_checkpoint is not None:
-                sorted_entries_cache: tuple[StageBHeapEntryV2, ...] | None = None
-                rows_cache: tuple[BacktestStageBScoredVariantV2, ...] | None = None
-                tasks_cache: Mapping[str, BacktestStageBTaskV2] | None = None
+            self._emit_stage_b_checkpoint_v2(
+                top_heap=top_heap,
+                processed=processed,
+                total=total,
+                cancel_checker=cancel_checker,
+                on_checkpoint=on_checkpoint,
+            )
 
-                def _sorted_entries() -> tuple[StageBHeapEntryV2, ...]:
-                    nonlocal sorted_entries_cache
-                    if sorted_entries_cache is None:
-                        sorted_entries_cache = sorted_stage_b_heap_entries_v2(heap=top_heap)
-                    return sorted_entries_cache
+        return self._materialize_stage_b_heap_v2(top_heap=top_heap)
 
-                def _materialize_ranked_rows() -> tuple[BacktestStageBScoredVariantV2, ...]:
-                    nonlocal rows_cache
-                    if rows_cache is None:
-                        rows_cache = tuple(entry[3] for entry in _sorted_entries())
-                    return rows_cache
+    def _run_stage_b_parallel_v2(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        shortlist: tuple[BacktestStageAScoredVariantV2, ...],
+        candles: CandleArrays,
+        scorer: MetricScorerV2,
+        top_k_limit: int,
+        ranking_plan: ResolvedRankingPlanV2,
+        effective_batch: int,
+        total: int,
+        cancel_checker: CancelCheckerV2 | None,
+        on_checkpoint: StageBCheckpointCallbackV2 | None,
+    ) -> tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+        """
+        Execute exact-parallel Stage B through spawned readonly workers and ordered chunk merge.
 
-                def _materialize_tasks() -> Mapping[str, BacktestStageBTaskV2]:
-                    nonlocal tasks_cache
-                    if tasks_cache is None:
-                        tasks_cache = stage_b_tasks_from_sorted_entries_v2(
-                            entries=_sorted_entries()
-                        )
-                    return tasks_cache
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
 
-                on_checkpoint(
-                    processed,
-                    total,
-                    _materialize_ranked_rows,
-                    _materialize_tasks,
+        Args:
+            template: Effective run template used for deterministic variant-key build.
+            runtime_plan:
+                Deterministic artifact-backed runtime plan with resolved execution profile.
+            shortlist: Deterministically ranked Stage A shortlist rows.
+            candles: Warmup-inclusive request-timeframe candles.
+            scorer: Artifact-backed Stage B scorer contract implementation.
+            top_k_limit: Maximum number of Stage B rows retained in memory.
+            ranking_plan: Pre-resolved ranking plan.
+            effective_batch: Positive checkpoint cadence in processed units.
+            total: Total Stage B variants expected from `runtime_plan`.
+            cancel_checker: Optional cooperative cancellation callback by stage.
+            on_checkpoint: Optional checkpoint callback with lazy frontier materializers.
+        Returns:
+            tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+                Deterministically ranked Stage B rows and task mapping by `variant_key`.
+        Assumptions:
+            Worker completion order must not influence merged results or checkpoint frontiers.
+        Raises:
+            ValueError: If scorer does not expose spawned-worker snapshot support.
+        Side Effects:
+            Spawns process workers via the `spawn` multiprocessing context.
+        """
+        worker_factory = resolve_parallel_stage_b_worker_factory_v2(scorer=scorer)
+        if worker_factory is None:
+            raise ValueError(
+                "resolved parallel Stage B profile requires scorer worker snapshot support"
+            )
+        risk_total = len(runtime_plan.risk_variants)
+        if risk_total == 0 or len(shortlist) == 0:
+            return self._materialize_stage_b_heap_v2(top_heap=[])
+        base_variants_per_chunk = _parallel_stage_b_base_variants_per_chunk_v2(
+            risk_total=risk_total,
+            effective_batch=effective_batch,
+        )
+        chunk_count = (len(shortlist) + base_variants_per_chunk - 1) // base_variants_per_chunk
+        profile = getattr(runtime_plan, "execution_profile", None)
+        requested_workers = getattr(getattr(profile, "parallelism", None), "stage_b_workers", 1)
+        worker_count = max(1, min(chunk_count, int(requested_workers)))
+        if worker_count <= 1:
+            return self._run_stage_b_serial_v2(
+                template=template,
+                runtime_plan=runtime_plan,
+                shortlist=shortlist,
+                candles=candles,
+                scorer=scorer,
+                top_k_limit=top_k_limit,
+                ranking_plan=ranking_plan,
+                effective_batch=effective_batch,
+                total=total,
+                cancel_checker=cancel_checker,
+                on_checkpoint=on_checkpoint,
+            )
+
+        scorer_class, scorer_snapshot = worker_factory
+        top_heap: list[StageBHeapEntryV2] = []
+        processed = 0
+        next_merge_chunk_index = 0
+        pending_futures: dict[Future[_StageBParallelChunkResultV2], int] = {}
+        ready_results: dict[int, _StageBParallelChunkResultV2] = {}
+        max_inflight = max(worker_count, worker_count * 2)
+        chunk_iterator = iter(
+            _iter_stage_b_parallel_chunks_v2(
+                template=template,
+                runtime_plan=runtime_plan,
+                shortlist=shortlist,
+                effective_batch=effective_batch,
+            )
+        )
+        chunks_exhausted = False
+
+        with ProcessPoolExecutor(
+            max_workers=worker_count,
+            mp_context=get_context("spawn"),
+            initializer=_initialize_stage_b_parallel_worker_v2,
+            initargs=(
+                _StageBParallelWorkerBootstrapV2(
+                    scorer_worker_class=scorer_class,
+                    scorer_worker_snapshot=scorer_snapshot,
+                    candles=candles,
+                ),
+            ),
+        ) as executor:
+            while not chunks_exhausted or pending_futures:
+                while not chunks_exhausted and len(pending_futures) < max_inflight:
+                    if cancel_checker is not None:
+                        cancel_checker(STAGE_B_LITERAL_V2)
+                    try:
+                        chunk = next(chunk_iterator)
+                    except StopIteration:
+                        chunks_exhausted = True
+                        break
+                    future = executor.submit(
+                        _score_stage_b_parallel_chunk_v2,
+                        chunk=chunk,
+                        ranking_plan=ranking_plan,
+                        top_k_limit=top_k_limit,
+                    )
+                    pending_futures[future] = chunk.chunk_index
+                if not pending_futures:
+                    continue
+                completed, _ = wait(
+                    tuple(pending_futures.keys()),
+                    return_when=FIRST_COMPLETED,
                 )
+                for future in completed:
+                    chunk_index = pending_futures.pop(future)
+                    ready_results[chunk_index] = future.result()
+                while next_merge_chunk_index in ready_results:
+                    if cancel_checker is not None:
+                        cancel_checker(STAGE_B_LITERAL_V2)
+                    chunk_result = ready_results.pop(next_merge_chunk_index)
+                    for entry_snapshot in chunk_result.entries:
+                        self._merge_stage_b_heap_entry_v2(
+                            heap=top_heap,
+                            entry=_stage_b_heap_entry_from_parallel_snapshot_v2(
+                                snapshot=entry_snapshot
+                            ),
+                            top_k_limit=top_k_limit,
+                        )
+                    processed += chunk_result.task_count
+                    if processed % effective_batch == 0 or processed == total:
+                        self._emit_stage_b_checkpoint_v2(
+                            top_heap=top_heap,
+                            processed=processed,
+                            total=total,
+                            cancel_checker=cancel_checker,
+                            on_checkpoint=on_checkpoint,
+                        )
+                    next_merge_chunk_index += 1
 
+        return self._materialize_stage_b_heap_v2(top_heap=top_heap)
+
+    def _should_run_stage_b_parallel_v2(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+    ) -> bool:
+        """
+        Decide whether the resolved runtime plan enables process-based exact Stage B execution.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+
+        Args:
+            runtime_plan: Deterministic artifact-backed runtime plan.
+        Returns:
+            bool: `True` when Stage B should use spawned workers, otherwise `False`.
+        Assumptions:
+            Request classification stays unchanged; only already-resolved profiles may activate
+            this path.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        execution_profile = getattr(runtime_plan, "execution_profile", None)
+        if execution_profile is None:
+            return False
+        feature_flags = getattr(execution_profile, "feature_flags", None)
+        parallelism = getattr(execution_profile, "parallelism", None)
+        if feature_flags is None or parallelism is None:
+            return False
+        if not bool(getattr(feature_flags, "parallel_stage_b_enabled", False)):
+            return False
+        return int(getattr(parallelism, "stage_b_workers", 1)) > 1
+
+    def _merge_stage_b_heap_entry_v2(
+        self,
+        *,
+        heap: list[StageBHeapEntryV2],
+        entry: StageBHeapEntryV2,
+        top_k_limit: int,
+    ) -> None:
+        """
+        Merge one Stage B heap entry into the bounded retained frontier.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+        Args:
+            heap: Mutable retained Stage B heap.
+            entry: Candidate Stage B heap entry.
+            top_k_limit: Maximum retained heap size.
+        Returns:
+            None.
+        Assumptions:
+            Heap root stores the current worst retained row under the deterministic comparator.
+        Raises:
+            None.
+        Side Effects:
+            Mutates the supplied heap in place.
+        """
+        if len(heap) < top_k_limit:
+            heappush(heap, entry)
+            return
+        if heap_entry_outranks_v2(candidate=entry, baseline=heap[0]):
+            heapreplace(heap, entry)
+
+    def _emit_stage_b_checkpoint_v2(
+        self,
+        *,
+        top_heap: list[StageBHeapEntryV2],
+        processed: int,
+        total: int,
+        cancel_checker: CancelCheckerV2 | None,
+        on_checkpoint: StageBCheckpointCallbackV2 | None,
+    ) -> None:
+        """
+        Emit one lazy Stage B checkpoint from the current bounded retained frontier.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+
+        Args:
+            top_heap: Mutable retained Stage B heap.
+            processed: Processed Stage B units so far.
+            total: Total Stage B units expected.
+            cancel_checker: Optional cooperative cancellation callback by stage.
+            on_checkpoint: Optional checkpoint callback with lazy frontier materializers.
+        Returns:
+            None.
+        Assumptions:
+            Checkpoint materialization must preserve the same deterministic row/task ordering as
+            final Stage B output.
+        Raises:
+            None.
+        Side Effects:
+            May invoke cancellation and checkpoint callbacks.
+        """
+        if cancel_checker is not None:
+            cancel_checker(STAGE_B_LITERAL_V2)
+        if on_checkpoint is None:
+            return
+
+        sorted_entries_cache: tuple[StageBHeapEntryV2, ...] | None = None
+        rows_cache: tuple[BacktestStageBScoredVariantV2, ...] | None = None
+        tasks_cache: Mapping[str, BacktestStageBTaskV2] | None = None
+
+        def _sorted_entries() -> tuple[StageBHeapEntryV2, ...]:
+            nonlocal sorted_entries_cache
+            if sorted_entries_cache is None:
+                sorted_entries_cache = sorted_stage_b_heap_entries_v2(heap=top_heap)
+            return sorted_entries_cache
+
+        def _materialize_ranked_rows() -> tuple[BacktestStageBScoredVariantV2, ...]:
+            nonlocal rows_cache
+            if rows_cache is None:
+                rows_cache = tuple(entry[3] for entry in _sorted_entries())
+            return rows_cache
+
+        def _materialize_tasks() -> Mapping[str, BacktestStageBTaskV2]:
+            nonlocal tasks_cache
+            if tasks_cache is None:
+                tasks_cache = stage_b_tasks_from_sorted_entries_v2(entries=_sorted_entries())
+            return tasks_cache
+
+        on_checkpoint(
+            processed,
+            total,
+            _materialize_ranked_rows,
+            _materialize_tasks,
+        )
+
+    def _materialize_stage_b_heap_v2(
+        self,
+        *,
+        top_heap: list[StageBHeapEntryV2],
+    ) -> tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+        """
+        Materialize final deterministic Stage B rows and task mapping from the retained heap.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+        Args:
+            top_heap: Mutable retained Stage B heap.
+        Returns:
+            tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+                Deterministically ranked Stage B rows and task mapping by `variant_key`.
+        Assumptions:
+            Final row/task projections reuse the same comparator as checkpoint materialization.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
         return (
             stage_b_rows_from_heap_v2(heap=top_heap),
             stage_b_tasks_from_heap_v2(heap=top_heap),
@@ -390,6 +916,468 @@ class BacktestArtifactRuntimeRunnerV2:
         if batch_size <= 0:
             raise ValueError("stage batch_size must be > 0")
         return batch_size
+
+
+_STAGE_B_PARALLEL_WORKER_STATE_V2: _StageBParallelWorkerStateV2 | None = None
+
+
+def resolve_parallel_stage_b_worker_factory_v2(
+    *,
+    scorer: MetricScorerV2,
+) -> tuple[type[Any], object] | None:
+    """
+    Resolve optional spawned-worker scorer rehydration hooks for exact-parallel Stage B.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+
+    Args:
+        scorer: Scorer implementation selected for Stage B ranking.
+    Returns:
+        tuple[type[Any], object] | None: Scorer class plus picklable snapshot, or `None` when
+            the scorer does not advertise spawned-worker support.
+    Assumptions:
+        Optional worker hooks are additive and discovered by method presence.
+    Raises:
+        ValueError: If the scorer exposes only one side of the snapshot contract.
+    Side Effects:
+        None.
+    """
+    snapshot_method = getattr(scorer, "to_parallel_stage_b_worker_snapshot_v2", None)
+    factory_method = getattr(
+        scorer.__class__,
+        "from_parallel_stage_b_worker_snapshot_v2",
+        None,
+    )
+    if snapshot_method is None and factory_method is None:
+        return None
+    if snapshot_method is None or factory_method is None:
+        raise ValueError(
+            "parallel Stage B scorer must expose both "
+            "to_parallel_stage_b_worker_snapshot_v2 and "
+            "from_parallel_stage_b_worker_snapshot_v2"
+        )
+    return scorer.__class__, snapshot_method()
+
+
+def _initialize_stage_b_parallel_worker_v2(
+    worker_bootstrap: _StageBParallelWorkerBootstrapV2,
+) -> None:
+    """
+    Bootstrap one spawned Stage B worker with process-local scorer and immutable candles.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+
+    Args:
+        worker_bootstrap: Immutable scorer snapshot and candle payload for one process.
+    Returns:
+        None.
+    Assumptions:
+        macOS `spawn` requires explicit per-process scorer reconstruction instead of sharing the
+        parent object graph.
+    Raises:
+        ValueError: If scorer rehydration hooks are missing in the worker process.
+    Side Effects:
+        Stores worker-local scorer state in a private module global.
+    """
+    global _STAGE_B_PARALLEL_WORKER_STATE_V2
+    factory_method = getattr(
+        worker_bootstrap.scorer_worker_class,
+        "from_parallel_stage_b_worker_snapshot_v2",
+        None,
+    )
+    if factory_method is None:
+        raise ValueError(
+            "parallel Stage B worker bootstrap requires "
+            "from_parallel_stage_b_worker_snapshot_v2"
+        )
+    _STAGE_B_PARALLEL_WORKER_STATE_V2 = _StageBParallelWorkerStateV2(
+        scorer=cast(
+            MetricScorerV2,
+            factory_method(snapshot=worker_bootstrap.scorer_worker_snapshot),
+        ),
+        candles=worker_bootstrap.candles,
+    )
+
+
+def _require_stage_b_parallel_worker_state_v2() -> _StageBParallelWorkerStateV2:
+    """
+    Return the initialized worker-local state for one exact-parallel Stage B chunk.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+    Args:
+        None.
+    Returns:
+        _StageBParallelWorkerStateV2: Process-local scorer and candle payload.
+    Assumptions:
+        Spawned workers must run `_initialize_stage_b_parallel_worker_v2(...)` before jobs.
+    Raises:
+        ValueError: If the worker was used before bootstrap completed.
+    Side Effects:
+        None.
+    """
+    if _STAGE_B_PARALLEL_WORKER_STATE_V2 is None:
+        raise ValueError("parallel Stage B worker state is not initialized")
+    return _STAGE_B_PARALLEL_WORKER_STATE_V2
+
+
+def _parallel_stage_b_base_variants_per_chunk_v2(
+    *,
+    risk_total: int,
+    effective_batch: int,
+) -> int:
+    """
+    Resolve how many shortlisted base variants belong to one spawned Stage B chunk.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+    Args:
+        risk_total: Total number of Stage B risk variants.
+        effective_batch: Positive checkpoint cadence in processed units.
+    Returns:
+        int: Positive number of shortlisted base variants per chunk.
+    Assumptions:
+        Chunks stay aligned to whole base variants so worker-local caches can reuse Stage A
+        payloads across all risk variants of a base variant.
+    Raises:
+        ValueError: If `risk_total` is non-positive.
+    Side Effects:
+        None.
+    """
+    if risk_total <= 0:
+        raise ValueError("parallel Stage B requires at least one risk variant")
+    return max(1, effective_batch // risk_total)
+
+
+def _iter_stage_b_parallel_chunks_v2(
+    *,
+    template: RunBacktestTemplate,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+    shortlist: tuple[BacktestStageAScoredVariantV2, ...],
+    effective_batch: int,
+):
+    """
+    Build deterministic Stage B chunks grouped by contiguous shortlisted base variants.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+
+    Args:
+        template: Effective run template.
+        runtime_plan: Deterministic artifact-backed runtime plan.
+        shortlist: Deterministically ranked Stage A shortlist rows.
+        effective_batch: Positive checkpoint cadence in processed units.
+    Returns:
+        Iterator[_StageBParallelChunkV2]: Canonically ordered Stage B chunks.
+    Assumptions:
+        Chunk boundaries stay aligned to whole shortlisted base variants so worker-local caches
+        can reuse one Stage A base payload across all risk variants of that base variant.
+    Raises:
+        ValueError: If Stage B risk catalog is unexpectedly empty.
+    Side Effects:
+        None.
+    """
+    risk_total = len(runtime_plan.risk_variants)
+    base_variants_per_chunk = _parallel_stage_b_base_variants_per_chunk_v2(
+        risk_total=risk_total,
+        effective_batch=effective_batch,
+    )
+    chunk_index = 0
+    direction_mode = template.direction_mode
+    sizing_mode = template.sizing_mode
+    execution_params = template.execution_params or {}
+    for chunk_start in range(0, len(shortlist), base_variants_per_chunk):
+        chunk_shortlist = shortlist[chunk_start : chunk_start + base_variants_per_chunk]
+        tasks: list[_StageBParallelTaskSnapshotV2] = []
+        for local_shortlist_index, stage_a_row in enumerate(chunk_shortlist):
+            base_variant = stage_a_row.base_variant
+            shortlist_index = chunk_start + local_shortlist_index
+            for risk_variant in runtime_plan.risk_variants:
+                tasks.append(
+                    _stage_b_parallel_task_snapshot_from_task_v2(
+                        task=_stage_b_task_from_variant_v2(
+                            base_variant=base_variant,
+                            risk_variant=risk_variant,
+                            shortlist_index=shortlist_index,
+                            risk_total=risk_total,
+                            direction_mode=direction_mode,
+                            sizing_mode=sizing_mode,
+                            execution_params=execution_params,
+                        )
+                    )
+                )
+        yield _StageBParallelChunkV2(
+            chunk_index=chunk_index,
+            task_count=len(tasks),
+            tasks=tuple(tasks),
+        )
+        chunk_index += 1
+
+
+def _score_stage_b_parallel_chunk_v2(
+    *,
+    chunk: _StageBParallelChunkV2,
+    ranking_plan: ResolvedRankingPlanV2,
+    top_k_limit: int,
+) -> _StageBParallelChunkResultV2:
+    """
+    Score one deterministic Stage B chunk inside a spawned worker and keep local top-k only.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+
+    Args:
+        chunk: Canonically ordered Stage B chunk snapshot.
+        ranking_plan: Pre-resolved ranking plan.
+        top_k_limit: Maximum retained rows for the local chunk frontier.
+    Returns:
+        _StageBParallelChunkResultV2: Chunk-local bounded frontier ready for coordinator merge.
+    Assumptions:
+        A global top-k candidate must belong to the local top-k of its originating chunk.
+    Raises:
+        ValueError: If the worker scorer is unavailable or returns malformed metrics.
+    Side Effects:
+        Reuses worker-local scorer caches while processing this chunk.
+    """
+    worker_state = _require_stage_b_parallel_worker_state_v2()
+    configure_stage_ranking_context_if_supported_v2(
+        scorer=worker_state.scorer,
+        stage=STAGE_B_LITERAL_V2,
+        ranking_plan=ranking_plan,
+    )
+    score_variant_metric = resolve_score_variant_metric_fn_v2(scorer=worker_state.scorer)
+    local_heap: list[StageBHeapEntryV2] = []
+    for task_snapshot in chunk.tasks:
+        task = _stage_b_task_from_parallel_snapshot_v2(snapshot=task_snapshot)
+        row, metrics = score_stage_b_task_with_metrics_v2(
+            task=task,
+            candles=worker_state.candles,
+            score_variant_metric=score_variant_metric,
+        )
+        heap_entry = stage_b_heap_entry_v2(
+            row=row,
+            task=task,
+            metrics=metrics,
+            ranking_plan=ranking_plan,
+        )
+        if len(local_heap) < top_k_limit:
+            heappush(local_heap, heap_entry)
+        elif heap_entry_outranks_v2(candidate=heap_entry, baseline=local_heap[0]):
+            heapreplace(local_heap, heap_entry)
+    return _StageBParallelChunkResultV2(
+        chunk_index=chunk.chunk_index,
+        task_count=chunk.task_count,
+        entries=tuple(
+            _stage_b_parallel_heap_entry_snapshot_v2(entry=entry)
+            for entry in sorted_stage_b_heap_entries_v2(heap=local_heap)
+        ),
+    )
+
+
+def _stage_b_parallel_task_snapshot_from_task_v2(
+    *,
+    task: BacktestStageBTaskV2,
+) -> _StageBParallelTaskSnapshotV2:
+    """
+    Convert one Stage B task into a fully picklable spawned-worker snapshot.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+    Args:
+        task: Canonical in-process Stage B task payload.
+    Returns:
+        _StageBParallelTaskSnapshotV2: Picklable spawned-worker snapshot.
+    Assumptions:
+        Snapshot ordering is stable because nested mappings are serialized by sorted keys.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _StageBParallelTaskSnapshotV2(
+        variant_index=task.variant_index,
+        indicator_variant_key=task.indicator_variant_key,
+        variant_key=task.variant_key,
+        indicator_selections=tuple(
+            _StageBParallelIndicatorSelectionSnapshotV2(
+                indicator_id=selection.indicator_id,
+                inputs=tuple(
+                    sorted((str(key), value) for key, value in selection.inputs.items())
+                ),
+                params=tuple(
+                    sorted((str(key), value) for key, value in selection.params.items())
+                ),
+            )
+            for selection in task.indicator_selections
+        ),
+        signal_params=tuple(
+            (
+                str(indicator_id),
+                tuple(sorted((str(name), value) for name, value in params.items())),
+            )
+            for indicator_id, params in sorted(task.signal_params.items())
+        ),
+        risk_params=tuple(sorted((str(name), value) for name, value in task.risk_params.items())),
+    )
+
+
+def _stage_b_task_from_parallel_snapshot_v2(
+    *,
+    snapshot: _StageBParallelTaskSnapshotV2,
+) -> BacktestStageBTaskV2:
+    """
+    Rebuild one canonical Stage B task from a picklable spawned-worker snapshot.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/indicators/application/dto/variant_key.py
+
+    Args:
+        snapshot: Picklable spawned-worker task snapshot.
+    Returns:
+        BacktestStageBTaskV2: Canonical in-process Stage B task payload.
+    Assumptions:
+        Snapshot values already preserve deterministic ordering and scalar normalization.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return BacktestStageBTaskV2(
+        variant_index=snapshot.variant_index,
+        indicator_variant_key=snapshot.indicator_variant_key,
+        variant_key=snapshot.variant_key,
+        indicator_selections=tuple(
+            IndicatorVariantSelection(
+                indicator_id=selection.indicator_id,
+                inputs=dict(selection.inputs),
+                params=dict(selection.params),
+            )
+            for selection in snapshot.indicator_selections
+        ),
+        signal_params={
+            indicator_id: dict(params)
+            for indicator_id, params in snapshot.signal_params
+        },
+        risk_params=dict(snapshot.risk_params),
+    )
+
+
+def _stage_b_parallel_heap_entry_snapshot_v2(
+    *,
+    entry: StageBHeapEntryV2,
+) -> _StageBParallelHeapEntrySnapshotV2:
+    """
+    Convert one retained Stage B heap entry into a picklable worker-result snapshot.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+    Args:
+        entry: Canonical retained Stage B heap entry.
+    Returns:
+        _StageBParallelHeapEntrySnapshotV2: Picklable worker-result snapshot.
+    Assumptions:
+        Summary metrics are serialized by sorted keys to preserve deterministic payload order.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    primary_component, secondary_component, descending_variant_key, row, task = entry
+    return _StageBParallelHeapEntrySnapshotV2(
+        primary_component=primary_component,
+        secondary_component=secondary_component,
+        descending_variant_key=descending_variant_key,
+        variant_index=row.variant_index,
+        indicator_variant_key=row.indicator_variant_key,
+        variant_key=row.variant_key,
+        total_return_pct=row.total_return_pct,
+        summary_metrics_json=tuple(
+            sorted((str(key), float(value)) for key, value in row.summary_metrics_json.items())
+        ),
+        best_tp_pct=row.best_tp_pct,
+        best_sl_pct=row.best_sl_pct,
+        task=_stage_b_parallel_task_snapshot_from_task_v2(task=task),
+    )
+
+
+def _stage_b_heap_entry_from_parallel_snapshot_v2(
+    *,
+    snapshot: _StageBParallelHeapEntrySnapshotV2,
+) -> StageBHeapEntryV2:
+    """
+    Rebuild one canonical Stage B heap entry from a worker-result snapshot.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+    Args:
+        snapshot: Picklable worker-result snapshot.
+    Returns:
+        StageBHeapEntryV2: Canonical retained heap entry for coordinator merge.
+    Assumptions:
+        Ranking components were already computed under the same deterministic ranking plan inside
+        the worker process.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return (
+        snapshot.primary_component,
+        snapshot.secondary_component,
+        snapshot.descending_variant_key,
+        BacktestStageBScoredVariantV2(
+            variant_index=snapshot.variant_index,
+            indicator_variant_key=snapshot.indicator_variant_key,
+            variant_key=snapshot.variant_key,
+            total_return_pct=snapshot.total_return_pct,
+            summary_metrics_json=dict(snapshot.summary_metrics_json),
+            best_tp_pct=snapshot.best_tp_pct,
+            best_sl_pct=snapshot.best_sl_pct,
+        ),
+        _stage_b_task_from_parallel_snapshot_v2(snapshot=snapshot.task),
+    )
 
 
 def resolve_score_variant_metric_fn_v2(*, scorer: MetricScorerV2) -> ScoreVariantMetricFnV2:

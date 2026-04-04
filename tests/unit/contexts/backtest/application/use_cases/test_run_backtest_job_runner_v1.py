@@ -22,6 +22,9 @@ from trading.contexts.backtest.application.services import (
 from trading.contexts.backtest.application.services.staged_core_runner_v1 import (
     BacktestStageAScoredVariantV1,
 )
+from trading.contexts.backtest.application.services.v2 import (
+    artifact_runtime_core_v2 as artifact_runtime_core_module,
+)
 from trading.contexts.backtest.application.use_cases import RunBacktestJobRunnerV1
 from trading.contexts.backtest.application.use_cases import (
     run_backtest_job_runner_v1 as run_backtest_job_runner_module,
@@ -347,6 +350,7 @@ class _FakeGridContext:
         *,
         base_variants: tuple[BacktestStageABaseVariant, ...],
         risk_variants: tuple[BacktestRiskVariantV1, ...],
+        execution_profile: Any | None = None,
     ) -> None:
         """
         Initialize deterministic staged grid context payload.
@@ -371,6 +375,15 @@ class _FakeGridContext:
         self.risk_variants = risk_variants
         self.stage_a_variants_total = len(base_variants)
         self.stage_b_variants_total = len(base_variants) * len(risk_variants)
+        self.execution_profile = (
+            execution_profile
+            if execution_profile is not None
+            else _build_fake_execution_profile(
+                mode="exact_small",
+                stage_b_workers=1,
+                parallel_stage_b_enabled=False,
+            )
+        )
 
     def iter_stage_a_variants(self) -> tuple[BacktestStageABaseVariant, ...]:
         """
@@ -388,6 +401,39 @@ class _FakeGridContext:
             None.
         """
         return self._base_variants
+
+
+def _build_fake_execution_profile(
+    *,
+    mode: str,
+    stage_b_workers: int,
+    parallel_stage_b_enabled: bool,
+) -> Any:
+    """
+    Build minimal execution-profile fixture with only fields consumed by runtime core tests.
+
+    Args:
+        mode: Stable profile mode literal.
+        stage_b_workers: Configured Stage B worker count.
+        parallel_stage_b_enabled: Whether process-based Stage B is enabled for the profile.
+    Returns:
+        Any: SimpleNamespace carrying `mode`, `parallelism`, and `feature_flags`.
+    Assumptions:
+        Job-runner unit tests only need additive execution-profile fields used by Stage B runtime
+        dispatch and do not validate the full config/catalog dataclasses here.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return SimpleNamespace(
+        mode=mode,
+        parallelism=SimpleNamespace(stage_b_workers=stage_b_workers),
+        feature_flags=SimpleNamespace(
+            runtime_enabled=True,
+            parallel_stage_b_enabled=parallel_stage_b_enabled,
+        ),
+    )
 
 
 class _FakeGridBuilder:
@@ -981,6 +1027,222 @@ class _FrontierStableScorer:
             indicator_variant_key=indicator_variant_key,
             variant_key=variant_key,
         )
+
+
+class _ParallelRankingAwareScorerWithDetails(_RankingAwareScorerWithDetails):
+    """
+    Ranking-aware scorer fake exposing spawned-worker snapshot hooks for exact-parallel tests.
+    """
+
+    def to_parallel_stage_b_worker_snapshot_v2(self) -> Mapping[str, str]:
+        """
+        Return trivial picklable scorer snapshot for spawned-worker rehydration tests.
+
+        Args:
+            None.
+        Returns:
+            Mapping[str, str]: Minimal snapshot payload.
+        Assumptions:
+            This scorer is stateless, so worker bootstrap needs only a sentinel payload.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return {"scorer": "parallel-ranking-aware"}
+
+    @classmethod
+    def from_parallel_stage_b_worker_snapshot_v2(
+        cls,
+        *,
+        snapshot: Mapping[str, str],
+    ) -> _ParallelRankingAwareScorerWithDetails:
+        """
+        Rehydrate deterministic scorer fake from spawned-worker snapshot payload.
+
+        Args:
+            snapshot: Minimal snapshot payload.
+        Returns:
+            _ParallelRankingAwareScorerWithDetails: Rehydrated scorer fake.
+        Assumptions:
+            Snapshot contents are fixed and validated only lightly for these unit tests.
+        Raises:
+            ValueError: If snapshot drift is detected.
+        Side Effects:
+            None.
+        """
+        if snapshot.get("scorer") != "parallel-ranking-aware":
+            raise ValueError("unexpected parallel scorer snapshot")
+        return cls()
+
+
+@dataclass(frozen=True, slots=True)
+class _ImmediateParallelFutureV2:
+    """
+    Already-resolved future stub carrying one chunk index for deterministic wait-order tests.
+    """
+
+    value: Any
+    chunk_index: int
+
+    def result(self) -> Any:
+        """
+        Return stored future result value.
+
+        Args:
+            None.
+        Returns:
+            Any: Precomputed future result payload.
+        Assumptions:
+            Fake executor executes submitted work synchronously before exposing the future.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self.value
+
+
+class _FakeProcessPoolExecutorV2:
+    """
+    Synchronous process-pool stub capturing exact-parallel Stage B bootstrap and chunk order.
+    """
+
+    initializer_bootstraps: list[Any] = []
+    submitted_chunk_indexes: list[int] = []
+
+    def __init__(
+        self,
+        *,
+        max_workers: int,
+        mp_context: object,
+        initializer: Any | None = None,
+        initargs: tuple[object, ...] = (),
+    ) -> None:
+        """
+        Store fake process-pool constructor arguments for deterministic test assertions.
+
+        Args:
+            max_workers: Requested worker count, unused beyond interface compatibility.
+            mp_context: Requested multiprocessing context, unused in the fake executor.
+            initializer: Optional worker initializer callable.
+            initargs: Optional initializer arguments.
+        Returns:
+            None.
+        Assumptions:
+            Unit tests only need interface compatibility and bootstrap capture.
+        Raises:
+            None.
+        Side Effects:
+            Stores initializer state in memory for later synchronous execution.
+        """
+        del max_workers, mp_context
+        self._initializer = initializer
+        self._initargs = initargs
+
+    def __enter__(self) -> _FakeProcessPoolExecutorV2:
+        """
+        Run captured initializer once and return fake executor instance.
+
+        Args:
+            None.
+        Returns:
+            _FakeProcessPoolExecutorV2: This fake executor instance.
+        Assumptions:
+            One shared bootstrap event is sufficient for the synchronous in-process fake.
+        Raises:
+            Exception: Propagates initializer failures unchanged.
+        Side Effects:
+            Captures the worker bootstrap payload and initializes worker-local state in-process.
+        """
+        if self._initializer is not None:
+            _FakeProcessPoolExecutorV2.initializer_bootstraps.append(self._initargs[0])
+            self._initializer(*self._initargs)
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        exc_tb: object | None,
+    ) -> bool:
+        """
+        Propagate exceptions from the fake executor context body unchanged.
+
+        Args:
+            exc_type: Exception type raised inside the context body, if any.
+            exc: Exception instance raised inside the context body, if any.
+            exc_tb: Traceback raised inside the context body, if any.
+        Returns:
+            bool: Always `False` so failures remain visible to the caller.
+        Assumptions:
+            Fake executor should mirror real context-manager propagation behavior.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        del exc_type, exc, exc_tb
+        return False
+
+    def submit(
+        self,
+        fn: Any,
+        /,
+        *args: object,
+        **kwargs: object,
+    ) -> _ImmediateParallelFutureV2:
+        """
+        Execute submitted chunk synchronously and expose deterministic chunk metadata.
+
+        Args:
+            fn: Submitted callable.
+            *args: Positional callable arguments.
+            **kwargs: Keyword callable arguments.
+        Returns:
+            _ImmediateParallelFutureV2: Already-resolved future carrying the chunk index.
+        Assumptions:
+            Exact-parallel unit tests need deterministic merge-order simulation, not real IPC.
+        Raises:
+            Exception: Propagates callable failures unchanged.
+        Side Effects:
+            Captures submitted chunk indexes in memory.
+        """
+        chunk = cast(Any, kwargs["chunk"])
+        _FakeProcessPoolExecutorV2.submitted_chunk_indexes.append(int(chunk.chunk_index))
+        return _ImmediateParallelFutureV2(
+            value=fn(*args, **kwargs),
+            chunk_index=int(chunk.chunk_index),
+        )
+
+
+def _wait_highest_chunk_first_v2(
+    futures: tuple[_ImmediateParallelFutureV2, ...],
+    *,
+    return_when: object,
+) -> tuple[set[_ImmediateParallelFutureV2], set[_ImmediateParallelFutureV2]]:
+    """
+    Return one completed fake future at a time in reverse chunk order.
+
+    Args:
+        futures: Pending fake futures supplied by runtime core.
+        return_when: Ignored wait policy marker kept for signature compatibility.
+    Returns:
+        tuple[set[_ImmediateParallelFutureV2], set[_ImmediateParallelFutureV2]]:
+            Completed subset and remaining futures.
+    Assumptions:
+        Reverse completion order stresses coordinator-side deterministic chunk merge buffering.
+    Raises:
+        ValueError: If called with an empty futures tuple.
+    Side Effects:
+        None.
+    """
+    del return_when
+    if len(futures) == 0:
+        raise ValueError("wait helper requires at least one fake future")
+    completed_future = max(futures, key=lambda future: future.chunk_index)
+    remaining = {future for future in futures if future is not completed_future}
+    return {completed_future}, remaining
 
 
 class _FakeReportingService:
@@ -1922,6 +2184,114 @@ def test_process_claimed_job_skips_snapshot_replace_when_frontier_signature_unch
     ]
     assert report.status == "succeeded"
     assert len(running_snapshots) == 1
+
+
+def test_process_claimed_job_exact_parallel_matches_serial_stage_b_frontiers(
+    monkeypatch: Any,
+) -> None:
+    """
+    Verify exact-parallel Stage B keeps the same persisted frontier sequence as serial exact mode.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Runtime core merges parallel chunk results in canonical chunk order even when worker
+        completion arrives in reverse order.
+    Raises:
+        AssertionError: If exact-parallel changes persisted frontier ordering or skips process
+            worker bootstrap.
+    Side Effects:
+        Monkeypatches Stage B process-pool helpers inside runtime core for deterministic coverage.
+    """
+    _FakeProcessPoolExecutorV2.initializer_bootstraps = []
+    _FakeProcessPoolExecutorV2.submitted_chunk_indexes = []
+    monkeypatch.setattr(
+        artifact_runtime_core_module,
+        "ProcessPoolExecutor",
+        _FakeProcessPoolExecutorV2,
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module,
+        "wait",
+        _wait_highest_chunk_first_v2,
+    )
+
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    risk_variants = _build_risk_variants()
+    serial_results_repository = _FakeResultsRepository()
+    parallel_results_repository = _FakeResultsRepository()
+
+    serial_use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=_build_running_job()),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=serial_results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=risk_variants,
+            execution_profile=_build_fake_execution_profile(
+                mode="exact_small",
+                stage_b_workers=1,
+                parallel_stage_b_enabled=False,
+            ),
+        ),
+        scorer=_ParallelRankingAwareScorerWithDetails(),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=10_000,
+        snapshot_variants_step=1,
+        stage_batch_size=2,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 41, 0)),
+    )
+    parallel_use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=_build_running_job()),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=parallel_results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=risk_variants,
+            execution_profile=_build_fake_execution_profile(
+                mode="exact_parallel",
+                stage_b_workers=2,
+                parallel_stage_b_enabled=True,
+            ),
+        ),
+        scorer=_ParallelRankingAwareScorerWithDetails(),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=10_000,
+        snapshot_variants_step=1,
+        stage_batch_size=2,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 42, 0)),
+    )
+
+    serial_report = serial_use_case.process_claimed_job(
+        job=_build_running_job(),
+        locked_by="worker-test-1",
+    )
+    parallel_report = parallel_use_case.process_claimed_job(
+        job=_build_running_job(),
+        locked_by="worker-test-1",
+    )
+
+    serial_frontiers = [
+        tuple(row.variant_key for row in call["rows"])
+        for call in serial_results_repository.replace_calls
+    ]
+    parallel_frontiers = [
+        tuple(row.variant_key for row in call["rows"])
+        for call in parallel_results_repository.replace_calls
+    ]
+
+    assert serial_report.status == "succeeded"
+    assert parallel_report.status == "succeeded"
+    assert parallel_frontiers == serial_frontiers
+    assert len(_FakeProcessPoolExecutorV2.initializer_bootstraps) == 1
+    assert _FakeProcessPoolExecutorV2.submitted_chunk_indexes == [0, 1]
 
 
 def test_process_claimed_job_builds_runtime_candles_from_pinned_artifact_prices() -> None:

@@ -55,6 +55,7 @@ from trading.shared_kernel.primitives import (
 
 BacktestScalar = int | float | str | bool | None
 BacktestAxisScalar = int | float | str
+_PERSISTED_REQUEST_INTERNAL_FIELDS = frozenset({"execution_profile_mode"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -740,15 +741,53 @@ def decode_backtest_request_payload(*, payload: Mapping[str, Any]) -> RunBacktes
     Returns:
         RunBacktestRequest: Decoded application-layer request DTO.
     Assumptions:
-        Persisted `request_json` follows strict `POST /backtests` request semantics.
+        Persisted `request_json` follows strict `POST /backtests` request semantics plus
+        additive internal metadata used only by persisted-run read paths and launch routing.
     Raises:
         ValidationError: If persisted payload no longer matches strict API DTO contract.
         BacktestValidationError: If mode-selection or semantic mapper invariants are violated.
     Side Effects:
         None.
     """
-    request = BacktestsPostRequest.model_validate(payload)
+    request = BacktestsPostRequest.model_validate(
+        _strip_internal_persisted_request_fields(payload=payload)
+    )
     return build_backtest_run_request(request=request)
+
+
+def _strip_internal_persisted_request_fields(
+    *,
+    payload: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """
+    Remove additive persisted-only metadata before strict public request DTO validation.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - apps/api/dto/backtests.py
+      - apps/api/wiring/modules/backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+
+    Args:
+        payload: Canonical persisted request snapshot mapping.
+    Returns:
+        Mapping[str, Any]: Copy of the payload without persisted-only internal keys.
+    Assumptions:
+        Internal metadata remains top-level and additive so public request validation stays
+        backward compatible.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return {
+        key: value
+        for key, value in payload.items()
+        if key not in _PERSISTED_REQUEST_INTERNAL_FIELDS
+    }
 
 
 def build_backtest_variant_report_run_request(

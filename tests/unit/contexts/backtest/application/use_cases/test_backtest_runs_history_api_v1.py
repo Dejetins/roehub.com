@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Mapping
 from uuid import UUID
@@ -19,7 +20,11 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListQuery,
     CurrentUser,
 )
-from trading.contexts.backtest.application.services import ArtifactPinnedIdentityV2
+from trading.contexts.backtest.application.services import (
+    ArtifactPinnedIdentityV2,
+    ExecutionProfilesCatalogV2,
+    default_execution_profiles_catalog_v2,
+)
 from trading.contexts.backtest.application.use_cases import (
     BacktestRunProgressSnapshotBuilder,
     BuildBacktestRunVariantReportUseCase,
@@ -32,6 +37,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobExecutionMode,
+    BacktestJobStageWeights,
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
@@ -796,6 +802,80 @@ def test_run_progress_snapshot_builder_falls_back_to_catalog_default_mode() -> N
     assert progress.execution_profile_mode == "exact_small"
     assert progress.progress_percent == 0
     assert progress.eta_seconds is None
+
+
+def test_run_progress_snapshot_builder_reads_weights_from_execution_profile_catalog() -> None:
+    """
+    Verify progress/ETA semantics use profile-contract weights instead of a hardcoded side table.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        B3 moves deterministic stage weights into the execution-profile catalog consumed by both
+        launch and persisted-run read paths.
+    Raises:
+        AssertionError: If read path still ignores custom catalog weights.
+    Side Effects:
+        None.
+    """
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000965"),
+        user_id=owner_user_id,
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 55, tzinfo=timezone.utc),
+        request_json={
+            "mode": "template",
+            "top_k": 25,
+            "execution_profile_mode": "exact_parallel",
+        },
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+    running = queued.claim(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        locked_by="worker-test-1",
+        lease_expires_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+    ).update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=10,
+        total_units=20,
+    )
+
+    default_catalog = default_execution_profiles_catalog_v2()
+    exact_parallel = replace(
+        default_catalog.profile_for_mode(mode="exact_parallel"),
+        progress_weights=BacktestJobStageWeights(stage_a=10, stage_b=85, finalizing=5),
+    )
+    custom_catalog = ExecutionProfilesCatalogV2(
+        default_mode=default_catalog.default_mode,
+        available_profiles=tuple(
+            exact_parallel if profile.mode == "exact_parallel" else profile
+            for profile in default_catalog.available_profiles
+        ),
+    )
+
+    progress = BacktestRunProgressSnapshotBuilder(
+        execution_profiles=custom_catalog,
+        now_provider=lambda: datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+    ).build(run=running)
+
+    assert progress.execution_profile_mode == "exact_parallel"
+    assert progress.progress_percent == 52
+    assert progress.eta_seconds == 56
 
 
 def test_cancel_use_case_returns_updated_owner_run_snapshot() -> None:

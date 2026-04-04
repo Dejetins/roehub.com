@@ -201,11 +201,15 @@ def build_backtest_router(
         )
     )
     artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
-    runtime_planner = BacktestArtifactRuntimePlannerV2(
+    sync_runtime_planner = BacktestArtifactRuntimePlannerV2(
+        execution_profiles=runtime_config.execution_profiles,
+        launch_budget_mode="sync_inline",
+    )
+    background_runtime_planner = BacktestArtifactRuntimePlannerV2(
         execution_profiles=runtime_config.execution_profiles,
     )
 
-    run_use_case_kwargs: dict[str, Any] = dict(
+    run_use_case_base_kwargs: dict[str, Any] = dict(
         candle_feed=None,
         indicator_compute=indicator_compute,
         strategy_reader=strategy_reader,
@@ -226,9 +230,9 @@ def build_backtest_router(
         allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
         artifact_slot_resolver=artifact_slot_resolver,
-        runtime_planner=runtime_planner,
     )
     sync_run_use_case = RunBacktestUseCase(
+        runtime_planner=sync_runtime_planner,
         max_variants_per_compute=max(
             1,
             runtime_config.guards.max_variants_per_compute // 2,
@@ -237,12 +241,13 @@ def build_backtest_router(
             1,
             runtime_config.guards.max_compute_bytes_total // 2,
         ),
-        **run_use_case_kwargs,
+        **run_use_case_base_kwargs,
     )
     background_preflight_use_case = RunBacktestUseCase(
+        runtime_planner=background_runtime_planner,
         max_variants_per_compute=runtime_config.guards.max_variants_per_compute,
         max_compute_bytes_total=runtime_config.guards.max_compute_bytes_total,
-        **run_use_case_kwargs,
+        **run_use_case_base_kwargs,
     )
     jobs_gateway = _build_jobs_gateway(settings=runtime_settings)
     job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)

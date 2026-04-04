@@ -127,6 +127,20 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         "hybrid_family",
     )
     assert config.execution_profiles.default_profile().feature_flags.runtime_enabled is True
+    assert config.execution_profiles.available_profiles[1].feature_flags.runtime_enabled is True
+    assert (
+        config.execution_profiles.available_profiles[1].feature_flags.parallel_stage_b_enabled
+        is True
+    )
+    assert (
+        config.execution_profiles.default_profile().launch_budget.max_stage_a_variants_total
+        == 1500
+    )
+    assert (
+        config.execution_profiles.available_profiles[1].launch_budget.max_stage_b_variants_total
+        == 180000
+    )
+    assert config.execution_profiles.available_profiles[1].progress_weights.stage_a == 35
     assert (
         config.execution_profiles.default_profile().planning_budget_ms
         == 25
@@ -224,6 +238,11 @@ backtest:
         "hybrid_conservative",
         "hybrid_family",
     )
+    assert (
+        config.execution_profiles.default_profile().launch_budget.max_stage_a_variants_total
+        == 1500
+    )
+    assert config.execution_profiles.default_profile().progress_weights.stage_b == 70
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5 * 1024**3
     assert config.cpu.max_numba_threads > 0
@@ -465,6 +484,14 @@ backtest:
         planning_budget_ms: 15
         shortlist:
           enabled: false
+        launch_budget:
+          max_stage_a_variants_total: 120
+          max_stage_b_variants_total: 900
+          max_estimated_memory_bytes: 104857600
+        progress:
+          stage_a: 20
+          stage_b: 75
+          finalizing: 5
         parallelism:
           stage_a_workers: 1
           stage_b_workers: 1
@@ -477,6 +504,14 @@ backtest:
         planning_budget_ms: 35
         shortlist:
           enabled: false
+        launch_budget:
+          max_stage_a_variants_total: 3200
+          max_stage_b_variants_total: 24000
+          max_estimated_memory_bytes: 536870912
+        progress:
+          stage_a: 30
+          stage_b: 65
+          finalizing: 5
         parallelism:
           stage_a_workers: 1
           stage_b_workers: 3
@@ -490,6 +525,10 @@ backtest:
         shortlist:
           enabled: true
           max_candidates: 1500
+        progress:
+          stage_a: 45
+          stage_b: 50
+          finalizing: 5
         parallelism:
           stage_a_workers: 1
           stage_b_workers: 3
@@ -566,10 +605,26 @@ backtest:
         "hybrid_family",
     )
     assert config.execution_profiles.available_profiles[1].parallelism.stage_b_workers == 3
+    assert config.execution_profiles.available_profiles[1].feature_flags.runtime_enabled is False
+    assert (
+        config.execution_profiles.available_profiles[1].feature_flags.parallel_stage_b_enabled
+        is False
+    )
+    assert (
+        config.execution_profiles.available_profiles[0].launch_budget.max_stage_a_variants_total
+        == 120
+    )
+    assert config.execution_profiles.available_profiles[0].progress_weights.stage_b == 75
+    assert (
+        config.execution_profiles.available_profiles[1].launch_budget.max_stage_b_variants_total
+        == 24000
+    )
+    assert config.execution_profiles.available_profiles[1].progress_weights.stage_a == 30
     assert (
         config.execution_profiles.available_profiles[2].shortlist_config.max_candidates
         == 1500
     )
+    assert config.execution_profiles.available_profiles[2].progress_weights.stage_b == 50
     assert config.execution_profiles.available_profiles[3].planning_budget_ms == 65
     assert config.guards.max_variants_per_compute == 1200
     assert config.guards.max_compute_bytes_total == 1234567
@@ -762,6 +817,61 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="primary_metric_default"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_invalid_execution_profile_progress_weights(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when execution-profile progress weights stop summing to `100`.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Progress/ETA semantics now live in the execution-profile contract and must remain valid
+        at startup.
+    Raises:
+        AssertionError: If invalid progress weights do not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  execution_profiles:
+    default: exact_small
+    profiles:
+      - mode: exact_small
+        planning_budget_ms: 25
+        progress:
+          stage_a: 10
+          stage_b: 10
+          finalizing: 10
+      - mode: exact_parallel
+        planning_budget_ms: 50
+      - mode: hybrid_conservative
+        planning_budget_ms: 75
+      - mode: hybrid_family
+        planning_budget_ms: 100
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="must sum to 100"):
         load_backtest_runtime_config(config_path)
 
 

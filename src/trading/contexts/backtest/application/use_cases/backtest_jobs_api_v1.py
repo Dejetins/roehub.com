@@ -25,6 +25,7 @@ from trading.contexts.backtest.application.ports import (
 from trading.contexts.backtest.application.services.v2 import (
     BacktestArtifactLoaderV2,
     artifact_coordinates_from_market_id_v2,
+    validate_execution_profile_mode_v2,
 )
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
@@ -68,6 +69,7 @@ class CreateBacktestJobCommand:
     run_request: RunBacktestRequest
     request_payload: Mapping[str, Any]
     execution_mode: BacktestJobExecutionMode = "background_manual_legacy"
+    execution_profile_mode: str | None = None
 
     def __post_init__(self) -> None:
         """
@@ -95,6 +97,12 @@ class CreateBacktestJobCommand:
             raise ValueError(
                 "CreateBacktestJobCommand.execution_mode must be "
                 "'background_auto' or 'background_manual_legacy'"
+            )
+        if self.execution_profile_mode is not None:
+            object.__setattr__(
+                self,
+                "execution_profile_mode",
+                validate_execution_profile_mode_v2(value=self.execution_profile_mode),
             )
 
 
@@ -339,6 +347,7 @@ class CreateBacktestJobUseCase:
             run_request=command.run_request,
             resolved=resolved,
             effective_execution_payload=effective_execution_payload,
+            execution_profile_mode=command.execution_profile_mode,
         )
         artifact_pin = self._resolve_artifact_pin(
             template=resolved.template,
@@ -611,6 +620,7 @@ class CreateBacktestJobUseCase:
         run_request: RunBacktestRequest,
         resolved: _ResolvedJobCreationContext,
         effective_execution_payload: Mapping[str, float],
+        execution_profile_mode: str | None,
     ) -> Mapping[str, Any]:
         """
         Build worker-compatible request snapshot payload with effective scalar defaults.
@@ -620,6 +630,7 @@ class CreateBacktestJobUseCase:
             run_request: Parsed application request DTO.
             resolved: Resolved create context.
             effective_execution_payload: Full execution mapping resolved with defaults.
+            execution_profile_mode: Optional effective exact execution profile mode literal.
         Returns:
             Mapping[str, Any]: Deterministic snapshot payload persisted in `request_json`.
         Assumptions:
@@ -635,6 +646,8 @@ class CreateBacktestJobUseCase:
         normalized_payload["top_k"] = resolved.top_k
         normalized_payload["preselect"] = resolved.preselect
         normalized_payload["top_trades_n"] = resolved.top_trades_n
+        if execution_profile_mode is not None:
+            normalized_payload["execution_profile_mode"] = execution_profile_mode
 
         if resolved.mode == "template":
             raw_template = normalized_payload.get("template")

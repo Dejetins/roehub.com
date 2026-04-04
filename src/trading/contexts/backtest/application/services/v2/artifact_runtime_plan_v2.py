@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Iterator, Mapping
+from typing import Iterator, Literal, Mapping
 
 from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunBacktestTemplate
 from trading.contexts.backtest.application.ports import BacktestGridDefaultsProvider
@@ -28,6 +28,7 @@ from trading.contexts.indicators.domain.specifications import GridParamSpec, Gri
 from trading.platform.errors import RoehubError
 
 from .execution_profile_v2 import (
+    ExecutionProfileModeLiteralV2,
     ExecutionProfilesCatalogV2,
     ExecutionProfileV2,
     default_execution_profiles_catalog_v2,
@@ -35,6 +36,7 @@ from .execution_profile_v2 import (
 
 STAGE_A_LITERAL_V2 = "stage_a"
 STAGE_B_LITERAL_V2 = "stage_b"
+PlannerLaunchBudgetModeV2 = Literal["ignore", "sync_inline"]
 
 _FLOAT32_BYTES = 4
 _CANDLES_BYTES_PER_STEP = (5 * _FLOAT32_BYTES) + 8
@@ -367,9 +369,10 @@ class BacktestArtifactRuntimePlannerV2:
         self,
         *,
         execution_profiles: ExecutionProfilesCatalogV2 | None = None,
+        launch_budget_mode: PlannerLaunchBudgetModeV2 = "ignore",
     ) -> None:
         """
-        Store typed execution-profile catalog used by additive A1 runtime planning.
+        Store typed execution-profile catalog used by exact profile selection and launch routing.
 
         Docs:
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
@@ -381,13 +384,17 @@ class BacktestArtifactRuntimePlannerV2:
 
         Args:
             execution_profiles: Optional startup-validated execution-profile catalog.
+            launch_budget_mode:
+                Whether to ignore heavy-request launch budgets (`ignore`) or to raise a
+                deterministic `background_auto` routing signal when sync launch budgets are
+                exceeded (`sync_inline`).
         Returns:
             None.
         Assumptions:
-            Missing dependency falls back to the additive default catalog while current runtime
-            behavior stays exact and launch-policy-neutral.
+            Sync launch paths may enforce stricter profile launch budgets than background/worker
+            paths, but both still reuse the same exact profile catalog.
         Raises:
-            ValueError: If resolved catalog is missing.
+            ValueError: If resolved catalog or launch-budget mode is invalid.
         Side Effects:
             None.
         """
@@ -396,16 +403,23 @@ class BacktestArtifactRuntimePlannerV2:
         )
         if resolved_execution_profiles is None:  # type: ignore[truthy-bool]
             raise ValueError("BacktestArtifactRuntimePlannerV2 requires execution_profiles")
+        if launch_budget_mode not in {"ignore", "sync_inline"}:
+            raise ValueError(
+                "BacktestArtifactRuntimePlannerV2.launch_budget_mode must be 'ignore' or "
+                "'sync_inline'"
+            )
         self._execution_profiles = resolved_execution_profiles
+        self._launch_budget_mode = launch_budget_mode
 
     def resolve_execution_profile(
         self,
         *,
         stage_a_variants_total: int | None = None,
         stage_b_variants_total: int | None = None,
+        estimated_memory_bytes: int | None = None,
     ) -> ExecutionProfileV2:
         """
-        Resolve the current effective execution profile without changing launch/runtime policy.
+        Resolve the effective exact execution profile from deterministic planner cost evidence.
 
         Docs:
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
@@ -417,19 +431,45 @@ class BacktestArtifactRuntimePlannerV2:
 
         Args:
             stage_a_variants_total: Optional prepared Stage A variants count for future policy.
-            stage_b_variants_total: Optional prepared Stage B variants count for future policy.
+            stage_b_variants_total: Optional prepared Stage B variants count.
+            estimated_memory_bytes: Optional prepared deterministic memory estimate.
         Returns:
-            ExecutionProfileV2: Current exact baseline profile from the ordered catalog.
+            ExecutionProfileV2: Selected exact execution profile for the prepared request.
         Assumptions:
-            A1 only establishes typed profile discovery/plumbing; later EPICs may use the
-            prepared variant counts for classification without changing this method signature.
+            Ordered runtime-enabled exact profiles progress from lighter to heavier exact runtime
+            envelopes; heavy-but-valid sync requests may still be redirected to
+            `background_auto` by launch-budget policy.
         Raises:
-            ValueError: If configured default profile cannot be resolved from the catalog.
+            RoehubError: If sync launch budgets are exceeded and background routing is required.
+            ValueError: If configured exact profiles cannot be resolved from the catalog.
         Side Effects:
             None.
         """
-        _ = stage_a_variants_total, stage_b_variants_total
-        return self._execution_profiles.default_profile()
+        if (
+            stage_a_variants_total is None
+            or stage_b_variants_total is None
+            or estimated_memory_bytes is None
+        ):
+            return self._execution_profiles.default_profile()
+
+        exact_profiles = self._execution_profiles.runtime_enabled_exact_profiles()
+        for profile in exact_profiles:
+            if profile.launch_budget.allows(
+                stage_a_variants_total=stage_a_variants_total,
+                stage_b_variants_total=stage_b_variants_total,
+                estimated_memory_bytes=estimated_memory_bytes,
+            ):
+                return profile
+
+        background_profile = self._execution_profiles.background_exact_profile()
+        if self._launch_budget_mode == "sync_inline":
+            raise _background_auto_required_error_v2(
+                execution_profile_mode=background_profile.mode,
+                stage_a_variants_total=stage_a_variants_total,
+                stage_b_variants_total=stage_b_variants_total,
+                estimated_memory_bytes=estimated_memory_bytes,
+            )
+        return background_profile
 
     def build(
         self,
@@ -498,6 +538,7 @@ class BacktestArtifactRuntimePlannerV2:
                 stage=STAGE_A_LITERAL_V2,
                 total_variants=stage_a_variants_total,
                 max_variants_per_compute=max_variants_per_compute,
+                execution_profile_mode=self._execution_profiles.background_exact_profile().mode,
             )
 
         estimated_memory_bytes = _estimate_memory_bytes_v2(
@@ -509,6 +550,7 @@ class BacktestArtifactRuntimePlannerV2:
                 stage=STAGE_A_LITERAL_V2,
                 estimated_memory_bytes=estimated_memory_bytes,
                 max_compute_bytes_total=max_compute_bytes_total,
+                execution_profile_mode=self._execution_profiles.background_exact_profile().mode,
             )
 
         risk_variants = _risk_variants_from_template_v2(template=template)
@@ -519,10 +561,12 @@ class BacktestArtifactRuntimePlannerV2:
                 stage=STAGE_B_LITERAL_V2,
                 total_variants=stage_b_variants_total,
                 max_variants_per_compute=max_variants_per_compute,
+                execution_profile_mode=self._execution_profiles.background_exact_profile().mode,
             )
         execution_profile = self.resolve_execution_profile(
             stage_a_variants_total=stage_a_variants_total,
             stage_b_variants_total=stage_b_variants_total,
+            estimated_memory_bytes=estimated_memory_bytes,
         )
 
         return BacktestArtifactRuntimePlanV2(
@@ -1117,6 +1161,7 @@ def _variants_guard_error_v2(
     stage: str,
     total_variants: int,
     max_variants_per_compute: int,
+    execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
 ) -> RoehubError:
     """
     Build canonical variants-guard overflow error for artifact-backed runtime planning.
@@ -1125,6 +1170,7 @@ def _variants_guard_error_v2(
         stage: Stage literal where the overflow occurred.
         total_variants: Computed variant total.
         max_variants_per_compute: Configured variants guard.
+        execution_profile_mode: Optional exact profile hint for background fallback persistence.
     Returns:
         RoehubError: Canonical validation error payload.
     Assumptions:
@@ -1132,17 +1178,20 @@ def _variants_guard_error_v2(
     Raises:
         None.
     Side Effects:
-        None.
+        Adds an additive `execution_profile_mode` hint when profile-aware routing is active.
     """
+    details: dict[str, object] = {
+        "error": "max_variants_per_compute_exceeded",
+        "stage": stage,
+        "total_variants": total_variants,
+        "max_variants_per_compute": max_variants_per_compute,
+    }
+    if execution_profile_mode is not None:
+        details["execution_profile_mode"] = execution_profile_mode
     return RoehubError(
         code="validation_error",
         message="Backtest variants exceed configured compute budget",
-        details={
-            "error": "max_variants_per_compute_exceeded",
-            "stage": stage,
-            "total_variants": total_variants,
-            "max_variants_per_compute": max_variants_per_compute,
-        },
+        details=details,
     )
 
 
@@ -1151,6 +1200,7 @@ def _memory_guard_error_v2(
     stage: str,
     estimated_memory_bytes: int,
     max_compute_bytes_total: int,
+    execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
 ) -> RoehubError:
     """
     Build canonical memory-guard overflow error for artifact-backed runtime planning.
@@ -1159,6 +1209,7 @@ def _memory_guard_error_v2(
         stage: Stage literal where the overflow occurred.
         estimated_memory_bytes: Estimated memory bytes.
         max_compute_bytes_total: Configured memory guard budget.
+        execution_profile_mode: Optional exact profile hint for background fallback persistence.
     Returns:
         RoehubError: Canonical validation error payload.
     Assumptions:
@@ -1166,16 +1217,66 @@ def _memory_guard_error_v2(
     Raises:
         None.
     Side Effects:
+        Adds an additive `execution_profile_mode` hint when profile-aware routing is active.
+    """
+    details: dict[str, object] = {
+        "error": "max_compute_bytes_total_exceeded",
+        "stage": stage,
+        "estimated_memory_bytes": estimated_memory_bytes,
+        "max_compute_bytes_total": max_compute_bytes_total,
+    }
+    if execution_profile_mode is not None:
+        details["execution_profile_mode"] = execution_profile_mode
+    return RoehubError(
+        code="validation_error",
+        message="Backtest estimated memory exceeds configured compute budget",
+        details=details,
+    )
+
+
+def _background_auto_required_error_v2(
+    *,
+    execution_profile_mode: ExecutionProfileModeLiteralV2,
+    stage_a_variants_total: int,
+    stage_b_variants_total: int,
+    estimated_memory_bytes: int,
+) -> RoehubError:
+    """
+    Build deterministic sync-launch overflow signal for heavy-but-valid exact requests.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - apps/api/wiring/modules/backtest.py
+
+    Args:
+        execution_profile_mode: Exact execution profile selected for background execution.
+        stage_a_variants_total: Deterministic prepared Stage A variants count.
+        stage_b_variants_total: Deterministic prepared Stage B variants count.
+        estimated_memory_bytes: Deterministic estimated runtime memory footprint.
+    Returns:
+        RoehubError: Canonical validation payload used internally for `background_auto` routing.
+    Assumptions:
+        Full-budget preflight remains the source of truth for hard rejects; this error only
+        signals that sync launch budgets are too small for an otherwise exact-valid request.
+    Raises:
+        None.
+    Side Effects:
         None.
     """
     return RoehubError(
         code="validation_error",
-        message="Backtest estimated memory exceeds configured compute budget",
+        message="Backtest request exceeds sync launch budget and should run in background",
         details={
-            "error": "max_compute_bytes_total_exceeded",
-            "stage": stage,
+            "error": "background_auto_required",
+            "execution_profile_mode": execution_profile_mode,
+            "execution_mode": "background_auto",
+            "stage_a_variants_total": stage_a_variants_total,
+            "stage_b_variants_total": stage_b_variants_total,
             "estimated_memory_bytes": estimated_memory_bytes,
-            "max_compute_bytes_total": max_compute_bytes_total,
         },
     )
 

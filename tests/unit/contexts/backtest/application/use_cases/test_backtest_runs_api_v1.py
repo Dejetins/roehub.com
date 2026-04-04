@@ -417,6 +417,7 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_job.artifact_pin.artifact_asof_date == "2026-03-28"
     assert repo.created_job.request_json["template"]["execution"]["fee_pct"] == 0.075
     assert repo.created_job.request_json["template"]["direction_mode"] == "long-short"
+    assert repo.created_job.request_json["execution_profile_mode"] == "exact_small"
     assert len(repo.created_rows) == 1
     assert repo.created_rows[0].rank == 1
     assert repo.created_rows[0].variant_key == "a" * 64
@@ -514,6 +515,64 @@ def test_launch_backtest_with_auto_fallback_returns_sync_inline_when_sync_budget
     assert create_use_case.calls == 0
 
 
+def test_launch_backtest_with_auto_fallback_routes_heavy_valid_request_to_background_auto(
+) -> None:
+    """
+    Verify sync launch-budget classification can queue heavy-but-valid exact requests earlier.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Sync planner may now signal `background_auto_required` before Stage A/Stage B execution,
+        while full-budget preflight remains the hard-reject source of truth.
+    Raises:
+        AssertionError: If background routing or propagated execution profile drifts.
+    Side Effects:
+        None.
+    """
+    preflight_use_case = _FakePreflightUseCase()
+    create_use_case = _FakeBackgroundCreateUseCase(created_job=_background_auto_job())
+    use_case = LaunchBacktestRunWithAutoFallbackUseCase(
+        sync_inline_use_case=_FakeRunUseCase(
+            error=RoehubError(
+                code="validation_error",
+                message=(
+                    "Backtest request exceeds sync launch budget and should run in background"
+                ),
+                details={
+                    "error": "background_auto_required",
+                    "execution_mode": "background_auto",
+                    "execution_profile_mode": "exact_parallel",
+                    "stage_a_variants_total": 32000,
+                    "stage_b_variants_total": 240000,
+                    "estimated_memory_bytes": 2147483648,
+                },
+            )
+        ),
+        background_preflight_use_case=preflight_use_case,
+        background_create_use_case=create_use_case,
+        engine_version="signal_tf + 1m_risk",
+    )
+
+    launched = use_case.execute(
+        request=_template_request(),
+        current_user=CurrentUser(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+        ),
+        request_payload=_template_request_payload(),
+    )
+
+    assert preflight_use_case.calls == 1
+    assert create_use_case.calls == 1
+    assert create_use_case.last_command is not None
+    assert create_use_case.last_command.execution_mode == "background_auto"
+    assert create_use_case.last_command.execution_profile_mode == "exact_parallel"
+    assert launched.execution_mode == "background_auto"
+    assert launched.run_id == UUID("00000000-0000-0000-0000-000000000911")
+
+
 def test_launch_backtest_with_auto_fallback_creates_background_auto_after_guard_overflow() -> None:
     """
     Verify guard overflow falls back to explicit queued `background_auto` launch.
@@ -543,6 +602,7 @@ def test_launch_backtest_with_auto_fallback_creates_background_auto_after_guard_
                     "stage": "stage_a",
                     "total_variants": 999,
                     "max_variants_per_compute": 100,
+                    "execution_profile_mode": "exact_parallel",
                 },
             )
         ),
@@ -563,6 +623,7 @@ def test_launch_backtest_with_auto_fallback_creates_background_auto_after_guard_
     assert create_use_case.calls == 1
     assert create_use_case.last_command is not None
     assert create_use_case.last_command.execution_mode == "background_auto"
+    assert create_use_case.last_command.execution_profile_mode == "exact_parallel"
     assert launched.run_id == UUID("00000000-0000-0000-0000-000000000911")
     assert launched.state == "queued"
     assert launched.execution_mode == "background_auto"
@@ -873,6 +934,7 @@ def _template_run_response() -> RunBacktestResponse:
         artifact_slot_generation=11,
         artifact_asof_date="2026-03-28",
         artifact_manifest_hash="c" * 64,
+        execution_profile_mode="exact_small",
     )
 
 
@@ -896,7 +958,10 @@ def _background_auto_job() -> BacktestJob:
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000777"),
         mode="template",
         created_at=datetime(2026, 3, 28, 12, 0, 5, tzinfo=timezone.utc),
-        request_json=_template_request_payload(),
+        request_json={
+            **_template_request_payload(),
+            "execution_profile_mode": "exact_parallel",
+        },
         request_hash="f" * 64,
         spec_hash=None,
         spec_payload_json=None,

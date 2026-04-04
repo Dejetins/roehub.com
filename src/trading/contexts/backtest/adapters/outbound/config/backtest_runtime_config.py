@@ -20,6 +20,7 @@ from trading.contexts.backtest.application.dto import (
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
     DEFAULT_EXECUTION_PROFILE_MODE_V2,
     ExecutionProfileFeatureFlagsV2,
+    ExecutionProfileLaunchBudgetV2,
     ExecutionProfileParallelismConfigV2,
     ExecutionProfilesCatalogV2,
     ExecutionProfileShortlistConfigV2,
@@ -27,6 +28,7 @@ from trading.contexts.backtest.application.services.v2.execution_profile_v2 impo
     default_execution_profiles_catalog_v2,
     validate_execution_profile_mode_v2,
 )
+from trading.contexts.backtest.domain.entities import BacktestJobStageWeights
 from trading.contexts.indicators.application.services.grid_builder import (
     MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     MAX_VARIANTS_PER_COMPUTE_DEFAULT,
@@ -927,8 +929,8 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
         str: Canonical SHA-256 hash string.
     Assumptions:
         Hash includes result-affecting defaults (ranking/execution/reporting/persisted top-k)
-        and excludes operational-only knobs plus additive `contracts` / `execution_profiles`
-        fields that do not affect current exact runtime semantics in A1.
+        and excludes operational-only knobs plus additive `contracts` and
+        profile-routing/progress metadata that do not alter exact result payloads.
     Raises:
         TypeError: If payload normalization fails for unsupported node type.
     Side Effects:
@@ -1494,6 +1496,7 @@ def _parse_execution_profiles_catalog(
     if len(data) == 0:
         return default_execution_profiles_catalog_v2()
 
+    default_catalog = default_execution_profiles_catalog_v2()
     default_mode = validate_execution_profile_mode_v2(
         value=_get_str_with_default(
             data,
@@ -1507,14 +1510,18 @@ def _parse_execution_profiles_catalog(
 
     available_profiles: list[ExecutionProfileV2] = []
     for index, profile_map in enumerate(profiles_payload):
+        mode = validate_execution_profile_mode_v2(
+            value=_get_str(profile_map, "mode", required=True)
+        )
+        default_profile = default_catalog.profile_for_mode(mode=mode)
         shortlist_map = _get_mapping(profile_map, "shortlist", required=False)
         parallelism_map = _get_mapping(profile_map, "parallelism", required=False)
         feature_flags_map = _get_mapping(profile_map, "feature_flags", required=False)
+        launch_budget_map = _get_mapping(profile_map, "launch_budget", required=False)
+        progress_map = _get_mapping(profile_map, "progress", required=False)
         available_profiles.append(
             ExecutionProfileV2(
-                mode=validate_execution_profile_mode_v2(
-                    value=_get_str(profile_map, "mode", required=True)
-                ),
+                mode=mode,
                 shortlist_config=ExecutionProfileShortlistConfigV2(
                     enabled=_get_bool_with_default(
                         shortlist_map,
@@ -1555,6 +1562,40 @@ def _parse_execution_profiles_catalog(
                         feature_flags_map,
                         "family_plugin_enabled",
                         default=False,
+                    ),
+                ),
+                launch_budget=ExecutionProfileLaunchBudgetV2(
+                    max_stage_a_variants_total=_get_int_with_default(
+                        launch_budget_map,
+                        "max_stage_a_variants_total",
+                        default=default_profile.launch_budget.max_stage_a_variants_total,
+                    ),
+                    max_stage_b_variants_total=_get_int_with_default(
+                        launch_budget_map,
+                        "max_stage_b_variants_total",
+                        default=default_profile.launch_budget.max_stage_b_variants_total,
+                    ),
+                    max_estimated_memory_bytes=_get_int_with_default(
+                        launch_budget_map,
+                        "max_estimated_memory_bytes",
+                        default=default_profile.launch_budget.max_estimated_memory_bytes,
+                    ),
+                ),
+                progress_weights=BacktestJobStageWeights(
+                    stage_a=_get_int_with_default(
+                        progress_map,
+                        "stage_a",
+                        default=default_profile.progress_weights.stage_a,
+                    ),
+                    stage_b=_get_int_with_default(
+                        progress_map,
+                        "stage_b",
+                        default=default_profile.progress_weights.stage_b,
+                    ),
+                    finalizing=_get_int_with_default(
+                        progress_map,
+                        "finalizing",
+                        default=default_profile.progress_weights.finalizing,
                     ),
                 ),
                 planning_budget_ms=_get_int(profile_map, "planning_budget_ms", required=True),

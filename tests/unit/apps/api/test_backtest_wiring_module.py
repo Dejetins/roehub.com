@@ -582,6 +582,10 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     assert "/backtests/ping" in _paths_from_router(router=router)
     assert "/backtests/runs/ping" in _paths_from_router(router=router)
     assert len(captured_run_use_case_kwargs) == 2
+    assert (
+        captured_run_use_case_kwargs[0]["runtime_planner"]
+        is not captured_run_use_case_kwargs[1]["runtime_planner"]
+    )
     assert captured_run_use_case_kwargs[0]["candle_feed"] is None
     assert captured_run_use_case_kwargs[0]["max_variants_per_compute"] == 50
     assert captured_run_use_case_kwargs[0]["max_compute_bytes_total"] == 500
@@ -628,6 +632,20 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         "hybrid_conservative",
         "hybrid_family",
     ]
+    runtime_defaults_response = cast(
+        Any,
+        captured_backtests_router_kwargs["runtime_defaults_response"],
+    )
+    assert (
+        runtime_defaults_response.contracts.execution.available_execution_profiles[0]
+        .launch_budget.max_stage_a_variants_total
+        == 1500
+    )
+    assert (
+        runtime_defaults_response.contracts.execution.available_execution_profiles[1]
+        .progress_weights.stage_b
+        == 60
+    )
 
 
 

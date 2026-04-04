@@ -237,6 +237,19 @@ Source-of-truth payload:
   - через `replace_top_variants_snapshot(...)`,
   - trigger: elapsed `snapshot_seconds` **или** processed delta >= `snapshot_variants_step`.
 
+Exact-parallel note:
+
+- если resolved `ExecutionProfile` включает `parallel_stage_b_enabled`, worker process остаётся
+  coordinator'ом и поднимает spawned Stage B workers;
+- spawned workers читают pinned artifacts только readonly через mmap и не делят mutable scorer
+  caches между процессами;
+- каждый chunk возвращает только bounded local top-k frontier, а coordinator делает final merge в
+  canonical chunk order;
+- completion order worker'ов не должен менять persisted `/top`, best-cell replay winner или
+  `variant_key ASC` tie-break semantics;
+- request classification в `exact_parallel` всё ещё не описывается этим документом и остаётся
+  внешним follow-up scope.
+
 Snapshot payload policy во время `running`:
 
 - `summary_metrics_json` хранит только approved deterministic summary metrics object,

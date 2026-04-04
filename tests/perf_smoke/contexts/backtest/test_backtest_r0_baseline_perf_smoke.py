@@ -34,6 +34,13 @@ from trading.contexts.backtest.application.services import (
     read_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
     serialize_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
 )
+from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
+    BacktestArtifactRuntimePlannerV2,
+)
+from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+    ExecutionProfilesCatalogV2,
+    default_execution_profiles_catalog_v2,
+)
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
@@ -1075,6 +1082,7 @@ def _collect_artifact_v2_scenario_measurement(
             indicator_compute=indicator_compute,
             strategy_reader=_NullStrategyReader(),  # type: ignore[arg-type]
             artifact_slot_resolver=ArtifactSlotResolverV2(artifact_loader=artifact_loader),
+            runtime_planner=_exact_baseline_runtime_planner_v2(),
             warmup_bars_default=scenario.warmup_bars,
             top_k_default=scenario.top_k,
             preselect_default=scenario.preselect,
@@ -1108,6 +1116,38 @@ def _collect_artifact_v2_scenario_measurement(
         "indicator_estimate_calls": indicator_compute.estimate_calls,
         "variants_returned": len(response.variants),
     }
+
+
+def _exact_baseline_runtime_planner_v2() -> BacktestArtifactRuntimePlannerV2:
+    """
+    Build runtime planner whose default execution profile matches the exact-baseline corpus.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+
+    Args:
+        None.
+    Returns:
+        BacktestArtifactRuntimePlannerV2: Planner honoring `exact_baseline` execution profile.
+    Assumptions:
+        R0 artifact-backed perf smoke reuses the `exact_baseline` corpus anchor, which is bound
+        to `exact_parallel` without changing production request classification or runtime defaults.
+    Raises:
+        ValueError: If `exact_parallel` is not present in the default execution-profile catalog.
+    Side Effects:
+        None.
+    """
+    default_catalog = default_execution_profiles_catalog_v2()
+    execution_profiles = ExecutionProfilesCatalogV2(
+        default_mode="exact_parallel",
+        available_profiles=default_catalog.available_profiles,
+    )
+    return BacktestArtifactRuntimePlannerV2(execution_profiles=execution_profiles)
 
 
 def _build_perf_comparison(
