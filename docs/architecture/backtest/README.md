@@ -45,6 +45,8 @@
 - Jobs API: `docs/architecture/backtest/backtest-jobs-api-v1.md`
 - Jobs worker: `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
+- Follow-up runtime acceleration roadmap after the artifact-backed cutover:
+  `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
 - Artifact store v2 layout/publish/pinning/validator/config contract: `docs/architecture/backtest/backtest-artifact-store-v2.md`
 - Precompute runner v2 manifest/validator/config-driven publish contract, включая R3-01 canonical `1m` export, R3-02 rolled request TF prices, R3-03 `mappings/<tf>`, R3-04 publish-ready prices+mappings stage, R4-02 real `signals/<tf>/<indicator_id>` artifacts, R4-03 bounded `prefix + rebuilt_tail` signal rebuild, R5-01 real `hit_times/1m` и R12 stage-oriented `timeframe-scoped execution` with `execution_policy` + `ChunkPlanner`: `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - Signal rules catalog and R4-01 semantic source-of-truth: `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
