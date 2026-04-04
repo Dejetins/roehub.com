@@ -19,6 +19,9 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListQuery,
     CurrentUser,
 )
+from trading.contexts.backtest.application.use_cases.backtest_jobs_api_v1 import (
+    _build_sha256_from_payload,
+)
 from trading.contexts.backtest.application.use_cases.backtest_runs_api_v1 import (
     CreateAndRunBacktestSyncInlineUseCase,
     LaunchBacktestRunWithAutoFallbackUseCase,
@@ -418,6 +421,13 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_job.request_json["template"]["execution"]["fee_pct"] == 0.075
     assert repo.created_job.request_json["template"]["direction_mode"] == "long-short"
     assert repo.created_job.request_json["execution_profile_mode"] == "exact_small"
+    assert repo.created_job.request_hash == _build_sha256_from_payload(
+        payload={
+            key: value
+            for key, value in repo.created_job.request_json.items()
+            if key != "execution_profile_mode"
+        }
+    )
     assert len(repo.created_rows) == 1
     assert repo.created_rows[0].rank == 1
     assert repo.created_rows[0].variant_key == "a" * 64

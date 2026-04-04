@@ -31,6 +31,7 @@ from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Tim
 
 from .backtest_jobs_api_v1 import (
     CreateBacktestJobCommand,
+    _build_request_hash_from_request_json,
     _build_sha256_from_payload,
     _normalize_json_mapping,
 )
@@ -1147,7 +1148,7 @@ def _build_terminal_sync_inline_run(
         mode=cast(BacktestJobMode, request.mode),
         created_at=created_at,
         request_json=request_json,
-        request_hash=_build_sha256_from_payload(payload=request_json),
+        request_hash=_build_request_hash_from_request_json(payload=request_json),
         spec_hash=spec_hash,
         spec_payload_json=spec_payload_json,
         engine_params_hash=engine_params_hash,

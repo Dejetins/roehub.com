@@ -245,6 +245,10 @@ Response v1 включает:
 - ad-hoc mode: `grid_request_hash` (детерминированный hash от canonical request payload),
 - всегда: `engine_params_hash` (детерминированный hash от effective runtime settings, влияющих на результат).
 
+Persisted-only launch/read metadata such as `execution_profile_mode` may be stored in
+`request_json`, but it must stay out of `grid_request_hash` while exact result semantics remain
+unchanged.
+
 Зачем:
 - подтверждение воспроизводимости и защита от “тихих” изменений runtime defaults.
 

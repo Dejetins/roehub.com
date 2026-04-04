@@ -30,6 +30,9 @@ from trading.contexts.backtest.application.use_cases import (
     GetBacktestJobTopUseCase,
     ListBacktestJobsUseCase,
 )
+from trading.contexts.backtest.application.use_cases.backtest_jobs_api_v1 import (
+    _build_sha256_from_payload,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobStageAShortlist,
@@ -817,6 +820,67 @@ def test_create_backtest_job_use_case_accepts_background_auto_execution_mode() -
     assert created.execution_mode == "background_auto"
     assert repository.last_create_job is not None
     assert repository.last_create_job.execution_mode == "background_auto"
+
+
+def test_create_backtest_job_use_case_excludes_execution_profile_mode_from_request_hash() -> None:
+    """
+    Verify persisted-only `execution_profile_mode` metadata does not affect request identity.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Exact profile selection changes launch routing/read-model semantics, but not exact result
+        semantics for the same canonical request payload.
+    Raises:
+        AssertionError: If `request_hash` starts depending on persisted-only profile metadata.
+    Side Effects:
+        None.
+    """
+    repository = _FakeJobRepository(active_total=0)
+    artifact_loader = _FakeArtifactLoader(pointer=_artifact_pointer(slot="slot_b", generation=9))
+    use_case = CreateBacktestJobUseCase(
+        job_repository=repository,
+        strategy_reader=_FakeStrategyReader(snapshot=None),
+        top_k_persisted_default=300,
+        max_active_jobs_per_user=3,
+        warmup_bars_default=200,
+        top_k_default=300,
+        preselect_default=20000,
+        top_trades_n_default=3,
+        init_cash_quote_default=10000.0,
+        fixed_quote_default=100.0,
+        safe_profit_percent_default=30.0,
+        slippage_pct_default=0.01,
+        fee_pct_default_by_market_id={1: 0.075},
+        backtest_runtime_config_hash="e" * 64,
+        artifact_loader=cast(BacktestArtifactLoaderV2, artifact_loader),
+        now_provider=lambda: datetime(2026, 2, 23, 12, 3, tzinfo=timezone.utc),
+        job_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000914"),
+    )
+
+    created = use_case.execute(
+        command=CreateBacktestJobCommand(
+            run_request=RunBacktestRequest(
+                time_range=_time_range(),
+                template=_template(),
+            ),
+            request_payload=_template_request_payload(),
+            execution_mode="background_auto",
+            execution_profile_mode="exact_parallel",
+        ),
+        current_user=CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")),
+    )
+
+    assert created.request_json["execution_profile_mode"] == "exact_parallel"
+    assert created.request_hash == _build_sha256_from_payload(
+        payload={
+            key: value
+            for key, value in created.request_json.items()
+            if key != "execution_profile_mode"
+        }
+    )
 
 
 def test_create_backtest_job_use_case_rejects_missing_current_yaml_for_pinning() -> None:

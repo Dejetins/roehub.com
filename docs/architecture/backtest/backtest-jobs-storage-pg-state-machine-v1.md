@@ -94,7 +94,7 @@
   - `started_at`, `finished_at` (`timestamptz null`)
   - `cancel_requested_at` (`timestamptz null`)
 - request/reproducibility:
-  - `request_json jsonb not null` (canonical effective payload)
+  - `request_json jsonb not null` (canonical effective payload plus additive persisted-only metadata)
   - `request_hash text not null` (sha256 hex)
   - `spec_hash text null` (sha256 hex; обязателен для `mode=saved`)
   - `spec_payload_json jsonb null` (обязателен для `mode=saved`)
@@ -405,6 +405,9 @@ Traceback в БД не храним; он остается только в ло�
 ## Контракты и инварианты
 
 - Один и тот же effective payload + одинаковый runtime result-affecting hash -> один и тот же `request_hash`.
+- Additive persisted-only routing/read metadata inside `request_json` (например,
+  `execution_profile_mode`) не должно участвовать в `request_hash`, если не меняет exact result
+  semantics.
 - `state` и `stage` принимают только фиксированные literals.
 - `queued -> failed` запрещен.
 - Active jobs per user считаются как `queued + running`.

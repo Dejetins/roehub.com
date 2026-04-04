@@ -50,6 +50,7 @@ from .request_runtime_contract_v1 import (
 
 NowProvider = Callable[[], datetime]
 JobIdFactory = Callable[[], UUID]
+_REQUEST_HASH_INTERNAL_FIELDS = frozenset({"execution_profile_mode"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -370,7 +371,7 @@ class CreateBacktestJobUseCase:
             mode=resolved.mode,
             created_at=self._now(),
             request_json=request_json,
-            request_hash=_build_sha256_from_payload(payload=request_json),
+            request_hash=_build_request_hash_from_request_json(payload=request_json),
             spec_hash=resolved.spec_hash,
             spec_payload_json=resolved.spec_payload_json,
             engine_params_hash=_build_sha256_from_payload(
@@ -1619,6 +1620,39 @@ def _build_sha256_from_payload(*, payload: Mapping[str, Any]) -> str:
         ensure_ascii=True,
     )
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+
+
+def _build_request_hash_from_request_json(*, payload: Mapping[str, Any]) -> str:
+    """
+    Build canonical `request_hash` without persisted-only routing/read-model metadata.
+
+    Docs:
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - apps/api/dto/backtests.py
+    Args:
+        payload: Persisted `request_json` snapshot which may carry additive internal fields.
+    Returns:
+        str: Deterministic SHA-256 hash over canonical request semantics only.
+    Assumptions:
+        Internal launch/read metadata like `execution_profile_mode` must not change request
+        identity for exact-equivalent runs.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _build_sha256_from_payload(
+        payload={
+            key: value
+            for key, value in payload.items()
+            if key not in _REQUEST_HASH_INTERNAL_FIELDS
+        }
+    )
 
 
 
