@@ -21,6 +21,7 @@ from trading.contexts.backtest.application.ports import BacktestJobRepository
 from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
+    SIGNAL_FEATURE_NAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
     BacktestArtifactPrecomputeRunnerV2,
@@ -257,6 +258,12 @@ def test_yaml_backtest_artifact_loader_v2_reads_current_and_strict_manifests(
         "15m",
         "ma.ema",
     )
+    signal_features_manifest = loader.load_signal_features_manifest(
+        store.coordinates,
+        store.inactive_slot,
+        "15m",
+        "ma.ema",
+    )
     hit_times_manifest = loader.load_hit_times_manifest(
         store.coordinates,
         store.inactive_slot,
@@ -275,6 +282,10 @@ def test_yaml_backtest_artifact_loader_v2_reads_current_and_strict_manifests(
     assert signal_manifest.rows_count == 2
     assert signal_manifest.signals.axis_order == ("variant", "time")
     assert signal_manifest.grid.variant_key_version == 1
+    assert signal_manifest.signal_features is not None
+    assert signal_features_manifest.rows_count == 2
+    assert signal_features_manifest.features.axis_order == ("variant", "feature")
+    assert signal_features_manifest.feature_names == SIGNAL_FEATURE_NAMES_V2
     assert hit_times_manifest.timeline_bar_count == 4
     assert hit_times_manifest.long_tp.array.axis_order == ("level", "time")
 
@@ -291,14 +302,30 @@ def test_yaml_backtest_artifact_loader_v2_reads_current_and_strict_manifests(
         ).manifest,
         slot=store.inactive_slot,
     )
+    explicit_signal_features_manifest = loader.load_signal_features_manifest_from_path(
+        loader.resolve_signal_features_paths(
+            store.coordinates,
+            store.inactive_slot,
+            "15m",
+            "ma.ema",
+        ).manifest,
+        slot=store.inactive_slot,
+    )
     explicit_hit_times_manifest = loader.load_hit_times_manifest_from_path(
         loader.resolve_hit_times_manifest_path(store.coordinates, store.inactive_slot),
         slot=store.inactive_slot,
     )
     hit_times_paths = loader.resolve_hit_times_paths(store.coordinates, store.inactive_slot)
+    signal_features_paths = loader.resolve_signal_features_paths(
+        store.coordinates,
+        store.inactive_slot,
+        "15m",
+        "ma.ema",
+    )
 
     assert explicit_root_manifest.slot_generation == 5
     assert explicit_signal_manifest.indicator_id == "ma.ema"
+    assert explicit_signal_features_manifest.indicator_id == "ma.ema"
     assert explicit_hit_times_manifest.sentinel_index == 4
     assert (
         hit_times_paths.long_tp
@@ -307,6 +334,51 @@ def test_yaml_backtest_artifact_loader_v2_reads_current_and_strict_manifests(
             store.inactive_slot,
         ).long_tp
     )
+    assert (
+        signal_features_paths.features
+        == store.builder.signal_features_paths(
+            store.coordinates,
+            store.inactive_slot,
+            "15m",
+            "ma.ema",
+        ).features
+    )
+
+
+def test_yaml_backtest_artifact_loader_v2_accepts_legacy_slot_without_signal_features(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify the loader keeps reading legacy signal manifests that omit `signal_features`.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Old published slots remain readable while the additive feature family is still optional.
+    Raises:
+        AssertionError: If the optional field becomes mandatory.
+    Side Effects:
+        Builds one synthetic legacy-style inactive slot under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    store = build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path,
+        inactive_include_signal_features=False,
+    )
+    signal_manifest = store.loader.load_signal_manifest(
+        store.coordinates,
+        store.inactive_slot,
+        "15m",
+        "ma.ema",
+    )
+
+    assert signal_manifest.signal_features is None
 
 
 def test_yaml_backtest_artifact_loader_v2_avoids_directory_scanning(

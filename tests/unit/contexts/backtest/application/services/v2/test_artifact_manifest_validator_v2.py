@@ -49,8 +49,51 @@ def test_backtest_artifact_manifest_validator_v2_accepts_valid_strict_slot(
     assert result.manifest_sha256 is not None
     assert len(result.signal_manifests) == 1
     assert result.signal_manifests[0].indicator_id == "ma.ema"
+    assert result.signal_manifests[0].signal_features is not None
     assert result.hit_times_manifest is not None
     assert result.hit_times_manifest.timeline_bar_count == 4
+    assert result.diagnostics == ()
+
+
+def test_backtest_artifact_manifest_validator_v2_accepts_legacy_slot_without_signal_features(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify strict validation keeps accepting old slots that omit additive signal features.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `signal_features` remains optional until a later runtime rollout actually requires it.
+    Raises:
+        AssertionError: If legacy slots are rejected.
+    Side Effects:
+        Creates and reads one synthetic legacy-style artifact tree under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    store = build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path,
+        inactive_include_signal_features=False,
+    )
+    validator = BacktestArtifactManifestValidatorV2(artifact_loader=store.loader)
+
+    result = validator.validate_slot(
+        coordinates=store.coordinates,
+        slot=store.inactive_slot,
+        validation_spec=store.validation_spec,
+        expected_asof_date="2026-03-26",
+        expected_slot_generation=5,
+    )
+
+    assert result.slot_manifest is not None
+    assert len(result.signal_manifests) == 1
+    assert result.signal_manifests[0].signal_features is None
     assert result.diagnostics == ()
 
 

@@ -24,6 +24,7 @@ from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_TIMEFRAMES_V2,
+    SIGNAL_FEATURE_NAMES_V2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
     ArtifactCoordinatesV2,
@@ -2104,13 +2105,31 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
         "15m",
         "ma.ema",
     )
+    ema_features_manifest = fixture.loader.load_signal_features_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "15m",
+        "ma.ema",
+    )
     fifteen_minute_sma_manifest = fixture.loader.load_signal_manifest(
         fixture.coordinates,
         fixture.inactive_slot,
         "15m",
         "ma.sma",
     )
+    fifteen_minute_sma_features_manifest = fixture.loader.load_signal_features_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "15m",
+        "ma.sma",
+    )
     one_hour_sma_manifest = fixture.loader.load_signal_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+        "1h",
+        "ma.sma",
+    )
+    one_hour_sma_features_manifest = fixture.loader.load_signal_features_manifest(
         fixture.coordinates,
         fixture.inactive_slot,
         "1h",
@@ -2143,6 +2162,21 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
         ).signals,
         allow_pickle=False,
     )
+    ema_feature_matrix = _load_signal_features_matrix_v2(
+        fixture=fixture,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+    fifteen_minute_sma_feature_matrix = _load_signal_features_matrix_v2(
+        fixture=fixture,
+        timeframe="15m",
+        indicator_id="ma.sma",
+    )
+    one_hour_sma_feature_matrix = _load_signal_features_matrix_v2(
+        fixture=fixture,
+        timeframe="1h",
+        indicator_id="ma.sma",
+    )
     validator = BacktestArtifactManifestValidatorV2(artifact_loader=fixture.loader)
     validation_result = validator.validate_slot(
         coordinates=fixture.coordinates,
@@ -2174,28 +2208,73 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
     assert ema_manifest.signals.dtype == "int8"
     assert ema_manifest.signals.shape == (6, 288)
     assert ema_manifest.signals.axis_order == ("variant", "time")
+    assert ema_manifest.signal_features is not None
+    assert ema_features_manifest.feature_names == SIGNAL_FEATURE_NAMES_V2
+    assert ema_features_manifest.features.dtype == "float32"
+    assert ema_features_manifest.features.shape == (6, len(SIGNAL_FEATURE_NAMES_V2))
+    assert ema_features_manifest.features.axis_order == ("variant", "feature")
     assert dict(ema_manifest.grid.signals_v1_params_defaults) == {}
     assert fifteen_minute_sma_manifest.rows_count == 6
     assert fifteen_minute_sma_manifest.timeline.bar_count == 288
     assert fifteen_minute_sma_manifest.signals.dtype == "int8"
     assert fifteen_minute_sma_manifest.signals.shape == (6, 288)
     assert fifteen_minute_sma_manifest.signals.axis_order == ("variant", "time")
+    assert fifteen_minute_sma_manifest.signal_features is not None
+    assert fifteen_minute_sma_features_manifest.feature_names == SIGNAL_FEATURE_NAMES_V2
+    assert fifteen_minute_sma_features_manifest.features.dtype == "float32"
+    assert fifteen_minute_sma_features_manifest.features.shape == (
+        6,
+        len(SIGNAL_FEATURE_NAMES_V2),
+    )
+    assert fifteen_minute_sma_features_manifest.features.axis_order == (
+        "variant",
+        "feature",
+    )
     assert dict(fifteen_minute_sma_manifest.grid.signals_v1_params_defaults) == {}
     assert one_hour_sma_manifest.rows_count == 6
     assert one_hour_sma_manifest.timeline.bar_count == 72
     assert one_hour_sma_manifest.signals.dtype == "int8"
     assert one_hour_sma_manifest.signals.shape == (6, 72)
     assert one_hour_sma_manifest.signals.axis_order == ("variant", "time")
+    assert one_hour_sma_manifest.signal_features is not None
+    assert one_hour_sma_features_manifest.feature_names == SIGNAL_FEATURE_NAMES_V2
+    assert one_hour_sma_features_manifest.features.dtype == "float32"
+    assert one_hour_sma_features_manifest.features.shape == (
+        6,
+        len(SIGNAL_FEATURE_NAMES_V2),
+    )
+    assert one_hour_sma_features_manifest.features.axis_order == (
+        "variant",
+        "feature",
+    )
     assert dict(one_hour_sma_manifest.grid.signals_v1_params_defaults) == {}
     assert ema_matrix.dtype == np.int8
     assert fifteen_minute_sma_matrix.dtype == np.int8
     assert one_hour_sma_matrix.dtype == np.int8
+    assert ema_feature_matrix.dtype == np.float32
+    assert fifteen_minute_sma_feature_matrix.dtype == np.float32
+    assert one_hour_sma_feature_matrix.dtype == np.float32
     assert ema_matrix.shape == (6, 288)
     assert fifteen_minute_sma_matrix.shape == (6, 288)
     assert one_hour_sma_matrix.shape == (6, 72)
+    assert ema_feature_matrix.shape == (6, len(SIGNAL_FEATURE_NAMES_V2))
+    assert fifteen_minute_sma_feature_matrix.shape == (6, len(SIGNAL_FEATURE_NAMES_V2))
+    assert one_hour_sma_feature_matrix.shape == (6, len(SIGNAL_FEATURE_NAMES_V2))
     assert set(np.unique(ema_matrix).tolist()) <= {-1, 0, 1}
     assert set(np.unique(fifteen_minute_sma_matrix).tolist()) <= {-1, 0, 1}
     assert set(np.unique(one_hour_sma_matrix).tolist()) <= {-1, 0, 1}
+    np.testing.assert_allclose(
+        ema_feature_matrix,
+        _expected_signal_features_matrix_v2(signal_matrix=ema_matrix),
+    )
+    np.testing.assert_allclose(
+        fifteen_minute_sma_feature_matrix,
+        _expected_signal_features_matrix_v2(signal_matrix=fifteen_minute_sma_matrix),
+    )
+    np.testing.assert_allclose(
+        one_hour_sma_feature_matrix,
+        _expected_signal_features_matrix_v2(signal_matrix=one_hour_sma_matrix),
+    )
     assert len(validation_result.signal_manifests) == 3
     assert validation_result.hit_times_manifest is None
     assert validation_result.diagnostics == ()
@@ -4073,19 +4152,124 @@ def _load_signal_matrix_v2(
     )
 
 
+def _load_signal_features_matrix_v2(
+    *,
+    fixture: ArtifactPrecomputeFixtureV2,
+    timeframe: str,
+    indicator_id: str,
+) -> np.ndarray:
+    """
+    Load one strict `signal_features/<tf>/<indicator_id>/features.f32.npy` matrix.
+
+    Args:
+        fixture: Minimal strict precompute fixture.
+        timeframe: Signal timeframe literal.
+        indicator_id: Signal indicator identifier.
+    Returns:
+        np.ndarray: Loaded compact `float32` feature matrix with shape `[V, feature]`.
+    Assumptions:
+        The caller already materialized the target additive feature artifact into the inactive
+        slot.
+    Raises:
+        FileNotFoundError: If the deterministic feature path is missing.
+        ValueError: If numpy cannot load the stored `.npy` payload.
+    Side Effects:
+        Reads one feature matrix from disk.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+    """
+    return np.load(
+        fixture.loader.resolve_signal_features_paths(
+            fixture.coordinates,
+            fixture.inactive_slot,
+            timeframe,
+            indicator_id,
+        ).features,
+        allow_pickle=False,
+    )
+
+
+def _expected_signal_features_matrix_v2(*, signal_matrix: np.ndarray) -> np.ndarray:
+    """
+    Derive the expected fixed row-local feature matrix from one emitted signal matrix.
+
+    Args:
+        signal_matrix: Strict emitted signal matrix with shape `[variant, time]`.
+    Returns:
+        np.ndarray: Deterministic `float32` feature matrix with shape `[variant, feature]`.
+    Assumptions:
+        Runner tests must assert the documented fixed feature ordering without depending on the
+        production helper internals.
+    Raises:
+        ValueError: If the provided signal matrix is not two-dimensional or has empty axes.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - tests/unit/contexts/backtest/application/services/v2/test_signal_features_loader_v2.py
+    """
+    if signal_matrix.ndim != 2:
+        raise ValueError(f"signal_matrix must be 2D; got ndim={signal_matrix.ndim!r}")
+    variant_count = int(signal_matrix.shape[0])
+    timeline_bar_count = int(signal_matrix.shape[1])
+    if variant_count <= 0 or timeline_bar_count <= 0:
+        raise ValueError("signal_matrix must have positive variant and timeline dimensions")
+    nonzero_count = np.count_nonzero(signal_matrix != 0, axis=1).astype(np.float32, copy=False)
+    long_count = np.count_nonzero(signal_matrix > 0, axis=1).astype(np.float32, copy=False)
+    short_count = np.count_nonzero(signal_matrix < 0, axis=1).astype(np.float32, copy=False)
+    activity_ratio = np.ascontiguousarray(
+        nonzero_count / np.float32(timeline_bar_count),
+        dtype=np.float32,
+    )
+    direction_balance = np.zeros(variant_count, dtype=np.float32)
+    np.divide(
+        long_count - short_count,
+        nonzero_count,
+        out=direction_balance,
+        where=nonzero_count > 0.0,
+    )
+    if timeline_bar_count < 2:
+        transition_count = np.zeros(variant_count, dtype=np.float32)
+    else:
+        transition_count = np.count_nonzero(
+            signal_matrix[:, 1:] != signal_matrix[:, :-1],
+            axis=1,
+        ).astype(np.float32, copy=False)
+    return np.ascontiguousarray(
+        np.column_stack(
+            (
+                nonzero_count,
+                long_count,
+                short_count,
+                activity_ratio,
+                direction_balance,
+                transition_count,
+            )
+        ),
+        dtype=np.float32,
+    )
+
+
 def _read_signal_export_bytes_v2(
     *,
     fixture: ArtifactPrecomputeFixtureV2,
     signal_targets: tuple[tuple[str, str], ...],
 ) -> tuple[bytes, ...]:
     """
-    Read deterministic per-target signal manifest bytes and signal matrix bytes.
+    Read deterministic per-target signal and signal-feature manifest bytes and array bytes.
 
     Args:
         fixture: Minimal strict precompute fixture.
         signal_targets: Explicit ordered `(timeframe, indicator_id)` signal targets.
     Returns:
-        tuple[bytes, ...]: Stable byte snapshots for per-target signal files.
+        tuple[bytes, ...]: Stable byte snapshots for per-target signal and feature files.
     Assumptions:
         Identical rebuild inputs with fixed `generated_at_utc` should keep emitted file bytes
         unchanged across repeated runs.
@@ -4108,8 +4292,16 @@ def _read_signal_export_bytes_v2(
             timeframe,
             indicator_id,
         )
+        signal_features_paths = fixture.loader.resolve_signal_features_paths(
+            fixture.coordinates,
+            fixture.inactive_slot,
+            timeframe,
+            indicator_id,
+        )
         snapshots.append(signal_paths.manifest.read_bytes())
         snapshots.append(signal_paths.signals.read_bytes())
+        snapshots.append(signal_features_paths.manifest.read_bytes())
+        snapshots.append(signal_features_paths.features.read_bytes())
     return tuple(snapshots)
 
 

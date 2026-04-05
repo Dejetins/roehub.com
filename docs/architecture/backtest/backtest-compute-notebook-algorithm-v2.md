@@ -52,6 +52,30 @@ production transfer contract.
 - research tables, plots и ad-hoc orchestration;
 - попытка перенести notebook один-в-один как runtime facade.
 
+## Additive signal-features cache note (C1)
+
+Milestone C1 adds an optional artifact-backed row-local feature cache next to published signals:
+
+- `signal_features/<tf>/<indicator_id>/features.f32.npy`
+- `signal_features/<tf>/<indicator_id>/manifest.yaml`
+
+Scope and compatibility:
+
+- these artifacts are additive and optional; old slots without them remain readable;
+- feature order is fixed and explicit:
+  - `nonzero_count`
+  - `long_count`
+  - `short_count`
+  - `activity_ratio`
+  - `direction_balance`
+  - `transition_count`
+- features derive only from the already materialized signal row and its timeline length;
+- notebook code is not rewritten in this milestone, but future notebook/runtime/plugin work may
+  reuse the same explicit feature source instead of recomputing these row-local values ad hoc.
+- Milestone C2 keeps runtime access optional: exact runtime may open/carry this warm cache when
+  available, but old slots without `signal_features` remain valid and heuristics stay disabled by
+  default.
+
 ---
 
 ## Подробный notebook walkthrough (reference-only)

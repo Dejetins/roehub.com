@@ -63,6 +63,8 @@ from .contracts import (
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_AXIS_ORDER_V2,
     ARTIFACT_SIGNAL_DTYPE_LITERAL_V2,
+    ARTIFACT_SIGNAL_FEATURE_AXIS_ORDER_V2,
+    ARTIFACT_SIGNAL_FEATURE_DTYPE_LITERAL_V2,
     ARTIFACT_SIGNAL_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_VALUE_SET_V2,
     ARTIFACT_TIME_AXIS_ORDER_V2,
@@ -72,6 +74,9 @@ from .contracts import (
     HIT_TIMES_TIMEFRAME_LITERAL_V2,
     SIGNAL_ARTIFACT_MANIFEST_KIND_V2,
     SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+    SIGNAL_FEATURE_NAMES_V2,
+    SIGNAL_FEATURES_ARTIFACT_MANIFEST_KIND_V2,
+    SIGNAL_FEATURES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
     ArtifactArrayMetadataV2,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
@@ -94,6 +99,9 @@ from .contracts import (
     ArtifactSignalChunkJobV2,
     ArtifactSignalChunkPlanningRequestV2,
     ArtifactSignalEncodingContractV2,
+    ArtifactSignalFeaturesManifestDocumentV2,
+    ArtifactSignalFeaturesPathsV2,
+    ArtifactSignalFeaturesReferenceV2,
     ArtifactSignalGridContractV2,
     ArtifactSignalManifestDocumentV2,
     ArtifactSignalPathsV2,
@@ -491,6 +499,23 @@ class _SignalArtifactMaterializationResultV2:
     reused_prefix_bars: int
     rewritten_tail_bars: int
     completed_chunks_total: int
+
+
+@dataclass(frozen=True, slots=True)
+class _SignalFeaturesArtifactBuildResultV2:
+    """
+    Internal immutable output of one strict additive signal-feature artifact materialization.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+    """
+
+    manifest: ArtifactSignalFeaturesManifestDocumentV2
+    reference: ArtifactSignalFeaturesReferenceV2
 
 
 @dataclass(frozen=True, slots=True)
@@ -1799,6 +1824,23 @@ def _materialize_signal_artifact_v2(
         signal_params_defaults=signal_params_defaults,
         max_signal_rows_per_artifact=runtime_settings.max_signal_rows_per_artifact,
     )
+    signal_features_paths = artifact_loader.resolve_signal_features_paths(
+        coordinates,
+        slot,
+        signal_target.timeframe,
+        signal_target.indicator_id,
+    )
+    signal_features_build_result = _materialize_signal_features_artifact_v2(
+        slot=slot,
+        slot_root=slot_root,
+        request=request,
+        slot_generation=slot_generation,
+        runtime_settings=runtime_settings,
+        signal_target=signal_target,
+        signal_shape=signal_shape,
+        signal_paths=signal_paths,
+        signal_features_paths=signal_features_paths,
+    )
     signal_manifest = _build_signal_manifest_v2(
         coordinates=coordinates,
         slot=slot,
@@ -1815,6 +1857,7 @@ def _materialize_signal_artifact_v2(
         signal_params_defaults=signal_params_defaults,
         signal_rules_engine=signal_rules_engine,
         effective_tail_bars=signal_tail_plan.effective_tail_bars,
+        signal_features=signal_features_build_result.reference,
     )
     _write_yaml_atomically_v2(
         path=signal_paths.manifest,
@@ -1825,6 +1868,156 @@ def _materialize_signal_artifact_v2(
         reused_prefix_bars=signal_tail_plan.reused_prefix_bars,
         rewritten_tail_bars=signal_shape[1] - signal_tail_plan.reused_prefix_bars,
         completed_chunks_total=len(chunk_jobs),
+    )
+
+
+def _materialize_signal_features_artifact_v2(
+    *,
+    slot: str,
+    slot_root: Path,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+    signal_shape: tuple[int, int],
+    signal_paths: ArtifactSignalPathsV2,
+    signal_features_paths: ArtifactSignalFeaturesPathsV2,
+) -> _SignalFeaturesArtifactBuildResultV2:
+    """
+    Materialize one additive signal-feature family from the already written signal matrix.
+
+    Args:
+        slot: Inactive slot literal receiving the feature artifact.
+        slot_root: Absolute inactive-slot root directory.
+        request: Explicit export request carrying root identity and timestamps.
+        slot_generation: Deterministic generation assigned to the inactive slot build.
+        runtime_settings: Strict runtime settings contributing config identity to provenance.
+        signal_target: Explicit `(timeframe, indicator_id)` materialization target.
+        signal_shape: Final signal matrix shape used as the strict row/timeline contract.
+        signal_paths: Fixed signal family paths whose written matrix becomes the feature source.
+        signal_features_paths: Fixed signal-feature family paths under the inactive slot.
+    Returns:
+        _SignalFeaturesArtifactBuildResultV2: Typed feature manifest plus the reference written
+            back into the owning signal manifest.
+    Assumptions:
+        Feature derivation is intentionally row-local, deterministic, and depends only on the
+        final signal rows plus their timeline length.
+    Raises:
+        ValueError: If the written signal matrix shape drifts from the expected contract.
+        OSError: If writing the feature array or manifest fails.
+    Side Effects:
+        Memory-maps the final signal matrix, writes `features.f32.npy`, and writes the additive
+        feature `manifest.yaml`.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    signal_matrix = np.load(signal_paths.signals, mmap_mode="r", allow_pickle=False)
+    actual_signal_shape = tuple(int(value) for value in signal_matrix.shape)
+    if actual_signal_shape != signal_shape:
+        raise ValueError(
+            "written signal matrix shape must match the expected strict contract; got "
+            f"{actual_signal_shape!r}, expected {signal_shape!r}"
+        )
+    feature_matrix = _build_signal_features_matrix_v2(signal_matrix=signal_matrix)
+    _write_npy_atomically_v2(path=signal_features_paths.features, array=feature_matrix)
+    feature_manifest = _build_signal_features_manifest_v2(
+        slot=slot,
+        slot_root=slot_root,
+        request=request,
+        slot_generation=slot_generation,
+        runtime_settings=runtime_settings,
+        signal_target=signal_target,
+        signal_shape=signal_shape,
+        signal_paths=signal_paths,
+        signal_features_paths=signal_features_paths,
+    )
+    _write_yaml_atomically_v2(
+        path=signal_features_paths.manifest,
+        payload=_serialize_signal_features_manifest_v2(feature_manifest),
+    )
+    reference = ArtifactSignalFeaturesReferenceV2(
+        manifest_path=_slot_relative_path_v2(
+            slot_root=slot_root,
+            absolute_path=signal_features_paths.manifest,
+        ),
+        manifest_sha256=_file_sha256_hex_v2(signal_features_paths.manifest),
+    )
+    return _SignalFeaturesArtifactBuildResultV2(
+        manifest=feature_manifest,
+        reference=reference,
+    )
+
+
+def _build_signal_features_matrix_v2(*, signal_matrix: np.ndarray) -> np.ndarray:
+    """
+    Derive the fixed warm-cache signal features from one final `[variant, time]` signal matrix.
+
+    Args:
+        signal_matrix: Final strict signal matrix whose values must already satisfy `{-1, 0, 1}`.
+    Returns:
+        np.ndarray: Contiguous `float32` feature matrix with shape `[variant, feature]`.
+    Assumptions:
+        Feature derivation stays intentionally small, explicit, and row-local for Milestone C1.
+    Raises:
+        ValueError: If the matrix is not two-dimensional or has an empty feature axis.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if signal_matrix.ndim != 2:
+        raise ValueError(
+            f"signal feature source matrix must be 2D; got ndim={signal_matrix.ndim!r}"
+        )
+    variant_count = int(signal_matrix.shape[0])
+    timeline_bar_count = int(signal_matrix.shape[1])
+    if variant_count <= 0 or timeline_bar_count <= 0:
+        raise ValueError(
+            "signal feature source matrix must have positive variant and timeline dimensions"
+        )
+    nonzero_count = np.count_nonzero(signal_matrix != 0, axis=1).astype(np.float32, copy=False)
+    long_count = np.count_nonzero(signal_matrix > 0, axis=1).astype(np.float32, copy=False)
+    short_count = np.count_nonzero(signal_matrix < 0, axis=1).astype(np.float32, copy=False)
+    activity_ratio = np.ascontiguousarray(
+        nonzero_count / np.float32(timeline_bar_count),
+        dtype=np.float32,
+    )
+    direction_balance = np.zeros(variant_count, dtype=np.float32)
+    np.divide(
+        long_count - short_count,
+        nonzero_count,
+        out=direction_balance,
+        where=nonzero_count > 0.0,
+    )
+    if timeline_bar_count < 2:
+        transition_count = np.zeros(variant_count, dtype=np.float32)
+    else:
+        transition_count = np.count_nonzero(
+            signal_matrix[:, 1:] != signal_matrix[:, :-1],
+            axis=1,
+        ).astype(np.float32, copy=False)
+    return np.ascontiguousarray(
+        np.column_stack(
+            (
+                nonzero_count,
+                long_count,
+                short_count,
+                activity_ratio,
+                direction_balance,
+                transition_count,
+            )
+        ),
+        dtype=np.float32,
     )
 
 
@@ -3176,6 +3369,99 @@ def _validate_signal_matrix_v2(
         raise ValueError(f"{label} values must be exactly {ARTIFACT_SIGNAL_VALUE_SET_V2!r}")
 
 
+def _build_signal_features_manifest_v2(
+    *,
+    slot: str,
+    slot_root: Path,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+    signal_shape: tuple[int, int],
+    signal_paths: ArtifactSignalPathsV2,
+    signal_features_paths: ArtifactSignalFeaturesPathsV2,
+) -> ArtifactSignalFeaturesManifestDocumentV2:
+    """
+    Build the strict typed signal-feature manifest for one freshly written feature matrix.
+
+    Args:
+        slot: Inactive slot literal receiving the manifest.
+        slot_root: Absolute inactive-slot root directory.
+        request: Explicit export request carrying root identity and timestamps.
+        slot_generation: Deterministic generation assigned to the inactive slot build.
+        runtime_settings: Strict runtime settings contributing config hash identity.
+        signal_target: Explicit `(timeframe, indicator_id)` materialization target.
+        signal_shape: Final source signal matrix shape `[V, T_tf]`.
+        signal_paths: Fixed source signal family paths used for provenance hashing.
+        signal_features_paths: Fixed signal-feature family paths under the inactive slot.
+    Returns:
+        ArtifactSignalFeaturesManifestDocumentV2: Typed strict signal-feature manifest.
+    Assumptions:
+        The feature file already exists on disk and is ready for `sha256` hashing.
+    Raises:
+        ValueError: If one manifest field violates the strict typed contract.
+        OSError: If one written artifact file cannot be hashed.
+    Side Effects:
+        Reads the freshly written feature matrix file to compute its manifest hash.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+    """
+    validated_slot = validate_artifact_slot_v2(slot)
+    features_metadata = ArtifactArrayMetadataV2(
+        path=_slot_relative_path_v2(
+            slot_root=slot_root,
+            absolute_path=signal_features_paths.features,
+        ),
+        dtype=ARTIFACT_SIGNAL_FEATURE_DTYPE_LITERAL_V2,
+        shape=(int(signal_shape[0]), len(SIGNAL_FEATURE_NAMES_V2)),
+        axis_order=ARTIFACT_SIGNAL_FEATURE_AXIS_ORDER_V2,
+        sha256=_file_sha256_hex_v2(signal_features_paths.features),
+    )
+    provenance = _build_signal_features_manifest_provenance_v2(
+        request=request,
+        slot_generation=slot_generation,
+        runtime_settings=runtime_settings,
+        signal_target=signal_target,
+        signal_shape=signal_shape,
+        signal_paths=signal_paths,
+        signal_features_paths=signal_features_paths,
+    )
+    payload = {
+        "schema_version": SIGNAL_FEATURES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+        "manifest_kind": SIGNAL_FEATURES_ARTIFACT_MANIFEST_KIND_V2,
+        "slot": validated_slot,
+        "slot_generation": slot_generation,
+        "asof_date": request.asof_date,
+        "indicator_id": signal_target.indicator_id,
+        "timeframe": signal_target.timeframe,
+        "features": _serialize_array_metadata_v2(features_metadata),
+        "rows_count": int(signal_shape[0]),
+        "feature_names": [name for name in SIGNAL_FEATURE_NAMES_V2],
+        "provenance": _serialize_provenance_v2(provenance),
+    }
+    return ArtifactSignalFeaturesManifestDocumentV2(
+        path=signal_features_paths.manifest,
+        raw_payload=payload,
+        slot=validated_slot,
+        schema_version=SIGNAL_FEATURES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+        manifest_kind=SIGNAL_FEATURES_ARTIFACT_MANIFEST_KIND_V2,
+        slot_generation=slot_generation,
+        asof_date=request.asof_date,
+        indicator_id=signal_target.indicator_id,
+        timeframe=signal_target.timeframe,
+        features=features_metadata,
+        rows_count=int(signal_shape[0]),
+        feature_names=SIGNAL_FEATURE_NAMES_V2,
+        provenance=provenance,
+    )
+
+
 def _build_signal_manifest_v2(
     *,
     coordinates: ArtifactCoordinatesV2,
@@ -3193,6 +3479,7 @@ def _build_signal_manifest_v2(
     signal_params_defaults: Mapping[str, Any],
     signal_rules_engine: BacktestSignalRulesEngineV2,
     effective_tail_bars: int,
+    signal_features: ArtifactSignalFeaturesReferenceV2 | None,
 ) -> ArtifactSignalManifestDocumentV2:
     """
     Build the strict typed per-indicator signal manifest for one freshly written matrix.
@@ -3212,6 +3499,7 @@ def _build_signal_manifest_v2(
         signal_params_defaults: Resolved `signals.v1.params` default mapping.
         signal_rules_engine: Explicit signal rules engine used to capture dependency metadata.
         effective_tail_bars: Effective target-timeframe tail window used for rebuild planning.
+        signal_features: Optional additive feature-manifest reference for the same signal target.
     Returns:
         ArtifactSignalManifestDocumentV2: Typed strict signal manifest.
     Assumptions:
@@ -3269,6 +3557,8 @@ def _build_signal_manifest_v2(
         "grid": _serialize_signal_grid_contract_v2(grid_contract),
         "provenance": _serialize_provenance_v2(provenance),
     }
+    if signal_features is not None:
+        payload["signal_features"] = _serialize_signal_features_reference_v2(signal_features)
     return ArtifactSignalManifestDocumentV2(
         path=signal_paths.manifest,
         raw_payload=payload,
@@ -3285,6 +3575,7 @@ def _build_signal_manifest_v2(
         signal_value_set=ARTIFACT_SIGNAL_VALUE_SET_V2,
         grid=grid_contract,
         provenance=provenance,
+        signal_features=signal_features,
     )
 
 
@@ -6569,6 +6860,125 @@ def _default_signal_encoding_contract_v2() -> ArtifactSignalEncodingContractV2:
     )
 
 
+def _build_signal_features_manifest_provenance_v2(
+    *,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_target: ArtifactSignalValidationSpecV2,
+    signal_shape: tuple[int, int],
+    signal_paths: ArtifactSignalPathsV2,
+    signal_features_paths: ArtifactSignalFeaturesPathsV2,
+) -> ArtifactManifestProvenanceV2:
+    """
+    Build deterministic provenance for one strict additive signal-feature manifest.
+
+    Args:
+        request: Explicit export request carrying shared identity and timestamps.
+        slot_generation: Deterministic generation assigned to the inactive slot build.
+        runtime_settings: Strict runtime settings contributing the config hash.
+        signal_target: Explicit `(timeframe, indicator_id)` materialization target.
+        signal_shape: Final source signal matrix shape `[V, T_tf]`.
+        signal_paths: Fixed source signal family paths used for provenance hashing.
+        signal_features_paths: Fixed signal-feature family paths under the inactive slot.
+    Returns:
+        ArtifactManifestProvenanceV2: Strict signal-feature manifest provenance payload.
+    Assumptions:
+        Feature provenance tracks only explicit source identity and the fixed feature schema, not
+        YAML serialization bytes.
+    Raises:
+        OSError: If one source artifact hash cannot be read from disk.
+    Side Effects:
+        Reads source and feature artifact files to compute stable hashes.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return ArtifactManifestProvenanceV2(
+        generator=_PRECOMPUTE_GENERATOR_LITERAL_V2,
+        generator_version=_PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2,
+        generated_at_utc=request.generated_at_utc,
+        config_sha256=runtime_settings.config_sha256,
+        inputs_sha256=_build_signal_features_manifest_inputs_sha256_v2(
+            request=request,
+            slot_generation=slot_generation,
+            signal_target=signal_target,
+            signal_shape=signal_shape,
+            signal_paths=signal_paths,
+            signal_features_paths=signal_features_paths,
+        ),
+    )
+
+
+def _build_signal_features_manifest_inputs_sha256_v2(
+    *,
+    request: ArtifactCanonicalPriceExportRequestV2,
+    slot_generation: int,
+    signal_target: ArtifactSignalValidationSpecV2,
+    signal_shape: tuple[int, int],
+    signal_paths: ArtifactSignalPathsV2,
+    signal_features_paths: ArtifactSignalFeaturesPathsV2,
+) -> str:
+    """
+    Hash normalized signal-feature source identity into deterministic manifest provenance.
+
+    Args:
+        request: Explicit export request carrying root identity and timestamps.
+        slot_generation: Deterministic generation assigned to the inactive slot build.
+        signal_target: Explicit `(timeframe, indicator_id)` materialization target.
+        signal_shape: Final source signal matrix shape `[V, T_tf]`.
+        signal_paths: Fixed source signal family paths used for provenance hashing.
+        signal_features_paths: Fixed signal-feature family paths under the inactive slot.
+    Returns:
+        str: Lowercase SHA-256 digest over normalized signal-feature manifest inputs.
+    Assumptions:
+        Feature provenance is driven by the immutable signal source plus the fixed feature schema.
+    Raises:
+        OSError: If one source artifact hash cannot be read from disk.
+    Side Effects:
+        Reads source and feature artifact files to compute stable hashes.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    normalized_payload = {
+        "identity": {
+            "exchange": request.coordinates.exchange,
+            "market_type": request.coordinates.market_type,
+            "symbol": request.coordinates.symbol,
+        },
+        "slot_generation": slot_generation,
+        "asof_date": request.asof_date,
+        "signal_target": {
+            "timeframe": signal_target.timeframe,
+            "indicator_id": signal_target.indicator_id,
+        },
+        "signal_shape": [int(signal_shape[0]), int(signal_shape[1])],
+        "feature_names": [name for name in SIGNAL_FEATURE_NAMES_V2],
+        "source_signal": {
+            "path": signal_paths.signals.name,
+            "sha256": _file_sha256_hex_v2(signal_paths.signals),
+        },
+        "feature_matrix": {
+            "path": signal_features_paths.features.name,
+            "sha256": _file_sha256_hex_v2(signal_features_paths.features),
+        },
+    }
+    return hashlib.sha256(
+        json.dumps(
+            normalized_payload,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
 def _build_signal_manifest_provenance_v2(
     *,
     coordinates: ArtifactCoordinatesV2,
@@ -7201,7 +7611,7 @@ def _serialize_signal_manifest_v2(
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
-    return {
+    payload = {
         "schema_version": manifest.schema_version,
         "manifest_kind": manifest.manifest_kind,
         "slot": manifest.slot,
@@ -7215,6 +7625,79 @@ def _serialize_signal_manifest_v2(
         "signal_value_set": [int(value) for value in manifest.signal_value_set],
         "grid": _serialize_signal_grid_contract_v2(manifest.grid),
         "provenance": _serialize_provenance_v2(manifest.provenance),
+    }
+    if manifest.signal_features is not None:
+        payload["signal_features"] = _serialize_signal_features_reference_v2(
+            manifest.signal_features
+        )
+    return payload
+
+
+def _serialize_signal_features_manifest_v2(
+    manifest: ArtifactSignalFeaturesManifestDocumentV2,
+) -> dict[str, Any]:
+    """
+    Serialize one typed strict signal-feature manifest into deterministic YAML-ready payload order.
+
+    Args:
+        manifest: Typed strict signal-feature manifest.
+    Returns:
+        dict[str, Any]: YAML-ready signal-feature manifest payload.
+    Assumptions:
+        Manifest fields are already validated and use canonical slot-relative path literals.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    return {
+        "schema_version": manifest.schema_version,
+        "manifest_kind": manifest.manifest_kind,
+        "slot": manifest.slot,
+        "slot_generation": manifest.slot_generation,
+        "asof_date": manifest.asof_date,
+        "indicator_id": manifest.indicator_id,
+        "timeframe": manifest.timeframe,
+        "features": _serialize_array_metadata_v2(manifest.features),
+        "rows_count": manifest.rows_count,
+        "feature_names": [name for name in manifest.feature_names],
+        "provenance": _serialize_provenance_v2(manifest.provenance),
+    }
+
+
+def _serialize_signal_features_reference_v2(
+    reference: ArtifactSignalFeaturesReferenceV2,
+) -> dict[str, Any]:
+    """
+    Serialize one typed signal-feature manifest reference into deterministic YAML-ready order.
+
+    Args:
+        reference: Typed signal-feature manifest reference.
+    Returns:
+        dict[str, Any]: YAML-ready reference payload.
+    Assumptions:
+        Signal manifests reference the additive feature family only through explicit manifest
+        path/hash metadata.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+    """
+    return {
+        "manifest_path": reference.manifest_path,
+        "manifest_sha256": reference.manifest_sha256,
     }
 
 

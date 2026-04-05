@@ -32,18 +32,22 @@ from .artifact_runtime_plan_v2 import (
     STAGE_A_LITERAL_V2,
     BacktestArtifactRuntimePlanV2,
     BacktestIndicatorPlanV2,
+    BacktestSignalFeaturesAccessPlanV2,
     BacktestStageABaseVariantV2,
 )
 from .contracts import (
+    ArtifactSignalFeaturesRowsV2,
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactLoaderV2,
     BacktestArtifactSlotResolverV2,
     BacktestPriceArraysLoaderV2,
+    BacktestSignalFeaturesLoaderV2,
     BacktestSignalMatrixLoaderV2,
     artifact_market_id_from_coordinates_v2,
 )
 from .price_arrays_loader import MmapPriceArraysLoaderV2
 from .signal_aggregator_kernel import aggregate_final_signal_rows_v2
+from .signal_features_loader_v2 import MmapSignalFeaturesLoaderV2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .trade_compactor_kernel import (
     build_compact_trade_list_v2,
@@ -188,6 +192,83 @@ class PreparedIndicatorRowPlanV2:
 
 
 @dataclass(frozen=True, slots=True)
+class PreparedIndicatorChunkInputsV2:
+    """
+    Per-indicator Stage A chunk inputs carrying signal rows and optional warm-cache feature access.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+
+    indicator_id: str
+    signal_rows: np.ndarray
+    signal_features_loader: BacktestSignalFeaturesLoaderV2 | None = None
+    signal_features_context: ArtifactSlotPinnedRuntimeContextV2 | None = None
+    signal_features_access: BacktestSignalFeaturesAccessPlanV2 | None = None
+    signal_feature_row_selection: slice | tuple[int, ...] | None = None
+
+    def load_signal_feature_rows(self) -> ArtifactSignalFeaturesRowsV2 | None:
+        """
+        Materialize optional selected signal-feature rows for this chunk in variant order.
+
+        Args:
+            None.
+        Returns:
+            ArtifactSignalFeaturesRowsV2 | None: Selected feature rows when the additive
+                `signal_features` family is available for this indicator, else `None`.
+        Assumptions:
+            `signal_feature_row_selection` stays aligned with `signal_rows` ordering for the same
+            chunk variants, and feature matrices should stay lazy until this method is called.
+        Raises:
+            ValueError: If lazy feature-access metadata is only partially populated.
+        Side Effects:
+            May memory-map one additive feature matrix on first explicit access and returns the
+            selected typed rows.
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+        """
+        if (
+            self.signal_features_loader is None
+            and self.signal_features_context is None
+            and self.signal_features_access is None
+            and self.signal_feature_row_selection is None
+        ):
+            return None
+        if (
+            self.signal_features_loader is None
+            or self.signal_features_context is None
+            or self.signal_features_access is None
+            or self.signal_feature_row_selection is None
+        ):
+            raise ValueError(
+                "PreparedIndicatorChunkInputsV2 requires complete lazy signal-feature access "
+                "metadata when warm-cache access is enabled"
+            )
+        if self.signal_features_access.optional:
+            return self.signal_features_loader.try_load_signal_feature_rows(
+                context=self.signal_features_context,
+                timeframe=self.signal_features_access.timeframe,
+                indicator_id=self.signal_features_access.indicator_id,
+                row_selection=self.signal_feature_row_selection,
+            )
+        return self.signal_features_loader.load_signal_feature_rows(
+            context=self.signal_features_context,
+            timeframe=self.signal_features_access.timeframe,
+            indicator_id=self.signal_features_access.indicator_id,
+            row_selection=self.signal_feature_row_selection,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestStageAShortlistBuilderV2:
     """
     Build deterministic Stage A shortlist rows from artifacts-only inputs and pure kernels.
@@ -204,6 +285,7 @@ class BacktestStageAShortlistBuilderV2:
 
     price_arrays_loader: BacktestPriceArraysLoaderV2
     signal_matrix_loader: BacktestSignalMatrixLoaderV2
+    signal_features_loader: BacktestSignalFeaturesLoaderV2 | None = None
     configurable_ranking_enabled: bool = True
     chunk_size_default: int = 2048
     init_cash_quote_default: float = 10000.0
@@ -395,6 +477,107 @@ class BacktestStageAShortlistBuilderV2:
 
         return stage_a_rows_from_heap_v2(heap=shortlist_heap)
 
+    def load_chunk_runtime_inputs(
+        self,
+        *,
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
+        chunk_variants: Sequence[BacktestStageABaseVariantV2],
+        grid_context: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        signal_target_slice: slice,
+    ) -> tuple[PreparedIndicatorChunkInputsV2, ...]:
+        """
+        Load one Stage A chunk's per-indicator runtime inputs with optional feature warm cache.
+
+        Args:
+            row_plans: Prepared per-indicator row-addressing plans.
+            chunk_variants: Deterministic Stage A base variants for the current chunk.
+            grid_context: Prepared runtime plan owning timeframe and warm-cache access plans.
+            artifact_context: Slot-pinned runtime context used by explicit-path loaders.
+            signal_target_slice: Target request slice in the signal timeline.
+        Returns:
+            tuple[PreparedIndicatorChunkInputsV2, ...]: Per-indicator signal rows plus additive
+                optional `signal_features` access handles for the current chunk.
+        Assumptions:
+            Warm-cache access stays optional in Milestone C and must not fail exact execution on
+            legacy slots that omit additive feature artifacts.
+        Raises:
+            ValueError: If row addressing drifts from the prepared indicator plans.
+            FileNotFoundError: If selected signal rows are missing on disk.
+        Side Effects:
+            Reads selected signal rows only; additive feature matrices remain lazy until one
+            consumer explicitly calls `PreparedIndicatorChunkInputsV2.load_signal_feature_rows()`.
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+          - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+        """
+        prepared_inputs: list[PreparedIndicatorChunkInputsV2] = []
+        for plan_position, row_plan in enumerate(row_plans):
+            row_indexes = tuple(
+                int(value)
+                for value in np.fromiter(
+                    (
+                        row_plan.row_index_for_selection(
+                            selection=_indicator_selection_for_plan_v2(
+                                base_variant=base_variant,
+                                indicator_position=plan_position,
+                                indicator_id=row_plan.indicator_id,
+                            )
+                        )
+                        for base_variant in chunk_variants
+                    ),
+                    dtype=np.int64,
+                    count=len(chunk_variants),
+                ).tolist()
+            )
+            signal_rows = _load_chunk_signal_rows_v2(
+                signal_matrix_loader=self.signal_matrix_loader,
+                artifact_context=artifact_context,
+                timeframe=grid_context.timeframe_code,
+                indicator_id=row_plan.indicator_id,
+                indicator_row_indexes=np.asarray(row_indexes, dtype=np.int64),
+                signal_target_slice=signal_target_slice,
+            )
+            signal_features_access = _signal_features_access_plan_for_indicator_v2(
+                grid_context=grid_context,
+                indicator_id=row_plan.indicator_id,
+            )
+            prepared_inputs.append(
+                PreparedIndicatorChunkInputsV2(
+                    indicator_id=row_plan.indicator_id,
+                    signal_rows=signal_rows,
+                    signal_features_loader=(
+                        self.signal_features_loader
+                        if (
+                            signal_features_access is not None
+                            and self.signal_features_loader is not None
+                        )
+                        else None
+                    ),
+                    signal_features_context=(
+                        artifact_context
+                        if (
+                            signal_features_access is not None
+                            and self.signal_features_loader is not None
+                        )
+                        else None
+                    ),
+                    signal_features_access=signal_features_access,
+                    signal_feature_row_selection=(
+                        row_indexes
+                        if (
+                            signal_features_access is not None
+                            and self.signal_features_loader is not None
+                        )
+                        else None
+                    ),
+                )
+            )
+        return tuple(prepared_inputs)
+
     def _resolve_batch_size(
         self,
         *,
@@ -539,30 +722,17 @@ class BacktestStageAShortlistBuilderV2:
           - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
           - src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py
         """
-        selected_signal_rows: dict[str, np.ndarray] = {}
-        for plan_position, row_plan in enumerate(row_plans):
-            indicator_row_indexes = np.fromiter(
-                (
-                    row_plan.row_index_for_selection(
-                        selection=_indicator_selection_for_plan_v2(
-                            base_variant=base_variant,
-                            indicator_position=plan_position,
-                            indicator_id=row_plan.indicator_id,
-                        )
-                    )
-                    for base_variant in chunk_variants
-                ),
-                dtype=np.int64,
-                count=len(chunk_variants),
-            )
-            selected_signal_rows[row_plan.indicator_id] = _load_chunk_signal_rows_v2(
-                signal_matrix_loader=self.signal_matrix_loader,
-                artifact_context=artifact_context,
-                timeframe=grid_context.timeframe_code,
-                indicator_id=row_plan.indicator_id,
-                indicator_row_indexes=indicator_row_indexes,
-                signal_target_slice=signal_target_slice,
-            )
+        chunk_inputs = self.load_chunk_runtime_inputs(
+            row_plans=row_plans,
+            chunk_variants=chunk_variants,
+            grid_context=grid_context,
+            artifact_context=artifact_context,
+            signal_target_slice=signal_target_slice,
+        )
+        selected_signal_rows = {
+            prepared_input.indicator_id: prepared_input.signal_rows
+            for prepared_input in chunk_inputs
+        }
 
         final_signal = aggregate_final_signal_rows_v2(selected_signal_rows=selected_signal_rows)
         compact_trades_by_variant = build_compact_trade_list_v2(
@@ -592,7 +762,6 @@ class BacktestStageAShortlistBuilderV2:
                 heappush(shortlist_heap, heap_entry)
             elif heap_entry_outranks_v2(candidate=heap_entry, baseline=shortlist_heap[0]):
                 heapreplace(shortlist_heap, heap_entry)
-
 
 def build_default_stage_a_shortlist_builder_v2(
     *,
@@ -641,6 +810,9 @@ def build_default_stage_a_shortlist_builder_v2(
     return BacktestStageAShortlistBuilderV2(
         price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=typed_artifact_loader),
         signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=typed_artifact_loader),
+        signal_features_loader=MmapSignalFeaturesLoaderV2(
+            artifact_loader=typed_artifact_loader
+        ),
         configurable_ranking_enabled=configurable_ranking_enabled,
         init_cash_quote_default=init_cash_quote_default,
         fixed_quote_default=fixed_quote_default,
@@ -903,6 +1075,44 @@ def _indicator_selection_for_plan_v2(
     return selection
 
 
+def _signal_features_access_plan_for_indicator_v2(
+    *,
+    grid_context: BacktestArtifactRuntimePlanV2,
+    indicator_id: str,
+) -> BacktestSignalFeaturesAccessPlanV2 | None:
+    """
+    Resolve one optional warm-cache access entry from the runtime plan or plan-like test fixture.
+
+    Args:
+        grid_context: Runtime plan or compatible fixture carrying optional warm-cache metadata.
+        indicator_id: Canonical indicator identifier for the requested chunk input.
+    Returns:
+        BacktestSignalFeaturesAccessPlanV2 | None: Matching access entry or `None` when the plan
+            does not expose optional `signal_features` access for this indicator.
+    Assumptions:
+        Legacy test doubles may omit this additive field entirely and should keep exact behavior.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+    resolver = getattr(grid_context, "signal_features_access_for_indicator", None)
+    if callable(resolver):
+        resolved = resolver(indicator_id=indicator_id)
+        return cast(BacktestSignalFeaturesAccessPlanV2 | None, resolved)
+    access_entries = getattr(grid_context, "signal_features_access", ())
+    for access_entry in access_entries:
+        if getattr(access_entry, "indicator_id", None) == indicator_id:
+            return cast(BacktestSignalFeaturesAccessPlanV2, access_entry)
+    return None
+
+
 def _normalize_indicator_scalar_v2(*, value: object) -> int | float | str:
     """
     Normalize explicit indicator scalar values into supported mixed-radix key types.
@@ -1047,6 +1257,7 @@ def _utc_timestamp_to_epoch_millis_v2(value: object) -> int:
 
 __all__ = [
     "BacktestStageAShortlistBuilderV2",
+    "PreparedIndicatorChunkInputsV2",
     "PreparedIndicatorRowPlanV2",
     "build_prepared_indicator_row_plan_from_grid_spec_v2",
     "build_default_stage_a_shortlist_builder_v2",

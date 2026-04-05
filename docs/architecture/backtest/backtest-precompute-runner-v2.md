@@ -459,6 +459,7 @@ Precompute runner v2 обязан:
 - использовать deterministic paths из R2-01;
 - писать root `manifest.yaml`;
 - писать per-indicator `signals/<tf>/<indicator_id>/manifest.yaml`;
+- additive-писать `signal_features/<tf>/<indicator_id>/manifest.yaml` для новых signal targets;
 - писать `hit_times/1m/manifest.yaml`;
 - указывать в manifests fixed runtime metadata:
   - `dtype`
@@ -492,10 +493,16 @@ Precompute runner v2 обязан:
   runner обязан писать:
   - `signals/<tf>/<indicator_id>/signals.i8.npy`
   - `signals/<tf>/<indicator_id>/manifest.yaml`
+  - `signal_features/<tf>/<indicator_id>/features.f32.npy`
+  - `signal_features/<tf>/<indicator_id>/manifest.yaml`
 - если config использует `signal_artifacts: all_supported_v1`, explicit target set равен полному
   registry всех signal-capable indicators, а не сокращённому operator-curated subset;
 - root manifest обязан публиковать real `signals.supported_timeframes`,
   `signals.supported_indicator_ids` и `signals.manifests`;
+- signal manifest может additively ссылаться на `signal_features` того же `(timeframe,
+  indicator_id)`, но старые слоты без этой ссылки остаются publish/runtime-compatible;
+- signal features derive only from the already materialized signal row and its final timeline
+  length; pair-specific, TP/SL-specific и runtime-threshold-dependent fields запрещены;
 - после R4-03 rebuild обязан выводить bounded per-target signal window из
   `lookback_policy.signal_tail_bars_1m`, а затем materialize'ить только
   `prefix + rebuilt_tail` по time axis;
@@ -733,11 +740,43 @@ R4-02 replaces the root-manifest signal placeholder for explicit configured targ
 - `grid.signals_v1_params_defaults` из strict `signals.v1.params = default-only`;
 - `provenance`.
 
+Optional C1 extension in the same manifest:
+
+- `signal_features.manifest_path = signal_features/<tf>/<indicator_id>/manifest.yaml`;
+- `signal_features.manifest_sha256`;
+- absence of this field remains valid for old slots and must not block exact runtime reads.
+
 R4-03 provenance additions for per-indicator signal manifests:
 
 - `inputs_sha256` must include `lookback_policy.signal_tail_bars_1m`;
 - `inputs_sha256` must include the effective target tail budget derived for the target;
 - `inputs_sha256` must include `rebuild_strategy = prefix + rebuilt_tail`.
+
+### Additive signal-features manifest
+
+Каждый `signal_features/<tf>/<indicator_id>/manifest.yaml` при наличии обязан фиксировать:
+
+- `indicator_id`, `timeframe`, `slot`, `slot_generation`, `asof_date`;
+- `features.path = signal_features/<tf>/<indicator_id>/features.f32.npy`;
+- `features.dtype = float32`;
+- `features.shape = [V, 6]`;
+- `features.axis_order = [variant, feature]`;
+- `features.sha256`;
+- `rows_count = V`;
+- fixed `feature_names` order:
+  - `nonzero_count`
+  - `long_count`
+  - `short_count`
+  - `activity_ratio`
+  - `direction_balance`
+  - `transition_count`
+- `provenance`.
+
+C1 runtime neutrality:
+
+- precompute writes this family as a warm row-cache foundation only;
+- shortlist, scoring, heuristic profiles and adaptive selector behavior remain unchanged in this
+  milestone.
 
 ### `hit_times/1m/manifest.yaml`
 
@@ -758,7 +797,9 @@ Whole-slot validator обязан идти в фиксированном пор�
 2. price arrays;
 3. mapping arrays;
 4. signal manifest refs + signal manifests + `signals.i8.npy`;
-5. hit-times manifest ref + hit-times manifest + `tp/sl` grids + tables.
+5. optional signal-feature refs + `signal_features/<tf>/<indicator_id>/manifest.yaml` +
+   `features.f32.npy` when the owning signal manifest declares them;
+6. hit-times manifest ref + hit-times manifest + `tp/sl` grids + tables.
 
 Для каждого artifact family validator обязан проверять:
 
@@ -787,6 +828,11 @@ Whole-slot validator обязан идти в фиксированном пор�
   - `shape=[V,T_tf]`
   - timeline equality с root price coverage
   - deterministic root catalog ordering and hash/path correspondence
+- signal_features:
+  - validation is optional/additive and runs only when signal manifest declares the family
+  - `shape=[V,6]`
+  - `feature_names` fixed and ordered
+  - values must be finite
 - hit_times:
   - `tp/sl` grids strictly increasing
   - tables bounded by sentinel

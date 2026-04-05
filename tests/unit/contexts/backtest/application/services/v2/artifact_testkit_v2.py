@@ -17,6 +17,7 @@ from trading.contexts.backtest.adapters.outbound.config import (
 from trading.contexts.backtest.application.services import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
+    SIGNAL_FEATURE_NAMES_V2,
     ArtifactCoordinatesV2,
     ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactSignalValidationSpecV2,
@@ -84,6 +85,8 @@ def build_synthetic_artifact_store_v2(
     inactive_long_sl: np.ndarray | None = None,
     inactive_short_tp: np.ndarray | None = None,
     inactive_short_sl: np.ndarray | None = None,
+    active_include_signal_features: bool = True,
+    inactive_include_signal_features: bool = True,
     omit_inactive_files: tuple[str, ...] = (),
 ) -> SyntheticArtifactStoreV2:
     """
@@ -101,6 +104,10 @@ def build_synthetic_artifact_store_v2(
         inactive_long_sl: Optional override for inactive `long_sl`.
         inactive_short_tp: Optional override for inactive `short_tp`.
         inactive_short_sl: Optional override for inactive `short_sl`.
+        active_include_signal_features: Whether the active slot publishes additive
+            `signal_features` metadata and files.
+        inactive_include_signal_features: Whether the inactive slot publishes additive
+            `signal_features` metadata and files.
         omit_inactive_files: Optional tuple of slot-relative paths to skip for the inactive slot.
     Returns:
         SyntheticArtifactStoreV2: Builder, loader, coordinates, validation spec, and slot ids.
@@ -146,6 +153,7 @@ def build_synthetic_artifact_store_v2(
         long_sl=_default_long_sl(),
         short_tp=_default_short_tp(),
         short_sl=_default_short_sl(),
+        include_signal_features=active_include_signal_features,
         omit_files=(),
     )
     _write_slot_payloads(
@@ -177,6 +185,7 @@ def build_synthetic_artifact_store_v2(
         short_sl=(
             inactive_short_sl.copy() if inactive_short_sl is not None else _default_short_sl()
         ),
+        include_signal_features=inactive_include_signal_features,
         omit_files=omit_inactive_files,
     )
 
@@ -498,6 +507,7 @@ def _write_slot_payloads(
     long_sl: np.ndarray,
     short_tp: np.ndarray,
     short_sl: np.ndarray,
+    include_signal_features: bool,
     omit_files: tuple[str, ...],
 ) -> None:
     """
@@ -516,6 +526,7 @@ def _write_slot_payloads(
         long_sl: Hit-times `long_sl`.
         short_tp: Hit-times `short_tp`.
         short_sl: Hit-times `short_sl`.
+        include_signal_features: Whether to publish additive `signal_features` for this slot.
         omit_files: Optional tuple of slot-relative file paths to skip.
     Returns:
         None.
@@ -558,6 +569,7 @@ def _write_slot_payloads(
     price_15m_paths = builder.price_paths(coordinates, slot, "15m")
     mapping_paths = builder.mapping_paths(coordinates, slot, "15m")
     signal_paths = builder.signal_paths(coordinates, slot, "15m", "ma.ema")
+    signal_features_paths = builder.signal_features_paths(coordinates, slot, "15m", "ma.ema")
     hit_times_paths = builder.hit_times_paths(coordinates, slot)
 
     _write_npy_if_needed(
@@ -649,6 +661,48 @@ def _write_slot_payloads(
         slot_relative_path=_slot_relative_path(builder, coordinates, slot, signal_paths.signals),
         omit_files=omit_files,
     )
+    signal_features_reference_payload: dict[str, str] | None = None
+    if include_signal_features:
+        signal_feature_matrix = _build_signal_feature_matrix_v2(signal_values=signal_values)
+        _write_npy_if_needed(
+            signal_features_paths.features,
+            signal_feature_matrix,
+            slot_relative_path=_slot_relative_path(
+                builder,
+                coordinates,
+                slot,
+                signal_features_paths.features,
+            ),
+            omit_files=omit_files,
+        )
+        signal_features_manifest_payload = {
+            "schema_version": 1,
+            "manifest_kind": "signal_features",
+            "slot": slot,
+            "slot_generation": slot_generation,
+            "asof_date": asof_date,
+            "indicator_id": "ma.ema",
+            "timeframe": "15m",
+            "features": _array_metadata_payload(
+                builder=builder,
+                coordinates=coordinates,
+                slot=slot,
+                absolute_path=signal_features_paths.features,
+            ),
+            "rows_count": int(signal_values.shape[0]),
+            "feature_names": list(SIGNAL_FEATURE_NAMES_V2),
+            "provenance": _provenance_payload(),
+        }
+        _write_yaml(signal_features_paths.manifest, signal_features_manifest_payload)
+        signal_features_reference_payload = {
+            "manifest_path": _slot_relative_path(
+                builder,
+                coordinates,
+                slot,
+                signal_features_paths.manifest,
+            ),
+            "manifest_sha256": _file_sha256_hex_v2(signal_features_paths.manifest),
+        }
     _write_npy_if_needed(
         hit_times_paths.tp_values,
         tp_values,
@@ -733,6 +787,8 @@ def _write_slot_payloads(
         },
         "provenance": _provenance_payload(),
     }
+    if signal_features_reference_payload is not None:
+        signal_manifest_payload["signal_features"] = signal_features_reference_payload
     if _slot_relative_path(builder, coordinates, slot, signal_paths.manifest) not in omit_files:
         _write_yaml(signal_paths.manifest, signal_manifest_payload)
 
@@ -1244,6 +1300,8 @@ def _axis_order_for_shape(shape: tuple[int, ...]) -> list[str]:
         return ["time", "field"]
     if shape == (2, 2):
         return ["variant", "time"]
+    if len(shape) == 2 and shape[1] == len(SIGNAL_FEATURE_NAMES_V2):
+        return ["variant", "feature"]
     if shape == (2, 4):
         return ["level", "time"]
     raise ValueError(f"unsupported synthetic shape for axis order inference: {shape!r}")
@@ -1297,6 +1355,70 @@ def _default_signal_values() -> np.ndarray:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
     return np.array([[-1, 0], [1, 0]], dtype=np.int8)
+
+
+def _build_signal_feature_matrix_v2(*, signal_values: np.ndarray) -> np.ndarray:
+    """
+    Derive the fixed additive row-local feature matrix from synthetic signal rows.
+
+    Args:
+        signal_values: Synthetic strict signal matrix with shape `[variant, time]`.
+    Returns:
+        np.ndarray: Contiguous `float32` feature matrix with shape `[variant, feature]`.
+    Assumptions:
+        Synthetic fixtures must mirror the production feature ordering exactly for loader and
+        validator tests.
+    Raises:
+        ValueError: If the provided signal matrix is not two-dimensional or has empty axes.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
+    """
+    if signal_values.ndim != 2:
+        raise ValueError(f"signal_values must be 2D; got ndim={signal_values.ndim!r}")
+    row_count = int(signal_values.shape[0])
+    timeline_length = int(signal_values.shape[1])
+    if row_count <= 0 or timeline_length <= 0:
+        raise ValueError("signal_values must have positive variant and timeline dimensions")
+    nonzero_count = np.count_nonzero(signal_values != 0, axis=1).astype(np.float32, copy=False)
+    long_count = np.count_nonzero(signal_values > 0, axis=1).astype(np.float32, copy=False)
+    short_count = np.count_nonzero(signal_values < 0, axis=1).astype(np.float32, copy=False)
+    activity_ratio = np.ascontiguousarray(
+        nonzero_count / np.float32(timeline_length),
+        dtype=np.float32,
+    )
+    direction_balance = np.zeros(row_count, dtype=np.float32)
+    np.divide(
+        long_count - short_count,
+        nonzero_count,
+        out=direction_balance,
+        where=nonzero_count > 0.0,
+    )
+    if timeline_length < 2:
+        transition_count = np.zeros(row_count, dtype=np.float32)
+    else:
+        transition_count = np.count_nonzero(
+            signal_values[:, 1:] != signal_values[:, :-1],
+            axis=1,
+        ).astype(np.float32, copy=False)
+    return np.ascontiguousarray(
+        np.column_stack(
+            (
+                nonzero_count,
+                long_count,
+                short_count,
+                activity_ratio,
+                direction_balance,
+                transition_count,
+            )
+        ),
+        dtype=np.float32,
+    )
 
 
 def _default_mapping_open_idx() -> np.ndarray:

@@ -17,10 +17,15 @@ from trading.contexts.backtest.application.services import (
     ArtifactPinnedIdentityV2,
     ArtifactSlotPinnedRuntimeContextV2,
     ArtifactSlotResolverV2,
+    BacktestSignalFeaturesAccessPlanV2,
     BacktestStageABaseVariant,
     BacktestStageAShortlistBuilderV2,
     MmapPriceArraysLoaderV2,
+    MmapSignalFeaturesLoaderV2,
     MmapSignalMatrixLoaderV2,
+    PreparedIndicatorChunkInputsV2,
+    PreparedIndicatorRowPlanV2,
+    compute_target_slice_by_close_time_v2,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
@@ -60,6 +65,7 @@ class _FakeGridContext:
         direction_mode: str = "long-short",
         sizing_mode: str = "all_in",
         execution_params: Mapping[str, float | int | str | bool | None] | None = None,
+        signal_features_access: tuple[BacktestSignalFeaturesAccessPlanV2, ...] = (),
     ) -> None:
         """
         Initialize the minimal deterministic grid context consumed by the shortlist builder.
@@ -71,6 +77,8 @@ class _FakeGridContext:
             direction_mode: Direction mode literal.
             sizing_mode: Sizing mode literal.
             execution_params: Optional execution overrides.
+            signal_features_access:
+                Optional additive warm-cache access metadata mirroring the runtime-plan surface.
         Returns:
             None.
         Assumptions:
@@ -88,6 +96,7 @@ class _FakeGridContext:
         self.direction_mode = direction_mode
         self.sizing_mode = sizing_mode
         self.execution_params = execution_params or {}
+        self.signal_features_access = signal_features_access
         self.stage_a_variants_total = len(base_variants)
 
     def iter_stage_a_variants(self) -> tuple[BacktestStageABaseVariant, ...]:
@@ -167,6 +176,104 @@ class _RecordingSignalMatrixLoader:
         row_selection = tuple(int(value) for value in kwargs["row_selection"])
         self.calls.append((indicator_id, row_selection))
         return self._wrapped.load_signal_rows(**kwargs)
+
+
+class _RecordingSignalFeaturesLoader:
+    """
+    Signal-feature loader wrapper recording whether warm-cache rows are touched lazily.
+    """
+
+    def __init__(self, *, wrapped: MmapSignalFeaturesLoaderV2) -> None:
+        """
+        Initialize recording wrapper around the real mmap signal-feature loader.
+
+        Args:
+            wrapped: Real feature loader used for underlying strict row reads.
+        Returns:
+            None.
+        Assumptions:
+            Milestone C exact path should not access feature artifacts until explicitly requested.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call logs.
+        """
+        self._wrapped = wrapped
+        self.row_calls: list[tuple[str, tuple[int, ...] | slice]] = []
+
+    def load_signal_features_matrix(self, **kwargs: Any) -> Any:
+        """
+        Delegate full matrix loads to the wrapped loader for protocol completeness.
+
+        Args:
+            **kwargs: Loader keyword arguments.
+        Returns:
+            Any: Wrapped strict full-matrix payload.
+        Assumptions:
+            This wrapper records lazy row access only; matrix loads are delegated transparently.
+        Raises:
+            None.
+        Side Effects:
+            Delegates to the wrapped loader.
+        """
+        return self._wrapped.load_signal_features_matrix(**kwargs)
+
+    def try_load_signal_features_matrix(self, **kwargs: Any) -> Any:
+        """
+        Delegate optional full matrix loads to the wrapped loader.
+
+        Args:
+            **kwargs: Loader keyword arguments.
+        Returns:
+            Any: Wrapped optional full-matrix payload.
+        Assumptions:
+            Builder tests care only about row-access timing, not direct matrix calls.
+        Raises:
+            None.
+        Side Effects:
+            Delegates to the wrapped loader.
+        """
+        return self._wrapped.try_load_signal_features_matrix(**kwargs)
+
+    def load_signal_feature_rows(self, **kwargs: Any) -> Any:
+        """
+        Record one strict feature-row request and delegate to the wrapped loader.
+
+        Args:
+            **kwargs: Loader keyword arguments.
+        Returns:
+            Any: Wrapped selected feature-row payload.
+        Assumptions:
+            `row_selection` mirrors the deterministic signal-row ordering for the same chunk.
+        Raises:
+            None.
+        Side Effects:
+            Appends one `(indicator_id, row_selection)` tuple to the in-memory log.
+        """
+        indicator_id = str(kwargs["indicator_id"])
+        row_selection = cast(tuple[int, ...] | slice, kwargs["row_selection"])
+        self.row_calls.append((indicator_id, row_selection))
+        return self._wrapped.load_signal_feature_rows(**kwargs)
+
+    def try_load_signal_feature_rows(self, **kwargs: Any) -> Any:
+        """
+        Record one optional feature-row request and delegate to the wrapped loader.
+
+        Args:
+            **kwargs: Loader keyword arguments.
+        Returns:
+            Any: Wrapped selected feature-row payload or `None`.
+        Assumptions:
+            Optional access is the Milestone C exact-path baseline for legacy-compatible slots.
+        Raises:
+            None.
+        Side Effects:
+            Appends one `(indicator_id, row_selection)` tuple to the in-memory log.
+        """
+        indicator_id = str(kwargs["indicator_id"])
+        row_selection = cast(tuple[int, ...] | slice, kwargs["row_selection"])
+        self.row_calls.append((indicator_id, row_selection))
+        return self._wrapped.try_load_signal_feature_rows(**kwargs)
 
 
 class _FlatPriceLoader:
@@ -415,6 +522,171 @@ def test_stage_a_shortlist_builder_v2_uses_subset_row_loading_for_selected_varia
     assert recording_loader.calls == [("ma.ema", (0,))]
 
 
+def test_stage_a_shortlist_builder_v2_exposes_optional_signal_features_warm_cache(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify Stage A can expose cached feature rows as an additive warm-cache runtime surface.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with strict signal and signal-feature artifacts.
+    Returns:
+        None.
+    Assumptions:
+        Warm-cache access must reuse the same deterministic row ordering as signal-row loading.
+    Raises:
+        AssertionError: If feature rows are missing or lose deterministic alignment.
+    Side Effects:
+        Memory-maps strict signal and `signal_features` artifacts from the synthetic store.
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    grid_context = _grid_context_for_windows(windows=(10,))
+    _attach_signal_features_access(grid_context=grid_context)
+    price_loader = MmapPriceArraysLoaderV2(artifact_loader=store.loader)
+    signal_prices = price_loader.load_price_arrays(context=context, timeframe="15m")
+    signal_target_slice = compute_target_slice_by_close_time_v2(
+        close_time=signal_prices.close_time,
+        target_time_range=_synthetic_target_time_range(),
+    )
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=price_loader,
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+        signal_features_loader=MmapSignalFeaturesLoaderV2(artifact_loader=store.loader),
+    )
+    row_plans = tuple(
+        PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
+        for plan in cast(Any, grid_context).indicator_plans
+    )
+
+    chunk_inputs = builder.load_chunk_runtime_inputs(
+        row_plans=row_plans,
+        chunk_variants=cast(Any, grid_context).iter_stage_a_variants(),
+        grid_context=cast(Any, grid_context),
+        artifact_context=context,
+        signal_target_slice=signal_target_slice,
+    )
+
+    assert len(chunk_inputs) == 1
+    assert isinstance(chunk_inputs[0], PreparedIndicatorChunkInputsV2)
+    feature_rows = chunk_inputs[0].load_signal_feature_rows()
+    assert feature_rows is not None
+    assert feature_rows.feature_names == (
+        "nonzero_count",
+        "long_count",
+        "short_count",
+        "activity_ratio",
+        "direction_balance",
+        "transition_count",
+    )
+    np.testing.assert_allclose(
+        feature_rows.rows,
+        np.array(((1.0, 0.0, 1.0, 0.5, -1.0, 1.0),), dtype=np.float32),
+    )
+
+
+def test_stage_a_shortlist_builder_v2_keeps_signal_features_lazy_until_explicit_access(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify load_chunk_runtime_inputs does not eagerly touch warm-cache feature artifacts.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with strict signal and signal-feature artifacts.
+    Returns:
+        None.
+    Assumptions:
+        Milestone C should carry feature-access metadata through exact path without preloading the
+        additive feature family.
+    Raises:
+        AssertionError: If Stage A eagerly accesses feature rows before explicit demand.
+    Side Effects:
+        Reads strict signal rows and then, only after explicit access, memory-maps feature rows.
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    grid_context = _grid_context_for_windows(windows=(10,))
+    _attach_signal_features_access(grid_context=grid_context)
+    price_loader = MmapPriceArraysLoaderV2(artifact_loader=store.loader)
+    signal_prices = price_loader.load_price_arrays(context=context, timeframe="15m")
+    signal_target_slice = compute_target_slice_by_close_time_v2(
+        close_time=signal_prices.close_time,
+        target_time_range=_synthetic_target_time_range(),
+    )
+    recording_feature_loader = _RecordingSignalFeaturesLoader(
+        wrapped=MmapSignalFeaturesLoaderV2(artifact_loader=store.loader)
+    )
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=price_loader,
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+        signal_features_loader=recording_feature_loader,
+    )
+    row_plans = tuple(
+        PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
+        for plan in cast(Any, grid_context).indicator_plans
+    )
+
+    chunk_inputs = builder.load_chunk_runtime_inputs(
+        row_plans=row_plans,
+        chunk_variants=cast(Any, grid_context).iter_stage_a_variants(),
+        grid_context=cast(Any, grid_context),
+        artifact_context=context,
+        signal_target_slice=signal_target_slice,
+    )
+
+    assert recording_feature_loader.row_calls == []
+    feature_rows = chunk_inputs[0].load_signal_feature_rows()
+    assert feature_rows is not None
+    assert recording_feature_loader.row_calls == [("ma.ema", (0,))]
+
+
+def test_stage_a_shortlist_builder_v2_keeps_exact_shortlist_unchanged_without_signal_features(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+    tmp_path: Any,
+) -> None:
+    """
+    Verify exact Stage A shortlist semantics stay unchanged when warm-cache artifacts are absent.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with additive signal-feature artifacts.
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Feature access in Milestone C is optional and must not change winners or scores.
+    Raises:
+        AssertionError: If exact shortlist ordering or scores drift between slot variants.
+    Side Effects:
+        Builds one extra synthetic legacy-style store without `signal_features`.
+    """
+    feature_store = synthetic_artifact_store_v2
+    legacy_store = build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path / "legacy_store",
+        inactive_include_signal_features=False,
+    )
+    target_time_range = _synthetic_target_time_range()
+    grid_context = _grid_context_for_windows(windows=(10, 20))
+    _attach_signal_features_access(grid_context=grid_context)
+
+    feature_shortlist = _build_shortlist_with_optional_features(
+        store=feature_store,
+        grid_context=grid_context,
+        target_time_range=target_time_range,
+    )
+    legacy_shortlist = _build_shortlist_with_optional_features(
+        store=legacy_store,
+        grid_context=grid_context,
+        target_time_range=target_time_range,
+    )
+
+    assert tuple(row.base_variant.base_variant_key for row in feature_shortlist) == tuple(
+        row.base_variant.base_variant_key for row in legacy_shortlist
+    )
+    assert tuple(round(row.total_return_pct, 6) for row in feature_shortlist) == tuple(
+        round(row.total_return_pct, 6) for row in legacy_shortlist
+    )
+
+
 def test_stage_a_shortlist_builder_v2_breaks_metric_ties_by_base_variant_key() -> None:
     """
     Verify shortlist ordering remains deterministic when no-risk metrics tie exactly.
@@ -485,6 +757,65 @@ def _inactive_context(store: SyntheticArtifactStoreV2) -> ArtifactSlotPinnedRunt
             artifact_asof_date="2026-03-26",
             artifact_manifest_hash="b" * 64,
         ),
+    )
+
+
+def _attach_signal_features_access(*, grid_context: _FakeGridContext) -> None:
+    """
+    Attach additive warm-cache access metadata to the lightweight fake runtime-plan fixture.
+
+    Args:
+        grid_context: Minimal Stage A grid context fixture used by these tests.
+    Returns:
+        None.
+    Assumptions:
+        Tests use one `15m/ma.ema` signal target and keep feature access optional.
+    Raises:
+        None.
+    Side Effects:
+        Adds `signal_features_access` attribute to the mutable fake grid-context instance.
+    """
+    grid_context.signal_features_access = (
+        BacktestSignalFeaturesAccessPlanV2(
+            indicator_id="ma.ema",
+            timeframe="15m",
+            optional=True,
+        ),
+    )
+
+
+def _build_shortlist_with_optional_features(
+    *,
+    store: SyntheticArtifactStoreV2,
+    grid_context: _FakeGridContext,
+    target_time_range: TimeRange,
+) -> tuple[Any, ...]:
+    """
+    Build one deterministic exact shortlist with optional feature warm-cache access enabled.
+
+    Args:
+        store: Synthetic artifact store fixture.
+        grid_context: Minimal Stage A grid context carrying additive feature-access metadata.
+        target_time_range: Requested trading window.
+    Returns:
+        tuple[Any, ...]: Exact Stage A shortlist rows.
+    Assumptions:
+        Builder must keep exact semantics identical whether feature artifacts exist or not.
+    Raises:
+        ValueError: Propagated from runtime builder if one artifact-local contract drifts.
+    Side Effects:
+        Memory-maps strict synthetic artifact families via the builder loaders.
+    """
+    return BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=store.loader),
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+        signal_features_loader=MmapSignalFeaturesLoaderV2(artifact_loader=store.loader),
+    ).build_shortlist(
+        grid_context=cast(Any, grid_context),
+        artifact_context=_inactive_context(store),
+        target_time_range=target_time_range,
+        shortlist_limit=2,
+        batch_size=1,
     )
 
 

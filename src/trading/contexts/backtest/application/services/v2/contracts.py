@@ -19,6 +19,7 @@ CURRENT_ARTIFACT_POINTER_FILENAME_V2 = "current.yaml"
 ARTIFACT_MANIFEST_FILENAME_V2 = "manifest.yaml"
 PRICES_DIRECTORY_LITERAL_V2 = "prices"
 SIGNALS_DIRECTORY_LITERAL_V2 = "signals"
+SIGNAL_FEATURES_DIRECTORY_LITERAL_V2 = "signal_features"
 MAPPINGS_DIRECTORY_LITERAL_V2 = "mappings"
 HIT_TIMES_DIRECTORY_LITERAL_V2 = "hit_times"
 ARTIFACT_SLOT_A_LITERAL_V2 = "slot_a"
@@ -30,6 +31,7 @@ OPEN_TIME_FILENAME_V2 = "open_time.i64.npy"
 CLOSE_TIME_FILENAME_V2 = "close_time.i64.npy"
 OHLCV_FILENAME_V2 = "ohlcv.f32.npy"
 SIGNALS_FILENAME_V2 = "signals.i8.npy"
+SIGNAL_FEATURES_FILENAME_V2 = "features.f32.npy"
 TP_VALUES_FILENAME_V2 = "tp_values.f32.npy"
 SL_VALUES_FILENAME_V2 = "sl_values.f32.npy"
 LONG_TP_FILENAME_V2 = "long_tp.u32.npy"
@@ -39,11 +41,14 @@ SHORT_SL_FILENAME_V2 = "short_sl.u32.npy"
 CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2 = 1
 ROOT_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
 SIGNAL_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
+SIGNAL_FEATURES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
 HIT_TIMES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2 = 1
 ROOT_ARTIFACT_MANIFEST_KIND_V2 = "slot_root"
 SIGNAL_ARTIFACT_MANIFEST_KIND_V2 = "signal"
+SIGNAL_FEATURES_ARTIFACT_MANIFEST_KIND_V2 = "signal_features"
 HIT_TIMES_ARTIFACT_MANIFEST_KIND_V2 = "hit_times_1m"
 ARTIFACT_SIGNAL_DTYPE_LITERAL_V2 = "int8"
+ARTIFACT_SIGNAL_FEATURE_DTYPE_LITERAL_V2 = "float32"
 ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2 = "int64"
 ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2 = "float32"
 ARTIFACT_MAPPING_DTYPE_LITERAL_V2 = "uint32"
@@ -51,6 +56,7 @@ ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2 = "float32"
 ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2 = "uint32"
 ARTIFACT_SIGNAL_VALUE_SET_V2: tuple[int, int, int] = (-1, 0, 1)
 ARTIFACT_SIGNAL_AXIS_ORDER_V2: tuple[str, str] = ("variant", "time")
+ARTIFACT_SIGNAL_FEATURE_AXIS_ORDER_V2: tuple[str, str] = ("variant", "feature")
 ARTIFACT_TIME_AXIS_ORDER_V2: tuple[str, ...] = ("time",)
 ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2: tuple[str, str] = ("time", "field")
 ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2: tuple[str, ...] = ("level",)
@@ -101,6 +107,20 @@ SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2: tuple[str, ...] = (
     "timeline",
     "signal_value_set",
     "grid",
+    "provenance",
+)
+SIGNAL_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2: tuple[str, ...] = ("signal_features",)
+SIGNAL_FEATURES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2: tuple[str, ...] = (
+    "schema_version",
+    "manifest_kind",
+    "slot",
+    "slot_generation",
+    "asof_date",
+    "indicator_id",
+    "timeframe",
+    "features",
+    "rows_count",
+    "feature_names",
     "provenance",
 )
 HIT_TIMES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2: tuple[str, ...] = (
@@ -250,6 +270,14 @@ SUPPORTED_SIGNAL_INPUT_SOURCES_V2: tuple[SignalSourceLiteralV2, ...] = (
     "hl2",
     "hlc3",
     "ohlc4",
+)
+SIGNAL_FEATURE_NAMES_V2: tuple[str, ...] = (
+    "nonzero_count",
+    "long_count",
+    "short_count",
+    "activity_ratio",
+    "direction_balance",
+    "transition_count",
 )
 
 
@@ -1124,6 +1152,23 @@ class ArtifactSignalPathsV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactSignalFeaturesPathsV2:
+    """
+    Explicit paths for one `signal_features/<tf>/<indicator_id>/` artifact directory.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+    """
+
+    manifest: Path
+    features: Path
+
+
+@dataclass(frozen=True, slots=True)
 class ArtifactMappingPathsV2:
     """
     Explicit paths for one `mappings/<tf>/` artifact directory.
@@ -1479,6 +1524,55 @@ class ArtifactSignalCatalogV2:
             self,
             "manifests",
             _sorted_signal_catalog_entries_v2(self.manifests),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalFeaturesReferenceV2:
+    """
+    Optional signal-manifest reference to one strict `signal_features/<tf>/<indicator_id>` family.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+
+    manifest_path: str
+    manifest_sha256: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate one optional signal-feature manifest reference stored inside a signal manifest.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Feature references stay slot-relative and deterministic for one signal target.
+        Raises:
+            ValueError: If the relative path or manifest hash literal is invalid.
+        Side Effects:
+            Normalizes stored literals to canonical validated values.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        object.__setattr__(
+            self,
+            "manifest_path",
+            validate_relative_artifact_path_v2(self.manifest_path),
+        )
+        object.__setattr__(
+            self,
+            "manifest_sha256",
+            validate_current_pointer_manifest_sha256_v2(self.manifest_sha256),
         )
 
 
@@ -1951,6 +2045,7 @@ class ArtifactSignalManifestDocumentV2:
     signal_value_set: tuple[int, ...]
     grid: ArtifactSignalGridContractV2
     provenance: ArtifactManifestProvenanceV2
+    signal_features: ArtifactSignalFeaturesReferenceV2 | None = None
 
     def __post_init__(self) -> None:
         """
@@ -1973,9 +2068,10 @@ class ArtifactSignalManifestDocumentV2:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
         """
-        _validate_exact_mapping_keys_v2(
+        _validate_exact_mapping_keys_with_optional_v2(
             payload=self.raw_payload,
             required_keys=SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            optional_keys=SIGNAL_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
             path=self.path,
         )
         object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
@@ -2018,6 +2114,125 @@ class ArtifactSignalManifestDocumentV2:
             "signal_value_set",
             validate_signal_value_set_v2(self.signal_value_set),
         )
+        if self.signal_features is not None:
+            object.__setattr__(
+                self,
+                "signal_features",
+                ArtifactSignalFeaturesReferenceV2(
+                    manifest_path=self.signal_features.manifest_path,
+                    manifest_sha256=self.signal_features.manifest_sha256,
+                ),
+            )
+        object.__setattr__(
+            self, "raw_payload", freeze_artifact_payload_mapping_v2(self.raw_payload)
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalFeaturesManifestDocumentV2:
+    """
+    Parsed strict `signal_features/<tf>/<indicator_id>/manifest.yaml` document.
+
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+    """
+
+    path: Path
+    raw_payload: Mapping[str, Any]
+    slot: ArtifactSlotLiteralV2
+    schema_version: int
+    manifest_kind: str
+    slot_generation: int
+    asof_date: str
+    indicator_id: str
+    timeframe: str
+    features: ArtifactArrayMetadataV2
+    rows_count: int
+    feature_names: tuple[str, ...]
+    provenance: ArtifactManifestProvenanceV2
+
+    def __post_init__(self) -> None:
+        """
+        Re-validate the strict signal-feature manifest contract and freeze raw payload ordering.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Signal-feature manifests stay additive and optional, but when present they must fully
+            describe one immutable `[variant, feature]` matrix.
+        Raises:
+            ValueError: If manifest keys, identity fields, or feature-name ordering are invalid.
+        Side Effects:
+            Normalizes validated literals and freezes `raw_payload`.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+        """
+        _validate_exact_mapping_keys_v2(
+            payload=self.raw_payload,
+            required_keys=SIGNAL_FEATURES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            path=self.path,
+        )
+        object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
+        object.__setattr__(
+            self,
+            "schema_version",
+            validate_manifest_schema_version_v2(
+                self.schema_version,
+                field_name="signal_features manifest schema_version",
+                expected_schema_version=SIGNAL_FEATURES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "manifest_kind",
+            validate_manifest_kind_v2(
+                self.manifest_kind,
+                expected_kind=SIGNAL_FEATURES_ARTIFACT_MANIFEST_KIND_V2,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "slot_generation",
+            validate_positive_manifest_int_v2(self.slot_generation),
+        )
+        object.__setattr__(
+            self,
+            "asof_date",
+            validate_current_pointer_asof_date_v2(self.asof_date),
+        )
+        object.__setattr__(self, "indicator_id", validate_indicator_id_v2(self.indicator_id))
+        object.__setattr__(self, "timeframe", validate_signal_timeframe_v2(self.timeframe))
+        object.__setattr__(
+            self,
+            "rows_count",
+            validate_positive_manifest_int_v2(self.rows_count),
+        )
+        object.__setattr__(
+            self,
+            "feature_names",
+            validate_signal_feature_names_v2(self.feature_names),
+        )
+        if self.rows_count != self.features.shape[0]:
+            raise ValueError(
+                "signal_features rows_count must match features.shape[0]; got "
+                f"{self.rows_count!r}, expected {self.features.shape[0]!r}"
+            )
+        if len(self.feature_names) != self.features.shape[1]:
+            raise ValueError(
+                "signal_features feature_names length must match features.shape[1]; got "
+                f"{len(self.feature_names)!r}, expected {self.features.shape[1]!r}"
+            )
         object.__setattr__(
             self, "raw_payload", freeze_artifact_payload_mapping_v2(self.raw_payload)
         )
@@ -3855,6 +4070,45 @@ class ArtifactSignalMatrixV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ArtifactSignalFeaturesMatrixV2:
+    """
+    Memory-mapped feature matrix loaded from one explicit additive signal-feature family.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    timeframe: str
+    indicator_id: str
+    manifest: ArtifactSignalFeaturesManifestDocumentV2
+    matrix: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactSignalFeaturesRowsV2:
+    """
+    Deterministic feature-row subset exposed as runtime warm-cache input when available.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+
+    timeframe: str
+    indicator_id: str
+    feature_names: tuple[str, ...]
+    rows: np.ndarray
+
+
+@dataclass(frozen=True, slots=True)
 class StageACompactTradeV2:
     """
     Deterministic Stage A compact trade entry built without Stage B risk exits.
@@ -4524,6 +4778,16 @@ class BacktestArtifactPathResolverV2(Protocol):
         """Resolve explicit signal artifact paths for one indicator and timeframe."""
         ...
 
+    def signal_features_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalFeaturesPathsV2:
+        """Resolve explicit signal-feature artifact paths for one indicator and timeframe."""
+        ...
+
     def mapping_paths(
         self,
         coordinates: ArtifactCoordinatesV2,
@@ -4601,6 +4865,25 @@ class BacktestArtifactLoaderV2(Protocol):
         """Read one per-indicator signal manifest from an explicit path."""
         ...
 
+    def load_signal_features_manifest(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalFeaturesManifestDocumentV2:
+        """Read one signal-feature manifest by deterministic coordinates."""
+        ...
+
+    def load_signal_features_manifest_from_path(
+        self,
+        path: Path,
+        *,
+        slot: ArtifactSlotLiteralV2,
+    ) -> ArtifactSignalFeaturesManifestDocumentV2:
+        """Read one signal-feature manifest from an explicit path."""
+        ...
+
     def load_hit_times_manifest(
         self,
         coordinates: ArtifactCoordinatesV2,
@@ -4650,6 +4933,16 @@ class BacktestArtifactLoaderV2(Protocol):
         indicator_id: str,
     ) -> ArtifactSignalPathsV2:
         """Resolve signal artifact paths without touching disk."""
+        ...
+
+    def resolve_signal_features_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalFeaturesPathsV2:
+        """Resolve signal-feature artifact paths without touching disk."""
         ...
 
     def resolve_mapping_paths(
@@ -4773,6 +5066,96 @@ class BacktestSignalMatrixLoaderV2(Protocol):
         row_selection: slice | tuple[int, ...],
     ) -> np.ndarray:
         """Load one deterministic signal-row subset, reusing memmap views when possible."""
+        ...
+
+
+class BacktestSignalFeaturesLoaderV2(Protocol):
+    """
+    Port for strict mmap-based signal-feature loading and optional legacy-safe access.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    def load_signal_features_matrix(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalFeaturesMatrixV2:
+        """Load one validated signal-feature matrix when the additive family is present."""
+        ...
+
+    def try_load_signal_features_matrix(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalFeaturesMatrixV2 | None:
+        """Return `None` for legacy slots without feature artifacts, else load strictly."""
+        ...
+
+    def load_signal_feature_rows(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str,
+        indicator_id: str,
+        row_selection: slice | tuple[int, ...],
+    ) -> ArtifactSignalFeaturesRowsV2:
+        """
+        Load one deterministic feature-row subset when the additive family is present.
+
+        Args:
+            context: Shared slot-pinned runtime context resolved at runtime start.
+            timeframe: Requested signal timeframe.
+            indicator_id: Requested indicator identifier.
+            row_selection: Deterministic row-selection payload aligned with signal-row ordering.
+        Returns:
+            ArtifactSignalFeaturesRowsV2: Typed selected feature rows preserving caller order.
+        Assumptions:
+            Returned rows stay 1:1 aligned with the requested signal-row subset.
+        Raises:
+            FileNotFoundError: If the declared feature family is missing on disk.
+            ValueError: If the additive family is absent or row selection is invalid.
+        Side Effects:
+            May memory-map or reuse one cached feature matrix.
+        """
+        ...
+
+    def try_load_signal_feature_rows(
+        self,
+        *,
+        context: ArtifactSlotPinnedRuntimeContextV2,
+        timeframe: str,
+        indicator_id: str,
+        row_selection: slice | tuple[int, ...],
+    ) -> ArtifactSignalFeaturesRowsV2 | None:
+        """
+        Return `None` for legacy slots without features, else load selected rows strictly.
+
+        Args:
+            context: Shared slot-pinned runtime context resolved at runtime start.
+            timeframe: Requested signal timeframe.
+            indicator_id: Requested indicator identifier.
+            row_selection: Deterministic row-selection payload aligned with signal-row ordering.
+        Returns:
+            ArtifactSignalFeaturesRowsV2 | None: Typed selected feature rows or `None` for legacy
+                slots that omit additive `signal_features`.
+        Assumptions:
+            Only manifest-level absence is treated as a backward-compatible `None`.
+        Raises:
+            FileNotFoundError: If the declared feature family is missing on disk.
+            ValueError: If row selection or manifest/file metadata is invalid.
+        Side Effects:
+            May memory-map or reuse one cached feature matrix.
+        """
         ...
 
 
@@ -5143,6 +5526,7 @@ def validate_artifact_dtype_literal_v2(dtype_literal: str) -> str:
     """
     allowed_dtypes = (
         ARTIFACT_SIGNAL_DTYPE_LITERAL_V2,
+        ARTIFACT_SIGNAL_FEATURE_DTYPE_LITERAL_V2,
         ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2,
         ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2,
         ARTIFACT_MAPPING_DTYPE_LITERAL_V2,
@@ -5264,6 +5648,44 @@ def validate_signal_value_set_v2(value_set: tuple[int, ...]) -> tuple[int, int, 
     return ARTIFACT_SIGNAL_VALUE_SET_V2
 
 
+def validate_signal_feature_names_v2(
+    feature_names: tuple[str, ...],
+) -> tuple[str, ...]:
+    """
+    Validate the fixed ordered signal-feature schema shipped for warm row feature caching.
+
+    Args:
+        feature_names: Candidate ordered feature-name tuple.
+    Returns:
+        tuple[str, ...]: Canonical ordered feature-name tuple.
+    Assumptions:
+        Milestone C1 intentionally fixes a small explicit row-local schema and does not allow
+        runtime inference of feature positions.
+    Raises:
+        ValueError: If the feature-name tuple differs from the exact ordered contract.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
+    """
+    if not isinstance(feature_names, tuple):
+        raise ValueError("signal feature_names must be tuple")
+    validated_names = tuple(
+        validate_manifest_text_literal_v2(value, field_name=f"feature_names[{index}]")
+        for index, value in enumerate(feature_names)
+    )
+    if validated_names != SIGNAL_FEATURE_NAMES_V2:
+        raise ValueError(
+            "signal feature_names must be exactly "
+            f"{SIGNAL_FEATURE_NAMES_V2}; got {validated_names!r}"
+        )
+    return SIGNAL_FEATURE_NAMES_V2
+
+
 def validate_hit_times_monotonicity_literal_v2(monotonicity: str) -> str:
     """
     Validate the declared monotonicity literal for hit-times lookup tables.
@@ -5334,6 +5756,59 @@ def _validate_exact_mapping_keys_v2(
             f"{path} must contain exactly keys {required_keys}"
             + (f"; {'; '.join(details)}" if len(details) > 0 else "")
         )
+
+
+def _validate_exact_mapping_keys_with_optional_v2(
+    *,
+    payload: Mapping[str, Any],
+    required_keys: tuple[str, ...],
+    optional_keys: tuple[str, ...],
+    path: Path,
+) -> None:
+    """
+    Validate one manifest payload with exact required keys plus an explicit optional key set.
+
+    Args:
+        payload: Parsed YAML mapping payload.
+        required_keys: Canonical ordered required key tuple.
+        optional_keys: Canonical tuple of additive optional keys allowed by the schema.
+        path: Source manifest path used in deterministic error messages.
+    Returns:
+        None.
+    Assumptions:
+        Additive schema evolution remains explicit; unspecified extra keys are still forbidden.
+    Raises:
+        ValueError: If required keys are missing or unsupported keys appear.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+    allowed_keys = tuple((*required_keys, *optional_keys))
+    raw_keys = tuple(sorted(payload.keys()))
+    allowed_key_set = set(allowed_keys)
+    missing_keys = tuple(key for key in required_keys if key not in payload)
+    extra_keys = tuple(key for key in raw_keys if key not in allowed_key_set)
+    if len(missing_keys) == 0 and len(extra_keys) == 0:
+        return
+    details: list[str] = []
+    if len(missing_keys) > 0:
+        details.append(f"missing keys {missing_keys}")
+    if len(extra_keys) > 0:
+        details.append(f"unexpected keys {extra_keys}")
+    raise ValueError(
+        f"{path} must contain required keys {required_keys}"
+        + (
+            f" and may contain optional keys {optional_keys}"
+            if len(optional_keys) > 0
+            else ""
+        )
+        + (f"; {'; '.join(details)}" if len(details) > 0 else "")
+    )
 
 
 def _sorted_unique_indicator_ids_v2(

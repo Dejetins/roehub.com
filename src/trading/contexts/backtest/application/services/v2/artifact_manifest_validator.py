@@ -17,8 +17,11 @@ from .contracts import (
     ARTIFACT_MAPPING_DTYPE_LITERAL_V2,
     ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2,
     ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2,
+    ARTIFACT_SIGNAL_FEATURE_AXIS_ORDER_V2,
+    ARTIFACT_SIGNAL_FEATURE_DTYPE_LITERAL_V2,
     ARTIFACT_SIGNAL_VALUE_SET_V2,
     ARTIFACT_TIME_AXIS_ORDER_V2,
+    SIGNAL_FEATURE_NAMES_V2,
     ArtifactArrayMetadataV2,
     ArtifactCoordinatesV2,
     ArtifactHitTimesManifestDocumentV2,
@@ -27,6 +30,7 @@ from .contracts import (
     ArtifactMappingTimeframeManifestV2,
     ArtifactPriceTimeframeManifestV2,
     ArtifactSignalCatalogEntryV2,
+    ArtifactSignalFeaturesManifestDocumentV2,
     ArtifactSignalManifestDocumentV2,
     ArtifactSlotLiteralV2,
     ArtifactSlotValidationResultV2,
@@ -1017,6 +1021,266 @@ class BacktestArtifactManifestValidatorV2:
                         artifact_path=signal_paths.signals,
                     )
                 )
+        if signal_manifest.signal_features is None:
+            return
+        loaded_signal_features_manifest = self._load_signal_features_manifest_with_diagnostics(
+            coordinates=coordinates,
+            slot=slot,
+            slot_root=slot_root,
+            signal_manifest=signal_manifest,
+            diagnostics=diagnostics,
+        )
+        if loaded_signal_features_manifest is None:
+            return
+        self._validate_signal_features_manifest(
+            coordinates=coordinates,
+            slot=slot,
+            slot_root=slot_root,
+            slot_manifest=slot_manifest,
+            signal_manifest=signal_manifest,
+            signal_features_manifest=loaded_signal_features_manifest,
+            diagnostics=diagnostics,
+        )
+
+    def _load_signal_features_manifest_with_diagnostics(
+        self,
+        *,
+        coordinates: ArtifactCoordinatesV2,
+        slot: ArtifactSlotLiteralV2,
+        slot_root: Path,
+        signal_manifest: ArtifactSignalManifestDocumentV2,
+        diagnostics: list[ArtifactValidationDiagnosticV2],
+    ) -> ArtifactSignalFeaturesManifestDocumentV2 | None:
+        """
+        Load one optional signal-feature manifest while converting read failures into diagnostics.
+
+        Args:
+            coordinates: Artifact coordinates under validation.
+            slot: Explicit slot literal under validation.
+            slot_root: Absolute slot-root path.
+            signal_manifest: Parsed signal manifest carrying the additive feature reference.
+            diagnostics: Mutable diagnostics buffer to extend.
+        Returns:
+            ArtifactSignalFeaturesManifestDocumentV2 | None: Parsed feature manifest when loading
+                succeeds, else `None`.
+        Assumptions:
+            Signal-feature discovery stays explicit and originates only from the owning signal
+            manifest reference.
+        Raises:
+            None.
+        Side Effects:
+            Reads one signal-feature manifest file from disk and appends diagnostics on failure.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+        """
+        signal_features_reference = signal_manifest.signal_features
+        if signal_features_reference is None:
+            return None
+        signal_features_paths = self.artifact_loader.resolve_signal_features_paths(
+            coordinates,
+            slot,
+            signal_manifest.timeframe,
+            signal_manifest.indicator_id,
+        )
+        expected_relative_path = _relative_slot_path_v2(
+            slot_root,
+            signal_features_paths.manifest,
+        )
+        if signal_features_reference.manifest_path != expected_relative_path:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="signal_features_manifest_reference_path_mismatch",
+                    message=(
+                        "signal manifest signal_features reference must use the deterministic "
+                        f"manifest path; got {signal_features_reference.manifest_path!r}, "
+                        f"expected {expected_relative_path!r}"
+                    ),
+                    location="signal_features.manifest_path",
+                    manifest_path=signal_manifest.path,
+                    artifact_path=signal_features_paths.manifest,
+                )
+            )
+        if signal_features_paths.manifest.is_file():
+            actual_manifest_hash = _file_sha256_hex_v2(signal_features_paths.manifest)
+            if signal_features_reference.manifest_sha256 != actual_manifest_hash:
+                diagnostics.append(
+                    ArtifactValidationDiagnosticV2(
+                        code="signal_features_manifest_reference_hash_mismatch",
+                        message=(
+                            "signal manifest signal_features sha256 must match actual manifest; "
+                            f"got {signal_features_reference.manifest_sha256!r}, expected "
+                            f"{actual_manifest_hash!r}"
+                        ),
+                        location="signal_features.manifest_sha256",
+                        manifest_path=signal_manifest.path,
+                        artifact_path=signal_features_paths.manifest,
+                    )
+                )
+        try:
+            return self.artifact_loader.load_signal_features_manifest(
+                coordinates,
+                slot,
+                signal_manifest.timeframe,
+                signal_manifest.indicator_id,
+            )
+        except (FileNotFoundError, ValueError) as error:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="signal_features_manifest_invalid",
+                    message=str(error),
+                    location=(
+                        "signal_features"
+                        f"[{signal_manifest.timeframe}:{signal_manifest.indicator_id}]"
+                    ),
+                    manifest_path=signal_features_paths.manifest,
+                )
+            )
+            return None
+
+    def _validate_signal_features_manifest(
+        self,
+        *,
+        coordinates: ArtifactCoordinatesV2,
+        slot: ArtifactSlotLiteralV2,
+        slot_root: Path,
+        slot_manifest: ArtifactManifestDocumentV2,
+        signal_manifest: ArtifactSignalManifestDocumentV2,
+        signal_features_manifest: ArtifactSignalFeaturesManifestDocumentV2,
+        diagnostics: list[ArtifactValidationDiagnosticV2],
+    ) -> None:
+        """
+        Validate one strict additive signal-feature manifest against owning signal contracts.
+
+        Args:
+            coordinates: Artifact coordinates under validation.
+            slot: Explicit slot literal under validation.
+            slot_root: Absolute slot-root path.
+            slot_manifest: Root manifest used for cross-contract checks.
+            signal_manifest: Owning signal manifest for the same `(timeframe, indicator_id)`.
+            signal_features_manifest: Parsed strict additive feature manifest.
+            diagnostics: Mutable diagnostics buffer to extend.
+        Returns:
+            None.
+        Assumptions:
+            Signal features remain row-local warm-cache data for the exact same signal rows and
+            therefore must align 1:1 with the owning signal manifest.
+        Raises:
+            None.
+        Side Effects:
+            Reads the feature matrix file from disk and appends diagnostics.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+        """
+        if signal_features_manifest.timeframe != signal_manifest.timeframe:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="signal_features_manifest_timeframe_mismatch",
+                    message=(
+                        "signal_features manifest timeframe must match owning signal manifest; "
+                        f"got {signal_features_manifest.timeframe!r}, expected "
+                        f"{signal_manifest.timeframe!r}"
+                    ),
+                    location="timeframe",
+                    manifest_path=signal_features_manifest.path,
+                )
+            )
+        if signal_features_manifest.indicator_id != signal_manifest.indicator_id:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="signal_features_manifest_indicator_id_mismatch",
+                    message=(
+                        "signal_features manifest indicator_id must match owning signal "
+                        f"manifest; got {signal_features_manifest.indicator_id!r}, expected "
+                        f"{signal_manifest.indicator_id!r}"
+                    ),
+                    location="indicator_id",
+                    manifest_path=signal_features_manifest.path,
+                )
+            )
+        if signal_features_manifest.slot_generation != slot_manifest.slot_generation:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="signal_features_manifest_slot_generation_mismatch",
+                    message=(
+                        "signal_features manifest slot_generation must match root manifest; got "
+                        f"{signal_features_manifest.slot_generation!r}, expected "
+                        f"{slot_manifest.slot_generation!r}"
+                    ),
+                    location="slot_generation",
+                    manifest_path=signal_features_manifest.path,
+                )
+            )
+        if signal_features_manifest.asof_date != slot_manifest.asof_date:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="signal_features_manifest_asof_date_mismatch",
+                    message=(
+                        "signal_features manifest asof_date must match root manifest; got "
+                        f"{signal_features_manifest.asof_date!r}, expected "
+                        f"{slot_manifest.asof_date!r}"
+                    ),
+                    location="asof_date",
+                    manifest_path=signal_features_manifest.path,
+                )
+            )
+        if signal_features_manifest.rows_count != signal_manifest.rows_count:
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="signal_features_rows_count_mismatch",
+                    message=(
+                        "signal_features rows_count must match owning signal rows_count; got "
+                        f"{signal_features_manifest.rows_count!r}, expected "
+                        f"{signal_manifest.rows_count!r}"
+                    ),
+                    location="rows_count",
+                    manifest_path=signal_features_manifest.path,
+                )
+            )
+
+        signal_features_paths = self.artifact_loader.resolve_signal_features_paths(
+            coordinates,
+            slot,
+            signal_manifest.timeframe,
+            signal_manifest.indicator_id,
+        )
+        feature_array = self._validate_array_metadata_and_load(
+            slot_root=slot_root,
+            manifest_path=signal_features_manifest.path,
+            location=(
+                "signal_features"
+                f"[{signal_manifest.timeframe}:{signal_manifest.indicator_id}].features"
+            ),
+            metadata=signal_features_manifest.features,
+            expected_path=signal_features_paths.features,
+            expected_dtype=ARTIFACT_SIGNAL_FEATURE_DTYPE_LITERAL_V2,
+            expected_axis_order=ARTIFACT_SIGNAL_FEATURE_AXIS_ORDER_V2,
+            expected_shape=(
+                signal_manifest.rows_count,
+                len(SIGNAL_FEATURE_NAMES_V2),
+            ),
+            diagnostics=diagnostics,
+        )
+        if feature_array is not None and not np.all(np.isfinite(feature_array)):
+            diagnostics.append(
+                ArtifactValidationDiagnosticV2(
+                    code="signal_features_values_not_finite",
+                    message="signal_features matrix must contain only finite float32 values",
+                    location=(
+                        "signal_features"
+                        f"[{signal_manifest.timeframe}:{signal_manifest.indicator_id}]"
+                    ),
+                    manifest_path=signal_features_manifest.path,
+                    artifact_path=signal_features_paths.features,
+                )
+            )
 
     def _load_hit_times_manifest_with_diagnostics(
         self,

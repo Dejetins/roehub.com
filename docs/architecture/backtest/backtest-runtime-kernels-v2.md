@@ -78,7 +78,7 @@ R5-01 artifact contracts.
 
 | Stage | Required inputs | Produced contract |
 |---|---|---|
-| Stage A | `prices/<signal_tf>/*`, `signals/<signal_tf>/<indicator_id>/signals.i8.npy`, `mappings/<signal_tf>/bar_close_1m_idx.u32.npy` | `final_signal`, deterministic edges, `compact trade list`, shortlist-ready no-risk summaries |
+| Stage A | `prices/<signal_tf>/*`, `signals/<signal_tf>/<indicator_id>/signals.i8.npy`, `mappings/<signal_tf>/bar_close_1m_idx.u32.npy`, optional `signal_features/<signal_tf>/<indicator_id>/features.f32.npy` warm cache | `final_signal`, deterministic edges, `compact trade list`, shortlist-ready no-risk summaries |
 | Stage B | Stage A `compact trade list`, `prices/1m/*`, `hit_times/1m/manifest.yaml`, `hit_times/1m/*.npy` | best TP/SL cell, exact replay of best TP/SL cell, final `metrics over compact trades` |
 
 ## R6-01 / R6-03 implemented boundary
@@ -105,6 +105,9 @@ artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kerne
 - runtime loaders могут переиспользовать уже валидированные mmap payloads для
   `prices/<tf>`, `mappings/<tf>`, `hit_times/1m` и `signals/<tf>/<indicator_id>` внутри одного
   pinned run вместо повторного `np.load(...)` на каждый internal call;
+- additive `signal_features/<tf>/<indicator_id>` могут открываться тем же pinned runtime как
+  optional warm-cache surface для future hybrid/plugin work, но exact `exact_small` /
+  `exact_parallel` path не должен использовать их для shortlist pruning или score drift;
 - contiguous explicit signal row tuples могут быть internal-normalized до slice-view, если это
   не меняет deterministic row ordering и subset semantics;
 - `chunked variant processing` обязано давать тот же shortlist result, что и non-chunked path.

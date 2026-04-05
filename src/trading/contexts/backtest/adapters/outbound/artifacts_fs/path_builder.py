@@ -22,6 +22,8 @@ from trading.contexts.backtest.application.services.v2.contracts import (
     PRICES_DIRECTORY_LITERAL_V2,
     SHORT_SL_FILENAME_V2,
     SHORT_TP_FILENAME_V2,
+    SIGNAL_FEATURES_DIRECTORY_LITERAL_V2,
+    SIGNAL_FEATURES_FILENAME_V2,
     SIGNALS_DIRECTORY_LITERAL_V2,
     SIGNALS_FILENAME_V2,
     SL_VALUES_FILENAME_V2,
@@ -30,6 +32,7 @@ from trading.contexts.backtest.application.services.v2.contracts import (
     ArtifactHitTimesPathsV2,
     ArtifactMappingPathsV2,
     ArtifactPricePathsV2,
+    ArtifactSignalFeaturesPathsV2,
     ArtifactSignalPathsV2,
     ArtifactSlotLiteralV2,
     BacktestArtifactPathResolverV2,
@@ -247,6 +250,48 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         return ArtifactSignalPathsV2(
             manifest=indicator_directory / ARTIFACT_MANIFEST_FILENAME_V2,
             signals=indicator_directory / SIGNALS_FILENAME_V2,
+        )
+
+    def signal_features_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalFeaturesPathsV2:
+        """
+        Resolve explicit paths for one `signal_features/<tf>/<indicator_id>/` directory.
+
+        Args:
+            coordinates: Validated artifact coordinates.
+            slot: Candidate slot literal.
+            timeframe: Candidate signal timeframe literal.
+            indicator_id: Candidate indicator id token.
+        Returns:
+            ArtifactSignalFeaturesPathsV2: Deterministic path set for signal-feature artifacts.
+        Assumptions:
+            Signal-feature families mirror signal target coordinates and must stay directly
+            addressable without runtime filesystem scanning.
+        Raises:
+            ValueError: If one input literal violates the explicit artifact contract.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+        """
+        indicator_directory = self._timeframe_directory(
+            coordinates=coordinates,
+            slot=slot,
+            top_level_directory=SIGNAL_FEATURES_DIRECTORY_LITERAL_V2,
+            timeframe=validate_signal_timeframe_v2(timeframe),
+        ) / validate_indicator_id_v2(indicator_id)
+        return ArtifactSignalFeaturesPathsV2(
+            manifest=indicator_directory / ARTIFACT_MANIFEST_FILENAME_V2,
+            features=indicator_directory / SIGNAL_FEATURES_FILENAME_V2,
         )
 
     def mapping_paths(

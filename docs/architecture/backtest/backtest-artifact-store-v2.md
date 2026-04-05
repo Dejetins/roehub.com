@@ -10,6 +10,7 @@
   - `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`
   - `src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py`
   - `src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py`
+  - `src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py`
   - `src/trading/contexts/backtest/application/use_cases/run_backtest.py`
   - `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py`
 - Compatibility note:
@@ -29,8 +30,11 @@
 - R4-02: real `signals/<tf>/<indicator_id>` families и root `signals.*` catalog metadata.
 - R4-03: deterministic bounded tail rebuild for explicit per-target signal artifacts without
   full-history recompute on daily rebuilds.
+- C1: additive optional `signal_features/<tf>/<indicator_id>` families for row-local warm-cache
+  inputs and typed mmap loading without changing runtime shortlist or scoring behavior yet.
 - R6-01: runtime-side resolver для strict `current.yaml`, shared `slot-pinned context` identity
   и explicit mmap loaders для `prices/<tf>`, `signals/<tf>/<indicator_id>/signals.i8.npy`,
+  `signal_features/<tf>/<indicator_id>/features.f32.npy`,
   `mappings/<tf>/bar_open_1m_idx.u32.npy`,
   `mappings/<tf>/bar_close_1m_idx.u32.npy`, `hit_times/1m/manifest.yaml` без runtime scanning и
   без hot-path `sha256` recomputation.
@@ -143,6 +147,11 @@ artifacts/backtest/v2/
               <indicator_id>/
                 signals.i8.npy
                 manifest.yaml
+          signal_features/
+            15m/
+              <indicator_id>/
+                features.f32.npy
+                manifest.yaml
             30m/
             1h/
             2h/
@@ -190,6 +199,8 @@ artifacts/backtest/v2/
 | Prices | `<slot>/prices/<tf>/ohlcv.f32.npy` |
 | Signals | `<slot>/signals/<tf>/<indicator_id>/signals.i8.npy` |
 | Signals | `<slot>/signals/<tf>/<indicator_id>/manifest.yaml` |
+| Signal features | `<slot>/signal_features/<tf>/<indicator_id>/features.f32.npy` |
+| Signal features | `<slot>/signal_features/<tf>/<indicator_id>/manifest.yaml` |
 | Mappings | `<slot>/mappings/<tf>/bar_open_1m_idx.u32.npy` |
 | Mappings | `<slot>/mappings/<tf>/bar_close_1m_idx.u32.npy` |
 | Hit times | `<slot>/hit_times/1m/manifest.yaml` |
@@ -567,6 +578,46 @@ Per-indicator `signals/<tf>/<indicator_id>/manifest.yaml` обязан соде�
   - `signals.v1.params defaults (default-only)`
 - `provenance`.
 
+Additive C1 extension:
+
+- signal manifest может содержать optional `signal_features` reference:
+  - `manifest_path: signal_features/<tf>/<indicator_id>/manifest.yaml`
+  - `manifest_sha256`
+- отсутствие `signal_features` в уже опубликованных старых слотах остаётся валидным и не должно
+  ломать exact runtime readability;
+- explicit discovery остаётся manifest-driven: runtime не сканирует `signal_features/` каталоги,
+  а следует только signal-manifest reference.
+
+### Additive signal-features manifest
+
+`signal_features/<tf>/<indicator_id>/manifest.yaml` при наличии обязан содержать:
+
+- `indicator_id`, `timeframe`, `slot`, `slot_generation`, `asof_date`;
+- `features` metadata:
+  - `path: signal_features/<tf>/<indicator_id>/features.f32.npy`
+  - `dtype: float32`
+  - `shape: [V, 6]`
+  - `axis_order: [variant, feature]`
+  - `sha256`
+- `rows_count = V`;
+- fixed ordered `feature_names`:
+  - `nonzero_count`
+  - `long_count`
+  - `short_count`
+  - `activity_ratio`
+  - `direction_balance`
+  - `transition_count`
+- `provenance`.
+
+C1 scope restriction:
+
+- features are row-local only and derive only from the already materialized signal row plus its
+  timeline length;
+- pair-specific, TP/SL-specific, ranking-policy-specific and runtime-threshold-dependent data do
+  not belong in this family;
+- the family is a warm-cache foundation for later runtime/notebook/plugin reuse, not an activated
+  ranking policy by itself.
+
 После R4-03 этот manifest дополнительно фиксирует тот факт, что итоговая матрица получена через
 bounded rebuild:
 
@@ -613,6 +664,8 @@ Root `signals` section после R4-02 дополнительно обязан:
 Перед `current.yaml` switch publish validator обязан детерминированно проверить весь inactive slot:
 
 - root/signal/hit-times manifests читаются только по explicit paths;
+- optional `signal_features` manifests and arrays валидируются строго только когда owning
+  signal-manifest explicitly declares them;
 - strict schema version / manifest kind / required keys;
 - `sha256` каждого referenced file;
 - `dtype` contract;
@@ -620,6 +673,7 @@ Root `signals` section после R4-02 дополнительно обязан:
 - `axis_order` contract;
 - monotonic `open_time` и `close_time`;
 - signal value set `{-1,0,1}`;
+- finite `signal_features` values when the additive family is present;
 - mapping bounds относительно `1m` timeline;
 - `prices/1m.open_time[bar_open_1m_idx] == prices/<tf>.open_time`;
 - `prices/1m.close_time[bar_close_1m_idx] == prices/<tf>.close_time`;
@@ -646,6 +700,7 @@ R2-01/R2-02/R6-01 реализованы следующими модулями:
 - `src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py`
 - `src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py`
 - `src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py`
+- `src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py`
 - `src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py`
 - `src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py`
 - `src/trading/contexts/backtest/application/use_cases/run_backtest.py`

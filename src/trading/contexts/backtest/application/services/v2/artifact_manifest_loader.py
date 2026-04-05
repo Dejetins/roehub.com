@@ -15,7 +15,9 @@ from .contracts import (
     CURRENT_ARTIFACT_POINTER_FILENAME_V2,
     HIT_TIMES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
     ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+    SIGNAL_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
     SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+    SIGNAL_FEATURES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
     ArtifactArrayMetadataV2,
     ArtifactCoordinatesV2,
     ArtifactCurrentPointerV2,
@@ -32,6 +34,9 @@ from .contracts import (
     ArtifactSignalCatalogEntryV2,
     ArtifactSignalCatalogV2,
     ArtifactSignalEncodingContractV2,
+    ArtifactSignalFeaturesManifestDocumentV2,
+    ArtifactSignalFeaturesPathsV2,
+    ArtifactSignalFeaturesReferenceV2,
     ArtifactSignalGridContractV2,
     ArtifactSignalManifestDocumentV2,
     ArtifactSignalPathsV2,
@@ -289,6 +294,83 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
             slot=validate_artifact_slot_v2(slot),
         )
 
+    def load_signal_features_manifest(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalFeaturesManifestDocumentV2:
+        """
+        Read one signal-feature manifest via deterministic coordinates and literals.
+
+        Args:
+            coordinates: Validated artifact coordinates.
+            slot: Candidate slot literal.
+            timeframe: Candidate signal timeframe literal.
+            indicator_id: Candidate indicator identifier.
+        Returns:
+            ArtifactSignalFeaturesManifestDocumentV2: Parsed strict signal-feature manifest.
+        Assumptions:
+            Signal-feature manifests are addressed only by explicit deterministic paths.
+        Raises:
+            FileNotFoundError: If the manifest path does not exist.
+            ValueError: If inputs or YAML payload violate strict contracts.
+        Side Effects:
+            Reads one UTF-8 YAML file from disk.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+        """
+        signal_features_paths = self.path_resolver.signal_features_paths(
+            coordinates,
+            validate_artifact_slot_v2(slot),
+            validate_signal_timeframe_v2(timeframe),
+            validate_indicator_id_v2(indicator_id),
+        )
+        return self.load_signal_features_manifest_from_path(
+            signal_features_paths.manifest,
+            slot=validate_artifact_slot_v2(slot),
+        )
+
+    def load_signal_features_manifest_from_path(
+        self,
+        path: Path,
+        *,
+        slot: ArtifactSlotLiteralV2,
+    ) -> ArtifactSignalFeaturesManifestDocumentV2:
+        """
+        Read one signal-feature manifest from an explicit already-known path.
+
+        Args:
+            path: Full path to `signal_features/<tf>/<indicator_id>/manifest.yaml`.
+            slot: Explicit slot literal associated with the path.
+        Returns:
+            ArtifactSignalFeaturesManifestDocumentV2: Parsed strict signal-feature manifest.
+        Assumptions:
+            Signal-feature manifests are schema-validated immediately on load.
+        Raises:
+            FileNotFoundError: If the path does not exist.
+            ValueError: If the YAML payload violates strict contracts.
+        Side Effects:
+            Reads one UTF-8 YAML file from disk.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+        """
+        payload = self._load_yaml_mapping(path=path, document_label=ARTIFACT_MANIFEST_FILENAME_V2)
+        return self._parse_signal_features_manifest_document(
+            path=path,
+            payload=payload,
+            slot=validate_artifact_slot_v2(slot),
+        )
+
     def load_hit_times_manifest(
         self,
         coordinates: ArtifactCoordinatesV2,
@@ -488,6 +570,43 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
         return self.path_resolver.signal_paths(coordinates, slot, timeframe, indicator_id)
+
+    def resolve_signal_features_paths(
+        self,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        timeframe: str,
+        indicator_id: str,
+    ) -> ArtifactSignalFeaturesPathsV2:
+        """
+        Resolve one `signal_features/<tf>/<indicator_id>/` path set without touching disk.
+
+        Args:
+            coordinates: Validated artifact coordinates.
+            slot: Candidate slot literal.
+            timeframe: Candidate signal timeframe literal.
+            indicator_id: Candidate indicator id token.
+        Returns:
+            ArtifactSignalFeaturesPathsV2: Deterministic path set for signal-feature files.
+        Assumptions:
+            Signal-feature artifacts must be addressable directly from coordinates and literals.
+        Raises:
+            ValueError: If one input literal violates the explicit artifact contract.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+        """
+        return self.path_resolver.signal_features_paths(
+            coordinates,
+            slot,
+            timeframe,
+            indicator_id,
+        )
 
     def resolve_mapping_paths(
         self,
@@ -689,9 +808,10 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
-        self._require_exact_yaml_keys(
+        self._require_exact_yaml_keys_with_optional(
             payload=payload,
             required_keys=SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            optional_keys=SIGNAL_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
             path=path,
         )
         manifest_slot = validate_artifact_slot_v2(
@@ -744,6 +864,92 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
             grid=self._parse_signal_grid(
                 path=path,
                 payload=self._required_mapping_field(payload=payload, key="grid", path=path),
+            ),
+            provenance=self._parse_provenance(
+                path=path,
+                payload=self._required_mapping_field(payload=payload, key="provenance", path=path),
+            ),
+            signal_features=self._parse_optional_signal_features_reference(
+                path=path,
+                payload=payload,
+            ),
+        )
+
+    def _parse_signal_features_manifest_document(
+        self,
+        *,
+        path: Path,
+        payload: Mapping[str, Any],
+        slot: ArtifactSlotLiteralV2,
+    ) -> ArtifactSignalFeaturesManifestDocumentV2:
+        """
+        Parse one strict signal-feature manifest payload into typed DTOs.
+
+        Args:
+            path: Source manifest path.
+            payload: Parsed YAML payload.
+            slot: Explicit slot literal resolved from deterministic path.
+        Returns:
+            ArtifactSignalFeaturesManifestDocumentV2: Strict typed signal-feature manifest.
+        Assumptions:
+            Signal-feature manifests are schema-validated eagerly during explicit-path reads.
+        Raises:
+            ValueError: If the payload shape or any nested strict field is invalid.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+        """
+        self._require_exact_yaml_keys(
+            payload=payload,
+            required_keys=SIGNAL_FEATURES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
+            path=path,
+        )
+        manifest_slot = validate_artifact_slot_v2(
+            str(self._required_yaml_field(payload=payload, key="slot", path=path))
+        )
+        if manifest_slot != slot:
+            raise ValueError(f"{path} field 'slot' must be {slot!r}; got {manifest_slot!r}")
+        return ArtifactSignalFeaturesManifestDocumentV2(
+            path=path,
+            raw_payload=payload,
+            slot=manifest_slot,
+            schema_version=self._required_yaml_field(
+                payload=payload,
+                key="schema_version",
+                path=path,
+            ),
+            manifest_kind=str(
+                self._required_yaml_field(payload=payload, key="manifest_kind", path=path)
+            ),
+            slot_generation=self._required_yaml_field(
+                payload=payload,
+                key="slot_generation",
+                path=path,
+            ),
+            asof_date=str(self._required_yaml_field(payload=payload, key="asof_date", path=path)),
+            indicator_id=str(
+                self._required_yaml_field(payload=payload, key="indicator_id", path=path)
+            ),
+            timeframe=str(self._required_yaml_field(payload=payload, key="timeframe", path=path)),
+            features=self._parse_array_metadata(
+                path=path,
+                key="features",
+                payload=self._required_mapping_field(payload=payload, key="features", path=path),
+            ),
+            rows_count=self._required_yaml_field(payload=payload, key="rows_count", path=path),
+            feature_names=self._parse_string_tuple(
+                path=path,
+                key="feature_names",
+                values=self._required_sequence_field(
+                    payload=payload,
+                    key="feature_names",
+                    path=path,
+                ),
             ),
             provenance=self._parse_provenance(
                 path=path,
@@ -1168,6 +1374,63 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
                 ),
             ),
             manifests=tuple(manifest_entries),
+        )
+
+    def _parse_optional_signal_features_reference(
+        self,
+        *,
+        path: Path,
+        payload: Mapping[str, Any],
+    ) -> ArtifactSignalFeaturesReferenceV2 | None:
+        """
+        Parse the optional signal-feature reference nested inside one signal manifest.
+
+        Args:
+            path: Source signal-manifest path.
+            payload: Parsed signal-manifest payload.
+        Returns:
+            ArtifactSignalFeaturesReferenceV2 | None: Typed additive feature reference when
+                present, else `None` for legacy manifests.
+        Assumptions:
+            Signal-feature discovery is additive and explicit; absence must remain valid.
+        Raises:
+            ValueError: If the optional nested mapping shape is invalid.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+          - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+        """
+        if "signal_features" not in payload:
+            return None
+        signal_features_payload = self._required_mapping_field(
+            payload=payload,
+            key="signal_features",
+            path=path,
+        )
+        self._require_exact_yaml_keys(
+            payload=signal_features_payload,
+            required_keys=("manifest_path", "manifest_sha256"),
+            path=path,
+        )
+        return ArtifactSignalFeaturesReferenceV2(
+            manifest_path=str(
+                self._required_yaml_field(
+                    payload=signal_features_payload,
+                    key="manifest_path",
+                    path=path,
+                )
+            ),
+            manifest_sha256=str(
+                self._required_yaml_field(
+                    payload=signal_features_payload,
+                    key="manifest_sha256",
+                    path=path,
+                )
+            ),
         )
 
     def _parse_hit_times_reference(
@@ -1739,6 +2002,58 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
                 f"{path} must contain exactly keys {required_keys}"
                 + (f"; {'; '.join(details)}" if len(details) > 0 else "")
             )
+
+    def _require_exact_yaml_keys_with_optional(
+        self,
+        *,
+        payload: Mapping[str, Any],
+        required_keys: tuple[str, ...],
+        optional_keys: tuple[str, ...],
+        path: Path,
+    ) -> None:
+        """
+        Enforce exact required keys plus an explicit additive optional key set for YAML mappings.
+
+        Args:
+            payload: Nested YAML mapping payload.
+            required_keys: Canonical required key tuple.
+            optional_keys: Canonical optional additive key tuple.
+            path: Source manifest path used in deterministic errors.
+        Returns:
+            None.
+        Assumptions:
+            Additive schema evolution remains explicit; unsupported extra keys still fail fast.
+        Raises:
+            ValueError: If one required key is missing or one unsupported key is present.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/contracts.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
+        """
+        payload_keys = tuple(sorted(payload.keys()))
+        allowed_keys = tuple(sorted((*required_keys, *optional_keys)))
+        missing_keys = tuple(key for key in required_keys if key not in payload)
+        extra_keys = tuple(key for key in payload_keys if key not in allowed_keys)
+        if len(missing_keys) == 0 and len(extra_keys) == 0:
+            return
+        details: list[str] = []
+        if len(missing_keys) > 0:
+            details.append(f"missing keys {missing_keys}")
+        if len(extra_keys) > 0:
+            details.append(f"unexpected keys {extra_keys}")
+        raise ValueError(
+            f"{path} must contain required keys {required_keys}"
+            + (
+                f" and may contain optional keys {optional_keys}"
+                if len(optional_keys) > 0
+                else ""
+            )
+            + (f"; {'; '.join(details)}" if len(details) > 0 else "")
+        )
 
     def _load_yaml_mapping(self, *, path: Path, document_label: str) -> Mapping[str, Any]:
         """

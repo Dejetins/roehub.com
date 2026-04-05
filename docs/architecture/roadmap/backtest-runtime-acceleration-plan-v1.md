@@ -548,6 +548,10 @@ signal_features/<tf>/<indicator_id>/features.f32.npy  # [V, F]
 - runtime сначала открывает cached features;
 - если feature artifact отсутствует и profile его не требует, exact path остаётся рабочим;
 - для heuristic profiles cached features становятся preferred input.
+- Milestone C ограничивается access/warm-cache plumbing:
+  - `exact_small` и `exact_parallel` не включают `heuristic_shortlist_enabled` по умолчанию;
+  - `hybrid_conservative` и `hybrid_family` остаются rollout-disabled;
+  - optional warm-cache access не меняет winners, scores или deterministic ordering exact path.
 
 Кодовые точки:
 

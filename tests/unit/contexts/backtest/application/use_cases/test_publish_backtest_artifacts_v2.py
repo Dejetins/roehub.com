@@ -291,6 +291,12 @@ def test_publish_backtest_artifacts_v2_bootstraps_missing_current_pointer(
     current_pointer = publish_fixture.fixture.loader.load_current_pointer(
         publish_fixture.fixture.coordinates
     )
+    signal_manifest = publish_fixture.fixture.loader.load_signal_manifest(
+        publish_fixture.fixture.coordinates,
+        "slot_a",
+        "15m",
+        "ma.ema",
+    )
 
     assert result.status == "succeeded"
     assert result.publish_mode == "bootstrap"
@@ -306,6 +312,7 @@ def test_publish_backtest_artifacts_v2_bootstraps_missing_current_pointer(
     assert current_pointer.active_slot == "slot_a"
     assert current_pointer.slot_generation == 1
     assert current_pointer.manifest_sha256 == result.published_manifest_sha256
+    assert signal_manifest.signal_features is not None
     assert current_pointer_path.is_file()
     assert publish_fixture.fixture.builder.slot_manifest_path(
         publish_fixture.fixture.coordinates,
@@ -359,6 +366,12 @@ def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_without
     current_pointer = publish_fixture.fixture.loader.load_current_pointer(
         publish_fixture.fixture.coordinates
     )
+    slot_b_signal_manifest = publish_fixture.fixture.loader.load_signal_manifest(
+        publish_fixture.fixture.coordinates,
+        "slot_b",
+        "15m",
+        "ma.ema",
+    )
 
     assert first_result.publish_mode == "bootstrap"
     assert second_result.publish_mode == "incremental"
@@ -371,6 +384,7 @@ def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_without
     assert current_pointer.active_slot == "slot_b"
     assert current_pointer.slot_generation == 2
     assert _file_sha256_hex_v2(slot_a_manifest_path) == slot_a_manifest_sha_before
+    assert slot_b_signal_manifest.signal_features is not None
     assert publish_fixture.fixture.builder.slot_manifest_path(
         publish_fixture.fixture.coordinates,
         "slot_b",

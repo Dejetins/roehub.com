@@ -418,7 +418,8 @@ class BacktestArtifactRuntimeRunnerV2:
         Assumptions:
             Final deterministic tie-break for Stage B remains `variant_key ASC`, while
             `exact_parallel` may activate process-based chunk scoring only when the resolved
-            execution profile explicitly enables it.
+            execution profile explicitly enables it. Additive `signal_features` warm-cache access
+            carried by Stage A/runtime planning remains inactive for exact Stage B scoring.
         Raises:
             ValueError: If limits/batch-size are invalid or scorer payload is malformed.
         Side Effects:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Iterator, Literal, Mapping
 
@@ -200,6 +200,49 @@ class BacktestStageABaseVariantV2:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestSignalFeaturesAccessPlanV2:
+    """
+    Additive per-indicator warm-cache access plan for optional `signal_features` runtime reads.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
+    """
+
+    indicator_id: str
+    timeframe: str
+    optional: bool = True
+
+    def __post_init__(self) -> None:
+        """
+        Validate one deterministic warm-cache access entry for runtime feature loading.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Milestone C keeps signal-feature access additive and optional for exact profiles.
+        Raises:
+            ValueError: If one identifying literal is blank or `optional` is not boolean.
+        Side Effects:
+            None.
+        """
+        if not self.indicator_id.strip():
+            raise ValueError(
+                "BacktestSignalFeaturesAccessPlanV2.indicator_id must be non-empty"
+            )
+        if not self.timeframe.strip():
+            raise ValueError("BacktestSignalFeaturesAccessPlanV2.timeframe must be non-empty")
+        if not isinstance(self.optional, bool):
+            raise ValueError("BacktestSignalFeaturesAccessPlanV2.optional must be bool")
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestArtifactRuntimePlanV2:
     """
     Deterministic artifact-backed runtime plan for Stage A enumeration and Stage B expansion.
@@ -226,6 +269,9 @@ class BacktestArtifactRuntimePlanV2:
     stage_b_variants_total: int
     estimated_memory_bytes: int
     indicator_estimate_calls: int
+    signal_features_access: tuple[BacktestSignalFeaturesAccessPlanV2, ...] = field(
+        default=(),
+    )
 
     def __post_init__(self) -> None:
         """
@@ -278,6 +324,16 @@ class BacktestArtifactRuntimePlanV2:
             self,
             "execution_params",
             MappingProxyType(_normalize_scalar_mapping_v2(values=self.execution_params)),
+        )
+        object.__setattr__(
+            self,
+            "signal_features_access",
+            tuple(
+                sorted(
+                    self.signal_features_access,
+                    key=lambda plan: (plan.timeframe, plan.indicator_id),
+                )
+            ),
         )
 
     def iter_stage_a_variants(self) -> Iterator[BacktestStageABaseVariantV2]:
@@ -349,6 +405,37 @@ class BacktestArtifactRuntimePlanV2:
                     indicator_variant_key=indicator_variant_key,
                     base_variant_key=base_variant_key,
                 )
+
+    def signal_features_access_for_indicator(
+        self,
+        *,
+        indicator_id: str,
+    ) -> BacktestSignalFeaturesAccessPlanV2 | None:
+        """
+        Resolve the additive warm-cache access entry for one indicator when present.
+
+        Args:
+            indicator_id: Canonical indicator identifier from Stage A plans.
+        Returns:
+            BacktestSignalFeaturesAccessPlanV2 | None: Access entry for the indicator or `None`
+                when the current runtime plan does not request optional feature access.
+        Assumptions:
+            Runtime plan contains at most one signal-feature access entry per indicator/timeframe.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+        """
+        for access_plan in self.signal_features_access:
+            if access_plan.indicator_id == indicator_id:
+                return access_plan
+        return None
 
 
 class BacktestArtifactRuntimePlannerV2:
@@ -579,6 +666,14 @@ class BacktestArtifactRuntimePlannerV2:
             direction_mode=template.direction_mode,
             sizing_mode=template.sizing_mode,
             execution_params=template.execution_params or {},
+            signal_features_access=tuple(
+                BacktestSignalFeaturesAccessPlanV2(
+                    indicator_id=plan.indicator_id,
+                    timeframe=template.timeframe.code,
+                    optional=True,
+                )
+                for plan in indicator_plans
+            ),
             stage_a_variants_total=stage_a_variants_total,
             stage_b_variants_total=stage_b_variants_total,
             estimated_memory_bytes=estimated_memory_bytes,
@@ -1288,6 +1383,7 @@ __all__ = [
     "BacktestIndicatorPlanV2",
     "BacktestRiskVariantV2",
     "BacktestSignalAxisPlanV2",
+    "BacktestSignalFeaturesAccessPlanV2",
     "BacktestStageABaseVariantV2",
     "STAGE_A_LITERAL_V2",
     "STAGE_B_LITERAL_V2",
