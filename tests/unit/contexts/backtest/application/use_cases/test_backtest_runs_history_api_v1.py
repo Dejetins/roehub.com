@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Mapping
 from uuid import UUID
 
@@ -24,6 +25,7 @@ from trading.contexts.backtest.application.services import (
     ArtifactPinnedIdentityV2,
     ExecutionProfilesCatalogV2,
     default_execution_profiles_catalog_v2,
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
 )
 from trading.contexts.backtest.application.use_cases import (
     BacktestRunProgressSnapshotBuilder,
@@ -52,6 +54,16 @@ from trading.shared_kernel.primitives import (
     TimeRange,
     UserId,
     UtcTimestamp,
+)
+
+_BENCHMARK_CORPUS_PATH = (
+    Path(__file__).resolve().parents[6]
+    / "tests"
+    / "perf_smoke"
+    / "contexts"
+    / "backtest"
+    / "fixtures"
+    / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
 )
 
 
@@ -762,6 +774,7 @@ def test_run_progress_snapshot_builder_uses_request_profile_override_for_weights
     )
 
     progress = BacktestRunProgressSnapshotBuilder(
+        benchmark_corpus=_benchmark_corpus(),
         now_provider=lambda: datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc)
     ).build(run=running)
 
@@ -802,6 +815,68 @@ def test_run_progress_snapshot_builder_falls_back_to_catalog_default_mode() -> N
     assert progress.execution_profile_mode == "exact_small"
     assert progress.progress_percent == 0
     assert progress.eta_seconds is None
+
+
+def test_run_progress_snapshot_builder_uses_benchmark_fallback_before_throughput_is_defensible(
+) -> None:
+    """
+    Verify persisted run ETA falls back to the committed benchmark corpus before throughput exists.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The current run has started and exposes stage counters, but elapsed time is still too
+        small for the timeline-only ETA path to defend a throughput-based estimate.
+    Raises:
+        AssertionError: If benchmark fallback does not produce the expected deterministic ETA.
+    Side Effects:
+        None.
+    """
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000966"),
+        user_id=owner_user_id,
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 59, 55, tzinfo=timezone.utc),
+        request_json={
+            "mode": "template",
+            "top_k": 25,
+            "execution_profile_mode": "exact_parallel",
+        },
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+    running = queued.claim(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        locked_by="worker-test-1",
+        lease_expires_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+    ).update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=0,
+        total_units=48,
+    )
+
+    progress = BacktestRunProgressSnapshotBuilder(
+        benchmark_corpus=_benchmark_corpus(),
+        now_provider=lambda: datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+    ).build(run=running)
+
+    assert progress.execution_profile_mode == "exact_parallel"
+    assert progress.progress_percent == 35
+    assert progress.eta_seconds == 34
 
 
 def test_run_progress_snapshot_builder_reads_weights_from_execution_profile_catalog() -> None:
@@ -1171,6 +1246,28 @@ def test_list_use_case_passes_keyset_query_to_repository_for_runs() -> None:
     assert repository.last_list_query.state == "queued"
     assert repository.last_list_query.limit == 25
     assert repository.last_list_query.cursor == cursor
+
+
+def _benchmark_corpus():
+    """
+    Load the committed benchmark corpus used by persisted runs ETA fallback unit tests.
+
+    Args:
+        None.
+    Returns:
+        object: Typed committed benchmark corpus fixture.
+    Assumptions:
+        Unit tests may read the committed corpus fixture directly because request-path file IO is
+        the production constraint, not the test harness.
+    Raises:
+        OSError: If the committed benchmark fixture is missing.
+        ValueError: If the fixture payload violates the typed corpus contract.
+    Side Effects:
+        Reads one repository fixture file.
+    """
+    return load_backtest_runtime_acceleration_benchmark_corpus_v2(
+        path=_BENCHMARK_CORPUS_PATH
+    )
 
 
 def _queued_run(

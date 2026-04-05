@@ -19,7 +19,12 @@ if TYPE_CHECKING:
         FamilyPluginRegistryV2,
     )
 
-type AdaptiveSelectorPolicyModeLiteralV2 = Literal["disabled", "shadow", "active"]
+type AdaptiveSelectorPolicyModeLiteralV2 = Literal[
+    "disabled",
+    "shadow",
+    "opt_in",
+    "active",
+]
 type AdaptiveSelectorRuntimeModeLiteralV2 = Literal[
     "sync_inline",
     "background_capable",
@@ -30,6 +35,7 @@ ALLOWED_ADAPTIVE_SELECTOR_POLICY_MODES_V2: tuple[
 ] = (
     "disabled",
     "shadow",
+    "opt_in",
     "active",
 )
 ALLOWED_ADAPTIVE_SELECTOR_RUNTIME_MODES_V2: tuple[
@@ -45,7 +51,8 @@ _ADAPTIVE_SELECTOR_POLICY_MODE_PRIORITY_V2: dict[
 ] = {
     "disabled": 0,
     "shadow": 1,
-    "active": 2,
+    "opt_in": 2,
+    "active": 3,
 }
 
 
@@ -70,8 +77,9 @@ def validate_adaptive_selector_policy_mode_v2(
     Returns:
         AdaptiveSelectorPolicyModeLiteralV2: Canonical approved policy mode.
     Assumptions:
-        Rollout remains explicit through `disabled`, `shadow`, and `active` modes so Milestone
-        F2 can promote environments without redefining selector contracts.
+        Rollout remains explicit through `disabled`, `shadow`, `opt_in`, and `active` modes so
+        Milestone F2 can distinguish recommendation-only shadow behavior, internal opt-in live
+        evaluation, and full active rollout without redefining selector contracts.
     Raises:
         ValueError: If the literal is blank or outside the approved policy surface.
     Side Effects:
@@ -166,7 +174,7 @@ class AdaptiveSelectorCandidatePolicyV2:
             Hybrid promotion remains deterministic: the selector counts exceeded cost-model
             signals across `grid cardinality`, `stage_a`, `stage_b`, and memory rather than
             depending on wall-clock measurements, while `rollout_mode` may keep one candidate in
-            `shadow` or `disabled` even when the env-level selector mode is broader.
+            `shadow`, `opt_in`, or `disabled` even when the env-level selector mode is broader.
         Raises:
             ValueError: If one threshold is non-positive, `rollout_mode` is invalid, or the
                 required signal count is outside the four available cost-model dimensions.
@@ -249,7 +257,8 @@ class AdaptiveSelectorPolicyV2:
             None.
         Assumptions:
             Selector policy remains conservative in this milestone: rollout mode is explicit and
-            family-specific promotion stays stricter than universal `hybrid_conservative`.
+            family-specific promotion stays stricter than universal `hybrid_conservative`, while
+            `opt_in` remains a first-class phase between `shadow` and `active`.
         Raises:
             ValueError: If mode or one nested candidate policy is invalid.
         Side Effects:
@@ -448,8 +457,8 @@ class AdaptiveSelectorDecisionV2:
             None.
         Assumptions:
             Shadow mode may recommend a different profile than the effective one, but every
-            decision still retains the exact-only fallback used when rollout is disabled or
-            ambiguous.
+            decision still retains the exact-only fallback used when rollout is disabled,
+            shadow-only, opt-in-only, or otherwise ambiguous.
         Raises:
             ValueError: If the mode literal is invalid, one profile is missing, or no candidate
                 evaluations are present.
@@ -569,7 +578,9 @@ class CostModelAdaptiveExecutionSelectorV2:
             AdaptiveSelectorDecisionV2: Effective and recommended execution-profile metadata.
         Assumptions:
             Exact selection remains the conservative fallback, while hybrid promotion may happen
-            only in background-capable runtime mode and only when rollout gates are live.
+            only in background-capable runtime mode and only when rollout gates are live, with
+            `opt_in` staying recommendation-only unless a separate internal requested-profile
+            override path explicitly asks for live hybrid execution.
         Raises:
             ValueError: If one contract input is missing.
         Side Effects:
@@ -701,8 +712,9 @@ class CostModelAdaptiveExecutionSelectorV2:
         Returns:
             AdaptiveSelectorCandidateEvaluationV2: Eligible evaluation or explicit skip reason.
         Assumptions:
-            Candidate-specific rollout caps stay additive and may keep a profile in `shadow` or
-            `disabled` even when the environment-level selector mode is more permissive.
+            Candidate-specific rollout caps stay additive and may keep a profile in `shadow`,
+            `opt_in`, or `disabled` even when the environment-level selector mode is more
+            permissive.
         Raises:
             ValueError: Propagated if the candidate profile is invalid for hybrid evaluation.
         Side Effects:
@@ -990,7 +1002,8 @@ def default_adaptive_selector_policy_v2() -> AdaptiveSelectorPolicyV2:
         AdaptiveSelectorPolicyV2: Conservative disabled-by-default selector policy.
     Assumptions:
         Milestone F1 ships the selector foundation without changing the environment rollout by
-        default; F2 may later promote `shadow` or `active` explicitly per environment.
+        default; F2 may later promote `shadow`, `opt_in`, or `active` explicitly per
+        environment.
     Raises:
         ValueError: If one default threshold drifts from the typed policy contract.
     Side Effects:
@@ -1085,7 +1098,8 @@ def _bounded_adaptive_selector_policy_mode_v2(
         AdaptiveSelectorPolicyModeLiteralV2: More conservative of the two rollout modes.
     Assumptions:
         Candidate-specific rollout stays narrower than or equal to the environment rollout, so
-        `hybrid_family` may remain `shadow` even when `hybrid_conservative` is `active`.
+        `hybrid_family` may remain `shadow` even when `hybrid_conservative` is `opt_in` or
+        `active`.
     Raises:
         None.
     Side Effects:

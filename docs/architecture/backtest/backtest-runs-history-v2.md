@@ -59,8 +59,9 @@
   - `progress_percent` считается детерминированно из
     `stage + processed_units + total_units + execution-profile progress_weights`,
     а не из client-side spinner/эвристики;
-  - `eta_seconds` строится только из текущего run timeline и возвращает `null`,
-    если defensible throughput signal ещё нет;
+  - `eta_seconds` использует precedence `current throughput -> benchmark fallback -> null`:
+    сначала текущий run timeline, затем startup-loaded benchmark corpus, и только потом
+    `null`, если ни один источник не даёт defensible estimate;
   - read path берёт `execution_profile_mode` из persisted `request_json`, если B3 profile-aware
     launch уже сохранил effective profile;
   - для старых rows или unrelated legacy rows fallback остаётся configured default exact profile,
@@ -219,7 +220,7 @@ Response (`200 OK`):
 - `created_at`, `updated_at`, `started_at`, `finished_at`, `cancel_requested_at`
 - `processed_units`, `total_units`
 - `progress_percent`
-- `eta_seconds`
+- `eta_seconds` (`throughput first`, `benchmark fallback second`, `null last`)
 - `execution_mode`
 - `execution_profile_mode`
 - `market_id`, `symbol`, `timeframe`

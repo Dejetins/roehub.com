@@ -23,6 +23,10 @@ from trading.contexts.backtest.application.services.v2.adaptive_selector_v2 impo
     default_adaptive_selector_policy_v2,
     validate_adaptive_selector_policy_mode_v2,
 )
+from trading.contexts.backtest.application.services.v2.benchmark_corpus_v2 import (
+    BacktestRuntimeAccelerationBenchmarkCorpusV2,
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
+)
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
     DEFAULT_EXECUTION_PROFILE_MODE_V2,
     ExecutionProfileFeatureFlagsV2,
@@ -46,6 +50,14 @@ from trading.contexts.indicators.application.services.grid_builder import (
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _BACKTEST_CONFIG_PATH_KEY = "ROEHUB_BACKTEST_CONFIG"
 _ALLOWED_ENVS = ("dev", "prod", "test")
+_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_RELATIVE_PATH = (
+    Path("tests")
+    / "perf_smoke"
+    / "contexts"
+    / "backtest"
+    / "fixtures"
+    / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
+)
 
 _WARMUP_BARS_DEFAULT = 200
 _TOP_K_DEFAULT = 300
@@ -586,6 +598,9 @@ class BacktestRuntimeConfig:
     adaptive_selector_policy: AdaptiveSelectorPolicyV2 = field(
         default_factory=default_adaptive_selector_policy_v2
     )
+    runtime_acceleration_benchmark_corpus: (
+        BacktestRuntimeAccelerationBenchmarkCorpusV2 | None
+    ) = None
     warmup_bars_default: int = _WARMUP_BARS_DEFAULT
     top_k_default: int = _TOP_K_DEFAULT
     preselect_default: int = _PRESELECT_DEFAULT
@@ -689,6 +704,54 @@ def resolve_backtest_config_path(
 
 
 
+def _resolve_runtime_acceleration_benchmark_corpus_path(
+    *,
+    config_path: Path,
+) -> Path | None:
+    """
+    Resolve the committed benchmark-corpus fixture path for startup-loaded ETA fallback metadata.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - src/trading/contexts/backtest/application/services/v2/benchmark_corpus_v2.py
+      - apps/api/wiring/modules/backtest.py
+
+    Args:
+        config_path: Runtime YAML path currently being loaded.
+    Returns:
+        Path | None: Matching committed benchmark-corpus fixture, or `None` for ad-hoc temp
+            configs outside the repository env layout.
+    Assumptions:
+        Standard startup uses `configs/<env>/backtest.yaml`; temp unit-test configs may not have
+        the benchmark corpus nearby and can skip startup loading of the in-memory corpus object.
+    Raises:
+        FileNotFoundError: If a standard repo env config is loaded but the committed corpus fixture
+            is missing.
+    Side Effects:
+        None.
+    """
+    resolved_config_path = config_path.resolve()
+    for parent in (resolved_config_path.parent, *resolved_config_path.parents):
+        candidate_path = parent / _RUNTIME_ACCELERATION_BENCHMARK_CORPUS_RELATIVE_PATH
+        if candidate_path.exists():
+            return candidate_path
+
+    if (
+        resolved_config_path.name == "backtest.yaml"
+        and resolved_config_path.parent.name in _ALLOWED_ENVS
+        and resolved_config_path.parent.parent.name == "configs"
+    ):
+        raise FileNotFoundError(
+            "runtime acceleration benchmark corpus not found near "
+            f"{resolved_config_path}"
+        )
+    return None
+
+
 def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     """
     Load and validate source-of-truth Backtest runtime YAML configuration.
@@ -721,6 +784,16 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     payload = yaml.safe_load(config_path.read_text(encoding="utf-8"))
     if not isinstance(payload, Mapping):
         raise ValueError("backtest config must be mapping at top-level")
+    runtime_acceleration_benchmark_corpus_path = (
+        _resolve_runtime_acceleration_benchmark_corpus_path(config_path=config_path)
+    )
+    runtime_acceleration_benchmark_corpus = (
+        None
+        if runtime_acceleration_benchmark_corpus_path is None
+        else load_backtest_runtime_acceleration_benchmark_corpus_v2(
+            path=runtime_acceleration_benchmark_corpus_path
+        )
+    )
 
     version = _get_int(payload, "version", required=True)
     backtest_map = _get_mapping(payload, "backtest", required=False)
@@ -922,6 +995,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         contracts=contracts,
         execution_profiles=execution_profiles,
         adaptive_selector_policy=adaptive_selector_policy,
+        runtime_acceleration_benchmark_corpus=runtime_acceleration_benchmark_corpus,
         warmup_bars_default=warmup_bars_default,
         top_k_default=top_k_default,
         preselect_default=preselect_default,

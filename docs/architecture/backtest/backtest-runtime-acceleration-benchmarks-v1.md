@@ -46,6 +46,9 @@ plugin rollout на одном и том же наборе deterministic slices.
 | `high_correlation` | `exact_parallel` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b` | correlation-sensitive synthetic slice + exact best-cell replay anchor |
 | `small_grid_overhead` | `exact_small` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b` | lightweight sync-sized synthetic slice consumed by staged-runner perf smoke |
 | `memory_footprint` | `exact_parallel` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b`, `finalizing` | wide retained-survivor synthetic slice anchored to background-sized baseline |
+| `medium_grids` | `exact_parallel` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b`, `finalizing` | roadmap explicit medium-grid slice reusing `large-run` plus benchmark ETA fallback envelope |
+| `huge_grids` | `exact_parallel` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b`, `finalizing` | roadmap explicit huge-grid slice reusing `background-run` plus benchmark ETA fallback envelope |
+| `multi_block` | `exact_parallel` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b`, `finalizing` | additive synthetic multi-block workload slice used for reviewable rollout evidence and ETA fallback |
 
 ## Как корпус используется сейчас
 
@@ -56,6 +59,10 @@ plugin rollout на одном и том же наборе deterministic slices.
 - `small_grid_overhead` уже читает committed corpus metadata из
   `test_backtest_staged_runner_perf_smoke.py`, поэтому small sync harness больше не держит
   отдельный hardcoded shape.
+- `medium_grids`, `huge_grids`, и `multi_block` закрывают недостающие roadmap edge slices
+  additively, не меняя старые `slice_id` и не создавая второй benchmark corpus.
+- ETA fallback для persisted runs history теперь использует тот же committed corpus через
+  startup-loaded typed metadata (`eta_fallback`), а не request-path fixture reads.
 - `test_backtest_hybrid_shortlist_rollout_v2.py` читает те же `slice_id` и
   `rollout_gates`, поэтому hybrid rollout evidence не создаёт второй ad-hoc benchmark set.
 - `test_backtest_adaptive_selector_rollout_v2.py` связывает committed env rollout config с теми
@@ -74,6 +81,10 @@ F2 intentionally keeps benchmark evidence, selector policy, and active defaults 
 - `exact_baseline=exact_parallel` остаётся evidence anchor и не становится runtime default.
 - `small_grid_overhead` объясняет, почему даже при `adaptive selector=active` small sync runs
   должны оставаться `exact_small`.
+- `medium_grids` и `huge_grids` делают roadmap buckets explicit without conflating the benchmark
+  anchor with the active runtime default exact profile.
+- `multi_block` keeps multi-block strategy evidence explicit and machine-readable instead of
+  relying on implicit reuse of unrelated large-run slices.
 - `test_backtest_hybrid_shortlist_rollout_v2.py` + `memory_footprint` дают evidence surface для
   `hybrid_conservative` selective default only on large runs.
 - `test_backtest_family_plugin_rollout_v2.py` доказывает proposal-layer viability для pure
@@ -82,7 +93,7 @@ F2 intentionally keeps benchmark evidence, selector policy, and active defaults 
 
 То есть benchmark corpus по-прежнему не является runtime selector input.
 Он только фиксирует reviewable evidence, по которому env config может безопасно оставаться
-`shadow`, перейти в `active`, или откатиться обратно.
+`shadow`, перейти в `opt_in`, затем в `active`, или откатиться обратно.
 
 ## Что корпус сейчас намеренно не делает
 

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
@@ -10,6 +11,9 @@ from apps.api.dto import encode_backtest_runs_cursor
 from apps.api.routes import build_backtest_runs_router
 from trading.contexts.backtest.application.dto import BacktestMetricRowV1, BacktestReportV1
 from trading.contexts.backtest.application.ports import BacktestJobListPage
+from trading.contexts.backtest.application.services import (
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
+)
 from trading.contexts.backtest.application.use_cases import (
     BacktestRunProgressSnapshotBuilder,
     BacktestRunTopReadResult,
@@ -27,6 +31,16 @@ from trading.contexts.backtest.domain.entities import (
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 from trading.shared_kernel.primitives import PaidLevel, UserId
+
+_BENCHMARK_CORPUS_PATH = (
+    Path(__file__).resolve().parents[4]
+    / "tests"
+    / "perf_smoke"
+    / "contexts"
+    / "backtest"
+    / "fixtures"
+    / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
+)
 
 
 class _HeaderCurrentUserDependency:
@@ -65,6 +79,28 @@ class _HeaderCurrentUserDependency:
             user_id=UserId.from_string(raw_user_id),
             paid_level=PaidLevel.free(),
         )
+
+
+def _benchmark_corpus():
+    """
+    Load the committed benchmark corpus used by public runs route ETA fallback tests.
+
+    Args:
+        None.
+    Returns:
+        object: Typed committed benchmark corpus fixture.
+    Assumptions:
+        Route tests may read the committed corpus fixture directly because the production rule is
+        only that the request path itself must avoid file IO.
+    Raises:
+        OSError: If the committed benchmark fixture is missing.
+        ValueError: If the fixture payload violates the typed corpus contract.
+    Side Effects:
+        Reads one repository fixture file.
+    """
+    return load_backtest_runtime_acceleration_benchmark_corpus_v2(
+        path=_BENCHMARK_CORPUS_PATH
+    )
 
 
 @dataclass
@@ -540,6 +576,75 @@ def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_field
     assert body["execution_profile_mode"] == "exact_parallel"
     assert body["progress_percent"] == 65
     assert body["eta_seconds"] == 33
+
+
+def test_get_backtest_run_status_uses_benchmark_eta_fallback_when_timeline_signal_is_too_early(
+) -> None:
+    """
+    Verify status route returns benchmark-backed ETA when current throughput is not defensible.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The run has started and exposed Stage B counters, but elapsed time is still too small for
+        the timeline-only ETA path to publish a throughput-based estimate.
+    Raises:
+        AssertionError: If route wiring drops the benchmark-backed ETA fallback.
+    Side Effects:
+        None.
+    """
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000939"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 59, 55, tzinfo=timezone.utc),
+        request_json={
+            "top_k": 25,
+            "execution_profile_mode": "exact_parallel",
+        },
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+    running = queued.claim(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        locked_by="worker-a-1",
+        lease_expires_at=datetime(2026, 3, 29, 12, 5, tzinfo=timezone.utc),
+    ).update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=0,
+        total_units=48,
+    )
+    client, _, _ = _build_client(
+        status_use_case=_StatusUseCaseFake(run=running),
+        run_progress_builder=BacktestRunProgressSnapshotBuilder(
+            benchmark_corpus=_benchmark_corpus(),
+            now_provider=lambda: datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        ),
+    )
+
+    response = client.get(
+        "/backtests/runs/00000000-0000-0000-0000-000000000939",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["execution_profile_mode"] == "exact_parallel"
+    assert body["progress_percent"] == 35
+    assert body["eta_seconds"] == 34
 
 
 def test_get_backtest_run_top_returns_persisted_rows_in_deterministic_order() -> None:

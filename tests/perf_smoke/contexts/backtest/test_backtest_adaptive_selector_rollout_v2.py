@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -231,4 +232,39 @@ def test_dev_active_rollout_keeps_small_sync_runs_exact_first() -> None:
     assert config.adaptive_selector_policy.mode == "active"
     assert decision.effective_profile.mode == "exact_small"
     assert decision.recommended_profile.mode == "exact_small"
+    assert decision.recommendation_applied is False
+
+
+def test_prod_opt_in_phase_is_explicit_without_becoming_active_by_default() -> None:
+    """
+    Verify the explicit prod `opt_in` phase stays distinct from both shadow and active rollout.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The roadmap requires an explicit prod opt-in phase before selective defaulting becomes
+        live, while the committed prod config may still remain `shadow` by default.
+    Raises:
+        AssertionError: If the explicit opt-in policy literal is collapsed back into shadow or
+            active semantics.
+    Side Effects:
+        None.
+    """
+    config = _runtime_config(env_name="prod")
+    selector = CostModelAdaptiveExecutionSelectorV2()
+    opt_in_policy = replace(config.adaptive_selector_policy, mode="opt_in")
+
+    decision = selector.select(
+        evidence=_large_ma_run_evidence(config=config),
+        execution_profiles=config.execution_profiles,
+        policy=opt_in_policy,
+    )
+
+    assert config.adaptive_selector_policy.mode == "shadow"
+    assert opt_in_policy.mode == "opt_in"
+    assert decision.policy_mode == "opt_in"
+    assert decision.effective_profile.mode == "exact_parallel"
+    assert decision.recommended_profile.mode == "hybrid_family"
     assert decision.recommendation_applied is False

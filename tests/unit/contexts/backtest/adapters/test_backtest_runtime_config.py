@@ -123,6 +123,9 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.adaptive_selector_policy.mode == "active"
     assert config.adaptive_selector_policy.hybrid_conservative.rollout_mode == "active"
     assert config.adaptive_selector_policy.hybrid_family.rollout_mode == "shadow"
+    assert config.runtime_acceleration_benchmark_corpus is not None
+    assert config.runtime_acceleration_benchmark_corpus.milestone_id == "A-F"
+    assert config.runtime_acceleration_benchmark_corpus.epic_id == "A3+D2+D3+F2"
     assert config.adaptive_selector_policy.hybrid_conservative.min_grid_cardinality == 6000
     assert config.adaptive_selector_policy.hybrid_family.min_stage_b_variants_total == 80000
     assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
@@ -242,6 +245,66 @@ def test_load_backtest_runtime_config_reads_env_specific_selector_modes(
     config = load_backtest_runtime_config(config_path)
 
     assert config.adaptive_selector_policy.mode == expected_mode
+    assert config.adaptive_selector_policy.hybrid_conservative.rollout_mode == "active"
+    assert config.adaptive_selector_policy.hybrid_family.rollout_mode == "shadow"
+
+
+def test_load_backtest_runtime_config_accepts_explicit_opt_in_selector_mode(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify startup config parser accepts the explicit `opt_in` rollout phase.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        The explicit prod opt-in phase is config-driven and must stay distinct from both `shadow`
+        and `active` even when individual env defaults remain conservative.
+    Raises:
+        AssertionError: If the typed config surface rejects `opt_in`.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  execution_profiles:
+    adaptive_selector:
+      mode: opt_in
+      hybrid_conservative:
+        rollout_mode: active
+      hybrid_family:
+        rollout_mode: shadow
+    default: exact_small
+    profiles:
+      - mode: exact_small
+        planning_budget_ms: 25
+      - mode: exact_parallel
+        planning_budget_ms: 50
+      - mode: hybrid_conservative
+        planning_budget_ms: 75
+      - mode: hybrid_family
+        planning_budget_ms: 100
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    config = load_backtest_runtime_config(config_path)
+
+    assert config.adaptive_selector_policy.mode == "opt_in"
     assert config.adaptive_selector_policy.hybrid_conservative.rollout_mode == "active"
     assert config.adaptive_selector_policy.hybrid_family.rollout_mode == "shadow"
 
@@ -965,7 +1028,8 @@ def test_load_backtest_runtime_config_rejects_invalid_adaptive_selector_mode(
     Returns:
         None.
     Assumptions:
-        Selector rollout must stay on the explicit `disabled`, `shadow`, and `active` literals.
+        Selector rollout must stay on the explicit `disabled`, `shadow`, `opt_in`, and `active`
+        literals.
     Raises:
         AssertionError: If invalid selector mode does not raise ValueError.
     Side Effects:

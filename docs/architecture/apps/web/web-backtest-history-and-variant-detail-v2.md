@@ -73,6 +73,7 @@ lazy detail page для одного persisted variant.
   - `requested_top_n`
   - timestamps
   - progress counters + additive `progress_percent/eta_seconds`
+    where ETA uses `throughput first -> benchmark fallback second -> null last`
 - Не показывает и не кэширует internal hashes (`request_hash`, `engine_params_hash`, etc.).
 
 ### 3) Run details page

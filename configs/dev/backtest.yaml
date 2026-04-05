@@ -57,7 +57,7 @@ backtest:
   execution_profiles:
     default: exact_small
     adaptive_selector:
-      mode: active
+      mode: active  # dev already runs the selective-default phase for large runs.
       hybrid_conservative:
         rollout_mode: active
         min_grid_cardinality: 6000

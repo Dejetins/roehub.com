@@ -41,6 +41,7 @@ from .execution_profile_v2 import (
     ExecutionProfileV2,
     default_execution_profiles_catalog_v2,
     execution_profile_supports_requested_runtime_v2,
+    execution_profile_uses_hierarchical_shortlist_runtime_v2,
 )
 
 STAGE_A_LITERAL_V2 = "stage_a"
@@ -684,8 +685,10 @@ class BacktestArtifactRuntimePlannerV2:
         Returns:
             ExecutionProfileV2: Selected execution profile for the prepared request.
         Assumptions:
-            Requested-profile overrides keep precedence, while automatic selection uses the typed
-            adaptive selector only when planning evidence is available.
+            Requested exact-profile overrides keep precedence, while requested hybrid overrides are
+            allowed only when selector rollout has reached explicit `opt_in` or `active`
+            semantics; automatic selection uses the typed adaptive selector only when planning
+            evidence is available.
         Raises:
             RoehubError: If sync launch budgets are exceeded and background routing is required.
             ValueError: If configured profiles cannot be resolved from the catalog.
@@ -696,11 +699,24 @@ class BacktestArtifactRuntimePlannerV2:
             requested_profile = self._execution_profiles.profile_for_mode(
                 mode=requested_execution_profile_mode
             )
+            if (
+                execution_profile_uses_hierarchical_shortlist_runtime_v2(
+                    profile=requested_profile
+                )
+                and not _adaptive_selector_policy_supports_requested_hybrid_profile_v2(
+                    policy_mode=self._adaptive_selector_policy.mode
+                )
+            ):
+                raise _requested_execution_profile_not_enabled_error_v2(
+                    execution_profile_mode=requested_profile.mode,
+                    policy_mode=self._adaptive_selector_policy.mode,
+                )
             if not execution_profile_supports_requested_runtime_v2(
                 profile=requested_profile
             ):
                 raise _requested_execution_profile_not_enabled_error_v2(
-                    execution_profile_mode=requested_profile.mode
+                    execution_profile_mode=requested_profile.mode,
+                    policy_mode=self._adaptive_selector_policy.mode,
                 )
             if (
                 self._launch_budget_mode == "sync_inline"
@@ -1653,6 +1669,37 @@ def _memory_guard_error_v2(
     )
 
 
+def _adaptive_selector_policy_supports_requested_hybrid_profile_v2(
+    *,
+    policy_mode: str,
+) -> bool:
+    """
+    Check whether selector rollout explicitly allows internal live hybrid opt-in requests.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+
+    Args:
+        policy_mode: Environment-level adaptive selector rollout mode.
+    Returns:
+        bool: `True` when explicit requested hybrid execution is allowed for the env.
+    Assumptions:
+        `shadow` keeps recommendations inspectable but does not yet permit live hybrid opt-in,
+        while `opt_in` and `active` do.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return policy_mode in {"opt_in", "active"}
+
+
 def _background_auto_required_error_v2(
     *,
     execution_profile_mode: ExecutionProfileModeLiteralV2,
@@ -1703,6 +1750,7 @@ def _background_auto_required_error_v2(
 def _requested_execution_profile_not_enabled_error_v2(
     *,
     execution_profile_mode: ExecutionProfileModeLiteralV2,
+    policy_mode: str | None = None,
 ) -> RoehubError:
     """
     Build canonical validation error for explicitly requested but rollout-disabled profiles.
@@ -1718,23 +1766,27 @@ def _requested_execution_profile_not_enabled_error_v2(
 
     Args:
         execution_profile_mode: Internal requested execution profile mode literal.
+        policy_mode: Optional selector rollout mode active for the current environment.
     Returns:
         RoehubError: Canonical validation payload describing the disabled requested profile.
     Assumptions:
         Requested hybrid rollout profiles remain internal-only and must fail fast when feature
-        flags or shortlist gating do not explicitly enable live runtime.
+        flags or selector rollout policy do not explicitly enable live runtime.
     Raises:
         None.
     Side Effects:
         None.
     """
+    details: dict[str, object] = {
+        "error": "execution_profile_not_enabled",
+        "execution_profile_mode": execution_profile_mode,
+    }
+    if policy_mode is not None:
+        details["adaptive_selector_policy_mode"] = policy_mode
     return RoehubError(
         code="validation_error",
         message="Requested execution profile is not enabled for live runtime",
-        details={
-            "error": "execution_profile_not_enabled",
-            "execution_profile_mode": execution_profile_mode,
-        },
+        details=details,
     )
 
 

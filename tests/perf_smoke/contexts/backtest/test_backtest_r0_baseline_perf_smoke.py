@@ -784,12 +784,17 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
     assert corpus.source_fixtures.stage_b_golden_fixture == (
         "tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json"
     )
+    assert corpus.milestone_id == "A-F"
+    assert corpus.epic_id == "A3+D2+D3+F2"
     assert corpus.slice_order == (
         "exact_baseline",
         "low_activity",
         "high_correlation",
         "small_grid_overhead",
         "memory_footprint",
+        "medium_grids",
+        "huge_grids",
+        "multi_block",
     )
     assert corpus.rollout_gates.top_1_recall.metric == "top_1_recall"
     assert corpus.rollout_gates.top_1_recall.min_ratio == 0.99
@@ -836,6 +841,9 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
     assert small_grid_overhead.synthetic_run_spec.total_candles_bars == 512
     assert small_grid_overhead.synthetic_run_spec.expected_stage_a_variants_total == 6
     assert small_grid_overhead.synthetic_run_spec.expected_stage_b_variants_total == 16
+    assert small_grid_overhead.eta_fallback is not None
+    assert small_grid_overhead.eta_fallback.stage_a_units_per_second == 4.0
+    assert small_grid_overhead.eta_fallback.finalizing_seconds == 1
 
     memory_footprint = corpus.slice_for_id(slice_id="memory_footprint")
     assert memory_footprint.candidate_execution_profile_mode == "hybrid_conservative"
@@ -845,10 +853,39 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
     assert memory_footprint.synthetic_run_spec.expected_stage_a_variants_total == 10
     assert memory_footprint.synthetic_run_spec.expected_stage_b_variants_total == 90
 
+    medium_grids = corpus.slice_for_id(slice_id="medium_grids")
+    assert medium_grids.candidate_execution_profile_mode == "hybrid_conservative"
+    assert "medium_grids" in medium_grids.evaluation_focus
+    assert "benchmark_fallback" in medium_grids.evaluation_focus
+    assert medium_grids.synthetic_run_spec is not None
+    assert medium_grids.synthetic_run_spec.expected_stage_a_variants_total == 24
+    assert medium_grids.synthetic_run_spec.expected_stage_b_variants_total == 96
+    assert medium_grids.eta_fallback is not None
+    assert medium_grids.eta_fallback.stage_b_units_per_second == 1.5
+
+    huge_grids = corpus.slice_for_id(slice_id="huge_grids")
+    assert huge_grids.candidate_execution_profile_mode == "hybrid_conservative"
+    assert "huge_grids" in huge_grids.evaluation_focus
+    assert huge_grids.synthetic_run_spec is not None
+    assert huge_grids.synthetic_run_spec.expected_stage_a_variants_total == 96
+    assert huge_grids.synthetic_run_spec.expected_stage_b_variants_total == 384
+    assert huge_grids.eta_fallback is not None
+    assert huge_grids.eta_fallback.finalizing_seconds == 4
+
+    multi_block = corpus.slice_for_id(slice_id="multi_block")
+    assert multi_block.candidate_execution_profile_mode == "hybrid_conservative"
+    assert "multi_block" in multi_block.evaluation_focus
+    assert "benchmark_fallback" in multi_block.evaluation_focus
+    assert multi_block.synthetic_run_spec is not None
+    assert multi_block.synthetic_run_spec.expected_stage_a_variants_total == 36
+    assert multi_block.synthetic_run_spec.expected_stage_b_variants_total == 144
+    assert multi_block.eta_fallback is not None
+    assert multi_block.eta_fallback.stage_a_units_per_second == 2.5
+
 
 def test_a3_runtime_acceleration_benchmark_corpus_serialization_is_byte_stable() -> None:
     """
-    Verify the committed D2+D3 benchmark corpus keeps canonical byte-stable JSON formatting.
+    Verify the committed A3+D2+D3+F2 benchmark corpus keeps canonical byte-stable JSON formatting.
 
     Docs:
       - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
@@ -941,7 +978,8 @@ def _load_benchmark_scenarios() -> tuple[_R0BenchmarkScenario, ...]:
 
 def _load_runtime_acceleration_benchmark_corpus():
     """
-    Load the committed D2+D3 benchmark corpus for exact and hybrid rollout perf-smoke coverage.
+    Load the committed A3+D2+D3+F2 benchmark corpus for exact and hybrid rollout
+    perf-smoke coverage.
 
     Docs:
       - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md

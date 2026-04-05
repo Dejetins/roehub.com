@@ -57,7 +57,7 @@ backtest:
   execution_profiles:
     default: exact_small
     adaptive_selector:
-      mode: shadow
+      mode: shadow  # default prod stays shadow; the next supported phase is opt_in, then active.
       hybrid_conservative:
         rollout_mode: active
         min_grid_cardinality: 6000

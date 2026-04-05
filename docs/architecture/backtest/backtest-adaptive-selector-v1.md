@@ -29,6 +29,8 @@ The selector exposes one typed rollout policy:
 - `disabled`: automatic behavior stays on the existing conservative exact-only fallback.
 - `shadow`: the selector computes a recommendation but the executed profile remains the exact-only
   fallback.
+- `opt_in`: automatic selection still keeps exact execution, but internal requested hybrid
+  overrides are now explicitly allowed for controlled live evaluation.
 - `active`: the selector may execute the recommended profile when it is valid.
 
 The policy lives in `backtest.execution_profiles.adaptive_selector` inside
@@ -54,9 +56,15 @@ Committed env defaults after F2:
 The candidate cap is the narrow additive F2 extension that keeps `hybrid_family` narrower than
 `hybrid_conservative` without redesigning the global selector contract.
 
-Internal-only manual evaluation still exists through explicit non-public
-`execution_profile_mode` overrides for controlled testing flows. This does not widen the public
-`POST /backtests` contract and does not let the browser choose profiles.
+The next explicit rollout phase after committed prod `shadow` is `opt_in`:
+
+- `prod=opt_in` keeps automatic selection recommendation-only;
+- but internal non-public requested `execution_profile_mode=hybrid_*` overrides now become
+  explicitly sanctioned for controlled live evaluation;
+- `active` still remains the later phase where selective defaulting may execute automatically.
+
+This does not widen the public `POST /backtests` contract and does not let the browser choose
+profiles.
 
 ## Deterministic evidence
 

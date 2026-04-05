@@ -57,6 +57,7 @@
     startup config;
   - this includes env-level `mode` plus candidate-specific rollout caps for
     `hybrid_conservative` and `hybrid_family`;
+  - env-level `mode` may now be `disabled | shadow | opt_in | active`;
   - committed prod defaults may now expose `hybrid_family.feature_flags.runtime_enabled=true`
     for internal/manual and shadow-recommendation flows, while the selector rollout cap still
     keeps `hybrid_family` non-live by default;

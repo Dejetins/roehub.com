@@ -22,11 +22,14 @@ BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_SCHEMA_VERSION_V2 = 1
 BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_KIND_V2 = (
     "backtest_runtime_acceleration_benchmark_corpus_v1"
 )
-BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_MILESTONE_ID_V2 = "D"
-BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_EPIC_ID_V2 = "D2+D3"
+BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_MILESTONE_ID_V2 = "A-F"
+BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_EPIC_ID_V2 = "A3+D2+D3+F2"
 
 type BenchmarkCorpusSliceIdLiteralV2 = Literal[
     "exact_baseline",
+    "medium_grids",
+    "huge_grids",
+    "multi_block",
     "low_activity",
     "high_correlation",
     "small_grid_overhead",
@@ -49,6 +52,9 @@ type BenchmarkCorpusRolloutGateIdLiteralV2 = Literal[
 
 _ALLOWED_BENCHMARK_CORPUS_SLICE_IDS_V2: tuple[BenchmarkCorpusSliceIdLiteralV2, ...] = (
     "exact_baseline",
+    "medium_grids",
+    "huge_grids",
+    "multi_block",
     "low_activity",
     "high_correlation",
     "small_grid_overhead",
@@ -214,6 +220,55 @@ class BacktestRuntimeBenchmarkRolloutGatesV2:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestRuntimeBenchmarkEtaFallbackV2:
+    """
+    Benchmark-backed ETA fallback envelope for one committed workload slice.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
+      - tests/perf_smoke/contexts/backtest/fixtures/
+        backtest_runtime_acceleration_benchmark_corpus_v1.json
+      - tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_history_api_v1.py
+    """
+
+    stage_a_units_per_second: float
+    stage_b_units_per_second: float
+    finalizing_seconds: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one additive benchmark-backed ETA fallback envelope.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Throughput floors remain conservative benchmark anchors and are not CI pass/fail
+            thresholds or public API fields.
+        Raises:
+            ValueError: If one throughput floor or finalizing fallback is non-positive.
+        Side Effects:
+            None.
+        """
+        if self.stage_a_units_per_second <= 0.0:
+            raise ValueError(
+                "BacktestRuntimeBenchmarkEtaFallbackV2.stage_a_units_per_second must be > 0"
+            )
+        if self.stage_b_units_per_second <= 0.0:
+            raise ValueError(
+                "BacktestRuntimeBenchmarkEtaFallbackV2.stage_b_units_per_second must be > 0"
+            )
+        if self.finalizing_seconds <= 0:
+            raise ValueError(
+                "BacktestRuntimeBenchmarkEtaFallbackV2.finalizing_seconds must be > 0"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestRuntimeBenchmarkSyntheticRunSpecV2:
     """
     Deterministic synthetic run shape used by lightweight benchmark/perf-smoke harnesses.
@@ -332,6 +387,7 @@ class BacktestRuntimeBenchmarkSliceV2:
     r0_scenario_ids: tuple[str, ...]
     r5_stage_b_case_ids: tuple[str, ...]
     synthetic_run_spec: BacktestRuntimeBenchmarkSyntheticRunSpecV2 | None
+    eta_fallback: BacktestRuntimeBenchmarkEtaFallbackV2 | None
     notes: str
 
     def __post_init__(self) -> None:
@@ -384,6 +440,10 @@ class BacktestRuntimeBenchmarkSliceV2:
             )
         if not self.notes.strip():
             raise ValueError("BacktestRuntimeBenchmarkSliceV2.notes must be non-empty")
+        if self.eta_fallback is not None and self.synthetic_run_spec is None:
+            raise ValueError(
+                "BacktestRuntimeBenchmarkSliceV2.eta_fallback requires synthetic_run_spec"
+            )
         if self.rollout_scope == "exact_only":
             if self.candidate_execution_profile_mode is not None:
                 raise ValueError(
@@ -701,6 +761,10 @@ def _parse_backtest_runtime_benchmark_slice_v2(
         payload=raw_slice,
         key="synthetic_run_spec",
     )
+    eta_fallback_map = _require_optional_mapping(
+        payload=raw_slice,
+        key="eta_fallback",
+    )
     return BacktestRuntimeBenchmarkSliceV2(
         slice_id=_parse_benchmark_slice_id_v2(
             value=_require_str(payload=raw_slice, key="slice_id")
@@ -734,6 +798,13 @@ def _parse_backtest_runtime_benchmark_slice_v2(
             if synthetic_run_spec_map is None
             else _parse_backtest_runtime_benchmark_synthetic_run_spec_v2(
                 raw_spec=synthetic_run_spec_map
+            )
+        ),
+        eta_fallback=(
+            None
+            if eta_fallback_map is None
+            else _parse_backtest_runtime_benchmark_eta_fallback_v2(
+                raw_eta_fallback=eta_fallback_map
             )
         ),
         notes=_require_str(payload=raw_slice, key="notes"),
@@ -870,6 +941,41 @@ def _parse_backtest_runtime_benchmark_synthetic_run_spec_v2(
         expected_stage_b_variants_total=_require_int(
             payload=raw_spec,
             key="expected_stage_b_variants_total",
+        ),
+    )
+
+
+def _parse_backtest_runtime_benchmark_eta_fallback_v2(
+    *,
+    raw_eta_fallback: dict[str, object],
+) -> BacktestRuntimeBenchmarkEtaFallbackV2:
+    """
+    Parse one raw ETA-fallback payload into a typed conservative benchmark envelope.
+
+    Args:
+        raw_eta_fallback: Raw JSON object describing stage throughput floors.
+    Returns:
+        BacktestRuntimeBenchmarkEtaFallbackV2: Parsed typed ETA fallback contract.
+    Assumptions:
+        Benchmark-backed ETA remains an internal read-model fallback and not a request-path
+        runtime benchmark.
+    Raises:
+        ValueError: If one required throughput field is missing or invalid.
+    Side Effects:
+        None.
+    """
+    return BacktestRuntimeBenchmarkEtaFallbackV2(
+        stage_a_units_per_second=_require_float(
+            payload=raw_eta_fallback,
+            key="stage_a_units_per_second",
+        ),
+        stage_b_units_per_second=_require_float(
+            payload=raw_eta_fallback,
+            key="stage_b_units_per_second",
+        ),
+        finalizing_seconds=_require_int(
+            payload=raw_eta_fallback,
+            key="finalizing_seconds",
         ),
     )
 
@@ -1256,6 +1362,34 @@ def _require_optional_float(
     return float(value)
 
 
+def _require_float(
+    *,
+    payload: dict[str, object],
+    key: str,
+) -> float:
+    """
+    Require one numeric scalar value from a raw JSON object payload.
+
+    Args:
+        payload: Raw JSON object payload.
+        key: Required scalar key.
+    Returns:
+        float: Numeric scalar value.
+    Assumptions:
+        JSON numbers may be authored as integer or float literals.
+    Raises:
+        ValueError: If the key is missing or the value is not numeric.
+    Side Effects:
+        None.
+    """
+    value = payload.get(key)
+    if value is None:
+        raise ValueError(f"{key} must be a number")
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{key} must be a number")
+    return float(value)
+
+
 def _coerce_int(
     *,
     value: object,
@@ -1316,6 +1450,7 @@ __all__ = [
     "BenchmarkCorpusSliceIdLiteralV2",
     "BenchmarkCorpusStageLiteralV2",
     "BacktestRuntimeAccelerationBenchmarkCorpusV2",
+    "BacktestRuntimeBenchmarkEtaFallbackV2",
     "BacktestRuntimeBenchmarkRolloutGateV2",
     "BacktestRuntimeBenchmarkRolloutGatesV2",
     "BacktestRuntimeBenchmarkSliceV2",

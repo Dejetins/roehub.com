@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from math import ceil
 from typing import Callable
 from uuid import UUID
 
@@ -21,6 +23,9 @@ from trading.contexts.backtest.application.services import (
     ArtifactPinnedIdentityV2,
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactSlotResolverV2,
+    BacktestRuntimeAccelerationBenchmarkCorpusV2,
+    BacktestRuntimeBenchmarkSliceV2,
+    BenchmarkCorpusSliceIdLiteralV2,
     ExecutionProfileModeLiteralV2,
     ExecutionProfilesCatalogV2,
     artifact_coordinates_from_market_id_v2,
@@ -88,19 +93,25 @@ class BacktestRunProgressSnapshotBuilder:
         self,
         *,
         execution_profiles: ExecutionProfilesCatalogV2 | None = None,
+        benchmark_corpus: BacktestRuntimeAccelerationBenchmarkCorpusV2 | None = None,
         now_provider: NowProvider | None = None,
     ) -> None:
         """
-        Store the execution-profile catalog and clock used for conservative ETA projection.
+        Store the execution-profile catalog, startup-loaded benchmark corpus, and clock.
 
         Args:
             execution_profiles: Optional startup-validated execution-profile catalog.
+            benchmark_corpus:
+                Optional startup-loaded benchmark corpus used only for deterministic benchmark
+                fallback ETA when current throughput is not yet defensible.
             now_provider: Optional UTC clock provider for deterministic tests/read models.
         Returns:
             None.
         Assumptions:
             Current A2 contract keeps persisted run profile resolution additive and may fall back
-            to the configured default profile when the run snapshot has no explicit profile field.
+            to the configured default profile when the run snapshot has no explicit profile field,
+            while benchmark-backed ETA fallback must come from an already loaded in-memory typed
+            corpus rather than request-path fixture reads.
         Raises:
             ValueError: If the resolved execution-profile catalog is missing.
         Side Effects:
@@ -114,6 +125,7 @@ class BacktestRunProgressSnapshotBuilder:
                 "BacktestRunProgressSnapshotBuilder requires execution_profiles"
             )
         self._execution_profiles = resolved_execution_profiles
+        self._benchmark_corpus = benchmark_corpus
         self._now = now_provider or _utc_now
 
     def build(self, *, run: BacktestJob) -> BacktestRunProgressSnapshot:
@@ -125,8 +137,9 @@ class BacktestRunProgressSnapshotBuilder:
         Returns:
             BacktestRunProgressSnapshot: Additive progress read model for public API/UI.
         Assumptions:
-            ETA relies only on current-run timestamps and weighted progress; benchmark-history
-            fallbacks stay out of scope for this milestone.
+            ETA uses current-run throughput first and only falls back to the startup-loaded
+            benchmark corpus when the current run has not produced a defensible throughput signal
+            yet.
         Raises:
             None.
         Side Effects:
@@ -136,10 +149,16 @@ class BacktestRunProgressSnapshotBuilder:
         stage_weights = self._execution_profiles.profile_for_mode(
             mode=execution_profile_mode
         ).progress_weights
+        eta_seconds = run.eta_seconds(stage_weights=stage_weights, now=self._now())
+        if eta_seconds is None:
+            eta_seconds = self._benchmark_eta_seconds(
+                run=run,
+                execution_profile_mode=execution_profile_mode,
+            )
         return BacktestRunProgressSnapshot(
             execution_profile_mode=execution_profile_mode,
             progress_percent=run.progress_percent(stage_weights=stage_weights),
-            eta_seconds=run.eta_seconds(stage_weights=stage_weights, now=self._now()),
+            eta_seconds=eta_seconds,
         )
 
     def _resolve_execution_profile_mode(
@@ -172,6 +191,328 @@ class BacktestRunProgressSnapshotBuilder:
             except ValueError:
                 pass
         return self._execution_profiles.default_mode
+
+    def _benchmark_eta_seconds(
+        self,
+        *,
+        run: BacktestJob,
+        execution_profile_mode: ExecutionProfileModeLiteralV2,
+    ) -> int | None:
+        """
+        Build deterministic benchmark-backed ETA fallback when current throughput is not ready.
+
+        Args:
+            run: Persisted run aggregate read from storage.
+            execution_profile_mode: Effective execution-profile mode already resolved for the run.
+        Returns:
+            int | None: Conservative fallback ETA in seconds, or `None` when no benchmark slice
+                can defend the estimate.
+        Assumptions:
+            Benchmark fallback remains internal read-model metadata driven by the startup-loaded
+            benchmark corpus and does not read committed fixtures on the request path.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self._benchmark_corpus is None:
+            return None
+        if run.state != "running" or run.started_at is None:
+            return None
+
+        benchmark_slice_id = self._resolve_benchmark_slice_id_for_eta_fallback(
+            run=run,
+            execution_profile_mode=execution_profile_mode,
+        )
+        try:
+            benchmark_slice = self._benchmark_corpus.slice_for_id(
+                slice_id=benchmark_slice_id
+            )
+        except KeyError:
+            return None
+        if benchmark_slice.eta_fallback is None:
+            return None
+
+        remaining_seconds = self._remaining_seconds_for_current_stage(
+            run=run,
+            benchmark_slice=benchmark_slice,
+        )
+        for later_stage in _later_backtest_job_stages(stage=run.stage):
+            remaining_seconds += self._full_stage_seconds_for_benchmark_slice(
+                stage=later_stage,
+                benchmark_slice=benchmark_slice,
+            )
+        if remaining_seconds <= 0.0:
+            return None
+        return max(1, ceil(remaining_seconds))
+
+    def _resolve_benchmark_slice_id_for_eta_fallback(
+        self,
+        *,
+        run: BacktestJob,
+        execution_profile_mode: ExecutionProfileModeLiteralV2,
+    ) -> BenchmarkCorpusSliceIdLiteralV2:
+        """
+        Resolve the committed benchmark slice used for deterministic ETA fallback classification.
+
+        Args:
+            run: Persisted run aggregate read from storage.
+            execution_profile_mode: Effective execution-profile mode already resolved for the run.
+        Returns:
+            str: Stable benchmark slice identifier from the committed corpus.
+        Assumptions:
+            History ETA only needs the coarse roadmap buckets `small grids`, `medium grids`,
+            `huge grids`, and `multi-block` to stay deterministic and reviewable.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self._request_signal_block_count(request_payload=run.request_json) >= 2:
+            return "multi_block"
+        if execution_profile_mode == "exact_small":
+            return "small_grid_overhead"
+
+        benchmark_corpus = self._benchmark_corpus
+        if benchmark_corpus is None:
+            return "medium_grids"
+        try:
+            huge_grids_slice = benchmark_corpus.slice_for_id(slice_id="huge_grids")
+        except KeyError:
+            huge_grids_slice = None
+        if (
+            run.execution_mode != "sync_inline"
+            or self._matches_or_exceeds_slice_scale(
+                run=run,
+                benchmark_slice=huge_grids_slice,
+            )
+        ):
+            return "huge_grids"
+        return "medium_grids"
+
+    def _matches_or_exceeds_slice_scale(
+        self,
+        *,
+        run: BacktestJob,
+        benchmark_slice: BacktestRuntimeBenchmarkSliceV2 | None,
+    ) -> bool:
+        """
+        Check whether the current run is already at or above one benchmark slice scale.
+
+        Args:
+            run: Persisted run aggregate read from storage.
+            benchmark_slice: Optional benchmark slice from the committed corpus.
+        Returns:
+            bool: `True` when the current stage unit total meets or exceeds the slice anchor.
+        Assumptions:
+            Current stage counters are the only persisted scale signal available on the history
+            path, so benchmark classification must stay intentionally coarse.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if benchmark_slice is None or benchmark_slice.synthetic_run_spec is None:
+            return False
+        expected_units_total = self._stage_units_total_from_slice(
+            stage=run.stage,
+            benchmark_slice=benchmark_slice,
+        )
+        if expected_units_total <= 0:
+            return False
+        return run.total_units >= expected_units_total
+
+    def _remaining_seconds_for_current_stage(
+        self,
+        *,
+        run: BacktestJob,
+        benchmark_slice: BacktestRuntimeBenchmarkSliceV2,
+    ) -> float:
+        """
+        Compute conservative remaining seconds for the currently persisted run stage.
+
+        Args:
+            run: Persisted run aggregate read from storage.
+            benchmark_slice: Benchmark slice carrying ETA fallback throughput metadata.
+        Returns:
+            float: Remaining seconds estimate for the current stage only.
+        Assumptions:
+            Current-stage total units may still be zero on early snapshots, in which case the
+            benchmark slice synthetic stage totals provide the fallback scale anchor.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        total_units = run.total_units
+        if total_units <= 0:
+            total_units = self._stage_units_total_from_slice(
+                stage=run.stage,
+                benchmark_slice=benchmark_slice,
+            )
+        processed_units = min(max(run.processed_units, 0), total_units)
+        eta_fallback = benchmark_slice.eta_fallback
+        if eta_fallback is None:
+            return 0.0
+        if run.stage == "finalizing":
+            if total_units <= 0:
+                return float(eta_fallback.finalizing_seconds)
+            remaining_ratio = 1.0 - min(max(processed_units / total_units, 0.0), 1.0)
+            return eta_fallback.finalizing_seconds * remaining_ratio
+        if run.stage == "stage_a":
+            remaining_units = max(total_units - processed_units, 0)
+            return remaining_units / eta_fallback.stage_a_units_per_second
+        remaining_units = max(total_units - processed_units, 0)
+        return remaining_units / eta_fallback.stage_b_units_per_second
+
+    def _full_stage_seconds_for_benchmark_slice(
+        self,
+        *,
+        stage: str,
+        benchmark_slice: BacktestRuntimeBenchmarkSliceV2,
+    ) -> float:
+        """
+        Compute full-stage benchmark fallback seconds for one later stage in the roadmap order.
+
+        Args:
+            stage: Target run stage literal.
+            benchmark_slice: Benchmark slice carrying ETA fallback throughput metadata.
+        Returns:
+            float: Full-stage conservative seconds for the slice and stage.
+        Assumptions:
+            Later stages use the slice synthetic workload totals because persisted history rows do
+            not yet carry future-stage unit counts.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        eta_fallback = benchmark_slice.eta_fallback
+        if eta_fallback is None:
+            return 0.0
+        if stage == "finalizing":
+            return float(eta_fallback.finalizing_seconds)
+        units_total = self._stage_units_total_from_slice(
+            stage=stage,
+            benchmark_slice=benchmark_slice,
+        )
+        if stage == "stage_a":
+            return units_total / eta_fallback.stage_a_units_per_second
+        return units_total / eta_fallback.stage_b_units_per_second
+
+    def _stage_units_total_from_slice(
+        self,
+        *,
+        stage: str,
+        benchmark_slice: BacktestRuntimeBenchmarkSliceV2,
+    ) -> int:
+        """
+        Resolve the benchmark stage-unit anchor for one stage from the committed slice metadata.
+
+        Args:
+            stage: Target run stage literal.
+            benchmark_slice: Benchmark slice carrying synthetic workload metadata.
+        Returns:
+            int: Synthetic stage-unit total used as the deterministic benchmark anchor.
+        Assumptions:
+            ETA fallback reads only lightweight typed benchmark metadata and not benchmark result
+            payloads or fixture files on the request path.
+        Raises:
+            ValueError: If the benchmark slice omits `synthetic_run_spec`.
+        Side Effects:
+            None.
+        """
+        synthetic_run_spec = benchmark_slice.synthetic_run_spec
+        if synthetic_run_spec is None:
+            raise ValueError("benchmark ETA fallback requires synthetic_run_spec")
+        if stage == "stage_a":
+            return synthetic_run_spec.expected_stage_a_variants_total
+        if stage == "stage_b":
+            return synthetic_run_spec.expected_stage_b_variants_total
+        return 1
+
+    def _request_signal_block_count(
+        self,
+        *,
+        request_payload: Mapping[str, object],
+    ) -> int:
+        """
+        Count deterministic top-level signal blocks from the persisted request payload snapshot.
+
+        Args:
+            request_payload: Canonical persisted request payload mapping from `request_json`.
+        Returns:
+            int: Distinct signal-block count across top-level, template, and overrides payloads.
+        Assumptions:
+            Multi-block ETA classification only needs the number of top-level signal-grid
+            indicator entries and not a full request decode on the history read path.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        indicator_ids: set[str] = set()
+        for signal_grids_map in (
+            self._signal_grids_map(payload=request_payload),
+            self._signal_grids_map(payload=request_payload.get("template")),
+            self._signal_grids_map(payload=request_payload.get("overrides")),
+        ):
+            if signal_grids_map is None:
+                continue
+            for raw_indicator_id in signal_grids_map.keys():
+                indicator_id = str(raw_indicator_id).strip().lower()
+                if indicator_id:
+                    indicator_ids.add(indicator_id)
+        return len(indicator_ids)
+
+    def _signal_grids_map(
+        self,
+        *,
+        payload: object,
+    ) -> Mapping[str, object] | None:
+        """
+        Return one `signal_grids` mapping from a persisted request payload fragment when present.
+
+        Args:
+            payload: One persisted payload fragment from `request_json`.
+        Returns:
+            Mapping[str, object] | None: Nested `signal_grids` mapping, or `None`.
+        Assumptions:
+            History ETA fallback must stay lightweight and only inspect shallow persisted payload
+            maps rather than fully decoding request DTOs.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if not isinstance(payload, Mapping):
+            return None
+        signal_grids_value = payload.get("signal_grids")
+        if not isinstance(signal_grids_value, Mapping):
+            return None
+        return signal_grids_value
+
+
+def _later_backtest_job_stages(*, stage: str) -> tuple[str, ...]:
+    """
+    Return the deterministic run-stage suffix after one currently persisted job stage.
+
+    Args:
+        stage: Current run stage literal.
+    Returns:
+        tuple[str, ...]: Ordered later stages used for benchmark ETA summation.
+    Assumptions:
+        Persisted run stages remain `stage_a -> stage_b -> finalizing`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if stage == "stage_a":
+        return ("stage_b", "finalizing")
+    if stage == "stage_b":
+        return ("finalizing",)
+    return tuple()
 
 
 @dataclass(frozen=True, slots=True)

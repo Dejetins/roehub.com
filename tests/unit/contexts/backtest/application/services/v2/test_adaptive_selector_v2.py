@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import pytest
+
 from trading.contexts.backtest.application.services.v2.adaptive_selector_v2 import (
     AdaptiveSelectorCandidateEvaluationV2,
     AdaptiveSelectorPlanningEvidenceV2,
@@ -20,6 +22,7 @@ from trading.contexts.backtest.application.services.v2.execution_profile_v2 impo
 from trading.contexts.backtest.application.services.v2.family_plugins.registry_v2 import (
     FamilyPluginRegistryV2,
 )
+from trading.platform.errors import RoehubError
 
 
 def _catalog_with_live_hybrid_profiles() -> ExecutionProfilesCatalogV2:
@@ -250,6 +253,45 @@ def test_selector_shadow_reports_hybrid_recommendation_without_switching_executi
     assert decision.recommendation_applied is False
 
 
+def test_selector_opt_in_keeps_exact_execution_while_exposing_explicit_opt_in_phase() -> None:
+    """
+    Verify `opt_in` stays recommendation-only for automatic selection while remaining explicit.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The explicit prod opt-in phase should remain distinguishable from both shadow and active
+        rollout even when the current automatic selector behavior still keeps exact execution.
+    Raises:
+        AssertionError: If opt-in mode is collapsed back into a different policy literal.
+    Side Effects:
+        None.
+    """
+    selector = CostModelAdaptiveExecutionSelectorV2()
+    decision = selector.select(
+        evidence=_evidence(
+            grid_cardinality=20000,
+            stage_b_variants_total=120000,
+            estimated_memory_bytes=1200000000,
+            runtime_mode="background_capable",
+            indicator_ids=("ma.fast", "ma.slow"),
+        ),
+        execution_profiles=_catalog_with_live_hybrid_profiles(),
+        policy=_policy(
+            mode="opt_in",
+            hybrid_conservative_rollout_mode="active",
+            hybrid_family_rollout_mode="shadow",
+        ),
+    )
+
+    assert decision.policy_mode == "opt_in"
+    assert decision.effective_profile.mode == "exact_parallel"
+    assert decision.recommended_profile.mode == "hybrid_family"
+    assert decision.recommendation_applied is False
+
+
 def test_selector_active_applies_conservative_hybrid_when_family_rollout_is_shadow() -> None:
     """
     Verify active rollout may execute `hybrid_conservative` while `hybrid_family` remains shadow.
@@ -431,3 +473,71 @@ def test_requested_execution_profile_override_keeps_precedence_over_selector() -
     )
 
     assert profile.mode == "exact_parallel"
+
+
+def test_requested_hybrid_profile_override_requires_explicit_opt_in_or_active_policy() -> None:
+    """
+    Verify shadow rollout keeps internal live hybrid overrides disabled until opt-in is explicit.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Making prod opt-in explicit means shadow mode may still inspect recommendations but should
+        no longer silently double as live hybrid opt-in for internal overrides.
+    Raises:
+        AssertionError: If shadow policy accepts a live hybrid requested-profile override.
+    Side Effects:
+        None.
+    """
+    planner = BacktestArtifactRuntimePlannerV2(
+        execution_profiles=_catalog_with_live_hybrid_profiles(),
+        adaptive_selector_policy=_policy(mode="shadow"),
+    )
+
+    with pytest.raises(RoehubError) as error_info:
+        planner.resolve_execution_profile(
+            stage_a_variants_total=20000,
+            stage_b_variants_total=120000,
+            estimated_memory_bytes=1200000000,
+            requested_execution_profile_mode="hybrid_conservative",
+            indicator_ids=("ma.fast", "ma.slow"),
+        )
+
+    details = error_info.value.details
+    assert details is not None
+    assert details["error"] == "execution_profile_not_enabled"
+    assert details["adaptive_selector_policy_mode"] == "shadow"
+
+
+def test_requested_hybrid_profile_override_is_allowed_in_opt_in_phase() -> None:
+    """
+    Verify explicit live hybrid overrides become allowed once rollout moves to `opt_in`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Opt-in rollout exists specifically to permit internal/manual live hybrid evaluation before
+        automatic selective defaulting becomes active.
+    Raises:
+        AssertionError: If opt-in rollout still rejects an otherwise live hybrid override.
+    Side Effects:
+        None.
+    """
+    planner = BacktestArtifactRuntimePlannerV2(
+        execution_profiles=_catalog_with_live_hybrid_profiles(),
+        adaptive_selector_policy=_policy(mode="opt_in"),
+    )
+
+    profile = planner.resolve_execution_profile(
+        stage_a_variants_total=20000,
+        stage_b_variants_total=120000,
+        estimated_memory_bytes=1200000000,
+        requested_execution_profile_mode="hybrid_conservative",
+        indicator_ids=("ma.fast", "ma.slow"),
+    )
+
+    assert profile.mode == "hybrid_conservative"

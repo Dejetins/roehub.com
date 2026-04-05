@@ -319,6 +319,7 @@ def build_backtest_router(
         sync_deadline_seconds=runtime_config.sync.sync_deadline_seconds,
         run_progress_builder=BacktestRunProgressSnapshotBuilder(
             execution_profiles=runtime_config.execution_profiles,
+            benchmark_corpus=runtime_config.runtime_acceleration_benchmark_corpus,
         ),
     )
     backtests_router.include_router(runs_router)
