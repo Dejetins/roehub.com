@@ -145,6 +145,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         config.execution_profiles.default_profile().planning_budget_ms
         == 25
     )
+    assert config.execution_profiles.default_profile().family_plugin_budget_ms == 10
     assert (
         config.execution_profiles.default_profile().shortlist_config.scoring.activity_ratio_weight
         == 0.4
@@ -513,6 +514,7 @@ backtest:
     default: exact_small
     profiles:
       - mode: exact_small
+        family_plugin_budget_ms: 7
         planning_budget_ms: 15
         shortlist:
           enabled: false
@@ -542,6 +544,7 @@ backtest:
           parallel_stage_b_enabled: false
           family_plugin_enabled: false
       - mode: exact_parallel
+        family_plugin_budget_ms: 17
         planning_budget_ms: 35
         shortlist:
           enabled: false
@@ -571,6 +574,7 @@ backtest:
           parallel_stage_b_enabled: false
           family_plugin_enabled: false
       - mode: hybrid_conservative
+        family_plugin_budget_ms: 27
         planning_budget_ms: 55
         shortlist:
           enabled: true
@@ -598,6 +602,7 @@ backtest:
           parallel_stage_b_enabled: false
           family_plugin_enabled: false
       - mode: hybrid_family
+        family_plugin_budget_ms: 37
         planning_budget_ms: 65
         shortlist:
           enabled: true
@@ -715,6 +720,7 @@ backtest:
         .active_span_ratio_weight
         == 0.25
     )
+    assert config.execution_profiles.available_profiles[3].family_plugin_budget_ms == 37
     assert config.execution_profiles.available_profiles[3].planning_budget_ms == 65
     assert config.guards.max_variants_per_compute == 1200
     assert config.guards.max_compute_bytes_total == 1234567
@@ -1018,6 +1024,61 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="must sum to 100"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_family_plugin_budget_above_planning_budget(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when family-plugin budget exceeds the shared planning budget.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Family-plugin timeout must stay inside the typed execution-profile planning budget rather
+        than introducing a detached timeout surface.
+    Raises:
+        AssertionError: If invalid family-plugin budget does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  execution_profiles:
+    default: exact_small
+    profiles:
+      - mode: exact_small
+        family_plugin_budget_ms: 30
+        planning_budget_ms: 25
+      - mode: exact_parallel
+        family_plugin_budget_ms: 20
+        planning_budget_ms: 50
+      - mode: hybrid_conservative
+        family_plugin_budget_ms: 30
+        planning_budget_ms: 75
+      - mode: hybrid_family
+        family_plugin_budget_ms: 40
+        planning_budget_ms: 100
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="family_plugin_budget_ms"):
         load_backtest_runtime_config(config_path)
 
 

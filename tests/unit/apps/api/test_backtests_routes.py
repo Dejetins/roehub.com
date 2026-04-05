@@ -561,6 +561,7 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "stage_b": 70,
                             "finalizing": 5,
                         },
+                        "family_plugin_budget_ms": 10,
                         "planning_budget_ms": 25,
                     },
                     {
@@ -602,6 +603,7 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "stage_b": 60,
                             "finalizing": 5,
                         },
+                        "family_plugin_budget_ms": 20,
                         "planning_budget_ms": 50,
                     },
                     {
@@ -643,6 +645,7 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "stage_b": 45,
                             "finalizing": 5,
                         },
+                        "family_plugin_budget_ms": 30,
                         "planning_budget_ms": 75,
                     },
                     {
@@ -684,6 +687,7 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "stage_b": 35,
                             "finalizing": 5,
                         },
+                        "family_plugin_budget_ms": 40,
                         "planning_budget_ms": 100,
                     },
                 ],

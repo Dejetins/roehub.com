@@ -613,6 +613,7 @@ class ExecutionProfileV2:
     feature_flags: ExecutionProfileFeatureFlagsV2
     launch_budget: ExecutionProfileLaunchBudgetV2
     progress_weights: BacktestJobStageWeights
+    family_plugin_budget_ms: int
     planning_budget_ms: int
 
     def __post_init__(self) -> None:
@@ -632,9 +633,11 @@ class ExecutionProfileV2:
         Returns:
             None.
         Assumptions:
-            Profile objects are immutable and reused across config/planner/DTO layers.
+            Profile objects are immutable and reused across config/planner/DTO layers; any
+            family-plugin timeout budget must stay explicitly tied to the profile budget surface.
         Raises:
-            ValueError: If one nested contract is missing or the planning budget is invalid.
+            ValueError: If one nested contract is missing or one planning/plugin budget is
+                invalid.
         Side Effects:
             Normalizes `mode` to the approved lowercase literal.
         """
@@ -653,8 +656,15 @@ class ExecutionProfileV2:
             raise ValueError("ExecutionProfileV2.launch_budget is required")
         if self.progress_weights is None:  # type: ignore[truthy-bool]
             raise ValueError("ExecutionProfileV2.progress_weights is required")
+        if self.family_plugin_budget_ms <= 0:
+            raise ValueError("ExecutionProfileV2.family_plugin_budget_ms must be > 0")
         if self.planning_budget_ms <= 0:
             raise ValueError("ExecutionProfileV2.planning_budget_ms must be > 0")
+        if self.family_plugin_budget_ms > self.planning_budget_ms:
+            raise ValueError(
+                "ExecutionProfileV2.family_plugin_budget_ms must be <= "
+                "ExecutionProfileV2.planning_budget_ms"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -952,6 +962,48 @@ def _default_progress_weights_for_mode_v2(
         ) from error
 
 
+def _default_family_plugin_budget_ms_for_mode_v2(
+    *,
+    mode: ExecutionProfileModeLiteralV2,
+) -> int:
+    """
+    Return the default typed family-plugin planning budget for one execution profile.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - apps/api/dto/backtest_runtime_defaults.py
+
+    Args:
+        mode: Stable execution-profile mode literal.
+    Returns:
+        int: Default budget in milliseconds reserved for future proposal-only family plugins.
+    Assumptions:
+        Plugin timeout stays budget-aware and is explicitly bounded by the execution-profile
+        contract instead of an unrelated hardcoded timeout.
+    Raises:
+        ValueError: If the mode literal is unsupported.
+    Side Effects:
+        None.
+    """
+    budgets_by_mode: dict[ExecutionProfileModeLiteralV2, int] = {
+        "exact_small": 10,
+        "exact_parallel": 20,
+        "hybrid_conservative": 30,
+        "hybrid_family": 40,
+    }
+    try:
+        return budgets_by_mode[mode]
+    except KeyError as error:  # pragma: no cover - guarded by validated literal type
+        raise ValueError(
+            f"Unsupported execution profile mode for family-plugin budget: {mode!r}"
+        ) from error
+
+
 def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
     """
     Build the default ordered execution-profile catalog for executable exact parallel rollout.
@@ -1001,6 +1053,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 ),
                 launch_budget=_default_launch_budget_for_mode_v2(mode="exact_small"),
                 progress_weights=_default_progress_weights_for_mode_v2(mode="exact_small"),
+                family_plugin_budget_ms=_default_family_plugin_budget_ms_for_mode_v2(
+                    mode="exact_small"
+                ),
                 planning_budget_ms=25,
             ),
             ExecutionProfileV2(
@@ -1023,6 +1078,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 ),
                 launch_budget=_default_launch_budget_for_mode_v2(mode="exact_parallel"),
                 progress_weights=_default_progress_weights_for_mode_v2(mode="exact_parallel"),
+                family_plugin_budget_ms=_default_family_plugin_budget_ms_for_mode_v2(
+                    mode="exact_parallel"
+                ),
                 planning_budget_ms=50,
             ),
             ExecutionProfileV2(
@@ -1057,6 +1115,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 progress_weights=_default_progress_weights_for_mode_v2(
                     mode="hybrid_conservative"
                 ),
+                family_plugin_budget_ms=_default_family_plugin_budget_ms_for_mode_v2(
+                    mode="hybrid_conservative"
+                ),
                 planning_budget_ms=75,
             ),
             ExecutionProfileV2(
@@ -1087,6 +1148,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 ),
                 launch_budget=_default_launch_budget_for_mode_v2(mode="hybrid_family"),
                 progress_weights=_default_progress_weights_for_mode_v2(
+                    mode="hybrid_family"
+                ),
+                family_plugin_budget_ms=_default_family_plugin_budget_ms_for_mode_v2(
                     mode="hybrid_family"
                 ),
                 planning_budget_ms=100,

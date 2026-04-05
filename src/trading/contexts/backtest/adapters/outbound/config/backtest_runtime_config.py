@@ -1521,7 +1521,8 @@ def _parse_execution_profiles_catalog(
     Returns:
         ExecutionProfilesCatalogV2: Parsed ordered catalog ready for planner/DTO reuse.
     Assumptions:
-        Missing section falls back to the additive A1 default catalog with all approved modes.
+        Missing section falls back to the additive A1 default catalog with all approved modes,
+        including typed family-plugin budgets for future `hybrid_family` proposal work.
     Raises:
         ValueError: If one profile mapping violates typed contract or ordering invariants.
     Side Effects:
@@ -1686,6 +1687,11 @@ def _parse_execution_profiles_catalog(
                         "finalizing",
                         default=default_profile.progress_weights.finalizing,
                     ),
+                ),
+                family_plugin_budget_ms=_get_int_with_default(
+                    profile_map,
+                    "family_plugin_budget_ms",
+                    default=default_profile.family_plugin_budget_ms,
                 ),
                 planning_budget_ms=_get_int(profile_map, "planning_budget_ms", required=True),
             )

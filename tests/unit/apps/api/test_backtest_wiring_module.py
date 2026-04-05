@@ -646,6 +646,11 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         .progress_weights.stage_b
         == 60
     )
+    assert (
+        runtime_defaults_response.contracts.execution.available_execution_profiles[3]
+        .family_plugin_budget_ms
+        == 40
+    )
 
 
 

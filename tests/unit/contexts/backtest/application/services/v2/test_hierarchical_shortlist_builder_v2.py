@@ -37,7 +37,8 @@ class _RecordingPriceLoader:
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
-      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
     """
 
     def __init__(self, *, close_time: np.ndarray) -> None:
@@ -50,7 +51,8 @@ class _RecordingPriceLoader:
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
-          - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
 
         Args:
             close_time: Request-timeframe close timestamps returned for every load.
@@ -76,7 +78,8 @@ class _RecordingPriceLoader:
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
-          - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
 
         Args:
             context: Ignored slot-pinned runtime context fixture.
@@ -96,6 +99,66 @@ class _RecordingPriceLoader:
         self.calls += 1
         return SimpleNamespace(close_time=self._close_time)
 
+    def load_mapping_arrays(self, *, context: Any, timeframe: str) -> Any:
+        """
+        Return a deterministic identity mapping fixture for protocol completeness.
+
+        Docs:
+          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+
+        Args:
+            context: Ignored slot-pinned runtime context fixture.
+            timeframe: Requested timeframe literal.
+        Returns:
+            Any: Namespace exposing a trivial `tf_to_1m` mapping.
+        Assumptions:
+            Unit tests in this module do not exercise mapping loads, but the loader protocol now
+            requires the method.
+        Raises:
+            ValueError: If a non-request timeframe is requested.
+        Side Effects:
+            None.
+        """
+        _ = context
+        if timeframe != "15m":
+            raise ValueError(f"unsupported timeframe: {timeframe}")
+        return SimpleNamespace(
+            tf_to_1m=np.arange(self._close_time.shape[0], dtype=np.int32)
+        )
+
+    def load_hit_times_arrays(self, *, context: Any) -> Any:
+        """
+        Return an empty hit-times fixture for protocol completeness in unit tests.
+
+        Docs:
+          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+
+        Args:
+            context: Ignored slot-pinned runtime context fixture.
+        Returns:
+            Any: Empty namespace placeholder.
+        Assumptions:
+            These tests do not touch hit-times arrays on the hybrid shortlist path.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = context
+        return SimpleNamespace()
+
 
 class _RecordingSignalLoader:
     """
@@ -107,7 +170,8 @@ class _RecordingSignalLoader:
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
-      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
     """
 
     def __init__(self, *, matrices_by_indicator: dict[str, np.ndarray]) -> None:
@@ -120,7 +184,8 @@ class _RecordingSignalLoader:
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
-          - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
 
         Args:
             matrices_by_indicator: Full signal matrices keyed by indicator id.
@@ -140,21 +205,30 @@ class _RecordingSignalLoader:
         self.matrix_calls: list[str] = []
         self.row_calls: list[tuple[str, tuple[int, ...]]] = []
 
-    def load_signal_matrix(self, *, indicator_id: str, **kwargs: Any) -> Any:
+    def load_signal_matrix(
+        self,
+        *,
+        context: Any,
+        timeframe: str,
+        indicator_id: str,
+    ) -> Any:
         """
         Return one full signal matrix for hybrid block scoring and record the request.
 
         Docs:
           - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-        Related:
-          - tests/unit/contexts/backtest/application/services/v2/
-            test_hierarchical_shortlist_builder_v2.py
-          - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
 
         Args:
             indicator_id: Indicator identifier used to resolve the in-memory matrix.
-            **kwargs: Ignored loader keyword arguments.
+            context: Ignored slot-pinned runtime context fixture.
+            timeframe: Requested timeframe literal.
+            indicator_id: Indicator identifier used to resolve the in-memory matrix.
         Returns:
             Any: Namespace exposing `matrix` and `manifest.rows_count`.
         Assumptions:
@@ -164,7 +238,9 @@ class _RecordingSignalLoader:
         Side Effects:
             Appends one indicator id to the matrix-load log.
         """
-        _ = kwargs
+        _ = context
+        if timeframe != "15m":
+            raise ValueError(f"unsupported timeframe: {timeframe}")
         matrix = self._matrices_by_indicator[indicator_id]
         self.matrix_calls.append(indicator_id)
         return SimpleNamespace(
@@ -175,9 +251,10 @@ class _RecordingSignalLoader:
     def load_signal_rows(
         self,
         *,
+        context: Any,
+        timeframe: str,
         indicator_id: str,
-        row_selection: tuple[int, ...],
-        **kwargs: Any,
+        row_selection: slice | tuple[int, ...],
     ) -> np.ndarray:
         """
         Return deterministic selected signal rows for exact-path survivor expansion tests.
@@ -191,9 +268,10 @@ class _RecordingSignalLoader:
           - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
 
         Args:
+            context: Ignored slot-pinned runtime context fixture.
+            timeframe: Requested timeframe literal.
             indicator_id: Indicator identifier used to resolve the in-memory matrix.
             row_selection: Explicit row indexes requested by the exact runtime.
-            **kwargs: Ignored loader keyword arguments.
         Returns:
             np.ndarray: Selected rows in the requested order.
         Assumptions:
@@ -204,14 +282,21 @@ class _RecordingSignalLoader:
         Side Effects:
             Appends one `(indicator_id, row_selection)` tuple to the row-load log.
         """
-        _ = kwargs
+        _ = context
+        if timeframe != "15m":
+            raise ValueError(f"unsupported timeframe: {timeframe}")
         matrix = self._matrices_by_indicator[indicator_id]
-        normalized_row_selection = tuple(int(value) for value in row_selection)
+        if isinstance(row_selection, slice):
+            normalized_row_selection = tuple(
+                range(*row_selection.indices(matrix.shape[0]))
+            )
+        else:
+            normalized_row_selection = tuple(int(value) for value in row_selection)
         self.row_calls.append((indicator_id, normalized_row_selection))
         return np.asarray(matrix[normalized_row_selection, :], dtype=np.int8)
 
 
-def test_hierarchical_shortlist_builder_v2_reduces_multi_indicator_runtime_plan_and_preserves_exact_order(
+def test_hierarchical_shortlist_builder_v2_reduces_runtime_plan_and_preserves_exact_order(
 ) -> None:
     """
     Verify hybrid builder prunes multi-block compute space and preserves exact Stage A ordering.
@@ -222,7 +307,8 @@ def test_hierarchical_shortlist_builder_v2_reduces_multi_indicator_runtime_plan_
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
-      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
 
     Args:
@@ -304,7 +390,8 @@ def test_hierarchical_shortlist_builder_v2_rejects_non_opt_in_profile_flags() ->
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
-      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
       - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
 
     Args:

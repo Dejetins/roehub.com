@@ -35,6 +35,7 @@ from trading.contexts.backtest.application.services import (
     BacktestPriceArraysLoaderV2,
     BacktestReportingServiceV1,
     BacktestStageAShortlistBuilderV2,
+    ExecutionProfileModeLiteralV2,
     MmapPriceArraysLoaderV2,
     artifact_coordinates_from_market_id_v2,
     build_default_artifact_backed_stage_b_scorer_v2,
@@ -2447,7 +2448,7 @@ def _optional_mode(*, payload: Mapping[str, Any], key: str, default: str) -> str
 def _requested_execution_profile_mode_from_request_json_v2(
     *,
     request_json: Mapping[str, Any],
-) -> str | None:
+) -> ExecutionProfileModeLiteralV2 | None:
     """
     Resolve the internal-only execution-profile override from persisted request JSON.
 
@@ -2462,7 +2463,8 @@ def _requested_execution_profile_mode_from_request_json_v2(
     Args:
         request_json: Persisted canonical request JSON payload.
     Returns:
-        str | None: Validated internal execution-profile mode override, or `None`.
+        ExecutionProfileModeLiteralV2 | None: Validated internal execution-profile mode
+            override, or `None`.
     Assumptions:
         Persisted `execution_profile_mode` is internal metadata only and remains excluded from
         request-hash semantics and the public request DTO.

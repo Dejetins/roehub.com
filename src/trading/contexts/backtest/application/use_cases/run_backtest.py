@@ -35,6 +35,7 @@ from trading.contexts.backtest.application.services import (
     BacktestHierarchicalShortlistBuilderV2,
     BacktestReportingServiceV1,
     BacktestStageAShortlistBuilderV2,
+    ExecutionProfileModeLiteralV2,
     artifact_coordinates_from_market_id_v2,
     build_default_artifact_backed_stage_b_scorer_v2,
     build_default_hierarchical_shortlist_builder_v2,
@@ -1332,7 +1333,7 @@ class RunBacktestUseCase:
 def _requested_execution_profile_mode_from_payload_v2(
     *,
     request_payload: Mapping[str, Any] | None,
-) -> str | None:
+) -> ExecutionProfileModeLiteralV2 | None:
     """
     Resolve the internal-only execution-profile override from canonical request payload snapshot.
 
@@ -1347,7 +1348,8 @@ def _requested_execution_profile_mode_from_payload_v2(
     Args:
         request_payload: Optional strict API payload snapshot used by persisted/internal flows.
     Returns:
-        str | None: Validated internal execution-profile mode override, or `None`.
+        ExecutionProfileModeLiteralV2 | None: Validated internal execution-profile mode
+            override, or `None`.
     Assumptions:
         `execution_profile_mode` is internal metadata only; it is not part of the public
         `/backtests` request DTO and must remain excluded from request-hash semantics.

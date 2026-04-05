@@ -331,6 +331,7 @@ class BacktestRuntimeExecutionProfileResponse(BaseModel):
     feature_flags: BacktestRuntimeExecutionProfileFeatureFlagsResponse
     launch_budget: BacktestRuntimeExecutionProfileLaunchBudgetResponse
     progress_weights: BacktestRuntimeExecutionProfileProgressWeightsResponse
+    family_plugin_budget_ms: int
     planning_budget_ms: int
 
 
@@ -514,6 +515,7 @@ def build_backtest_runtime_defaults_response(
                 stage_b=profile.progress_weights.stage_b,
                 finalizing=profile.progress_weights.finalizing,
             ),
+            family_plugin_budget_ms=profile.family_plugin_budget_ms,
             planning_budget_ms=profile.planning_budget_ms,
         )
         for profile in config.execution_profiles.available_profiles

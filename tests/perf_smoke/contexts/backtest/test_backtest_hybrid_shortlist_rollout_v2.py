@@ -35,8 +35,8 @@ from trading.shared_kernel.primitives import (
     InstrumentId,
     MarketId,
     Symbol,
-    TimeRange,
     Timeframe,
+    TimeRange,
     UtcTimestamp,
 )
 
@@ -107,7 +107,8 @@ class _SyntheticPriceLoaderV2:
           - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
-          - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
 
         Args:
             signal_bars: Number of request-timeframe bars in the synthetic scenario.
@@ -282,7 +283,8 @@ class _SyntheticSignalLoaderV2:
           - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
-          - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
 
         Args:
             signal_matrix: Full `[variant, time]` signal matrix for `ma.ema`.
@@ -302,7 +304,13 @@ class _SyntheticSignalLoaderV2:
         self.matrix_calls = 0
         self.row_calls: list[tuple[int, ...]] = []
 
-    def load_signal_matrix(self, *, indicator_id: str, **kwargs: Any) -> Any:
+    def load_signal_matrix(
+        self,
+        *,
+        context: Any,
+        timeframe: str,
+        indicator_id: str,
+    ) -> Any:
         """
         Return the full synthetic matrix for hybrid block scoring and record the request.
 
@@ -311,11 +319,13 @@ class _SyntheticSignalLoaderV2:
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
-          - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
 
         Args:
+            context: Ignored slot-pinned runtime context fixture.
+            timeframe: Requested timeframe literal.
             indicator_id: Requested indicator identifier.
-            **kwargs: Ignored loader keyword arguments.
         Returns:
             Any: Namespace exposing the full signal matrix and rows-count metadata.
         Assumptions:
@@ -325,7 +335,9 @@ class _SyntheticSignalLoaderV2:
         Side Effects:
             Increments the in-memory matrix-load counter.
         """
-        _ = kwargs
+        _ = context
+        if timeframe != "15m":
+            raise ValueError(f"unsupported timeframe: {timeframe}")
         if indicator_id != "ma.ema":
             raise ValueError(f"unsupported indicator_id: {indicator_id}")
         self.matrix_calls += 1
@@ -337,9 +349,10 @@ class _SyntheticSignalLoaderV2:
     def load_signal_rows(
         self,
         *,
+        context: Any,
+        timeframe: str,
         indicator_id: str,
-        row_selection: tuple[int, ...],
-        **kwargs: Any,
+        row_selection: slice | tuple[int, ...],
     ) -> np.ndarray:
         """
         Return deterministic selected signal rows for exact Stage A and exact Stage B reuse.
@@ -349,13 +362,16 @@ class _SyntheticSignalLoaderV2:
           - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
-          - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
-          - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            stage_a_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
 
         Args:
+            context: Ignored slot-pinned runtime context fixture.
+            timeframe: Requested timeframe literal.
             indicator_id: Requested indicator identifier.
             row_selection: Explicit row indexes requested by the exact runtime.
-            **kwargs: Ignored loader keyword arguments.
         Returns:
             np.ndarray: Selected signal rows in the requested order.
         Assumptions:
@@ -365,10 +381,17 @@ class _SyntheticSignalLoaderV2:
         Side Effects:
             Appends the requested row indexes to the in-memory row-load log.
         """
-        _ = kwargs
+        _ = context
+        if timeframe != "15m":
+            raise ValueError(f"unsupported timeframe: {timeframe}")
         if indicator_id != "ma.ema":
             raise ValueError(f"unsupported indicator_id: {indicator_id}")
-        normalized_row_selection = tuple(int(value) for value in row_selection)
+        if isinstance(row_selection, slice):
+            normalized_row_selection = tuple(
+                range(*row_selection.indices(self._matrix.shape[0]))
+            )
+        else:
+            normalized_row_selection = tuple(int(value) for value in row_selection)
         self.row_calls.append(normalized_row_selection)
         return np.asarray(self._matrix[normalized_row_selection, :], dtype=np.int8)
 

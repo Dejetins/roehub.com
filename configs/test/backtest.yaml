@@ -58,6 +58,7 @@ backtest:
     default: exact_small
     profiles:
       - mode: exact_small
+        family_plugin_budget_ms: 10
         planning_budget_ms: 25
         shortlist:
           enabled: false
@@ -87,6 +88,7 @@ backtest:
           parallel_stage_b_enabled: false
           family_plugin_enabled: false
       - mode: exact_parallel
+        family_plugin_budget_ms: 20
         planning_budget_ms: 50
         shortlist:
           enabled: false
@@ -116,6 +118,7 @@ backtest:
           parallel_stage_b_enabled: true
           family_plugin_enabled: false
       - mode: hybrid_conservative
+        family_plugin_budget_ms: 30
         planning_budget_ms: 75
         shortlist:
           enabled: true
@@ -147,6 +150,7 @@ backtest:
           parallel_stage_b_enabled: false
           family_plugin_enabled: false
       - mode: hybrid_family
+        family_plugin_budget_ms: 40
         planning_budget_ms: 100
         shortlist:
           enabled: true

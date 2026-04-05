@@ -46,6 +46,12 @@
   - this remains discovery/debug surface only for browser clients;
   - browser still does not choose `execution_profile_mode`, and public launch remains server-owned
     exact-first routing unless an internal-only override is used outside the public API contract.
+- E1/E2 additive contract:
+  - each execution profile now also publishes `family_plugin_budget_ms` next to
+    `planning_budget_ms`;
+  - this is a proposal-layer timeout budget for future `hybrid_family` plugins only;
+  - browser still does not choose `execution_profile_mode`, and `hybrid_family` remains
+    non-routable in live public launch flow.
 
 ## Цель
 
@@ -168,6 +174,7 @@
             "stage_b": 70,
             "finalizing": 5
           },
+          "family_plugin_budget_ms": 10,
           "planning_budget_ms": 25
         },
         {
@@ -206,6 +213,7 @@
             "stage_b": 60,
             "finalizing": 5
           },
+          "family_plugin_budget_ms": 20,
           "planning_budget_ms": 50
         },
         {
@@ -244,6 +252,7 @@
             "stage_b": 45,
             "finalizing": 5
           },
+          "family_plugin_budget_ms": 30,
           "planning_budget_ms": 75
         },
         {
@@ -282,6 +291,7 @@
             "stage_b": 35,
             "finalizing": 5
           },
+          "family_plugin_budget_ms": 40,
           "planning_budget_ms": 100
         }
       ]
@@ -347,6 +357,7 @@
   - `progress_weights.stage_a`
   - `progress_weights.stage_b`
   - `progress_weights.finalizing`
+  - `family_plugin_budget_ms`
   - `planning_budget_ms`
 - `contracts.launch.execution_mode` <- `backtest.contracts.launch.execution_mode`
 - `contracts.launch.auto_preflight_enabled` <- `backtest.contracts.launch.auto_preflight_enabled`
@@ -366,6 +377,9 @@
   browser a launch-policy owner.
 - `launch_budget` и `progress_weights` публикуют reviewable server-side hints, но browser не
   выбирает `execution_profile_mode` самостоятельно; launch classification остаётся server-owned.
+- `family_plugin_budget_ms` публикуется как typed proposal-layer budget for future family
+  accelerators; timeout/error/open-breaker semantics still degrade to warning + universal fallback,
+  and no concrete family plugin is live yet.
 - `contracts.launch.supported_indicator_ids` сериализуется в детерминированном `indicator_id` порядке.
 - `contracts.launch.source_values_by_indicator_id` сериализует ключи в том же порядке, значения `source` — в детерминированном literal order.
 - Payload содержит только non-secret значения, нужные для browser prefill/validation hints.

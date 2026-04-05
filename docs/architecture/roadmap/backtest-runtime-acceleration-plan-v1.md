@@ -740,7 +740,7 @@ class FamilyAccelerationPlugin(Protocol):
 
 5. `Milestone E`
 - family plugin contract
-- первый plugin
+- все plugin
 
 6. `Milestone F`
 - adaptive selector
