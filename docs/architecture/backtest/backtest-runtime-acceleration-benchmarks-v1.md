@@ -1,11 +1,12 @@
 # Backtest Runtime Acceleration Benchmarks v1
 
-Статус: active benchmark corpus for Milestone A / EPIC A3 and later exact-profile milestones  
+Статус: active benchmark corpus for Milestone A / EPIC A3 and later exact + hybrid rollout milestones  
 Область: `backtest` runtime follow-up after A1/A2  
 Связанные документы:
 - `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md`
 - `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 
 ## Зачем нужен этот документ
@@ -31,6 +32,8 @@ plugin rollout на одном и том же наборе deterministic slices.
   `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py`
 - small-grid lightweight harness:
   `tests/perf_smoke/contexts/backtest/test_backtest_staged_runner_perf_smoke.py`
+- hybrid rollout gates:
+  `tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py`
 - Stage B golden alignment:
   `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py`
 
@@ -40,7 +43,7 @@ plugin rollout на одном и том же наборе deterministic slices.
 |---|---|---|---|---|---|
 | `exact_baseline` | `exact_parallel` | none | `exact_only` | `stage_a`, `stage_b`, `finalizing` | existing `r0_benchmark_scenarios.json` + `r5_stage_b_golden_cases.json` |
 | `low_activity` | `exact_parallel` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b` | sparse synthetic slice + `earliest_signal_exit_mapping` anchor |
-| `high_correlation` | `exact_parallel` | `hybrid_family` | `plugin_rollout` | `stage_a`, `stage_b` | correlated-family synthetic slice + exact best-cell replay anchor |
+| `high_correlation` | `exact_parallel` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b` | correlation-sensitive synthetic slice + exact best-cell replay anchor |
 | `small_grid_overhead` | `exact_small` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b` | lightweight sync-sized synthetic slice consumed by staged-runner perf smoke |
 | `memory_footprint` | `exact_parallel` | `hybrid_conservative` | `hybrid_rollout` | `stage_a`, `stage_b`, `finalizing` | wide retained-survivor synthetic slice anchored to background-sized baseline |
 
@@ -53,29 +56,39 @@ plugin rollout на одном и том же наборе deterministic slices.
 - `small_grid_overhead` уже читает committed corpus metadata из
   `test_backtest_staged_runner_perf_smoke.py`, поэтому small sync harness больше не держит
   отдельный hardcoded shape.
+- `test_backtest_hybrid_shortlist_rollout_v2.py` читает те же `slice_id` и
+  `rollout_gates`, поэтому hybrid rollout evidence не создаёт второй ad-hoc benchmark set.
 - `test_stage_b_golden_fixtures_v2.py` проверяет, что corpus не расходится с canonical Stage B
   case order.
 - `test_backtest_r0_baseline_perf_smoke.py` проверяет byte-stable serialization и completeness
   всего benchmark corpus.
 
-## Что корпус пока намеренно не делает
+## Что корпус сейчас намеренно не делает
 
-- не вводит heuristic shortlist logic;
-- не вводит family plugin execution;
-- не вводит benchmark pass/fail thresholds по абсолютным wall-clock numbers;
-- не меняет active production default exact profile и не управляет `POST /backtests` routing;
+- не включает automatic hybrid selection для обычных launch requests;
+- не включает `hybrid_family` / family plugin execution;
+- не вводит benchmark pass/fail thresholds по абсолютным machine-dependent wall-clock numbers;
+- не меняет active production default exact profile и не управляет public `POST /backtests`
+  routing;
 - не меняет public runtime API или persisted storage contracts.
 
-D1 note:
+Milestone D note:
 
 - foundation-only modules `generic_row_scorer_v2.py` и `diversified_retention_v2.py` могут уже
-  использовать vocabulary slices `low_activity` и `high_correlation` для future explanation /
-  diversity benchmarking;
-- сам corpus по-прежнему не включает live heuristic routing и не трактует наличие shortlist
-  knobs как rollout activation.
+  использовать vocabulary slices `low_activity` и `high_correlation` для explanation / diversity
+  benchmarking;
+- `hierarchical_shortlist_builder_v2.py` и
+  `test_backtest_hybrid_shortlist_rollout_v2.py` теперь используют этот же corpus для explicit
+  hybrid rollout gates;
+- сам corpus по-прежнему не является launch selector и не трактует наличие shortlist knobs как
+  автоматическую rollout activation.
 
-То есть текущий CI проверяет shape, ordering, fixture linkage и уже существующие zero-call gates,
-а не rollout thresholds для будущих hybrid/plugin paths.
+То есть текущий CI проверяет:
+
+- shape, ordering и fixture linkage;
+- existing exact baseline anchors;
+- explicit hybrid rollout gates для `hybrid_conservative`;
+- но не превращает эти gates в automatic production routing policy.
 
 ## Repro protocol
 
@@ -86,7 +99,7 @@ uv run pytest -q \
   tests/perf_smoke/contexts/backtest/test_backtest_staged_runner_perf_smoke.py
 ```
 
-Если future milestone добавляет rollout gates по recall / overlap / diversity / memory, он должен:
+Если future milestone расширяет rollout gates или candidate profiles, он должен:
 
 1. переиспользовать существующие `slice_id`;
 2. расширять corpus additive fields, а не вводить новый ad-hoc benchmark set;

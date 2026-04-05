@@ -59,7 +59,7 @@
       "min_distinct_count": null,
       "notes": "Hybrid shortlist runtime must keep measured peak traced memory within a conservative 1.10x exact baseline envelope."
     }
-  ],
+  },
   "source_fixtures": {
     "r0_benchmark_scenarios": "tests/perf_smoke/contexts/backtest/fixtures/r0_benchmark_scenarios.json",
     "r5_stage_b_manifest": "tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json",

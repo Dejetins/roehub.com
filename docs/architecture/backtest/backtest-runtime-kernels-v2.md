@@ -26,6 +26,7 @@ R5-01 artifact contracts.
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+- `docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md`
 - `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - `docs/architecture/backtest/backtest-artifact-store-v2.md`
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
@@ -157,6 +158,28 @@ B2 активирует executable `exact_parallel` semantics для уже reso
 - использовать existing `exact_baseline` и `small_grid_overhead` benchmark vocabulary как
   evidence surface, не меняя active runtime default и не conflating `exact_baseline` anchor with
   rollout policy.
+
+## Milestone D hybrid shortlist note
+
+Milestone D добавляет первый approximate runtime path, но не меняет canonical default:
+
+- `generic_row_scorer_v2.py` и `diversified_retention_v2.py` дают reusable universal
+  foundation primitives;
+- `hierarchical_shortlist_builder_v2.py` остаётся отдельным module и не смешивает hybrid
+  orchestration с `stage_a_shortlist_builder_v2.py`;
+- hybrid path разрешён только для explicitly opted-in
+  `execution_profile.mode = hybrid_conservative`;
+- public launch routing не получает новый selector и по-прежнему остаётся exact-first;
+- final scoring authority остаётся за existing exact Stage B scorer.
+
+Практическая граница:
+
+- exact Stage A builder по-прежнему canonical для `exact_small` и `exact_parallel`;
+- hybrid runtime может уменьшать Stage A / Stage B candidate space только до передачи
+  survivors в exact scorer;
+- benchmark gates для `top_1_recall`, `top_10_overlap`, `low_activity`,
+  `high_correlation`, `small_grid_overhead`, `memory_footprint` описаны в
+  `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`.
 
 Что остаётся вне scope после R10-01:
 

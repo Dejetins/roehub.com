@@ -20,6 +20,7 @@ from trading.contexts.backtest.application.ports import (
     CurrentUser,
 )
 from trading.contexts.backtest.application.use_cases.backtest_jobs_api_v1 import (
+    _build_request_hash_from_request_json,
     _build_sha256_from_payload,
 )
 from trading.contexts.backtest.application.use_cases.backtest_runs_api_v1 import (

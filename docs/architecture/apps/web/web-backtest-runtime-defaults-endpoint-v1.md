@@ -39,6 +39,13 @@
   - active runtime exact default remains `exact_small`, while benchmark corpus may still keep
     `exact_baseline=exact_parallel` as evidence anchor; these roles must stay explicit and
     non-interchangeable.
+- D2 additive contract:
+  - `hybrid_conservative` can now appear in the startup-validated catalog with
+    `feature_flags.runtime_enabled=true` and
+    `feature_flags.heuristic_shortlist_enabled=true`;
+  - this remains discovery/debug surface only for browser clients;
+  - browser still does not choose `execution_profile_mode`, and public launch remains server-owned
+    exact-first routing unless an internal-only override is used outside the public API contract.
 
 ## Цель
 
@@ -222,8 +229,8 @@
             "stage_b_workers": 4
           },
           "feature_flags": {
-            "runtime_enabled": false,
-            "heuristic_shortlist_enabled": false,
+            "runtime_enabled": true,
+            "heuristic_shortlist_enabled": true,
             "parallel_stage_b_enabled": false,
             "family_plugin_enabled": false
           },
@@ -354,8 +361,9 @@
 - `contracts.execution.available_execution_profiles` сериализуется в YAML-defined profile order;
   этот порядок является частью browser/runtime discovery contract.
 - `shortlist_config.scoring` и `shortlist_config.retention` публикуются как reviewable
-  foundation-only knobs для future `hybrid_conservative` rollout; exact profiles продолжают
-  отдавать `heuristic_shortlist_enabled=false`.
+  rollout knobs; exact profiles продолжают отдавать `heuristic_shortlist_enabled=false`, а
+  `hybrid_conservative` может публиковаться как runtime-enabled opt-in profile without making the
+  browser a launch-policy owner.
 - `launch_budget` и `progress_weights` публикуют reviewable server-side hints, но browser не
   выбирает `execution_profile_mode` самостоятельно; launch classification остаётся server-owned.
 - `contracts.launch.supported_indicator_ids` сериализуется в детерминированном `indicator_id` порядке.

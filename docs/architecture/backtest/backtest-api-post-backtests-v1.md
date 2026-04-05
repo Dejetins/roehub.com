@@ -108,6 +108,12 @@ deterministic `422` ошибками.
     guard violations still return canonical deterministic `422`;
   - effective `execution_profile_mode` is persisted into unified run storage for later
     `/backtests/runs*` progress/history rendering.
+- D2 hybrid rollout note:
+  - `hybrid_conservative` now exists as an internal opt-in runtime path for benchmark/manual
+    wiring, but public `POST /backtests` still does not expose a profile selector;
+  - ordinary public launch routing remains exact-first and server-owned;
+  - internal-only `execution_profile_mode` metadata may be persisted in `request_json`, but it
+    must stay out of public request validation and out of request-hash semantics.
 
 ## Цель
 
@@ -137,8 +143,10 @@ deterministic `422` ошибками.
 - Current exact runtime-enabled launch profiles are:
   - `exact_small`
   - `exact_parallel`
-- Hybrid profiles remain discovery/config artifacts only in this milestone and do not participate
-  in public `POST /backtests` routing yet.
+- `hybrid_conservative` is now a runtime-enabled internal opt-in profile for benchmark/manual
+  hybrid rollout work, but it still does not participate in default public `POST /backtests`
+  routing and does not add a public request field.
+- `hybrid_family` remains future rollout surface only.
 - Варианты детерминированы, guards применяются в sync режиме:
   - `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md`
 - Execution engine v1: close-fill + fee/slippage + sizing + SL/TP:
