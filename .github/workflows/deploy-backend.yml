@@ -15,6 +15,7 @@ on:
       - "uv.lock"
       - "scripts/macos/**"
       - "infra/macos/**"
+      - "tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
 
@@ -65,7 +66,7 @@ jobs:
       - name: Validate repo layout for native deploy
         run: |
           set -euxo pipefail
-          for required_path in apps src configs alembic alembic.ini migrations scripts/macos infra/macos .python-version pyproject.toml uv.lock; do
+          for required_path in apps src configs alembic alembic.ini migrations scripts/macos infra/macos .python-version pyproject.toml uv.lock tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json; do
             test -e "${required_path}"
           done
 
@@ -86,6 +87,8 @@ jobs:
             mkdir -p /opt/roehub/app/scripts /opt/roehub/app/infra
             tar -C . -cf - apps src configs alembic migrations scripts/macos infra/macos | tar -C /opt/roehub/app -xf -
           fi
+          install -d /opt/roehub/app/tests/perf_smoke/contexts/backtest/fixtures
+          install -m 0644 tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json /opt/roehub/app/tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json
           install -m 0644 .python-version /opt/roehub/app/.python-version
           install -m 0644 alembic.ini /opt/roehub/app/alembic.ini
           install -m 0644 pyproject.toml /opt/roehub/app/pyproject.toml
@@ -93,6 +96,7 @@ jobs:
           test -s /opt/roehub/app/alembic.ini
           test -s /opt/roehub/app/pyproject.toml
           test -s /opt/roehub/app/uv.lock
+          test -s /opt/roehub/app/tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json
 
       - name: Install native runtime configs
         run: |

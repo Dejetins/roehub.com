@@ -87,6 +87,8 @@ def test_build_backtest_job_runner_app_skips_clickhouse_wiring_for_artifact_work
             allowed_request_timeframes=("15m", "30m", "1h"),
             forbidden_request_timeframes=("1m", "5m"),
         ),
+        execution_profiles=SimpleNamespace(),
+        adaptive_selector_policy=SimpleNamespace(mode="shadow"),
     )
     artifact_runtime_config = SimpleNamespace(
         artifact_root_path=lambda: Path("/tmp/backtest-artifacts-test")
@@ -147,6 +149,11 @@ def test_build_backtest_job_runner_app_skips_clickhouse_wiring_for_artifact_work
         worker_module,
         "ArtifactSlotResolverV2",
         lambda *, artifact_loader: SimpleNamespace(artifact_loader=artifact_loader),
+    )
+    monkeypatch.setattr(
+        worker_module,
+        "BacktestArtifactRuntimePlannerV2",
+        lambda **kwargs: SimpleNamespace(kwargs=kwargs),
     )
 
     def _fake_runner_use_case(**kwargs: object) -> object:

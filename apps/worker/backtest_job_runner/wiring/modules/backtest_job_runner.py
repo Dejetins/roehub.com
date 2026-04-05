@@ -386,6 +386,7 @@ def build_backtest_job_runner_app(
     artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
     runtime_planner = BacktestArtifactRuntimePlannerV2(
         execution_profiles=runtime_config.execution_profiles,
+        adaptive_selector_policy=runtime_config.adaptive_selector_policy,
     )
 
     runner_use_case = RunBacktestJobRunnerV1(

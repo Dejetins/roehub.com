@@ -417,21 +417,26 @@ def _build_fake_execution_profile(
         stage_b_workers: Configured Stage B worker count.
         parallel_stage_b_enabled: Whether process-based Stage B is enabled for the profile.
     Returns:
-        Any: SimpleNamespace carrying `mode`, `parallelism`, and `feature_flags`.
+        Any: SimpleNamespace carrying the minimal execution-profile surface used by job-runner
+            tests and runtime helpers.
     Assumptions:
-        Job-runner unit tests only need additive execution-profile fields used by Stage B runtime
-        dispatch and do not validate the full config/catalog dataclasses here.
+        Exact profiles keep shortlist runtime disabled, while hybrid profiles would enable the
+        shortlist-specific flags only when a future test explicitly requests them.
     Raises:
         None.
     Side Effects:
         None.
     """
+    shortlist_enabled = mode in {"hybrid_conservative", "hybrid_family"}
     return SimpleNamespace(
         mode=mode,
         parallelism=SimpleNamespace(stage_b_workers=stage_b_workers),
+        shortlist_config=SimpleNamespace(enabled=shortlist_enabled),
         feature_flags=SimpleNamespace(
             runtime_enabled=True,
+            heuristic_shortlist_enabled=shortlist_enabled,
             parallel_stage_b_enabled=parallel_stage_b_enabled,
+            family_plugin_enabled=mode == "hybrid_family",
         ),
     )
 
@@ -465,6 +470,7 @@ class _FakeGridBuilder:
         candles: Any,
         indicator_compute: Any,
         preselect: int,
+        requested_execution_profile_mode: str | None,
         defaults_provider: Any,
         max_variants_per_compute: int,
         max_compute_bytes_total: int,
@@ -477,6 +483,8 @@ class _FakeGridBuilder:
             candles: Candle arrays payload.
             indicator_compute: Indicator compute dependency.
             preselect: Stage-A preselect value.
+            requested_execution_profile_mode:
+                Optional explicit execution profile mode forwarded from persisted job payload.
             defaults_provider: Optional defaults provider.
             max_variants_per_compute: Variants guard.
             max_compute_bytes_total: Memory guard.
@@ -494,6 +502,7 @@ class _FakeGridBuilder:
             candles,
             indicator_compute,
             preselect,
+            requested_execution_profile_mode,
             defaults_provider,
             max_variants_per_compute,
             max_compute_bytes_total,
