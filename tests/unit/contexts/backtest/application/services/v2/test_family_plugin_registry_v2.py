@@ -18,6 +18,7 @@ from trading.contexts.backtest.application.services.v2.family_plugins import (
     FamilyPluginMetadataV2,
     FamilyPluginProposalResultV2,
     FamilyPluginRegistryV2,
+    build_default_family_plugin_registry_v2,
     build_family_plugin_planning_context_v2,
 )
 
@@ -227,6 +228,37 @@ def test_family_plugin_registry_returns_disabled_when_feature_flag_is_off() -> N
     assert resolution.status == "disabled"
     assert resolution.plugin is None
     assert resolution.warning is None
+
+
+def test_build_default_family_plugin_registry_v2_registers_first_ma_plugin() -> None:
+    """
+    Verify the shipped default registry exposes the first concrete MA-family plugin.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Concrete plugins must register through the shared registry surface rather than via
+        ad-hoc runtime branching.
+    Raises:
+        AssertionError: If the default registry does not resolve the shipped MA-family plugin.
+    Side Effects:
+        None.
+    """
+    registry = build_default_family_plugin_registry_v2()
+    context = build_family_plugin_planning_context_v2(
+        runtime_plan=_build_runtime_plan(
+            indicator_ids=("ma.ema", "ma.sma"),
+            family_plugin_enabled=True,
+        )
+    )
+
+    resolution = registry.resolve(context=context)
+
+    assert resolution.status == "resolved"
+    assert resolution.plugin is not None
+    assert resolution.plugin.metadata.plugin_id == "ma.family.v1"
 
 
 def test_family_plugin_registry_rejects_duplicate_selection_keys() -> None:

@@ -9,8 +9,9 @@ Docs:
 from __future__ import annotations
 
 import math
+import time
 from dataclasses import dataclass, field
-from typing import Iterator, Sequence, cast
+from typing import Callable, Iterator, Literal, Sequence, cast
 
 import numpy as np
 
@@ -43,6 +44,15 @@ from .execution_profile_v2 import (
     ExecutionProfileV2,
     execution_profile_uses_hierarchical_shortlist_runtime_v2,
 )
+from .family_plugins import (
+    FamilyPluginCircuitBreakerV2,
+    FamilyPluginProposalResultV2,
+    FamilyPluginRegistryStatusLiteralV2,
+    FamilyPluginRegistryV2,
+    FamilyPluginWarningV2,
+    build_default_family_plugin_registry_v2,
+    build_family_plugin_planning_context_v2,
+)
 from .generic_row_scorer_v2 import (
     GenericRowScorePayloadV2,
     GenericRowScorerV2,
@@ -51,6 +61,8 @@ from .generic_row_scorer_v2 import (
 from .price_arrays_loader import MmapPriceArraysLoaderV2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .stage_a_shortlist_builder_v2 import compute_target_slice_by_close_time_v2
+
+type HierarchicalProposalLayerSourceLiteralV2 = Literal["universal", "family_plugin"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +177,10 @@ class HierarchicalShortlistRuntimePlanV2(BacktestArtifactRuntimePlanV2):
     retained_stage_a_variants: tuple[BacktestStageABaseVariantV2, ...] = ()
     block_results: tuple[HierarchicalShortlistBlockResultV2, ...] = ()
     retained_compute_variants_total: int = 0
+    proposal_layer_source: HierarchicalProposalLayerSourceLiteralV2 = "universal"
+    family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2 | None = None
+    family_plugin_warning: FamilyPluginWarningV2 | None = None
+    family_plugin_proposal: FamilyPluginProposalResultV2 | None = None
 
     def __post_init__(self) -> None:
         """
@@ -198,6 +214,40 @@ class HierarchicalShortlistRuntimePlanV2(BacktestArtifactRuntimePlanV2):
             raise ValueError(
                 "HierarchicalShortlistRuntimePlanV2.retained_compute_variants_total must be > 0"
             )
+        if self.proposal_layer_source not in {"universal", "family_plugin"}:
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.proposal_layer_source must be "
+                "'universal' or 'family_plugin'"
+            )
+        if (
+            self.proposal_layer_source == "family_plugin"
+            and self.family_plugin_proposal is None
+        ):
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.family_plugin_proposal is required when "
+                "proposal_layer_source='family_plugin'"
+            )
+        if (
+            self.proposal_layer_source == "universal"
+            and self.family_plugin_proposal is not None
+        ):
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.family_plugin_proposal must be None when "
+                "proposal_layer_source='universal'"
+            )
+        if (
+            self.family_plugin_registry_status is not None
+            and self.family_plugin_registry_status not in {
+                "resolved",
+                "disabled",
+                "not_applicable",
+                "missing_plugin",
+            }
+        ):
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.family_plugin_registry_status must be one "
+                "of {'resolved', 'disabled', 'not_applicable', 'missing_plugin'} when provided"
+            )
         previous_stage_a_index: int | None = None
         seen_stage_a_indexes: set[int] = set()
         for variant in self.retained_stage_a_variants:
@@ -225,6 +275,10 @@ class HierarchicalShortlistRuntimePlanV2(BacktestArtifactRuntimePlanV2):
         retained_stage_a_variants: tuple[BacktestStageABaseVariantV2, ...],
         block_results: tuple[HierarchicalShortlistBlockResultV2, ...],
         retained_compute_variants_total: int,
+        proposal_layer_source: HierarchicalProposalLayerSourceLiteralV2 = "universal",
+        family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2 | None = None,
+        family_plugin_warning: FamilyPluginWarningV2 | None = None,
+        family_plugin_proposal: FamilyPluginProposalResultV2 | None = None,
     ) -> "HierarchicalShortlistRuntimePlanV2":
         """
         Build one reduced runtime plan reusing the exact-plan immutable contract surface.
@@ -235,6 +289,15 @@ class HierarchicalShortlistRuntimePlanV2(BacktestArtifactRuntimePlanV2):
             block_results: Per-indicator shortlist debug evidence.
             retained_compute_variants_total: Count of retained compute combinations before signal
                 expansion.
+            proposal_layer_source:
+                Whether retained variants came from the universal shortlist path or a concrete
+                family-plugin proposal layer.
+            family_plugin_registry_status:
+                Explicit registry resolution status when `hybrid_family` attempted plugin routing.
+            family_plugin_warning:
+                Optional warning payload describing `warning + universal fallback` behavior.
+            family_plugin_proposal:
+                Optional successful proposal payload emitted by the selected family plugin.
         Returns:
             HierarchicalShortlistRuntimePlanV2: Reduced runtime plan preserving exact Stage B
                 scorer contracts.
@@ -280,6 +343,10 @@ class HierarchicalShortlistRuntimePlanV2(BacktestArtifactRuntimePlanV2):
             retained_stage_a_variants=retained_stage_a_variants,
             block_results=block_results,
             retained_compute_variants_total=retained_compute_variants_total,
+            proposal_layer_source=proposal_layer_source,
+            family_plugin_registry_status=family_plugin_registry_status,
+            family_plugin_warning=family_plugin_warning,
+            family_plugin_proposal=family_plugin_proposal,
         )
 
     def iter_stage_a_variants(self) -> Iterator[BacktestStageABaseVariantV2]:
@@ -342,10 +409,11 @@ class _HierarchicalBeamCandidateV2:
 @dataclass(frozen=True, slots=True)
 class BacktestHierarchicalShortlistBuilderV2:
     """
-    Build conservative hybrid survivor runtime plans for explicit `hybrid_conservative` runs.
+    Build shared hybrid survivor runtime plans for `hybrid_conservative` and `hybrid_family`.
 
     Docs:
       - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
       - docs/architecture/backtest/backtest-runtime-kernels-v2.md
     Related:
@@ -360,6 +428,12 @@ class BacktestHierarchicalShortlistBuilderV2:
     diversified_retention: DiversifiedRetentionV2 = field(
         default_factory=DiversifiedRetentionV2
     )
+    family_plugin_registry: FamilyPluginRegistryV2 = field(
+        default_factory=build_default_family_plugin_registry_v2
+    )
+    family_plugin_circuit_breaker_factory: Callable[
+        [], FamilyPluginCircuitBreakerV2
+    ] = FamilyPluginCircuitBreakerV2
     block_survivor_multiplier: int = 2
 
     def __post_init__(self) -> None:
@@ -385,6 +459,15 @@ class BacktestHierarchicalShortlistBuilderV2:
             raise ValueError(
                 "BacktestHierarchicalShortlistBuilderV2 requires signal_matrix_loader"
             )
+        if self.family_plugin_registry is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires family_plugin_registry"
+            )
+        if self.family_plugin_circuit_breaker_factory is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires "
+                "family_plugin_circuit_breaker_factory"
+            )
         if self.block_survivor_multiplier <= 0:
             raise ValueError(
                 "BacktestHierarchicalShortlistBuilderV2.block_survivor_multiplier must be > 0"
@@ -398,10 +481,11 @@ class BacktestHierarchicalShortlistBuilderV2:
         target_time_range: TimeRange,
     ) -> BacktestArtifactRuntimePlanV2:
         """
-        Build one reduced runtime plan for the explicit hybrid conservative rollout path.
+        Build one reduced runtime plan for the live hybrid shortlist runtime path.
 
         Docs:
           - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/backtest-family-accelerators-v1.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -413,24 +497,193 @@ class BacktestHierarchicalShortlistBuilderV2:
             artifact_context: Slot-pinned runtime context for strict artifact reads.
             target_time_range: Requested trading window for row-level hybrid scoring.
         Returns:
-            BacktestArtifactRuntimePlanV2: Original plan when no reduction is needed, otherwise a
-                reduced `HierarchicalShortlistRuntimePlanV2`.
+            BacktestArtifactRuntimePlanV2: Original exact plan when hybrid reduction is not
+                needed, otherwise a reduced `HierarchicalShortlistRuntimePlanV2`.
         Assumptions:
-            Hybrid rollout remains opt-in and still delegates exact Stage A and exact Stage B
-            scoring to existing kernels after this reduced enumeration plan is built.
+            `hybrid_conservative` remains the universal path, while `hybrid_family` may execute a
+            proposal layer plugin and must degrade to the universal conservative path on warning
+            + universal fallback conditions.
         Raises:
             ValueError: If the resolved profile is not live-enabled for hierarchical shortlist
                 runtime or if artifact row-count contracts drift.
         Side Effects:
-            Reads pinned price and signal artifacts to score candidate indicator rows.
+            Reads pinned price and signal artifacts to score universal shortlist candidates, and
+            may execute one proposal-only family plugin for `hybrid_family`.
         """
         profile = runtime_plan.execution_profile
         if not execution_profile_uses_hierarchical_shortlist_runtime_v2(profile=profile):
             raise ValueError(
                 "BacktestHierarchicalShortlistBuilderV2 requires explicit "
-                "hybrid_conservative runtime-enabled profile"
+                "hybrid shortlist runtime-enabled profile"
+            )
+        if profile.mode == "hybrid_family":
+            return self._build_family_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+            )
+        return self._build_universal_runtime_plan(
+            runtime_plan=runtime_plan,
+            artifact_context=artifact_context,
+            target_time_range=target_time_range,
+        )
+
+    def _build_family_runtime_plan(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        target_time_range: TimeRange,
+    ) -> BacktestArtifactRuntimePlanV2:
+        """
+        Execute the bounded `hybrid_family` proposal layer before universal fallback.
+
+        Docs:
+          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/registry_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/
+            circuit_breaker_v2.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            artifact_context: Slot-pinned runtime context for universal-fallback artifact reads.
+            target_time_range: Requested trading window for row-level fallback scoring.
+        Returns:
+            BacktestArtifactRuntimePlanV2: Reduced plan carrying successful family-plugin
+                proposal metadata, or the universal conservative fallback result with explicit
+                warning/debug payloads.
+        Assumptions:
+            Family plugins remain proposal-only and must always reuse the existing universal
+            shortlist runtime plus exact Stage B scorer when they are missing, inapplicable,
+            timed out, raise, or sit behind an open circuit breaker.
+        Raises:
+            ValueError: Propagated only for invalid builder/runtime-plan invariants.
+        Side Effects:
+            May execute one proposal-only family plugin and may read artifacts for universal
+            fallback scoring.
+        """
+        planning_context = build_family_plugin_planning_context_v2(runtime_plan=runtime_plan)
+        resolution = self.family_plugin_registry.resolve(context=planning_context)
+        if resolution.status != "resolved":
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=resolution.warning,
+                force_materialized_plan=True,
+            )
+        plugin = resolution.plugin
+        if plugin is None:  # pragma: no cover
+            raise ValueError("resolved family-plugin registry entry must include plugin")
+        breaker = self.family_plugin_circuit_breaker_factory()
+        if breaker.is_open(plugin_id=plugin.metadata.plugin_id):
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=breaker.warning_for_open_breaker(
+                    plugin_id=plugin.metadata.plugin_id
+                ),
+                force_materialized_plan=True,
+            )
+        proposal_started_ns = time.perf_counter_ns()
+        try:
+            proposal = plugin.propose(context=planning_context)
+        except Exception as error:
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=breaker.record_error(
+                    plugin_id=plugin.metadata.plugin_id,
+                    error=error,
+                ),
+                force_materialized_plan=True,
+            )
+        elapsed_ms = (time.perf_counter_ns() - proposal_started_ns) / 1_000_000.0
+        if elapsed_ms > float(planning_context.plugin_budget_ms):
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=breaker.record_timeout(
+                    plugin_id=plugin.metadata.plugin_id,
+                    budget_ms=planning_context.plugin_budget_ms,
+                ),
+                force_materialized_plan=True,
+            )
+        breaker.record_success(plugin_id=plugin.metadata.plugin_id)
+        try:
+            return self._runtime_plan_from_family_plugin_proposal(
+                runtime_plan=runtime_plan,
+                proposal=proposal,
+                family_plugin_registry_status=resolution.status,
+            )
+        except ValueError as error:
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=breaker.record_error(
+                    plugin_id=plugin.metadata.plugin_id,
+                    error=error,
+                ),
+                force_materialized_plan=True,
             )
 
+    def _build_universal_runtime_plan(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        target_time_range: TimeRange,
+        family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2 | None = None,
+        family_plugin_warning: FamilyPluginWarningV2 | None = None,
+        force_materialized_plan: bool = False,
+    ) -> BacktestArtifactRuntimePlanV2:
+        """
+        Build the shared universal conservative shortlist runtime plan.
+
+        Docs:
+          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+          - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            artifact_context: Slot-pinned runtime context for strict artifact reads.
+            target_time_range: Requested trading window for row-level hybrid scoring.
+            family_plugin_registry_status:
+                Optional registry status from a preceding `hybrid_family` proposal attempt.
+            family_plugin_warning:
+                Optional warning payload describing `warning + universal fallback`.
+            force_materialized_plan:
+                When `True`, return a reduced runtime-plan wrapper even if no pruning is needed so
+                internal fallback/debug metadata remains explicit and reviewable.
+        Returns:
+            BacktestArtifactRuntimePlanV2: Original exact plan when no pruning is needed and no
+                explicit fallback metadata must be preserved, otherwise a reduced universal plan.
+        Assumptions:
+            Universal shortlist behavior remains the canonical conservative fallback for
+            `hybrid_family` and must remain unchanged for `hybrid_conservative`.
+        Raises:
+            ValueError: If artifact row-count contracts drift.
+        Side Effects:
+            Reads pinned price and signal artifacts to score candidate indicator rows.
+        """
         signal_variants_total = _signal_variants_total_v2(runtime_plan=runtime_plan)
         compute_variants_total = _compute_variants_total_v2(runtime_plan=runtime_plan)
         conservative_stage_a_budget = self._conservative_stage_a_budget(
@@ -442,7 +695,14 @@ class BacktestHierarchicalShortlistBuilderV2:
             conservative_stage_a_budget=conservative_stage_a_budget,
         )
         if target_compute_variants_total >= compute_variants_total:
-            return runtime_plan
+            if not force_materialized_plan:
+                return runtime_plan
+            return self._runtime_plan_from_all_stage_a_variants(
+                runtime_plan=runtime_plan,
+                proposal_layer_source="universal",
+                family_plugin_registry_status=family_plugin_registry_status,
+                family_plugin_warning=family_plugin_warning,
+            )
 
         block_survivor_budget = self._block_survivor_budget(
             runtime_plan=runtime_plan,
@@ -457,7 +717,7 @@ class BacktestHierarchicalShortlistBuilderV2:
             self._build_block_result(
                 plan=plan,
                 timeframe_code=runtime_plan.timeframe_code,
-                profile=profile,
+                profile=runtime_plan.execution_profile,
                 artifact_context=artifact_context,
                 signal_target_slice=signal_target_slice,
                 block_survivor_budget=block_survivor_budget,
@@ -478,6 +738,121 @@ class BacktestHierarchicalShortlistBuilderV2:
             retained_stage_a_variants=retained_stage_a_variants,
             block_results=block_results,
             retained_compute_variants_total=len(compute_candidates),
+            proposal_layer_source="universal",
+            family_plugin_registry_status=family_plugin_registry_status,
+            family_plugin_warning=family_plugin_warning,
+        )
+
+    def _runtime_plan_from_family_plugin_proposal(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        proposal: FamilyPluginProposalResultV2,
+        family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2,
+    ) -> HierarchicalShortlistRuntimePlanV2:
+        """
+        Convert one successful family-plugin proposal into a reduced exact runtime plan.
+
+        Docs:
+          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/contracts_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            proposal: Successful proposal-layer output from one family plugin.
+            family_plugin_registry_status: Registry status captured before plugin execution.
+        Returns:
+            HierarchicalShortlistRuntimePlanV2: Reduced exact runtime plan carrying the proposal.
+        Assumptions:
+            Family-plugin proposals remain row-shortlist-only in this milestone and therefore
+            must never bypass the shared exact Stage A/Stage B pipeline.
+        Raises:
+            ValueError: If the proposal omits `row_shortlist`.
+        Side Effects:
+            None.
+        """
+        if len(proposal.row_shortlist) == 0:
+            raise ValueError(
+                "family plugin proposal layer must emit a non-empty row_shortlist"
+            )
+        retained_stage_a_variants = tuple(
+            runtime_plan.stage_a_variant_for_index(stage_a_index=stage_a_index)
+            for stage_a_index in proposal.row_shortlist
+        )
+        retained_compute_variants_total = len(
+            {
+                stage_a_index // runtime_plan.signal_variants_total()
+                for stage_a_index in proposal.row_shortlist
+            }
+        )
+        return HierarchicalShortlistRuntimePlanV2.from_source_runtime_plan(
+            source_runtime_plan=runtime_plan,
+            retained_stage_a_variants=retained_stage_a_variants,
+            block_results=(),
+            retained_compute_variants_total=max(1, retained_compute_variants_total),
+            proposal_layer_source="family_plugin",
+            family_plugin_registry_status=family_plugin_registry_status,
+            family_plugin_proposal=proposal,
+        )
+
+    def _runtime_plan_from_all_stage_a_variants(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        proposal_layer_source: HierarchicalProposalLayerSourceLiteralV2,
+        family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2 | None = None,
+        family_plugin_warning: FamilyPluginWarningV2 | None = None,
+        family_plugin_proposal: FamilyPluginProposalResultV2 | None = None,
+    ) -> HierarchicalShortlistRuntimePlanV2:
+        """
+        Materialize a reduced-plan wrapper containing every exact Stage A variant in order.
+
+        Docs:
+          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            proposal_layer_source: Whether the wrapper represents universal or family-plugin flow.
+            family_plugin_registry_status:
+                Optional registry status from a preceding `hybrid_family` proposal attempt.
+            family_plugin_warning:
+                Optional warning payload describing `warning + universal fallback`.
+            family_plugin_proposal:
+                Optional successful family-plugin proposal payload.
+        Returns:
+            HierarchicalShortlistRuntimePlanV2: Wrapper carrying all exact Stage A variants plus
+                explicit proposal-layer debug metadata.
+        Assumptions:
+            This helper is used only when debug/fallback metadata must survive even though no
+            shortlist pruning was required.
+        Raises:
+            ValueError: Propagated if full exact Stage A iteration drifts from runtime-plan
+                invariants.
+        Side Effects:
+            None.
+        """
+        return HierarchicalShortlistRuntimePlanV2.from_source_runtime_plan(
+            source_runtime_plan=runtime_plan,
+            retained_stage_a_variants=tuple(runtime_plan.iter_stage_a_variants()),
+            block_results=(),
+            retained_compute_variants_total=_compute_variants_total_v2(
+                runtime_plan=runtime_plan
+            ),
+            proposal_layer_source=proposal_layer_source,
+            family_plugin_registry_status=family_plugin_registry_status,
+            family_plugin_warning=family_plugin_warning,
+            family_plugin_proposal=family_plugin_proposal,
         )
 
     def _conservative_stage_a_budget(

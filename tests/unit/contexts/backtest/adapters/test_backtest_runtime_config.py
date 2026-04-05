@@ -169,6 +169,17 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         .transition_ratio_weight
         == 0.3
     )
+    assert config.execution_profiles.available_profiles[3].feature_flags.runtime_enabled is True
+    assert (
+        config.execution_profiles.available_profiles[3].feature_flags
+        .heuristic_shortlist_enabled
+        is True
+    )
+    assert (
+        config.execution_profiles.available_profiles[3].feature_flags
+        .family_plugin_enabled
+        is True
+    )
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5368709120
     assert config.cpu.max_numba_threads == 4

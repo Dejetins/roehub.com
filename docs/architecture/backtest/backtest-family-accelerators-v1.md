@@ -1,27 +1,31 @@
 # Backtest Family Accelerators v1
 
-Документ фиксирует foundation Milestone E (`EPIC E1 + E2`) для proposal-only family accelerators
-в `hybrid_family`.
+Документ фиксирует foundation Milestone E (`EPIC E1 + E2`) и первый concrete `MA-family`
+plugin (`EPIC E3`) для proposal-only family accelerators в `hybrid_family`.
 
 ## Status
 
-- Status: proposal-only foundation; no concrete family plugin is shipped in this document.
+- Status: proposal-only foundation plus the first shipped `MA-family` plugin.
 - Scope:
   - typed contracts for future family accelerators,
   - deterministic registry selection,
   - per-run circuit breaker and warning semantics,
-  - additive execution-profile budget surface.
+  - additive execution-profile budget surface,
+  - the first concrete `ma.` plugin wired through the shared runtime path.
 - Explicitly out of scope:
-  - live `hybrid_family` routing in `RunBacktestUseCase`,
   - public selector changes in `POST /backtests`,
   - any family-specific backtest engine,
-  - any concrete MA-family or other plugin implementation.
+  - adaptive selector routing,
+  - non-MA plugins.
 
 ## Files
 
 - `src/trading/contexts/backtest/application/services/v2/family_plugins/contracts_v2.py`
 - `src/trading/contexts/backtest/application/services/v2/family_plugins/registry_v2.py`
 - `src/trading/contexts/backtest/application/services/v2/family_plugins/circuit_breaker_v2.py`
+- `src/trading/contexts/backtest/application/services/v2/family_plugins/ma_family_plugin_v2.py`
+- `src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py`
+- `src/trading/contexts/backtest/application/use_cases/run_backtest.py`
 - `src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py`
 - `src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py`
 - `apps/api/dto/backtest_runtime_defaults.py`
@@ -44,6 +48,33 @@ They may not:
 - bypass the universal conservative fallback path.
 
 The exact scorer remains the canonical source of truth on retained survivors.
+
+## First plugin: MA-family
+
+The first shipped plugin is `MA-family`.
+
+Implementation facts:
+
+- plugin id: `ma.family.v1`
+- registration: shared `FamilyPluginRegistryV2`
+- execution profile: internal-only `hybrid_family`
+- applicability: only pure canonical `ma.` indicator sets from
+  `src/trading/contexts/indicators/domain/definitions/ma.py`
+- proposal shapes used in v1:
+  - `row shortlist`
+  - `proxy score`
+
+Heuristic shape:
+
+- the plugin reads only shared runtime-plan metadata;
+- it samples deterministic `window` anchors per MA indicator;
+- it keeps `source` deterministic instead of creating a second runtime stack;
+- it expands retained compute anchors back into exact Stage A indexes;
+- it remains a `proposal layer` and never bypasses the exact scorer.
+
+This is intentionally narrow.
+It is not a special backtest engine.
+It is not a per-family runtime fork.
 
 ## Planning context
 
@@ -72,6 +103,11 @@ Current family resolution rule is explicit:
 
 This keeps family selection internal and reviewable without adding public API metadata.
 
+Additional E3 rule:
+
+- canonical `ma.` definitions are the source of truth for the first plugin;
+- unknown `ma.` ids are not treated as implicitly supported.
+
 ## Failure handling
 
 Failure handling is explicit and reusable:
@@ -80,10 +116,20 @@ Failure handling is explicit and reusable:
 - timeout -> `warning + universal fallback`,
 - error -> `warning + universal fallback`,
 - open breaker -> `warning + universal fallback`,
+- missing plugin -> `warning + universal fallback`,
+- mixed-family / registry non-applicability -> universal conservative fallback,
 - repeated failures open a per-run `circuit breaker`,
 - once open, the breaker stays open for the rest of that run.
 
 The breaker is run-local only. No cross-run cache or persistence is introduced.
+
+`hybrid_family` reuses the same shared hierarchical shortlist runtime as `hybrid_conservative`.
+
+That means:
+
+- successful plugin proposals become reduced exact runtime plans,
+- fallback still uses the existing universal conservative shortlist behavior,
+- exact Stage B remains canonical in every path.
 
 ## Runtime/profile surface
 
@@ -92,17 +138,34 @@ The breaker is run-local only. No cross-run cache or persistence is introduced.
 - `planning_budget_ms`
 - `family_plugin_budget_ms`
 
-`family_plugin_budget_ms` is additive discovery/config surface only in this milestone.
+`family_plugin_budget_ms` is the typed plugin budget for the proposal layer.
 
 Runtime defaults now expose the same field in `contracts.execution.available_execution_profiles[]`
 so browser/debug tooling sees the same typed profile contract used by config and planner layers.
 
-## Why no concrete plugin yet
+Rollout remains conservative:
 
-Milestone E ships only the foundation because the first concrete plugin needs separate rollout
-evidence and benchmark gates.
+- `dev`: `hybrid_family` runtime gates enabled for internal requested-mode use,
+- `test`: `hybrid_family` runtime gates enabled for internal coverage and perf-smoke evidence,
+- `prod`: `hybrid_family` remains disabled by default.
 
-The next plugin candidate may be MA-family, but it must still:
+There is still no public `POST /backtests` selector for `hybrid_family`.
+The path stays internal-only through the existing requested-profile override.
+
+## Warning/debug surface
+
+Reduced hybrid plans now carry compact internal debug metadata for reviewability:
+
+- proposal-layer source (`universal` vs `family_plugin`),
+- registry resolution status for `hybrid_family`,
+- optional plugin warning payload,
+- optional successful plugin proposal payload.
+
+This keeps warning behavior explicit without widening the public request contract.
+
+## Future work
+
+Future plugins must still:
 
 - plug into the shared registry,
 - return proposal-only output,

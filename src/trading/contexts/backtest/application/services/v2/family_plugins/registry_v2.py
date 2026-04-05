@@ -12,6 +12,7 @@ from .contracts_v2 import (
     FamilyPluginSelectionKeyV2,
     FamilyPluginWarningV2,
 )
+from .ma_family_plugin_v2 import MAFamilyAccelerationPluginV2
 
 type FamilyPluginRegistryStatusLiteralV2 = Literal[
     "resolved",
@@ -311,8 +312,39 @@ def _selection_keys_for_plugin_v2(
     )
 
 
+def build_default_family_plugin_registry_v2() -> FamilyPluginRegistryV2:
+    """
+    Build the startup-validated default registry for shipped proposal-only family plugins.
+
+    Docs:
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/indicators/indicators-ma.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/family_plugins/registry_v2.py
+      - src/trading/contexts/backtest/application/services/v2/family_plugins/
+        ma_family_plugin_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+
+    Args:
+        None.
+    Returns:
+        FamilyPluginRegistryV2: Registry populated with the shipped first `MA-family` plugin.
+    Assumptions:
+        Concrete plugins must register through the shared proposal-layer registry instead of
+        ad-hoc runtime branching.
+    Raises:
+        ValueError: Propagated when shipped plugin metadata violates registry uniqueness rules.
+    Side Effects:
+        None.
+    """
+    return FamilyPluginRegistryV2(plugins=(MAFamilyAccelerationPluginV2(),))
+
+
 __all__ = [
     "ALLOWED_FAMILY_PLUGIN_REGISTRY_STATUSES_V2",
+    "build_default_family_plugin_registry_v2",
     "FamilyPluginRegistryResolutionV2",
     "FamilyPluginRegistryStatusLiteralV2",
     "FamilyPluginRegistryV2",

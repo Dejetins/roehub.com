@@ -23,11 +23,13 @@ from .contracts_v2 import (
     validate_family_plugin_proposal_capability_v2,
     validate_family_plugin_warning_reason_v2,
 )
+from .ma_family_plugin_v2 import MAFamilyAccelerationPluginV2
 from .registry_v2 import (
     ALLOWED_FAMILY_PLUGIN_REGISTRY_STATUSES_V2,
     FamilyPluginRegistryResolutionV2,
     FamilyPluginRegistryStatusLiteralV2,
     FamilyPluginRegistryV2,
+    build_default_family_plugin_registry_v2,
 )
 
 __all__ = [
@@ -35,6 +37,7 @@ __all__ = [
     "ALLOWED_FAMILY_PLUGIN_REGISTRY_STATUSES_V2",
     "ALLOWED_FAMILY_PLUGIN_WARNING_REASONS_V2",
     "FAMILY_PLUGIN_WARNING_FALLBACK_ACTION_V2",
+    "build_default_family_plugin_registry_v2",
     "FamilyAccelerationPluginV2",
     "FamilyPluginApplicabilityV2",
     "FamilyPluginCircuitBreakerStateV2",
@@ -51,6 +54,7 @@ __all__ = [
     "FamilyPluginSelectionKeyV2",
     "FamilyPluginWarningReasonLiteralV2",
     "FamilyPluginWarningV2",
+    "MAFamilyAccelerationPluginV2",
     "build_family_plugin_planning_context_v2",
     "normalize_family_plugin_identifier_v2",
     "resolve_family_plugin_indicator_family_v2",

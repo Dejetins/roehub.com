@@ -438,6 +438,118 @@ class BacktestArtifactRuntimePlanV2:
                 return access_plan
         return None
 
+    def signal_variants_total(self) -> int:
+        """
+        Return the deterministic signal-space variants total owned by this runtime plan.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/
+            ma_family_plugin_v2.py
+
+        Args:
+            None.
+        Returns:
+            int: Signal mixed-radix variants total (`1` when `signal_axes` is empty).
+        Assumptions:
+            Empty signal-axis sets still expand to one deterministic default-only signal payload.
+        Raises:
+            ValueError: If one signal axis materializes to zero values.
+        Side Effects:
+            None.
+        """
+        return _product_v2(values=tuple(len(axis.values) for axis in self.signal_axes))
+
+    def stage_a_variant_for_index(
+        self,
+        *,
+        stage_a_index: int,
+    ) -> BacktestStageABaseVariantV2:
+        """
+        Materialize one exact Stage A base variant by stable mixed-radix index.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/
+            ma_family_plugin_v2.py
+
+        Args:
+            stage_a_index: Zero-based Stage A index in the exact runtime enumeration order.
+        Returns:
+            BacktestStageABaseVariantV2: Canonical exact Stage A variant payload for the index.
+        Assumptions:
+            Mixed-radix ordering must stay identical to `iter_stage_a_variants()` so proposal
+            layer runtimes may retain exact survivors without enumerating the full cartesian
+            product.
+        Raises:
+            ValueError: If `stage_a_index` falls outside the exact Stage A range or if mixed-radix
+                totals drift from plan invariants.
+        Side Effects:
+            None.
+        """
+        if stage_a_index < 0 or stage_a_index >= self.stage_a_variants_total:
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.stage_a_variant_for_index requires "
+                f"stage_a_index in [0, {self.stage_a_variants_total}), got {stage_a_index}"
+            )
+        signal_variants_total = self.signal_variants_total()
+        if signal_variants_total <= 0:
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.signal_variants_total must be > 0"
+            )
+        compute_variants_total = self.stage_a_variants_total // signal_variants_total
+        if compute_variants_total * signal_variants_total != self.stage_a_variants_total:
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.stage_a_variants_total must stay aligned with "
+                "indicator and signal mixed-radix products"
+            )
+        compute_index = stage_a_index // signal_variants_total
+        signal_index = stage_a_index % signal_variants_total
+        indicator_variant_indexes = _decode_mixed_radix_v2(
+            flat_index=compute_index,
+            radices=tuple(plan.variants for plan in self.indicator_plans),
+        )
+        indicator_selections = tuple(
+            _indicator_selection_from_variant_index_v2(
+                plan=plan,
+                variant_index=indicator_variant_indexes[position],
+            )
+            for position, plan in enumerate(self.indicator_plans)
+        )
+        indicator_variant_key = build_variant_key_v1(
+            instrument_id=self.instrument_id_literal,
+            timeframe=self.timeframe_code,
+            indicators=indicator_selections,
+        )
+        signal_params = _signal_params_from_variant_index_v2(
+            signal_axes=self.signal_axes,
+            variant_index=signal_index,
+        )
+        return BacktestStageABaseVariantV2(
+            stage_a_index=stage_a_index,
+            indicator_selections=indicator_selections,
+            signal_params=signal_params,
+            indicator_variant_key=indicator_variant_key,
+            base_variant_key=build_backtest_variant_key_v1(
+                indicator_variant_key=indicator_variant_key,
+                direction_mode=self.direction_mode,
+                sizing_mode=self.sizing_mode,
+                signals=signal_params,
+                risk_params=_STAGE_A_DISABLED_RISK_PARAMS_V2,
+                execution_params=self.execution_params,
+            ),
+        )
+
 
 class BacktestArtifactRuntimePlannerV2:
     """

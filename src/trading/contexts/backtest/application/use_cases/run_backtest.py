@@ -202,8 +202,8 @@ class RunBacktestUseCase:
             stage_a_shortlist_builder:
                 Optional artifact-backed Stage A shortlist builder for production runtime cutover.
             hierarchical_shortlist_builder:
-                Optional conservative hybrid shortlist builder used only for explicit
-                `hybrid_conservative` rollout runs.
+                Optional shared hybrid shortlist builder used for explicit
+                `hybrid_conservative` and internal `hybrid_family` rollout runs.
             runtime_planner:
                 Optional artifact-backed runtime planner replacing `grid_builder_v1` in
                 production paths.
@@ -436,7 +436,7 @@ class RunBacktestUseCase:
                 if self._hierarchical_shortlist_builder is None:
                     raise ValueError(
                         "RunBacktestUseCase requires hierarchical_shortlist_builder for "
-                        "hybrid_conservative runtime"
+                        "hybrid shortlist runtime"
                     )
                 effective_runtime_plan = (
                     self._hierarchical_shortlist_builder.build_runtime_plan(

@@ -374,22 +374,26 @@ def execution_profile_uses_hierarchical_shortlist_runtime_v2(
     Args:
         profile: Resolved execution profile candidate.
     Returns:
-        bool: `True` only for the explicit opt-in `hybrid_conservative` runtime path with all
+        bool: `True` only for the explicit opt-in hybrid shortlist runtime paths with all
             required rollout flags enabled.
     Assumptions:
-        Milestone D keeps exact profiles canonical by default and does not activate
-        `hybrid_family` runtime in this delivery.
+        `hybrid_conservative` remains the universal shortlist path, while `hybrid_family`
+        additionally requires `family_plugin_enabled` before the shared runtime may execute the
+        proposal layer.
     Raises:
         None.
     Side Effects:
         None.
     """
-    return (
-        profile.mode == "hybrid_conservative"
-        and profile.shortlist_config.enabled
-        and profile.feature_flags.runtime_enabled
-        and profile.feature_flags.heuristic_shortlist_enabled
-    )
+    if (
+        not profile.shortlist_config.enabled
+        or not profile.feature_flags.runtime_enabled
+        or not profile.feature_flags.heuristic_shortlist_enabled
+    ):
+        return False
+    if profile.mode == "hybrid_conservative":
+        return True
+    return profile.mode == "hybrid_family" and profile.feature_flags.family_plugin_enabled
 
 
 def execution_profile_supports_requested_runtime_v2(
@@ -413,9 +417,8 @@ def execution_profile_supports_requested_runtime_v2(
     Returns:
         bool: `True` when the profile may be used as an internal requested runtime mode.
     Assumptions:
-        Exact profiles require only `runtime_enabled`, while Milestone D hybrid runtime is limited
-        to `hybrid_conservative`; `hybrid_family` remains out of scope even if future config work
-        toggles other flags.
+        Exact profiles require only `runtime_enabled`, while hybrid runtimes remain internal-only
+        opt-in paths gated through the shared shortlist runtime checks.
     Raises:
         None.
     Side Effects:

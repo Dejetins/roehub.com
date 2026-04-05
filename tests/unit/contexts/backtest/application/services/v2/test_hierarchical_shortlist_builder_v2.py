@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import replace
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -14,6 +15,11 @@ from trading.contexts.backtest.application.services import (
     BacktestIndicatorPlanV2,
     BacktestRiskVariantV2,
     BacktestSignalAxisPlanV2,
+    FamilyPluginApplicabilityV2,
+    FamilyPluginCircuitBreakerV2,
+    FamilyPluginMetadataV2,
+    FamilyPluginProposalResultV2,
+    FamilyPluginRegistryV2,
     HierarchicalShortlistRuntimePlanV2,
 )
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
@@ -296,6 +302,102 @@ class _RecordingSignalLoader:
         return np.asarray(matrix[normalized_row_selection, :], dtype=np.int8)
 
 
+class _RecordingFamilyPlugin:
+    """
+    Minimal proposal-only family plugin test double with optional sleep/error behavior.
+
+    Docs:
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/family_plugins/contracts_v2.py
+    """
+
+    def __init__(
+        self,
+        *,
+        proposal_result: FamilyPluginProposalResultV2,
+        sleep_seconds: float = 0.0,
+        raised_error: Exception | None = None,
+    ) -> None:
+        """
+        Initialize one configurable family-plugin test double.
+
+        Docs:
+          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/registry_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/contracts_v2.py
+
+        Args:
+            proposal_result: Proposal payload returned on success.
+            sleep_seconds: Optional artificial latency used to trigger timeout handling.
+            raised_error: Optional exception raised instead of returning the proposal.
+        Returns:
+            None.
+        Assumptions:
+            Builder tests need a narrowly configurable plugin double rather than a second
+            production implementation.
+        Raises:
+            None.
+        Side Effects:
+            Initializes an in-memory call counter.
+        """
+        self.metadata = FamilyPluginMetadataV2(
+            plugin_id=proposal_result.plugin_id,
+            display_name="Recording MA plugin",
+            applicability=FamilyPluginApplicabilityV2(
+                execution_profile_modes=("hybrid_family",),
+                indicator_family_literals=("ma",),
+            ),
+            proposal_capabilities=("row_shortlist",),
+        )
+        self._proposal_result = proposal_result
+        self._sleep_seconds = sleep_seconds
+        self._raised_error = raised_error
+        self.calls = 0
+
+    def propose(self, *, context: Any) -> FamilyPluginProposalResultV2:
+        """
+        Return one configured proposal payload or trigger the requested failure behavior.
+
+        Docs:
+          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - tests/unit/contexts/backtest/application/services/v2/
+            test_hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/contracts_v2.py
+
+        Args:
+            context: Narrow immutable planning context.
+        Returns:
+            FamilyPluginProposalResultV2: Configured proposal payload on success.
+        Assumptions:
+            Builder tests exercise routing/fallback semantics rather than plugin heuristics.
+        Raises:
+            Exception: Re-raises the configured `raised_error` when present.
+        Side Effects:
+            Increments the in-memory call counter and may sleep for the configured delay.
+        """
+        _ = context
+        self.calls += 1
+        if self._sleep_seconds > 0.0:
+            time.sleep(self._sleep_seconds)
+        if self._raised_error is not None:
+            raise self._raised_error
+        return self._proposal_result
+
+
 def test_hierarchical_shortlist_builder_v2_reduces_runtime_plan_and_preserves_exact_order(
 ) -> None:
     """
@@ -432,12 +534,469 @@ def test_hierarchical_shortlist_builder_v2_rejects_non_opt_in_profile_flags() ->
         ),
     )
 
-    with pytest.raises(ValueError, match="hybrid_conservative runtime-enabled profile"):
+    with pytest.raises(ValueError, match="hybrid shortlist runtime-enabled profile"):
         builder.build_runtime_plan(
             runtime_plan=runtime_plan,
             artifact_context=_artifact_context_fixture(),
             target_time_range=_target_time_range_fixture(),
         )
+
+
+def test_hierarchical_shortlist_builder_v2_uses_ma_family_plugin_for_hybrid_family() -> None:
+    """
+    Verify `hybrid_family` keeps the shared runtime path but uses the MA-family proposal layer.
+
+    Docs:
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/indicators/indicators-ma.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/family_plugins/
+        ma_family_plugin_v2.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The first MA-family plugin must stay proposal-only and avoid reading universal fallback
+        artifacts on the success path.
+    Raises:
+        AssertionError: If the reduced runtime plan does not preserve explicit family-plugin
+            metadata or exact retained Stage A ordering.
+    Side Effects:
+        None.
+    """
+    price_loader = _RecordingPriceLoader(
+        close_time=np.array([2_599, 4_599, 6_599], dtype=np.int64)
+    )
+    signal_loader = _RecordingSignalLoader(
+        matrices_by_indicator={
+            "ma.ema": np.array([[1, -1, 1]], dtype=np.int8),
+            "ma.sma": np.array([[1, -1, 1]], dtype=np.int8),
+        }
+    )
+    builder = BacktestHierarchicalShortlistBuilderV2(
+        price_arrays_loader=price_loader,
+        signal_matrix_loader=signal_loader,
+    )
+    runtime_plan = _runtime_plan_fixture(
+        max_candidates=8,
+        profile=_hybrid_family_profile_fixture(max_candidates=8),
+        indicator_plans=(
+            BacktestIndicatorPlanV2(
+                indicator_id="ma.ema",
+                axes=(
+                    BacktestIndicatorAxisPlanV2(name="source", values=("close",)),
+                    BacktestIndicatorAxisPlanV2(name="window", values=(5, 10, 20, 40)),
+                ),
+                variants=4,
+            ),
+            BacktestIndicatorPlanV2(
+                indicator_id="ma.sma",
+                axes=(
+                    BacktestIndicatorAxisPlanV2(name="source", values=("close",)),
+                    BacktestIndicatorAxisPlanV2(name="window", values=(5, 10, 20, 40)),
+                ),
+                variants=4,
+            ),
+        ),
+        signal_axes=(
+            BacktestSignalAxisPlanV2(
+                indicator_id="ma.ema",
+                param_name="threshold",
+                values=(0.25, 0.5),
+            ),
+        ),
+        stage_b_variants_total=8,
+    )
+
+    reduced_plan = builder.build_runtime_plan(
+        runtime_plan=runtime_plan,
+        artifact_context=_artifact_context_fixture(),
+        target_time_range=_target_time_range_fixture(),
+    )
+
+    assert isinstance(reduced_plan, HierarchicalShortlistRuntimePlanV2)
+    assert reduced_plan.proposal_layer_source == "family_plugin"
+    assert reduced_plan.family_plugin_registry_status == "resolved"
+    assert reduced_plan.family_plugin_warning is None
+    assert reduced_plan.family_plugin_proposal is not None
+    assert reduced_plan.family_plugin_proposal.plugin_id == "ma.family.v1"
+    assert reduced_plan.family_plugin_proposal.row_shortlist == (
+        0,
+        1,
+        6,
+        7,
+        24,
+        25,
+        30,
+        31,
+    )
+    assert reduced_plan.stage_a_variants_total == 8
+    assert reduced_plan.retained_compute_variants_total == 4
+    assert tuple(
+        variant.stage_a_index for variant in reduced_plan.retained_stage_a_variants
+    ) == (0, 1, 6, 7, 24, 25, 30, 31)
+    assert price_loader.calls == 0
+    assert signal_loader.matrix_calls == []
+
+
+def test_hierarchical_shortlist_builder_v2_falls_back_for_mixed_family_hybrid_family() -> None:
+    """
+    Verify mixed-family `hybrid_family` requests degrade to the universal conservative path.
+
+    Docs:
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/family_plugins/registry_v2.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Mixed-family requests must not receive MA-only behavior because the proposal layer stays
+        explicit and deterministic.
+    Raises:
+        AssertionError: If mixed-family routing does not degrade to the universal shortlist path.
+    Side Effects:
+        None.
+    """
+    price_loader = _RecordingPriceLoader(
+        close_time=np.array([2_599, 4_599, 6_599], dtype=np.int64)
+    )
+    signal_loader = _RecordingSignalLoader(
+        matrices_by_indicator={
+            "ma.ema": np.array([[1, -1, 1], [1, 1, 1]], dtype=np.int8),
+            "momentum.trix": np.array([[1, 0, -1], [1, 1, -1]], dtype=np.int8),
+        }
+    )
+    builder = BacktestHierarchicalShortlistBuilderV2(
+        price_arrays_loader=price_loader,
+        signal_matrix_loader=signal_loader,
+    )
+    runtime_plan = _runtime_plan_fixture(
+        max_candidates=2,
+        profile=_hybrid_family_profile_fixture(max_candidates=2),
+        indicator_plans=(
+            BacktestIndicatorPlanV2(
+                indicator_id="ma.ema",
+                axes=(
+                    BacktestIndicatorAxisPlanV2(name="source", values=("close",)),
+                    BacktestIndicatorAxisPlanV2(name="window", values=(10, 20)),
+                ),
+                variants=2,
+            ),
+            BacktestIndicatorPlanV2(
+                indicator_id="momentum.trix",
+                axes=(BacktestIndicatorAxisPlanV2(name="window", values=(5, 10)),),
+                variants=2,
+            ),
+        ),
+        signal_axes=(),
+        stage_b_variants_total=2,
+    )
+
+    reduced_plan = builder.build_runtime_plan(
+        runtime_plan=runtime_plan,
+        artifact_context=_artifact_context_fixture(),
+        target_time_range=_target_time_range_fixture(),
+    )
+
+    assert isinstance(reduced_plan, HierarchicalShortlistRuntimePlanV2)
+    assert reduced_plan.proposal_layer_source == "universal"
+    assert reduced_plan.family_plugin_registry_status == "not_applicable"
+    assert reduced_plan.family_plugin_warning is None
+    assert reduced_plan.block_results
+    assert price_loader.calls == 1
+    assert signal_loader.matrix_calls == ["ma.ema", "momentum.trix"]
+
+
+def test_hierarchical_shortlist_builder_v2_falls_back_on_family_plugin_timeout() -> None:
+    """
+    Verify family-plugin timeout records warning metadata and degrades to universal fallback.
+
+    Docs:
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/family_plugins/
+        circuit_breaker_v2.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Timeout handling must preserve the universal shortlist path instead of failing the run.
+    Raises:
+        AssertionError: If timeout warnings are omitted or fallback does not execute.
+    Side Effects:
+        None.
+    """
+    plugin = _RecordingFamilyPlugin(
+        proposal_result=FamilyPluginProposalResultV2(
+            plugin_id="ma.family.v1",
+            row_shortlist=(0, 1),
+        ),
+        sleep_seconds=0.01,
+    )
+    builder = BacktestHierarchicalShortlistBuilderV2(
+        price_arrays_loader=_RecordingPriceLoader(
+            close_time=np.array([2_599, 4_599, 6_599], dtype=np.int64)
+        ),
+        signal_matrix_loader=_RecordingSignalLoader(
+            matrices_by_indicator={
+                "ma.ema": np.array([[1, -1, 1], [1, 1, 1]], dtype=np.int8),
+            }
+        ),
+        family_plugin_registry=FamilyPluginRegistryV2(plugins=(plugin,)),
+    )
+    runtime_plan = _runtime_plan_fixture(
+        max_candidates=2,
+        profile=replace(
+            _hybrid_family_profile_fixture(max_candidates=2),
+            family_plugin_budget_ms=1,
+        ),
+        indicator_plans=(
+            BacktestIndicatorPlanV2(
+                indicator_id="ma.ema",
+                axes=(
+                    BacktestIndicatorAxisPlanV2(name="source", values=("close",)),
+                    BacktestIndicatorAxisPlanV2(name="window", values=(10, 20)),
+                ),
+                variants=2,
+            ),
+        ),
+        signal_axes=(),
+        stage_b_variants_total=2,
+    )
+
+    reduced_plan = builder.build_runtime_plan(
+        runtime_plan=runtime_plan,
+        artifact_context=_artifact_context_fixture(),
+        target_time_range=_target_time_range_fixture(),
+    )
+
+    assert isinstance(reduced_plan, HierarchicalShortlistRuntimePlanV2)
+    assert reduced_plan.proposal_layer_source == "universal"
+    assert reduced_plan.family_plugin_registry_status == "resolved"
+    assert reduced_plan.family_plugin_warning is not None
+    assert reduced_plan.family_plugin_warning.reason == "timeout"
+    assert reduced_plan.family_plugin_warning.plugin_id == "ma.family.v1"
+    assert plugin.calls == 1
+
+
+def test_hierarchical_shortlist_builder_v2_falls_back_on_family_plugin_error() -> None:
+    """
+    Verify family-plugin exceptions degrade to universal fallback with explicit warning payloads.
+
+    Docs:
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/family_plugins/
+        circuit_breaker_v2.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Plugin exceptions must surface as warning + universal fallback rather than breaking the
+        exact shared runtime flow.
+    Raises:
+        AssertionError: If error warnings are omitted or the plugin is not attempted.
+    Side Effects:
+        None.
+    """
+    plugin = _RecordingFamilyPlugin(
+        proposal_result=FamilyPluginProposalResultV2(
+            plugin_id="ma.family.v1",
+            row_shortlist=(0,),
+        ),
+        raised_error=RuntimeError("boom"),
+    )
+    builder = BacktestHierarchicalShortlistBuilderV2(
+        price_arrays_loader=_RecordingPriceLoader(
+            close_time=np.array([2_599, 4_599, 6_599], dtype=np.int64)
+        ),
+        signal_matrix_loader=_RecordingSignalLoader(
+            matrices_by_indicator={
+                "ma.ema": np.array([[1, -1, 1], [1, 1, 1]], dtype=np.int8),
+            }
+        ),
+        family_plugin_registry=FamilyPluginRegistryV2(plugins=(plugin,)),
+    )
+    runtime_plan = _runtime_plan_fixture(
+        max_candidates=2,
+        profile=_hybrid_family_profile_fixture(max_candidates=2),
+        indicator_plans=(
+            BacktestIndicatorPlanV2(
+                indicator_id="ma.ema",
+                axes=(
+                    BacktestIndicatorAxisPlanV2(name="source", values=("close",)),
+                    BacktestIndicatorAxisPlanV2(name="window", values=(10, 20)),
+                ),
+                variants=2,
+            ),
+        ),
+        signal_axes=(),
+        stage_b_variants_total=2,
+    )
+
+    reduced_plan = builder.build_runtime_plan(
+        runtime_plan=runtime_plan,
+        artifact_context=_artifact_context_fixture(),
+        target_time_range=_target_time_range_fixture(),
+    )
+
+    assert isinstance(reduced_plan, HierarchicalShortlistRuntimePlanV2)
+    assert reduced_plan.proposal_layer_source == "universal"
+    assert reduced_plan.family_plugin_registry_status == "resolved"
+    assert reduced_plan.family_plugin_warning is not None
+    assert reduced_plan.family_plugin_warning.reason == "error"
+    assert "RuntimeError" in reduced_plan.family_plugin_warning.message
+    assert plugin.calls == 1
+
+
+def test_hierarchical_shortlist_builder_v2_falls_back_when_family_plugin_breaker_is_open(
+) -> None:
+    """
+    Verify an open family-plugin circuit breaker skips plugin execution and uses fallback.
+
+    Docs:
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/family_plugins/
+        circuit_breaker_v2.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The per-run circuit breaker must short-circuit the family-plugin path before invocation.
+    Raises:
+        AssertionError: If the open-breaker warning is omitted or the plugin is still called.
+    Side Effects:
+        None.
+    """
+    plugin = _RecordingFamilyPlugin(
+        proposal_result=FamilyPluginProposalResultV2(
+            plugin_id="ma.family.v1",
+            row_shortlist=(0,),
+        ),
+    )
+    breaker = FamilyPluginCircuitBreakerV2(failure_threshold=1)
+    breaker.record_error(plugin_id="ma.family.v1", error=RuntimeError("previous boom"))
+    builder = BacktestHierarchicalShortlistBuilderV2(
+        price_arrays_loader=_RecordingPriceLoader(
+            close_time=np.array([2_599, 4_599, 6_599], dtype=np.int64)
+        ),
+        signal_matrix_loader=_RecordingSignalLoader(
+            matrices_by_indicator={
+                "ma.ema": np.array([[1, -1, 1], [1, 1, 1]], dtype=np.int8),
+            }
+        ),
+        family_plugin_registry=FamilyPluginRegistryV2(plugins=(plugin,)),
+        family_plugin_circuit_breaker_factory=lambda: breaker,
+    )
+    runtime_plan = _runtime_plan_fixture(
+        max_candidates=2,
+        profile=_hybrid_family_profile_fixture(max_candidates=2),
+        indicator_plans=(
+            BacktestIndicatorPlanV2(
+                indicator_id="ma.ema",
+                axes=(
+                    BacktestIndicatorAxisPlanV2(name="source", values=("close",)),
+                    BacktestIndicatorAxisPlanV2(name="window", values=(10, 20)),
+                ),
+                variants=2,
+            ),
+        ),
+        signal_axes=(),
+        stage_b_variants_total=2,
+    )
+
+    reduced_plan = builder.build_runtime_plan(
+        runtime_plan=runtime_plan,
+        artifact_context=_artifact_context_fixture(),
+        target_time_range=_target_time_range_fixture(),
+    )
+
+    assert isinstance(reduced_plan, HierarchicalShortlistRuntimePlanV2)
+    assert reduced_plan.proposal_layer_source == "universal"
+    assert reduced_plan.family_plugin_registry_status == "resolved"
+    assert reduced_plan.family_plugin_warning is not None
+    assert reduced_plan.family_plugin_warning.reason == "open_breaker"
+    assert plugin.calls == 0
+
+
+def _hybrid_family_profile_fixture(*, max_candidates: int):
+    """
+    Build one explicit opt-in `hybrid_family` profile fixture for proposal-layer tests.
+
+    Docs:
+      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - configs/test/backtest.yaml
+
+    Args:
+        max_candidates: Explicit shortlist cap published by the profile fixture.
+    Returns:
+        object: Runtime-enabled `hybrid_family` execution profile fixture.
+    Assumptions:
+        Tests keep `hybrid_family` internal-only and opt-in through profile flags plus the
+        shared requested-runtime path.
+    Raises:
+        ValueError: Propagated if the constructed profile violates typed invariants.
+    Side Effects:
+        None.
+    """
+    catalog = default_execution_profiles_catalog_v2()
+    base_profile = catalog.profile_for_mode(mode="hybrid_family")
+    return replace(
+        base_profile,
+        feature_flags=ExecutionProfileFeatureFlagsV2(
+            runtime_enabled=True,
+            heuristic_shortlist_enabled=True,
+            parallel_stage_b_enabled=False,
+            family_plugin_enabled=True,
+        ),
+        shortlist_config=ExecutionProfileShortlistConfigV2(
+            enabled=True,
+            max_candidates=max_candidates,
+            scoring=base_profile.shortlist_config.scoring,
+            retention=base_profile.shortlist_config.retention,
+        ),
+    )
 
 
 def _runtime_plan_fixture(
