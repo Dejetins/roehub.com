@@ -57,6 +57,9 @@
     startup config;
   - this includes env-level `mode` plus candidate-specific rollout caps for
     `hybrid_conservative` and `hybrid_family`;
+  - committed prod defaults may now expose `hybrid_family.feature_flags.runtime_enabled=true`
+    for internal/manual and shadow-recommendation flows, while the selector rollout cap still
+    keeps `hybrid_family` non-live by default;
   - browser/debug tooling may inspect rollout state, but browser still does not choose
     `execution_profile_mode` and does not enable selector paths directly.
 
@@ -283,10 +286,10 @@
             "stage_b_workers": 4
           },
           "feature_flags": {
-            "runtime_enabled": false,
-            "heuristic_shortlist_enabled": false,
+            "runtime_enabled": true,
+            "heuristic_shortlist_enabled": true,
             "parallel_stage_b_enabled": false,
-            "family_plugin_enabled": false
+            "family_plugin_enabled": true
           },
           "launch_budget": {
             "max_stage_a_variants_total": 75000,

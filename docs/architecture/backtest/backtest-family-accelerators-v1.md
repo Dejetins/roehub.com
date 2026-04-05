@@ -145,12 +145,16 @@ so browser/debug tooling sees the same typed profile contract used by config and
 
 Rollout remains conservative:
 
-- `dev`: `hybrid_family` runtime gates enabled for internal requested-mode use,
-- `test`: `hybrid_family` runtime gates enabled for internal coverage and perf-smoke evidence,
-- `prod`: `hybrid_family` remains disabled by default.
+- `dev`: `hybrid_family` runtime gates are enabled, but adaptive-selector rollout for the
+  candidate remains `shadow`;
+- `test`: `hybrid_family` runtime gates are enabled for internal coverage and perf-smoke
+  evidence, while selector rollout remains `shadow`;
+- `prod`: `hybrid_family` runtime gates are enabled for internal/manual evaluation and shadow
+  recommendations, but committed selector rollout still keeps it non-live by default.
 
 There is still no public `POST /backtests` selector for `hybrid_family`.
-The path stays internal-only through the existing requested-profile override.
+The live path stays internal-only through the existing requested-profile override or shadow
+recommendation/debug surfaces.
 
 ## Warning/debug surface
 
