@@ -17,6 +17,12 @@ from trading.contexts.backtest.application.dto import (
     BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
     normalize_backtest_ranking_metric_literal,
 )
+from trading.contexts.backtest.application.services.v2.adaptive_selector_v2 import (
+    AdaptiveSelectorCandidatePolicyV2,
+    AdaptiveSelectorPolicyV2,
+    default_adaptive_selector_policy_v2,
+    validate_adaptive_selector_policy_mode_v2,
+)
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
     DEFAULT_EXECUTION_PROFILE_MODE_V2,
     ExecutionProfileFeatureFlagsV2,
@@ -577,6 +583,9 @@ class BacktestRuntimeConfig:
     execution_profiles: ExecutionProfilesCatalogV2 = field(
         default_factory=default_execution_profiles_catalog_v2
     )
+    adaptive_selector_policy: AdaptiveSelectorPolicyV2 = field(
+        default_factory=default_adaptive_selector_policy_v2
+    )
     warmup_bars_default: int = _WARMUP_BARS_DEFAULT
     top_k_default: int = _TOP_K_DEFAULT
     preselect_default: int = _PRESELECT_DEFAULT
@@ -641,6 +650,8 @@ class BacktestRuntimeConfig:
             raise ValueError("backtest.contracts section must be configured")
         if self.execution_profiles is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest.execution_profiles section must be configured")
+        if self.adaptive_selector_policy is None:  # type: ignore[truthy-bool]
+            raise ValueError("backtest.execution_profiles.adaptive_selector is required")
 
 
 
@@ -720,6 +731,11 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     cpu_map = _get_mapping(backtest_map, "cpu", required=False)
     contracts_map = _get_mapping(backtest_map, "contracts", required=False)
     execution_profiles_map = _get_mapping(backtest_map, "execution_profiles", required=False)
+    adaptive_selector_map = _get_mapping(
+        execution_profiles_map,
+        "adaptive_selector",
+        required=False,
+    )
     jobs_map = _get_mapping(backtest_map, "jobs", required=True)
     sync_map = _get_mapping(backtest_map, "sync", required=True)
     contracts_request_timeframes_map = _get_mapping(
@@ -895,6 +911,9 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     execution_profiles = _parse_execution_profiles_catalog(
         data=execution_profiles_map,
     )
+    adaptive_selector_policy = _parse_adaptive_selector_policy(
+        data=adaptive_selector_map,
+    )
 
     return BacktestRuntimeConfig(
         version=version,
@@ -902,6 +921,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         sync=sync,
         contracts=contracts,
         execution_profiles=execution_profiles,
+        adaptive_selector_policy=adaptive_selector_policy,
         warmup_bars_default=warmup_bars_default,
         top_k_default=top_k_default,
         preselect_default=preselect_default,
@@ -1700,6 +1720,120 @@ def _parse_execution_profiles_catalog(
     return ExecutionProfilesCatalogV2(
         default_mode=default_mode,
         available_profiles=tuple(available_profiles),
+    )
+
+
+def _parse_adaptive_selector_policy(
+    *,
+    data: Mapping[str, Any],
+) -> AdaptiveSelectorPolicyV2:
+    """
+    Parse typed adaptive-selector rollout policy from the runtime config surface.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
+      - configs/dev/backtest.yaml
+
+    Args:
+        data: Raw `backtest.execution_profiles.adaptive_selector` mapping from YAML.
+    Returns:
+        AdaptiveSelectorPolicyV2: Parsed selector rollout policy.
+    Assumptions:
+        Selector policy remains config-backed and fail-fast so later rollout can promote
+        `shadow` or `active` explicitly without redesigning the selector contract, while
+        candidate-specific rollout caps may keep `hybrid_family` narrower than
+        `hybrid_conservative`.
+    Raises:
+        ValueError: If one rollout mode or cost-model threshold is invalid.
+    Side Effects:
+        None.
+    """
+    if len(data) == 0:
+        return default_adaptive_selector_policy_v2()
+    default_policy = default_adaptive_selector_policy_v2()
+    hybrid_conservative_map = _get_mapping(data, "hybrid_conservative", required=False)
+    hybrid_family_map = _get_mapping(data, "hybrid_family", required=False)
+    return AdaptiveSelectorPolicyV2(
+        mode=validate_adaptive_selector_policy_mode_v2(
+            value=_get_str_with_default(
+                data,
+                "mode",
+                default=default_policy.mode,
+            )
+        ),
+        hybrid_conservative=AdaptiveSelectorCandidatePolicyV2(
+            min_grid_cardinality=_get_int_with_default(
+                hybrid_conservative_map,
+                "min_grid_cardinality",
+                default=default_policy.hybrid_conservative.min_grid_cardinality,
+            ),
+            min_stage_a_variants_total=_get_int_with_default(
+                hybrid_conservative_map,
+                "min_stage_a_variants_total",
+                default=default_policy.hybrid_conservative.min_stage_a_variants_total,
+            ),
+            min_stage_b_variants_total=_get_int_with_default(
+                hybrid_conservative_map,
+                "min_stage_b_variants_total",
+                default=default_policy.hybrid_conservative.min_stage_b_variants_total,
+            ),
+            min_estimated_memory_bytes=_get_int_with_default(
+                hybrid_conservative_map,
+                "min_estimated_memory_bytes",
+                default=default_policy.hybrid_conservative.min_estimated_memory_bytes,
+            ),
+            rollout_mode=validate_adaptive_selector_policy_mode_v2(
+                value=_get_str_with_default(
+                    hybrid_conservative_map,
+                    "rollout_mode",
+                    default=default_policy.hybrid_conservative.rollout_mode,
+                )
+            ),
+            minimum_exceeded_signals=_get_int_with_default(
+                hybrid_conservative_map,
+                "minimum_exceeded_signals",
+                default=default_policy.hybrid_conservative.minimum_exceeded_signals,
+            ),
+        ),
+        hybrid_family=AdaptiveSelectorCandidatePolicyV2(
+            min_grid_cardinality=_get_int_with_default(
+                hybrid_family_map,
+                "min_grid_cardinality",
+                default=default_policy.hybrid_family.min_grid_cardinality,
+            ),
+            min_stage_a_variants_total=_get_int_with_default(
+                hybrid_family_map,
+                "min_stage_a_variants_total",
+                default=default_policy.hybrid_family.min_stage_a_variants_total,
+            ),
+            min_stage_b_variants_total=_get_int_with_default(
+                hybrid_family_map,
+                "min_stage_b_variants_total",
+                default=default_policy.hybrid_family.min_stage_b_variants_total,
+            ),
+            min_estimated_memory_bytes=_get_int_with_default(
+                hybrid_family_map,
+                "min_estimated_memory_bytes",
+                default=default_policy.hybrid_family.min_estimated_memory_bytes,
+            ),
+            rollout_mode=validate_adaptive_selector_policy_mode_v2(
+                value=_get_str_with_default(
+                    hybrid_family_map,
+                    "rollout_mode",
+                    default=default_policy.hybrid_family.rollout_mode,
+                )
+            ),
+            minimum_exceeded_signals=_get_int_with_default(
+                hybrid_family_map,
+                "minimum_exceeded_signals",
+                default=default_policy.hybrid_family.minimum_exceeded_signals,
+            ),
+        ),
     )
 
 

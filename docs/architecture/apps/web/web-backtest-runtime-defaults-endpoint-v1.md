@@ -52,6 +52,13 @@
   - this is a proposal-layer timeout budget for future `hybrid_family` plugins only;
   - browser still does not choose `execution_profile_mode`, and `hybrid_family` remains
     non-routable in live public launch flow.
+- F2 additive contract:
+  - `contracts.execution.adaptive_selector` now exposes read-only selector rollout status from
+    startup config;
+  - this includes env-level `mode` plus candidate-specific rollout caps for
+    `hybrid_conservative` and `hybrid_family`;
+  - browser/debug tooling may inspect rollout state, but browser still does not choose
+    `execution_profile_mode` and does not enable selector paths directly.
 
 ## Цель
 
@@ -294,7 +301,26 @@
           "family_plugin_budget_ms": 40,
           "planning_budget_ms": 100
         }
-      ]
+      ],
+      "adaptive_selector": {
+        "mode": "shadow",
+        "hybrid_conservative": {
+          "rollout_mode": "active",
+          "min_grid_cardinality": 6000,
+          "min_stage_a_variants_total": 6000,
+          "min_stage_b_variants_total": 40000,
+          "min_estimated_memory_bytes": 805306368,
+          "minimum_exceeded_signals": 3
+        },
+        "hybrid_family": {
+          "rollout_mode": "shadow",
+          "min_grid_cardinality": 12000,
+          "min_stage_a_variants_total": 12000,
+          "min_stage_b_variants_total": 80000,
+          "min_estimated_memory_bytes": 1073741824,
+          "minimum_exceeded_signals": 3
+        }
+      }
     },
     "launch": {
       "execution_mode": "auto",

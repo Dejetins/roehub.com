@@ -691,6 +691,25 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                         "planning_budget_ms": 100,
                     },
                 ],
+                "adaptive_selector": {
+                    "mode": "disabled",
+                    "hybrid_conservative": {
+                        "rollout_mode": "active",
+                        "min_grid_cardinality": 6000,
+                        "min_stage_a_variants_total": 6000,
+                        "min_stage_b_variants_total": 40000,
+                        "min_estimated_memory_bytes": 805306368,
+                        "minimum_exceeded_signals": 3,
+                    },
+                    "hybrid_family": {
+                        "rollout_mode": "active",
+                        "min_grid_cardinality": 12000,
+                        "min_stage_a_variants_total": 12000,
+                        "min_stage_b_variants_total": 80000,
+                        "min_estimated_memory_bytes": 1073741824,
+                        "minimum_exceeded_signals": 3,
+                    },
+                },
             },
             "launch": {
                 "execution_mode": "auto",

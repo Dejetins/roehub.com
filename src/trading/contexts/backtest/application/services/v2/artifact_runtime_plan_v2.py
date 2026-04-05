@@ -27,6 +27,14 @@ from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId
 from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 from trading.platform.errors import RoehubError
 
+from .adaptive_selector_v2 import (
+    AdaptiveExecutionSelectorV2,
+    AdaptiveSelectorDecisionV2,
+    AdaptiveSelectorPlanningEvidenceV2,
+    AdaptiveSelectorPolicyV2,
+    CostModelAdaptiveExecutionSelectorV2,
+    default_adaptive_selector_policy_v2,
+)
 from .execution_profile_v2 import (
     ExecutionProfileModeLiteralV2,
     ExecutionProfilesCatalogV2,
@@ -273,6 +281,7 @@ class BacktestArtifactRuntimePlanV2:
     signal_features_access: tuple[BacktestSignalFeaturesAccessPlanV2, ...] = field(
         default=(),
     )
+    adaptive_selector_decision: AdaptiveSelectorDecisionV2 | None = None
 
     def __post_init__(self) -> None:
         """
@@ -291,9 +300,11 @@ class BacktestArtifactRuntimePlanV2:
         Returns:
             None.
         Assumptions:
-            Stage totals and memory totals were guard-validated by the planner.
+            Stage totals and memory totals were guard-validated by the planner; when selector
+            debug metadata is attached, it must agree with the effective execution profile.
         Raises:
-            ValueError: If one scalar invariant is invalid.
+            ValueError: If one scalar invariant is invalid or selector debug metadata drifts from
+                the effective execution profile.
         Side Effects:
             Replaces execution params with an immutable key-sorted proxy.
         """
@@ -303,6 +314,15 @@ class BacktestArtifactRuntimePlanV2:
             )
         if self.execution_profile is None:  # type: ignore[truthy-bool]
             raise ValueError("BacktestArtifactRuntimePlanV2.execution_profile is required")
+        if (
+            self.adaptive_selector_decision is not None
+            and self.adaptive_selector_decision.effective_profile.mode
+            != self.execution_profile.mode
+        ):
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.adaptive_selector_decision must match the "
+                "effective execution profile"
+            )
         if not self.timeframe_code.strip():
             raise ValueError("BacktestArtifactRuntimePlanV2.timeframe_code must be non-empty")
         if self.stage_a_variants_total <= 0:
@@ -570,15 +590,19 @@ class BacktestArtifactRuntimePlannerV2:
         *,
         execution_profiles: ExecutionProfilesCatalogV2 | None = None,
         launch_budget_mode: PlannerLaunchBudgetModeV2 = "ignore",
+        adaptive_selector_policy: AdaptiveSelectorPolicyV2 | None = None,
+        adaptive_selector: AdaptiveExecutionSelectorV2 | None = None,
     ) -> None:
         """
         Store typed execution-profile catalog used by exact profile selection and launch routing.
 
         Docs:
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-adaptive-selector-v1.md
           - docs/architecture/backtest/backtest-api-post-backtests-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
           - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
           - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
 
@@ -588,11 +612,18 @@ class BacktestArtifactRuntimePlannerV2:
                 Whether to ignore heavy-request launch budgets (`ignore`) or to raise a
                 deterministic `background_auto` routing signal when sync launch budgets are
                 exceeded (`sync_inline`).
+            adaptive_selector_policy:
+                Optional startup-validated adaptive-selector rollout policy controlling
+                `disabled`, `shadow`, and `active` automatic profile selection.
+            adaptive_selector:
+                Optional selector implementation. When omitted, the default deterministic cost
+                model is used.
         Returns:
             None.
         Assumptions:
             Sync launch paths may enforce stricter profile launch budgets than background/worker
-            paths, but both still reuse the same exact profile catalog.
+            paths, but both still reuse the same execution-profile catalog and adaptive-selector
+            policy surface.
         Raises:
             ValueError: If resolved catalog or launch-budget mode is invalid.
         Side Effects:
@@ -610,6 +641,12 @@ class BacktestArtifactRuntimePlannerV2:
             )
         self._execution_profiles = resolved_execution_profiles
         self._launch_budget_mode = launch_budget_mode
+        self._adaptive_selector_policy = (
+            adaptive_selector_policy or default_adaptive_selector_policy_v2()
+        )
+        self._adaptive_selector = (
+            adaptive_selector or CostModelAdaptiveExecutionSelectorV2()
+        )
 
     def resolve_execution_profile(
         self,
@@ -618,14 +655,17 @@ class BacktestArtifactRuntimePlannerV2:
         stage_b_variants_total: int | None = None,
         estimated_memory_bytes: int | None = None,
         requested_execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
+        indicator_ids: tuple[str, ...] | None = None,
     ) -> ExecutionProfileV2:
         """
         Resolve the effective execution profile from deterministic planner cost evidence.
 
         Docs:
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-adaptive-selector-v1.md
           - docs/architecture/backtest/backtest-api-post-backtests-v1.md
         Related:
+          - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
           - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
           - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
           - apps/api/wiring/modules/backtest.py
@@ -638,11 +678,14 @@ class BacktestArtifactRuntimePlannerV2:
                 Optional internal-only requested execution profile mode. When present, automatic
                 exact-profile selection is bypassed and the requested profile is validated against
                 live runtime gating plus sync launch budgets.
+            indicator_ids:
+                Optional deterministic indicator ids from the prepared plan. These stay internal
+                and are used only to validate `hybrid_family` plugin availability.
         Returns:
             ExecutionProfileV2: Selected execution profile for the prepared request.
         Assumptions:
-            Automatic profile selection remains exact-only by default, while requested-profile
-            resolution is internal-only and additive for explicit rollout wiring.
+            Requested-profile overrides keep precedence, while automatic selection uses the typed
+            adaptive selector only when planning evidence is available.
         Raises:
             RoehubError: If sync launch budgets are exceeded and background routing is required.
             ValueError: If configured profiles cannot be resolved from the catalog.
@@ -685,24 +728,73 @@ class BacktestArtifactRuntimePlannerV2:
         ):
             return self._execution_profiles.default_profile()
 
-        exact_profiles = self._execution_profiles.runtime_enabled_exact_profiles()
-        for profile in exact_profiles:
-            if profile.launch_budget.allows(
+        return self._resolve_execution_profile_selection(
+            stage_a_variants_total=stage_a_variants_total,
+            stage_b_variants_total=stage_b_variants_total,
+            estimated_memory_bytes=estimated_memory_bytes,
+            indicator_ids=indicator_ids,
+        )[0]
+
+    def _resolve_execution_profile_selection(
+        self,
+        *,
+        stage_a_variants_total: int,
+        stage_b_variants_total: int,
+        estimated_memory_bytes: int,
+        indicator_ids: tuple[str, ...] | None = None,
+    ) -> tuple[ExecutionProfileV2, AdaptiveSelectorDecisionV2]:
+        """
+        Resolve both the effective execution profile and the internal selector decision payload.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - tests/unit/contexts/backtest/application/services/v2/test_adaptive_selector_v2.py
+
+        Args:
+            stage_a_variants_total: Prepared Stage A variants count.
+            stage_b_variants_total: Prepared Stage B variants count.
+            estimated_memory_bytes: Deterministic memory estimate.
+            indicator_ids: Optional deterministic indicator ids from the prepared plan.
+        Returns:
+            tuple[ExecutionProfileV2, AdaptiveSelectorDecisionV2]: Effective execution profile
+                plus the full selector decision payload for internal inspection.
+        Assumptions:
+            This helper is used only after guard math is available, so the selector can stay
+            deterministic and free of runtime IO.
+        Raises:
+            RoehubError: If sync launch budgets are exceeded and background routing is required.
+        Side Effects:
+            None.
+        """
+        selector_decision = self._adaptive_selector.select(
+            evidence=AdaptiveSelectorPlanningEvidenceV2(
+                grid_cardinality=stage_a_variants_total,
                 stage_a_variants_total=stage_a_variants_total,
                 stage_b_variants_total=stage_b_variants_total,
                 estimated_memory_bytes=estimated_memory_bytes,
-            ):
-                return profile
-
-        background_profile = self._execution_profiles.background_exact_profile()
-        if self._launch_budget_mode == "sync_inline":
+                runtime_mode=(
+                    "sync_inline"
+                    if self._launch_budget_mode == "sync_inline"
+                    else "background_capable"
+                ),
+                indicator_ids=indicator_ids or (),
+            ),
+            execution_profiles=self._execution_profiles,
+            policy=self._adaptive_selector_policy,
+        )
+        if selector_decision.requires_background_auto:
             raise _background_auto_required_error_v2(
-                execution_profile_mode=background_profile.mode,
+                execution_profile_mode=selector_decision.exact_fallback_profile.mode,
                 stage_a_variants_total=stage_a_variants_total,
                 stage_b_variants_total=stage_b_variants_total,
                 estimated_memory_bytes=estimated_memory_bytes,
             )
-        return background_profile
+        return selector_decision.effective_profile, selector_decision
 
     def build(
         self,
@@ -800,12 +892,24 @@ class BacktestArtifactRuntimePlannerV2:
                 max_variants_per_compute=max_variants_per_compute,
                 execution_profile_mode=self._execution_profiles.background_exact_profile().mode,
             )
-        execution_profile = self.resolve_execution_profile(
-            stage_a_variants_total=stage_a_variants_total,
-            stage_b_variants_total=stage_b_variants_total,
-            estimated_memory_bytes=estimated_memory_bytes,
-            requested_execution_profile_mode=requested_execution_profile_mode,
-        )
+        adaptive_selector_decision: AdaptiveSelectorDecisionV2 | None = None
+        if requested_execution_profile_mode is None:
+            execution_profile, adaptive_selector_decision = (
+                self._resolve_execution_profile_selection(
+                    stage_a_variants_total=stage_a_variants_total,
+                    stage_b_variants_total=stage_b_variants_total,
+                    estimated_memory_bytes=estimated_memory_bytes,
+                    indicator_ids=tuple(plan.indicator_id for plan in indicator_plans),
+                )
+            )
+        else:
+            execution_profile = self.resolve_execution_profile(
+                stage_a_variants_total=stage_a_variants_total,
+                stage_b_variants_total=stage_b_variants_total,
+                estimated_memory_bytes=estimated_memory_bytes,
+                requested_execution_profile_mode=requested_execution_profile_mode,
+                indicator_ids=tuple(plan.indicator_id for plan in indicator_plans),
+            )
 
         return BacktestArtifactRuntimePlanV2(
             indicator_plans=indicator_plans,
@@ -829,6 +933,7 @@ class BacktestArtifactRuntimePlannerV2:
             stage_b_variants_total=stage_b_variants_total,
             estimated_memory_bytes=estimated_memory_bytes,
             indicator_estimate_calls=len(indicator_plans),
+            adaptive_selector_decision=adaptive_selector_decision,
         )
 
     def _build_indicator_plans(

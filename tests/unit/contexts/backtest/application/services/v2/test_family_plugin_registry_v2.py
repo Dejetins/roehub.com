@@ -230,6 +230,39 @@ def test_family_plugin_registry_returns_disabled_when_feature_flag_is_off() -> N
     assert resolution.warning is None
 
 
+def test_family_plugin_registry_returns_not_applicable_warning_for_mixed_families() -> None:
+    """
+    Verify mixed-family runtime plans emit explicit warning metadata for universal fallback.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The first live `hybrid_family` path must keep mixed-family fallback explicit and
+        reviewable instead of silently degrading.
+    Raises:
+        AssertionError: If mixed-family resolution omits its warning payload.
+    Side Effects:
+        None.
+    """
+    registry = build_default_family_plugin_registry_v2()
+    context = build_family_plugin_planning_context_v2(
+        runtime_plan=_build_runtime_plan(
+            indicator_ids=("ma.sma", "momentum.trix"),
+            family_plugin_enabled=True,
+        )
+    )
+
+    resolution = registry.resolve(context=context)
+
+    assert resolution.status == "not_applicable"
+    assert resolution.plugin is None
+    assert resolution.warning is not None
+    assert resolution.warning.reason == "not_applicable"
+    assert "warning + universal fallback" in resolution.warning.message
+
+
 def test_build_default_family_plugin_registry_v2_registers_first_ma_plugin() -> None:
     """
     Verify the shipped default registry exposes the first concrete MA-family plugin.

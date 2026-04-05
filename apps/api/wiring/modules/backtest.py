@@ -204,9 +204,11 @@ def build_backtest_router(
     sync_runtime_planner = BacktestArtifactRuntimePlannerV2(
         execution_profiles=runtime_config.execution_profiles,
         launch_budget_mode="sync_inline",
+        adaptive_selector_policy=runtime_config.adaptive_selector_policy,
     )
     background_runtime_planner = BacktestArtifactRuntimePlannerV2(
         execution_profiles=runtime_config.execution_profiles,
+        adaptive_selector_policy=runtime_config.adaptive_selector_policy,
     )
 
     run_use_case_base_kwargs: dict[str, Any] = dict(

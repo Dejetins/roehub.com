@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Literal, Mapping, cast
 
+from ..execution_profile_v2 import ExecutionProfileModeLiteralV2
 from .contracts_v2 import (
     FamilyAccelerationPluginV2,
     FamilyPluginPlanningContextV2,
@@ -119,10 +120,22 @@ class FamilyPluginRegistryResolutionV2:
                     "status='missing_plugin'"
                 )
             return
+        if self.status == "not_applicable":
+            if self.selection_key is not None:
+                raise ValueError(
+                    "FamilyPluginRegistryResolutionV2.selection_key must be None when "
+                    "status='not_applicable'"
+                )
+            if self.warning is None:  # type: ignore[truthy-bool]
+                raise ValueError(
+                    "FamilyPluginRegistryResolutionV2.warning is required when "
+                    "status='not_applicable'"
+                )
+            return
         if self.warning is not None:
             raise ValueError(
                 "FamilyPluginRegistryResolutionV2.warning must be None unless "
-                "status='missing_plugin'"
+                "status='missing_plugin' or status='not_applicable'"
             )
 
 
@@ -234,13 +247,66 @@ class FamilyPluginRegistryV2:
         """
         if context is None:  # type: ignore[truthy-bool]
             raise ValueError("FamilyPluginRegistryV2.resolve requires context")
-        if not context.runtime_plan.execution_profile.feature_flags.family_plugin_enabled:
-            return FamilyPluginRegistryResolutionV2(status="disabled")
-        if context.indicator_family_literal is None:
-            return FamilyPluginRegistryResolutionV2(status="not_applicable")
-        selection_key = FamilyPluginSelectionKeyV2(
+        return self.resolve_selection(
             execution_profile_mode=context.runtime_plan.execution_profile.mode,
             indicator_family_literal=context.indicator_family_literal,
+            family_plugin_enabled=(
+                context.runtime_plan.execution_profile.feature_flags.family_plugin_enabled
+            ),
+        )
+
+    def resolve_selection(
+        self,
+        *,
+        execution_profile_mode: ExecutionProfileModeLiteralV2,
+        indicator_family_literal: str | None,
+        family_plugin_enabled: bool,
+    ) -> FamilyPluginRegistryResolutionV2:
+        """
+        Resolve one proposal-only family-plugin candidate from explicit selector metadata.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/registry_v2.py
+          - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
+          - tests/unit/contexts/backtest/application/services/v2/test_family_plugin_registry_v2.py
+
+        Args:
+            execution_profile_mode: Candidate execution-profile mode under evaluation.
+            indicator_family_literal:
+                Deterministic indicator-family literal derived from planning-time indicator ids,
+                or `None` for mixed-family / unsupported requests.
+            family_plugin_enabled:
+                Explicit profile-level routing gate carried by the execution-profile catalog.
+        Returns:
+            FamilyPluginRegistryResolutionV2: Explicit deterministic registry resolution outcome.
+        Assumptions:
+            Adaptive selection and live runtime execution must share the same registry semantics
+            so `hybrid_family` cannot be recommended when plugin routing is unavailable.
+        Raises:
+            ValueError: If the execution-profile mode literal is unsupported.
+        Side Effects:
+            None.
+        """
+        if not family_plugin_enabled:
+            return FamilyPluginRegistryResolutionV2(status="disabled")
+        if indicator_family_literal is None:
+            return FamilyPluginRegistryResolutionV2(
+                status="not_applicable",
+                warning=FamilyPluginWarningV2(
+                    reason="not_applicable",
+                    message=(
+                        "Prepared runtime plan spans mixed indicator families and does not map "
+                        "to one proposal-only family plugin; warning + universal fallback applies."
+                    ),
+                ),
+            )
+        selection_key = FamilyPluginSelectionKeyV2(
+            execution_profile_mode=execution_profile_mode,
+            indicator_family_literal=indicator_family_literal,
         )
         plugin = self._plugins_by_selection_key.get(selection_key)
         if plugin is None:

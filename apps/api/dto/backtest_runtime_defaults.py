@@ -140,6 +140,51 @@ class BacktestRuntimeSignalsContractResponse(BaseModel):
     params_policy: str
 
 
+class BacktestRuntimeAdaptiveSelectorCandidateResponse(BaseModel):
+    """
+    API response model for one candidate-specific adaptive-selector rollout policy.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    rollout_mode: str
+    min_grid_cardinality: int
+    min_stage_a_variants_total: int
+    min_stage_b_variants_total: int
+    min_estimated_memory_bytes: int
+    minimum_exceeded_signals: int
+
+
+class BacktestRuntimeAdaptiveSelectorResponse(BaseModel):
+    """
+    API response model for read-only adaptive-selector rollout status.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - apps/api/routes/backtests.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    mode: str
+    hybrid_conservative: BacktestRuntimeAdaptiveSelectorCandidateResponse
+    hybrid_family: BacktestRuntimeAdaptiveSelectorCandidateResponse
+
+
 class BacktestRuntimeExecutionContractResponse(BaseModel):
     """
     API response model for frozen R0 execution semantics contract.
@@ -159,6 +204,7 @@ class BacktestRuntimeExecutionContractResponse(BaseModel):
     risk_model: str
     default_execution_profile: str
     available_execution_profiles: list["BacktestRuntimeExecutionProfileResponse"]
+    adaptive_selector: BacktestRuntimeAdaptiveSelectorResponse
 
 
 class BacktestRuntimeExecutionProfileShortlistResponse(BaseModel):
@@ -558,6 +604,55 @@ def build_backtest_runtime_defaults_response(
                 risk_model=config.contracts.risk_model,
                 default_execution_profile=config.execution_profiles.default_mode,
                 available_execution_profiles=available_execution_profiles,
+                adaptive_selector=BacktestRuntimeAdaptiveSelectorResponse(
+                    mode=config.adaptive_selector_policy.mode,
+                    hybrid_conservative=BacktestRuntimeAdaptiveSelectorCandidateResponse(
+                        rollout_mode=(
+                            config.adaptive_selector_policy.hybrid_conservative.rollout_mode
+                        ),
+                        min_grid_cardinality=(
+                            config.adaptive_selector_policy.hybrid_conservative.min_grid_cardinality
+                        ),
+                        min_stage_a_variants_total=(
+                            config.adaptive_selector_policy.hybrid_conservative
+                            .min_stage_a_variants_total
+                        ),
+                        min_stage_b_variants_total=(
+                            config.adaptive_selector_policy.hybrid_conservative
+                            .min_stage_b_variants_total
+                        ),
+                        min_estimated_memory_bytes=(
+                            config.adaptive_selector_policy.hybrid_conservative
+                            .min_estimated_memory_bytes
+                        ),
+                        minimum_exceeded_signals=(
+                            config.adaptive_selector_policy.hybrid_conservative
+                            .minimum_exceeded_signals
+                        ),
+                    ),
+                    hybrid_family=BacktestRuntimeAdaptiveSelectorCandidateResponse(
+                        rollout_mode=config.adaptive_selector_policy.hybrid_family.rollout_mode,
+                        min_grid_cardinality=(
+                            config.adaptive_selector_policy.hybrid_family.min_grid_cardinality
+                        ),
+                        min_stage_a_variants_total=(
+                            config.adaptive_selector_policy.hybrid_family
+                            .min_stage_a_variants_total
+                        ),
+                        min_stage_b_variants_total=(
+                            config.adaptive_selector_policy.hybrid_family
+                            .min_stage_b_variants_total
+                        ),
+                        min_estimated_memory_bytes=(
+                            config.adaptive_selector_policy.hybrid_family
+                            .min_estimated_memory_bytes
+                        ),
+                        minimum_exceeded_signals=(
+                            config.adaptive_selector_policy.hybrid_family
+                            .minimum_exceeded_signals
+                        ),
+                    ),
+                ),
             ),
             launch=BacktestRuntimeLaunchContractResponse(
                 execution_mode=config.contracts.execution_mode,
@@ -573,6 +668,8 @@ def build_backtest_runtime_defaults_response(
 
 
 __all__ = [
+    "BacktestRuntimeAdaptiveSelectorCandidateResponse",
+    "BacktestRuntimeAdaptiveSelectorResponse",
     "BacktestRuntimeContractsResponse",
     "BacktestRuntimeDefaultsResponse",
     "BacktestRuntimeExecutionDefaultsResponse",

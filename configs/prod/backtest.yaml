@@ -56,6 +56,22 @@ backtest:
       auto_fallback_to_background_enabled: true
   execution_profiles:
     default: exact_small
+    adaptive_selector:
+      mode: shadow
+      hybrid_conservative:
+        rollout_mode: active
+        min_grid_cardinality: 6000
+        min_stage_a_variants_total: 6000
+        min_stage_b_variants_total: 40000
+        min_estimated_memory_bytes: 805306368
+        minimum_exceeded_signals: 3
+      hybrid_family:
+        rollout_mode: shadow
+        min_grid_cardinality: 12000
+        min_stage_a_variants_total: 12000
+        min_stage_b_variants_total: 80000
+        min_estimated_memory_bytes: 1073741824
+        minimum_exceeded_signals: 3
     profiles:
       - mode: exact_small
         family_plugin_budget_ms: 10
@@ -177,10 +193,10 @@ backtest:
           stage_a_workers: 1
           stage_b_workers: 4
         feature_flags:
-          runtime_enabled: false
-          heuristic_shortlist_enabled: false
+          runtime_enabled: true
+          heuristic_shortlist_enabled: true
           parallel_stage_b_enabled: false
-          family_plugin_enabled: false
+          family_plugin_enabled: true
   guards:
     max_variants_per_compute: 600000
     max_compute_bytes_total: 5368709120

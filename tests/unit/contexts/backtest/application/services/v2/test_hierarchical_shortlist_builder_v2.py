@@ -715,7 +715,8 @@ def test_hierarchical_shortlist_builder_v2_falls_back_for_mixed_family_hybrid_fa
     assert isinstance(reduced_plan, HierarchicalShortlistRuntimePlanV2)
     assert reduced_plan.proposal_layer_source == "universal"
     assert reduced_plan.family_plugin_registry_status == "not_applicable"
-    assert reduced_plan.family_plugin_warning is None
+    assert reduced_plan.family_plugin_warning is not None
+    assert reduced_plan.family_plugin_warning.reason == "not_applicable"
     assert reduced_plan.block_results
     assert price_loader.calls == 1
     assert signal_loader.matrix_calls == ["ma.ema", "momentum.trix"]

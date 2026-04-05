@@ -120,6 +120,11 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.contracts.auto_preflight_enabled is True
     assert config.contracts.auto_fallback_to_background_enabled is True
     assert config.execution_profiles.default_mode == "exact_small"
+    assert config.adaptive_selector_policy.mode == "active"
+    assert config.adaptive_selector_policy.hybrid_conservative.rollout_mode == "active"
+    assert config.adaptive_selector_policy.hybrid_family.rollout_mode == "shadow"
+    assert config.adaptive_selector_policy.hybrid_conservative.min_grid_cardinality == 6000
+    assert config.adaptive_selector_policy.hybrid_family.min_stage_b_variants_total == 80000
     assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
         "exact_small",
         "exact_parallel",
@@ -207,6 +212,40 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.jobs.parallel_workers == 1
 
 
+@pytest.mark.parametrize(
+    ("config_path", "expected_mode"),
+    (
+        (Path("configs/test/backtest.yaml"), "shadow"),
+        (Path("configs/prod/backtest.yaml"), "shadow"),
+    ),
+)
+def test_load_backtest_runtime_config_reads_env_specific_selector_modes(
+    config_path: Path,
+    expected_mode: str,
+) -> None:
+    """
+    Verify committed env configs keep selector rollout explicit and conservative by environment.
+
+    Args:
+        config_path: Environment-specific runtime config path.
+        expected_mode: Expected env-level adaptive-selector mode.
+    Returns:
+        None.
+    Assumptions:
+        Candidate rollout caps remain explicit so `hybrid_family` may stay narrower than
+        `hybrid_conservative` even when env-level settings later change.
+    Raises:
+        AssertionError: If committed env configs drift from the F2 rollout contract.
+    Side Effects:
+        None.
+    """
+    config = load_backtest_runtime_config(config_path)
+
+    assert config.adaptive_selector_policy.mode == expected_mode
+    assert config.adaptive_selector_policy.hybrid_conservative.rollout_mode == "active"
+    assert config.adaptive_selector_policy.hybrid_family.rollout_mode == "shadow"
+
+
 
 def test_load_backtest_runtime_config_uses_defaults_when_optional_keys_absent(
     tmp_path: Path,
@@ -267,6 +306,9 @@ backtest:
     assert config.contracts.auto_preflight_enabled is True
     assert config.contracts.auto_fallback_to_background_enabled is True
     assert config.execution_profiles.default_mode == "exact_small"
+    assert config.adaptive_selector_policy.mode == "disabled"
+    assert config.adaptive_selector_policy.hybrid_conservative.rollout_mode == "active"
+    assert config.adaptive_selector_policy.hybrid_family.rollout_mode == "active"
     assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
         "exact_small",
         "exact_parallel",
@@ -523,6 +565,22 @@ backtest:
       auto_fallback_to_background_enabled: true
   execution_profiles:
     default: exact_small
+    adaptive_selector:
+      mode: shadow
+      hybrid_conservative:
+        rollout_mode: active
+        min_grid_cardinality: 3100
+        min_stage_a_variants_total: 3200
+        min_stage_b_variants_total: 3300
+        min_estimated_memory_bytes: 3400
+        minimum_exceeded_signals: 2
+      hybrid_family:
+        rollout_mode: shadow
+        min_grid_cardinality: 4100
+        min_stage_a_variants_total: 4200
+        min_stage_b_variants_total: 4300
+        min_estimated_memory_bytes: 4400
+        minimum_exceeded_signals: 4
     profiles:
       - mode: exact_small
         family_plugin_budget_ms: 7
@@ -684,6 +742,16 @@ backtest:
         "best_tp_pct",
     )
     assert config.execution_profiles.default_mode == "exact_small"
+    assert config.adaptive_selector_policy.mode == "shadow"
+    assert config.adaptive_selector_policy.hybrid_conservative.rollout_mode == "active"
+    assert config.adaptive_selector_policy.hybrid_conservative.min_grid_cardinality == 3100
+    assert (
+        config.adaptive_selector_policy.hybrid_conservative.minimum_exceeded_signals
+        == 2
+    )
+    assert config.adaptive_selector_policy.hybrid_family.rollout_mode == "shadow"
+    assert config.adaptive_selector_policy.hybrid_family.min_estimated_memory_bytes == 4400
+    assert config.adaptive_selector_policy.hybrid_family.minimum_exceeded_signals == 4
     assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
         "exact_small",
         "exact_parallel",
@@ -883,6 +951,58 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="default_mode"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_invalid_adaptive_selector_mode(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when adaptive-selector rollout mode is unsupported.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Selector rollout must stay on the explicit `disabled`, `shadow`, and `active` literals.
+    Raises:
+        AssertionError: If invalid selector mode does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  execution_profiles:
+    adaptive_selector:
+      mode: automatic
+    default: exact_small
+    profiles:
+      - mode: exact_small
+        planning_budget_ms: 25
+      - mode: exact_parallel
+        planning_budget_ms: 50
+      - mode: hybrid_conservative
+        planning_budget_ms: 75
+      - mode: hybrid_family
+        planning_budget_ms: 100
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="Adaptive selector policy mode"):
         load_backtest_runtime_config(config_path)
 
 

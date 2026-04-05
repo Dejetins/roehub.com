@@ -117,7 +117,7 @@ Failure handling is explicit and reusable:
 - error -> `warning + universal fallback`,
 - open breaker -> `warning + universal fallback`,
 - missing plugin -> `warning + universal fallback`,
-- mixed-family / registry non-applicability -> universal conservative fallback,
+- mixed-family / registry non-applicability -> `warning + universal fallback`,
 - repeated failures open a per-run `circuit breaker`,
 - once open, the breaker stays open for the rest of that run.
 

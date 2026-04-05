@@ -56,6 +56,22 @@ backtest:
       auto_fallback_to_background_enabled: true
   execution_profiles:
     default: exact_small
+    adaptive_selector:
+      mode: active
+      hybrid_conservative:
+        rollout_mode: active
+        min_grid_cardinality: 6000
+        min_stage_a_variants_total: 6000
+        min_stage_b_variants_total: 40000
+        min_estimated_memory_bytes: 805306368
+        minimum_exceeded_signals: 3
+      hybrid_family:
+        rollout_mode: shadow
+        min_grid_cardinality: 12000
+        min_stage_a_variants_total: 12000
+        min_stage_b_variants_total: 80000
+        min_estimated_memory_bytes: 1073741824
+        minimum_exceeded_signals: 3
     profiles:
       - mode: exact_small
         family_plugin_budget_ms: 10

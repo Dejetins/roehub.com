@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Literal, Protocol, cast
+from typing import TYPE_CHECKING, Literal, Protocol, cast
 
-from ..artifact_runtime_plan_v2 import BacktestArtifactRuntimePlanV2
 from ..execution_profile_v2 import (
     ExecutionProfileModeLiteralV2,
     validate_execution_profile_mode_v2,
 )
+
+if TYPE_CHECKING:
+    from ..artifact_runtime_plan_v2 import BacktestArtifactRuntimePlanV2
 
 type FamilyPluginProposalCapabilityLiteralV2 = Literal[
     "row_shortlist",
@@ -19,6 +21,7 @@ type FamilyPluginProposalCapabilityLiteralV2 = Literal[
 ]
 type FamilyPluginWarningReasonLiteralV2 = Literal[
     "missing_plugin",
+    "not_applicable",
     "timeout",
     "error",
     "open_breaker",
@@ -33,6 +36,7 @@ ALLOWED_FAMILY_PLUGIN_PROPOSAL_CAPABILITIES_V2: tuple[
 )
 ALLOWED_FAMILY_PLUGIN_WARNING_REASONS_V2: tuple[FamilyPluginWarningReasonLiteralV2, ...] = (
     "missing_plugin",
+    "not_applicable",
     "timeout",
     "error",
     "open_breaker",
@@ -134,8 +138,8 @@ def validate_family_plugin_warning_reason_v2(
     Returns:
         FamilyPluginWarningReasonLiteralV2: Canonical approved warning-reason literal.
     Assumptions:
-        Family-plugin failure handling is explicit and limited to missing-plugin, timeout, error,
-        and open-breaker paths.
+        Family-plugin failure handling is explicit and limited to missing-plugin,
+        not-applicable, timeout, error, and open-breaker paths.
     Raises:
         ValueError: If the literal is blank or outside the approved warning set.
     Side Effects:
@@ -814,8 +818,8 @@ class FamilyPluginWarningV2:
         Returns:
             None.
         Assumptions:
-            Warning payloads are the reusable diagnostic surface for timeout, error, open-breaker,
-            and missing-plugin fallback paths before any live `hybrid_family` routing ships.
+            Warning payloads are the reusable diagnostic surface for timeout, error,
+            open-breaker, missing-plugin, and not-applicable fallback paths.
         Raises:
             ValueError: If the reason or fallback action drift from the frozen contract, or if
                 `message` is blank.
@@ -840,10 +844,10 @@ class FamilyPluginWarningV2:
                     field_name="FamilyPluginWarningV2.plugin_id",
                 ),
             )
-        if self.reason != "missing_plugin" and self.plugin_id is None:
+        if self.reason in {"timeout", "error", "open_breaker"} and self.plugin_id is None:
             raise ValueError(
-                "FamilyPluginWarningV2.plugin_id is required for timeout/error/open_breaker "
-                "warnings"
+                "FamilyPluginWarningV2.plugin_id is required for "
+                "timeout/error/open_breaker warnings"
             )
         normalized_fallback_action = self.fallback_action.strip().lower()
         if normalized_fallback_action != FAMILY_PLUGIN_WARNING_FALLBACK_ACTION_V2:

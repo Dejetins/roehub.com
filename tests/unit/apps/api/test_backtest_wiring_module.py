@@ -620,6 +620,13 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         ).contracts.execution.default_execution_profile
         == "exact_small"
     )
+    assert (
+        cast(
+            Any,
+            captured_backtests_router_kwargs["runtime_defaults_response"],
+        ).contracts.execution.adaptive_selector.mode
+        == "disabled"
+    )
     assert [
         profile.mode
         for profile in cast(
@@ -650,6 +657,16 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         runtime_defaults_response.contracts.execution.available_execution_profiles[3]
         .family_plugin_budget_ms
         == 40
+    )
+    assert (
+        runtime_defaults_response.contracts.execution.adaptive_selector
+        .hybrid_conservative.rollout_mode
+        == "active"
+    )
+    assert (
+        runtime_defaults_response.contracts.execution.adaptive_selector
+        .hybrid_family.rollout_mode
+        == "active"
     )
 
 

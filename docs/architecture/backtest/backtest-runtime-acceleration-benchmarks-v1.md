@@ -58,10 +58,31 @@ plugin rollout на одном и том же наборе deterministic slices.
   отдельный hardcoded shape.
 - `test_backtest_hybrid_shortlist_rollout_v2.py` читает те же `slice_id` и
   `rollout_gates`, поэтому hybrid rollout evidence не создаёт второй ad-hoc benchmark set.
+- `test_backtest_adaptive_selector_rollout_v2.py` связывает committed env rollout config с теми
+  же evidence anchors: `small_grid_overhead` защищает `exact_small` / small sync runs, а
+  `memory_footprint` и existing hybrid/plugin rollout tests оправдывают только selective default
+  for large runs.
 - `test_stage_b_golden_fixtures_v2.py` проверяет, что corpus не расходится с canonical Stage B
   case order.
 - `test_backtest_r0_baseline_perf_smoke.py` проверяет byte-stable serialization и completeness
   всего benchmark corpus.
+
+## F2 rollout mapping
+
+F2 intentionally keeps benchmark evidence, selector policy, and active defaults separate:
+
+- `exact_baseline=exact_parallel` остаётся evidence anchor и не становится runtime default.
+- `small_grid_overhead` объясняет, почему даже при `adaptive selector=active` small sync runs
+  должны оставаться `exact_small`.
+- `test_backtest_hybrid_shortlist_rollout_v2.py` + `memory_footprint` дают evidence surface для
+  `hybrid_conservative` selective default only on large runs.
+- `test_backtest_family_plugin_rollout_v2.py` доказывает proposal-layer viability для pure
+  `ma.` requests, но этого пока недостаточно для unconditional live default; поэтому
+  `hybrid_family` остаётся narrower rollout path (`shadow` by default in committed prod config).
+
+То есть benchmark corpus по-прежнему не является runtime selector input.
+Он только фиксирует reviewable evidence, по которому env config может безопасно оставаться
+`shadow`, перейти в `active`, или откатиться обратно.
 
 ## Что корпус сейчас намеренно не делает
 
