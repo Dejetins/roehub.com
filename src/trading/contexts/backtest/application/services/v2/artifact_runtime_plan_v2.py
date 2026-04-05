@@ -32,6 +32,7 @@ from .execution_profile_v2 import (
     ExecutionProfilesCatalogV2,
     ExecutionProfileV2,
     default_execution_profiles_catalog_v2,
+    execution_profile_supports_requested_runtime_v2,
 )
 
 STAGE_A_LITERAL_V2 = "stage_a"
@@ -504,9 +505,10 @@ class BacktestArtifactRuntimePlannerV2:
         stage_a_variants_total: int | None = None,
         stage_b_variants_total: int | None = None,
         estimated_memory_bytes: int | None = None,
+        requested_execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
     ) -> ExecutionProfileV2:
         """
-        Resolve the effective exact execution profile from deterministic planner cost evidence.
+        Resolve the effective execution profile from deterministic planner cost evidence.
 
         Docs:
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
@@ -520,18 +522,50 @@ class BacktestArtifactRuntimePlannerV2:
             stage_a_variants_total: Optional prepared Stage A variants count for future policy.
             stage_b_variants_total: Optional prepared Stage B variants count.
             estimated_memory_bytes: Optional prepared deterministic memory estimate.
+            requested_execution_profile_mode:
+                Optional internal-only requested execution profile mode. When present, automatic
+                exact-profile selection is bypassed and the requested profile is validated against
+                live runtime gating plus sync launch budgets.
         Returns:
-            ExecutionProfileV2: Selected exact execution profile for the prepared request.
+            ExecutionProfileV2: Selected execution profile for the prepared request.
         Assumptions:
-            Ordered runtime-enabled exact profiles progress from lighter to heavier exact runtime
-            envelopes; heavy-but-valid sync requests may still be redirected to
-            `background_auto` by launch-budget policy.
+            Automatic profile selection remains exact-only by default, while requested-profile
+            resolution is internal-only and additive for explicit rollout wiring.
         Raises:
             RoehubError: If sync launch budgets are exceeded and background routing is required.
-            ValueError: If configured exact profiles cannot be resolved from the catalog.
+            ValueError: If configured profiles cannot be resolved from the catalog.
         Side Effects:
             None.
         """
+        if requested_execution_profile_mode is not None:
+            requested_profile = self._execution_profiles.profile_for_mode(
+                mode=requested_execution_profile_mode
+            )
+            if not execution_profile_supports_requested_runtime_v2(
+                profile=requested_profile
+            ):
+                raise _requested_execution_profile_not_enabled_error_v2(
+                    execution_profile_mode=requested_profile.mode
+                )
+            if (
+                self._launch_budget_mode == "sync_inline"
+                and stage_a_variants_total is not None
+                and stage_b_variants_total is not None
+                and estimated_memory_bytes is not None
+                and not requested_profile.launch_budget.allows(
+                    stage_a_variants_total=stage_a_variants_total,
+                    stage_b_variants_total=stage_b_variants_total,
+                    estimated_memory_bytes=estimated_memory_bytes,
+                )
+            ):
+                raise _background_auto_required_error_v2(
+                    execution_profile_mode=requested_profile.mode,
+                    stage_a_variants_total=stage_a_variants_total,
+                    stage_b_variants_total=stage_b_variants_total,
+                    estimated_memory_bytes=estimated_memory_bytes,
+                )
+            return requested_profile
+
         if (
             stage_a_variants_total is None
             or stage_b_variants_total is None
@@ -565,6 +599,7 @@ class BacktestArtifactRuntimePlannerV2:
         candles: CandleArrays,
         indicator_compute: IndicatorCompute,
         preselect: int,
+        requested_execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
@@ -585,6 +620,9 @@ class BacktestArtifactRuntimePlannerV2:
             candles: Warmup-inclusive request-timeframe candles from pinned artifacts.
             indicator_compute: Indicator estimate port used for compute-axis materialization.
             preselect: Stage A shortlist size before Stage B expansion.
+            requested_execution_profile_mode:
+                Optional internal-only execution profile mode overriding automatic exact profile
+                selection for explicit rollout/test/manual wiring.
             defaults_provider: Optional defaults provider for compute/signal fallback.
             max_variants_per_compute: Variants guard budget.
             max_compute_bytes_total: Memory guard budget.
@@ -654,6 +692,7 @@ class BacktestArtifactRuntimePlannerV2:
             stage_a_variants_total=stage_a_variants_total,
             stage_b_variants_total=stage_b_variants_total,
             estimated_memory_bytes=estimated_memory_bytes,
+            requested_execution_profile_mode=requested_execution_profile_mode,
         )
 
         return BacktestArtifactRuntimePlanV2(
@@ -839,6 +878,74 @@ def _axis_values_v2(*, axis: AxisDef) -> tuple[int | float | str, ...]:
     if axis.values_float is not None:
         return tuple(float(value) for value in axis.values_float)
     raise ValueError(f"AxisDef contains no values: {axis.name}")
+
+
+def build_signal_params_for_variant_index_v2(
+    *,
+    signal_axes: tuple[BacktestSignalAxisPlanV2, ...],
+    variant_index: int,
+) -> Mapping[str, Mapping[str, BacktestVariantScalar]]:
+    """
+    Build canonical signal params for one signal-space mixed-radix index.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+
+    Args:
+        signal_axes: Sorted materialized signal axes from the runtime plan.
+        variant_index: Flat signal-space index.
+    Returns:
+        Mapping[str, Mapping[str, BacktestVariantScalar]]: Canonical nested signal params map.
+    Assumptions:
+        Hybrid rollout must reuse the same signal expansion semantics as the exact runtime.
+    Raises:
+        ValueError: If `variant_index` is outside the mixed-radix signal bounds.
+    Side Effects:
+        None.
+    """
+    return _signal_params_from_variant_index_v2(
+        signal_axes=signal_axes,
+        variant_index=variant_index,
+    )
+
+
+def build_indicator_selection_for_variant_index_v2(
+    *,
+    plan: BacktestIndicatorPlanV2,
+    variant_index: int,
+) -> IndicatorVariantSelection:
+    """
+    Build canonical indicator selection for one indicator-local mixed-radix index.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+
+    Args:
+        plan: One materialized indicator plan from the runtime planner.
+        variant_index: Flat indicator-local variant index.
+    Returns:
+        IndicatorVariantSelection: Canonical explicit indicator selection.
+    Assumptions:
+        Hybrid rollout must preserve the same variant-key inputs as the exact runtime.
+    Raises:
+        ValueError: If `variant_index` is outside the indicator-local mixed-radix bounds.
+    Side Effects:
+        None.
+    """
+    return _indicator_selection_from_variant_index_v2(
+        plan=plan,
+        variant_index=variant_index,
+    )
 
 
 def _signal_params_from_variant_index_v2(
@@ -1376,9 +1483,49 @@ def _background_auto_required_error_v2(
     )
 
 
+def _requested_execution_profile_not_enabled_error_v2(
+    *,
+    execution_profile_mode: ExecutionProfileModeLiteralV2,
+) -> RoehubError:
+    """
+    Build canonical validation error for explicitly requested but rollout-disabled profiles.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+
+    Args:
+        execution_profile_mode: Internal requested execution profile mode literal.
+    Returns:
+        RoehubError: Canonical validation payload describing the disabled requested profile.
+    Assumptions:
+        Requested hybrid rollout profiles remain internal-only and must fail fast when feature
+        flags or shortlist gating do not explicitly enable live runtime.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return RoehubError(
+        code="validation_error",
+        message="Requested execution profile is not enabled for live runtime",
+        details={
+            "error": "execution_profile_not_enabled",
+            "execution_profile_mode": execution_profile_mode,
+        },
+    )
+
+
 __all__ = [
     "BacktestArtifactRuntimePlanV2",
     "BacktestArtifactRuntimePlannerV2",
+    "build_indicator_selection_for_variant_index_v2",
+    "build_signal_params_for_variant_index_v2",
     "BacktestIndicatorAxisPlanV2",
     "BacktestIndicatorPlanV2",
     "BacktestRiskVariantV2",

@@ -742,7 +742,7 @@ def test_r5_stage_b_golden_fixture_manifest_tracks_contract_fixture_bytes() -> N
 
 def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None:
     """
-    Verify the A3 benchmark corpus publishes deterministic exact and edge-case rollout slices.
+    Verify the D2+D3 benchmark corpus publishes deterministic exact and hybrid rollout slices.
 
     Docs:
       - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
@@ -758,8 +758,8 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
     Returns:
         None.
     Assumptions:
-        A3 keeps one explicit deterministic corpus for exact baseline, recall/diversity edge
-        cases, small-grid overhead, and memory-footprint pressure without introducing CI SLA
+        Milestone D keeps one explicit deterministic corpus for exact baseline, recall/diversity
+        edge cases, small-grid overhead, and memory-footprint pressure without introducing CI SLA
         thresholds.
     Raises:
         AssertionError: If one required slice, cross-reference, or synthetic harness contract is
@@ -791,6 +791,16 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
         "small_grid_overhead",
         "memory_footprint",
     )
+    assert corpus.rollout_gates.top_1_recall.metric == "top_1_recall"
+    assert corpus.rollout_gates.top_1_recall.min_ratio == 0.99
+    assert corpus.rollout_gates.top_10_overlap.metric == "top_10_overlap"
+    assert corpus.rollout_gates.top_10_overlap.min_ratio == 0.9
+    assert corpus.rollout_gates.low_activity.slice_id == "low_activity"
+    assert corpus.rollout_gates.low_activity.min_ratio == 0.97
+    assert corpus.rollout_gates.high_correlation.slice_id == "high_correlation"
+    assert corpus.rollout_gates.high_correlation.min_distinct_count == 2
+    assert corpus.rollout_gates.small_grid_overhead.max_ratio == 1.25
+    assert corpus.rollout_gates.memory_footprint.max_ratio == 1.1
 
     exact_baseline = corpus.slice_for_id(slice_id="exact_baseline")
     assert exact_baseline.execution_profile_mode == "exact_parallel"
@@ -804,14 +814,16 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
     assert low_activity.candidate_execution_profile_mode == "hybrid_conservative"
     assert low_activity.rollout_scope == "hybrid_rollout"
     assert "low_activity" in low_activity.evaluation_focus
+    assert "top_1_recall" in low_activity.evaluation_focus
     assert low_activity.synthetic_run_spec is not None
     assert low_activity.synthetic_run_spec.expected_stage_a_variants_total == 3
     assert low_activity.synthetic_run_spec.expected_stage_b_variants_total == 12
 
     high_correlation = corpus.slice_for_id(slice_id="high_correlation")
-    assert high_correlation.candidate_execution_profile_mode == "hybrid_family"
-    assert high_correlation.rollout_scope == "plugin_rollout"
+    assert high_correlation.candidate_execution_profile_mode == "hybrid_conservative"
+    assert high_correlation.rollout_scope == "hybrid_rollout"
     assert "high_correlation" in high_correlation.evaluation_focus
+    assert "diversity_evidence" in high_correlation.evaluation_focus
     assert high_correlation.synthetic_run_spec is not None
     assert high_correlation.synthetic_run_spec.expected_stage_b_variants_total == 36
 
@@ -819,6 +831,7 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
     assert small_grid_overhead.execution_profile_mode == "exact_small"
     assert small_grid_overhead.candidate_execution_profile_mode == "hybrid_conservative"
     assert "small_grid_overhead" in small_grid_overhead.evaluation_focus
+    assert "wall_clock_ratio" in small_grid_overhead.evaluation_focus
     assert small_grid_overhead.synthetic_run_spec is not None
     assert small_grid_overhead.synthetic_run_spec.total_candles_bars == 512
     assert small_grid_overhead.synthetic_run_spec.expected_stage_a_variants_total == 6
@@ -827,6 +840,7 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
     memory_footprint = corpus.slice_for_id(slice_id="memory_footprint")
     assert memory_footprint.candidate_execution_profile_mode == "hybrid_conservative"
     assert "memory_footprint" in memory_footprint.evaluation_focus
+    assert "peak_traced_memory_ratio" in memory_footprint.evaluation_focus
     assert memory_footprint.synthetic_run_spec is not None
     assert memory_footprint.synthetic_run_spec.expected_stage_a_variants_total == 10
     assert memory_footprint.synthetic_run_spec.expected_stage_b_variants_total == 90
@@ -834,7 +848,7 @@ def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None
 
 def test_a3_runtime_acceleration_benchmark_corpus_serialization_is_byte_stable() -> None:
     """
-    Verify the committed A3 benchmark corpus keeps canonical byte-stable JSON formatting.
+    Verify the committed D2+D3 benchmark corpus keeps canonical byte-stable JSON formatting.
 
     Docs:
       - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
@@ -927,7 +941,7 @@ def _load_benchmark_scenarios() -> tuple[_R0BenchmarkScenario, ...]:
 
 def _load_runtime_acceleration_benchmark_corpus():
     """
-    Load the committed A3 benchmark corpus for exact and future rollout perf-smoke coverage.
+    Load the committed D2+D3 benchmark corpus for exact and hybrid rollout perf-smoke coverage.
 
     Docs:
       - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md

@@ -22,8 +22,8 @@ BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_SCHEMA_VERSION_V2 = 1
 BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_KIND_V2 = (
     "backtest_runtime_acceleration_benchmark_corpus_v1"
 )
-BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_MILESTONE_ID_V2 = "A"
-BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_EPIC_ID_V2 = "A3"
+BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_MILESTONE_ID_V2 = "D"
+BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_EPIC_ID_V2 = "D2+D3"
 
 type BenchmarkCorpusSliceIdLiteralV2 = Literal[
     "exact_baseline",
@@ -38,6 +38,14 @@ type BenchmarkCorpusRolloutScopeLiteralV2 = Literal[
     "plugin_rollout",
 ]
 type BenchmarkCorpusStageLiteralV2 = Literal["stage_a", "stage_b", "finalizing"]
+type BenchmarkCorpusRolloutGateIdLiteralV2 = Literal[
+    "top_1_recall",
+    "top_10_overlap",
+    "low_activity",
+    "high_correlation",
+    "small_grid_overhead",
+    "memory_footprint",
+]
 
 _ALLOWED_BENCHMARK_CORPUS_SLICE_IDS_V2: tuple[BenchmarkCorpusSliceIdLiteralV2, ...] = (
     "exact_baseline",
@@ -57,6 +65,16 @@ _ALLOWED_BENCHMARK_CORPUS_STAGE_IDS_V2: tuple[BenchmarkCorpusStageLiteralV2, ...
     "stage_a",
     "stage_b",
     "finalizing",
+)
+_ALLOWED_BENCHMARK_CORPUS_ROLLOUT_GATE_IDS_V2: tuple[
+    BenchmarkCorpusRolloutGateIdLiteralV2, ...
+] = (
+    "top_1_recall",
+    "top_10_overlap",
+    "low_activity",
+    "high_correlation",
+    "small_grid_overhead",
+    "memory_footprint",
 )
 
 
@@ -107,6 +125,92 @@ class BacktestRuntimeBenchmarkSourceFixturesV2:
                 raise ValueError(
                     f"BacktestRuntimeBenchmarkSourceFixturesV2.{field_name} must point to JSON"
                 )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestRuntimeBenchmarkRolloutGateV2:
+    """
+    One explicit rollout threshold used to compare hybrid evidence against exact baseline.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/benchmark_corpus_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    """
+
+    metric: str
+    slice_id: BenchmarkCorpusSliceIdLiteralV2 | None
+    min_ratio: float | None = None
+    max_ratio: float | None = None
+    min_distinct_count: int | None = None
+    notes: str = ""
+
+    def __post_init__(self) -> None:
+        """
+        Validate one explicit rollout-gate threshold payload.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Gates stay additive and conservative; every gate defines at least one threshold or
+            count-based requirement that later perf-smoke evidence can assert deterministically.
+        Raises:
+            ValueError: If metric/notes are blank or no threshold/count is configured.
+        Side Effects:
+            None.
+        """
+        if not self.metric.strip():
+            raise ValueError("BacktestRuntimeBenchmarkRolloutGateV2.metric must be non-empty")
+        if not self.notes.strip():
+            raise ValueError("BacktestRuntimeBenchmarkRolloutGateV2.notes must be non-empty")
+        if (
+            self.min_ratio is None
+            and self.max_ratio is None
+            and self.min_distinct_count is None
+        ):
+            raise ValueError(
+                "BacktestRuntimeBenchmarkRolloutGateV2 must declare one threshold or count"
+            )
+        if self.min_ratio is not None and self.min_ratio < 0.0:
+            raise ValueError(
+                "BacktestRuntimeBenchmarkRolloutGateV2.min_ratio must be >= 0 when provided"
+            )
+        if self.max_ratio is not None and self.max_ratio < 0.0:
+            raise ValueError(
+                "BacktestRuntimeBenchmarkRolloutGateV2.max_ratio must be >= 0 when provided"
+            )
+        if self.min_distinct_count is not None and self.min_distinct_count <= 0:
+            raise ValueError(
+                "BacktestRuntimeBenchmarkRolloutGateV2.min_distinct_count must be > 0 when "
+                "provided"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestRuntimeBenchmarkRolloutGatesV2:
+    """
+    Explicit rollout-gate bundle for conservative hybrid shortlist evidence.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/benchmark_corpus_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    """
+
+    top_1_recall: BacktestRuntimeBenchmarkRolloutGateV2
+    top_10_overlap: BacktestRuntimeBenchmarkRolloutGateV2
+    low_activity: BacktestRuntimeBenchmarkRolloutGateV2
+    high_correlation: BacktestRuntimeBenchmarkRolloutGateV2
+    small_grid_overhead: BacktestRuntimeBenchmarkRolloutGateV2
+    memory_footprint: BacktestRuntimeBenchmarkRolloutGateV2
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,6 +425,7 @@ class BacktestRuntimeAccelerationBenchmarkCorpusV2:
     epic_id: str
     status: str
     reference_docs: tuple[str, ...]
+    rollout_gates: BacktestRuntimeBenchmarkRolloutGatesV2
     source_fixtures: BacktestRuntimeBenchmarkSourceFixturesV2
     slice_order: tuple[BenchmarkCorpusSliceIdLiteralV2, ...]
     slices: tuple[BacktestRuntimeBenchmarkSliceV2, ...]
@@ -371,6 +476,10 @@ class BacktestRuntimeAccelerationBenchmarkCorpusV2:
         if len(self.reference_docs) == 0:
             raise ValueError(
                 "BacktestRuntimeAccelerationBenchmarkCorpusV2.reference_docs must be non-empty"
+            )
+        if self.rollout_gates is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestRuntimeAccelerationBenchmarkCorpusV2.rollout_gates is required"
             )
         if len(self.slice_order) == 0:
             raise ValueError(
@@ -523,6 +632,7 @@ def _parse_backtest_runtime_acceleration_benchmark_corpus_payload_v2(
         None.
     """
     reference_docs = _require_string_tuple(payload=payload, key="reference_docs")
+    rollout_gates_map = _require_mapping(payload=payload, key="rollout_gates")
     source_fixtures_map = _require_mapping(payload=payload, key="source_fixtures")
     slices_payload = _require_mapping_sequence(payload=payload, key="slices")
     slice_order = cast(
@@ -543,6 +653,9 @@ def _parse_backtest_runtime_acceleration_benchmark_corpus_payload_v2(
         epic_id=_require_str(payload=payload, key="epic_id"),
         status=_require_str(payload=payload, key="status"),
         reference_docs=reference_docs,
+        rollout_gates=_parse_backtest_runtime_benchmark_rollout_gates_v2(
+            raw_rollout_gates=rollout_gates_map
+        ),
         source_fixtures=BacktestRuntimeBenchmarkSourceFixturesV2(
             r0_benchmark_scenarios=_require_str(
                 payload=source_fixtures_map,
@@ -624,6 +737,91 @@ def _parse_backtest_runtime_benchmark_slice_v2(
             )
         ),
         notes=_require_str(payload=raw_slice, key="notes"),
+    )
+
+
+def _parse_backtest_runtime_benchmark_rollout_gates_v2(
+    *,
+    raw_rollout_gates: dict[str, object],
+) -> BacktestRuntimeBenchmarkRolloutGatesV2:
+    """
+    Parse the top-level rollout-gate bundle from raw JSON payload.
+
+    Args:
+        raw_rollout_gates: Raw JSON mapping carrying named rollout gates.
+    Returns:
+        BacktestRuntimeBenchmarkRolloutGatesV2: Parsed conservative rollout-gate bundle.
+    Assumptions:
+        Gate keys are fixed literals that mirror the roadmap milestone D evidence surface.
+    Raises:
+        ValueError: If one required gate is missing or malformed.
+    Side Effects:
+        None.
+    """
+    return BacktestRuntimeBenchmarkRolloutGatesV2(
+        top_1_recall=_parse_backtest_runtime_benchmark_rollout_gate_v2(
+            gate_id="top_1_recall",
+            raw_gate=_require_mapping(payload=raw_rollout_gates, key="top_1_recall"),
+        ),
+        top_10_overlap=_parse_backtest_runtime_benchmark_rollout_gate_v2(
+            gate_id="top_10_overlap",
+            raw_gate=_require_mapping(payload=raw_rollout_gates, key="top_10_overlap"),
+        ),
+        low_activity=_parse_backtest_runtime_benchmark_rollout_gate_v2(
+            gate_id="low_activity",
+            raw_gate=_require_mapping(payload=raw_rollout_gates, key="low_activity"),
+        ),
+        high_correlation=_parse_backtest_runtime_benchmark_rollout_gate_v2(
+            gate_id="high_correlation",
+            raw_gate=_require_mapping(payload=raw_rollout_gates, key="high_correlation"),
+        ),
+        small_grid_overhead=_parse_backtest_runtime_benchmark_rollout_gate_v2(
+            gate_id="small_grid_overhead",
+            raw_gate=_require_mapping(payload=raw_rollout_gates, key="small_grid_overhead"),
+        ),
+        memory_footprint=_parse_backtest_runtime_benchmark_rollout_gate_v2(
+            gate_id="memory_footprint",
+            raw_gate=_require_mapping(payload=raw_rollout_gates, key="memory_footprint"),
+        ),
+    )
+
+
+def _parse_backtest_runtime_benchmark_rollout_gate_v2(
+    *,
+    gate_id: BenchmarkCorpusRolloutGateIdLiteralV2,
+    raw_gate: dict[str, object],
+) -> BacktestRuntimeBenchmarkRolloutGateV2:
+    """
+    Parse one raw rollout gate into a typed conservative threshold contract.
+
+    Args:
+        gate_id: Stable rollout-gate identifier from the committed corpus.
+        raw_gate: Raw JSON object for one rollout gate.
+    Returns:
+        BacktestRuntimeBenchmarkRolloutGateV2: Parsed typed rollout-gate contract.
+    Assumptions:
+        Gates may reference one benchmark slice or represent aggregate corpus-wide evidence.
+    Raises:
+        ValueError: If the gate payload is malformed.
+    Side Effects:
+        None.
+    """
+    _parse_benchmark_rollout_gate_id_v2(value=gate_id)
+    raw_slice_id = _require_optional_str(payload=raw_gate, key="slice_id")
+    return BacktestRuntimeBenchmarkRolloutGateV2(
+        metric=_require_str(payload=raw_gate, key="metric"),
+        slice_id=(
+            None
+            if raw_slice_id is None
+            else _parse_benchmark_slice_id_v2(value=raw_slice_id)
+        ),
+        min_ratio=_require_optional_float(payload=raw_gate, key="min_ratio"),
+        max_ratio=_require_optional_float(payload=raw_gate, key="max_ratio"),
+        min_distinct_count=_require_optional_int(
+            payload=raw_gate,
+            key="min_distinct_count",
+        ),
+        notes=_require_str(payload=raw_gate, key="notes"),
     )
 
 
@@ -755,6 +953,33 @@ def _parse_benchmark_stage_id_v2(
             f"{_ALLOWED_BENCHMARK_CORPUS_STAGE_IDS_V2}, got {value!r}"
         )
     return cast(BenchmarkCorpusStageLiteralV2, normalized_value)
+
+
+def _parse_benchmark_rollout_gate_id_v2(
+    *,
+    value: str,
+) -> BenchmarkCorpusRolloutGateIdLiteralV2:
+    """
+    Validate one rollout-gate identifier against the committed corpus contract.
+
+    Args:
+        value: Raw rollout-gate identifier.
+    Returns:
+        BenchmarkCorpusRolloutGateIdLiteralV2: Validated rollout-gate identifier.
+    Assumptions:
+        Rollout-gate ids are lowercase snake_case literals from the committed D2+D3 corpus.
+    Raises:
+        ValueError: If the literal is blank or unsupported.
+    Side Effects:
+        None.
+    """
+    normalized_value = value.strip().lower()
+    if normalized_value not in _ALLOWED_BENCHMARK_CORPUS_ROLLOUT_GATE_IDS_V2:
+        raise ValueError(
+            "benchmark rollout gate id must be one of "
+            f"{_ALLOWED_BENCHMARK_CORPUS_ROLLOUT_GATE_IDS_V2}, got {value!r}"
+        )
+    return cast(BenchmarkCorpusRolloutGateIdLiteralV2, normalized_value)
 
 
 def _require_mapping(
@@ -975,6 +1200,62 @@ def _require_int(
     return int(value)
 
 
+def _require_optional_int(
+    *,
+    payload: dict[str, object],
+    key: str,
+) -> int | None:
+    """
+    Read one optional integer scalar value from a raw JSON object payload.
+
+    Args:
+        payload: Raw JSON object payload.
+        key: Optional scalar key.
+    Returns:
+        int | None: Integer scalar value or `None` when omitted/null.
+    Assumptions:
+        Boolean values are rejected even though `bool` subclasses `int`.
+    Raises:
+        ValueError: If the key exists with a non-integer non-null value.
+    Side Effects:
+        None.
+    """
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{key} must be an integer or null")
+    return int(value)
+
+
+def _require_optional_float(
+    *,
+    payload: dict[str, object],
+    key: str,
+) -> float | None:
+    """
+    Read one optional numeric scalar value from a raw JSON object payload.
+
+    Args:
+        payload: Raw JSON object payload.
+        key: Optional scalar key.
+    Returns:
+        float | None: Numeric scalar value or `None` when omitted/null.
+    Assumptions:
+        JSON numbers may be authored as integer or float literals.
+    Raises:
+        ValueError: If the key exists with a non-numeric non-null value.
+    Side Effects:
+        None.
+    """
+    value = payload.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{key} must be a number or null")
+    return float(value)
+
+
 def _coerce_int(
     *,
     value: object,
@@ -1030,10 +1311,13 @@ __all__ = [
     "BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_KIND_V2",
     "BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_MILESTONE_ID_V2",
     "BACKTEST_RUNTIME_ACCELERATION_BENCHMARK_CORPUS_SCHEMA_VERSION_V2",
+    "BenchmarkCorpusRolloutGateIdLiteralV2",
     "BenchmarkCorpusRolloutScopeLiteralV2",
     "BenchmarkCorpusSliceIdLiteralV2",
     "BenchmarkCorpusStageLiteralV2",
     "BacktestRuntimeAccelerationBenchmarkCorpusV2",
+    "BacktestRuntimeBenchmarkRolloutGateV2",
+    "BacktestRuntimeBenchmarkRolloutGatesV2",
     "BacktestRuntimeBenchmarkSliceV2",
     "BacktestRuntimeBenchmarkSourceFixturesV2",
     "BacktestRuntimeBenchmarkSyntheticRunSpecV2",

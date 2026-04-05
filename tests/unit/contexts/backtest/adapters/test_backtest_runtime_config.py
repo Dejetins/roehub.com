@@ -157,6 +157,12 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         config.execution_profiles.available_profiles[2].shortlist_config.retention.max_per_bucket
         == 750
     )
+    assert config.execution_profiles.available_profiles[2].feature_flags.runtime_enabled is True
+    assert (
+        config.execution_profiles.available_profiles[2].feature_flags
+        .heuristic_shortlist_enabled
+        is True
+    )
     assert (
         config.execution_profiles.available_profiles[3].shortlist_config.scoring
         .transition_ratio_weight

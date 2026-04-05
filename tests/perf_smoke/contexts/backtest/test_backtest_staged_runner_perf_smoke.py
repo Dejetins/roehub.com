@@ -257,7 +257,7 @@ def _perf_smoke_template(
     spec: BacktestRuntimeBenchmarkSyntheticRunSpecV2,
 ) -> RunBacktestTemplate:
     """
-    Build deterministic small-grid staged template from the committed A3 benchmark corpus.
+    Build deterministic small-grid staged template from the committed D2+D3 benchmark corpus.
 
     Args:
         spec: Synthetic benchmark slice spec for the staged-runner small-grid harness.
@@ -265,7 +265,7 @@ def _perf_smoke_template(
         RunBacktestTemplate: Guard-safe template with compact Stage A and Stage B cardinalities.
     Assumptions:
         The committed `small_grid_overhead` corpus slice stays lightweight and mirrors the
-        existing staged-runner perf-smoke shape.
+        existing staged-runner perf-smoke shape for the opt-in hybrid rollout milestone.
     Raises:
         ValueError: If fixture payload violates DTO invariants.
     Side Effects:
@@ -309,8 +309,8 @@ def _load_small_grid_overhead_slice() -> BacktestRuntimeBenchmarkSliceV2:
     Returns:
         BacktestRuntimeBenchmarkSliceV2: Parsed `small_grid_overhead` corpus slice.
     Assumptions:
-        The staged-runner perf-smoke should reuse the A3 corpus instead of maintaining a separate
-        hardcoded small-grid benchmark shape.
+        The staged-runner perf-smoke should reuse the D2+D3 corpus instead of maintaining a
+        separate hardcoded small-grid benchmark shape.
     Raises:
         ValueError: If the benchmark corpus fixture violates its typed contract.
         KeyError: If the `small_grid_overhead` slice is missing.

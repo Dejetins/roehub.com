@@ -32,11 +32,15 @@ from trading.contexts.backtest.application.ports import (
 from trading.contexts.backtest.application.services import (
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactSlotResolverV2,
+    BacktestHierarchicalShortlistBuilderV2,
     BacktestReportingServiceV1,
     BacktestStageAShortlistBuilderV2,
     artifact_coordinates_from_market_id_v2,
     build_default_artifact_backed_stage_b_scorer_v2,
+    build_default_hierarchical_shortlist_builder_v2,
     build_default_stage_a_shortlist_builder_v2,
+    execution_profile_uses_hierarchical_shortlist_runtime_v2,
+    validate_execution_profile_mode_v2,
 )
 from trading.contexts.backtest.application.services.numba_runtime_v1 import (
     apply_backtest_numba_threads,
@@ -143,6 +147,7 @@ class RunBacktestUseCase:
         reporting_service: BacktestReportingServiceV1 | None = None,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         stage_a_shortlist_builder: BacktestStageAShortlistBuilderV2 | None = None,
+        hierarchical_shortlist_builder: BacktestHierarchicalShortlistBuilderV2 | None = None,
         runtime_planner: BacktestArtifactRuntimePlannerV2 | None = None,
         runtime_runner: BacktestArtifactRuntimeRunnerV2 | None = None,
         artifact_timeline_builder: BacktestArtifactTimelineBuilderV2 | None = None,
@@ -195,6 +200,9 @@ class RunBacktestUseCase:
             defaults_provider: Optional defaults provider for compute/signal grid fallback.
             stage_a_shortlist_builder:
                 Optional artifact-backed Stage A shortlist builder for production runtime cutover.
+            hierarchical_shortlist_builder:
+                Optional conservative hybrid shortlist builder used only for explicit
+                `hybrid_conservative` rollout runs.
             runtime_planner:
                 Optional artifact-backed runtime planner replacing `grid_builder_v1` in
                 production paths.
@@ -299,6 +307,12 @@ class RunBacktestUseCase:
             raise ValueError(
                 "RunBacktestUseCase requires artifact-backed stage_a_shortlist_builder"
             )
+        resolved_hierarchical_shortlist_builder = (
+            hierarchical_shortlist_builder
+            or build_default_hierarchical_shortlist_builder_v2(
+                artifact_slot_resolver=artifact_slot_resolver
+            )
+        )
         resolved_timeline_builder = artifact_timeline_builder or BacktestArtifactTimelineBuilderV2(
             price_arrays_loader=_build_price_arrays_loader_v2(
                 artifact_slot_resolver=artifact_slot_resolver
@@ -312,6 +326,7 @@ class RunBacktestUseCase:
         self._reporting_service = reporting_service or BacktestReportingServiceV1()
         self._defaults_provider = defaults_provider
         self._stage_a_shortlist_builder = resolved_stage_a_shortlist_builder
+        self._hierarchical_shortlist_builder = resolved_hierarchical_shortlist_builder
         self._runtime_planner = runtime_planner or BacktestArtifactRuntimePlannerV2()
         self._runtime_runner = runtime_runner or BacktestArtifactRuntimeRunnerV2(
             configurable_ranking_enabled=configurable_ranking_enabled
@@ -365,7 +380,9 @@ class RunBacktestUseCase:
             current_user: Authenticated user for ownership checks in saved mode.
             request_payload:
                 Optional strict API payload snapshot accepted for compatibility with
-                persisted-run orchestrators. Plain sync execution ignores this value.
+                persisted-run orchestrators. Sync execution also honors the internal-only
+                `execution_profile_mode` override when present; this field is not part of the
+                public `/backtests` request contract and must stay excluded from request hashes.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             RunBacktestResponse: Deterministic staged response with ranked top-k variants.
@@ -383,7 +400,11 @@ class RunBacktestUseCase:
                 raise BacktestValidationError("RunBacktestUseCase.execute requires request")
             if current_user is None:  # type: ignore[truthy-bool]
                 raise BacktestValidationError("RunBacktestUseCase.execute requires current_user")
-            _ = request_payload
+            requested_execution_profile_mode = (
+                _requested_execution_profile_mode_from_payload_v2(
+                    request_payload=request_payload
+                )
+            )
 
             apply_backtest_numba_threads(max_numba_threads=self._max_numba_threads)
             if run_control is not None:
@@ -402,10 +423,27 @@ class RunBacktestUseCase:
                 candles=timeline.candles,
                 indicator_compute=self._indicator_compute,
                 preselect=resolved.preselect,
+                requested_execution_profile_mode=requested_execution_profile_mode,
                 defaults_provider=self._defaults_provider,
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
             )
+            effective_runtime_plan = runtime_plan
+            if execution_profile_uses_hierarchical_shortlist_runtime_v2(
+                profile=runtime_plan.execution_profile
+            ):
+                if self._hierarchical_shortlist_builder is None:
+                    raise ValueError(
+                        "RunBacktestUseCase requires hierarchical_shortlist_builder for "
+                        "hybrid_conservative runtime"
+                    )
+                effective_runtime_plan = (
+                    self._hierarchical_shortlist_builder.build_runtime_plan(
+                        runtime_plan=runtime_plan,
+                        artifact_context=resolved.artifact_context,
+                        target_time_range=request.time_range,
+                    )
+                )
             if run_control is not None:
                 run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
             resolved_scorer = self._resolve_staged_scorer(
@@ -416,12 +454,12 @@ class RunBacktestUseCase:
             )
             self._prepare_scorer_for_runtime_plan(
                 scorer=resolved_scorer,
-                runtime_plan=runtime_plan,
+                runtime_plan=effective_runtime_plan,
                 candles=timeline.candles,
                 run_control=run_control,
             )
             shortlist = self._stage_a_shortlist_builder.build_shortlist(
-                grid_context=runtime_plan,
+                grid_context=effective_runtime_plan,
                 artifact_context=resolved.artifact_context,
                 target_time_range=request.time_range,
                 shortlist_limit=resolved.preselect,
@@ -430,7 +468,7 @@ class RunBacktestUseCase:
             )
             ranked_rows, ranked_tasks = self._runtime_runner.run_stage_b(
                 template=resolved.template,
-                runtime_plan=runtime_plan,
+                runtime_plan=effective_runtime_plan,
                 shortlist=shortlist,
                 candles=timeline.candles,
                 scorer=resolved_scorer,
@@ -464,7 +502,7 @@ class RunBacktestUseCase:
                 artifact_manifest_hash=resolved.artifact_context.artifact_manifest_hash,
                 spec_hash=resolved.spec_hash,
                 spec_payload_json=resolved.spec_payload_json,
-                execution_profile_mode=runtime_plan.execution_profile.mode,
+                execution_profile_mode=effective_runtime_plan.execution_profile.mode,
             )
         except RoehubError:
             raise
@@ -1289,6 +1327,50 @@ class RunBacktestUseCase:
                 )
             )
         return tuple(variants)
+
+
+def _requested_execution_profile_mode_from_payload_v2(
+    *,
+    request_payload: Mapping[str, Any] | None,
+) -> str | None:
+    """
+    Resolve the internal-only execution-profile override from canonical request payload snapshot.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - apps/api/dto/backtests.py
+
+    Args:
+        request_payload: Optional strict API payload snapshot used by persisted/internal flows.
+    Returns:
+        str | None: Validated internal execution-profile mode override, or `None`.
+    Assumptions:
+        `execution_profile_mode` is internal metadata only; it is not part of the public
+        `/backtests` request DTO and must remain excluded from request-hash semantics.
+    Raises:
+        BacktestValidationError: If the internal override exists but is not a valid mode string.
+    Side Effects:
+        None.
+    """
+    if request_payload is None:
+        return None
+    raw_mode = request_payload.get("execution_profile_mode")
+    if raw_mode is None:
+        return None
+    if not isinstance(raw_mode, str):
+        raise BacktestValidationError(
+            "internal execution_profile_mode override must be a string"
+        )
+    try:
+        return validate_execution_profile_mode_v2(value=raw_mode)
+    except ValueError as error:
+        raise BacktestValidationError(
+            "internal execution_profile_mode override is invalid"
+        ) from error
 
 
 def _merge_scalar_mappings(

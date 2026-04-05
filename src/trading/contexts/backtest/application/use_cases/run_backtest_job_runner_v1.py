@@ -31,13 +31,17 @@ from trading.contexts.backtest.application.services import (
     ArtifactPinnedIdentityV2,
     ArtifactSlotPinnedRuntimeContextV2,
     BacktestArtifactSlotResolverV2,
+    BacktestHierarchicalShortlistBuilderV2,
     BacktestPriceArraysLoaderV2,
     BacktestReportingServiceV1,
     BacktestStageAShortlistBuilderV2,
     MmapPriceArraysLoaderV2,
     artifact_coordinates_from_market_id_v2,
     build_default_artifact_backed_stage_b_scorer_v2,
+    build_default_hierarchical_shortlist_builder_v2,
     build_default_stage_a_shortlist_builder_v2,
+    execution_profile_uses_hierarchical_shortlist_runtime_v2,
+    validate_execution_profile_mode_v2,
 )
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobSnapshotCadenceV1,
@@ -200,6 +204,7 @@ class RunBacktestJobRunnerV1:
         reporting_service: BacktestReportingServiceV1 | None = None,
         core_runner: object | None = None,
         stage_a_shortlist_builder: BacktestStageAShortlistBuilderV2 | None = None,
+        hierarchical_shortlist_builder: BacktestHierarchicalShortlistBuilderV2 | None = None,
         runtime_planner: BacktestArtifactRuntimePlannerV2 | None = None,
         runtime_runner: BacktestArtifactRuntimeRunnerV2 | None = None,
         artifact_timeline_builder: BacktestArtifactTimelineBuilderV2 | None = None,
@@ -255,6 +260,9 @@ class RunBacktestJobRunnerV1:
                 routes through `staged_core_runner_v1.py` after R10-01.
             stage_a_shortlist_builder:
                 Optional artifact-backed Stage A shortlist builder for slot-pinned claimed runs.
+            hierarchical_shortlist_builder:
+                Optional conservative hybrid shortlist builder used only for explicit internal
+                `hybrid_conservative` worker runs.
             runtime_planner:
                 Optional artifact-backed runtime planner replacing `grid_builder_v1` in claimed
                 worker production paths.
@@ -375,6 +383,12 @@ class RunBacktestJobRunnerV1:
                 fee_pct_default_by_market_id=fee_pct_default_by_market_id,
             )
         )
+        resolved_hierarchical_shortlist_builder = (
+            hierarchical_shortlist_builder
+            or build_default_hierarchical_shortlist_builder_v2(
+                artifact_slot_resolver=artifact_slot_resolver
+            )
+        )
         resolved_price_arrays_loader = price_arrays_loader or _build_price_arrays_loader(
             artifact_slot_resolver=artifact_slot_resolver
         )
@@ -401,6 +415,7 @@ class RunBacktestJobRunnerV1:
             configurable_ranking_enabled=configurable_ranking_enabled,
         )
         self._stage_a_shortlist_builder = resolved_stage_a_shortlist_builder
+        self._hierarchical_shortlist_builder = resolved_hierarchical_shortlist_builder
         self._artifact_timeline_builder = resolved_timeline_builder
         self._price_arrays_loader = resolved_price_arrays_loader
         self._staged_scorer = staged_scorer
@@ -482,18 +497,40 @@ class RunBacktestJobRunnerV1:
                 target_time_range=context.request.time_range,
                 artifact_context=context.artifact_context,
             )
+            requested_execution_profile_mode = (
+                _requested_execution_profile_mode_from_request_json_v2(
+                    request_json=job.request_json
+                )
+            )
             runtime_plan = self._runtime_planner.build(
                 template=context.template,
                 candles=timeline.candles,
                 indicator_compute=self._indicator_compute,
                 preselect=context.preselect,
+                requested_execution_profile_mode=requested_execution_profile_mode,
                 defaults_provider=self._defaults_provider,
                 max_variants_per_compute=self._max_variants_per_compute,
                 max_compute_bytes_total=self._max_compute_bytes_total,
             )
+            effective_runtime_plan = runtime_plan
+            if execution_profile_uses_hierarchical_shortlist_runtime_v2(
+                profile=runtime_plan.execution_profile
+            ):
+                if self._hierarchical_shortlist_builder is None:
+                    raise ValueError(
+                        "RunBacktestJobRunnerV1 requires hierarchical_shortlist_builder for "
+                        "hybrid_conservative runtime"
+                    )
+                effective_runtime_plan = (
+                    self._hierarchical_shortlist_builder.build_runtime_plan(
+                        runtime_plan=runtime_plan,
+                        artifact_context=context.artifact_context,
+                        target_time_range=context.request.time_range,
+                    )
+                )
             self._prepare_scorer_for_runtime_plan(
                 scorer=scorer,
-                runtime_plan=runtime_plan,
+                runtime_plan=effective_runtime_plan,
                 candles=timeline.candles,
             )
 
@@ -501,7 +538,7 @@ class RunBacktestJobRunnerV1:
                 job=job,
                 locked_by=normalized_locked_by,
                 context=context,
-                runtime_plan=runtime_plan,
+                runtime_plan=effective_runtime_plan,
             )
             stage_durations[STAGE_A_LITERAL_V2] = max(perf_counter() - stage_started_at, 0.0)
 
@@ -513,7 +550,7 @@ class RunBacktestJobRunnerV1:
                 context=context,
                 timeline=timeline,
                 scorer=scorer,
-                runtime_plan=runtime_plan,
+                runtime_plan=effective_runtime_plan,
                 shortlist=shortlist,
                 last_heartbeat_at=heartbeat_at,
             )
@@ -2405,6 +2442,41 @@ def _optional_mode(*, payload: Mapping[str, Any], key: str, default: str) -> str
     if not normalized:
         return default
     return normalized
+
+
+def _requested_execution_profile_mode_from_request_json_v2(
+    *,
+    request_json: Mapping[str, Any],
+) -> str | None:
+    """
+    Resolve the internal-only execution-profile override from persisted request JSON.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+
+    Args:
+        request_json: Persisted canonical request JSON payload.
+    Returns:
+        str | None: Validated internal execution-profile mode override, or `None`.
+    Assumptions:
+        Persisted `execution_profile_mode` is internal metadata only and remains excluded from
+        request-hash semantics and the public request DTO.
+    Raises:
+        ValueError: If the internal override exists but is not a valid mode string.
+    Side Effects:
+        None.
+    """
+    raw_mode = request_json.get("execution_profile_mode")
+    if raw_mode is None:
+        return None
+    if not isinstance(raw_mode, str):
+        raise ValueError("persisted execution_profile_mode must be a string when provided")
+    return validate_execution_profile_mode_v2(value=raw_mode)
 
 
 __all__ = [

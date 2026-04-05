@@ -1,13 +1,64 @@
 {
   "schema_version": 1,
   "fixture_contract": "backtest_runtime_acceleration_benchmark_corpus_v1",
-  "milestone_id": "A",
-  "epic_id": "A3",
+  "milestone_id": "D",
+  "epic_id": "D2+D3",
   "status": "active",
   "reference_docs": [
     "docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md",
     "docs/architecture/backtest/backtest-v2-benchmarks.md",
-    "docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md"
+    "docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md",
+    "docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md"
+  ],
+  "rollout_gates": {
+    "top_1_recall": {
+      "metric": "top_1_recall",
+      "slice_id": null,
+      "min_ratio": 0.99,
+      "max_ratio": null,
+      "min_distinct_count": null,
+      "notes": "Aggregate hybrid_conservative top-1 recall against the exact baseline corpus must stay at or above 99%."
+    },
+    "top_10_overlap": {
+      "metric": "top_10_overlap",
+      "slice_id": null,
+      "min_ratio": 0.9,
+      "max_ratio": null,
+      "min_distinct_count": null,
+      "notes": "Aggregate hybrid_conservative top-10 overlap against exact baseline top-10 winners must stay at or above 90%."
+    },
+    "low_activity": {
+      "metric": "top_1_recall",
+      "slice_id": "low_activity",
+      "min_ratio": 0.97,
+      "max_ratio": null,
+      "min_distinct_count": null,
+      "notes": "Sparse-confirmation low_activity evidence must keep top-1 recall at or above 97%."
+    },
+    "high_correlation": {
+      "metric": "diversity_evidence",
+      "slice_id": "high_correlation",
+      "min_ratio": null,
+      "max_ratio": null,
+      "min_distinct_count": 2,
+      "notes": "High-correlation slices must retain at least two distinct indicator winners to show conservative diversity evidence."
+    },
+    "small_grid_overhead": {
+      "metric": "wall_clock_ratio",
+      "slice_id": "small_grid_overhead",
+      "min_ratio": null,
+      "max_ratio": 1.25,
+      "min_distinct_count": null,
+      "notes": "Hybrid shortlist planning must not introduce unacceptable small-grid overhead; the hybrid/exact wall-clock ratio should stay at or below 1.25x."
+    },
+    "memory_footprint": {
+      "metric": "peak_traced_memory_ratio",
+      "slice_id": "memory_footprint",
+      "min_ratio": null,
+      "max_ratio": 1.1,
+      "min_distinct_count": null,
+      "notes": "Hybrid shortlist runtime must keep measured peak traced memory within a conservative 1.10x exact baseline envelope."
+    }
   ],
   "source_fixtures": {
     "r0_benchmark_scenarios": "tests/perf_smoke/contexts/backtest/fixtures/r0_benchmark_scenarios.json",
@@ -67,8 +118,8 @@
       ],
       "evaluation_focus": [
         "low_activity",
-        "recall",
-        "survivor_overlap"
+        "top_1_recall",
+        "top_10_overlap"
       ],
       "r0_scenario_ids": [
         "sync-small-run"
@@ -100,22 +151,22 @@
         "expected_stage_a_variants_total": 3,
         "expected_stage_b_variants_total": 12
       },
-      "notes": "Future shortlist rollouts must prove they do not prune away sparse but valuable confirmations."
+      "notes": "Hybrid conservative rollout must prove it does not prune away sparse but valuable confirmations."
     },
     {
       "slice_id": "high_correlation",
-      "title": "Correlated family slice for diversity pressure and future plugin evidence",
+      "title": "Correlated indicator slice for hybrid conservative diversity evidence",
       "execution_profile_mode": "exact_parallel",
-      "candidate_execution_profile_mode": "hybrid_family",
-      "rollout_scope": "plugin_rollout",
+      "candidate_execution_profile_mode": "hybrid_conservative",
+      "rollout_scope": "hybrid_rollout",
       "stage_focus": [
         "stage_a",
         "stage_b"
       ],
       "evaluation_focus": [
         "high_correlation",
-        "diversity",
-        "family_overlap"
+        "top_10_overlap",
+        "diversity_evidence"
       ],
       "r0_scenario_ids": [
         "large-run"
@@ -151,7 +202,7 @@
         "expected_stage_a_variants_total": 6,
         "expected_stage_b_variants_total": 36
       },
-      "notes": "Use close indicator families to measure whether future plugins retain diversity instead of duplicating near-identical survivors."
+      "notes": "Use close indicator families to prove hybrid conservative retention keeps diversity evidence instead of collapsing into near-identical survivors."
     },
     {
       "slice_id": "small_grid_overhead",
@@ -166,7 +217,7 @@
       "evaluation_focus": [
         "small_grid_overhead",
         "planning_budget_ms",
-        "wall_clock_seconds"
+        "wall_clock_ratio"
       ],
       "r0_scenario_ids": [
         "sync-small-run"
@@ -199,7 +250,7 @@
         "expected_stage_a_variants_total": 6,
         "expected_stage_b_variants_total": 16
       },
-      "notes": "Keep this slice lightweight so contributors can compare exact_small against future hybrid planning overhead without machine-specific fail thresholds."
+      "notes": "Keep this slice lightweight so contributors can compare exact_small against hybrid shortlist overhead without machine-specific fail thresholds."
     },
     {
       "slice_id": "memory_footprint",
@@ -215,7 +266,7 @@
       "evaluation_focus": [
         "memory_footprint",
         "retained_candidates",
-        "peak_traced_memory_bytes"
+        "peak_traced_memory_ratio"
       ],
       "r0_scenario_ids": [
         "background-run"
@@ -257,7 +308,7 @@
         "expected_stage_a_variants_total": 10,
         "expected_stage_b_variants_total": 90
       },
-      "notes": "Use wider retained survivors and richer risk axes to track allocation pressure before beam-search or feature-cache growth."
+      "notes": "Use wider retained survivors and richer risk axes to track conservative hybrid memory pressure before broader approximate rollout."
     }
   ]
 }

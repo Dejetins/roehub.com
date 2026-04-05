@@ -355,6 +355,77 @@ def validate_execution_profile_mode_v2(
     return normalized_value
 
 
+def execution_profile_uses_hierarchical_shortlist_runtime_v2(
+    *,
+    profile: "ExecutionProfileV2",
+) -> bool:
+    """
+    Return whether one resolved profile may execute the live hybrid shortlist runtime.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+
+    Args:
+        profile: Resolved execution profile candidate.
+    Returns:
+        bool: `True` only for the explicit opt-in `hybrid_conservative` runtime path with all
+            required rollout flags enabled.
+    Assumptions:
+        Milestone D keeps exact profiles canonical by default and does not activate
+        `hybrid_family` runtime in this delivery.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return (
+        profile.mode == "hybrid_conservative"
+        and profile.shortlist_config.enabled
+        and profile.feature_flags.runtime_enabled
+        and profile.feature_flags.heuristic_shortlist_enabled
+    )
+
+
+def execution_profile_supports_requested_runtime_v2(
+    *,
+    profile: "ExecutionProfileV2",
+) -> bool:
+    """
+    Return whether one explicitly requested profile may run in the current live runtime.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+
+    Args:
+        profile: Resolved execution profile candidate.
+    Returns:
+        bool: `True` when the profile may be used as an internal requested runtime mode.
+    Assumptions:
+        Exact profiles require only `runtime_enabled`, while Milestone D hybrid runtime is limited
+        to `hybrid_conservative`; `hybrid_family` remains out of scope even if future config work
+        toggles other flags.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if profile.mode in _EXACT_EXECUTION_PROFILE_MODES_V2:
+        return profile.feature_flags.runtime_enabled
+    return execution_profile_uses_hierarchical_shortlist_runtime_v2(profile=profile)
+
+
 @dataclass(frozen=True, slots=True)
 class ExecutionProfileShortlistConfigV2:
     """
@@ -1039,6 +1110,8 @@ __all__ = [
     "ExecutionProfileV2",
     "ExecutionProfilesCatalogV2",
     "default_execution_profiles_catalog_v2",
+    "execution_profile_supports_requested_runtime_v2",
+    "execution_profile_uses_hierarchical_shortlist_runtime_v2",
     "validate_execution_profile_shortlist_diversity_bucket_v2",
     "validate_execution_profile_mode_v2",
 ]

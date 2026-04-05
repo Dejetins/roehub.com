@@ -438,6 +438,45 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_rows[0].best_sl_pct == 2.0
 
 
+def test_request_hash_ignores_internal_execution_profile_mode_across_exact_and_hybrid_modes(
+) -> None:
+    """
+    Verify internal execution-profile routing metadata does not affect canonical request hashes.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Internal `execution_profile_mode` may switch between exact and hybrid runtime paths but
+        must remain excluded from request-hash semantics.
+    Raises:
+        AssertionError: If canonical request hashes diverge only because internal profile
+            metadata changes.
+    Side Effects:
+        None.
+    """
+    base_payload = _template_request_payload()
+    exact_hash = _build_request_hash_from_request_json(
+        payload={**base_payload, "execution_profile_mode": "exact_small"}
+    )
+    hybrid_hash = _build_request_hash_from_request_json(
+        payload={**base_payload, "execution_profile_mode": "hybrid_conservative"}
+    )
+    canonical_hash = _build_sha256_from_payload(payload=base_payload)
+
+    assert exact_hash == canonical_hash
+    assert hybrid_hash == canonical_hash
+
+
 def test_create_and_run_backtest_sync_inline_keeps_preflight_validation_error_without_persistence(
 ) -> None:
     """
