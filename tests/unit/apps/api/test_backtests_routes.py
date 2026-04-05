@@ -527,6 +527,19 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                         "shortlist_config": {
                             "enabled": False,
                             "max_candidates": None,
+                            "scoring": {
+                                "activity_ratio_weight": 0.4,
+                                "direction_balance_weight": 0.25,
+                                "transition_ratio_weight": 0.25,
+                                "active_span_ratio_weight": 0.1,
+                            },
+                            "retention": {
+                                "diversity_buckets": [
+                                    "activity_band",
+                                    "direction_band",
+                                ],
+                                "max_per_bucket": None,
+                            },
                         },
                         "parallelism": {
                             "stage_a_workers": 1,
@@ -555,6 +568,19 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                         "shortlist_config": {
                             "enabled": False,
                             "max_candidates": None,
+                            "scoring": {
+                                "activity_ratio_weight": 0.4,
+                                "direction_balance_weight": 0.25,
+                                "transition_ratio_weight": 0.25,
+                                "active_span_ratio_weight": 0.1,
+                            },
+                            "retention": {
+                                "diversity_buckets": [
+                                    "activity_band",
+                                    "direction_band",
+                                ],
+                                "max_per_bucket": None,
+                            },
                         },
                         "parallelism": {
                             "stage_a_workers": 1,
@@ -583,6 +609,19 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                         "shortlist_config": {
                             "enabled": True,
                             "max_candidates": 5000,
+                            "scoring": {
+                                "activity_ratio_weight": 0.4,
+                                "direction_balance_weight": 0.25,
+                                "transition_ratio_weight": 0.25,
+                                "active_span_ratio_weight": 0.1,
+                            },
+                            "retention": {
+                                "diversity_buckets": [
+                                    "activity_band",
+                                    "direction_band",
+                                ],
+                                "max_per_bucket": 750,
+                            },
                         },
                         "parallelism": {
                             "stage_a_workers": 1,
@@ -611,6 +650,19 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                         "shortlist_config": {
                             "enabled": True,
                             "max_candidates": 2000,
+                            "scoring": {
+                                "activity_ratio_weight": 0.35,
+                                "direction_balance_weight": 0.2,
+                                "transition_ratio_weight": 0.3,
+                                "active_span_ratio_weight": 0.15,
+                            },
+                            "retention": {
+                                "diversity_buckets": [
+                                    "activity_band",
+                                    "transition_band",
+                                ],
+                                "max_per_bucket": 300,
+                            },
                         },
                         "parallelism": {
                             "stage_a_workers": 1,

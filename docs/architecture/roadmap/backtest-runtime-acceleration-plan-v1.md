@@ -568,7 +568,16 @@ signal_features/<tf>/<indicator_id>/features.f32.npy  # [V, F]
 Что делаем:
 
 - считаем cheap row score для любого indicator block;
-- используем cached features + cheap runtime-derived stats.
+- используем cached features + cheap runtime-derived stats;
+- публикуем typed row-score payload с explicit breakdown по
+  `activity_ratio`, `direction_balance`, `transition_count`, `active_span_ratio`;
+- добавляем deterministic diversified retain с explicit bucket axes вместо pure raw-score cut;
+- расширяем existing `ExecutionProfile.shortlist` contract additive knobs для scoring/retention,
+  не создавая second ad-hoc config surface;
+- не включаем runtime activation в этом EPIC:
+  `heuristic_shortlist_enabled` остаётся `false`,
+  `exact_small` / `exact_parallel` не меняют shortlist behavior,
+  `hybrid_conservative` остаётся foundation-only profile surface.
 
 Пример:
 

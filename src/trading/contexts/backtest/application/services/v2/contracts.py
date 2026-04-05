@@ -7,12 +7,17 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Callable, Literal, Mapping, Protocol, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, Mapping, Protocol, Sequence, cast
 
 import numpy as np
 
 from trading.contexts.indicators.application.dto import CandleArrays
 from trading.shared_kernel.primitives import TimeRange
+
+if TYPE_CHECKING:
+    from .diversified_retention_v2 import DiversifiedRetentionResultV2
+    from .execution_profile_v2 import ExecutionProfileShortlistRetentionConfigV2
+    from .generic_row_scorer_v2 import GenericRowScorePayloadV2, GenericRowScoringInputV2
 
 ARTIFACT_STORE_V2_ROOT_LITERAL = "artifacts/backtest/v2"
 CURRENT_ARTIFACT_POINTER_FILENAME_V2 = "current.yaml"
@@ -5156,6 +5161,62 @@ class BacktestSignalFeaturesLoaderV2(Protocol):
         Side Effects:
             May memory-map or reuse one cached feature matrix.
         """
+        ...
+
+
+class BacktestGenericRowScorerV2(Protocol):
+    """
+    Port for deterministic universal row scoring over signal rows and optional cached features.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    def score_rows(
+        self,
+        *,
+        rows: Sequence["GenericRowScoringInputV2"],
+    ) -> tuple["GenericRowScorePayloadV2", ...]:
+        """Score universal row candidates and return deterministic typed score payloads."""
+        ...
+
+    def score_row(
+        self,
+        *,
+        row: "GenericRowScoringInputV2",
+    ) -> "GenericRowScorePayloadV2":
+        """Score one universal row candidate and return an auditable typed payload."""
+        ...
+
+
+class BacktestDiversifiedRetentionV2(Protocol):
+    """
+    Port for deterministic diversity-aware survivor retention over scored row payloads.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+      - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+    """
+
+    def retain_rows(
+        self,
+        *,
+        scored_rows: Sequence["GenericRowScorePayloadV2"],
+        config: "ExecutionProfileShortlistRetentionConfigV2",
+        max_candidates: int,
+    ) -> "DiversifiedRetentionResultV2":
+        """Retain deterministic survivors using explicit diversity buckets and stable ties."""
         ...
 
 

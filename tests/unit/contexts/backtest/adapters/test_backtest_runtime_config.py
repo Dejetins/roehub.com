@@ -145,6 +145,23 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         config.execution_profiles.default_profile().planning_budget_ms
         == 25
     )
+    assert (
+        config.execution_profiles.default_profile().shortlist_config.scoring.activity_ratio_weight
+        == 0.4
+    )
+    assert (
+        config.execution_profiles.default_profile().shortlist_config.retention.diversity_buckets
+        == ("activity_band", "direction_band")
+    )
+    assert (
+        config.execution_profiles.available_profiles[2].shortlist_config.retention.max_per_bucket
+        == 750
+    )
+    assert (
+        config.execution_profiles.available_profiles[3].shortlist_config.scoring
+        .transition_ratio_weight
+        == 0.3
+    )
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5368709120
     assert config.cpu.max_numba_threads == 4
@@ -243,6 +260,15 @@ backtest:
         == 1500
     )
     assert config.execution_profiles.default_profile().progress_weights.stage_b == 70
+    assert (
+        config.execution_profiles.default_profile().shortlist_config.scoring
+        .active_span_ratio_weight
+        == 0.1
+    )
+    assert (
+        config.execution_profiles.available_profiles[2].shortlist_config.retention.max_per_bucket
+        == 750
+    )
     assert config.guards.max_variants_per_compute == 600000
     assert config.guards.max_compute_bytes_total == 5 * 1024**3
     assert config.cpu.max_numba_threads > 0
@@ -484,6 +510,15 @@ backtest:
         planning_budget_ms: 15
         shortlist:
           enabled: false
+          scoring:
+            activity_ratio_weight: 0.50
+            direction_balance_weight: 0.10
+            transition_ratio_weight: 0.20
+            active_span_ratio_weight: 0.20
+          retention:
+            diversity_buckets:
+              - activity_band
+              - transition_band
         launch_budget:
           max_stage_a_variants_total: 120
           max_stage_b_variants_total: 900
@@ -504,6 +539,15 @@ backtest:
         planning_budget_ms: 35
         shortlist:
           enabled: false
+          scoring:
+            activity_ratio_weight: 0.45
+            direction_balance_weight: 0.15
+            transition_ratio_weight: 0.20
+            active_span_ratio_weight: 0.20
+          retention:
+            diversity_buckets:
+              - activity_band
+              - direction_band
         launch_budget:
           max_stage_a_variants_total: 3200
           max_stage_b_variants_total: 24000
@@ -525,6 +569,16 @@ backtest:
         shortlist:
           enabled: true
           max_candidates: 1500
+          scoring:
+            activity_ratio_weight: 0.55
+            direction_balance_weight: 0.05
+            transition_ratio_weight: 0.20
+            active_span_ratio_weight: 0.20
+          retention:
+            diversity_buckets:
+              - activity_band
+              - transition_band
+            max_per_bucket: 200
         progress:
           stage_a: 45
           stage_b: 50
@@ -542,6 +596,16 @@ backtest:
         shortlist:
           enabled: true
           max_candidates: 750
+          scoring:
+            activity_ratio_weight: 0.30
+            direction_balance_weight: 0.20
+            transition_ratio_weight: 0.25
+            active_span_ratio_weight: 0.25
+          retention:
+            diversity_buckets:
+              - activity_band
+              - direction_band
+            max_per_bucket: 100
         parallelism:
           stage_a_workers: 1
           stage_b_workers: 2
@@ -624,7 +688,27 @@ backtest:
         config.execution_profiles.available_profiles[2].shortlist_config.max_candidates
         == 1500
     )
+    assert (
+        config.execution_profiles.available_profiles[0].shortlist_config.scoring
+        .activity_ratio_weight
+        == 0.5
+    )
+    assert (
+        config.execution_profiles.available_profiles[0].shortlist_config.retention
+        .diversity_buckets
+        == ("activity_band", "transition_band")
+    )
     assert config.execution_profiles.available_profiles[2].progress_weights.stage_b == 50
+    assert (
+        config.execution_profiles.available_profiles[2].shortlist_config.retention
+        .max_per_bucket
+        == 200
+    )
+    assert (
+        config.execution_profiles.available_profiles[3].shortlist_config.scoring
+        .active_span_ratio_weight
+        == 0.25
+    )
     assert config.execution_profiles.available_profiles[3].planning_budget_ms == 65
     assert config.guards.max_variants_per_compute == 1200
     assert config.guards.max_compute_bytes_total == 1234567
@@ -817,6 +901,62 @@ backtest:
     )
 
     with pytest.raises(ValueError, match="primary_metric_default"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_rejects_invalid_shortlist_diversity_bucket(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when shortlist retention references an unsupported bucket axis.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Conservative shortlist retention may only use the fixed exported bucket vocabulary.
+    Raises:
+        AssertionError: If invalid retention config does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  execution_profiles:
+    default: exact_small
+    profiles:
+      - mode: exact_small
+        planning_budget_ms: 25
+      - mode: exact_parallel
+        planning_budget_ms: 50
+      - mode: hybrid_conservative
+        planning_budget_ms: 75
+        shortlist:
+          enabled: true
+          max_candidates: 1000
+          retention:
+            diversity_buckets:
+              - correlation_band
+      - mode: hybrid_family
+        planning_budget_ms: 100
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="diversity bucket"):
         load_backtest_runtime_config(config_path)
 
 

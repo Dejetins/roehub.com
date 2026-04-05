@@ -129,7 +129,17 @@
           "mode": "exact_small",
           "shortlist_config": {
             "enabled": false,
-            "max_candidates": null
+            "max_candidates": null,
+            "scoring": {
+              "activity_ratio_weight": 0.4,
+              "direction_balance_weight": 0.25,
+              "transition_ratio_weight": 0.25,
+              "active_span_ratio_weight": 0.1
+            },
+            "retention": {
+              "diversity_buckets": ["activity_band", "direction_band"],
+              "max_per_bucket": null
+            }
           },
           "parallelism": {
             "stage_a_workers": 1,
@@ -157,7 +167,17 @@
           "mode": "exact_parallel",
           "shortlist_config": {
             "enabled": false,
-            "max_candidates": null
+            "max_candidates": null,
+            "scoring": {
+              "activity_ratio_weight": 0.4,
+              "direction_balance_weight": 0.25,
+              "transition_ratio_weight": 0.25,
+              "active_span_ratio_weight": 0.1
+            },
+            "retention": {
+              "diversity_buckets": ["activity_band", "direction_band"],
+              "max_per_bucket": null
+            }
           },
           "parallelism": {
             "stage_a_workers": 1,
@@ -185,7 +205,17 @@
           "mode": "hybrid_conservative",
           "shortlist_config": {
             "enabled": true,
-            "max_candidates": 5000
+            "max_candidates": 5000,
+            "scoring": {
+              "activity_ratio_weight": 0.4,
+              "direction_balance_weight": 0.25,
+              "transition_ratio_weight": 0.25,
+              "active_span_ratio_weight": 0.1
+            },
+            "retention": {
+              "diversity_buckets": ["activity_band", "direction_band"],
+              "max_per_bucket": 750
+            }
           },
           "parallelism": {
             "stage_a_workers": 1,
@@ -213,7 +243,17 @@
           "mode": "hybrid_family",
           "shortlist_config": {
             "enabled": true,
-            "max_candidates": 2000
+            "max_candidates": 2000,
+            "scoring": {
+              "activity_ratio_weight": 0.35,
+              "direction_balance_weight": 0.2,
+              "transition_ratio_weight": 0.3,
+              "active_span_ratio_weight": 0.15
+            },
+            "retention": {
+              "diversity_buckets": ["activity_band", "transition_band"],
+              "max_per_bucket": 300
+            }
           },
           "parallelism": {
             "stage_a_workers": 1,
@@ -282,6 +322,12 @@
   - `mode`
   - `shortlist_config.enabled`
   - `shortlist_config.max_candidates`
+  - `shortlist_config.scoring.activity_ratio_weight`
+  - `shortlist_config.scoring.direction_balance_weight`
+  - `shortlist_config.scoring.transition_ratio_weight`
+  - `shortlist_config.scoring.active_span_ratio_weight`
+  - `shortlist_config.retention.diversity_buckets[]`
+  - `shortlist_config.retention.max_per_bucket`
   - `parallelism.stage_a_workers`
   - `parallelism.stage_b_workers`
   - `feature_flags.runtime_enabled`
@@ -307,6 +353,9 @@
 - массивы `contracts.*` сериализуются в YAML-defined order; порядок является частью frozen contract surface.
 - `contracts.execution.available_execution_profiles` сериализуется в YAML-defined profile order;
   этот порядок является частью browser/runtime discovery contract.
+- `shortlist_config.scoring` и `shortlist_config.retention` публикуются как reviewable
+  foundation-only knobs для future `hybrid_conservative` rollout; exact profiles продолжают
+  отдавать `heuristic_shortlist_enabled=false`.
 - `launch_budget` и `progress_weights` публикуют reviewable server-side hints, но browser не
   выбирает `execution_profile_mode` самостоятельно; launch classification остаётся server-owned.
 - `contracts.launch.supported_indicator_ids` сериализуется в детерминированном `indicator_id` порядке.

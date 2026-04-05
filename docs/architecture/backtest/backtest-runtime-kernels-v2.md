@@ -108,6 +108,11 @@ artifact-backed shortlist bridge, а R6-03 добавляет Stage B risk kerne
 - additive `signal_features/<tf>/<indicator_id>` могут открываться тем же pinned runtime как
   optional warm-cache surface для future hybrid/plugin work, но exact `exact_small` /
   `exact_parallel` path не должен использовать их для shortlist pruning или score drift;
+- D1 foundation modules
+  `generic_row_scorer_v2.py` и `diversified_retention_v2.py`
+  могут использовать этот warm-cache surface вместе с cheap row-local runtime stats, но остаются
+  reusable detached primitives и не встраиваются в live exact runtime path до следующего
+  milestone;
 - contiguous explicit signal row tuples могут быть internal-normalized до slice-view, если это
   не меняет deterministic row ordering и subset semantics;
 - `chunked variant processing` обязано давать тот же shortlist result, что и non-chunked path.
@@ -317,6 +322,9 @@ load stage_a_output
   - `avg_trade_ret_pct`
   - `avg_trade_exec_bars`
   - `exposure_pct`
+- D1 generic shortlist foundation поверх этих metrics может публиковать separate row-score
+  explanation payload и diversity buckets, но не меняет canonical exact ordering/winners до
+  explicit rollout wiring milestone.
 - Не должен:
   - делать risk replay;
   - зависеть от `1m hit-times`;

@@ -61,6 +61,15 @@ backtest:
         planning_budget_ms: 25
         shortlist:
           enabled: false
+          scoring:
+            activity_ratio_weight: 0.40
+            direction_balance_weight: 0.25
+            transition_ratio_weight: 0.25
+            active_span_ratio_weight: 0.10
+          retention:
+            diversity_buckets:
+              - activity_band
+              - direction_band
         launch_budget:
           max_stage_a_variants_total: 1500
           max_stage_b_variants_total: 12000
@@ -81,6 +90,15 @@ backtest:
         planning_budget_ms: 50
         shortlist:
           enabled: false
+          scoring:
+            activity_ratio_weight: 0.40
+            direction_balance_weight: 0.25
+            transition_ratio_weight: 0.25
+            active_span_ratio_weight: 0.10
+          retention:
+            diversity_buckets:
+              - activity_band
+              - direction_band
         launch_budget:
           max_stage_a_variants_total: 25000
           max_stage_b_variants_total: 180000
@@ -102,6 +120,16 @@ backtest:
         shortlist:
           enabled: true
           max_candidates: 5000
+          scoring:
+            activity_ratio_weight: 0.40
+            direction_balance_weight: 0.25
+            transition_ratio_weight: 0.25
+            active_span_ratio_weight: 0.10
+          retention:
+            diversity_buckets:
+              - activity_band
+              - direction_band
+            max_per_bucket: 750
         launch_budget:
           max_stage_a_variants_total: 50000
           max_stage_b_variants_total: 250000
@@ -123,6 +151,16 @@ backtest:
         shortlist:
           enabled: true
           max_candidates: 2000
+          scoring:
+            activity_ratio_weight: 0.35
+            direction_balance_weight: 0.20
+            transition_ratio_weight: 0.30
+            active_span_ratio_weight: 0.15
+          retention:
+            diversity_buckets:
+              - activity_band
+              - transition_band
+            max_per_bucket: 300
         launch_budget:
           max_stage_a_variants_total: 75000
           max_stage_b_variants_total: 300000

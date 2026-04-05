@@ -179,6 +179,50 @@ class BacktestRuntimeExecutionProfileShortlistResponse(BaseModel):
 
     enabled: bool
     max_candidates: int | None = None
+    scoring: "BacktestRuntimeExecutionProfileShortlistScoringResponse"
+    retention: "BacktestRuntimeExecutionProfileShortlistRetentionResponse"
+
+
+class BacktestRuntimeExecutionProfileShortlistScoringResponse(BaseModel):
+    """
+    API response model for generic-row shortlist scoring weights.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    activity_ratio_weight: float
+    direction_balance_weight: float
+    transition_ratio_weight: float
+    active_span_ratio_weight: float
+
+
+class BacktestRuntimeExecutionProfileShortlistRetentionResponse(BaseModel):
+    """
+    API response model for deterministic diversified-retention shortlist knobs.
+
+    Docs:
+      - configs/prod/backtest.yaml
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - apps/api/dto/backtest_runtime_defaults.py
+      - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    diversity_buckets: list[str]
+    max_per_bucket: int | None = None
 
 
 class BacktestRuntimeExecutionProfileParallelismResponse(BaseModel):
@@ -363,6 +407,7 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
     contracts: BacktestRuntimeContractsResponse
 
 
+BacktestRuntimeExecutionProfileShortlistResponse.model_rebuild()
 BacktestRuntimeExecutionContractResponse.model_rebuild()
 BacktestRuntimeContractsResponse.model_rebuild()
 BacktestRuntimeDefaultsResponse.model_rebuild()
@@ -420,6 +465,26 @@ def build_backtest_runtime_defaults_response(
             shortlist_config=BacktestRuntimeExecutionProfileShortlistResponse(
                 enabled=profile.shortlist_config.enabled,
                 max_candidates=profile.shortlist_config.max_candidates,
+                scoring=BacktestRuntimeExecutionProfileShortlistScoringResponse(
+                    activity_ratio_weight=(
+                        profile.shortlist_config.scoring.activity_ratio_weight
+                    ),
+                    direction_balance_weight=(
+                        profile.shortlist_config.scoring.direction_balance_weight
+                    ),
+                    transition_ratio_weight=(
+                        profile.shortlist_config.scoring.transition_ratio_weight
+                    ),
+                    active_span_ratio_weight=(
+                        profile.shortlist_config.scoring.active_span_ratio_weight
+                    ),
+                ),
+                retention=BacktestRuntimeExecutionProfileShortlistRetentionResponse(
+                    diversity_buckets=list(
+                        profile.shortlist_config.retention.diversity_buckets
+                    ),
+                    max_per_bucket=profile.shortlist_config.retention.max_per_bucket,
+                ),
             ),
             parallelism=BacktestRuntimeExecutionProfileParallelismResponse(
                 stage_a_workers=profile.parallelism.stage_a_workers,
@@ -515,6 +580,8 @@ __all__ = [
     "BacktestRuntimeExecutionProfileProgressWeightsResponse",
     "BacktestRuntimeExecutionProfileParallelismResponse",
     "BacktestRuntimeExecutionProfileResponse",
+    "BacktestRuntimeExecutionProfileShortlistRetentionResponse",
+    "BacktestRuntimeExecutionProfileShortlistScoringResponse",
     "BacktestRuntimeExecutionProfileShortlistResponse",
     "BacktestRuntimeJobsDefaultsResponse",
     "BacktestRuntimeLaunchContractResponse",

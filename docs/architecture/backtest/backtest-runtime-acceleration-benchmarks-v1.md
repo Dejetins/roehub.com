@@ -66,6 +66,14 @@ plugin rollout на одном и том же наборе deterministic slices.
 - не меняет active production default exact profile и не управляет `POST /backtests` routing;
 - не меняет public runtime API или persisted storage contracts.
 
+D1 note:
+
+- foundation-only modules `generic_row_scorer_v2.py` и `diversified_retention_v2.py` могут уже
+  использовать vocabulary slices `low_activity` и `high_correlation` для future explanation /
+  diversity benchmarking;
+- сам corpus по-прежнему не включает live heuristic routing и не трактует наличие shortlist
+  knobs как rollout activation.
+
 То есть текущий CI проверяет shape, ordering, fixture linkage и уже существующие zero-call gates,
 а не rollout thresholds для будущих hybrid/plugin paths.
 

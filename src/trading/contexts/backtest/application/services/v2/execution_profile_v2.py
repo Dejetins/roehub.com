@@ -8,8 +8,9 @@ Docs:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal
+import math
+from dataclasses import dataclass, field
+from typing import Literal, cast
 
 from trading.contexts.backtest.domain.entities import BacktestJobStageWeights
 
@@ -18,6 +19,11 @@ type ExecutionProfileModeLiteralV2 = Literal[
     "exact_parallel",
     "hybrid_conservative",
     "hybrid_family",
+]
+type ExecutionProfileShortlistDiversityBucketLiteralV2 = Literal[
+    "activity_band",
+    "direction_band",
+    "transition_band",
 ]
 
 ALLOWED_EXECUTION_PROFILE_MODES_V2: tuple[ExecutionProfileModeLiteralV2, ...] = (
@@ -31,6 +37,195 @@ _EXACT_EXECUTION_PROFILE_MODES_V2: tuple[ExecutionProfileModeLiteralV2, ...] = (
     "exact_small",
     "exact_parallel",
 )
+ALLOWED_EXECUTION_PROFILE_SHORTLIST_DIVERSITY_BUCKETS_V2: tuple[
+    ExecutionProfileShortlistDiversityBucketLiteralV2, ...
+] = (
+    "activity_band",
+    "direction_band",
+    "transition_band",
+)
+
+
+def validate_execution_profile_shortlist_diversity_bucket_v2(
+    *,
+    value: str,
+) -> ExecutionProfileShortlistDiversityBucketLiteralV2:
+    """
+    Validate one shortlist diversity bucket literal against the frozen D1 contract.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+
+    Args:
+        value: Raw diversity-bucket literal from config or defaults payload.
+    Returns:
+        ExecutionProfileShortlistDiversityBucketLiteralV2: Canonical approved bucket literal.
+    Assumptions:
+        Conservative shortlist retention may use only exported scorer bucket axes to keep future
+        rollout reviewable and deterministic.
+    Raises:
+        ValueError: If the literal is blank or outside the approved bucket set.
+    Side Effects:
+        None.
+    """
+    normalized_value = value.strip().lower()
+    if not normalized_value:
+        raise ValueError(
+            "ExecutionProfile shortlist diversity bucket literal must be non-empty"
+        )
+    if normalized_value not in ALLOWED_EXECUTION_PROFILE_SHORTLIST_DIVERSITY_BUCKETS_V2:
+        raise ValueError(
+            "ExecutionProfile shortlist diversity bucket must be one of "
+            f"{ALLOWED_EXECUTION_PROFILE_SHORTLIST_DIVERSITY_BUCKETS_V2}, got {value!r}"
+        )
+    return cast(ExecutionProfileShortlistDiversityBucketLiteralV2, normalized_value)
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionProfileShortlistScoringConfigV2:
+    """
+    Typed generic-row scoring weights for conservative shortlist foundation work.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - apps/api/dto/backtest_runtime_defaults.py
+    """
+
+    activity_ratio_weight: float = 0.40
+    direction_balance_weight: float = 0.25
+    transition_ratio_weight: float = 0.25
+    active_span_ratio_weight: float = 0.10
+
+    def __post_init__(self) -> None:
+        """
+        Validate normalized shortlist scoring weights for universal row-scoring payloads.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+          - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+          - apps/api/dto/backtest_runtime_defaults.py
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Weights stay additive and reviewable so future rollout can reuse the same generic
+            scorer without hidden heuristics.
+        Raises:
+            ValueError: If one weight is negative, non-finite, or the total weight is zero.
+        Side Effects:
+            Normalizes all weight fields to builtin `float`.
+        """
+        total_weight = 0.0
+        for field_name in (
+            "activity_ratio_weight",
+            "direction_balance_weight",
+            "transition_ratio_weight",
+            "active_span_ratio_weight",
+        ):
+            raw_value = getattr(self, field_name)
+            field_value = float(raw_value)
+            if not math.isfinite(field_value):
+                raise ValueError(
+                    f"ExecutionProfileShortlistScoringConfigV2.{field_name} must be finite"
+                )
+            if field_value < 0.0:
+                raise ValueError(
+                    f"ExecutionProfileShortlistScoringConfigV2.{field_name} must be >= 0"
+                )
+            object.__setattr__(self, field_name, field_value)
+            total_weight += field_value
+        if total_weight <= 0.0:
+            raise ValueError(
+                "ExecutionProfileShortlistScoringConfigV2 must define at least one positive "
+                "weight"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionProfileShortlistRetentionConfigV2:
+    """
+    Typed diversified-retention knobs for deterministic shortlist survivor selection.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+      - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+      - apps/api/dto/backtest_runtime_defaults.py
+    """
+
+    diversity_buckets: tuple[ExecutionProfileShortlistDiversityBucketLiteralV2, ...] = (
+        "activity_band",
+        "direction_band",
+    )
+    max_per_bucket: int | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate deterministic diversity-bucket ordering and optional per-bucket survivor caps.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+          - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
+          - apps/api/dto/backtest_runtime_defaults.py
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Bucket identity and iteration order remain explicit so later hybrid rollout can
+            reason about `low_activity` and correlation-sensitive slices without hidden grouping.
+        Raises:
+            ValueError: If bucket literals are blank/duplicated/unsupported or one cap is
+                non-positive.
+        Side Effects:
+            Normalizes bucket literals into an immutable tuple preserving configured order.
+        """
+        if len(self.diversity_buckets) == 0:
+            raise ValueError(
+                "ExecutionProfileShortlistRetentionConfigV2.diversity_buckets must be non-empty"
+            )
+        normalized_buckets: list[ExecutionProfileShortlistDiversityBucketLiteralV2] = []
+        seen_buckets: set[ExecutionProfileShortlistDiversityBucketLiteralV2] = set()
+        for raw_bucket in self.diversity_buckets:
+            typed_bucket = validate_execution_profile_shortlist_diversity_bucket_v2(
+                value=raw_bucket
+            )
+            if typed_bucket in seen_buckets:
+                raise ValueError(
+                    "ExecutionProfileShortlistRetentionConfigV2.diversity_buckets must not "
+                    f"contain duplicates, got {raw_bucket!r}"
+                )
+            normalized_buckets.append(typed_bucket)
+            seen_buckets.add(typed_bucket)
+        object.__setattr__(self, "diversity_buckets", tuple(normalized_buckets))
+        if self.max_per_bucket is not None and self.max_per_bucket <= 0:
+            raise ValueError(
+                "ExecutionProfileShortlistRetentionConfigV2.max_per_bucket must be > 0 when "
+                "provided"
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,6 +371,12 @@ class ExecutionProfileShortlistConfigV2:
 
     enabled: bool = False
     max_candidates: int | None = None
+    scoring: ExecutionProfileShortlistScoringConfigV2 = field(
+        default_factory=ExecutionProfileShortlistScoringConfigV2
+    )
+    retention: ExecutionProfileShortlistRetentionConfigV2 = field(
+        default_factory=ExecutionProfileShortlistRetentionConfigV2
+    )
 
     def __post_init__(self) -> None:
         """
@@ -194,7 +395,8 @@ class ExecutionProfileShortlistConfigV2:
         Returns:
             None.
         Assumptions:
-            `max_candidates` is optional for exact profiles and strict-positive when present.
+            `max_candidates` is optional for exact profiles and strict-positive when present,
+            while generic scoring/retention knobs stay additive until rollout activation.
         Raises:
             ValueError: If one shortlist field violates deterministic bounds.
         Side Effects:
@@ -202,9 +404,18 @@ class ExecutionProfileShortlistConfigV2:
         """
         if not isinstance(self.enabled, bool):
             raise ValueError("ExecutionProfileShortlistConfigV2.enabled must be bool")
+        if self.scoring is None:  # type: ignore[truthy-bool]
+            raise ValueError("ExecutionProfileShortlistConfigV2.scoring is required")
+        if self.retention is None:  # type: ignore[truthy-bool]
+            raise ValueError("ExecutionProfileShortlistConfigV2.retention is required")
         if self.max_candidates is not None and self.max_candidates <= 0:
             raise ValueError(
                 "ExecutionProfileShortlistConfigV2.max_candidates must be > 0 when provided"
+            )
+        if self.enabled and self.max_candidates is None:
+            raise ValueError(
+                "ExecutionProfileShortlistConfigV2.max_candidates must be provided when "
+                "shortlist is enabled"
             )
 
 
@@ -704,6 +915,8 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 shortlist_config=ExecutionProfileShortlistConfigV2(
                     enabled=False,
                     max_candidates=None,
+                    scoring=ExecutionProfileShortlistScoringConfigV2(),
+                    retention=ExecutionProfileShortlistRetentionConfigV2(),
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
                     stage_a_workers=1,
@@ -724,6 +937,8 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 shortlist_config=ExecutionProfileShortlistConfigV2(
                     enabled=False,
                     max_candidates=None,
+                    scoring=ExecutionProfileShortlistScoringConfigV2(),
+                    retention=ExecutionProfileShortlistRetentionConfigV2(),
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
                     stage_a_workers=1,
@@ -744,6 +959,16 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 shortlist_config=ExecutionProfileShortlistConfigV2(
                     enabled=True,
                     max_candidates=5000,
+                    scoring=ExecutionProfileShortlistScoringConfigV2(
+                        activity_ratio_weight=0.40,
+                        direction_balance_weight=0.25,
+                        transition_ratio_weight=0.25,
+                        active_span_ratio_weight=0.10,
+                    ),
+                    retention=ExecutionProfileShortlistRetentionConfigV2(
+                        diversity_buckets=("activity_band", "direction_band"),
+                        max_per_bucket=750,
+                    ),
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
                     stage_a_workers=1,
@@ -768,6 +993,16 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 shortlist_config=ExecutionProfileShortlistConfigV2(
                     enabled=True,
                     max_candidates=2000,
+                    scoring=ExecutionProfileShortlistScoringConfigV2(
+                        activity_ratio_weight=0.35,
+                        direction_balance_weight=0.20,
+                        transition_ratio_weight=0.30,
+                        active_span_ratio_weight=0.15,
+                    ),
+                    retention=ExecutionProfileShortlistRetentionConfigV2(
+                        diversity_buckets=("activity_band", "transition_band"),
+                        max_per_bucket=300,
+                    ),
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
                     stage_a_workers=1,
@@ -790,15 +1025,20 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
 
 
 __all__ = [
+    "ALLOWED_EXECUTION_PROFILE_SHORTLIST_DIVERSITY_BUCKETS_V2",
     "ALLOWED_EXECUTION_PROFILE_MODES_V2",
     "DEFAULT_EXECUTION_PROFILE_MODE_V2",
     "ExecutionProfileFeatureFlagsV2",
     "ExecutionProfileLaunchBudgetV2",
     "ExecutionProfileModeLiteralV2",
     "ExecutionProfileParallelismConfigV2",
+    "ExecutionProfileShortlistDiversityBucketLiteralV2",
+    "ExecutionProfileShortlistRetentionConfigV2",
+    "ExecutionProfileShortlistScoringConfigV2",
     "ExecutionProfileShortlistConfigV2",
     "ExecutionProfileV2",
     "ExecutionProfilesCatalogV2",
     "default_execution_profiles_catalog_v2",
+    "validate_execution_profile_shortlist_diversity_bucket_v2",
     "validate_execution_profile_mode_v2",
 ]

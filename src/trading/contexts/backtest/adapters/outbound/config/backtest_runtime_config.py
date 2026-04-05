@@ -24,9 +24,12 @@ from trading.contexts.backtest.application.services.v2.execution_profile_v2 impo
     ExecutionProfileParallelismConfigV2,
     ExecutionProfilesCatalogV2,
     ExecutionProfileShortlistConfigV2,
+    ExecutionProfileShortlistRetentionConfigV2,
+    ExecutionProfileShortlistScoringConfigV2,
     ExecutionProfileV2,
     default_execution_profiles_catalog_v2,
     validate_execution_profile_mode_v2,
+    validate_execution_profile_shortlist_diversity_bucket_v2,
 )
 from trading.contexts.backtest.domain.entities import BacktestJobStageWeights
 from trading.contexts.indicators.application.services.grid_builder import (
@@ -1149,6 +1152,37 @@ def _get_optional_int(data: Mapping[str, Any], key: str) -> int | None:
     return _get_int(data, key, required=True)
 
 
+def _get_optional_int_with_default(
+    data: Mapping[str, Any],
+    key: str,
+    *,
+    default: int | None,
+) -> int | None:
+    """
+    Read optional integer with explicit fallback default and `null` support.
+
+    Args:
+        data: Source mapping.
+        key: Integer key name.
+        default: Fallback value when key is absent.
+    Returns:
+        int | None: Parsed integer or configured default.
+    Assumptions:
+        YAML `null` value disables the optional override explicitly.
+    Raises:
+        ValueError: If provided non-null value is not an integer.
+    Side Effects:
+        None.
+    """
+    if key not in data:
+        return default
+    value = data.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"expected int at key '{key}', got {type(value).__name__}")
+    return value
+
 
 def _get_int_with_default(data: Mapping[str, Any], key: str, *, default: int) -> int:
     """
@@ -1515,6 +1549,8 @@ def _parse_execution_profiles_catalog(
         )
         default_profile = default_catalog.profile_for_mode(mode=mode)
         shortlist_map = _get_mapping(profile_map, "shortlist", required=False)
+        shortlist_scoring_map = _get_mapping(shortlist_map, "scoring", required=False)
+        shortlist_retention_map = _get_mapping(shortlist_map, "retention", required=False)
         parallelism_map = _get_mapping(profile_map, "parallelism", required=False)
         feature_flags_map = _get_mapping(profile_map, "feature_flags", required=False)
         launch_budget_map = _get_mapping(profile_map, "launch_budget", required=False)
@@ -1526,9 +1562,62 @@ def _parse_execution_profiles_catalog(
                     enabled=_get_bool_with_default(
                         shortlist_map,
                         "enabled",
-                        default=False,
+                        default=default_profile.shortlist_config.enabled,
                     ),
-                    max_candidates=_get_optional_int(shortlist_map, "max_candidates"),
+                    max_candidates=_get_optional_int_with_default(
+                        shortlist_map,
+                        "max_candidates",
+                        default=default_profile.shortlist_config.max_candidates,
+                    ),
+                    scoring=ExecutionProfileShortlistScoringConfigV2(
+                        activity_ratio_weight=_get_float_with_default(
+                            shortlist_scoring_map,
+                            "activity_ratio_weight",
+                            default=(
+                                default_profile.shortlist_config.scoring.activity_ratio_weight
+                            ),
+                        ),
+                        direction_balance_weight=_get_float_with_default(
+                            shortlist_scoring_map,
+                            "direction_balance_weight",
+                            default=(
+                                default_profile.shortlist_config.scoring.direction_balance_weight
+                            ),
+                        ),
+                        transition_ratio_weight=_get_float_with_default(
+                            shortlist_scoring_map,
+                            "transition_ratio_weight",
+                            default=(
+                                default_profile.shortlist_config.scoring.transition_ratio_weight
+                            ),
+                        ),
+                        active_span_ratio_weight=_get_float_with_default(
+                            shortlist_scoring_map,
+                            "active_span_ratio_weight",
+                            default=(
+                                default_profile.shortlist_config.scoring.active_span_ratio_weight
+                            ),
+                        ),
+                    ),
+                    retention=ExecutionProfileShortlistRetentionConfigV2(
+                        diversity_buckets=tuple(
+                            validate_execution_profile_shortlist_diversity_bucket_v2(
+                                value=bucket_name
+                            )
+                            for bucket_name in _get_str_sequence_with_default(
+                                shortlist_retention_map,
+                                "diversity_buckets",
+                                default=(
+                                    default_profile.shortlist_config.retention.diversity_buckets
+                                ),
+                            )
+                        ),
+                        max_per_bucket=_get_optional_int_with_default(
+                            shortlist_retention_map,
+                            "max_per_bucket",
+                            default=default_profile.shortlist_config.retention.max_per_bucket,
+                        ),
+                    ),
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
                     stage_a_workers=_get_int_with_default(
