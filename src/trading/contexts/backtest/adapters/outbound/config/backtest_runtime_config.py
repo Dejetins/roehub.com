@@ -532,7 +532,7 @@ class BacktestJobsRuntimeConfig:
     claim_poll_seconds: float
     lease_seconds: int
     heartbeat_seconds: int
-    parallel_workers: int
+    worker_processes: int
     snapshot_seconds: int | None = None
     snapshot_variants_step: int | None = None
 
@@ -561,8 +561,12 @@ class BacktestJobsRuntimeConfig:
             raise ValueError("backtest.jobs.lease_seconds must be > 0")
         if self.heartbeat_seconds <= 0:
             raise ValueError("backtest.jobs.heartbeat_seconds must be > 0")
-        if self.parallel_workers <= 0:
-            raise ValueError("backtest.jobs.parallel_workers must be > 0")
+        if self.worker_processes < 0:
+            raise ValueError("backtest.jobs.worker_processes must be >= 0")
+        if self.enabled and self.worker_processes == 0:
+            raise ValueError(
+                "backtest.jobs.worker_processes must be >= 1 when backtest.jobs.enabled=true"
+            )
 
         if self.snapshot_seconds is not None and self.snapshot_seconds <= 0:
             raise ValueError("backtest.jobs.snapshot_seconds must be > 0 when provided")
@@ -912,7 +916,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         claim_poll_seconds=_get_float(jobs_map, "claim_poll_seconds", required=True),
         lease_seconds=_get_int(jobs_map, "lease_seconds", required=True),
         heartbeat_seconds=_get_int(jobs_map, "heartbeat_seconds", required=True),
-        parallel_workers=_get_int(jobs_map, "parallel_workers", required=True),
+        worker_processes=_get_int(jobs_map, "worker_processes", required=True),
         snapshot_seconds=_get_optional_int(jobs_map, "snapshot_seconds"),
         snapshot_variants_step=_get_optional_int(jobs_map, "snapshot_variants_step"),
     )

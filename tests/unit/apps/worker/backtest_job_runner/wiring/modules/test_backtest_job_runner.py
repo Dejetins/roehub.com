@@ -67,6 +67,7 @@ def test_build_backtest_job_runner_app_skips_clickhouse_wiring_for_artifact_work
             top_k_persisted_default=300,
             lease_seconds=60,
             heartbeat_seconds=15,
+            worker_processes=1,
             snapshot_seconds=None,
             snapshot_variants_step=None,
             claim_poll_seconds=5.0,

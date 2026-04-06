@@ -411,7 +411,7 @@ def _runtime_defaults_response() -> BacktestRuntimeDefaultsResponse:
                 claim_poll_seconds=1.0,
                 lease_seconds=60,
                 heartbeat_seconds=15,
-                parallel_workers=1,
+                worker_processes=1,
                 snapshot_seconds=30,
                 snapshot_variants_step=1000,
             ),

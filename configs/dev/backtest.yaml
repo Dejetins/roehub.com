@@ -213,7 +213,7 @@ backtest:
     heartbeat_seconds: 15
     snapshot_seconds: 30
     snapshot_variants_step: 1000
-    parallel_workers: 1
+    worker_processes: 1
   reporting:
     top_trades_n_default: 3
     eager_top_reports_enabled: false

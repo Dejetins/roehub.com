@@ -21,7 +21,7 @@ _DEFAULT_JOBS_BLOCK = """
     heartbeat_seconds: 15
     snapshot_seconds: 30
     snapshot_variants_step: 1000
-    parallel_workers: 1
+    worker_processes: 1
 """.rstrip()
 
 _DEFAULT_SYNC_BLOCK = """
@@ -212,7 +212,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.jobs.heartbeat_seconds == 15
     assert config.jobs.snapshot_seconds == 30
     assert config.jobs.snapshot_variants_step == 1000
-    assert config.jobs.parallel_workers == 1
+    assert config.jobs.worker_processes == 1
 
 
 @pytest.mark.parametrize(
@@ -298,7 +298,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -467,7 +467,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -503,7 +503,7 @@ backtest:
     claim_poll_seconds: 1.0
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -783,7 +783,7 @@ backtest:
     heartbeat_seconds: 20
     snapshot_seconds: 10
     snapshot_variants_step: 200
-    parallel_workers: 4
+    worker_processes: 4
 """.strip(),
     )
 
@@ -882,7 +882,7 @@ backtest:
     assert config.jobs.heartbeat_seconds == 20
     assert config.jobs.snapshot_seconds == 10
     assert config.jobs.snapshot_variants_step == 200
-    assert config.jobs.parallel_workers == 4
+    assert config.jobs.worker_processes == 4
 
 
 
@@ -915,12 +915,94 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
     with pytest.raises(ValueError, match="top_k_persisted_default"):
         load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_requires_canonical_worker_processes_key(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader requires the canonical queue-concurrency key and rejects legacy-only payloads.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        EPIC B1 publishes `backtest.jobs.worker_processes` as the only accepted key until any
+        later compatibility alias work is implemented explicitly.
+    Raises:
+        AssertionError: If legacy-only jobs payload does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="worker_processes"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_allows_zero_worker_processes_when_jobs_disabled(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify disabled jobs config may declare zero worker processes without failing startup parsing.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Queue concurrency matters only when the jobs subsystem is enabled, but the canonical key
+        remains required in the typed config surface.
+    Raises:
+        AssertionError: If disabled jobs config with zero worker processes fails to load.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: false
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    worker_processes: 0
+""".strip(),
+    )
+
+    config = load_backtest_runtime_config(config_path)
+
+    assert config.jobs.enabled is False
+    assert config.jobs.worker_processes == 0
 
 
 def test_load_backtest_runtime_config_rejects_invalid_contract_top_n_bounds(
@@ -958,7 +1040,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1009,7 +1091,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1062,7 +1144,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1103,7 +1185,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1159,7 +1241,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1214,7 +1296,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1269,7 +1351,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1311,7 +1393,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1348,7 +1430,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1387,7 +1469,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
@@ -1465,7 +1547,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
         filename="backtest_a.yaml",
     )
@@ -1498,7 +1580,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
         filename="backtest_b.yaml",
     )
@@ -1543,7 +1625,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
         filename="backtest_ranking_a.yaml",
     )
@@ -1564,7 +1646,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
         filename="backtest_ranking_b.yaml",
     )
@@ -1610,7 +1692,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
         filename="backtest_contract_a.yaml",
     )
@@ -1637,7 +1719,7 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
         filename="backtest_contract_b.yaml",
     )
@@ -1681,7 +1763,7 @@ backtest:
     heartbeat_seconds: 15
     snapshot_seconds: 30
     snapshot_variants_step: 1000
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
         filename="backtest_operational_a.yaml",
     )
@@ -1705,7 +1787,7 @@ backtest:
     heartbeat_seconds: 30
     snapshot_seconds: 5
     snapshot_variants_step: 50
-    parallel_workers: 8
+    worker_processes: 8
 """.strip(),
         filename="backtest_operational_b.yaml",
     )
