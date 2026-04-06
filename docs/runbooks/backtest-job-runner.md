@@ -1,10 +1,11 @@
 # Ранбук backtest job runner
 
-Ранбук для worker-процесса `backtest-job-runner`, который используется в Backtest Jobs v1.
+Ранбук для worker-процесса `backtest-job-runner`, который используется как canonical claimed
+background worker для persisted runs.
 
 ## Status
 
-- Status: active operational runbook after R10-01 / R10-02 / R10-03 closure.
+- Status: active operational runbook for canonical `backtest-job-runner` v2 service surface.
 - Compatibility note:
   - queued/running rows могут иметь `execution_mode=background_auto` или
     `execution_mode=background_manual_legacy`;
@@ -23,6 +24,7 @@
 - поведение cancel и lease-lost
 
 Архитектурные ссылки:
+- `docs/architecture/backtest/backtest-job-runner-v2.md`
 - `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
 - `docs/architecture/backtest/backtest-jobs-api-v1.md`

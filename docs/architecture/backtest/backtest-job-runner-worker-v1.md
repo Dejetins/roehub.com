@@ -4,7 +4,9 @@
 
 ## Status
 
-- Status: active v1 worker contract with R0 freeze notes.
+- Status: historical / compatibility document after canonical worker doc split.
+- Canonical document:
+  - `docs/architecture/backtest/backtest-job-runner-v2.md`
 - Compatibility note:
   - lifecycle/storage/public literals stay active, but runtime internals are now artifact-backed;
   - `background_auto` and `background_manual_legacy` share the same claimed-worker execution

@@ -52,7 +52,7 @@ owner: backtest
 - [backtest-compute-notebook-algorithm-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md)
 - [backtest-precompute-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-precompute-runner-v2.md)
 - [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
-- [backtest-job-runner-worker-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
 - [06_backtest_compute.ipynb](/Users/daniildegtyarev/Projects/roehub.com/tests/notebook_tests/06_backtest_compute.ipynb)
 
 ## 3. Ключевые решения этого follow-up плана
@@ -232,7 +232,7 @@ POST /backtests
 
 - [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
 - [web-backtest-history-and-variant-detail-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md)
-- [backtest-job-runner-worker-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
 
 ## 6. Execution profile как явная сущность
 
@@ -454,7 +454,7 @@ class ExecutionProfile:
 Документы:
 
 - [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
-- [backtest-job-runner-worker-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
 
 #### EPIC B2. Better memmap locality и loader discipline
 

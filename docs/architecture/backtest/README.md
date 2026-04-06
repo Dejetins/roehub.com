@@ -43,7 +43,7 @@
 - Sync API: `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
 - Reporting metrics/table: `docs/architecture/backtest/backtest-reporting-metrics-table-v1.md`
 - Jobs API: `docs/architecture/backtest/backtest-jobs-api-v1.md`
-- Jobs worker: `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+- Jobs worker: `docs/architecture/backtest/backtest-job-runner-v2.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
 - Follow-up runtime acceleration roadmap after the artifact-backed cutover:
   `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
