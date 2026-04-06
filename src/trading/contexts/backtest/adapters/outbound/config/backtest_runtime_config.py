@@ -561,6 +561,7 @@ class BacktestJobsRuntimeConfig:
             raise ValueError("backtest.jobs.lease_seconds must be > 0")
         if self.heartbeat_seconds <= 0:
             raise ValueError("backtest.jobs.heartbeat_seconds must be > 0")
+        # Worker cardinality is operational, but invalid values still break startup invariants.
         if self.worker_processes < 0:
             raise ValueError("backtest.jobs.worker_processes must be >= 0")
         if self.enabled and self.worker_processes == 0:
@@ -1062,7 +1063,7 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
         str: Canonical SHA-256 hash string.
     Assumptions:
         Hash includes result-affecting defaults (ranking/execution/reporting/persisted top-k)
-        and excludes operational-only knobs plus additive `contracts` and
+        and excludes operational-only knobs such as `worker_processes` plus additive `contracts` and
         profile-routing/progress metadata that do not alter exact result payloads.
     Raises:
         TypeError: If payload normalization fails for unsupported node type.
@@ -1093,6 +1094,7 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
                 "eager_top_reports_enabled": config.reporting.eager_top_reports_enabled,
             },
             "jobs": {
+                # Current storage/API contracts hash only result-affecting job defaults.
                 "top_k_persisted_default": config.jobs.top_k_persisted_default,
             },
         }

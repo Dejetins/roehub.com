@@ -65,6 +65,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Prometheus metrics HTTP port (CLI override has highest priority).",
     )
+    parser.add_argument(
+        "--instance-index",
+        type=int,
+        default=0,
+        help="Deterministic worker instance index used to build unique locked_by identity.",
+    )
     return parser
 
 
@@ -116,13 +122,18 @@ def _install_signal_handlers(stop_event: asyncio.Event) -> None:
             signal.signal(sig, lambda *_args: _mark_stop())
 
 
-async def _run_async(config_path: str | None, metrics_port: int | None) -> int:
+async def _run_async(
+    config_path: str | None,
+    metrics_port: int | None,
+    instance_index: int,
+) -> int:
     """
     Build and run Backtest job-runner worker until stop signal.
 
     Args:
         config_path: Optional CLI runtime config path override.
         metrics_port: Optional CLI Prometheus endpoint port override.
+        instance_index: Deterministic worker instance index for fleet-safe identity.
     Returns:
         int: Process exit code.
     Assumptions:
@@ -152,7 +163,17 @@ async def _run_async(config_path: str | None, metrics_port: int | None) -> int:
     app = build_backtest_job_runner_app(
         config_path=str(resolved_config_path),
         environ=os.environ,
+        instance_index=instance_index,
         metrics_port=effective_metrics_port,
+    )
+    logging.getLogger(__name__).info(
+        (
+            "event=worker_starting component=backtest-job-runner "
+            "instance_index=%s locked_by=%s metrics_port=%s"
+        ),
+        instance_index,
+        app.locked_by,
+        effective_metrics_port,
     )
     await app.run(stop_event)
     return 0
@@ -180,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
             _run_async(
                 config_path=args.config,
                 metrics_port=args.metrics_port,
+                instance_index=args.instance_index,
             )
         )
     except Exception:  # noqa: BLE001

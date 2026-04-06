@@ -305,7 +305,7 @@ R7-02 additional sync-inline write path:
 - `backtest.jobs.heartbeat_seconds`
 - `backtest.jobs.snapshot_seconds` (optional with strict positive validation when present)
 - `backtest.jobs.snapshot_variants_step` (optional with strict positive validation when present)
-- `backtest.jobs.parallel_workers` (default 1)
+- `backtest.jobs.worker_processes`
 
 Validation policy:
 
@@ -325,7 +325,7 @@ Validation policy:
 
 Из hash намеренно исключаем operational knobs:
 
-- `enabled`, `max_active_jobs_per_user`, `claim_poll_seconds`, `lease_seconds`, `heartbeat_seconds`, `snapshot_seconds`, `snapshot_variants_step`, `parallel_workers`.
+- `enabled`, `max_active_jobs_per_user`, `claim_poll_seconds`, `lease_seconds`, `heartbeat_seconds`, `snapshot_seconds`, `snapshot_variants_step`, `worker_processes`.
 
 ## Non-goals
 

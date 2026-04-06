@@ -1088,6 +1088,84 @@ backtest:
     assert config.jobs.worker_processes == 0
 
 
+def test_load_backtest_runtime_config_fails_fast_on_zero_worker_processes_when_jobs_enabled(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify enabled jobs config rejects zero worker cardinality as a startup invariant.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        `worker_processes` is required strict config even before worker fleet materialization.
+    Raises:
+        AssertionError: If enabled jobs config with zero workers does not fail fast.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    worker_processes: 0
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="worker_processes must be >= 1"):
+        load_backtest_runtime_config(config_path)
+
+
+def test_load_backtest_runtime_config_fails_fast_on_negative_worker_processes(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify worker cardinality never accepts negative values in strict startup config.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Negative worker cardinality is invalid regardless of whether jobs are enabled.
+    Raises:
+        AssertionError: If negative worker cardinality does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: false
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    worker_processes: -1
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="worker_processes must be >= 0"):
+        load_backtest_runtime_config(config_path)
+
+
 def test_load_backtest_runtime_config_rejects_invalid_contract_top_n_bounds(
     tmp_path: Path,
 ) -> None:
@@ -1873,6 +1951,71 @@ backtest:
     worker_processes: 8
 """.strip(),
         filename="backtest_operational_b.yaml",
+    )
+    hash_b = build_backtest_runtime_config_hash(
+        config=load_backtest_runtime_config(config_path_b)
+    )
+
+    assert hash_a == hash_b
+
+
+def test_build_backtest_runtime_config_hash_ignores_worker_processes(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify runtime hash keeps `worker_processes` out of the current result-affecting payload.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Current `backtest_runtime_config_hash` semantics exclude operational worker cardinality
+        even though startup invariants validate it strictly.
+    Raises:
+        AssertionError: If hash changes when only `worker_processes` differs.
+    Side Effects:
+        None.
+    """
+    config_path_a = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    worker_processes: 1
+""".strip(),
+        filename="backtest_worker_processes_a.yaml",
+    )
+    config_path_b = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    worker_processes: 8
+""".strip(),
+        filename="backtest_worker_processes_b.yaml",
+    )
+
+    hash_a = build_backtest_runtime_config_hash(
+        config=load_backtest_runtime_config(config_path_a)
     )
     hash_b = build_backtest_runtime_config_hash(
         config=load_backtest_runtime_config(config_path_b)

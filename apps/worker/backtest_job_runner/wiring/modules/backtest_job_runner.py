@@ -209,6 +209,7 @@ class BacktestJobRunnerApp:
 
     claim_poll_seconds: float
     lease_seconds: int
+    instance_index: int
     locked_by: str
     lease_repository: BacktestJobLeaseRepository
     runner_use_case: RunBacktestJobRunnerV1
@@ -234,6 +235,8 @@ class BacktestJobRunnerApp:
             raise ValueError("BacktestJobRunnerApp.claim_poll_seconds must be > 0")
         if self.lease_seconds <= 0:
             raise ValueError("BacktestJobRunnerApp.lease_seconds must be > 0")
+        if self.instance_index < 0:
+            raise ValueError("BacktestJobRunnerApp.instance_index must be >= 0")
         if not self.locked_by.strip():
             raise ValueError("BacktestJobRunnerApp.locked_by must be non-empty")
         if self.metrics_port <= 0:
@@ -262,7 +265,12 @@ class BacktestJobRunnerApp:
         """
         start_http_server(self.metrics_port, registry=self.metrics.registry)
         _LOG.info(
-            "event=metrics_started component=backtest-job-runner metrics_port=%s",
+            (
+                "event=metrics_started component=backtest-job-runner "
+                "instance_index=%s locked_by=%s metrics_port=%s"
+            ),
+            self.instance_index,
+            self.locked_by,
             self.metrics_port,
         )
 
@@ -332,6 +340,7 @@ def build_backtest_job_runner_app(
     *,
     config_path: str,
     environ: Mapping[str, str],
+    instance_index: int,
     metrics_port: int,
 ) -> BacktestJobRunnerApp:
     """
@@ -348,6 +357,7 @@ def build_backtest_job_runner_app(
     Args:
         config_path: Path to `backtest.yaml` runtime config.
         environ: Process environment mapping.
+        instance_index: Deterministic worker instance index for supervised fleets.
         metrics_port: Prometheus metrics HTTP server port.
     Returns:
         BacktestJobRunnerApp: Ready-to-run worker app.
@@ -361,8 +371,14 @@ def build_backtest_job_runner_app(
     """
     if metrics_port <= 0:
         raise ValueError("build_backtest_job_runner_app metrics_port must be > 0")
+    if instance_index < 0:
+        raise ValueError("build_backtest_job_runner_app instance_index must be >= 0")
 
     runtime_config = load_backtest_runtime_config(Path(config_path))
+    _validate_instance_index(
+        instance_index=instance_index,
+        worker_processes=runtime_config.jobs.worker_processes,
+    )
     artifact_runtime_config = load_backtest_artifacts_runtime_config(
         resolve_backtest_artifacts_config_path(environ=environ)
     )
@@ -423,7 +439,8 @@ def build_backtest_job_runner_app(
     return BacktestJobRunnerApp(
         claim_poll_seconds=runtime_config.jobs.claim_poll_seconds,
         lease_seconds=runtime_config.jobs.lease_seconds,
-        locked_by=_build_locked_by(),
+        instance_index=instance_index,
+        locked_by=_build_locked_by(instance_index=instance_index),
         lease_repository=lease_repository,
         runner_use_case=runner_use_case,
         metrics=BacktestJobRunnerMetrics(),
@@ -453,23 +470,58 @@ async def _wait_with_stop(*, stop_event: asyncio.Event, timeout_seconds: float) 
         return
 
 
-def _build_locked_by() -> str:
+def _validate_instance_index(*, instance_index: int, worker_processes: int) -> None:
     """
-    Build deterministic lease owner identifier in `<hostname>-<pid>` format.
+    Validate that one worker process maps to one deterministic fleet instance slot.
 
     Args:
-        None.
+        instance_index: Explicit worker instance index supplied at startup.
+        worker_processes: Configured fleet cardinality for the worker service.
     Returns:
-        str: Lease owner literal.
+        None.
     Assumptions:
-        Hostname and process id are stable for process lifetime.
+        Worker fleet materialization is external, but every process must declare a valid slot.
+    Raises:
+        ValueError: If instance index is negative or outside configured worker cardinality.
+    Side Effects:
+        None.
+    """
+    if instance_index < 0:
+        raise ValueError("instance_index must be >= 0")
+    if instance_index >= worker_processes:
+        raise ValueError(
+            "instance_index must be < worker_processes for backtest-job-runner startup"
+        )
+
+
+def _build_locked_by(
+    *,
+    instance_index: int,
+    hostname: str | None = None,
+    pid: int | None = None,
+) -> str:
+    """
+    Build deterministic lease owner identity for one worker process instance.
+
+    Args:
+        instance_index: Explicit worker instance index for fleet-safe identity.
+        hostname: Optional hostname override for deterministic tests.
+        pid: Optional process id override for deterministic tests.
+    Returns:
+        str: Lease owner literal in `hostname=<hostname>;pid=<pid>;instance_index=<n>` format.
+    Assumptions:
+        Hostname, process id, and instance index are stable for process lifetime.
     Raises:
         None.
     Side Effects:
         Reads OS hostname and process id.
     """
-    hostname = socket.gethostname().strip() or "unknown-host"
-    return f"{hostname}-{os.getpid()}"
+    resolved_hostname = (hostname if hostname is not None else socket.gethostname()).strip()
+    resolved_pid = os.getpid() if pid is None else pid
+    normalized_hostname = resolved_hostname or "unknown-host"
+    return (
+        f"hostname={normalized_hostname};pid={resolved_pid};instance_index={instance_index}"
+    )
 
 
 def _utc_now() -> datetime:
