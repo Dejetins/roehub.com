@@ -4,10 +4,12 @@
 
 ## Status
 
-- Status: historical / compatibility document after canonical worker doc split.
+- Status: historical / compatibility-only document after the canonical worker doc split.
 - Canonical document:
-  - `docs/architecture/backtest/backtest-job-runner-v2.md`
+  - [`docs/architecture/backtest/backtest-job-runner-v2.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
 - Compatibility note:
+  - this file is preserved for migration history and legacy semantics and no longer defines the
+    active worker runtime;
   - lifecycle/storage/public literals stay active, but runtime internals are now artifact-backed;
   - `background_auto` and `background_manual_legacy` share the same claimed-worker execution
     path and pin semantics;

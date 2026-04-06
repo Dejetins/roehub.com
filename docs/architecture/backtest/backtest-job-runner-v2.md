@@ -1,159 +1,158 @@
-# Backtest Job Runner v2 -- claimed background worker для persisted runs
+# Backtest Job Runner v2 -- canonical claimed background worker for persisted runs
+
+This document defines the canonical architecture for the `backtest-job-runner` service in the
+artifact-backed backtest v2 runtime.
 
 ## Status
 
-- Статус: canonical architecture document для фактического `backtest-job-runner` поверх
-  backtest v2 runtime.
-- Этот документ является основным source of truth для background execution path persisted runs.
-- Документ `docs/architecture/backtest/backtest-job-runner-worker-v1.md` считается
-  historical/compatibility document и не является больше canonical описанием worker-а.
-- Публичный lifecycle vocabulary и persisted run storage остаются совместимыми с runs/history
-  contracts, а runtime internals работают через artifact-backed v2.
+- Status: canonical architecture document for the active `backtest-job-runner` runtime.
+- This file is the source of truth for the claimed background execution path for persisted runs.
+- [`docs/architecture/backtest/backtest-job-runner-worker-v1.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
+  is historical / compatibility-only and is kept for migration context.
+- Public lifecycle vocabulary and persisted run storage remain compatible with runs/history
+  contracts, while runtime internals are artifact-backed v2.
 
-## Цель
+## Purpose
 
-`backtest-job-runner` это отдельный долгоживущий worker-процесс, который забирает queued
-persisted runs из Postgres и исполняет их через общий backtest v2 runtime.
+`backtest-job-runner` is a dedicated long-lived worker service that claims queued persisted runs
+from Postgres and executes them through the shared backtest v2 runtime.
 
-Worker существует для того, чтобы:
+The worker exists so that:
 
-- тяжёлые, но валидные, запуски могли автоматически уходить в `background_auto`;
-- такие запуски оставались видимыми в `Backtest history` как persisted runs;
-- API и UI не блокировались тяжёлым background execution;
-- sync path и background path использовали одну общую runtime orchestration surface и один
+- heavy but valid runs can be launched as `background_auto`;
+- those runs remain visible in Backtest History as persisted runs;
+- API and UI surfaces are not blocked by long-running execution;
+- sync and background execution share the same runtime orchestration surface and the same
   canonical exact scorer.
 
 ## Scope
 
-Этот документ покрывает:
+This document covers:
 
-- роль worker-а в backtest v2 architecture;
-- startup и fail-fast wiring;
-- claim, lease, heartbeat, cancel и reclaim semantics;
-- slot-pinned artifact bootstrap для claimed runs;
-- shared runtime planning и execution profile contract;
-- persisted progress и summary-only results contract;
+- the worker's role in the backtest v2 architecture;
+- startup and fail-fast wiring;
+- claim, lease, heartbeat, cancel, and reclaim semantics;
+- slot-pinned artifact bootstrap for claimed runs;
+- shared runtime planning and `ExecutionProfile` usage;
+- persisted progress and summary-only results;
 - observability;
-- production deployment contract;
+- production deployment expectations;
 - compatibility boundaries.
 
-Этот документ не покрывает:
+This document does not cover:
 
-- artifact rebuild/publish pipeline;
+- the artifact rebuild/publish pipeline;
 - sync-inline response assembly;
-- lazy variant detail/trades recomputation;
-- browser UI rendering, кроме тех частей, которые завязаны на persisted progress contract;
-- детальную rollout matrix adaptive selector policy.
+- lazy variant detail or trades recomputation;
+- browser UI rendering beyond the persisted progress contract;
+- the detailed adaptive-selector rollout matrix.
 
-## Основные архитектурные решения
+## Core architectural decisions
 
-### 1. `backtest-job-runner` не является отдельным backtest engine
+### 1. `backtest-job-runner` is not a separate backtest engine
 
-`backtest-job-runner` это background execution host для того же canonical v2 runtime, который
-используется sync path.
+`backtest-job-runner` is a background execution host for the same canonical v2 runtime used by
+the sync path.
 
-Worker не должен:
+The worker must not:
 
-- создавать второй orchestration surface;
-- вводить отдельный scoring engine;
-- иметь собственную policy matrix выбора runtime profile;
-- иметь отдельный источник истины для progress semantics или rollout semantics.
+- create a second orchestration surface;
+- introduce a separate scoring engine;
+- own a separate runtime-profile selection policy;
+- redefine progress or rollout semantics.
 
-### 2. Один claimed background path
+### 2. There is one claimed background path
 
-Canonical background launch mode для новой системы это `background_auto`.
+The canonical background launch mode is `background_auto`.
 
-`background_manual_legacy` сохраняется только как compatibility-only literal:
+`background_manual_legacy` remains only a compatibility-only literal:
 
-- новые запуски не должны создаваться с `background_manual_legacy`;
-- worker обязан продолжать корректно исполнять уже существующие persisted rows с этим literal;
-- в новой продуктовой и архитектурной документации основной background path описывается через
+- new runs must not be created with `background_manual_legacy`;
+- the worker must continue to execute already persisted rows that carry this literal;
+- active product and architecture documentation must describe the background path through
   `background_auto`.
 
-### 3. Один worker process = один claim loop = одна claimed job одновременно
+### 3. One worker process equals one claim loop and one claimed job at a time
 
-Один экземпляр `backtest-job-runner`:
+One `backtest-job-runner` instance:
 
-- является одним долгоживущим процессом;
-- держит один последовательный claim loop;
-- в каждый момент времени обрабатывает не более одной claimed job.
+- is a single long-lived process;
+- owns one sequential claim loop;
+- processes at most one claimed job at any given time.
 
-Горизонтальное масштабирование очереди достигается не через усложнение claim loop, а через
-несколько независимых worker processes.
+Queue scalability comes from multiple independent worker processes, not from making one claim
+loop concurrent.
 
-### 4. Queue concurrency и runtime parallelism это разные вещи
+### 4. Queue concurrency and runtime parallelism are different concerns
 
-Параллельность обработки нескольких независимых background runs должна задаваться отдельно от
-внутренней вычислительной параллельности одного run.
+Parallel processing of multiple independent background runs must be configured separately from the
+internal compute parallelism of one run.
 
-Для этого canonical operational knob это:
+The canonical queue-concurrency knob is:
 
 - `backtest.jobs.worker_processes`
 
-Этот параметр задаёт число независимых worker processes, которые одновременно claim-ят
-background jobs.
+This setting defines how many independent worker processes may claim background jobs at the same
+time.
 
-Важно:
+Important boundaries:
 
-- `worker_processes` отвечает за queue concurrency;
-- runtime parallelism одного run остаётся responsibility shared v2 runtime и resolved
-  `ExecutionProfile`;
-- нельзя смешивать queue concurrency knob и intra-run compute knob в один и тот же параметр.
+- `worker_processes` controls queue concurrency;
+- single-run runtime parallelism remains the responsibility of the shared v2 runtime and the
+  resolved `ExecutionProfile`;
+- queue concurrency and intra-run compute parallelism must not be collapsed into one parameter.
 
-### 5. Service-manager-agnostic архитектура
+### 5. The architecture is service-manager-agnostic
 
-Этот документ описывает service contract worker-а, а не конкретный supervisor.
+This document defines the worker service contract, not a supervisor-specific deployment shape.
 
-Архитектурный контракт требует, чтобы worker был:
+The architectural contract requires the worker to be:
 
-- долгоживущим supervised service;
-- автоматически перезапускаемым при падении;
-- масштабируемым до `N = worker_processes` экземпляров;
-- оснащённым уникальной instance identity;
-- оснащённым logs и metrics.
+- a long-lived supervised service;
+- restarted automatically after crashes;
+- scalable to `N = worker_processes` instances;
+- assigned a unique instance identity;
+- observable through logs and metrics.
 
-Конкретная реализация через `launchd`, `systemd`, контейнеры или другой supervisor описывается
-в runbook/ops документации, но не в этом архитектурном документе.
+The concrete implementation may use `launchd`, `systemd`, containers, or another supervisor, but
+that choice belongs in runbook and ops documentation rather than this architecture document.
 
-## Роль worker-а в системе
+## Role in the system
 
-В production-системе существует одна canonical persisted run storage family и одна runtime
-orchestration surface:
+Production has one canonical persisted-run storage family and one runtime orchestration surface:
 
-- API создаёт persisted run record;
-- sync-compatible runs могут завершаться inline;
-- heavy-but-valid runs классифицируются в `background_auto`;
-- `backtest-job-runner` claim-ит queued persisted runs и исполняет их;
-- runs history/detail API читает то же самое persisted storage;
-- progress, ETA и top snapshots видны через единый persisted run contract.
+- the API creates a persisted run record;
+- sync-compatible runs may finish inline;
+- heavy but valid runs are classified into `background_auto`;
+- `backtest-job-runner` claims queued persisted runs and executes them;
+- runs history and detail APIs read from the same persisted storage;
+- progress, ETA, and top snapshots are exposed through one persisted run contract.
 
-Worker является частью production backtest contract. Это не факультативный вспомогательный
-процесс.
+The worker is part of the production backtest contract. It is not an optional helper process.
 
-## Startup и fail-fast wiring
+## Startup and fail-fast wiring
 
-На старте worker обязан:
+At startup the worker must:
 
-- загрузить runtime config из `backtest.yaml`;
-- загрузить artifact runtime config;
-- потребовать `STRATEGY_PG_DSN`;
-- собрать Postgres repositories для jobs, leases и results;
-- собрать canonical request decoder для persisted `request_json`;
-- собрать defaults provider и compatibility-only estimate helpers;
-- собрать artifact loader и `ArtifactSlotResolverV2`;
-- собрать `BacktestArtifactRuntimePlannerV2` из startup-loaded `execution_profiles` и
+- load runtime config from `backtest.yaml`;
+- load artifact runtime config;
+- require `STRATEGY_PG_DSN`;
+- construct Postgres repositories for jobs, leases, and results;
+- construct the canonical request decoder for persisted `request_json`;
+- construct defaults providers and compatibility-only estimate helpers;
+- construct artifact loading and `ArtifactSlotResolverV2`;
+- construct `BacktestArtifactRuntimePlannerV2` from startup-loaded `execution_profiles` and
   `adaptive_selector_policy`;
-- поднять metrics endpoint;
-- проверить, что worker может войти в claim loop без ленивого исправления критических
-  зависимостей.
+- start the metrics endpoint;
+- verify that the worker can enter the claim loop without lazily repairing critical dependencies.
 
-Startup является fail-fast. Отсутствующий runtime config, неверный artifact config, пустой DSN,
-невозможность собрать artifact/runtime dependencies или invalid worker cardinality должны
-останавливать процесс до запуска claim loop.
+Startup is fail-fast. Missing runtime config, invalid artifact config, an empty DSN, inability to
+construct runtime dependencies, or invalid worker cardinality must stop the process before the
+claim loop begins.
 
-## Конфигурационный контракт
+## Configuration contract
 
-Минимальный operational contract worker-а включает:
+The minimum operational contract for the worker includes:
 
 - `backtest.jobs.enabled`
 - `backtest.jobs.worker_processes`
@@ -163,274 +162,277 @@ Startup является fail-fast. Отсутствующий runtime config, �
 - `backtest.jobs.snapshot_seconds`
 - `backtest.jobs.snapshot_variants_step`
 
-Нормативные правила:
+Normative rules:
 
-- если `backtest.jobs.enabled=false`, worker может завершаться со статусом disabled и кодом `0`;
-- если `backtest.jobs.enabled=true`, то `worker_processes` должен быть `>= 1`;
-- queue concurrency определяется только через `worker_processes`;
-- service manager обязан materialize ровно `worker_processes` независимых экземпляров worker-а;
-- каждый экземпляр должен иметь уникальный `locked_by` и уникальную runtime identity.
+- if `backtest.jobs.enabled=false`, the worker may exit with disabled status and exit code `0`;
+- if `backtest.jobs.enabled=true`, `worker_processes` must be `>= 1`;
+- queue concurrency is defined only through `worker_processes`;
+- the service manager must materialize exactly `worker_processes` independent worker instances;
+- every instance must have a unique `locked_by` value and unique runtime identity.
 
-Если operational environment временно materialize-ит несколько workers внешним способом, без
-явного config knob, это может считаться переходным состоянием, но canonical contract этого
-документа остаётся `backtest.jobs.worker_processes`.
+If an environment temporarily materializes multiple workers through an external mechanism without
+the explicit config knob, that may be treated as transitional, but the canonical contract remains
+`backtest.jobs.worker_processes`.
 
-## Claim, lease и reclaim
+## Claim, lease, and reclaim
 
-Worker loop работает так:
+The worker loop behaves as follows:
 
-1. poll через `claim_next(now, locked_by, lease_seconds)`;
-2. если job нет, sleep на `claim_poll_seconds`;
-3. если job claimed, запускается один deterministic attempt;
-4. во время обработки worker продлевает lease через heartbeat;
-5. при потере lease текущий attempt немедленно прекращается.
+1. Poll via `claim_next(now, locked_by, lease_seconds)`.
+2. If no job is available, sleep for `claim_poll_seconds`.
+3. If a job is claimed, run one deterministic attempt.
+4. During processing, extend the lease through heartbeat writes.
+5. If the lease is lost, stop the current attempt immediately.
 
-Обязательные инварианты:
+Required invariants:
 
-- claim атомарный и использует row-lock semantics;
-- в каждый момент времени только один worker может владеть claimed job;
-- `locked_by` это стабильная identity worker-а, например `<hostname>-<pid>-<instance_index>`;
-- queued jobs могут быть отменены сразу на уровне storage;
-- running jobs отменяются на границах батчей;
-- reclaim может перезапустить attempt с начала;
-- job не должна застревать в `running` навсегда после смерти worker-а;
-- worker, потерявший lease, не должен продолжать писать progress, snapshots или terminal state.
+- claim is atomic and uses row-lock semantics;
+- only one worker may own a claimed job at a time;
+- `locked_by` is a stable worker identity such as `<hostname>-<pid>-<instance_index>`;
+- queued jobs may be cancelled immediately at the storage layer;
+- running jobs are cancelled only at batch boundaries;
+- reclaim may restart the attempt from the beginning;
+- a job must not remain in `running` forever after worker death;
+- a worker that loses its lease must stop writing progress, snapshots, or terminal state.
 
-## Source of truth для claimed runs
+## Source of truth for claimed runs
 
-Claimed worker читает только persisted run payloads:
+Claimed worker execution reads only persisted run payloads:
 
-- `job.request_json` является request source of truth;
-- snapshot payload saved-mode используется там, где нужно восстановить effective template
-  semantics;
-- worker не должен перечитывать live saved strategy state для уже созданной job;
-- worker не должен принимать runtime-решения на основе текущего browser state или UI state.
+- `job.request_json` is the request source of truth;
+- saved-mode snapshot payloads are used only when effective-template semantics must be restored;
+- the worker must not reread live saved-strategy state for an already created job;
+- the worker must not make runtime decisions based on current browser or UI state.
 
-Это гарантирует, что claimed run остаётся воспроизводимым, даже если strategy storage изменился
-после запуска.
+This keeps claimed runs reproducible even if strategy storage changes after launch.
 
-## Контракт slot-pinned artifacts
+## Slot-pinned artifact contract
 
-Каждый claimed background run обязан уже нести pinned artifact identity в persisted job row:
+Every claimed background run must already carry pinned artifact identity in the persisted job row:
 
 - `artifact_slot`;
 - `artifact_slot_generation`;
 - `artifact_asof_date`;
 - `artifact_manifest_hash`.
 
-До старта runtime work worker обязан разрешить slot-pinned context через
+Before runtime work begins, the worker must resolve slot-pinned context through
 `resolve_pinned_context(...)`.
 
-Обязательные правила:
+Required rules:
 
-- отсутствие pin metadata является deterministic failure;
-- отсутствие pinned artifacts является deterministic failure;
-- drift pinned artifacts является deterministic failure;
-- fallback на live `current.yaml` discovery для claimed runs запрещён;
-- fallback на legacy runtime при провале pinned artifact bootstrap запрещён.
+- missing pin metadata is a deterministic failure;
+- missing pinned artifacts are a deterministic failure;
+- drifted pinned artifacts are a deterministic failure;
+- fallback to live `current.yaml` discovery for claimed runs is forbidden;
+- fallback to a legacy runtime after pinned-artifact bootstrap failure is forbidden.
 
-Worker исполняет только slot-pinned run. Он не участвует в publish/rebuild decision path и не
-выполняет rebuild artifacts внутри себя.
+The worker executes only slot-pinned runs. It is not part of the artifact publish or rebuild
+decision path and must not rebuild artifacts itself.
 
-## Shared runtime planning и ExecutionProfile
+## Shared runtime planning and `ExecutionProfile`
 
-Worker не владеет отдельной planning policy. Он делегирует runtime planning в shared v2 planner
-stack.
+The worker does not own a separate planning policy. It delegates runtime planning to the shared
+v2 planner stack.
 
-Для каждого claimed run worker:
+For every claimed run the worker:
 
-- валидирует effective request/template contract;
-- применяет supported request timeframes;
-- применяет default-only rules для signal overrides;
-- разрешает runtime plan через `BacktestArtifactRuntimePlannerV2`;
-- использует startup-loaded `execution_profiles` и `adaptive_selector_policy`;
-- исполняет выбранный profile через shared artifact-backed runtime services.
+- validates the effective request and template contract;
+- applies supported request timeframe rules;
+- applies default-only signal-override rules;
+- resolves the runtime plan through `BacktestArtifactRuntimePlannerV2`;
+- uses startup-loaded `execution_profiles` and `adaptive_selector_policy`;
+- executes the selected profile through shared artifact-backed runtime services.
 
-Это означает:
+This means:
 
-- `background_auto` это launch classification, а не отдельный scoring engine;
-- `exact_small`, `exact_parallel`, `hybrid_conservative` и `hybrid_family` это runtime profile
-  decisions внутри claimed path;
-- browser и public API по-прежнему не выбирают `execution_profile_mode` напрямую;
-- worker не принимает rollout-решения сам, а obeys shared adaptive selector policy.
+- `background_auto` is a launch classification, not a separate scoring engine;
+- `exact_small`, `exact_parallel`, `hybrid_conservative`, and `hybrid_family` are runtime-profile
+  decisions inside the same claimed path;
+- browser and public API surfaces still do not choose `execution_profile_mode` directly;
+- the worker does not make rollout decisions on its own and instead obeys the shared adaptive
+  selector policy.
 
-## Граница rollout policy
+## Rollout-policy boundary
 
-Детальная rollout matrix для adaptive selector не дублируется в этом документе.
+This document intentionally does not duplicate the detailed adaptive-selector rollout matrix.
 
-Этот документ фиксирует только границу ответственности:
+It defines only the responsibility boundary:
 
-- worker использует shared `execution_profiles`;
-- worker использует shared `adaptive_selector_policy`;
-- worker не владеет отдельными фазами rollout;
-- worker не определяет самостоятельно `shadow`, `opt_in` или `active`;
-- worker исполняет runtime plan, уже разрешённый общим planner/policy layer.
+- the worker uses shared `execution_profiles`;
+- the worker uses shared `adaptive_selector_policy`;
+- the worker does not own rollout phases;
+- the worker does not define `shadow`, `opt_in`, or `active` states by itself;
+- the worker executes a runtime plan already resolved by the shared planner and policy layer.
 
-Подробные rollout rules, phase literals, benchmark gates и promotion criteria должны жить в
-selector/runtime docs и config, а не в worker architecture doc.
+Detailed rollout rules, phase literals, benchmark gates, and promotion criteria belong in
+selector, runtime, and config documents rather than the worker architecture document.
 
-## Flow исполнения по стадиям
+## Stage execution model
 
-Claimed execution использует одну общую stage model.
+Claimed execution uses one shared stage model.
 
 ### Stage A
 
-Worker строит deterministic shortlist базовых вариантов через artifact-backed Stage A services и
-сохраняет Stage A shortlist metadata для observability и дальнейшей диагностики.
+The worker builds a deterministic shortlist of base variants through artifact-backed Stage A
+services and persists Stage A shortlist metadata for observability and diagnostics.
 
 ### Stage B
 
-Worker расширяет retained candidates по risk dimensions и считает их через shared artifact-backed
-Stage B runtime. Текущие best rows сохраняются как summary-only snapshots по snapshot cadence.
+The worker expands retained candidates across risk dimensions and scores them through the shared
+artifact-backed Stage B runtime. The current best rows are persisted as summary-only snapshots on
+the configured snapshot cadence.
 
 ### Finalizing
 
-Finalizing завершает persisted summary rows и terminal state transition.
+Finalizing writes terminal summary rows and performs the terminal state transition.
 
-Persisted background rows остаются summary-only:
+Persisted background rows remain summary-only:
 
-- worker не materialize full report bodies как часть persisted run contract;
-- worker не materialize trades payloads как часть persisted run contract;
-- detail/trades concern остаётся отдельно от claimed background execution.
+- the worker does not materialize full report bodies as part of the persisted run contract;
+- the worker does not materialize trades payloads as part of the persisted run contract;
+- detail and trades remain separate from claimed background execution.
 
-## Persistence и progress/ETA contract
+## Persistence and progress/ETA contract
 
-Canonical persisted run storage остаётся на family таблиц `backtest_jobs`,
-`backtest_job_top_variants` и `backtest_job_stage_a_shortlist`.
+The canonical persisted-run storage family remains:
 
-Worker отвечает за сохранение:
+- `backtest_jobs`
+- `backtest_job_top_variants`
+- `backtest_job_stage_a_shortlist`
 
-- lifecycle state и timestamps;
-- имени текущей stage;
-- `processed_units` и `total_units`;
-- lease и heartbeat fields;
-- failure/cancel payloads, если они есть;
-- summary-only top rows и Stage A shortlist snapshots.
+The worker is responsible for persisting:
 
-Worker не отвечает за финальный browser ETA.
+- lifecycle state and timestamps;
+- the current stage name;
+- `processed_units` and `total_units`;
+- lease and heartbeat fields;
+- failure and cancel payloads when present;
+- summary-only top rows and Stage A shortlist snapshots.
 
-Worker обязан сохранять deterministic progress counters, на которых позже строится read model:
+The worker is not responsible for the final browser ETA.
+
+The worker must persist deterministic progress counters that later power the read model:
 
 - `stage`;
 - `processed_units`;
 - `total_units`;
-- timestamps и heartbeat data.
+- timestamps and heartbeat data.
 
-Пользовательские `progress_percent` и `eta_seconds` вычисляются в runs history layer на основе:
+User-facing `progress_percent` and `eta_seconds` are computed in the runs-history layer from:
 
 - worker counters;
 - execution-profile semantics;
-- throughput estimate;
-- benchmark-backed fallback, если throughput ещё не является defensible.
+- throughput estimates;
+- benchmark-backed fallback values when real throughput is not yet defensible.
 
-Таким образом, worker и history layer делят ответственность явно:
+Responsibility is intentionally split:
 
-- worker пишет факты исполнения;
-- read model считает user-facing progress и ETA.
+- the worker writes execution facts;
+- the read model calculates user-facing progress and ETA.
 
 ## Observability
 
-Worker публикует process-level metrics и structured logs.
+The worker publishes process-level metrics and structured logs.
 
-Минимальная metrics surface:
+Minimum metrics surface:
 
-- общее число claimed jobs;
-- число succeeded jobs;
-- число failed jobs;
-- число cancelled jobs;
-- число lease-lost events;
-- длительность job;
-- длительность stage;
-- gauge активных claimed jobs.
+- total claimed jobs;
+- succeeded jobs;
+- failed jobs;
+- cancelled jobs;
+- lease-lost events;
+- job duration;
+- stage duration;
+- gauge of active claimed jobs.
 
-Operational contract для metrics:
+Operational requirements for metrics:
 
-- каждый экземпляр worker-а должен иметь наблюдаемую metrics surface;
-- deployment target обязан обеспечивать уникальный binding metrics endpoint или эквивалентную
+- each worker instance must expose an observable metrics surface;
+- the deployment target must provide either a unique metrics endpoint binding or an equivalent
   aggregation model;
-- отсутствие видимой metrics surface у живого worker-а считается operational defect.
+- absence of a visible metrics surface for a live worker is an operational defect.
 
-Structured logs должны позволять ответить на вопросы:
+Structured logs must make it possible to answer:
 
-- был ли worker включён или выключен на startup;
-- какая job была claimed каким worker identity;
-- на какой stage сейчас находится run;
-- терял ли worker lease;
-- failure возник из-за pin drift, runtime error или cancellation;
-- сколько экземпляров worker-а реально активно в production.
+- whether the worker started enabled or disabled;
+- which job was claimed by which worker identity;
+- which stage a run is in;
+- whether the worker lost its lease;
+- whether a failure came from pin drift, runtime error, or cancellation;
+- how many worker instances are actually active in production.
 
 ## Production deployment contract
 
-Если `backtest.jobs.enabled=true`, production обязан обеспечивать постоянно работающий supervised
-worker service.
+If `backtest.jobs.enabled=true`, production must provide a continuously running supervised worker
+service.
 
-Это означает:
+This means:
 
-- deployment обязан установить или обновить все worker services;
-- deployment обязан перезапустить worker services;
-- deployment обязан проверить, что поднялось нужное число экземпляров;
-- deployment обязан проверить, что экземпляры реально живы и способны находиться в claim loop.
+- deployment must install or update the worker services;
+- deployment must restart the worker services;
+- deployment must verify that the required number of instances started;
+- deployment must verify that those instances are alive and able to remain in the claim loop.
 
-Если `backtest.jobs.enabled=true`, а постоянный worker service не установлен или не запущен,
-такой deploy считается некорректным, даже если API успешно поднялся.
+If `backtest.jobs.enabled=true` but the persistent worker service is not installed or not
+running, the deploy is incorrect even if the API process starts successfully.
 
-Рекомендуемый post-deploy smoke для worker-а должен быть service-level, а не request-level:
+Recommended post-deploy smoke for the worker must be service-level rather than request-level:
 
-- проверить регистрацию service instances у supervisor;
-- проверить, что процессы запущены;
-- проверить, что каждый экземпляр публикует logs и metrics;
-- проверить, что worker не завершился сразу со статусом disabled/error;
-- проверить соответствие числа живых worker processes значению `worker_processes`.
+- verify worker instance registration in the supervisor;
+- verify that the processes are running;
+- verify that each instance publishes logs and metrics;
+- verify that the worker does not exit immediately with disabled or error status;
+- verify that the number of live worker processes matches `worker_processes`.
 
-Создание тестовой production job как обязательной части каждого deploy smoke не требуется и не
-должно считаться canonical методом проверки.
+Creating a test production job as part of every deploy smoke is not required and is not the
+canonical validation method.
 
-## Масштабируемость
+## Scalability
 
-Архитектура worker-а должна быть готова к дальнейшему масштабированию:
+The worker architecture must remain ready for future scale:
 
-- на одном host через большее число supervised worker processes;
-- на нескольких host через ту же storage-based claim/lease model;
-- через смену service manager без переписывания worker contract;
-- без появления второго queue coordinator вне Postgres storage contract.
+- on one host by increasing the number of supervised worker processes;
+- across multiple hosts through the same storage-based claim and lease model;
+- by changing the service manager without rewriting the worker contract;
+- without introducing a second queue coordinator outside the Postgres storage contract.
 
-Scaling boundary остаётся простой:
+The scaling boundary remains simple:
 
-- очередь масштабируется числом worker processes;
-- correctness обеспечивается storage-level claim/lease;
-- runtime semantics одного run определяются shared planner и shared kernels.
+- the queue scales by the number of worker processes;
+- correctness is enforced through storage-level claim and lease rules;
+- single-run runtime semantics are defined by the shared planner and shared kernels.
 
 ## Compatibility
 
-`background_manual_legacy` остаётся поддерживаемым только как compatibility input для уже
-существующих persisted rows.
+`background_manual_legacy` remains supported only as a compatibility input for already persisted
+rows.
 
-Нормативные правила compatibility:
+Normative compatibility rules:
 
-- worker обязан уметь claim-ить и исполнять такие строки;
-- новые product flows не должны документироваться через `background_manual_legacy`;
-- новые launch contracts не должны производить этот literal;
-- в canonical архитектурном описании worker-а основной background path считается только через
-  `background_auto`.
+- the worker must be able to claim and execute such rows;
+- new product flows must not be documented through `background_manual_legacy`;
+- new launch contracts must not emit that literal;
+- the canonical worker architecture is described only through `background_auto`.
 
 ## Non-goals
 
-Этот документ не вводит:
+This document does not introduce:
 
-- новую публичную launch API surface;
-- право browser-а выбирать `execution_profile_mode`;
-- отдельный policy layer внутри worker-а;
-- отдельный engine для background runs;
-- смешение benchmark evidence anchor и active runtime default;
-- platform-specific dependency на `launchd` или другой supervisor в архитектурном контракте.
+- a new public launch API surface;
+- a browser-controlled `execution_profile_mode`;
+- a separate policy layer inside the worker;
+- a separate engine for background runs;
+- a conflation of benchmark-evidence anchors with active runtime defaults;
+- a platform-specific dependency on `launchd` or any other supervisor inside the architecture
+  contract.
 
-## Связанные документы
+## Related documents
 
 - [Final Backtest Refactor Plan v2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-refactor-final-plan-v2.md)
-- [План доработки и ускорения backtest runtime v1](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md)
-- [Backtest Jobs v1 -- Job-Runner Worker (claim/lease + streaming batches + cancel) (BKT-EPIC-10)](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
+- [Backtest Runtime Acceleration Plan v1](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md)
+- [Backtest Job Runner Worker v1](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
 - [Backtest Runs History API v2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
-- [Backtest API v1 — `POST /backtests` (saved strategy + ad-hoc grid) (BKT-EPIC-07)](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-api-post-backtests-v1.md)
-- [Ранбук backtest job runner](/Users/daniildegtyarev/Projects/roehub.com/docs/runbooks/backtest-job-runner.md)
+- [Backtest API v1: `POST /backtests`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-api-post-backtests-v1.md)
+- [Backtest Job Runner Runbook](/Users/daniildegtyarev/Projects/roehub.com/docs/runbooks/backtest-job-runner.md)
 - [run_backtest_job_runner_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py)
 - [backtest_job_runner.py](/Users/daniildegtyarev/Projects/roehub.com/apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py)

@@ -17,6 +17,11 @@
     engine path;
   - `top_k` остаётся request/response compatibility naming, а `top_n_default` и `top_n_max`
     документируются как additive target literals через runtime defaults.
+- Canonical worker navigation:
+  - active claimed background worker architecture lives in
+    `docs/architecture/backtest/backtest-job-runner-v2.md`;
+  - `docs/architecture/backtest/backtest-job-runner-worker-v1.md` is historical /
+    `compatibility-only`.
 
 ## Основные контракты
 
@@ -43,7 +48,7 @@
 - Sync API: `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
 - Reporting metrics/table: `docs/architecture/backtest/backtest-reporting-metrics-table-v1.md`
 - Jobs API: `docs/architecture/backtest/backtest-jobs-api-v1.md`
-- Jobs worker: `docs/architecture/backtest/backtest-job-runner-v2.md`
+- Jobs worker (canonical): `docs/architecture/backtest/backtest-job-runner-v2.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
 - Follow-up runtime acceleration roadmap after the artifact-backed cutover:
   `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
@@ -64,9 +69,11 @@
 | Artifact-backed runtime kernels | Active | `docs/architecture/backtest/backtest-runtime-kernels-v2.md` |
 | Artifact store and publish/pinning | Active | `docs/architecture/backtest/backtest-artifact-store-v2.md` |
 | Runs history and summary/detail API | Active | `docs/architecture/backtest/backtest-runs-history-v2.md` |
+| Claimed background worker service | Active | `docs/architecture/backtest/backtest-job-runner-v2.md` |
 | Runs-first web UX | Active | `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md` |
 | `/backtests/jobs*` endpoints and pages | Compatibility alias | `docs/architecture/backtest/backtest-runs-history-v2.md` |
 | `POST /api/backtests/variant-report` | Compatibility alias | `docs/architecture/backtest/backtest-runs-history-v2.md` |
+| Backtest job runner worker v1 doc | compatibility-only | `docs/architecture/backtest/backtest-job-runner-worker-v1.md` |
 | Live candle rollup / staged-core / close-fill hot path | superseded | `docs/architecture/backtest/backtest-runtime-kernels-v2.md` |
 
 ## Актуальная политика rollout
