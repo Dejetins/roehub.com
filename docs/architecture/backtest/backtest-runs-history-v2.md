@@ -19,6 +19,11 @@
   - storage mapper for `GET /backtests/runs/{run_id}/top` normalizes persisted
     `updated_at` from PostgreSQL `timestamptz` to UTC before creating
     `BacktestJobTopVariant`, so read-path behavior does not depend on session timezone.
+- Compatibility note:
+  - `background_auto` is the canonical background path for new queued runs that enter
+    `/backtests/runs*`;
+  - `background_manual_legacy` remains a `compatibility-only` `execution_mode` literal for
+    already persisted rows and compatibility aliases, and those rows remain supported.
 - R7-04 additive note:
   - public lazy detail endpoint `POST /backtests/runs/{run_id}/variant-report` пересчитывает
     ровно один выбранный вариант по persisted `run_id` и explicit `variant` payload;
@@ -30,8 +35,8 @@
   - `POST /backtests` теперь может создавать queued run с `execution_mode=background_auto`
     и отвечать `202 Accepted` вместо скрытого mode switch;
   - такие runs появляются в `/backtests/runs*` сразу после launch и используют тот же storage,
-    owner policy, status, `/top`, `/cancel` и history semantics, что и
-    `background_manual_legacy`.
+    owner policy, status, `/top`, `/cancel` и history semantics, что и уже persisted
+    `background_manual_legacy` compatibility rows.
 - R8-03 additive note:
   - public history/status продолжает показывать lifecycle literals
     `queued|running|succeeded|failed|cancelled` без отдельного vocabulary для background modes;
@@ -147,8 +152,8 @@ Hashes (`request_hash`, `engine_params_hash`, `backtest_runtime_config_hash`, `s
 `execution_mode` после R8-02 может быть:
 
 - `sync_inline`
-- `background_auto`
-- `background_manual_legacy`
+- `background_auto` as the canonical background path for new queued runs
+- `background_manual_legacy` as a `compatibility-only` literal for already persisted rows
 
 ### 4) `/top` остается summary-only
 

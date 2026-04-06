@@ -13,7 +13,9 @@
 - Compatibility note:
   - `/backtests/jobs*` и legacy `POST /api/backtests/variant-report` остаются
     `compatibility alias`, но не primary UX;
-  - `background_manual_legacy` остаётся публичным persisted literal, а не selectable legacy
+  - `background_auto` is the canonical background path for new queued runs;
+  - `background_manual_legacy` остаётся публичным persisted literal, но только как
+    `compatibility-only` значение для уже сохранённых legacy rows, а не selectable legacy
     engine path;
   - `top_k` остаётся request/response compatibility naming, а `top_n_default` и `top_n_max`
     документируются как additive target literals через runtime defaults.
@@ -71,6 +73,8 @@
 | Runs history and summary/detail API | Active | `docs/architecture/backtest/backtest-runs-history-v2.md` |
 | Claimed background worker service | Active | `docs/architecture/backtest/backtest-job-runner-v2.md` |
 | Runs-first web UX | Active | `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md` |
+| `background_auto` background launch vocabulary | Active canonical background path | `docs/architecture/backtest/backtest-api-post-backtests-v1.md` |
+| `background_manual_legacy` execution_mode literal | compatibility-only | `docs/architecture/backtest/backtest-runs-history-v2.md` |
 | `/backtests/jobs*` endpoints and pages | Compatibility alias | `docs/architecture/backtest/backtest-runs-history-v2.md` |
 | `POST /api/backtests/variant-report` | Compatibility alias | `docs/architecture/backtest/backtest-runs-history-v2.md` |
 | Backtest job runner worker v1 doc | compatibility-only | `docs/architecture/backtest/backtest-job-runner-worker-v1.md` |
@@ -146,7 +150,8 @@
   - sync/jobs runtime summary rows не строят `report`/`trades` тела.
 - R8-03 закрепляет background safety contract:
   - publish guard блокируется только по active background runs
-    (`queued|running` + `background_auto|background_manual_legacy`);
+    (`queued|running` + canonical `background_auto` rows or `background_manual_legacy`
+    compatibility-only rows);
   - `queued -> cancelled` снимает guard сразу;
   - `running` с `cancel_requested_at` остаётся blocking до terminal state;
   - runs history/status сохраняют один и тот же lifecycle vocabulary для обоих background modes.
@@ -179,8 +184,9 @@
     artifact-backed v2 runtime orchestration;
   - active production path больше не зависит от `candle_timeline_builder.py`,
     `grid_builder_v1.py`, `staged_core_runner_v1.py`, `staged_runner_v1.py`;
-  - silent legacy fallback запрещён; `background_manual_legacy` остаётся только совместимым
-    persisted/public literal.
+  - silent legacy fallback запрещён; `background_manual_legacy` остаётся только
+    `compatibility-only` persisted/public literal, while `background_auto` stays the canonical
+    background path.
 - Milestone A / EPIC A3 фиксирует один rollout corpus для runtime acceleration:
   - slice ids:
     `exact_baseline`, `low_activity`, `high_correlation`, `small_grid_overhead`,

@@ -15,6 +15,10 @@ lazy detail page для одного persisted variant.
   - legacy `POST /api/backtests/variant-report` остаётся compatibility path;
   - preferred public detail flow использует
     `POST /api/backtests/runs/{run_id}/variant-report`.
+  - launch and status UX treat `background_auto` as the canonical background path for new queued
+    runs;
+  - if a persisted row still shows `background_manual_legacy`, the UI treats it as a
+    `compatibility-only` literal for already stored runs rather than a modern selectable path.
   - after R9-03 launch/status/detail navigation is runs-first:
     - `/backtests/history`
     - `/backtests/runs/{run_id}`
@@ -47,6 +51,8 @@ lazy detail page для одного persisted variant.
 - Launch UI must treat `execution_mode=background_auto` as an explicit queued outcome:
   `run_id`, `state`, and `execution_mode` are shown to the user immediately after `POST /backtests`
   instead of keeping an invisible browser-side sync/job toggle.
+- `background_manual_legacy` may still appear for legacy persisted rows in history/detail pages,
+  but only as a `compatibility-only` literal and not as an active launch choice.
 
 ## Scope
 

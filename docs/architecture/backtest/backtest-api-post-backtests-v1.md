@@ -9,7 +9,11 @@ deterministic `422` ошибками.
 - Status: active v1 launch contract after R8-02 explicit auto-fallback cutover.
 - Compatibility note:
   - `POST /backtests` remains the active public launch route;
+  - `background_auto` is the canonical background path for new queued runs created by
+    `POST /backtests`;
   - `/backtests/jobs*` stays a `compatibility alias` for legacy background flows;
+  - `background_manual_legacy` remains a `compatibility-only` literal for already persisted
+    rows and compatibility launch surfaces, not an active launch choice for new runs;
   - request/response naming keeps `top_k`, while `top_n_default` and `top_n_max` stay additive
     runtime-defaults literals.
 - R7-03 follow-up note:
@@ -23,8 +27,8 @@ deterministic `422` ошибками.
   - legacy `POST /backtests/variant-report` remains behavior-compatible compatibility path for
     clients that still send full run envelope in request body.
 - R8-01 background follow-up note:
-  - external `execution_mode=background_manual_legacy` remains unchanged for persisted queued/running
-    rows and public history payloads,
+  - external `execution_mode=background_manual_legacy` remains unchanged only for already
+    persisted queued/running rows and public history payloads as a `compatibility-only` literal,
   - claimed worker execution behind that mode now reuses the same slot-pinned Stage A / Stage B
     artifact runtime contract as sync path and no longer depends on ClickHouse or
     `IndicatorCompute.compute(...)`,
@@ -45,11 +49,12 @@ deterministic `422` ошибками.
 - R8-02 launch orchestration note:
   - `POST /backtests` теперь пробует `sync_inline` только в sync half-budgets,
   - при canonical guard overflow backend выполняет explicit full-budget preflight; если он
-    проходит, создаётся queued persisted run с `execution_mode=background_auto`,
+    проходит, создаётся queued persisted run с `execution_mode=background_auto` как canonical
+    background path,
   - fallback branch отвечает `202 Accepted` и явно возвращает `run_id`, `state=queued`,
     `execution_mode=background_auto`, `engine_version` и artifact pin metadata,
-  - manual compatibility endpoint `POST /backtests/jobs` сохраняет поведение
-    `execution_mode=background_manual_legacy`,
+  - manual compatibility endpoint `POST /backtests/jobs` сохраняет compatibility-only behavior
+    `execution_mode=background_manual_legacy` для legacy callers,
   - если full budgets тоже не проходят, backend возвращает canonical deterministic `422`
     и не создаёт persisted run row.
 - R7-02 storage note:
@@ -293,7 +298,8 @@ R9-01 launch UX note:
   - backend не делает hidden mode switch,
   - planner-aware exact classification может отправить heavy-but-valid request в этот branch
     ещё до legacy overflow-style fallback reject,
-  - выполняет full-budget preflight и создаёт queued row с `execution_mode=background_auto`,
+  - выполняет full-budget preflight и создаёт queued row с `execution_mode=background_auto` как
+    canonical background path,
   - persist'ит effective `execution_profile_mode` в `request_json`, чтобы history/progress read path
     не терял реальный selected profile,
   - возвращает `202 Accepted`,
