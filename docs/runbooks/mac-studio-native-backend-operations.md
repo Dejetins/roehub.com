@@ -56,6 +56,7 @@ Production:
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
 - `com.roehub.backtest-artifact-publisher` (`launchd`, metrics `127.0.0.1:9203`, daily `03:05 Europe/Moscow`)
+- `com.roehub.backtest-job-runner.<instance_index>` (`launchd`, materialized from `backtest.jobs.worker_processes`, metrics `127.0.0.1:(9204 + instance_index)`)
 
 Test:
 
@@ -69,6 +70,7 @@ Test:
 - `com.roehub.test.market-data-ws-worker` (metrics `127.0.0.1:19201`)
 - `com.roehub.test.market-data-scheduler` (metrics `127.0.0.1:19202`)
 - `com.roehub.test.backtest-artifact-publisher` (metrics `127.0.0.1:19203`, daily `03:05 Europe/Moscow`)
+- `com.roehub.test.backtest-job-runner.<instance_index>` (materialized from `backtest.jobs.worker_processes`, metrics `127.0.0.1:(19204 + instance_index)`)
 
 ## Common commands
 
@@ -86,6 +88,12 @@ Reload сервисов:
 bash scripts/macos/reload_launchd_services.sh prod
 bash scripts/macos/reload_launchd_services.sh test
 bash scripts/macos/reload_launchd_services.sh all
+```
+
+Отдельно проверить worker fleet:
+
+```bash
+launchctl list | grep backtest-job-runner
 ```
 
 Schema bootstrap (identity SQL + Alembic):
@@ -324,6 +332,18 @@ launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\
   `/Users/daniildegtyarev/Library/Logs/roehub/backtest-artifact-publisher.err.log`;
 - если сервис был остановлен после `03:05 Europe/Moscow`, перезапустите его до следующего окна или
   выполните ручной publish нужного symbol root.
+
+`backtest-job-runner` fleet не совпадает с `backtest.jobs.worker_processes` или один из instance быстро выходит:
+
+- проверьте `configs/prod/backtest.yaml` или `configs/test/backtest.yaml` и значение
+  `worker_processes`;
+- перерендирите и перезагрузите fleet: `bash scripts/macos/reload_launchd_services.sh prod`
+  или `bash scripts/macos/reload_launchd_services.sh test`;
+- проверьте `launchctl list | grep backtest-job-runner`;
+- проверьте instance-specific logs в `/Users/daniildegtyarev/Library/Logs/roehub/` с suffix
+  `.0`, `.1`, ...;
+- проверьте доступность per-instance metrics endpoint на `9204 + instance_index` для prod или
+  `19204 + instance_index` для test.
 
 `backtest-artifact-publisher` растит `backtest_artifact_publish_blocked_total{reason="inactive_slot_pinned"}`:
 

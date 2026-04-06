@@ -75,12 +75,27 @@ uv run python -m apps.worker.backtest_job_runner.main.main --instance-index 0
 `--instance-index` в диапазоне `0..worker_processes-1`. Это значение входит в `locked_by` вместе
 с `hostname` и `pid`, поэтому logs и lease owner остаются однозначными для каждого instance.
 
+На `Mac Studio` launchd materialization рендерится из `backtest.jobs.worker_processes` через
+`scripts/macos/render_backtest_job_runner_launchd.py`. Per-instance service shape остаётся purely
+operational:
+
+- prod labels: `com.roehub.backtest-job-runner.<instance_index>`
+- test labels: `com.roehub.test.backtest-job-runner.<instance_index>`
+- prod logs:
+  `/Users/daniildegtyarev/Library/Logs/roehub/backtest-job-runner.<instance_index>.out.log`
+- test logs:
+  `/Users/daniildegtyarev/Library/Logs/roehub/test-backtest-job-runner.<instance_index>.out.log`
+
 Метрики также биндуются per instance по детерминированному правилу:
 
 - effective `metrics_port = base_metrics_port + instance_index`
 - если `--metrics-port` не передан, `base_metrics_port` по умолчанию равен `9204`
 - supervisor/service manager должен передавать уникальный `instance_index`, чтобы каждый worker
   instance имел distinct metrics endpoint
+- launchd для prod передаёт общий `--metrics-port 9204`, для test `--metrics-port 19204`
+
+Больше queue concurrency достигается только добавлением supervised worker processes. Один process
+по-прежнему владеет single claim loop и обрабатывает one claimed job at a time.
 
 ## 4) Семантика toggle
 
@@ -90,6 +105,9 @@ uv run python -m apps.worker.backtest_job_runner.main.main --instance-index 0
 - claim loop не запускается
 
 Такое поведение ожидаемо и безопасно для maintenance window.
+
+Если `launchd` fleet materialization выполняется при `backtest.jobs.enabled=false`, helper script
+должен оставить `0` worker services и удалить stale managed plists для этого profile.
 
 ## 5) Сигналы здоровья
 
@@ -101,6 +119,18 @@ curl -fsS http://127.0.0.1:$((9204 + 0))/metrics | head
 
 Для worker fleet проверка должна использовать порт конкретного instance. Например, для
 `instance_index=2` при базовом порте `9204` endpoint будет `http://127.0.0.1:9206/metrics`.
+
+Проверка полного fleet на `Mac Studio`:
+
+```bash
+launchctl list | grep backtest-job-runner
+```
+
+Reload full supervised surface:
+
+```bash
+bash scripts/macos/reload_launchd_services.sh prod
+```
 
 Основные counters:
 - `backtest_job_runner_claim_total`

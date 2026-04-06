@@ -468,7 +468,8 @@ class RunBacktestJobRunnerV1:
         Returns:
             BacktestJobRunReportV1: Deterministic processing report for this attempt.
         Assumptions:
-            Job was atomically claimed under `locked_by` before method invocation.
+            Job was atomically claimed under `locked_by` before method invocation, and
+            `claim_next(...)` remains the responsibility of the outer single claim loop.
         Raises:
             ValueError: If claimed job snapshot/state is invalid.
         Side Effects:
@@ -480,6 +481,7 @@ class RunBacktestJobRunnerV1:
         if not normalized_locked_by:
             raise ValueError("process_claimed_job requires non-empty locked_by")
 
+        # This use case intentionally handles only the already-claimed job provided by the caller.
         stage_durations: dict[str, float] = {
             STAGE_A_LITERAL_V2: 0.0,
             STAGE_B_LITERAL_V2: 0.0,

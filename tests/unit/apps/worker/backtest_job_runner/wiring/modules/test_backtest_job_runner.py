@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
+from uuid import UUID
 
 import pytest
 
@@ -238,6 +240,135 @@ def test_build_locked_by_includes_hostname_pid_and_instance_index() -> None:
     )
 
     assert locked_by == "hostname=worker-host;pid=321;instance_index=4"
+
+
+def test_backtest_job_runner_app_keeps_single_claim_loop_and_one_claimed_job_at_a_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify one worker process alternates `claim_next(...)` and claimed-job execution sequentially.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Queue concurrency must remain at the fleet level, so one process must not claim a second
+        job before finishing the first claimed attempt.
+    Raises:
+        AssertionError: If the app reorders claim/process events or leaves the active gauge set.
+    Side Effects:
+        Monkeypatches metrics HTTP startup for isolated claim-loop coverage.
+    """
+    events: list[tuple[str, object]] = []
+    claimed_jobs = [
+        SimpleNamespace(job_id=UUID("00000000-0000-0000-0000-000000000101"), attempt=1),
+        SimpleNamespace(job_id=UUID("00000000-0000-0000-0000-000000000102"), attempt=2),
+    ]
+    stop_event = asyncio.Event()
+
+    class _FakeLeaseRepository:
+        """
+        Lease repository fake returning two claimed jobs in deterministic order.
+        """
+
+        def claim_next(
+            self,
+            *,
+            now: object,
+            locked_by: str,
+            lease_seconds: int,
+        ) -> object | None:
+            """
+            Return the next claimed job and record claim-loop ordering metadata.
+
+            Args:
+                now: Claim timestamp payload.
+                locked_by: Active lease owner literal.
+                lease_seconds: Lease TTL.
+            Returns:
+                object | None: Next claimed job fixture or `None` when exhausted.
+            Assumptions:
+                Test drives stop_event before the app would need to poll after the second job.
+            Raises:
+                AssertionError: If the claim loop mutates the worker identity unexpectedly.
+            Side Effects:
+                Appends the observed claim event to the in-memory event log.
+            """
+            _ = now, lease_seconds
+            assert locked_by == "worker-test-1"
+            if not claimed_jobs:
+                events.append(("claim_next", None))
+                return None
+            claimed_job = claimed_jobs.pop(0)
+            events.append(("claim_next", claimed_job.job_id))
+            return claimed_job
+
+    class _FakeRunnerUseCase:
+        """
+        Runner fake recording single-job processing order for one worker process.
+        """
+
+        def process_claimed_job(
+            self,
+            *,
+            job: object,
+            locked_by: str,
+        ) -> worker_module.BacktestJobRunReportV1:
+            """
+            Record one claimed-job execution and stop after the second attempt.
+
+            Args:
+                job: Already-claimed job fixture.
+                locked_by: Active lease owner literal.
+            Returns:
+                BacktestJobRunReportV1: Succeeded report for the provided claimed job.
+            Assumptions:
+                The app should not invoke this method concurrently for more than one claimed job.
+            Raises:
+                AssertionError: If the worker identity changes across attempts.
+            Side Effects:
+                Appends the observed process event and sets stop_event after the second job.
+            """
+            assert locked_by == "worker-test-1"
+            claimed_job = cast(Any, job)
+            events.append(("process_claimed_job", claimed_job.job_id))
+            if claimed_job.job_id == UUID("00000000-0000-0000-0000-000000000102"):
+                stop_event.set()
+            return worker_module.BacktestJobRunReportV1(
+                job_id=claimed_job.job_id,
+                attempt=claimed_job.attempt,
+                status="succeeded",
+            )
+
+    monkeypatch.setattr(worker_module, "start_http_server", lambda *args, **kwargs: None)
+    app = worker_module.BacktestJobRunnerApp(
+        claim_poll_seconds=5.0,
+        lease_seconds=60,
+        instance_index=0,
+        locked_by="worker-test-1",
+        lease_repository=cast(Any, _FakeLeaseRepository()),
+        runner_use_case=cast(Any, _FakeRunnerUseCase()),
+        metrics=worker_module.BacktestJobRunnerMetrics(
+            registry=worker_module.CollectorRegistry()
+        ),
+        metrics_port=9204,
+    )
+
+    asyncio.run(asyncio.wait_for(app.run(stop_event), timeout=1.0))
+
+    assert events == [
+        ("claim_next", UUID("00000000-0000-0000-0000-000000000101")),
+        ("process_claimed_job", UUID("00000000-0000-0000-0000-000000000101")),
+        ("claim_next", UUID("00000000-0000-0000-0000-000000000102")),
+        ("process_claimed_job", UUID("00000000-0000-0000-0000-000000000102")),
+    ]
+    active_claimed_jobs_metric = next(
+        metric
+        for metric in app.metrics.registry.collect()
+        if metric.name == "backtest_job_runner_active_claimed_jobs"
+    )
+    assert active_claimed_jobs_metric.samples[0].value == 0.0
 
 
 def test_run_async_passes_instance_index_to_worker_wiring(

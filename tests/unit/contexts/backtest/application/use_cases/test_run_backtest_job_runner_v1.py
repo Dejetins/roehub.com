@@ -1420,6 +1420,7 @@ class _FakeLeaseRepository:
         Side Effects:
             None.
         """
+        self.claim_next_calls: list[dict[str, Any]] = []
         self.update_progress_calls: list[dict[str, Any]] = []
         self.heartbeat_calls: list[dict[str, Any]] = []
         self.finish_calls: list[dict[str, Any]] = []
@@ -1447,7 +1448,13 @@ class _FakeLeaseRepository:
         Side Effects:
             None.
         """
-        _ = now, locked_by, lease_seconds
+        self.claim_next_calls.append(
+            {
+                "now": now,
+                "locked_by": locked_by,
+                "lease_seconds": lease_seconds,
+            }
+        )
         return None
 
     def heartbeat(
@@ -1795,6 +1802,68 @@ def test_process_claimed_job_persists_stage_progress_and_finalizing_policy() -> 
 
     assert len(results_repository.replace_calls) == 1
     assert reporting_service.calls == []
+
+
+def test_process_claimed_job_does_not_claim_additional_jobs() -> None:
+    """
+    Verify the use case handles only the provided claimed job and never calls `claim_next(...)`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Claiming the next queued job belongs to the outer single claim loop, not this use case.
+    Raises:
+        AssertionError: If the use case starts its own claim loop or changes `locked_by`.
+    Side Effects:
+        None.
+    """
+    job = _build_running_job()
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    risk_variants = _build_risk_variants()
+    lease_repository = _FakeLeaseRepository()
+    results_repository = _FakeResultsRepository()
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=lease_repository,
+        results_repository=results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=risk_variants,
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                base_variants[0].base_variant_key: 1.0,
+                base_variants[1].base_variant_key: 2.0,
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 0, 0)),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by=" worker-test-1 ")
+
+    observed_locked_by = {
+        call["locked_by"]
+        for call in (
+            lease_repository.update_progress_calls
+            + lease_repository.heartbeat_calls
+            + lease_repository.finish_calls
+            + results_repository.replace_calls
+            + results_repository.shortlist_calls
+        )
+    }
+
+    assert report.status == "succeeded"
+    assert lease_repository.claim_next_calls == []
+    assert observed_locked_by == {"worker-test-1"}
 
 
 def test_process_claimed_job_applies_configured_primary_and_secondary_ranking() -> None:

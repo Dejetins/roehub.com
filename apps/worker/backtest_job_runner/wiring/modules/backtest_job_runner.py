@@ -225,7 +225,7 @@ class BacktestJobRunnerApp:
         Returns:
             None.
         Assumptions:
-            Single app instance handles one sequential claim-processing loop.
+            Single app instance owns one single claim loop and handles one claimed job at a time.
         Raises:
             ValueError: If one scalar or dependency is invalid.
         Side Effects:
@@ -257,7 +257,8 @@ class BacktestJobRunnerApp:
         Returns:
             None.
         Assumptions:
-            Worker processes one claimed job at a time.
+            One worker process owns one single claim loop and calls `claim_next(...)` again only
+            after the current claimed job has been fully processed.
         Raises:
             Exception: Unexpected claim/process errors are logged and loop continues.
         Side Effects:
@@ -277,6 +278,8 @@ class BacktestJobRunnerApp:
         while not stop_event.is_set():
             claimed = None
             try:
+                # Keep queue concurrency at the fleet level: one process owns one single claim
+                # loop and does not claim another job until the current claimed attempt finishes.
                 claimed = self.lease_repository.claim_next(
                     now=_utc_now(),
                     locked_by=self.locked_by,
@@ -304,6 +307,7 @@ class BacktestJobRunnerApp:
             self.metrics.active_claimed_jobs.inc()
             started = perf_counter()
             try:
+                # The use case consumes exactly one already-claimed job attempt for this process.
                 report = self.runner_use_case.process_claimed_job(
                     job=claimed,
                     locked_by=self.locked_by,

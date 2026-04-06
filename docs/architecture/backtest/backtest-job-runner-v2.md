@@ -78,7 +78,8 @@ One `backtest-job-runner` instance:
 
 - is a single long-lived process;
 - owns one sequential claim loop;
-- processes at most one claimed job at any given time.
+- processes at most one claimed job at any given time;
+- calls `claim_next(...)` again only after the current claimed job attempt finishes.
 
 Queue scalability comes from multiple independent worker processes, not from making one claim
 loop concurrent.
@@ -188,6 +189,7 @@ Required invariants:
 
 - claim is atomic and uses row-lock semantics;
 - only one worker may own a claimed job at a time;
+- one process must not run an in-process multi-job scheduler or overlap multiple claimed jobs;
 - startup must pass an explicit `instance_index` per worker process, defaulting to `0` for a
   single local instance;
 - `locked_by` is a stable worker identity in
