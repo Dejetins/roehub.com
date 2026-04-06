@@ -69,6 +69,8 @@ The canonical background launch mode is `background_auto`.
 
 - new runs must not be created with `background_manual_legacy`;
 - the worker must continue to execute already persisted rows that carry this literal;
+- compatibility remains necessary because queued/running rows may still exist from pre-cutover
+  storage and must stay executable/reviewable until terminal completion;
 - active product and architecture documentation must describe the background path through
   `background_auto`.
 

@@ -314,6 +314,7 @@ def test_post_backtest_jobs_returns_201_with_status_hash_fields() -> None:
     assert body["engine_params_hash"] == "b" * 64
     assert body["backtest_runtime_config_hash"] == "c" * 64
     assert create_fake.last_command is not None
+    assert create_fake.last_command.execution_mode == "background_auto"
 
 
 

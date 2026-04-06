@@ -2665,6 +2665,60 @@ def test_process_claimed_job_forwards_internal_profile_override_to_shared_planne
     assert job.execution_mode == execution_mode
 
 
+def test_process_claimed_job_rejects_non_background_execution_mode() -> None:
+    """
+    Verify the worker rejects claimed rows that are not background execution modes.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The claim loop is reserved for queued/running background work, so `sync_inline` must not
+        silently enter the worker path.
+    Raises:
+        AssertionError: If the worker accepts a non-background execution-mode literal.
+    Side Effects:
+        None.
+    """
+    use_case = _build_use_case(
+        request=_build_request(top_k=5, preselect=2, top_trades_n=1),
+        job_repository=_FakeJobRepository(
+            default_job=_build_running_job(execution_mode="sync_inline")
+        ),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=_FakeResultsRepository(),
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                _build_stage_a_variants()[0].base_variant_key: 3.0,
+                _build_stage_a_variants()[1].base_variant_key: 2.0,
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 49, 0)),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "process_claimed_job requires background_auto or "
+            "background_manual_legacy execution_mode"
+        ),
+    ):
+        use_case.process_claimed_job(
+            job=_build_running_job(execution_mode="sync_inline"),
+            locked_by="worker-test-1",
+        )
+
+
 def test_process_claimed_job_uses_artifact_stage_a_shortlist_builder_when_available() -> None:
     """
     Verify worker Stage A uses the artifact-backed shortlist builder with pinned context.
@@ -3003,7 +3057,7 @@ def _build_request(
 
 def _build_running_job(
     *,
-    execution_mode: BacktestJobExecutionMode = "background_manual_legacy",
+    execution_mode: BacktestJobExecutionMode = "background_auto",
     request_json: Mapping[str, Any] | None = None,
 ) -> BacktestJob:
     """
@@ -3056,7 +3110,7 @@ def _build_running_job(
 
 def _build_running_job_with_artifact_pin(
     *,
-    execution_mode: BacktestJobExecutionMode = "background_manual_legacy",
+    execution_mode: BacktestJobExecutionMode = "background_auto",
     request_json: Mapping[str, Any] | None = None,
 ) -> BacktestJob:
     """

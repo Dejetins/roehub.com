@@ -52,7 +52,9 @@ lazy detail page для одного persisted variant.
   `run_id`, `state`, and `execution_mode` are shown to the user immediately after `POST /backtests`
   instead of keeping an invisible browser-side sync/job toggle.
 - `background_manual_legacy` may still appear for legacy persisted rows in history/detail pages,
-  but only as a `compatibility-only` literal and not as an active launch choice.
+  but only as a `compatibility-only` literal and not as an active launch choice;
+- this compatibility remains necessary because history/detail pages can still open pre-cutover
+  queued/running rows until the worker drives them to terminal state.
 
 ## Scope
 

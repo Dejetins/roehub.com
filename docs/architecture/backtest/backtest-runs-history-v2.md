@@ -23,7 +23,8 @@
   - `background_auto` is the canonical background path for new queued runs that enter
     `/backtests/runs*`;
   - `background_manual_legacy` remains a `compatibility-only` `execution_mode` literal for
-    already persisted rows and compatibility aliases, and those rows remain supported.
+    already persisted rows and compatibility aliases, and those rows remain supported because
+    history/detail/cancel must continue to handle pre-cutover queued/running runs deterministically.
 - R7-04 additive note:
   - public lazy detail endpoint `POST /backtests/runs/{run_id}/variant-report` пересчитывает
     ровно один выбранный вариант по persisted `run_id` и explicit `variant` payload;
@@ -154,6 +155,7 @@ Hashes (`request_hash`, `engine_params_hash`, `backtest_runtime_config_hash`, `s
 - `sync_inline`
 - `background_auto` as the canonical background path for new queued runs
 - `background_manual_legacy` as a `compatibility-only` literal for already persisted rows
+  that remain visible through read/cancel surfaces until they reach a terminal state
 
 ### 4) `/top` остается summary-only
 

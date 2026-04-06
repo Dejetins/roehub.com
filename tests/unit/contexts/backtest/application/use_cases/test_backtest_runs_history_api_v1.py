@@ -1317,7 +1317,7 @@ def _running_run(
     *,
     run_id: UUID,
     user_id: UserId,
-    execution_mode: BacktestJobExecutionMode = "background_manual_legacy",
+    execution_mode: BacktestJobExecutionMode = "background_auto",
 ) -> BacktestJob:
     """
     Build deterministic running persisted run fixture for public lifecycle tests.

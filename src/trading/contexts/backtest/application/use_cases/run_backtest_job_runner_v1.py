@@ -481,6 +481,7 @@ class RunBacktestJobRunnerV1:
         """
         if job.state != "running":
             raise ValueError("process_claimed_job requires running claimed job")
+        self._validate_claimed_execution_mode(job=job)
         normalized_locked_by = locked_by.strip()
         if not normalized_locked_by:
             raise ValueError("process_claimed_job requires non-empty locked_by")
@@ -620,6 +621,33 @@ class RunBacktestJobRunnerV1:
                 stage_a_duration_seconds=stage_durations[STAGE_A_LITERAL_V2],
                 stage_b_duration_seconds=stage_durations[STAGE_B_LITERAL_V2],
                 finalizing_duration_seconds=stage_durations["finalizing"],
+            )
+
+    def _validate_claimed_execution_mode(
+        self,
+        *,
+        job: BacktestJob,
+    ) -> None:
+        """
+        Validate that the worker processes only canonical or compatibility-only background rows.
+
+        Args:
+            job: Claimed running job snapshot selected by the outer claim loop.
+        Returns:
+            None.
+        Assumptions:
+            `background_auto` is the only canonical active background launch literal, while
+            `background_manual_legacy` remains supported only for already persisted rows that
+            predate or bypassed the canonical launch cutover.
+        Raises:
+            ValueError: If the claimed row carries a non-background execution mode.
+        Side Effects:
+            None.
+        """
+        if job.execution_mode not in {"background_auto", "background_manual_legacy"}:
+            raise ValueError(
+                "process_claimed_job requires background_auto or "
+                "background_manual_legacy execution_mode"
             )
 
     def _plan_claimed_runtime(

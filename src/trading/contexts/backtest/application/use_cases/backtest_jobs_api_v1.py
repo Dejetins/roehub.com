@@ -69,7 +69,7 @@ class CreateBacktestJobCommand:
 
     run_request: RunBacktestRequest
     request_payload: Mapping[str, Any]
-    execution_mode: BacktestJobExecutionMode = "background_manual_legacy"
+    execution_mode: BacktestJobExecutionMode = "background_auto"
     execution_profile_mode: str | None = None
 
     def __post_init__(self) -> None:
@@ -82,6 +82,8 @@ class CreateBacktestJobCommand:
             None.
         Assumptions:
             `request_payload` is derived from strict API DTO with `extra=forbid`.
+            The canonical active background launch literal is `background_auto`; compatibility
+            support for `background_manual_legacy` is kept only for bounded legacy call paths.
         Raises:
             ValueError: If request objects are missing.
         Side Effects:

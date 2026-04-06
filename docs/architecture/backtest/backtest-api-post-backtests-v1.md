@@ -13,7 +13,8 @@ deterministic `422` ошибками.
     `POST /backtests`;
   - `/backtests/jobs*` stays a `compatibility alias` for legacy background flows;
   - `background_manual_legacy` remains a `compatibility-only` literal for already persisted
-    rows and compatibility launch surfaces, not an active launch choice for new runs;
+    queued/running rows and read compatibility surfaces, not an active launch choice for new
+    runs;
   - request/response naming keeps `top_k`, while `top_n_default` and `top_n_max` stay additive
     runtime-defaults literals.
 - R7-03 follow-up note:
@@ -53,8 +54,8 @@ deterministic `422` ошибками.
     background path,
   - fallback branch отвечает `202 Accepted` и явно возвращает `run_id`, `state=queued`,
     `execution_mode=background_auto`, `engine_version` и artifact pin metadata,
-  - manual compatibility endpoint `POST /backtests/jobs` сохраняет compatibility-only behavior
-    `execution_mode=background_manual_legacy` для legacy callers,
+  - active launch docs stay centered on `background_auto`; if history/status surfaces still show
+    `background_manual_legacy`, that literal is preserved only for already persisted legacy rows,
   - если full budgets тоже не проходят, backend возвращает canonical deterministic `422`
     и не создаёт persisted run row.
 - R7-02 storage note:

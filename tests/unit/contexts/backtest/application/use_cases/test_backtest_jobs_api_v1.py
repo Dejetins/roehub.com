@@ -680,7 +680,7 @@ def test_create_backtest_job_use_case_artifact_pin_converts_to_pinned_identity_v
     assert pinned_identity.slot_generation == 9
     assert pinned_identity.artifact_asof_date == "2026-03-24"
     assert pinned_identity.artifact_manifest_hash == "a" * 64
-    assert created.execution_mode == "background_manual_legacy"
+    assert created.execution_mode == "background_auto"
     assert created.market_id == 1
     assert created.symbol == "BTCUSDT"
     assert created.timeframe == "1m"
@@ -759,7 +759,7 @@ def test_create_backtest_job_use_case_saved_mode_persists_spec_hash_and_snapshot
     assert created.artifact_pin is not None
     assert created.artifact_pin.artifact_slot == "slot_b"
     assert created.artifact_pin.artifact_manifest_hash == "a" * 64
-    assert created.execution_mode == "background_manual_legacy"
+    assert created.execution_mode == "background_auto"
     assert created.market_id == 1
     assert created.symbol == "BTCUSDT"
     assert created.timeframe == "1m"
@@ -777,7 +777,8 @@ def test_create_backtest_job_use_case_accepts_background_auto_execution_mode() -
     Returns:
         None.
     Assumptions:
-        Manual jobs endpoint keeps default `background_manual_legacy`; override is explicit only.
+        `POST /backtests` and compatibility jobs creation now share `background_auto` as the
+        canonical active background literal.
     Raises:
         AssertionError: If create flow ignores command-level execution mode override.
     Side Effects:
