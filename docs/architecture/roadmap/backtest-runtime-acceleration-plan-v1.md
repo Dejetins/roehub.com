@@ -53,7 +53,15 @@ owner: backtest
 - [backtest-precompute-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-precompute-runner-v2.md)
 - [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
 - [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
+- [backtest-job-runner-v2-implementation-plan.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md)
 - [06_backtest_compute.ipynb](/Users/daniildegtyarev/Projects/roehub.com/tests/notebook_tests/06_backtest_compute.ipynb)
+
+Для active roadmap surface canonical worker document здесь один:
+`docs/architecture/backtest/backtest-job-runner-v2.md`.
+
+`docs/architecture/backtest/backtest-job-runner-worker-v1.md` сохраняется только как
+historical / compatibility reference для старого EPIC-10 vocabulary и не должен читаться как
+canonical worker contract.
 
 ## 3. Ключевые решения этого follow-up плана
 

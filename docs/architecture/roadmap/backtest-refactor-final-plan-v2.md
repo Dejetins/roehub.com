@@ -31,7 +31,9 @@
 - [backtest-signals-from-indicators-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-signals-from-indicators-v1.md)
 - [backtest-candle-timeline-rollup-warmup-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md)
 - [backtest-api-post-backtests-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-api-post-backtests-v1.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
 - [backtest-job-runner-worker-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
+  — historical / compatibility reference for legacy EPIC-10 wording
 - [backtest-execution-engine-close-fill-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md)
 - [backtest-bounded-context-domain-use-case-skeleton-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md)
 - [backtest-grid-builder-staged-runner-guards-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md)
@@ -1444,7 +1446,7 @@ Update note after R10-01 / R10-02:
 - `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
 - `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
 - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+- `docs/architecture/backtest/backtest-job-runner-worker-v1.md` (historical / compatibility reference)
 - `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
 - `docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md`
 - `docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md`

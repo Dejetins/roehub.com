@@ -1,6 +1,8 @@
-# Backtest Jobs v1 -- Job-Runner Worker (claim/lease + streaming batches + cancel) (BKT-EPIC-10)
+# Backtest Jobs v1 -- Job-Runner Worker (historical / compatibility-only; claim/lease + streaming batches + cancel) (BKT-EPIC-10)
 
-Документ фиксирует архитектурный контракт EPIC-10: новый воркер `backtest-job-runner`, который забирает queued jobs из Postgres, выполняет backtest батчами, пишет progress и best-so-far top-K snapshots, корректно обрабатывает cancel и lease/reclaim.
+Historical / compatibility-only document for the original EPIC-10 `backtest-job-runner`
+contract: the worker claims queued jobs from Postgres, executes backtest batches, writes
+progress and best-so-far top-K snapshots, and handles cancel and lease/reclaim.
 
 ## Status
 

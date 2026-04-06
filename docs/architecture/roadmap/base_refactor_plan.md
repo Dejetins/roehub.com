@@ -17,7 +17,8 @@
 - `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
 - `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
 - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+- `docs/architecture/backtest/backtest-job-runner-v2.md`
+- `docs/architecture/backtest/backtest-job-runner-worker-v1.md` (historical / compatibility reference)
 - `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
 - `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
 - `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
@@ -1102,7 +1103,8 @@ Post-R10 additive follow-up:
 - `apps/worker/backtest_job_runner/**`
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+- `docs/architecture/backtest/backtest-job-runner-v2.md` — canonical worker contract
+- `docs/architecture/backtest/backtest-job-runner-worker-v1.md` — historical / compatibility context
 
 ---
 
@@ -1307,7 +1309,7 @@ Post-R10 additive follow-up:
   - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
   - `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
   - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-  - `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+  - `docs/architecture/backtest/backtest-job-runner-worker-v1.md` (historical / compatibility reference)
   - `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
   - `docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md`
   - `docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md`
