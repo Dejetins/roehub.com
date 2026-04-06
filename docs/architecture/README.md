@@ -4,6 +4,7 @@
 
 ## Ключевые документы
 
+- [Backtest Architecture Docs](docs/architecture/backtest/README.md)
 - [Indicators Architecture](docs/architecture/indicators/README.md)
 - [План миграции kernels на float32/mixed precision (v1)](docs/architecture/indicators/indicators-kernels-f32-migration-plan-v1.md)
 - [Backtest v1 — Grid Builder + Staged Runner + Sync Guards (BKT-EPIC-04)](docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md)
@@ -11,6 +12,8 @@
 - [Backtest Precompute Runner V2 (R2-03 / R2-04 / R3-01 / R3-02 / R3-03 / R3-04 / R4-01 / R4-02 / R4-03 / R5-01 / R6-01)](docs/architecture/backtest/backtest-precompute-runner-v2.md)
 - [Backtest Runtime Kernels V2 (R5-02 contract / R6-01 loader-context boundary / R6-02 Stage A kernels / R6-03 Stage B risk kernels / R6-04 ranking + summary-only top-N)](docs/architecture/backtest/backtest-runtime-kernels-v2.md)
 - [Backtest Job Runner v2 -- canonical claimed background worker for persisted runs](docs/architecture/backtest/backtest-job-runner-v2.md)
+- [Ранбук backtest job runner](docs/runbooks/backtest-job-runner.md)
+- [Backtest Jobs v1 -- Job-Runner Worker (historical / compatibility-only; claim/lease + streaming batches + cancel) (BKT-EPIC-10)](docs/architecture/backtest/backtest-job-runner-worker-v1.md)
 - [План внедрения backtest-job-runner v2](docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md)
 - [План доработки и ускорения backtest runtime v1](docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md)
 - [Алгоритм расчета из `tests/notebook_tests/06_backtest_compute.ipynb` (v2, reference semantics)](docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md)

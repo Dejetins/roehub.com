@@ -22,11 +22,13 @@
 - Canonical worker navigation:
   - active claimed background worker architecture lives in
     `docs/architecture/backtest/backtest-job-runner-v2.md`;
+  - operational runbook for the canonical worker lives in
+    `docs/runbooks/backtest-job-runner.md`;
   - active roadmap sequence for the worker lives in
     `docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md` and keeps
     `backtest-job-runner-v2.md` as the canonical worker document;
   - `docs/architecture/backtest/backtest-job-runner-worker-v1.md` is historical /
-    `compatibility-only`.
+    `compatibility-only` and should be opened only for compatibility context.
 
 ## Основные контракты
 
@@ -54,12 +56,14 @@
 - Reporting metrics/table: `docs/architecture/backtest/backtest-reporting-metrics-table-v1.md`
 - Jobs API: `docs/architecture/backtest/backtest-jobs-api-v1.md`
 - Jobs worker (canonical): `docs/architecture/backtest/backtest-job-runner-v2.md`
+- Jobs worker runbook (canonical operations): `docs/runbooks/backtest-job-runner.md`
 - Worker implementation roadmap (active): `docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md`
 - Perf optimization plan: `docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md`
 - Follow-up runtime acceleration roadmap after the artifact-backed cutover:
   `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
 - Historical worker architecture reference:
-  `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+  `docs/architecture/backtest/backtest-job-runner-worker-v1.md` (open only when historical /
+  compatibility context is needed)
 - Runtime-acceleration benchmark corpus and lightweight rollout harness:
   `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`
 - Hybrid conservative shortlist runtime, opt-in execution boundary and rollout gates:
