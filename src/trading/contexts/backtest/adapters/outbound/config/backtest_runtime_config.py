@@ -756,6 +756,38 @@ def _resolve_runtime_acceleration_benchmark_corpus_path(
     return None
 
 
+def _get_jobs_worker_processes(jobs_map: Mapping[str, Any]) -> int:
+    """
+    Load the canonical jobs worker cardinality with a bounded deprecated alias path.
+
+    Args:
+        jobs_map: Parsed `backtest.jobs` mapping from runtime YAML.
+    Returns:
+        int: Canonical worker-process count for typed runtime config.
+    Assumptions:
+        `worker_processes` remains the long-term source of truth.
+        `parallel_workers` is accepted only as a deprecated alias when the canonical key is
+        absent.
+    Raises:
+        ValueError: If both keys are present and config must fail fast, or if the selected key is
+            missing/invalid.
+    Side Effects:
+        None.
+    """
+    has_worker_processes = "worker_processes" in jobs_map
+    has_parallel_workers = "parallel_workers" in jobs_map
+    if has_worker_processes and has_parallel_workers:
+        raise ValueError(
+            "backtest.jobs.worker_processes and backtest.jobs.parallel_workers cannot both be "
+            "set; fail fast and keep one source of truth"
+        )
+    if has_worker_processes:
+        return _get_int(jobs_map, "worker_processes", required=True)
+    if has_parallel_workers:
+        return _get_int(jobs_map, "parallel_workers", required=True)
+    return _get_int(jobs_map, "worker_processes", required=True)
+
+
 def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     """
     Load and validate source-of-truth Backtest runtime YAML configuration.
@@ -916,7 +948,7 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
         claim_poll_seconds=_get_float(jobs_map, "claim_poll_seconds", required=True),
         lease_seconds=_get_int(jobs_map, "lease_seconds", required=True),
         heartbeat_seconds=_get_int(jobs_map, "heartbeat_seconds", required=True),
-        worker_processes=_get_int(jobs_map, "worker_processes", required=True),
+        worker_processes=_get_jobs_worker_processes(jobs_map),
         snapshot_seconds=_get_optional_int(jobs_map, "snapshot_seconds"),
         snapshot_variants_step=_get_optional_int(jobs_map, "snapshot_variants_step"),
     )

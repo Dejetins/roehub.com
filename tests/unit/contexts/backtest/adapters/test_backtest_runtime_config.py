@@ -923,21 +923,21 @@ backtest:
         load_backtest_runtime_config(config_path)
 
 
-def test_load_backtest_runtime_config_requires_canonical_worker_processes_key(
+def test_load_backtest_runtime_config_accepts_canonical_worker_processes_key(
     tmp_path: Path,
 ) -> None:
     """
-    Verify loader requires the canonical queue-concurrency key and rejects legacy-only payloads.
+    Verify loader keeps `worker_processes` as the canonical queue-concurrency key.
 
     Args:
         tmp_path: pytest temporary path fixture.
     Returns:
         None.
     Assumptions:
-        EPIC B1 publishes `backtest.jobs.worker_processes` as the only accepted key until any
-        later compatibility alias work is implemented explicitly.
+        The typed runtime surface must stay centered on `worker_processes` even during the
+        temporary compatibility window for legacy configs.
     Raises:
-        AssertionError: If legacy-only jobs payload does not raise ValueError.
+        AssertionError: If canonical-only jobs payload does not load deterministically.
     Side Effects:
         None.
     """
@@ -955,11 +955,94 @@ backtest:
     claim_poll_seconds: 1
     lease_seconds: 60
     heartbeat_seconds: 15
-    parallel_workers: 1
+    worker_processes: 1
 """.strip(),
     )
 
-    with pytest.raises(ValueError, match="worker_processes"):
+    config = load_backtest_runtime_config(config_path)
+
+    assert config.jobs.worker_processes == 1
+
+
+def test_load_backtest_runtime_config_accepts_parallel_workers_as_deprecated_alias(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader accepts `parallel_workers` only as a deprecated alias when the canonical key
+    is absent.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        EPIC B2 provides a bounded compatibility path without restoring the legacy literal as the
+        canonical typed field.
+    Raises:
+        AssertionError: If alias-only jobs payload does not normalize into `worker_processes`.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 2
+""".strip(),
+    )
+
+    config = load_backtest_runtime_config(config_path)
+
+    assert config.jobs.worker_processes == 2
+
+
+def test_load_backtest_runtime_config_fails_fast_on_ambiguous_worker_keys(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify loader fails fast when both canonical and deprecated alias keys are present.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Jobs config must have one source of truth for worker cardinality during migration.
+    Raises:
+        AssertionError: If ambiguous dual-key jobs payload does not raise ValueError.
+    Side Effects:
+        None.
+    """
+    config_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    worker_processes: 2
+    parallel_workers: 2
+""".strip(),
+    )
+
+    with pytest.raises(ValueError, match="fail fast"):
         load_backtest_runtime_config(config_path)
 
 
