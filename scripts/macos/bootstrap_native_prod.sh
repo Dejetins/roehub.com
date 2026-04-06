@@ -31,11 +31,13 @@ do
   install -m 0644 "$REPO_ROOT/infra/macos/launchd/$plist" "$LAUNCH_AGENTS_DIR/$plist"
 done
 
-"$PYTHON_BIN" "$REPO_ROOT/scripts/macos/render_backtest_job_runner_launchd.py" \
-  --profile prod \
-  --repo-root "$REPO_ROOT" \
-  --launch-agents-dir "$LAUNCH_AGENTS_DIR" \
-  --clean >/dev/null
+mapfile -t worker_plists < <(
+  "$PYTHON_BIN" "$REPO_ROOT/scripts/macos/render_backtest_job_runner_launchd.py" \
+    --profile prod \
+    --repo-root "$REPO_ROOT" \
+    --launch-agents-dir "$LAUNCH_AGENTS_DIR" \
+    --clean
+)
 
 cat > /opt/homebrew/etc/prometheus.args <<'EOF'
 --config.file=/opt/roehub/config/prometheus.prod.yml
@@ -46,5 +48,10 @@ EOF
 cat > /opt/homebrew/etc/node_exporter.args <<'EOF'
 --web.listen-address=127.0.0.1:9100
 EOF
+
+echo "prod backtest-job-runner fleet materialized: ${#worker_plists[@]} instance(s)"
+if ((${#worker_plists[@]} > 0)); then
+  printf 'prod backtest-job-runner service: %s\n' "${worker_plists[@]}"
+fi
 
 echo "prod native templates installed"

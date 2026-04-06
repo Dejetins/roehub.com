@@ -86,6 +86,8 @@ reload_profile() {
   while IFS= read -r service; do
     existing_worker_services+=("$service")
   done < <(collect_worker_services "$profile")
+  echo "reloading ${profile} static services: ${#static_services[@]}"
+  echo "reloading ${profile} backtest-job-runner fleet (existing instances): ${#existing_worker_services[@]}"
   for service in "${static_services[@]}" "${existing_worker_services[@]}"; do
     launchctl bootout "gui/${UID_VALUE}" "${LAUNCH_AGENTS_DIR}/${service}" || true
   done
@@ -93,6 +95,7 @@ reload_profile() {
   while IFS= read -r service; do
     worker_services+=("$service")
   done < <(render_worker_services "$profile")
+  echo "reloading ${profile} backtest-job-runner fleet (desired instances): ${#worker_services[@]}"
   for service in "${static_services[@]}" "${worker_services[@]}"; do
     launchctl bootstrap "gui/${UID_VALUE}" "${LAUNCH_AGENTS_DIR}/${service}"
   done

@@ -132,6 +132,46 @@ Reload full supervised surface:
 bash scripts/macos/reload_launchd_services.sh prod
 ```
 
+GitHub Actions `deploy-backend` должен вызывать этот reload только после
+`bash scripts/macos/bootstrap_native_prod.sh`, чтобы production rollout обновлял и API, и
+`backtest-job-runner` fleet через один deploy surface. Если `backtest.jobs.enabled=true`,
+production deploy считается некорректным, пока число зарегистрированных и live
+`backtest-job-runner` instances не совпадает с `worker_processes`.
+
+### 5.1 Service-level smoke после deploy
+
+Для production rollout canonical health rule теперь явный: deploy использует `service-level smoke`
+для `backtest-job-runner` и следует правилу `no synthetic production job`.
+
+Smoke обязан подтвердить:
+- service registration у `launchd`;
+- live process на каждом `backtest-job-runner.<instance_index>`;
+- рабочий `metrics endpoint` на каждом instance;
+- отсутствие immediate disabled/error exit по `last exit code`;
+- совпадение fleet cardinality с `worker_processes`.
+
+Минимальная ручная проверка после reload:
+
+```bash
+cd /opt/roehub/app
+worker_processes="$(
+  /opt/roehub/app/.venv/bin/python -c "from trading.contexts.backtest.adapters.outbound import load_backtest_runtime_config; print(load_backtest_runtime_config('/opt/roehub/app/configs/prod/backtest.yaml').jobs.worker_processes)"
+)"
+launchctl list | grep backtest-job-runner
+for ((instance_index = 0; instance_index < worker_processes; instance_index++)); do
+  launchctl print "gui/$(id -u)/com.roehub.backtest-job-runner.${instance_index}" | grep -E 'state =|pid =|last exit code ='
+  curl -fsS "http://127.0.0.1:$((9204 + instance_index))/metrics" | grep -m1 '^# HELP backtest_job_runner_claim_total '
+done
+```
+
+Интерпретация failure коротко:
+- registration mismatch: fleet не materialize-ился или reload не применил нужные services;
+- live-process mismatch: worker ушел в immediate disabled/error exit или crash-loop;
+- `last exit code != 0`: launchd уже увидел immediate error exit до стабильного claim loop;
+- `metrics endpoint` failure: process мог стартовать, но service surface не observable;
+- API `401` сам по себе не заменяет worker smoke и не делает deploy green;
+- production smoke не должен создавать synthetic backtest jobs.
+
 Основные counters:
 - `backtest_job_runner_claim_total`
 - `backtest_job_runner_succeeded_total`
@@ -154,7 +194,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - `artifact_slot`
 - `artifact_manifest_hash`
 
-## 5.1 Closure smoke после rollout
+## 5.2 Closure smoke после rollout
 
 Команда минимальной проверки после релиза worker/API/runtime:
 

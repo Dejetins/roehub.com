@@ -90,11 +90,38 @@ bash scripts/macos/reload_launchd_services.sh test
 bash scripts/macos/reload_launchd_services.sh all
 ```
 
+GitHub Actions workflow `deploy-backend` должен использовать этот же install/reload path:
+сначала `bash scripts/macos/bootstrap_native_prod.sh`, затем
+`bash scripts/macos/reload_launchd_services.sh prod`. Когда `backtest.jobs.enabled=true`,
+production rollout без live `backtest-job-runner` fleet и без совпадения с
+`backtest.jobs.worker_processes` считается некорректным, даже если `com.roehub.api` уже поднялся.
+Этот gate является `service-level smoke`, а не request-path smoke, и использует supervisor,
+process, and `metrics endpoint` signals. Правило остаётся жестким: `no synthetic production job`.
+
 Отдельно проверить worker fleet:
 
 ```bash
 launchctl list | grep backtest-job-runner
 ```
+
+Ручная service-level smoke проверка после deploy:
+
+```bash
+cd /opt/roehub/app
+worker_processes="$(
+  /opt/roehub/app/.venv/bin/python -c "from trading.contexts.backtest.adapters.outbound import load_backtest_runtime_config; print(load_backtest_runtime_config('/opt/roehub/app/configs/prod/backtest.yaml').jobs.worker_processes)"
+)"
+for ((instance_index = 0; instance_index < worker_processes; instance_index++)); do
+  launchctl print "gui/$(id -u)/com.roehub.backtest-job-runner.${instance_index}" | grep -E 'state =|pid =|last exit code ='
+  curl -fsS "http://127.0.0.1:$((9204 + instance_index))/metrics" | grep -m1 '^# HELP backtest_job_runner_claim_total '
+done
+```
+
+Failure interpretation:
+- install/bootstrap failure: `bootstrap_native_prod.sh` не установил launchd/materialized plists;
+- reload failure: `reload_launchd_services.sh prod` не зарегистрировал ожидаемый fleet size;
+- immediate error exit: `launchctl print` показывает `last exit code != 0` для worker service;
+- liveness/observability failure: service label есть, но нет live pid или не отвечает `metrics endpoint`.
 
 Schema bootstrap (identity SQL + Alembic):
 
