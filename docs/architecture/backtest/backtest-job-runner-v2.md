@@ -244,13 +244,14 @@ For every claimed run the worker:
 - validates the effective request and template contract;
 - applies supported request timeframe rules;
 - applies default-only signal-override rules;
-- resolves the runtime plan through `BacktestArtifactRuntimePlannerV2`;
+- resolves the runtime plan through `BacktestArtifactRuntimePlannerV2.plan(...)`;
 - uses startup-loaded `execution_profiles` and `adaptive_selector_policy`;
 - executes the selected profile through shared artifact-backed runtime services.
 
 This means:
 
 - `background_auto` is a launch classification, not a separate scoring engine;
+- `background_manual_legacy` compatibility runs still consume the same shared planner path;
 - `exact_small`, `exact_parallel`, `hybrid_conservative`, and `hybrid_family` are runtime-profile
   decisions inside the same claimed path;
 - browser and public API surfaces still do not choose `execution_profile_mode` directly;

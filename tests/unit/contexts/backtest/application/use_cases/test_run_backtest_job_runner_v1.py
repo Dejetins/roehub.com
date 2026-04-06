@@ -441,27 +441,76 @@ def _build_fake_execution_profile(
     )
 
 
-class _FakeGridBuilder:
+class _RecordingSharedRuntimePlanner:
     """
-    Grid builder stub returning predefined staged grid context.
+    Shared runtime planner stub returning one predefined runtime plan.
     """
 
-    def __init__(self, *, context: _FakeGridContext) -> None:
+    def __init__(self, *, runtime_plan: _FakeGridContext) -> None:
         """
-        Initialize grid builder stub with fixed context.
+        Initialize planner stub with one deterministic runtime plan.
 
         Args:
-            context: Prebuilt staged grid context.
+            runtime_plan: Prebuilt runtime plan fixture.
         Returns:
             None.
         Assumptions:
-            Context values match use-case request preselect settings.
+            The runtime plan already encodes the execution profile chosen by the shared planner.
         Raises:
             None.
         Side Effects:
-            None.
+            Stores in-memory planner call logs for boundary assertions.
         """
-        self._context = context
+        self._runtime_plan = runtime_plan
+        self.calls: list[dict[str, Any]] = []
+
+    def plan(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        candles: Any,
+        indicator_compute: Any,
+        preselect: int,
+        requested_execution_profile_mode: str | None,
+        defaults_provider: Any,
+        max_variants_per_compute: int,
+        max_compute_bytes_total: int,
+    ) -> _FakeGridContext:
+        """
+        Record one shared-planner invocation and return the predefined runtime plan.
+
+        Args:
+            template: Run template payload.
+            candles: Candle arrays payload.
+            indicator_compute: Indicator compute dependency.
+            preselect: Stage-A preselect value.
+            requested_execution_profile_mode:
+                Optional explicit execution profile mode forwarded from persisted job payload.
+            defaults_provider: Optional defaults provider.
+            max_variants_per_compute: Variants guard.
+            max_compute_bytes_total: Memory guard.
+        Returns:
+            _FakeGridContext: Prebuilt runtime plan fixture.
+        Assumptions:
+            Guard checks and adaptive policy decisions are out of scope for this fake.
+        Raises:
+            None.
+        Side Effects:
+            Appends planner inputs to the in-memory call log.
+        """
+        self.calls.append(
+            {
+                "template": template,
+                "candles": candles,
+                "indicator_compute": indicator_compute,
+                "preselect": preselect,
+                "requested_execution_profile_mode": requested_execution_profile_mode,
+                "defaults_provider": defaults_provider,
+                "max_variants_per_compute": max_variants_per_compute,
+                "max_compute_bytes_total": max_compute_bytes_total,
+            }
+        )
+        return self._runtime_plan
 
     def build(
         self,
@@ -476,7 +525,7 @@ class _FakeGridBuilder:
         max_compute_bytes_total: int,
     ) -> _FakeGridContext:
         """
-        Return predefined staged grid context.
+        Preserve the legacy planner fake API by forwarding to `plan(...)`.
 
         Args:
             template: Run template payload.
@@ -489,25 +538,24 @@ class _FakeGridBuilder:
             max_variants_per_compute: Variants guard.
             max_compute_bytes_total: Memory guard.
         Returns:
-            _FakeGridContext: Prebuilt staged grid context.
+            _FakeGridContext: Prebuilt runtime plan fixture.
         Assumptions:
-            Guard checks are out of scope for this fake.
+            Some tests may still call `build(...)` while the worker now calls `plan(...)`.
         Raises:
             None.
         Side Effects:
-            None.
+            Delegates to `plan(...)`, which records planner inputs.
         """
-        _ = (
-            template,
-            candles,
-            indicator_compute,
-            preselect,
-            requested_execution_profile_mode,
-            defaults_provider,
-            max_variants_per_compute,
-            max_compute_bytes_total,
+        return self.plan(
+            template=template,
+            candles=candles,
+            indicator_compute=indicator_compute,
+            preselect=preselect,
+            requested_execution_profile_mode=requested_execution_profile_mode,
+            defaults_provider=defaults_provider,
+            max_variants_per_compute=max_variants_per_compute,
+            max_compute_bytes_total=max_compute_bytes_total,
         )
-        return self._context
 
 
 class _FakePriceArraysLoader:
@@ -1700,6 +1748,40 @@ class _NowProvider:
         return now
 
 
+def test_run_backtest_job_runner_v1_requires_shared_runtime_planner() -> None:
+    """
+    Verify worker use-case construction fails without an injected shared runtime planner.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Worker wiring is the canonical owner of startup-loaded planner injection, so the
+        use-case must not silently fall back to local default `execution_profiles` or
+        `adaptive_selector_policy`.
+    Raises:
+        AssertionError: If constructor allows a missing shared planner.
+    Side Effects:
+        None.
+    """
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+
+    with pytest.raises(ValueError, match="shared runtime_planner"):
+        RunBacktestJobRunnerV1(
+            job_repository=cast(Any, _FakeJobRepository(default_job=_build_running_job())),
+            lease_repository=cast(Any, _FakeLeaseRepository()),
+            results_repository=cast(Any, _FakeResultsRepository()),
+            request_decoder=cast(Any, _FakeRequestDecoder(request=request)),
+            indicator_compute=cast(Any, _NoOpIndicatorCompute()),
+            runtime_planner=None,
+            artifact_slot_resolver=cast(
+                Any,
+                _RecordingArtifactSlotResolver(context=_default_pinned_context()),
+            ),
+        )
+
+
 def test_process_claimed_job_persists_stage_progress_and_finalizing_policy() -> None:
     """
     Verify succeeded flow writes stage progress semantics without eager finalizing details.
@@ -2509,6 +2591,80 @@ def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime(
     assert job.execution_mode == execution_mode
 
 
+@pytest.mark.parametrize(
+    ("execution_mode",),
+    (
+        ("background_auto",),
+        ("background_manual_legacy",),
+    ),
+)
+def test_process_claimed_job_forwards_internal_profile_override_to_shared_planner(
+    execution_mode: BacktestJobExecutionMode,
+) -> None:
+    """
+    Verify claimed worker execution delegates internal profile selection to the shared planner.
+
+    Args:
+        execution_mode: Persisted background execution mode literal under test.
+    Returns:
+        None.
+    Assumptions:
+        The worker may execute either `background_auto` or compatibility-only
+        `background_manual_legacy`, but both must consume the same shared planner surface.
+    Raises:
+        AssertionError: If the worker stops forwarding internal planner metadata or creates a
+            mode-specific profile-selection branch.
+    Side Effects:
+        None.
+    """
+    requested_mode = "hybrid_conservative"
+    job = _build_running_job_with_artifact_pin(
+        execution_mode=execution_mode,
+        request_json={
+            "mode": "template",
+            "execution_profile_mode": requested_mode,
+        },
+    )
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    planner = _RecordingSharedRuntimePlanner(
+        runtime_plan=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        )
+    )
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=_FakeResultsRepository(),
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                _build_stage_a_variants()[0].base_variant_key: 3.0,
+                _build_stage_a_variants()[1].base_variant_key: 2.0,
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 47, 0)),
+        runtime_planner=planner,
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert len(planner.calls) == 1
+    assert planner.calls[0]["requested_execution_profile_mode"] == requested_mode
+    assert planner.calls[0]["preselect"] == request.preselect
+    assert job.execution_mode == execution_mode
+
+
 def test_process_claimed_job_uses_artifact_stage_a_shortlist_builder_when_available() -> None:
     """
     Verify worker Stage A uses the artifact-backed shortlist builder with pinned context.
@@ -2708,6 +2864,7 @@ def _build_use_case(
     snapshot_variants_step: int | None,
     stage_batch_size: int,
     now_provider: _NowProvider,
+    runtime_planner: Any | None = None,
     artifact_slot_resolver: Any | None = None,
     stage_a_shortlist_builder: Any | None = None,
     price_arrays_loader: Any | None = None,
@@ -2728,6 +2885,7 @@ def _build_use_case(
         snapshot_variants_step: Optional variants-step trigger threshold.
         stage_batch_size: Batch boundary size.
         now_provider: Monotonic now-provider fixture.
+        runtime_planner: Optional shared runtime planner test double.
         artifact_slot_resolver: Optional shared slot-pinned context resolver test double.
         stage_a_shortlist_builder: Optional artifact-backed Stage A builder test double.
         price_arrays_loader: Optional artifact price loader test double.
@@ -2753,13 +2911,18 @@ def _build_use_case(
     resolved_price_arrays_loader = (
         price_arrays_loader if price_arrays_loader is not None else _FakePriceArraysLoader()
     )
+    resolved_runtime_planner = (
+        runtime_planner
+        if runtime_planner is not None
+        else _RecordingSharedRuntimePlanner(runtime_plan=grid_context)
+    )
     return RunBacktestJobRunnerV1(
         job_repository=cast(Any, job_repository),
         lease_repository=cast(Any, lease_repository),
         results_repository=cast(Any, results_repository),
         request_decoder=cast(Any, _FakeRequestDecoder(request=request)),
         indicator_compute=cast(Any, _NoOpIndicatorCompute()),
-        runtime_planner=cast(Any, _FakeGridBuilder(context=grid_context)),
+        runtime_planner=cast(Any, resolved_runtime_planner),
         reporting_service=cast(Any, reporting_service),
         staged_scorer=cast(Any, scorer),
         warmup_bars_default=200,
@@ -2841,12 +3004,14 @@ def _build_request(
 def _build_running_job(
     *,
     execution_mode: BacktestJobExecutionMode = "background_manual_legacy",
+    request_json: Mapping[str, Any] | None = None,
 ) -> BacktestJob:
     """
     Build deterministic running Backtest job fixture with persisted artifact pin metadata.
 
     Args:
         execution_mode: Background execution mode literal persisted on the claimed job.
+        request_json: Optional persisted request payload override.
     Returns:
         BacktestJob: Running claimed job fixture pinned to immutable artifact identity.
     Assumptions:
@@ -2862,7 +3027,7 @@ def _build_running_job(
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
         mode="template",
         created_at=created_at,
-        request_json={"mode": "template"},
+        request_json=request_json if request_json is not None else {"mode": "template"},
         request_hash="a" * 64,
         spec_hash=None,
         spec_payload_json=None,
@@ -2892,12 +3057,14 @@ def _build_running_job(
 def _build_running_job_with_artifact_pin(
     *,
     execution_mode: BacktestJobExecutionMode = "background_manual_legacy",
+    request_json: Mapping[str, Any] | None = None,
 ) -> BacktestJob:
     """
     Build deterministic running Backtest job fixture with persisted artifact pin metadata.
 
     Args:
         execution_mode: Background execution mode literal persisted on the claimed job.
+        request_json: Optional persisted request payload override.
     Returns:
         BacktestJob: Running claimed job fixture with immutable artifact pin metadata.
     Assumptions:
@@ -2907,7 +3074,10 @@ def _build_running_job_with_artifact_pin(
     Side Effects:
         None.
     """
-    return _build_running_job(execution_mode=execution_mode)
+    return _build_running_job(
+        execution_mode=execution_mode,
+        request_json=request_json,
+    )
 
 
 def _default_pinned_context() -> _FakeSlotPinnedContext:

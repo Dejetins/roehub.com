@@ -175,12 +175,17 @@ def test_build_backtest_job_runner_app_skips_clickhouse_wiring_for_artifact_work
     )
 
     artifact_slot_resolver = cast(Any, captured_runner_kwargs["artifact_slot_resolver"])
+    runtime_planner = cast(Any, captured_runner_kwargs["runtime_planner"])
     assert app.instance_index == 2
     assert app.metrics_port == 9206
     assert "hostname=" in app.locked_by
     assert ";pid=" in app.locked_by
     assert app.locked_by.endswith("instance_index=2")
     assert "candle_timeline_builder" not in captured_runner_kwargs
+    assert runtime_planner.kwargs == {
+        "execution_profiles": runtime_config.execution_profiles,
+        "adaptive_selector_policy": runtime_config.adaptive_selector_policy,
+    }
     assert artifact_slot_resolver.artifact_loader.path_resolver.root == Path(
         "/tmp/backtest-artifacts-test"
     )

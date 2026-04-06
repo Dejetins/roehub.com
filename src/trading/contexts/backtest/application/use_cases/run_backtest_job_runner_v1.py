@@ -182,7 +182,7 @@ class RunBacktestJobRunnerV1:
     Execute one claimed Backtest job attempt via streaming Stage-A/Stage-B/finalizing flow.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-job-runner-v2.md
       - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
       - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
     Related:
@@ -265,8 +265,10 @@ class RunBacktestJobRunnerV1:
                 Optional conservative hybrid shortlist builder used only for explicit internal
                 `hybrid_conservative` worker runs.
             runtime_planner:
-                Optional artifact-backed runtime planner replacing `grid_builder_v1` in claimed
-                worker production paths.
+                Required shared artifact-backed runtime planner. Claimed worker execution must
+                consume this injected planner so `execution_profiles` and
+                `adaptive_selector_policy` remain owned by the shared runtime layer rather than a
+                worker-local rollout matrix or fallback planner surface.
             runtime_runner:
                 Optional shared artifact-backed Stage B runner replacing
                 `staged_core_runner_v1` in claimed worker production paths.
@@ -334,6 +336,8 @@ class RunBacktestJobRunnerV1:
             raise ValueError("RunBacktestJobRunnerV1 requires indicator_compute")
         if artifact_slot_resolver is None:  # type: ignore[truthy-bool]
             raise ValueError("RunBacktestJobRunnerV1 requires artifact_slot_resolver")
+        if runtime_planner is None:  # type: ignore[truthy-bool]
+            raise ValueError("RunBacktestJobRunnerV1 requires shared runtime_planner")
         if warmup_bars_default <= 0:
             raise ValueError("warmup_bars_default must be > 0")
         if top_k_default <= 0:
@@ -410,7 +414,7 @@ class RunBacktestJobRunnerV1:
         self._indicator_compute = indicator_compute
         self._defaults_provider = defaults_provider
         self._reporting_service = reporting_service or BacktestReportingServiceV1()
-        self._runtime_planner = runtime_planner or BacktestArtifactRuntimePlannerV2()
+        self._shared_runtime_planner = runtime_planner
         self._runtime_runner = runtime_runner or BacktestArtifactRuntimeRunnerV2(
             batch_size_default=stage_batch_size,
             configurable_ranking_enabled=configurable_ranking_enabled,
@@ -500,20 +504,10 @@ class RunBacktestJobRunnerV1:
                 target_time_range=context.request.time_range,
                 artifact_context=context.artifact_context,
             )
-            requested_execution_profile_mode = (
-                _requested_execution_profile_mode_from_request_json_v2(
-                    request_json=job.request_json
-                )
-            )
-            runtime_plan = self._runtime_planner.build(
-                template=context.template,
+            runtime_plan = self._plan_claimed_runtime(
+                context=context,
                 candles=timeline.candles,
-                indicator_compute=self._indicator_compute,
-                preselect=context.preselect,
-                requested_execution_profile_mode=requested_execution_profile_mode,
-                defaults_provider=self._defaults_provider,
-                max_variants_per_compute=self._max_variants_per_compute,
-                max_compute_bytes_total=self._max_compute_bytes_total,
+                request_json=job.request_json,
             )
             effective_runtime_plan = runtime_plan
             if execution_profile_uses_hierarchical_shortlist_runtime_v2(
@@ -627,6 +621,47 @@ class RunBacktestJobRunnerV1:
                 stage_b_duration_seconds=stage_durations[STAGE_B_LITERAL_V2],
                 finalizing_duration_seconds=stage_durations["finalizing"],
             )
+
+    def _plan_claimed_runtime(
+        self,
+        *,
+        context: _ResolvedJobRequestContext,
+        candles: Any,
+        request_json: Mapping[str, Any],
+    ) -> BacktestArtifactRuntimePlanV2:
+        """
+        Resolve the claimed-job runtime plan through the shared planner surface.
+
+        Args:
+            context: Resolved deterministic job request context.
+            candles: Warmup-aware artifact candle arrays already resolved for the claimed job.
+            request_json: Persisted canonical request JSON for the claimed job.
+        Returns:
+            BacktestArtifactRuntimePlanV2: Shared planner output consumed by the worker.
+        Assumptions:
+            The worker executes the plan chosen by the shared planner and does not own its own
+            rollout table for `execution_profiles`, `adaptive_selector_policy`, `background_auto`,
+            or `opt_in`.
+        Raises:
+            RoehubError: Propagated from the shared planner when guard limits are exceeded.
+            ValueError: If persisted internal planner metadata is invalid.
+        Side Effects:
+            Calls the shared planner, which may perform deterministic estimate work through
+            `IndicatorCompute.estimate(...)`.
+        """
+        requested_execution_profile_mode = _requested_execution_profile_mode_from_request_json_v2(
+            request_json=request_json
+        )
+        return self._shared_runtime_planner.plan(
+            template=context.template,
+            candles=candles,
+            indicator_compute=self._indicator_compute,
+            preselect=context.preselect,
+            requested_execution_profile_mode=requested_execution_profile_mode,
+            defaults_provider=self._defaults_provider,
+            max_variants_per_compute=self._max_variants_per_compute,
+            max_compute_bytes_total=self._max_compute_bytes_total,
+        )
 
     def _resolve_request_context(
         self,

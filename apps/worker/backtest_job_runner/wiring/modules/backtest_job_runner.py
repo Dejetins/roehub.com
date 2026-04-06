@@ -351,7 +351,7 @@ def build_backtest_job_runner_app(
     Build fully wired Backtest job-runner worker app with fail-fast dependencies.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/backtest-job-runner-v2.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py
@@ -404,7 +404,7 @@ def build_backtest_job_runner_app(
         )
     )
     artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
-    runtime_planner = BacktestArtifactRuntimePlannerV2(
+    shared_runtime_planner = BacktestArtifactRuntimePlannerV2(
         execution_profiles=runtime_config.execution_profiles,
         adaptive_selector_policy=runtime_config.adaptive_selector_policy,
     )
@@ -438,7 +438,7 @@ def build_backtest_job_runner_app(
         allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
         artifact_slot_resolver=artifact_slot_resolver,
-        runtime_planner=runtime_planner,
+        runtime_planner=shared_runtime_planner,
     )
     return BacktestJobRunnerApp(
         claim_poll_seconds=runtime_config.jobs.claim_poll_seconds,

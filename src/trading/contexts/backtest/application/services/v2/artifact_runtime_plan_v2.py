@@ -812,7 +812,7 @@ class BacktestArtifactRuntimePlannerV2:
             )
         return selector_decision.effective_profile, selector_decision
 
-    def build(
+    def plan(
         self,
         *,
         template: RunBacktestTemplate,
@@ -825,7 +825,7 @@ class BacktestArtifactRuntimePlannerV2:
         max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     ) -> BacktestArtifactRuntimePlanV2:
         """
-        Build deterministic artifact-backed runtime plan with guard checks.
+        Resolve one deterministic shared runtime plan with guard checks.
 
         Docs:
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
@@ -834,6 +834,7 @@ class BacktestArtifactRuntimePlannerV2:
           - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
           - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
           - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
 
         Args:
             template: Resolved backtest template payload.
@@ -849,8 +850,8 @@ class BacktestArtifactRuntimePlannerV2:
         Returns:
             BacktestArtifactRuntimePlanV2: Prepared artifact-backed runtime plan.
         Assumptions:
-            Artifact runtime still uses `IndicatorCompute.estimate(...)` only for guard math and
-            mixed-radix plan materialization, not for per-variant hot-path compute.
+            Sync and worker callers both consume this shared planner surface so
+            `execution_profiles` and `adaptive_selector_policy` remain centralized here.
         Raises:
             RoehubError: If guard limits are exceeded.
             ValueError: If request axes are invalid.
@@ -950,6 +951,63 @@ class BacktestArtifactRuntimePlannerV2:
             estimated_memory_bytes=estimated_memory_bytes,
             indicator_estimate_calls=len(indicator_plans),
             adaptive_selector_decision=adaptive_selector_decision,
+        )
+
+    def build(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        candles: CandleArrays,
+        indicator_compute: IndicatorCompute,
+        preselect: int,
+        requested_execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
+        defaults_provider: BacktestGridDefaultsProvider | None = None,
+        max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
+        max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+    ) -> BacktestArtifactRuntimePlanV2:
+        """
+        Preserve the historical planner API by forwarding to `plan(...)`.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+
+        Args:
+            template: Resolved backtest template payload.
+            candles: Warmup-inclusive request-timeframe candles from pinned artifacts.
+            indicator_compute: Indicator estimate port used for compute-axis materialization.
+            preselect: Stage A shortlist size before Stage B expansion.
+            requested_execution_profile_mode:
+                Optional internal-only execution profile mode overriding automatic exact profile
+                selection for explicit rollout/test/manual wiring.
+            defaults_provider: Optional defaults provider for compute/signal fallback.
+            max_variants_per_compute: Variants guard budget.
+            max_compute_bytes_total: Memory guard budget.
+        Returns:
+            BacktestArtifactRuntimePlanV2: Prepared artifact-backed runtime plan.
+        Assumptions:
+            Existing callers may still use `build(...)`, but shared planner ownership remains in
+            `plan(...)`.
+        Raises:
+            RoehubError: If guard limits are exceeded.
+            ValueError: If request axes are invalid.
+        Side Effects:
+            Calls `plan(...)`, which may call `indicator_compute.estimate(...)` once per
+            indicator block.
+        """
+        return self.plan(
+            template=template,
+            candles=candles,
+            indicator_compute=indicator_compute,
+            preselect=preselect,
+            requested_execution_profile_mode=requested_execution_profile_mode,
+            defaults_provider=defaults_provider,
+            max_variants_per_compute=max_variants_per_compute,
+            max_compute_bytes_total=max_compute_bytes_total,
         )
 
     def _build_indicator_plans(
