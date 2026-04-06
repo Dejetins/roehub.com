@@ -23,6 +23,35 @@ from .backtest_job_repository import (
 )
 
 
+def _qualify_job_select_columns(*, relation_alias: str) -> str:
+    """
+    Qualify shared backtest job select columns for SQL clauses with joined relations.
+
+    Args:
+        relation_alias: SQL relation alias that owns the backtest job columns.
+    Returns:
+        str: Comma-separated select list with stable output names preserved via aliases.
+    Assumptions:
+        `_BACKTEST_JOB_SELECT_COLUMNS` is a newline/comma-separated list of plain column names.
+    Raises:
+        ValueError: If `relation_alias` is empty.
+    Side Effects:
+        None.
+    """
+    normalized_alias = relation_alias.strip()
+    if not normalized_alias:
+        raise ValueError("_qualify_job_select_columns requires non-empty relation_alias")
+    qualified_columns: list[str] = []
+    for raw_line in _BACKTEST_JOB_SELECT_COLUMNS.strip().splitlines():
+        normalized_column = raw_line.strip().rstrip(",")
+        if not normalized_column:
+            continue
+        qualified_columns.append(
+            f"{normalized_alias}.{normalized_column} AS {normalized_column}"
+        )
+    return ",\n                ".join(qualified_columns)
+
+
 class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
     """
     Explicit SQL adapter for Backtest jobs claim/lease/progress/finish worker operations.
@@ -91,6 +120,8 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
         normalized_owner = _normalize_locked_by(value=locked_by)
         validated_lease_seconds = _validate_lease_seconds(lease_seconds=lease_seconds)
         lease_expires_at = now + timedelta(seconds=validated_lease_seconds)
+        claimed_select_columns = _qualify_job_select_columns(relation_alias="jobs")
+        final_select_columns = _qualify_job_select_columns(relation_alias="claimed")
 
         query = f"""
         WITH queued_candidate AS (
@@ -140,10 +171,10 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
             FROM candidate
             WHERE jobs.job_id = candidate.job_id
             RETURNING
-                {_BACKTEST_JOB_SELECT_COLUMNS}
+                {claimed_select_columns}
         )
         SELECT
-            {_BACKTEST_JOB_SELECT_COLUMNS}
+            {final_select_columns}
         FROM claimed
         """
         row = self._gateway.fetch_one(

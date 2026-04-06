@@ -259,6 +259,11 @@ uv run pytest -q \
 - Проверьте per-instance metrics endpoint на `9204 + instance_index` или `19204 + instance_index`:
   отсутствие `backtest_job_runner_claim_total` означает, что instance не дошёл до observable claim
   loop.
+- Если service-level smoke зелёный, но `queued` jobs не переходят в `running`, проверьте
+  `backtest-job-runner.<instance_index>.err.log` на `event=claim_failed`. Отдельный класс проблем:
+  worker process жив, metrics endpoint отвечает, но SQL внутри `claim_next(...)` падает до первого
+  успешного claim. Типичный симптом: `psycopg.errors.AmbiguousColumn` на unqualified shared job
+  columns в joined `RETURNING` / `SELECT` clauses.
 - Только после этого переходите к SQL-диагностике lease/claim: это исключает ложный анализ
   storage path, когда worker fleet вообще не materialize-ился.
 

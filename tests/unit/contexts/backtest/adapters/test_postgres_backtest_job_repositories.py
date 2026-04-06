@@ -167,6 +167,40 @@ def test_lease_repository_claim_uses_skip_locked_and_fifo_order() -> None:
     assert "lease_expires_at <= %(now)s" in gateway.fetch_one_queries[0]
 
 
+def test_lease_repository_claim_qualifies_returning_columns_when_candidate_join_is_present(
+) -> None:
+    """
+    Verify claim SQL qualifies returned job columns to avoid ambiguous column errors.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `claim_next(...)` updates from a candidate CTE that also exposes `job_id`.
+    Raises:
+        AssertionError: If claim SQL leaves shared columns unqualified in joined
+            RETURNING/SELECT clauses.
+    Side Effects:
+        None.
+    """
+    gateway = _FakeGateway(fetch_one_results=[_build_job_row(state="running")])
+    repository = PostgresBacktestJobLeaseRepository(gateway=gateway)
+
+    claimed = repository.claim_next(
+        now=datetime(2026, 2, 22, 19, 0, tzinfo=timezone.utc),
+        locked_by="worker-a-1",
+        lease_seconds=60,
+    )
+
+    assert claimed is not None
+    claim_sql = gateway.fetch_one_queries[0]
+    assert "RETURNING\n                jobs.job_id AS job_id" in claim_sql
+    assert "jobs.locked_by AS locked_by" in claim_sql
+    assert "SELECT\n            claimed.job_id AS job_id" in claim_sql
+    assert "claimed.lease_expires_at AS lease_expires_at" in claim_sql
+
+
 def test_job_repository_list_for_user_uses_keyset_desc_ordering() -> None:
     """
     Verify list SQL uses deterministic keyset ordering and cursor predicate contract.
