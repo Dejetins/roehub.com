@@ -2022,3 +2022,68 @@ backtest:
     )
 
     assert hash_a == hash_b
+
+
+def test_build_backtest_runtime_config_hash_normalizes_parallel_workers_alias(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify runtime hash treats legacy `parallel_workers` as a compatibility alias only.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Loader normalization must collapse legacy alias input into canonical `worker_processes`
+        semantics so persisted hashes do not diverge during the bounded compatibility window.
+    Raises:
+        AssertionError: If canonical and alias-only configs produce different hashes.
+    Side Effects:
+        None.
+    """
+    canonical_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    worker_processes: 4
+""".strip(),
+        filename="backtest_worker_processes_canonical.yaml",
+    )
+    legacy_alias_path = _write_backtest_config(
+        tmp_path,
+        body="""
+version: 1
+backtest:
+  sync:
+    sync_deadline_seconds: 55
+  jobs:
+    enabled: true
+    top_k_persisted_default: 300
+    max_active_jobs_per_user: 3
+    claim_poll_seconds: 1
+    lease_seconds: 60
+    heartbeat_seconds: 15
+    parallel_workers: 4
+""".strip(),
+        filename="backtest_parallel_workers_alias.yaml",
+    )
+
+    canonical_config = load_backtest_runtime_config(canonical_path)
+    legacy_alias_config = load_backtest_runtime_config(legacy_alias_path)
+
+    assert canonical_config.jobs.worker_processes == 4
+    assert legacy_alias_config.jobs.worker_processes == 4
+    assert build_backtest_runtime_config_hash(
+        config=canonical_config
+    ) == build_backtest_runtime_config_hash(config=legacy_alias_config)

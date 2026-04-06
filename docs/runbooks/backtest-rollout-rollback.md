@@ -9,7 +9,8 @@ runtime и как откатываться при нарушении determinist
 - Status: active R10-03 closure runbook.
 - Canonical scope:
   - sync launch через `POST /backtests`;
-  - claimed background execution с `execution_mode=background_auto` и
+  - canonical claimed background execution через `execution_mode=background_auto`;
+  - already-persisted compatibility rows могут всё ещё использовать
     `execution_mode=background_manual_legacy`;
   - summary-only persisted rows (`report_table_md=NULL`, `trades_json=NULL`);
   - artifact publish / slot pinning / rollback coordination.
@@ -62,8 +63,9 @@ uv run pytest -q \
 Порядок rollout:
 
 1. выкатить API build;
-2. выкатить worker build;
-3. подтвердить, что worker claim loop активен и не пишет `status=disabled`;
+2. выкатить `backtest-job-runner` worker fleet;
+3. подтвердить `service-level smoke`: fleet materialized, live worker instances совпадают с
+   `worker_processes`, и worker не пишет `status=disabled` при `backtest.jobs.enabled=true`;
 4. не менять `current.yaml` вручную во время rollout.
 
 ### 2.4 Verify post-rollout behavior
@@ -71,7 +73,8 @@ uv run pytest -q \
 Проверки после деплоя:
 
 - sync launch возвращает persisted metadata с `execution_mode=sync_inline`;
-- background fallback/compat flows продолжают показывать `background_auto` или
+- canonical background launches продолжают показывать `background_auto`;
+- already-persisted compatibility rows при необходимости всё ещё показывают
   `background_manual_legacy`;
 - `/top` и persisted rows не materialize'ят `report_table_md` и `trades_json`;
 - новых ClickHouse/indicator-compute hot-path зависимостей не появилось.
@@ -109,8 +112,8 @@ Rollback обязателен, если возникает хотя бы оди�
 - hot path снова вызывает `IndicatorCompute.compute(...)`;
 - claimed background runs массово падают из-за pin drift;
 - persisted summary rows перестали быть summary-only;
-- API/worker не могут стабильно обслуживать `background_auto` и
-  `background_manual_legacy`.
+- API/worker не могут стабильно обслуживать canonical `background_auto` path или already-persisted
+  compatibility rows с `background_manual_legacy`.
 
 ## 4) Rollback actions
 

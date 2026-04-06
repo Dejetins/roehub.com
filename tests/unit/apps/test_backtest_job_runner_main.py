@@ -209,3 +209,68 @@ def test_run_async_rejects_non_positive_metrics_port(monkeypatch) -> None:
                 instance_index=0,
             )
         )
+
+
+def test_run_async_rejects_metrics_port_overflow_for_instance_aware_fleet(
+    monkeypatch,
+) -> None:
+    """
+    Verify entrypoint rejects per-instance metrics port overflow before worker build.
+
+    Args:
+        monkeypatch: pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Deploy surfaces pass a base metrics port and the entrypoint derives the effective
+        per-instance port by adding `instance_index`.
+    Raises:
+        AssertionError: If overflow does not raise ValueError or still attempts app wiring.
+    Side Effects:
+        None.
+    """
+    calls = {"build": 0}
+
+    monkeypatch.setattr(
+        backtest_job_runner_main,
+        "_resolve_config_path",
+        lambda *, config_path, environ: Path("configs/dev/backtest.yaml"),
+    )
+    monkeypatch.setattr(
+        backtest_job_runner_main,
+        "load_backtest_runtime_config",
+        lambda _path: SimpleNamespace(
+            jobs=SimpleNamespace(enabled=True),
+        ),
+    )
+
+    def _build_app(**_kwargs) -> _NoOpApp:
+        """
+        Record unexpected startup wiring calls during port-overflow validation.
+
+        Args:
+            _kwargs: Ignored app build arguments.
+        Returns:
+            _NoOpApp: Unused stub if called unexpectedly.
+        Assumptions:
+            Metrics-port overflow must fail before app wiring is attempted.
+        Raises:
+            None.
+        Side Effects:
+            Increments local build-call counter.
+        """
+        calls["build"] += 1
+        return _NoOpApp()
+
+    monkeypatch.setattr(backtest_job_runner_main, "build_backtest_job_runner_app", _build_app)
+
+    with pytest.raises(ValueError, match="<= 65535"):
+        asyncio.run(
+            backtest_job_runner_main._run_async(
+                config_path=None,
+                metrics_port=65535,
+                instance_index=1,
+            )
+        )
+
+    assert calls["build"] == 0

@@ -223,6 +223,57 @@ def test_build_backtest_job_runner_app_rejects_instance_index_outside_worker_pro
         )
 
 
+def test_build_backtest_job_runner_app_rejects_negative_instance_index_before_runtime_load(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify worker fleet startup rejects negative instance_index before reading runtime config.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        A negative `instance_index` is a deploy-time wiring bug and should fail before any
+        config, artifact, or storage dependencies are touched.
+    Raises:
+        AssertionError: If startup reads runtime config before raising ValueError.
+    Side Effects:
+        Monkeypatches the runtime loader to assert fail-fast ordering.
+    """
+    load_calls = {"runtime_config": 0}
+
+    def _load_runtime_config(_path: Path) -> object:
+        """
+        Record unexpected runtime-config reads during negative-index validation.
+
+        Args:
+            _path: Resolved runtime-config path.
+        Returns:
+            object: Never returns because this code path should stay unreachable.
+        Assumptions:
+            Instance-index validation must happen before heavier startup wiring.
+        Raises:
+            AssertionError: Always, because loader should not be reached in this test.
+        Side Effects:
+            Increments local runtime-config load counter.
+        """
+        load_calls["runtime_config"] += 1
+        raise AssertionError("load_backtest_runtime_config should not be called")
+
+    monkeypatch.setattr(worker_module, "load_backtest_runtime_config", _load_runtime_config)
+
+    with pytest.raises(ValueError, match="instance_index must be >= 0"):
+        build_backtest_job_runner_app(
+            config_path="configs/dev/backtest.yaml",
+            environ={"STRATEGY_PG_DSN": "postgresql://local/test"},
+            instance_index=-1,
+            metrics_port=9204,
+        )
+
+    assert load_calls["runtime_config"] == 0
+
+
 def test_build_locked_by_includes_hostname_pid_and_instance_index() -> None:
     """
     Verify locked_by identity is deterministic and readable for fleet operations.

@@ -9,8 +9,9 @@ background worker для persisted runs.
 - Canonical architecture reference:
   - [`docs/architecture/backtest/backtest-job-runner-v2.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
 - Compatibility note:
-  - queued/running rows могут иметь `execution_mode=background_auto` или
-    `execution_mode=background_manual_legacy`;
+  - canonical background launch mode для новых persisted runs: `execution_mode=background_auto`;
+  - queued/running rows могут всё ещё иметь `execution_mode=background_manual_legacy`, но это
+    compatibility-only literal для уже сохранённых jobs;
   - claimed hot path не должен обращаться к ClickHouse и не должен вызывать
     `IndicatorCompute.compute(...)`;
   - persisted summary rows остаются summary-only:
@@ -141,7 +142,8 @@ production deploy считается некорректным, пока числ
 ### 5.1 Service-level smoke после deploy
 
 Для production rollout canonical health rule теперь явный: deploy использует `service-level smoke`
-для `backtest-job-runner` и следует правилу `no synthetic production job`.
+для `backtest-job-runner` и следует правилу `no synthetic production job`. Этот smoke
+проверяет service surface worker fleet, а не request-path/API behavior.
 
 Smoke обязан подтвердить:
 - service registration у `launchd`;
@@ -154,17 +156,52 @@ Smoke обязан подтвердить:
 
 ```bash
 cd /opt/roehub/app
-worker_processes="$(
-  /opt/roehub/app/.venv/bin/python -c "from trading.contexts.backtest.adapters.outbound import load_backtest_runtime_config; print(load_backtest_runtime_config('/opt/roehub/app/configs/prod/backtest.yaml').jobs.worker_processes)"
+base_metrics_port=9204
+mapfile -t worker_runtime < <(
+  /opt/roehub/app/.venv/bin/python -c "from trading.contexts.backtest.adapters.outbound import load_backtest_runtime_config; config = load_backtest_runtime_config('/opt/roehub/app/configs/prod/backtest.yaml'); print('1' if config.jobs.enabled else '0'); print(config.jobs.worker_processes)"
+)
+jobs_enabled="${worker_runtime[0]}"
+worker_processes="${worker_runtime[1]}"
+echo "service-level smoke target=backtest-job-runner"
+echo "jobs.enabled=${jobs_enabled}"
+echo "worker_processes=${worker_processes}"
+echo "metrics_endpoint_base_port=${base_metrics_port}"
+echo "no synthetic production job"
+if [ "${jobs_enabled}" != '1' ]; then
+  echo "backtest-job-runner fleet is not required because jobs.enabled=false"
+  exit 0
+fi
+registered_workers="$(
+  launchctl list \
+    | awk '$3 ~ /^com\.roehub\.backtest-job-runner\.[0-9]+$/ {count++} END {print count+0}'
 )"
+live_workers="$(
+  launchctl list \
+    | awk '$3 ~ /^com\.roehub\.backtest-job-runner\.[0-9]+$/ && $1 ~ /^[0-9]+$/ {count++} END {print count+0}'
+)"
+echo "registered_backtest_job_runner_workers=${registered_workers}"
+echo "live_backtest_job_runner_workers=${live_workers}"
 launchctl list | grep backtest-job-runner
+test "${registered_workers}" = "${worker_processes}"
+test "${live_workers}" = "${worker_processes}"
 for ((instance_index = 0; instance_index < worker_processes; instance_index++)); do
   launchctl print "gui/$(id -u)/com.roehub.backtest-job-runner.${instance_index}" | grep -E 'state =|pid =|last exit code ='
-  curl -fsS "http://127.0.0.1:$((9204 + instance_index))/metrics" | grep -m1 '^# HELP backtest_job_runner_claim_total '
+  metrics_ok='0'
+  for attempt in 1 2 3 4 5 6; do
+    if curl -fsS "http://127.0.0.1:$((base_metrics_port + instance_index))/metrics" \
+      | grep -q '^# HELP backtest_job_runner_claim_total '; then
+      metrics_ok='1'
+      break
+    fi
+    sleep 5
+  done
+  test "${metrics_ok}" = '1'
 done
 ```
 
 Интерпретация failure коротко:
+- `jobs.enabled=false`: worker fleet не обязателен, поэтому отсутствие services в этот момент
+  является ожидаемым и не считается deploy error;
 - registration mismatch: fleet не materialize-ился или reload не применил нужные services;
 - live-process mismatch: worker ушел в immediate disabled/error exit или crash-loop;
 - `last exit code != 0`: launchd уже увидел immediate error exit до стабильного claim loop;
@@ -211,6 +248,19 @@ uv run pytest -q \
 - `0 IndicatorCompute.compute(...) calls on hot path`.
 
 ## 6) Диагностика зависших jobs
+
+### 6.0 Что проверить сначала, если `queued` jobs не claim-ятся
+
+- Проверьте `backtest.jobs.enabled` и `worker_processes`: при `jobs.enabled=false` fleet
+  intentionally отсутствует, а при `jobs.enabled=true` deploy считается некорректным, пока
+  materialized/live services не совпадают с `worker_processes`.
+- Проверьте `launchctl list | grep backtest-job-runner`: если labels или live pid не совпадают с
+  expected fleet cardinality, проблема ещё на service-level smoke, а не в SQL claim path.
+- Проверьте per-instance metrics endpoint на `9204 + instance_index` или `19204 + instance_index`:
+  отсутствие `backtest_job_runner_claim_total` означает, что instance не дошёл до observable claim
+  loop.
+- Только после этого переходите к SQL-диагностике lease/claim: это исключает ложный анализ
+  storage path, когда worker fleet вообще не materialize-ился.
 
 ### 6.1 Найти running jobs с истекшим lease
 
@@ -288,7 +338,8 @@ curl -fsS -b cookies.txt "http://127.0.0.1:8000/backtests/jobs/<job_id>/top?limi
 ```
 
 Для jobs, которые не в `succeeded`, `report_table_md` и `trades` не возвращаются.
-Это одинаково для `background_auto` и `background_manual_legacy`.
+Это одинаково для canonical `background_auto` и для already-persisted compatibility rows c
+`background_manual_legacy`.
 
 ## 8) Ранбук lease-lost
 
@@ -331,9 +382,10 @@ Round trip smoke:
 - Некорректные значения `CH_*`: startup падает в loader настроек ClickHouse.
 - Jobs отключены toggle-ом: проверьте конфиг `backtest.jobs.enabled=false`.
 - Растёт failed counter: проверьте `last_error` и `last_error_json` в `backtest_jobs`.
-- `background_auto` остаётся в `queued` без перехода к `running`: проверить worker toggle,
-  claim loop и lease SQL.
-- `background_manual_legacy` или `background_auto` падает с pin/manifest drift:
+- `background_auto` остаётся в `queued` без перехода к `running`: сначала пройдите checks из
+  `service-level smoke` и раздела `6.0`, затем уже проверяйте claim loop и lease SQL.
+- already-persisted `background_manual_legacy` или canonical `background_auto` падает с
+  pin/manifest drift:
   проверить `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`,
   `artifact_asof_date` на row и соответствие published slot.
 - В `/top` появились `report_table_md` или `trades_json`: это regression, потому что worker

@@ -2665,6 +2665,77 @@ def test_process_claimed_job_forwards_internal_profile_override_to_shared_planne
     assert job.execution_mode == execution_mode
 
 
+def test_process_claimed_job_treats_background_manual_legacy_as_compatibility_only(
+) -> None:
+    """
+    Verify `background_manual_legacy` reuses the canonical shared planner contract.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `background_manual_legacy` remains a compatibility-only persisted literal and must not
+        create a separate worker planner branch from canonical `background_auto`.
+    Raises:
+        AssertionError: If planner inputs differ only because the persisted execution mode is
+            `background_manual_legacy`.
+    Side Effects:
+        None.
+    """
+    planner_contracts: dict[
+        BacktestJobExecutionMode,
+        tuple[RunBacktestTemplate, int, str | None],
+    ] = {}
+
+    for execution_mode in ("background_auto", "background_manual_legacy"):
+        job = _build_running_job_with_artifact_pin(execution_mode=execution_mode)
+        request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+        planner = _RecordingSharedRuntimePlanner(
+            runtime_plan=_FakeGridContext(
+                base_variants=_build_stage_a_variants(),
+                risk_variants=_build_risk_variants(),
+            )
+        )
+        use_case = _build_use_case(
+            request=request,
+            job_repository=_FakeJobRepository(default_job=job),
+            lease_repository=_FakeLeaseRepository(),
+            results_repository=_FakeResultsRepository(),
+            grid_context=_FakeGridContext(
+                base_variants=_build_stage_a_variants(),
+                risk_variants=_build_risk_variants(),
+            ),
+            scorer=_DeterministicScorerWithDetails(
+                stage_a_scores={
+                    _build_stage_a_variants()[0].base_variant_key: 3.0,
+                    _build_stage_a_variants()[1].base_variant_key: 2.0,
+                }
+            ),
+            reporting_service=_FakeReportingService(),
+            top_k_persisted_default=2,
+            snapshot_seconds=None,
+            snapshot_variants_step=None,
+            stage_batch_size=1,
+            now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 48, 0)),
+            runtime_planner=planner,
+        )
+
+        report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+        assert report.status == "succeeded"
+        assert len(planner.calls) == 1
+        planner_contracts[execution_mode] = (
+            planner.calls[0]["template"],
+            planner.calls[0]["preselect"],
+            planner.calls[0]["requested_execution_profile_mode"],
+        )
+
+    assert planner_contracts["background_auto"] == planner_contracts[
+        "background_manual_legacy"
+    ]
+
+
 def test_process_claimed_job_rejects_non_background_execution_mode() -> None:
     """
     Verify the worker rejects claimed rows that are not background execution modes.
