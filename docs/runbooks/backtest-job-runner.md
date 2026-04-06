@@ -59,7 +59,7 @@ background worker для persisted runs.
 ```bash
 export STRATEGY_PG_DSN='postgresql://user:pass@127.0.0.1:5432/roehub'
 export ROEHUB_ENV='dev'
-uv run python -m apps.worker.backtest_job_runner.main.main --config configs/dev/backtest.yaml --metrics-port 9204
+uv run python -m apps.worker.backtest_job_runner.main.main --config configs/dev/backtest.yaml --metrics-port 9204 --instance-index 0
 ```
 
 Локальный запуск с выбором конфига через env:
@@ -68,8 +68,12 @@ uv run python -m apps.worker.backtest_job_runner.main.main --config configs/dev/
 export STRATEGY_PG_DSN='postgresql://user:pass@127.0.0.1:5432/roehub'
 export ROEHUB_ENV='prod'
 export ROEHUB_BACKTEST_CONFIG='configs/prod/backtest.yaml'
-uv run python -m apps.worker.backtest_job_runner.main.main
+uv run python -m apps.worker.backtest_job_runner.main.main --instance-index 0
 ```
+
+Для fleet materialization каждый supervised worker process должен получать свой детерминированный
+`--instance-index` в диапазоне `0..worker_processes-1`. Это значение входит в `locked_by` вместе
+с `hostname` и `pid`, поэтому logs и lease owner остаются однозначными для каждого instance.
 
 ## 4) Семантика toggle
 

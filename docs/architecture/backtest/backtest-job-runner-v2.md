@@ -188,7 +188,10 @@ Required invariants:
 
 - claim is atomic and uses row-lock semantics;
 - only one worker may own a claimed job at a time;
-- `locked_by` is a stable worker identity such as `<hostname>-<pid>-<instance_index>`;
+- startup must pass an explicit `instance_index` per worker process, defaulting to `0` for a
+  single local instance;
+- `locked_by` is a stable worker identity in
+  `hostname=<hostname>;pid=<pid>;instance_index=<instance_index>` format;
 - queued jobs may be cancelled immediately at the storage layer;
 - running jobs are cancelled only at batch boundaries;
 - reclaim may restart the attempt from the beginning;

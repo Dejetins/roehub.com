@@ -14,6 +14,8 @@ class _NoOpApp:
     No-op app stub used to isolate backtest job-runner entrypoint tests.
     """
 
+    locked_by = "hostname=test-host;pid=123;instance_index=0"
+
     async def run(self, _stop_event: asyncio.Event) -> None:
         """
         Complete immediately without side effects.
@@ -77,6 +79,7 @@ def test_run_async_exits_zero_when_jobs_worker_disabled(monkeypatch) -> None:
         backtest_job_runner_main._run_async(
             config_path=None,
             metrics_port=None,
+            instance_index=0,
         )
     )
 
@@ -114,8 +117,32 @@ def test_run_async_metrics_port_cli_override_has_priority(monkeypatch) -> None:
         ),
     )
 
-    def _build_app(*, config_path: str, environ, metrics_port: int) -> _NoOpApp:
+    def _build_app(
+        *,
+        config_path: str,
+        environ,
+        instance_index: int,
+        metrics_port: int,
+    ) -> _NoOpApp:
+        """
+        Record startup wiring arguments without starting a real worker app.
+
+        Args:
+            config_path: Resolved worker config path.
+            environ: Process environment mapping.
+            instance_index: Explicit worker instance index forwarded by the entrypoint.
+            metrics_port: Effective metrics port passed to wiring.
+        Returns:
+            _NoOpApp: No-op app stub for entrypoint tests.
+        Assumptions:
+            Metrics-port priority test uses default instance index `0`.
+        Raises:
+            AssertionError: If entrypoint forwards an unexpected instance index.
+        Side Effects:
+            Appends received metrics port to local capture list.
+        """
         _ = config_path, environ
+        assert instance_index == 0
         received_metrics_ports.append(metrics_port)
         return _NoOpApp()
 
@@ -130,12 +157,14 @@ def test_run_async_metrics_port_cli_override_has_priority(monkeypatch) -> None:
         backtest_job_runner_main._run_async(
             config_path=None,
             metrics_port=9400,
+            instance_index=0,
         )
     )
     default_exit_code = asyncio.run(
         backtest_job_runner_main._run_async(
             config_path=None,
             metrics_port=None,
+            instance_index=0,
         )
     )
 
@@ -177,5 +206,6 @@ def test_run_async_rejects_non_positive_metrics_port(monkeypatch) -> None:
             backtest_job_runner_main._run_async(
                 config_path=None,
                 metrics_port=0,
+                instance_index=0,
             )
         )
