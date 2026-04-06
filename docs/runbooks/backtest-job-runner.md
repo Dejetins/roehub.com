@@ -75,6 +75,13 @@ uv run python -m apps.worker.backtest_job_runner.main.main --instance-index 0
 `--instance-index` в диапазоне `0..worker_processes-1`. Это значение входит в `locked_by` вместе
 с `hostname` и `pid`, поэтому logs и lease owner остаются однозначными для каждого instance.
 
+Метрики также биндуются per instance по детерминированному правилу:
+
+- effective `metrics_port = base_metrics_port + instance_index`
+- если `--metrics-port` не передан, `base_metrics_port` по умолчанию равен `9204`
+- supervisor/service manager должен передавать уникальный `instance_index`, чтобы каждый worker
+  instance имел distinct metrics endpoint
+
 ## 4) Семантика toggle
 
 Если `backtest.jobs.enabled=false` в runtime-конфиге:
@@ -89,8 +96,11 @@ uv run python -m apps.worker.backtest_job_runner.main.main --instance-index 0
 Endpoint метрик:
 
 ```bash
-curl -fsS http://127.0.0.1:9204/metrics | head
+curl -fsS http://127.0.0.1:$((9204 + 0))/metrics | head
 ```
+
+Для worker fleet проверка должна использовать порт конкретного instance. Например, для
+`instance_index=2` при базовом порте `9204` endpoint будет `http://127.0.0.1:9206/metrics`.
 
 Основные counters:
 - `backtest_job_runner_claim_total`

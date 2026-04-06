@@ -15,6 +15,7 @@ from trading.contexts.backtest.adapters.outbound import (
 )
 
 _DEFAULT_METRICS_PORT = 9204
+_MAX_TCP_PORT = 65_535
 
 
 def _configure_logging() -> None:
@@ -63,7 +64,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "--metrics-port",
         type=int,
         default=None,
-        help="Prometheus metrics HTTP port (CLI override has highest priority).",
+        help=(
+            "Prometheus base metrics HTTP port; effective per instance metrics_port is "
+            "base_port + instance_index."
+        ),
     )
     parser.add_argument(
         "--instance-index",
@@ -122,6 +126,34 @@ def _install_signal_handlers(stop_event: asyncio.Event) -> None:
             signal.signal(sig, lambda *_args: _mark_stop())
 
 
+def _resolve_metrics_port(*, metrics_port: int | None, instance_index: int) -> int:
+    """
+    Resolve deterministic per-instance Prometheus metrics port for one worker process.
+
+    Args:
+        metrics_port: Optional CLI base metrics port override.
+        instance_index: Deterministic worker instance index for fleet-safe binding.
+    Returns:
+        int: Final per-instance metrics_port binding.
+    Assumptions:
+        Each worker instance should expose one distinct metrics endpoint via
+        `base_metrics_port + instance_index`.
+    Raises:
+        ValueError: If base port or instance index is invalid, or resolved port exceeds TCP range.
+    Side Effects:
+        None.
+    """
+    if instance_index < 0:
+        raise ValueError("--instance-index must be >= 0")
+    resolved_base_port = _DEFAULT_METRICS_PORT if metrics_port is None else metrics_port
+    if resolved_base_port <= 0:
+        raise ValueError("--metrics-port must be > 0 when provided")
+    resolved_metrics_port = resolved_base_port + instance_index
+    if resolved_metrics_port > _MAX_TCP_PORT:
+        raise ValueError("resolved metrics_port must be <= 65535")
+    return resolved_metrics_port
+
+
 async def _run_async(
     config_path: str | None,
     metrics_port: int | None,
@@ -132,7 +164,7 @@ async def _run_async(
 
     Args:
         config_path: Optional CLI runtime config path override.
-        metrics_port: Optional CLI Prometheus endpoint port override.
+        metrics_port: Optional CLI base metrics port override.
         instance_index: Deterministic worker instance index for fleet-safe identity.
     Returns:
         int: Process exit code.
@@ -152,10 +184,9 @@ async def _run_async(
         )
         return 0
 
-    if metrics_port is not None and metrics_port <= 0:
-        raise ValueError("--metrics-port must be > 0 when provided")
-    effective_metrics_port = (
-        metrics_port if metrics_port is not None else _DEFAULT_METRICS_PORT
+    effective_metrics_port = _resolve_metrics_port(
+        metrics_port=metrics_port,
+        instance_index=instance_index,
     )
 
     stop_event = asyncio.Event()

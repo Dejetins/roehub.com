@@ -69,7 +69,7 @@ def test_build_backtest_job_runner_app_skips_clickhouse_wiring_for_artifact_work
             top_k_persisted_default=300,
             lease_seconds=60,
             heartbeat_seconds=15,
-            worker_processes=1,
+            worker_processes=3,
             snapshot_seconds=None,
             snapshot_variants_step=None,
             claim_poll_seconds=5.0,
@@ -168,16 +168,16 @@ def test_build_backtest_job_runner_app_skips_clickhouse_wiring_for_artifact_work
     app = build_backtest_job_runner_app(
         config_path="configs/dev/backtest.yaml",
         environ={"STRATEGY_PG_DSN": "postgresql://local/test"},
-        instance_index=0,
-        metrics_port=9204,
+        instance_index=2,
+        metrics_port=9206,
     )
 
     artifact_slot_resolver = cast(Any, captured_runner_kwargs["artifact_slot_resolver"])
-    assert app.instance_index == 0
-    assert app.metrics_port == 9204
+    assert app.instance_index == 2
+    assert app.metrics_port == 9206
     assert "hostname=" in app.locked_by
     assert ";pid=" in app.locked_by
-    assert app.locked_by.endswith("instance_index=0")
+    assert app.locked_by.endswith("instance_index=2")
     assert "candle_timeline_builder" not in captured_runner_kwargs
     assert artifact_slot_resolver.artifact_loader.path_resolver.root == Path(
         "/tmp/backtest-artifacts-test"
@@ -244,16 +244,16 @@ def test_run_async_passes_instance_index_to_worker_wiring(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    Verify worker entrypoint forwards explicit instance_index into app wiring.
+    Verify worker entrypoint forwards explicit instance_index and per-instance metrics_port.
 
     Args:
         monkeypatch: Pytest monkeypatch fixture.
     Returns:
         None.
     Assumptions:
-        Entry point resolves config and metrics before starting the single worker app loop.
+        Entry point resolves a deterministic per-instance metrics_port before starting the app.
     Raises:
-        AssertionError: If instance index is not forwarded to build_backtest_job_runner_app.
+        AssertionError: If instance-aware identity or metrics binding is not forwarded correctly.
     Side Effects:
         Monkeypatches startup dependencies and runs the async entrypoint once.
     """
@@ -311,4 +311,78 @@ def test_run_async_passes_instance_index_to_worker_wiring(
     assert exit_code == 0
     assert captured_build_kwargs["config_path"] == "configs/dev/backtest.yaml"
     assert captured_build_kwargs["instance_index"] == 3
-    assert captured_build_kwargs["metrics_port"] == 9304
+    assert captured_build_kwargs["metrics_port"] == 9307
+
+
+def test_run_async_uses_default_metrics_port_base_plus_instance_index(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify worker entrypoint derives default per-instance metrics_port from base port and index.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        When CLI does not override the base port, the worker uses the default base plus
+        `instance_index`.
+    Raises:
+        AssertionError: If default metrics_port does not remain deterministic per instance.
+    Side Effects:
+        Monkeypatches startup dependencies and runs the async entrypoint once.
+    """
+    captured_build_kwargs: dict[str, object] = {}
+
+    class _FakeApp:
+        """
+        Minimal worker app stub that exits immediately after startup wiring.
+        """
+
+        locked_by = "hostname=test-host;pid=123;instance_index=2"
+
+        async def run(self, stop_event: object) -> None:
+            """
+            Record one startup invocation without entering a long-lived claim loop.
+
+            Args:
+                stop_event: Cooperative shutdown signal passed by the entrypoint.
+            Returns:
+                None.
+            Assumptions:
+                Startup test only needs to observe that the app would have been run.
+            Raises:
+                None.
+            Side Effects:
+                Stores the received stop event for later assertions.
+            """
+            captured_build_kwargs["stop_event"] = stop_event
+
+    monkeypatch.setattr(
+        main_module,
+        "_resolve_config_path",
+        lambda *, config_path, environ: Path(config_path or "configs/dev/backtest.yaml"),
+    )
+    monkeypatch.setattr(
+        main_module,
+        "load_backtest_runtime_config",
+        lambda _path: SimpleNamespace(jobs=SimpleNamespace(enabled=True)),
+    )
+    monkeypatch.setattr(main_module, "_install_signal_handlers", lambda _stop_event: None)
+    monkeypatch.setattr(
+        main_module,
+        "build_backtest_job_runner_app",
+        lambda **kwargs: captured_build_kwargs.update(kwargs) or _FakeApp(),
+    )
+
+    exit_code = main_module.asyncio.run(
+        main_module._run_async(
+            config_path="configs/dev/backtest.yaml",
+            metrics_port=None,
+            instance_index=2,
+        )
+    )
+
+    assert exit_code == 0
+    assert captured_build_kwargs["instance_index"] == 2
+    assert captured_build_kwargs["metrics_port"] == 9206
