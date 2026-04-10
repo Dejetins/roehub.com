@@ -57,6 +57,12 @@ R6-04 фиксирует полный runtime ranking contract и summary-only t
   same finalists, ranking order, and `variant_key` semantics as the approved exact baseline.
 - summary-only runtime rows: ranking payload определяет inclusion в `top_n`, а report/trades тела
   не materialize'ятся в sync/jobs summary paths.
+- Milestone C artifact dependency expands the canonical `hit_times/1m` surface to:
+  - `tp_values = [0.5, 1.0, ..., 50.0]` (`100` levels);
+  - `sl_values = [0.5, 1.0, ..., 25.0]` (`50` levels);
+  - raw table footprint is therefore `300` `uint32` cells per `1m` bar, which keeps the default
+    `20_000`-bar incremental tail under `50_000_000` cells while moving bootstrap/full rebuilds
+    into a documented multi-gibibyte memory range.
 
 ## Артефакты R0
 

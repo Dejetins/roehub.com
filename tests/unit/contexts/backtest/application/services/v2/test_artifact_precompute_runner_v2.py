@@ -83,6 +83,8 @@ from trading.shared_kernel.primitives import (
 _BASE_TIME_UTC = datetime(2026, 3, 26, 0, 0, tzinfo=timezone.utc)
 _FULL_BUILD_DAYS_V2 = 3
 _FULL_BUILD_MINUTES_V2 = _FULL_BUILD_DAYS_V2 * 24 * 60
+_CANONICAL_WIDENED_TP_LEVELS_PCT_V2 = tuple(value / 2.0 for value in range(1, 101))
+_CANONICAL_WIDENED_SL_LEVELS_PCT_V2 = tuple(value / 2.0 for value in range(1, 51))
 _TARGET_VARIANT_CEILINGS_V2 = {
     "momentum.trix": 1000,
     "momentum.stoch": 150,
@@ -1396,6 +1398,8 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     tp_values, sl_values, long_tp, long_sl, short_tp, short_sl = _load_hit_times_arrays_v2(
         fixture=fixture,
     )
+    expected_tp_level_count = len(fixture.runtime_settings.hit_times_tp_levels_pct)
+    expected_sl_level_count = len(fixture.runtime_settings.hit_times_sl_levels_pct)
     expected_bar_counts = {
         "1m": _FULL_BUILD_MINUTES_V2,
         "15m": 288,
@@ -1445,12 +1449,30 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     assert long_sl.dtype == np.uint32
     assert short_tp.dtype == np.uint32
     assert short_sl.dtype == np.uint32
-    assert tp_values.shape == (1,)
-    assert sl_values.shape == (1,)
-    assert long_tp.shape == (1, _FULL_BUILD_MINUTES_V2)
-    assert long_sl.shape == (1, _FULL_BUILD_MINUTES_V2)
-    assert short_tp.shape == (1, _FULL_BUILD_MINUTES_V2)
-    assert short_sl.shape == (1, _FULL_BUILD_MINUTES_V2)
+    assert hit_times_manifest.tp_values.shape == (expected_tp_level_count,)
+    assert hit_times_manifest.sl_values.shape == (expected_sl_level_count,)
+    assert hit_times_manifest.long_tp.array.shape == (
+        expected_tp_level_count,
+        _FULL_BUILD_MINUTES_V2,
+    )
+    assert hit_times_manifest.long_sl.array.shape == (
+        expected_sl_level_count,
+        _FULL_BUILD_MINUTES_V2,
+    )
+    assert hit_times_manifest.short_tp.array.shape == (
+        expected_tp_level_count,
+        _FULL_BUILD_MINUTES_V2,
+    )
+    assert hit_times_manifest.short_sl.array.shape == (
+        expected_sl_level_count,
+        _FULL_BUILD_MINUTES_V2,
+    )
+    assert tp_values.shape == (expected_tp_level_count,)
+    assert sl_values.shape == (expected_sl_level_count,)
+    assert long_tp.shape == (expected_tp_level_count, _FULL_BUILD_MINUTES_V2)
+    assert long_sl.shape == (expected_sl_level_count, _FULL_BUILD_MINUTES_V2)
+    assert short_tp.shape == (expected_tp_level_count, _FULL_BUILD_MINUTES_V2)
+    assert short_sl.shape == (expected_sl_level_count, _FULL_BUILD_MINUTES_V2)
     assert np.all(np.diff(tp_values) > 0)
     assert np.all(np.diff(sl_values) > 0)
     assert np.all(long_tp <= _FULL_BUILD_MINUTES_V2)
@@ -1505,6 +1527,76 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
         three_day_ohlcv[0],
         _expected_bucket_ohlcv_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2))),
     )
+
+
+def test_backtest_artifact_precompute_runner_v2_builds_widened_hit_times_manifest_shapes(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify the runner materializes the exact widened canonical `hit_times/1m` shape contract.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Milestone C widens the canonical artifact grid without changing runtime consumers in this
+        prompt, so the precompute runner must emit the full widened manifest/table shapes itself.
+    Raises:
+        AssertionError: If the widened grid is not written into `tp_values`, `sl_values`, or the
+            four strict hit-times tables exactly.
+    Side Effects:
+        Builds one inactive-slot export under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+      - configs/prod/backtest_artifacts.yaml
+    """
+    fixture = build_artifact_precompute_fixture_v2(
+        tmp_path=tmp_path,
+        hit_times_tp_levels_pct=_CANONICAL_WIDENED_TP_LEVELS_PCT_V2,
+        hit_times_sl_levels_pct=_CANONICAL_WIDENED_SL_LEVELS_PCT_V2,
+        max_hit_times_cells=1_500_000,
+        max_hit_times_cells_full_rebuild=1_500_000,
+    )
+    runner = BacktestArtifactPrecomputeRunnerV2(
+        runtime_settings=fixture.runtime_settings,
+        artifact_loader=fixture.loader,
+        canonical_candle_reader=_FakeCanonicalCandleReader(
+            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(_FULL_BUILD_MINUTES_V2)))
+        ),
+    )
+
+    runner.export_canonical_price_1m(_request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2))
+
+    hit_times_manifest = fixture.loader.load_hit_times_manifest(
+        fixture.coordinates,
+        fixture.inactive_slot,
+    )
+    tp_values, sl_values, long_tp, long_sl, short_tp, short_sl = _load_hit_times_arrays_v2(
+        fixture=fixture,
+    )
+
+    np.testing.assert_allclose(
+        tp_values,
+        np.asarray(_CANONICAL_WIDENED_TP_LEVELS_PCT_V2, dtype=np.float32) / np.float32(100.0),
+    )
+    np.testing.assert_allclose(
+        sl_values,
+        np.asarray(_CANONICAL_WIDENED_SL_LEVELS_PCT_V2, dtype=np.float32) / np.float32(100.0),
+    )
+    assert hit_times_manifest.tp_values.shape == (100,)
+    assert hit_times_manifest.sl_values.shape == (50,)
+    assert hit_times_manifest.long_tp.array.shape == (100, _FULL_BUILD_MINUTES_V2)
+    assert hit_times_manifest.long_sl.array.shape == (50, _FULL_BUILD_MINUTES_V2)
+    assert hit_times_manifest.short_tp.array.shape == (100, _FULL_BUILD_MINUTES_V2)
+    assert hit_times_manifest.short_sl.array.shape == (50, _FULL_BUILD_MINUTES_V2)
+    assert long_tp.shape == (100, _FULL_BUILD_MINUTES_V2)
+    assert long_sl.shape == (50, _FULL_BUILD_MINUTES_V2)
+    assert short_tp.shape == (100, _FULL_BUILD_MINUTES_V2)
+    assert short_sl.shape == (50, _FULL_BUILD_MINUTES_V2)
 
 
 def test_artifact_precompute_coordinator_v2_rejects_nested_timeframe_sessions_when_limited_to_one(

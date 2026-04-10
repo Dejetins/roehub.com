@@ -54,6 +54,9 @@ backtest_artifacts:
     signal_chunk_rows_max: 256
 """.strip()
 
+_EXPECTED_CANONICAL_TP_LEVELS_PCT = tuple(value / 2.0 for value in range(1, 101))
+_EXPECTED_CANONICAL_SL_LEVELS_PCT = tuple(value / 2.0 for value in range(1, 51))
+
 
 def _write_backtest_artifacts_config(
     tmp_path: Path,
@@ -150,15 +153,15 @@ def test_load_backtest_artifacts_runtime_config_reads_yaml_values() -> None:
         (item.timeframe, item.indicator_id) for item in config.validation_plan.signal_artifacts
     ) == expected_signal_targets
     assert config.validation_plan.require_hit_times_manifest is True
-    assert config.hit_times_grid.tp_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
-    assert config.hit_times_grid.sl_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
+    assert config.hit_times_grid.tp_levels_pct == _EXPECTED_CANONICAL_TP_LEVELS_PCT
+    assert config.hit_times_grid.sl_levels_pct == _EXPECTED_CANONICAL_SL_LEVELS_PCT
     assert config.slot_policy.slots == ("slot_a", "slot_b")
     assert config.publish_schedule.full_rebuild_hour_utc == 2
     assert config.publish_schedule.full_rebuild_minute_utc == 0
     assert config.lookback_policy.price_tail_bars_1m == 20000
     assert config.lookback_policy.signal_tail_bars_1m == 20000
     assert config.validation_budgets.max_hit_times_cells == 50000000
-    assert config.validation_budgets.max_hit_times_cells_full_rebuild == 150000000
+    assert config.validation_budgets.max_hit_times_cells_full_rebuild == 1500000000
     assert config.execution_policy.max_open_timeframe_sessions == 1
     assert config.execution_policy.signal_worker_processes == 4
     assert config.execution_policy.signal_worker_memory_budget_bytes == 2147483648
@@ -194,8 +197,8 @@ def test_backtest_artifacts_runtime_config_to_precompute_runtime_settings_includ
     assert runtime_settings.mapping_tail_bars_1m == 20000
     assert runtime_settings.signal_tail_bars_1m == 20000
     assert runtime_settings.hit_times_tail_bars_1m == 20000
-    assert runtime_settings.hit_times_tp_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
-    assert runtime_settings.hit_times_sl_levels_pct == (0.5, 1.0, 1.5, 2.0, 3.0)
+    assert runtime_settings.hit_times_tp_levels_pct == _EXPECTED_CANONICAL_TP_LEVELS_PCT
+    assert runtime_settings.hit_times_sl_levels_pct == _EXPECTED_CANONICAL_SL_LEVELS_PCT
     assert runtime_settings.execution_policy.max_open_timeframe_sessions == 1
     assert runtime_settings.execution_policy.signal_worker_processes == 4
     assert runtime_settings.execution_policy.signal_worker_memory_budget_bytes == 2147483648
@@ -203,7 +206,7 @@ def test_backtest_artifacts_runtime_config_to_precompute_runtime_settings_includ
     assert runtime_settings.execution_policy.signal_chunk_rows_max == 256
     assert runtime_settings.max_signal_rows_per_artifact == 5000000
     assert runtime_settings.max_hit_times_cells == 50000000
-    assert runtime_settings.max_hit_times_cells_full_rebuild == 150000000
+    assert runtime_settings.max_hit_times_cells_full_rebuild == 1500000000
 
 
 def test_resolve_backtest_artifacts_config_path_precedence() -> None:

@@ -441,10 +441,23 @@ These fields are mandatory for distinguishing a long bootstrap from a normal dai
   - bootstrap пустого symbol root и explicit `full_rebuild` используют
     `validation_budgets.max_hit_times_cells_full_rebuild`;
   - steady-state incremental rebuild uses `validation_budgets.max_hit_times_cells`.
+- widened-grid budgeting is part of the canonical contract:
+  - total strict table cells = `timeline_bar_count * (2 * len(tp_values) + 2 * len(sl_values))`;
+  - canonical `tp_values = [0.5, 1.0, ..., 50.0]` (`100` levels) and
+    `sl_values = [0.5, 1.0, ..., 25.0]` (`50` levels) therefore produce `300` cells per `1m`
+    bar;
+  - default `hit_times_tail_bars_1m = 20_000` yields `6_000_000` cells
+    (about `22.9 MiB` of raw `uint32` table bytes);
+  - `max_hit_times_cells_full_rebuild = 1_500_000_000` aligns bootstrap/full rebuild with the
+    existing `5_000_000`-bar validation ceiling
+    (about `5.6 GiB` of raw `uint32` table bytes before allocator/runtime overhead).
 - Runner result contract обязан публиковать explicit stage-level stats для `prices`, `mappings`,
   `signals`, `hit_times`:
   - `reused_prefix_bars`
   - `rewritten_tail_bars`
+  - `tp_level_count`
+  - `sl_level_count`
+  - `table_cell_count`
   - scheduler/prometheus aggregation по-прежнему строится из per-stage `rewritten_tail_bars` через
     `backtest_artifact_tail_rebuild_bars_total{stage}`.
 - Если reuse prerequisites нарушены для конкретного stage или symbol root, выполняется
@@ -525,6 +538,9 @@ artifact-backed `prices/1m.ohlcv`.
 Это означает:
 
 - `backtest_artifacts.hit_times_grid` становится source-of-truth для `tp_values` и `sl_values`;
+- canonical widened grid for `configs/{dev,test,prod}/backtest_artifacts.yaml` is explicit:
+  - `tp_levels_pct = [0.5, 1.0, ..., 50.0]` (`100` levels);
+  - `sl_levels_pct = [0.5, 1.0, ..., 25.0]` (`50` levels);
 - runner обязан писать real files:
   - `hit_times/1m/tp_values.f32.npy`
   - `hit_times/1m/sl_values.f32.npy`

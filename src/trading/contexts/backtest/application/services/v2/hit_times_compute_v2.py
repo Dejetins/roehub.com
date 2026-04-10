@@ -35,6 +35,43 @@ class HitTimesArraysV2:
     sentinel_index: int
 
 
+def hit_times_table_cell_count_v2(
+    *,
+    timeline_bar_count: int,
+    tp_level_count: int,
+    sl_level_count: int,
+) -> int:
+    """
+    Count total strict hit-times table cells across all four TP/SL table families.
+
+    Args:
+        timeline_bar_count: Canonical `1m` timeline length.
+        tp_level_count: Number of TP levels carried by `tp_values`.
+        sl_level_count: Number of SL levels carried by `sl_values`.
+    Returns:
+        int: Total cell count across `long_tp`, `long_sl`, `short_tp`, and `short_sl`.
+    Assumptions:
+        The strict artifact family always materializes two TP tables and two SL tables with
+        shape `[level, time]`.
+    Raises:
+        ValueError: If one input count is negative.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
+    """
+    if timeline_bar_count < 0:
+        raise ValueError(f"timeline_bar_count must be >= 0; got {timeline_bar_count!r}")
+    if tp_level_count < 0:
+        raise ValueError(f"tp_level_count must be >= 0; got {tp_level_count!r}")
+    if sl_level_count < 0:
+        raise ValueError(f"sl_level_count must be >= 0; got {sl_level_count!r}")
+    return timeline_bar_count * (2 * tp_level_count + 2 * sl_level_count)
+
+
 def materialize_hit_times_from_ohlcv_v2(
     *,
     ohlcv: np.ndarray,
@@ -76,8 +113,10 @@ def materialize_hit_times_from_ohlcv_v2(
         field_name="sl_levels_pct",
     )
     timeline_bar_count = int(normalized_ohlcv.shape[0])
-    table_cell_count = timeline_bar_count * (
-        2 * int(tp_values.shape[0]) + 2 * int(sl_values.shape[0])
+    table_cell_count = hit_times_table_cell_count_v2(
+        timeline_bar_count=timeline_bar_count,
+        tp_level_count=int(tp_values.shape[0]),
+        sl_level_count=int(sl_values.shape[0]),
     )
     if table_cell_count > max_hit_times_cells:
         raise ValueError(

@@ -119,6 +119,7 @@ from .contracts import (
 )
 from .hit_times_compute_v2 import (
     HitTimesArraysV2,
+    hit_times_table_cell_count_v2,
     materialize_hit_times_from_ohlcv_v2,
     merge_hit_times_prefix_with_rebuilt_tail_v2,
 )
@@ -918,12 +919,25 @@ class BacktestArtifactPrecomputeRunnerV2:
                 force_full_rebuild=request.force_full_rebuild,
                 has_existing_slot_manifest=existing_manifest is not None,
             )
+            hit_times_timeline_bar_count = int(
+                canonical_stage_result.rollup_source_arrays.open_time.shape[0]
+            )
+            hit_times_tp_level_count = len(self.runtime_settings.hit_times_tp_levels_pct)
+            hit_times_sl_level_count = len(self.runtime_settings.hit_times_sl_levels_pct)
             hit_times_build_result = coordinator.run_stage(
                 stage_input=ArtifactPrecomputeStageInputV2(
                     stage="hit_times",
                     details={
                         "hit_times_tail_bars_1m": self.runtime_settings.hit_times_tail_bars_1m,
                         "max_hit_times_cells": hit_times_budget,
+                        "timeline_bar_count": hit_times_timeline_bar_count,
+                        "tp_level_count": hit_times_tp_level_count,
+                        "sl_level_count": hit_times_sl_level_count,
+                        "table_cell_count": hit_times_table_cell_count_v2(
+                            timeline_bar_count=hit_times_timeline_bar_count,
+                            tp_level_count=hit_times_tp_level_count,
+                            sl_level_count=hit_times_sl_level_count,
+                        ),
                     },
                 ),
                 execute=lambda: _materialize_hit_times_artifacts_v2(
@@ -946,6 +960,14 @@ class BacktestArtifactPrecomputeRunnerV2:
                     details={
                         "reused_prefix_bars": stage_result.reused_prefix_bars,
                         "rewritten_tail_bars": stage_result.rewritten_tail_bars,
+                        "timeline_bar_count": stage_result.manifest.timeline_bar_count,
+                        "tp_level_count": int(stage_result.manifest.tp_values.shape[0]),
+                        "sl_level_count": int(stage_result.manifest.sl_values.shape[0]),
+                        "table_cell_count": hit_times_table_cell_count_v2(
+                            timeline_bar_count=stage_result.manifest.timeline_bar_count,
+                            tp_level_count=int(stage_result.manifest.tp_values.shape[0]),
+                            sl_level_count=int(stage_result.manifest.sl_values.shape[0]),
+                        ),
                     },
                 ),
             )
@@ -6303,6 +6325,13 @@ def _build_hit_times_manifest_inputs_sha256_v2(
             "max_hit_times_cells": max_hit_times_cells,
             "timeline_bar_count": int(arrays.long_tp.shape[1]),
             "sentinel_index": arrays.sentinel_index,
+            "tp_level_count": int(arrays.tp_values.shape[0]),
+            "sl_level_count": int(arrays.sl_values.shape[0]),
+            "table_cell_count": hit_times_table_cell_count_v2(
+                timeline_bar_count=int(arrays.long_tp.shape[1]),
+                tp_level_count=int(arrays.tp_values.shape[0]),
+                sl_level_count=int(arrays.sl_values.shape[0]),
+            ),
         },
         sort_keys=True,
         separators=(",", ":"),

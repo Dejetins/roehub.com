@@ -223,6 +223,8 @@ def build_artifact_precompute_fixture_v2(
     mapping_tail_bars_1m: int = 10,
     signal_tail_bars_1m: int = 10,
     hit_times_tail_bars_1m: int = 10,
+    hit_times_tp_levels_pct: tuple[float, ...] = (1.0,),
+    hit_times_sl_levels_pct: tuple[float, ...] = (1.0,),
     validation_price_timeframes: tuple[str, ...] = ARTIFACT_PRICE_TIMEFRAMES_V2,
     validation_mapping_timeframes: tuple[str, ...] = ARTIFACT_MAPPING_TIMEFRAMES_V2,
     validation_signal_artifacts: tuple[tuple[str, str], ...] | str = (),
@@ -250,6 +252,10 @@ def build_artifact_precompute_fixture_v2(
             expressed in `1m` bars.
         hit_times_tail_bars_1m: Strict positive `hit_times/1m` tail rebuild budget in canonical
             `1m` bars.
+        hit_times_tp_levels_pct: Explicit TP levels in human-percent units written into
+            `backtest_artifacts.hit_times_grid.tp_levels_pct`.
+        hit_times_sl_levels_pct: Explicit SL levels in human-percent units written into
+            `backtest_artifacts.hit_times_grid.sl_levels_pct`.
         validation_signal_artifacts: Explicit `(timeframe, indicator_id)` targets or the
             machine-readable literal `all_supported_v1` written into
             `backtest_artifacts.validation_plan.signal_artifacts`.
@@ -328,8 +334,8 @@ def build_artifact_precompute_fixture_v2(
                         "require_hit_times_manifest": require_hit_times_manifest,
                     },
                     "hit_times_grid": {
-                        "tp_levels_pct": [1.0],
-                        "sl_levels_pct": [1.0],
+                        "tp_levels_pct": list(hit_times_tp_levels_pct),
+                        "sl_levels_pct": list(hit_times_sl_levels_pct),
                     },
                     "slot_policy": {"slots": ["slot_a", "slot_b"]},
                     "publish_schedule": {
