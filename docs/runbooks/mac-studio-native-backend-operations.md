@@ -203,6 +203,85 @@ bash scripts/macos/clickhouse_partition_dedup.sh all
 - `docs/runbooks/clickhouse-partition-dedup.md`
 - `docs/runbooks/clickhouse-memory-profiles.md`
 
+## Hourly page cache purge
+
+Опциональный root `LaunchDaemon` для периодического сброса macOS disk/page cache:
+
+- label: `com.roehub.purge-hourly`
+- plist path: `/Library/LaunchDaemons/com.roehub.purge-hourly.plist`
+- command: `/usr/sbin/purge`
+- cadence: каждые `3600` секунд
+
+Важно:
+
+- `purge` очищает disk/page cache, но не лечит `malloc`/heap leaks;
+- после тяжёлых чтений `ClickHouse` cache снова прогреется;
+- использовать только как ops workaround, а не как замену root-cause fix.
+
+Включение:
+
+```bash
+sudo tee /Library/LaunchDaemons/com.roehub.purge-hourly.plist >/dev/null <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.roehub.purge-hourly</string>
+
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/sbin/purge</string>
+    </array>
+
+    <key>StartInterval</key>
+    <integer>3600</integer>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StandardOutPath</key>
+    <string>/var/log/roehub-purge.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/var/log/roehub-purge.err.log</string>
+  </dict>
+</plist>
+EOF
+
+sudo chown root:wheel /Library/LaunchDaemons/com.roehub.purge-hourly.plist
+sudo chmod 644 /Library/LaunchDaemons/com.roehub.purge-hourly.plist
+sudo launchctl bootstrap system /Library/LaunchDaemons/com.roehub.purge-hourly.plist
+```
+
+Проверка статуса:
+
+```bash
+sudo launchctl print system/com.roehub.purge-hourly
+```
+
+Ожидаемые признаки:
+
+- `path = /Library/LaunchDaemons/com.roehub.purge-hourly.plist`
+- `program = /usr/sbin/purge`
+- `run interval = 3600 seconds`
+- после первого запуска `runs > 0`
+
+Ручной trigger для smoke-проверки:
+
+```bash
+sudo launchctl kickstart -k system/com.roehub.purge-hourly
+sudo launchctl print system/com.roehub.purge-hourly | grep -E 'runs =|last exit code =|state ='
+sudo tail -n 50 /var/log/roehub-purge.log /var/log/roehub-purge.err.log
+```
+
+Отключение:
+
+```bash
+sudo launchctl bootout system /Library/LaunchDaemons/com.roehub.purge-hourly.plist
+sudo rm /Library/LaunchDaemons/com.roehub.purge-hourly.plist
+```
+
 Настройка `tailscale serve`:
 
 ```bash
