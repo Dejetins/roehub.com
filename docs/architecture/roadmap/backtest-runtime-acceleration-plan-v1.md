@@ -48,12 +48,16 @@ owner: backtest
 
 - [base_refactor_plan.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/base_refactor_plan.md)
 - [backtest-refactor-final-plan-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-refactor-final-plan-v2.md)
+- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-engine-vnext.md)
 - [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
 - [backtest-compute-notebook-algorithm-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md)
 - [backtest-precompute-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-precompute-runner-v2.md)
 - [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
 - [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
 - [backtest-job-runner-v2-implementation-plan.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md)
+
+Historical notebook reference only:
+
 - [06_backtest_compute.ipynb](/Users/daniildegtyarev/Projects/roehub.com/tests/notebook_tests/06_backtest_compute.ipynb)
 
 Для active roadmap surface canonical worker document здесь один:

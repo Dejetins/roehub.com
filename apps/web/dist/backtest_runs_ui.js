@@ -316,7 +316,6 @@ function initRunSummaryPage(pageRoot) {
     progressPercent: pageRoot.querySelector("#run-field-progress-percent"),
     etaSeconds: pageRoot.querySelector("#run-field-eta-seconds"),
     rankingPrimaryMetric: pageRoot.querySelector("#run-field-ranking-primary-metric"),
-    rankingSecondaryMetric: pageRoot.querySelector("#run-field-ranking-secondary-metric"),
   };
 
   if (Object.values(fieldMap).some((node) => node === null)) {
@@ -424,7 +423,6 @@ function initRunSummaryPage(pageRoot) {
     setTextContent(fieldMap.progressPercent, formatPercentValue(progressPercent));
     setTextContent(fieldMap.etaSeconds, formatEtaSeconds(etaSeconds));
     setTextContent(fieldMap.rankingPrimaryMetric, formatValue(status.ranking_primary_metric));
-    setTextContent(fieldMap.rankingSecondaryMetric, formatValue(status.ranking_secondary_metric));
 
     progressTrack.setAttribute("aria-valuenow", String(progressPercent));
     progressBar.style.width = `${progressPercent}%`;

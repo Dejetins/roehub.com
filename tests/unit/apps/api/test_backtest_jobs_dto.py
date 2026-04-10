@@ -232,7 +232,6 @@ def test_backtest_jobs_create_request_accepts_ranking_block() -> None:
             },
             "ranking": {
                 "primary_metric": "TOTAL_RETURN_PCT",
-                "secondary_metric": "MAX_DRAWDOWN_PCT",
             },
         }
     )
@@ -240,7 +239,7 @@ def test_backtest_jobs_create_request_accepts_ranking_block() -> None:
     run_request = build_backtest_run_request(request=request)
     assert run_request.ranking is not None
     assert run_request.ranking.primary_metric == "total_return_pct"
-    assert run_request.ranking.secondary_metric == "max_drawdown_pct"
+    assert run_request.ranking.secondary_metric is None
 
 
 def test_build_backtest_job_top_response_includes_summary_metrics_fields() -> None:
@@ -310,3 +309,4 @@ def test_build_backtest_job_top_response_includes_summary_metrics_fields() -> No
     }
     assert dumped["items"][0]["best_tp_pct"] == 4.0
     assert dumped["items"][0]["best_sl_pct"] == 2.0
+    assert "ranking_secondary_metric" not in dumped

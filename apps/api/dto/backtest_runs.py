@@ -99,7 +99,6 @@ class BacktestRunStatusResponse(BaseModel):
     timeframe: str | None = None
     requested_top_n: int | None = None
     ranking_primary_metric: str | None = None
-    ranking_secondary_metric: str | None = None
     artifact_slot: BacktestJobArtifactSlotLiteral | None = None
     artifact_slot_generation: int | None = None
     artifact_manifest_hash: str | None = None
@@ -143,7 +142,6 @@ class BacktestRunsListItemResponse(BaseModel):
     timeframe: str | None = None
     requested_top_n: int | None = None
     ranking_primary_metric: str | None = None
-    ranking_secondary_metric: str | None = None
     artifact_slot: BacktestJobArtifactSlotLiteral | None = None
     artifact_slot_generation: int | None = None
     artifact_manifest_hash: str | None = None
@@ -293,7 +291,6 @@ def build_backtest_run_status_response(
         timeframe=run.timeframe,
         requested_top_n=run.requested_top_n,
         ranking_primary_metric=run.ranking_primary_metric,
-        ranking_secondary_metric=run.ranking_secondary_metric,
         artifact_slot=run.artifact_pin.artifact_slot if run.artifact_pin is not None else None,
         artifact_slot_generation=(
             run.artifact_pin.artifact_slot_generation if run.artifact_pin is not None else None
@@ -370,7 +367,6 @@ def build_backtest_runs_list_response(
                 timeframe=item.timeframe,
                 requested_top_n=item.requested_top_n,
                 ranking_primary_metric=item.ranking_primary_metric,
-                ranking_secondary_metric=item.ranking_secondary_metric,
                 artifact_slot=(
                     item.artifact_pin.artifact_slot if item.artifact_pin is not None else None
                 ),

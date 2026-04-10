@@ -64,6 +64,9 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_timeline
 from trading.contexts.backtest.application.services.v2.price_arrays_loader import (
     MmapPriceArraysLoaderV2,
 )
+from trading.contexts.backtest.application.services.warmup_estimator import (
+    resolve_internal_backtest_warmup_bars,
+)
 from trading.contexts.backtest.application.use_cases.errors import map_backtest_exception
 from trading.contexts.backtest.application.use_cases.request_runtime_contract_v1 import (
     validate_signal_overrides_default_only,
@@ -115,7 +118,6 @@ class _ResolvedRunContext:
     warmup_bars: int
     top_k: int
     preselect: int
-    top_trades_n: int
     ranking: BacktestRankingConfig
     artifact_context: ArtifactSlotPinnedRuntimeContextV2
     spec_hash: str | None = None
@@ -155,7 +157,6 @@ class RunBacktestUseCase:
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
-        top_trades_n_default: int = 3,
         ranking_primary_metric_default: str = BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
         ranking_secondary_metric_default: str | None = (
             BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
@@ -213,16 +214,15 @@ class RunBacktestUseCase:
             artifact_timeline_builder:
                 Optional artifact-backed request-timeframe timeline builder replacing live
                 ClickHouse timeline construction in production paths.
-            warmup_bars_default: Runtime default warmup bars.
+            warmup_bars_default:
+                Retained compatibility/default-only runtime setting ignored by the active
+                derived warmup path after Milestone B / EPIC B2.
             top_k_default: Runtime default top-k response limit.
             preselect_default: Runtime default preselect shortlist limit.
-            top_trades_n_default:
-                Retained compatibility default for downstream on-demand trades/report flows; sync
-                runtime summaries themselves remain summary-only.
             ranking_primary_metric_default:
                 Runtime default for ranking primary metric literal.
             ranking_secondary_metric_default:
-                Runtime default for ranking secondary metric literal.
+                Retained compatibility runtime setting ignored after single-metric ranking cutover.
             configurable_ranking_enabled:
                 Feature-flag guard for configurable ranking behavior rollout.
             init_cash_quote_default: Runtime default initial strategy quote balance.
@@ -265,8 +265,6 @@ class RunBacktestUseCase:
             raise ValueError("RunBacktestUseCase.top_k_default must be > 0")
         if preselect_default <= 0:
             raise ValueError("RunBacktestUseCase.preselect_default must be > 0")
-        if top_trades_n_default <= 0:
-            raise ValueError("RunBacktestUseCase.top_trades_n_default must be > 0")
         if init_cash_quote_default <= 0.0:
             raise ValueError("RunBacktestUseCase.init_cash_quote_default must be > 0")
         if fixed_quote_default <= 0.0:
@@ -288,7 +286,6 @@ class RunBacktestUseCase:
 
         ranking_defaults = BacktestRankingConfig(
             primary_metric=ranking_primary_metric_default,
-            secondary_metric=ranking_secondary_metric_default,
         )
 
         _ = candle_feed, candle_timeline_builder, staged_runner
@@ -332,10 +329,8 @@ class RunBacktestUseCase:
         self._runtime_runner = runtime_runner or BacktestArtifactRuntimeRunnerV2(
             configurable_ranking_enabled=configurable_ranking_enabled
         )
-        self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
-        self._top_trades_n_default = top_trades_n_default
         self._ranking_defaults = ranking_defaults
         self._configurable_ranking_enabled = configurable_ranking_enabled
         self._init_cash_quote_default = init_cash_quote_default
@@ -488,10 +483,8 @@ class RunBacktestUseCase:
                 instrument_id=resolved.template.instrument_id,
                 timeframe=resolved.template.timeframe,
                 strategy_id=resolved.strategy_id,
-                warmup_bars=resolved.warmup_bars,
                 top_k=resolved.top_k,
                 preselect=resolved.preselect,
-                top_trades_n=resolved.top_trades_n,
                 direction_mode=resolved.template.direction_mode,
                 sizing_mode=resolved.template.sizing_mode,
                 execution_params=resolved.template.execution_params,
@@ -680,6 +673,8 @@ class RunBacktestUseCase:
             requested_time_range: Original user request range used for reporting metrics.
             template: Effective template resolved from ad-hoc request or persisted run snapshot.
             warmup_bars: Optional warmup override from request or persisted request snapshot.
+                New public call paths should pass `None`; explicit values remain
+                compatibility-only for internal callers.
             variant_payload: Explicit selected variant payload for one lazy detail recompute.
             include_trades: Whether to include trades in response payload.
             run_control: Optional cooperative cancellation/deadline control object.
@@ -721,9 +716,9 @@ class RunBacktestUseCase:
             if run_control is not None:
                 run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
 
-            resolved_warmup_bars = self._resolve_with_default(
-                value=warmup_bars,
-                default=self._warmup_bars_default,
+            resolved_warmup_bars = resolve_internal_backtest_warmup_bars(
+                template=template,
+                warmup_bars=warmup_bars,
             )
             resolved_artifact_context = (
                 artifact_context
@@ -783,10 +778,6 @@ class RunBacktestUseCase:
         Side Effects:
             Reads saved strategy snapshot through ACL port in saved mode.
         """
-        warmup_bars = self._resolve_with_default(
-            value=request.warmup_bars,
-            default=self._warmup_bars_default,
-        )
         top_k = self._resolve_with_default(
             value=request.top_k,
             default=self._top_k_default,
@@ -795,15 +786,7 @@ class RunBacktestUseCase:
             value=request.preselect,
             default=self._preselect_default,
         )
-        top_trades_n = self._resolve_with_default(
-            value=request.top_trades_n,
-            default=self._top_trades_n_default,
-        )
         ranking = self._resolve_ranking_config(request=request)
-        if request.top_trades_n is not None and top_trades_n > top_k:
-            raise BacktestValidationError("Backtest request top_trades_n must be <= top_k")
-        if top_trades_n > top_k:
-            top_trades_n = top_k
 
         if request.strategy_id is not None:
             snapshot = self._strategy_reader.load_any(strategy_id=request.strategy_id)
@@ -833,6 +816,10 @@ class RunBacktestUseCase:
                 base_template=base_template,
                 overrides=request.overrides,
             )
+            warmup_bars = resolve_internal_backtest_warmup_bars(
+                template=template,
+                warmup_bars=request.warmup_bars,
+            )
             artifact_context = self._bootstrap_artifact_context(template=template)
             return _ResolvedRunContext(
                 mode="saved",
@@ -841,7 +828,6 @@ class RunBacktestUseCase:
                 warmup_bars=warmup_bars,
                 top_k=top_k,
                 preselect=preselect,
-                top_trades_n=top_trades_n,
                 ranking=ranking,
                 artifact_context=artifact_context,
                 spec_hash=_build_sha256_from_payload(payload=spec_payload_json),
@@ -859,6 +845,10 @@ class RunBacktestUseCase:
             forbidden_request_timeframes=self._forbidden_request_timeframes,
             root_path="body.template",
         )
+        warmup_bars = resolve_internal_backtest_warmup_bars(
+            template=request.template,
+            warmup_bars=request.warmup_bars,
+        )
         artifact_context = self._bootstrap_artifact_context(template=request.template)
 
         return _ResolvedRunContext(
@@ -868,7 +858,6 @@ class RunBacktestUseCase:
             warmup_bars=warmup_bars,
             top_k=top_k,
             preselect=preselect,
-            top_trades_n=top_trades_n,
             ranking=ranking,
             artifact_context=artifact_context,
             spec_hash=None,

@@ -1950,16 +1950,16 @@ def test_process_claimed_job_does_not_claim_additional_jobs() -> None:
 
 def test_process_claimed_job_applies_configured_primary_and_secondary_ranking() -> None:
     """
-    Verify worker Stage-B ordering follows configured primary/secondary ranking semantics.
+    Verify worker ignores compatibility-only `secondary_metric` and keeps deterministic ordering.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Primary metric comes from signal threshold; secondary metric comes from `sl_pct`.
+        Single-metric ranking now uses the primary metric plus deterministic tie-break only.
     Raises:
-        AssertionError: If running snapshot order violates configured ranking contract.
+        AssertionError: If compatibility-only secondary metric still perturbs worker ordering.
     Side Effects:
         None.
     """
@@ -2005,22 +2005,21 @@ def test_process_claimed_job_applies_configured_primary_and_secondary_ranking() 
     ) == (1, 1, 2, 2)
     assert tuple(
         float(row.payload_json["risk_params"]["sl_pct"] or 0.0) for row in running_rows
-    ) == (1.0, 0.0, 1.0, 0.0)
+    ) == (0.0, 1.0, 1.0, 0.0)
 
 
 def test_process_claimed_job_applies_secondary_win_rate_ordering() -> None:
     """
-    Verify worker Stage-B ordering supports `win_rate_pct DESC` as configured secondary metric.
+    Verify alternate compatibility-only secondary metrics leave worker ordering unchanged.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Fixture scorer derives `win_rate_pct` from `sl_pct`, so disabled SL outranks enabled SL
-        under equal `max_drawdown_pct`.
+        Single-metric worker ordering is now independent from deprecated secondary literals.
     Raises:
-        AssertionError: If running snapshot order violates configured win-rate tie-break.
+        AssertionError: If deprecated secondary literals still change ranked snapshot order.
     Side Effects:
         None.
     """
@@ -2066,7 +2065,7 @@ def test_process_claimed_job_applies_secondary_win_rate_ordering() -> None:
     ) == (1, 1, 2, 2)
     assert tuple(
         float(row.payload_json["risk_params"]["sl_pct"] or 0.0) for row in running_rows
-    ) == (0.0, 1.0, 0.0, 1.0)
+    ) == (0.0, 1.0, 1.0, 0.0)
 
 
 def test_process_claimed_job_cancels_on_batch_boundary() -> None:
@@ -2504,6 +2503,53 @@ def test_process_claimed_job_builds_runtime_candles_from_pinned_artifact_prices(
     assert len(price_arrays_loader.calls) == 1
     assert price_arrays_loader.calls[0]["context"] == _default_pinned_context()
     assert price_arrays_loader.calls[0]["timeframe"] == request.template.timeframe.code
+
+
+def test_resolve_request_context_derives_internal_warmup_without_public_field() -> None:
+    """
+    Verify claimed worker derives internal warmup from effective indicator requirements.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public request decoding no longer supplies `warmup_bars`, so the worker must derive it
+        from the resolved template.
+    Raises:
+        AssertionError: If derived warmup no longer follows the indicator window requirement.
+    Side Effects:
+        None.
+    """
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    job = _build_running_job()
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=_FakeResultsRepository(),
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                variant.base_variant_key: float(index + 1)
+                for index, variant in enumerate(_build_stage_a_variants())
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 42, 0)),
+    )
+
+    context = use_case._resolve_request_context(job=job)
+
+    assert context.request.warmup_bars is None
+    assert context.warmup_bars == 10
 
 
 @pytest.mark.parametrize(
@@ -3053,7 +3099,6 @@ def _build_use_case(
         warmup_bars_default=200,
         top_k_default=300,
         preselect_default=20_000,
-        top_trades_n_default=3,
         top_k_persisted_default=top_k_persisted_default,
         heartbeat_seconds=1_000,
         lease_seconds=60,
@@ -3071,7 +3116,7 @@ def _build_request(
     *,
     top_k: int,
     preselect: int,
-    top_trades_n: int,
+    top_trades_n: int | None = None,
     ranking: BacktestRankingConfig | None = None,
 ) -> RunBacktestRequest:
     """
@@ -3080,7 +3125,8 @@ def _build_request(
     Args:
         top_k: Requested top-k value.
         preselect: Requested Stage-A preselect value.
-        top_trades_n: Requested trades payload cap.
+        top_trades_n:
+            Retained legacy test-helper argument ignored after the summary-only launch cutover.
         ranking: Optional ranking override payload.
     Returns:
         RunBacktestRequest: Template-mode request fixture.
@@ -3091,6 +3137,7 @@ def _build_request(
     Side Effects:
         None.
     """
+    _ = top_trades_n
     template = RunBacktestTemplate(
         instrument_id=InstrumentId(
             market_id=MarketId(1),
@@ -3121,7 +3168,6 @@ def _build_request(
         template=template,
         top_k=top_k,
         preselect=preselect,
-        top_trades_n=top_trades_n,
         ranking=ranking,
     )
 

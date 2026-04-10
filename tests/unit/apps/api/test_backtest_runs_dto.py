@@ -140,6 +140,7 @@ def test_build_backtest_run_status_response_uses_run_vocabulary_without_hashes()
     assert dumped["artifact_slot"] == "slot_b"
     assert dumped["last_error_json"]["code"] == "unexpected_error"
     assert "request_hash" not in dumped
+    assert "ranking_secondary_metric" not in dumped
 
 
 def test_build_backtest_run_status_response_keeps_running_background_cancel_marker() -> None:
@@ -180,6 +181,7 @@ def test_build_backtest_run_status_response_keeps_running_background_cancel_mark
     assert dumped["execution_profile_mode"] == "exact_small"
     assert dumped["cancel_requested_at"] == "2026-03-29T12:00:30Z"
     assert dumped["finished_at"] is None
+    assert "ranking_secondary_metric" not in dumped
 
 
 def test_build_backtest_run_top_response_includes_summary_metrics_fields() -> None:

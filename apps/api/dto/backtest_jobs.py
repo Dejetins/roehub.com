@@ -97,7 +97,6 @@ class BacktestJobStatusResponse(BaseModel):
     timeframe: str | None = None
     requested_top_n: int | None = None
     ranking_primary_metric: str | None = None
-    ranking_secondary_metric: str | None = None
     artifact_slot: BacktestJobArtifactSlotLiteral | None = None
     artifact_slot_generation: int | None = None
     artifact_manifest_hash: str | None = None
@@ -138,7 +137,6 @@ class BacktestJobsListItemResponse(BaseModel):
     timeframe: str | None = None
     requested_top_n: int | None = None
     ranking_primary_metric: str | None = None
-    ranking_secondary_metric: str | None = None
     artifact_slot: BacktestJobArtifactSlotLiteral | None = None
     artifact_slot_generation: int | None = None
     artifact_manifest_hash: str | None = None
@@ -209,7 +207,6 @@ class BacktestJobVariantReportContextResponse(BaseModel):
     strategy_id: str | None = None
     template: dict[str, Any] | None = None
     overrides: dict[str, Any] | None = None
-    warmup_bars: int | None = None
     include_trades: bool = False
 
 
@@ -289,7 +286,6 @@ def build_backtest_job_status_response(*, job: BacktestJob) -> BacktestJobStatus
         timeframe=job.timeframe,
         requested_top_n=job.requested_top_n,
         ranking_primary_metric=job.ranking_primary_metric,
-        ranking_secondary_metric=job.ranking_secondary_metric,
         artifact_slot=job.artifact_pin.artifact_slot if job.artifact_pin is not None else None,
         artifact_slot_generation=(
             job.artifact_pin.artifact_slot_generation if job.artifact_pin is not None else None
@@ -354,7 +350,6 @@ def build_backtest_jobs_list_response(
                 timeframe=item.timeframe,
                 requested_top_n=item.requested_top_n,
                 ranking_primary_metric=item.ranking_primary_metric,
-                ranking_secondary_metric=item.ranking_secondary_metric,
                 artifact_slot=(
                     item.artifact_pin.artifact_slot if item.artifact_pin is not None else None
                 ),
@@ -486,24 +481,13 @@ def _build_backtest_job_variant_report_context(
         if isinstance(normalized_overrides, Mapping):
             overrides_payload = dict(normalized_overrides)
 
-    warmup_bars_value: int | None = None
-    raw_warmup_bars = request_payload.get("warmup_bars")
-    if isinstance(raw_warmup_bars, int) and raw_warmup_bars > 0:
-        warmup_bars_value = raw_warmup_bars
-
-    include_trades = False
-    raw_top_trades_n = request_payload.get("top_trades_n")
-    if isinstance(raw_top_trades_n, int):
-        include_trades = raw_top_trades_n > 0
-
     try:
         return BacktestJobVariantReportContextResponse(
             time_range=dict(_normalize_json_value(value=time_range_payload)),
             strategy_id=strategy_id_value,
             template=template_payload,
             overrides=overrides_payload,
-            warmup_bars=warmup_bars_value,
-            include_trades=include_trades,
+            include_trades=False,
         )
     except ValueError:
         return None

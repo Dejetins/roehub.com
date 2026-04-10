@@ -80,7 +80,12 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-extend-exclude = ["tests/notebook_tests/*.ipynb"]
+force-exclude = true
+extend-exclude = [
+  "apps/web/dist/*.js",
+  "apps/web/templates/*.html",
+  "tests/notebook_tests/*.ipynb",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]

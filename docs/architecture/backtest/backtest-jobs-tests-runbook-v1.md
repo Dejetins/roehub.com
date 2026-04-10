@@ -45,7 +45,8 @@
   - snapshot cadence OR (`snapshot_seconds` или `snapshot_variants_step`).
   - cancel detection на границах батчей останавливает compute и переводит job в `cancelled`.
   - lease-lost прекращает дальнейшие writes и не делает terminal finish.
-  - succeeded finalizing записывает `report_table_md` для всех persisted rows и trades только для `top_trades_n`.
+  - succeeded finalizing сохраняет persisted top rows как `summary-only`; trades materialize-ятся
+    только по explicit on-demand `variant-report`.
 
 - API (routes/DTO/wiring):
   - jobs endpoints монтируются только при `backtest.jobs.enabled=true`.

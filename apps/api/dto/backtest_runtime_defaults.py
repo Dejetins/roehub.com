@@ -75,7 +75,6 @@ class BacktestRuntimeRankingDefaultsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     primary_metric_default: str
-    secondary_metric_default: str | None = None
 
 
 class BacktestRuntimeRequestTimeframesContractResponse(BaseModel):
@@ -444,10 +443,8 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    warmup_bars_default: int
     top_k_default: int
     preselect_default: int
-    top_trades_n_default: int
     ranking: BacktestRuntimeRankingDefaultsResponse
     execution: BacktestRuntimeExecutionDefaultsResponse
     jobs: BacktestRuntimeJobsDefaultsResponse
@@ -567,13 +564,10 @@ def build_backtest_runtime_defaults_response(
         for profile in config.execution_profiles.available_profiles
     ]
     return BacktestRuntimeDefaultsResponse(
-        warmup_bars_default=config.warmup_bars_default,
         top_k_default=config.top_k_default,
         preselect_default=config.preselect_default,
-        top_trades_n_default=config.reporting.top_trades_n_default,
         ranking=BacktestRuntimeRankingDefaultsResponse(
             primary_metric_default=config.ranking.primary_metric_default,
-            secondary_metric_default=config.ranking.secondary_metric_default,
         ),
         execution=BacktestRuntimeExecutionDefaultsResponse(
             init_cash_quote_default=config.execution.init_cash_quote_default,

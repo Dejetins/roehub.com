@@ -45,7 +45,6 @@ R7-03 rollout note:
 - Все операции owner-only на уровне use-case (не через "скрывающие" SQL-фильтры).
 - Валидации EPIC-11:
   - `top_k <= backtest.jobs.top_k_persisted_default`
-  - `top_trades_n <= top_k`
   - quota: active jobs per user (`queued + running`) < `backtest.jobs.max_active_jobs_per_user`
 - Deterministic list pagination через keyset cursor `(created_at DESC, job_id DESC)`.
 - Deterministic API errors через `RoehubError` и existing global error handlers.
@@ -167,12 +166,11 @@ Request:
   - `time_range`
   - `strategy_id xor template`
   - `overrides?` (saved-only)
-  - `warmup_bars?`, `top_k?`, `preselect?`, `top_trades_n?`
+  - `top_k?`, `preselect?`, `ranking?`
 
 Доп. валидации jobs API:
 
 - `top_k <= backtest.jobs.top_k_persisted_default`
-- `top_trades_n <= top_k`
 - active quota per user.
 
 Response (`201 Created`):
@@ -208,7 +206,7 @@ Response (`200 OK`):
   - `rank`, `variant_key`, `indicator_variant_key`, `variant_index`, `total_return_pct`,
     `payload`, `summary_metrics_json`, `best_tp_pct`, `best_sl_pct`.
 - `report_context` содержит поля run-context (`time_range`, `strategy_id xor template`,
-  `overrides?`, `warmup_bars?`, `include_trades`) для on-demand report endpoint.
+  `overrides?`, `include_trades`) для on-demand `variant-report` endpoint.
 
 ### 4) `GET /backtests/jobs?state=&limit=&cursor=`
 

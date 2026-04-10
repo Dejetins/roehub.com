@@ -70,6 +70,9 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_timeline
     BacktestArtifactRuntimeTimelineV2,
     BacktestArtifactTimelineBuilderV2,
 )
+from trading.contexts.backtest.application.services.warmup_estimator import (
+    resolve_internal_backtest_warmup_bars,
+)
 from trading.contexts.backtest.application.use_cases.request_runtime_contract_v1 import (
     validate_signal_overrides_default_only,
     validate_template_runtime_contract,
@@ -171,7 +174,6 @@ class _ResolvedJobRequestContext:
     warmup_bars: int
     top_k: int
     preselect: int
-    top_trades_n: int
     persisted_k: int
     ranking: BacktestRankingConfig
     artifact_context: ArtifactSlotPinnedRuntimeContextV2
@@ -214,7 +216,6 @@ class RunBacktestJobRunnerV1:
         warmup_bars_default: int = 200,
         top_k_default: int = 300,
         preselect_default: int = 20000,
-        top_trades_n_default: int = 3,
         ranking_primary_metric_default: str = BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
         ranking_secondary_metric_default: str | None = (
             BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
@@ -280,16 +281,15 @@ class RunBacktestJobRunnerV1:
                 request-timeframe candles from pinned `prices/<tf>` arrays when no timeline
                 builder is injected.
             staged_scorer: Optional custom staged scorer.
-            warmup_bars_default: Runtime default warmup bars.
+            warmup_bars_default:
+                Retained compatibility/default-only runtime setting ignored by the active
+                derived warmup path after Milestone B / EPIC B2.
             top_k_default: Runtime default top-k request fallback.
             preselect_default: Runtime default Stage-A shortlist size.
-            top_trades_n_default:
-                Retained compatibility default for downstream detail/report flows; job snapshots
-                and final persisted rows remain summary-only during R6-04.
             ranking_primary_metric_default:
                 Runtime default for ranking primary metric literal.
             ranking_secondary_metric_default:
-                Runtime default for ranking secondary metric literal.
+                Retained compatibility runtime setting ignored after single-metric ranking cutover.
             configurable_ranking_enabled:
                 Feature-flag guard for configurable ranking behavior rollout.
             top_k_persisted_default: Persisted rows cap for worker snapshots/finalizing.
@@ -344,8 +344,6 @@ class RunBacktestJobRunnerV1:
             raise ValueError("top_k_default must be > 0")
         if preselect_default <= 0:
             raise ValueError("preselect_default must be > 0")
-        if top_trades_n_default <= 0:
-            raise ValueError("top_trades_n_default must be > 0")
         if top_k_persisted_default <= 0:
             raise ValueError("top_k_persisted_default must be > 0")
         if init_cash_quote_default <= 0.0:
@@ -373,7 +371,6 @@ class RunBacktestJobRunnerV1:
 
         ranking_defaults = BacktestRankingConfig(
             primary_metric=ranking_primary_metric_default,
-            secondary_metric=ranking_secondary_metric_default,
         )
         _ = candle_timeline_builder, grid_builder, core_runner
         resolved_stage_a_shortlist_builder = (
@@ -424,10 +421,8 @@ class RunBacktestJobRunnerV1:
         self._artifact_timeline_builder = resolved_timeline_builder
         self._price_arrays_loader = resolved_price_arrays_loader
         self._staged_scorer = staged_scorer
-        self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
-        self._top_trades_n_default = top_trades_n_default
         self._ranking_defaults = ranking_defaults
         self._configurable_ranking_enabled = configurable_ranking_enabled
         self._top_k_persisted_default = top_k_persisted_default
@@ -737,9 +732,9 @@ class RunBacktestJobRunnerV1:
                 forbidden_request_timeframes=self._forbidden_request_timeframes,
                 root_path="request.template",
             )
-        warmup_bars = self._resolve_positive_override(
-            value=request.warmup_bars,
-            default=self._warmup_bars_default,
+        warmup_bars = resolve_internal_backtest_warmup_bars(
+            template=template,
+            warmup_bars=request.warmup_bars,
         )
         top_k = self._resolve_positive_override(
             value=request.top_k,
@@ -749,13 +744,7 @@ class RunBacktestJobRunnerV1:
             value=request.preselect,
             default=self._preselect_default,
         )
-        top_trades_n = self._resolve_positive_override(
-            value=request.top_trades_n,
-            default=self._top_trades_n_default,
-        )
         ranking = self._resolve_ranking_config(request=request)
-        if top_trades_n > top_k:
-            top_trades_n = top_k
         artifact_context = self._bootstrap_artifact_context(job=job, template=template)
 
         return _ResolvedJobRequestContext(
@@ -764,7 +753,6 @@ class RunBacktestJobRunnerV1:
             warmup_bars=warmup_bars,
             top_k=top_k,
             preselect=preselect,
-            top_trades_n=top_trades_n,
             persisted_k=min(top_k, self._top_k_persisted_default),
             ranking=ranking,
             artifact_context=artifact_context,

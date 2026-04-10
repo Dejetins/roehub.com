@@ -571,11 +571,6 @@ function initJobDetailsPage(pageRoot) {
     if (Object.keys(overridesPayload).length > 0) {
       payload.overrides = normalizeJsonLikeValue(overridesPayload);
     }
-
-    const warmupBars = parsePositiveInt(String(context.warmup_bars || ""), 0);
-    if (warmupBars > 0) {
-      payload.warmup_bars = warmupBars;
-    }
     return payload;
   };
 

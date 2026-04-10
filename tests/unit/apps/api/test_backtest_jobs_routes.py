@@ -313,6 +313,7 @@ def test_post_backtest_jobs_returns_201_with_status_hash_fields() -> None:
     assert body["request_hash"] == "a" * 64
     assert body["engine_params_hash"] == "b" * 64
     assert body["backtest_runtime_config_hash"] == "c" * 64
+    assert "ranking_secondary_metric" not in body
     assert create_fake.last_command is not None
     assert create_fake.last_command.execution_mode == "background_auto"
 
@@ -522,8 +523,8 @@ def test_get_backtest_job_top_hides_details_for_non_succeeded_jobs() -> None:
     context = payload["report_context"]
     assert context["strategy_id"] is None
     assert context["template"]["timeframe"] == "1m"
-    assert context["warmup_bars"] == 200
-    assert context["include_trades"] is True
+    assert "warmup_bars" not in context
+    assert context["include_trades"] is False
     item = payload["items"][0]
     assert "report_table_md" not in item
     assert "trades" not in item

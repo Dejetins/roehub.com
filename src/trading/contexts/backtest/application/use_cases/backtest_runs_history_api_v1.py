@@ -708,7 +708,6 @@ class BuildBacktestRunVariantReportUseCase:
             warmup_bars=request.warmup_bars,
             top_k=request.top_k,
             preselect=request.preselect,
-            top_trades_n=request.top_trades_n,
             ranking=request.ranking,
         )
 

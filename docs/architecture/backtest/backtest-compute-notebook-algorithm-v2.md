@@ -1,12 +1,15 @@
-# Алгоритм расчета из `tests/notebook_tests/06_backtest_compute.ipynb` (v2, reference semantics)
+# Алгоритм расчета из `tests/notebook_tests/06_backtest_compute.ipynb` (v2, historical reference semantics)
 
-Этот документ сохраняет детальную notebook reference для
+Этот документ сохраняет historical notebook reference для
 `tests/notebook_tests/06_backtest_compute.ipynb` и привязывает конкретные notebook-функции к
 production transfer contract.
 
 Канонический production entrypoint для R5-02/R6 находится в
 `docs/architecture/backtest/backtest-runtime-kernels-v2.md`.
-Текущий документ нужен как semantics source, notebook anchor и reference-only walkthrough.
+Канонический redesign anchor для новых engine-vNext prompts находится в
+`docs/architecture/backtest/backtest-engine-vnext.md` и
+`tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`.
+Текущий документ нужен как historical semantics source и reference-only walkthrough.
 
 ## Status
 
@@ -19,6 +22,8 @@ production transfer contract.
   - this document is reference-only and does not describe the active production orchestration;
   - active runtime launch/detail paths consume artifact-backed modules and the canonical
     `signal_tf + 1m_risk` contract from `backtest-runtime-kernels-v2.md`.
+  - active redesign planning no longer treats `06_backtest_compute.ipynb` as the canonical
+    implementation anchor for new prompts.
 - Historical/reference scope kept here:
   - notebook function anchors such as `build_trade_list_for_pair` and `evaluate_trade_factor`,
   - parity reference for `signal_tf + 1m_risk`,

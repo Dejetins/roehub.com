@@ -5,6 +5,11 @@
 ## Status
 
 - Status: active navigation surface after R10-02 docs synchronization.
+- Target redesign surface before cutover:
+  - `docs/architecture/backtest/backtest-engine-vnext.md` is the canonical vNext redesign doc for
+    Milestone A / EPIC A1;
+  - it is additive and target-only, while current shipped behavior remains governed by the active
+    runtime/API/worker contracts below.
 - Canonical production surface:
   - `POST /backtests`
   - `/backtests/history`
@@ -46,6 +51,9 @@
   `src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py`
 - Runtime kernels v2 contract for `signal_tf + 1m_risk`, Stage A / Stage B boundaries and
   notebook-derived transfer scope: `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- Canonical target redesign document for the next engine shape, `01_run_322...` anchor, staged
+  replacement matrix, and vocabulary reset before cutover:
+  `docs/architecture/backtest/backtest-engine-vnext.md`
 - Notebook transfer reference and function-level semantics anchors:
   `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - R5-03 Stage B golden fixture baseline for `signal_tf + 1m_risk`:
@@ -77,6 +85,7 @@
 
 | Surface | Current status | Canonical document |
 |---|---|---|
+| vNext redesign architecture before code cutover | Approved target | `docs/architecture/backtest/backtest-engine-vnext.md` |
 | Sync and auto-fallback launch | Active | `docs/architecture/backtest/backtest-api-post-backtests-v1.md` |
 | Artifact-backed runtime kernels | Active | `docs/architecture/backtest/backtest-runtime-kernels-v2.md` |
 | Artifact store and publish/pinning | Active | `docs/architecture/backtest/backtest-artifact-store-v2.md` |

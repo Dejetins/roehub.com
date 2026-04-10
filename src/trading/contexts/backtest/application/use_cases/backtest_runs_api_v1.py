@@ -7,7 +7,6 @@ from uuid import UUID, uuid4
 
 from trading.contexts.backtest.application.dto import (
     BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
-    BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
     BacktestReportV1,
     RunBacktestRequest,
     RunBacktestResponse,
@@ -715,10 +714,6 @@ def _build_background_auto_launch_response(
         ),
         timeframe=Timeframe(_require_job_timeframe(created_run=created_run)),
         strategy_id=request.strategy_id,
-        warmup_bars=_require_positive_int_request_json(
-            request_json=created_run.request_json,
-            field_name="warmup_bars",
-        ),
         top_k=_require_positive_int_request_json(
             request_json=created_run.request_json,
             field_name="top_k",
@@ -726,10 +721,6 @@ def _build_background_auto_launch_response(
         preselect=_require_positive_int_request_json(
             request_json=created_run.request_json,
             field_name="preselect",
-        ),
-        top_trades_n=_require_positive_int_request_json(
-            request_json=created_run.request_json,
-            field_name="top_trades_n",
         ),
         variants=tuple(),
         total_indicator_compute_calls=0,
@@ -972,10 +963,8 @@ def _build_request_json_payload(
         None.
     """
     normalized_payload = _normalize_json_mapping(values=request_payload)
-    normalized_payload["warmup_bars"] = response.warmup_bars
     normalized_payload["top_k"] = response.top_k
     normalized_payload["preselect"] = response.preselect
-    normalized_payload["top_trades_n"] = response.top_trades_n
     normalized_payload["execution_profile_mode"] = _require_response_execution_profile_mode(
         response=response
     )
@@ -1129,12 +1118,6 @@ def _build_terminal_sync_inline_run(
         if request.ranking is not None
         else BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1
     )
-    ranking_secondary_metric = (
-        request.ranking.secondary_metric
-        if request.ranking is not None
-        else BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
-    )
-
     spec_hash = response.spec_hash if request.mode == "saved" else None
     spec_payload_json = response.spec_payload_json if request.mode == "saved" else None
     if request.mode == "saved" and (spec_hash is None or spec_payload_json is None):
@@ -1160,7 +1143,7 @@ def _build_terminal_sync_inline_run(
         timeframe=str(response.timeframe),
         requested_top_n=response.top_k,
         ranking_primary_metric=ranking_primary_metric,
-        ranking_secondary_metric=ranking_secondary_metric,
+        ranking_secondary_metric=None,
     )
     claimed = queued.claim(
         changed_at=created_at,

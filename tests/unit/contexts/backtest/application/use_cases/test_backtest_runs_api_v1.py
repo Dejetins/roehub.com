@@ -684,7 +684,6 @@ def test_launch_backtest_with_auto_fallback_creates_background_auto_after_guard_
     assert launched.artifact_manifest_hash == "c" * 64
     assert launched.top_k == 2
     assert launched.preselect == 100
-    assert launched.top_trades_n == 1
     assert launched.variants == tuple()
     assert launched.engine_params_hash == "e" * 64
 
@@ -770,13 +769,13 @@ def test_launch_backtest_with_auto_fallback_skips_non_guard_validation_errors() 
         sync_inline_use_case=_FakeRunUseCase(
             error=RoehubError(
                 code="validation_error",
-                message="Backtest request top_trades_n must be <= top_k",
+                message="Backtest request top_k must be <= 300",
                 details={
                     "errors": [
                         {
-                            "path": "body.top_trades_n",
+                            "path": "body.top_k",
                             "code": "max_value",
-                            "message": "top_trades_n must be <= top_k",
+                            "message": "top_k must be <= 300",
                         }
                     ]
                 },
@@ -796,7 +795,7 @@ def test_launch_backtest_with_auto_fallback_skips_non_guard_validation_errors() 
             request_payload=_template_request_payload(),
         )
 
-    assert error_info.value.message == "Backtest request top_trades_n must be <= top_k"
+    assert error_info.value.message == "Backtest request top_k must be <= 300"
     assert preflight_use_case.calls == 0
     assert create_use_case.calls == 0
 
@@ -852,7 +851,6 @@ def _template_request() -> RunBacktestRequest:
         warmup_bars=200,
         top_k=2,
         preselect=100,
-        top_trades_n=1,
     )
 
 
@@ -902,10 +900,8 @@ def _template_request_payload() -> Mapping[str, Any]:
                 "slippage_pct": 0.01,
             },
         },
-        "warmup_bars": 200,
         "top_k": 2,
         "preselect": 100,
-        "top_trades_n": 1,
     }
 
 
@@ -929,10 +925,8 @@ def _template_run_response() -> RunBacktestResponse:
         strategy_id=None,
         instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
         timeframe=Timeframe("1m"),
-        warmup_bars=200,
         top_k=2,
         preselect=100,
-        top_trades_n=1,
         direction_mode="long-short",
         sizing_mode="all_in",
         execution_params={

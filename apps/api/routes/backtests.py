@@ -64,7 +64,8 @@ def build_backtests_router(
         runtime_defaults_response: Prebuilt deterministic runtime defaults response payload.
         current_user_dependency: Identity dependency resolving authenticated principal.
         sync_deadline_seconds: Hard wall-time deadline for cooperative sync cancellation.
-        eager_top_reports_enabled: Feature flag controlling eager top reports in sync response.
+        eager_top_reports_enabled:
+            Retained legacy flag ignored after summary-only launch cutover.
     Returns:
         APIRouter: Configured backtests router.
     Assumptions:
@@ -183,7 +184,7 @@ def build_backtests_router(
                 request=request,
                 response=use_case_response,
                 strategy_snapshot=strategy_snapshot,
-                include_reports=eager_top_reports_enabled,
+                include_reports=False,
             )
         except RoehubError:
             raise

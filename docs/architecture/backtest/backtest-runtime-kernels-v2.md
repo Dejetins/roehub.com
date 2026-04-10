@@ -1,9 +1,13 @@
 # Backtest Runtime Kernels V2 (R5-02 contract / R6-01 loader-context boundary for `signal_tf + 1m_risk`)
 
-Этот документ фиксирует канонический production contract для Stage A / Stage B runtime kernels,
-который переносит notebook-derived kernel semantics из
-`tests/notebook_tests/06_backtest_compute.ipynb` в generic runtime boundaries, не меняя shipped
-R5-01 artifact contracts.
+Этот документ фиксирует канонический production contract для Stage A / Stage B runtime kernels
+после shipped artifact-backed cutover, не меняя R5-01 artifact contracts.
+
+Для активного redesign surface canonical target anchor теперь находится в
+`docs/architecture/backtest/backtest-engine-vnext.md` и опирается на
+`tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`.
+`tests/notebook_tests/06_backtest_compute.ipynb` остаётся только historical semantics reference,
+а не активным implementation anchor для новых prompts.
 
 Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02 + R6-03 + R6-04`,
 `Milestone R10 / EPIC R10-01 production hot-path cutover`  
@@ -20,24 +24,35 @@ R5-01 artifact contracts.
   - legacy v1 modules remain import-stable only where migration boundaries still need them;
   - production launch, claimed worker execution, and run-scoped lazy detail do not silently
     fallback to legacy runtime orchestration.
+  - target redesign vocabulary and future cutover planning now live in
+    `docs/architecture/backtest/backtest-engine-vnext.md`; this document remains the current
+    shipped runtime contract until a later cutover prompt updates it explicitly.
 
 Связанные документы:
 
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+- `docs/architecture/backtest/backtest-engine-vnext.md`
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md`
 - `docs/architecture/backtest/backtest-precompute-runner-v2.md`
 - `docs/architecture/backtest/backtest-artifact-store-v2.md`
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
-- `tests/notebook_tests/06_backtest_compute.ipynb`
+- `tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`
 - `tests/notebook_tests/05_hit_time_grid.ipynb`
+
+Historical notebook references only:
+
+- `tests/notebook_tests/06_backtest_compute.ipynb`
 
 ## Роль документа
 
 - Это главный entrypoint для R5-02 и будущего R6 implementation path.
 - Notebook остаётся semantics source, но production runtime трактует его как
   `notebook-derived kernel semantics` и `not a literal notebook orchestration script`.
+- Для target redesign decisions, public vocabulary cleanup, и будущих cutover prompts canonical
+  handoff идёт через `docs/architecture/backtest/backtest-engine-vnext.md`, а не через
+  `06_backtest_compute.ipynb`.
 - R5-01 остаётся immutable input boundary: runtime читает только shipped `1m hit-times`,
   `prices/<tf>`, `prices/1m`, `mappings/<tf>` и `signals/<tf>/<indicator_id>`.
 - R6-01 уже реализует runtime-side artifact loading primitives:
@@ -51,6 +66,9 @@ R5-01 artifact contracts.
 - Sync и background starts теперь обязаны делить один immutable `slot-pinned context` contract,
   а не расходиться по разным pointer/discovery paths.
 - Документ не вводит новые API payloads, новые request TF или новые persisted storage contracts.
+- Launch/persistence flows остаются `summary-only`; full user-facing trades/report bodies для
+  выбранного варианта по-прежнему относятся к on-demand detail surfaces, а не к default runtime
+  result.
 
 ## Канонический словарь
 

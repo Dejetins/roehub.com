@@ -141,7 +141,6 @@ Public runs payload не должен протекать внутренними 
 - `timeframe`
 - `requested_top_n`
 - `ranking_primary_metric`
-- `ranking_secondary_metric`
 - `artifact_slot`
 - `artifact_slot_generation`
 - `artifact_manifest_hash`
@@ -232,7 +231,7 @@ Response (`200 OK`):
 - `execution_profile_mode`
 - `market_id`, `symbol`, `timeframe`
 - `requested_top_n`
-- `ranking_primary_metric`, `ranking_secondary_metric`
+- `ranking_primary_metric`
 - `artifact_slot`, `artifact_slot_generation`, `artifact_manifest_hash`, `artifact_asof_date`
 
 ### 2) `GET /backtests/runs/{run_id}`

@@ -59,7 +59,6 @@ function initBacktestPage(pageRoot) {
   const directionModeSelect = pageRoot.querySelector("#backtest-direction-mode");
   const sizingModeSelect = pageRoot.querySelector("#backtest-sizing-mode");
   const rankingPrimaryMetricSelect = pageRoot.querySelector("#backtest-ranking-primary-metric");
-  const rankingSecondaryMetricSelect = pageRoot.querySelector("#backtest-ranking-secondary-metric");
   const executionInitCash = pageRoot.querySelector("#backtest-exec-init-cash");
   const executionFeePct = pageRoot.querySelector("#backtest-exec-fee-pct");
   const executionSlippagePct = pageRoot.querySelector("#backtest-exec-slippage-pct");
@@ -81,8 +80,6 @@ function initBacktestPage(pageRoot) {
   const riskTpPct = pageRoot.querySelector("#backtest-risk-tp-pct");
   const topNInput = pageRoot.querySelector("#backtest-top-n");
   const preselectInput = pageRoot.querySelector("#backtest-preselect");
-  const topTradesInput = pageRoot.querySelector("#backtest-top-trades-n");
-  const warmupBarsInput = pageRoot.querySelector("#backtest-warmup-bars");
   const runtimeDefaultsHint = pageRoot.querySelector("#backtest-runtime-defaults-hint");
 
   const resultsPanel = pageRoot.querySelector("#backtest-results-panel");
@@ -116,7 +113,6 @@ function initBacktestPage(pageRoot) {
     || directionModeSelect === null
     || sizingModeSelect === null
     || rankingPrimaryMetricSelect === null
-    || rankingSecondaryMetricSelect === null
     || executionInitCash === null
     || executionFeePct === null
     || executionSlippagePct === null
@@ -138,8 +134,6 @@ function initBacktestPage(pageRoot) {
     || riskTpPct === null
     || topNInput === null
     || preselectInput === null
-    || topTradesInput === null
-    || warmupBarsInput === null
     || runtimeDefaultsHint === null
     || resultsPanel === null
     || resultsMeta === null
@@ -473,7 +467,6 @@ function initBacktestPage(pageRoot) {
     const summaryContract = readRuntimeSummaryContract();
     const launchContract = readRuntimeLaunchContract();
     const preselectDefault = readFiniteInteger(defaultsRecord.preselect_default);
-    const warmupBarsDefault = readFiniteInteger(defaultsRecord.warmup_bars_default);
     const topNDefault = readFiniteInteger(summaryContract.top_n_default);
     const topNMax = readFiniteInteger(summaryContract.top_n_max);
     const requestTimeframes = readAllowedTimeframes();
@@ -483,7 +476,6 @@ function initBacktestPage(pageRoot) {
       `top_n_default=${topNDefault ?? "-"}`,
       `top_n_max=${topNMax ?? "-"}`,
       `preselect=${preselectDefault ?? "-"}`,
-      `warmup_bars=${warmupBarsDefault ?? "-"}`,
       `request_timeframes=${requestTimeframes.join(",") || "-"}`,
       `ranking_metrics=${rankingMetrics.join(",") || "-"}`,
       `auto_preflight_enabled=${String(Boolean(launchContract.auto_preflight_enabled))}`,
@@ -592,15 +584,10 @@ function initBacktestPage(pageRoot) {
     const rankingRecord = asRecord(defaultsRecord.ranking);
     const summaryContract = readRuntimeSummaryContract();
 
-    const warmupBarsDefault = readFiniteInteger(defaultsRecord.warmup_bars_default);
     const topNDefault = readFiniteInteger(summaryContract.top_n_default);
     const topNMax = readFiniteInteger(summaryContract.top_n_max);
     const preselectDefault = readFiniteInteger(defaultsRecord.preselect_default);
-    const topTradesDefault = readFiniteInteger(defaultsRecord.top_trades_n_default);
 
-    if (warmupBarsDefault !== null) {
-      warmupBarsInput.value = String(warmupBarsDefault);
-    }
     if (topNDefault !== null) {
       topNInput.value = String(topNDefault);
     }
@@ -610,38 +597,17 @@ function initBacktestPage(pageRoot) {
     if (preselectDefault !== null) {
       preselectInput.value = String(preselectDefault);
     }
-    if (topTradesDefault !== null) {
-      topTradesInput.value = String(topTradesDefault);
-    }
     populateTimeframeOptions();
     repopulateRankingMetricSelect({
       selectNode: rankingPrimaryMetricSelect,
       includeEmptyOption: true,
       emptyLabel: "Use runtime default",
     });
-    repopulateRankingMetricSelect({
-      selectNode: rankingSecondaryMetricSelect,
-      includeEmptyOption: true,
-      emptyLabel: "None (tie-break by variant_key)",
-    });
     const primaryMetricDefault = readOptionalRankingMetricLiteral({
       rawValue: rankingRecord.primary_metric_default,
       fieldLabel: "ranking.primary_metric_default",
     });
-    const secondaryMetricDefault = readOptionalRankingMetricLiteral({
-      rawValue: rankingRecord.secondary_metric_default,
-      fieldLabel: "ranking.secondary_metric_default",
-    });
     rankingPrimaryMetricSelect.value = primaryMetricDefault || "";
-    if (
-      secondaryMetricDefault !== null
-      && primaryMetricDefault !== null
-      && secondaryMetricDefault === primaryMetricDefault
-    ) {
-      rankingSecondaryMetricSelect.value = "";
-    } else {
-      rankingSecondaryMetricSelect.value = secondaryMetricDefault || "";
-    }
 
     const initCashDefault = readFiniteNumber(executionRecord.init_cash_quote_default);
     const fixedQuoteDefault = readFiniteNumber(executionRecord.fixed_quote_default);
@@ -1495,27 +1461,14 @@ function initBacktestPage(pageRoot) {
       rawValue: rankingPrimaryMetricSelect.value,
       fieldLabel: "primary_metric",
     });
-    const secondaryMetric = readOptionalRankingMetricLiteral({
-      rawValue: rankingSecondaryMetricSelect.value,
-      fieldLabel: "secondary_metric",
-    });
-    if (primaryMetric === null && secondaryMetric !== null) {
-      throw new Error("primary_metric is required when secondary_metric is provided.");
-    }
-    if (primaryMetric !== null && secondaryMetric !== null && primaryMetric === secondaryMetric) {
-      throw new Error("secondary_metric must be different from primary_metric.");
-    }
     return {
       directionMode: directionMode.length > 0 ? directionMode : null,
       sizingMode: sizingMode.length > 0 ? sizingMode : null,
       rankingPrimaryMetric: primaryMetric,
-      rankingSecondaryMetric: secondaryMetric,
       execution: buildExecutionPayload(),
       riskGrid: buildRiskGridPayload(),
       topN: readRequestedTopN(),
       preselect: readOptionalPositiveInt(preselectInput, "preselect"),
-      topTradesN: readOptionalPositiveInt(topTradesInput, "top_trades_n"),
-      warmupBars: readOptionalPositiveInt(warmupBarsInput, "warmup_bars"),
     };
   };
 
@@ -1598,19 +1551,10 @@ function initBacktestPage(pageRoot) {
     if (advanced.preselect !== null) {
       requestPayload.preselect = advanced.preselect;
     }
-    if (advanced.topTradesN !== null) {
-      requestPayload.top_trades_n = advanced.topTradesN;
-    }
-    if (advanced.warmupBars !== null) {
-      requestPayload.warmup_bars = advanced.warmupBars;
-    }
     if (advanced.rankingPrimaryMetric !== null) {
       requestPayload.ranking = {
         primary_metric: advanced.rankingPrimaryMetric,
       };
-      if (advanced.rankingSecondaryMetric !== null) {
-        requestPayload.ranking.secondary_metric = advanced.rankingSecondaryMetric;
-      }
     }
 
     if (state.mode === "template") {
@@ -1860,7 +1804,7 @@ function initBacktestPage(pageRoot) {
     const payload = {
       time_range: normalizeJsonLikeValue(asRecord(runRequestPayload.time_range)),
       variant: normalizeJsonLikeValue(variantPayload),
-      include_trades: Number(runResponsePayload.top_trades_n || 0) > 0,
+      include_trades: true,
     };
 
     const strategyId = String(runRequestPayload.strategy_id || "").trim();
@@ -1883,11 +1827,6 @@ function initBacktestPage(pageRoot) {
     const overridesPayload = asRecord(runRequestPayload.overrides);
     if (Object.keys(overridesPayload).length > 0) {
       payload.overrides = normalizeJsonLikeValue(overridesPayload);
-    }
-
-    const warmupBars = readFiniteInteger(runRequestPayload.warmup_bars);
-    if (warmupBars !== null && warmupBars > 0) {
-      payload.warmup_bars = warmupBars;
     }
     return payload;
   };
@@ -1973,8 +1912,6 @@ function initBacktestPage(pageRoot) {
       timeframe: response.timeframe || "",
       top_k: response.top_k,
       preselect: response.preselect,
-      top_trades_n: response.top_trades_n,
-      warmup_bars: response.warmup_bars,
       spec_hash: response.spec_hash || null,
       grid_request_hash: response.grid_request_hash || null,
       engine_params_hash: response.engine_params_hash || null,
@@ -2394,7 +2331,6 @@ function initBacktestPage(pageRoot) {
     directionModeSelect,
     sizingModeSelect,
     rankingPrimaryMetricSelect,
-    rankingSecondaryMetricSelect,
     executionInitCash,
     executionFeePct,
     executionSlippagePct,
@@ -2416,8 +2352,6 @@ function initBacktestPage(pageRoot) {
     riskTpPct,
     topNInput,
     preselectInput,
-    topTradesInput,
-    warmupBarsInput,
   ].forEach((node) => {
     const onAdvancedChanged = () => {
       hideLaunchStatus();

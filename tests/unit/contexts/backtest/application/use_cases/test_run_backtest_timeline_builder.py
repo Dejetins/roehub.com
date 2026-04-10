@@ -896,7 +896,6 @@ def test_run_backtest_use_case_routes_sync_path_through_artifact_timeline_builde
     )
     assert normalized_range.end == UtcTimestamp(datetime(2026, 2, 16, 12, 11, tzinfo=timezone.utc))
     assert response.total_indicator_compute_calls == 1
-    assert response.warmup_bars == 2
     assert len(response.variants) == 1
 
 

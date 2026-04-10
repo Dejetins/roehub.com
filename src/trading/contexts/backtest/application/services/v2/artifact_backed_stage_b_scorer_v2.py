@@ -346,7 +346,6 @@ class BacktestArtifactBackedStageBScorerV2(
         self._stage_b_exact_cache_by_variant_key: dict[str, _ExactStageBCellCacheV2] = {}
         self._fast_search_cache_by_base_variant_key: dict[str, StageBFastSearchResultV2] = {}
         self._ranking_primary_by_stage: dict[str, str] = {}
-        self._ranking_secondary_by_stage: dict[str, str | None] = {}
 
     def prepare_for_grid_context(
         self,
@@ -394,7 +393,6 @@ class BacktestArtifactBackedStageBScorerV2(
         *,
         stage: str,
         primary_metric: str,
-        secondary_metric: str | None,
     ) -> None:
         """
         Store active staged-run ranking literals so Stage B can enable safe fast-path lookups.
@@ -402,12 +400,11 @@ class BacktestArtifactBackedStageBScorerV2(
         Args:
             stage: Stage literal (`stage_a` or `stage_b`).
             primary_metric: Active primary ranking metric literal.
-            secondary_metric: Active secondary metric literal or `None`.
         Returns:
             None.
         Assumptions:
             Fast TP/SL search can safely answer Stage B hot-path scoring only when ranking uses
-            `total_return_pct` with no secondary metric.
+            `total_return_pct`.
         Raises:
             None.
         Side Effects:
@@ -421,7 +418,6 @@ class BacktestArtifactBackedStageBScorerV2(
             artifact_backed_stage_b_scorer_v2.py
         """
         self._ranking_primary_by_stage[stage] = primary_metric
-        self._ranking_secondary_by_stage[stage] = secondary_metric
 
     def to_parallel_stage_b_worker_snapshot_v2(self) -> _ParallelStageBScorerSnapshotV2:
         """
@@ -1090,7 +1086,6 @@ class BacktestArtifactBackedStageBScorerV2(
         """
         return (
             self._ranking_primary_by_stage.get(STAGE_B_LITERAL_V2) == "total_return_pct"
-            and self._ranking_secondary_by_stage.get(STAGE_B_LITERAL_V2) is None
         )
 
 

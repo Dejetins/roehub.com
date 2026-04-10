@@ -9,7 +9,6 @@ from uuid import UUID, uuid4
 
 from trading.contexts.backtest.application.dto import (
     BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
-    BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
     RunBacktestRequest,
     RunBacktestTemplate,
 )
@@ -50,7 +49,7 @@ from .request_runtime_contract_v1 import (
 
 NowProvider = Callable[[], datetime]
 JobIdFactory = Callable[[], UUID]
-_REQUEST_HASH_INTERNAL_FIELDS = frozenset({"execution_profile_mode"})
+_REQUEST_HASH_INTERNAL_FIELDS = frozenset({"execution_profile_mode", "top_trades_n"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,10 +124,8 @@ class _ResolvedJobCreationContext:
 
     mode: BacktestJobMode
     template: RunBacktestTemplate
-    warmup_bars: int
     top_k: int
     preselect: int
-    top_trades_n: int
     spec_hash: str | None
     spec_payload_json: Mapping[str, Any] | None
 
@@ -175,7 +172,6 @@ class CreateBacktestJobUseCase:
         warmup_bars_default: int,
         top_k_default: int,
         preselect_default: int,
-        top_trades_n_default: int,
         init_cash_quote_default: float,
         fixed_quote_default: float,
         safe_profit_percent_default: float,
@@ -197,10 +193,11 @@ class CreateBacktestJobUseCase:
             strategy_reader: Saved strategy snapshot reader for saved-mode ownership checks.
             top_k_persisted_default: Persisted top-k cap from runtime config.
             max_active_jobs_per_user: Active jobs quota for one user.
-            warmup_bars_default: Runtime default for warmup bars.
+            warmup_bars_default:
+                Retained compatibility/default-only runtime setting ignored by the active public
+                create-job path after Milestone B / EPIC B2.
             top_k_default: Runtime default for top-k.
             preselect_default: Runtime default for preselect.
-            top_trades_n_default: Runtime default for top-trades payload cap.
             init_cash_quote_default: Runtime default for execution init cash.
             fixed_quote_default: Runtime default for fixed quote sizing.
             safe_profit_percent_default: Runtime default for profit lock percent.
@@ -240,8 +237,6 @@ class CreateBacktestJobUseCase:
             raise ValueError("top_k_default must be > 0")
         if preselect_default <= 0:
             raise ValueError("preselect_default must be > 0")
-        if top_trades_n_default <= 0:
-            raise ValueError("top_trades_n_default must be > 0")
         if top_k_default > top_k_persisted_default:
             raise ValueError("top_k_default must be <= top_k_persisted_default")
         if init_cash_quote_default <= 0.0:
@@ -259,10 +254,8 @@ class CreateBacktestJobUseCase:
         self._strategy_reader = strategy_reader
         self._top_k_persisted_default = top_k_persisted_default
         self._max_active_jobs_per_user = max_active_jobs_per_user
-        self._warmup_bars_default = warmup_bars_default
         self._top_k_default = top_k_default
         self._preselect_default = preselect_default
-        self._top_trades_n_default = top_trades_n_default
         self._init_cash_quote_default = init_cash_quote_default
         self._fixed_quote_default = fixed_quote_default
         self._safe_profit_percent_default = safe_profit_percent_default
@@ -361,12 +354,6 @@ class CreateBacktestJobUseCase:
             if command.run_request.ranking is not None
             else BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1
         )
-        ranking_secondary_metric = (
-            command.run_request.ranking.secondary_metric
-            if command.run_request.ranking is not None
-            else BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1
-        )
-
         job = BacktestJob.create_queued(
             job_id=self._job_id_factory(),
             user_id=current_user.user_id,
@@ -391,7 +378,7 @@ class CreateBacktestJobUseCase:
             timeframe=str(resolved.template.timeframe),
             requested_top_n=resolved.top_k,
             ranking_primary_metric=ranking_primary_metric,
-            ranking_secondary_metric=ranking_secondary_metric,
+            ranking_secondary_metric=None,
         )
         return self._job_repository.create(job=job)
 
@@ -419,11 +406,6 @@ class CreateBacktestJobUseCase:
             Reads saved strategy snapshot in `saved` mode.
         """
         run_request = command.run_request
-        warmup_bars = _resolve_positive_override(
-            value=run_request.warmup_bars,
-            default=self._warmup_bars_default,
-            field_path="body.warmup_bars",
-        )
         top_k = _resolve_positive_override(
             value=run_request.top_k,
             default=self._top_k_default,
@@ -433,11 +415,6 @@ class CreateBacktestJobUseCase:
             value=run_request.preselect,
             default=self._preselect_default,
             field_path="body.preselect",
-        )
-        top_trades_n = _resolve_positive_override(
-            value=run_request.top_trades_n,
-            default=self._top_trades_n_default,
-            field_path="body.top_trades_n",
         )
 
         if top_k > self._top_k_persisted_default:
@@ -457,20 +434,6 @@ class CreateBacktestJobUseCase:
                 ),
             )
 
-        if run_request.top_trades_n is not None and top_trades_n > top_k:
-            raise validation_error(
-                message="Backtest jobs request top_trades_n must be <= top_k",
-                errors=(
-                    {
-                        "path": "body.top_trades_n",
-                        "code": "max_value",
-                        "message": "top_trades_n must be <= top_k",
-                    },
-                ),
-            )
-        if top_trades_n > top_k:
-            top_trades_n = top_k
-
         if run_request.strategy_id is None:
             if run_request.template is None:
                 raise BacktestValidationError(
@@ -486,10 +449,8 @@ class CreateBacktestJobUseCase:
             return _ResolvedJobCreationContext(
                 mode="template",
                 template=run_request.template,
-                warmup_bars=warmup_bars,
                 top_k=top_k,
                 preselect=preselect,
-                top_trades_n=top_trades_n,
                 spec_hash=None,
                 spec_payload_json=None,
             )
@@ -530,10 +491,8 @@ class CreateBacktestJobUseCase:
         return _ResolvedJobCreationContext(
             mode="saved",
             template=resolved_template,
-            warmup_bars=warmup_bars,
             top_k=top_k,
             preselect=preselect,
-            top_trades_n=top_trades_n,
             spec_hash=_build_sha256_from_payload(payload=spec_payload),
             spec_payload_json=MappingProxyType(spec_payload),
         )
@@ -645,10 +604,8 @@ class CreateBacktestJobUseCase:
             None.
         """
         normalized_payload = _normalize_json_mapping(values=request_payload)
-        normalized_payload["warmup_bars"] = resolved.warmup_bars
         normalized_payload["top_k"] = resolved.top_k
         normalized_payload["preselect"] = resolved.preselect
-        normalized_payload["top_trades_n"] = resolved.top_trades_n
         if execution_profile_mode is not None:
             normalized_payload["execution_profile_mode"] = execution_profile_mode
 

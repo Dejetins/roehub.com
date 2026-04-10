@@ -17,7 +17,7 @@ from types import MappingProxyType
 from typing import Annotated, Any, Literal, Mapping, Sequence
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from trading.contexts.backtest.application.dto import (
     BacktestMetricRowV1,
@@ -55,7 +55,9 @@ from trading.shared_kernel.primitives import (
 
 BacktestScalar = int | float | str | bool | None
 BacktestAxisScalar = int | float | str
-_PERSISTED_REQUEST_INTERNAL_FIELDS = frozenset({"execution_profile_mode"})
+_PERSISTED_REQUEST_INTERNAL_FIELDS = frozenset(
+    {"execution_profile_mode", "top_trades_n", "warmup_bars"}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -287,13 +289,12 @@ class BacktestRankingRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     primary_metric: str
-    secondary_metric: str | None = None
 
-    @field_validator("primary_metric", "secondary_metric")
+    @field_validator("primary_metric")
     @classmethod
     def _normalize_metric_literal(cls, metric: str | None) -> str | None:
         """
-        Normalize ranking metric literal into canonical lowercase snake_case identifier.
+        Normalize the single active ranking metric into canonical lowercase snake_case form.
 
         Args:
             metric: Raw metric literal from API request.
@@ -312,28 +313,6 @@ class BacktestRankingRequest(BaseModel):
             metric=metric,
             field_path="ranking.metric",
         )
-
-    @model_validator(mode="after")
-    def _validate_secondary_metric(self) -> BacktestRankingRequest:
-        """
-        Validate secondary metric invariant for deterministic multi-key ranking behavior.
-
-        Args:
-            None.
-        Returns:
-            BacktestRankingRequest: Validated request model instance.
-        Assumptions:
-            Secondary metric is optional and cannot duplicate primary metric.
-        Raises:
-            ValueError: If `secondary_metric` duplicates `primary_metric`.
-        Side Effects:
-            None.
-        """
-        if self.secondary_metric is None:
-            return self
-        if self.secondary_metric == self.primary_metric:
-            raise ValueError("secondary_metric must be different from primary_metric")
-        return self
 
 
 class BacktestsPostRequest(BaseModel):
@@ -355,10 +334,8 @@ class BacktestsPostRequest(BaseModel):
     strategy_id: UUID | None = None
     template: BacktestTemplateRequest | None = None
     overrides: BacktestSavedOverridesRequest | None = None
-    warmup_bars: int | None = Field(default=None, gt=0)
     top_k: int | None = Field(default=None, gt=0)
     preselect: int | None = Field(default=None, gt=0)
-    top_trades_n: int | None = Field(default=None, gt=0)
     ranking: BacktestRankingRequest | None = None
 
 
@@ -462,7 +439,6 @@ class BacktestsVariantReportPostRequest(BaseModel):
     strategy_id: UUID | None = None
     template: BacktestTemplateRequest | None = None
     overrides: BacktestSavedOverridesRequest | None = None
-    warmup_bars: int | None = Field(default=None, gt=0)
     variant: BacktestVariantPayloadRequest
     include_trades: bool = False
 
@@ -637,10 +613,8 @@ class BacktestsPostResponse(BaseModel):
     strategy_id: UUID | None
     instrument_id: BacktestInstrumentIdResponse
     timeframe: str
-    warmup_bars: int
     top_k: int
     preselect: int
-    top_trades_n: int
     run_id: UUID
     state: str
     execution_mode: str
@@ -715,10 +689,8 @@ def build_backtest_run_request(*, request: BacktestsPostRequest) -> RunBacktestR
         strategy_id=request.strategy_id,
         template=_build_template(request=request.template),
         overrides=_build_saved_overrides(request=request.overrides),
-        warmup_bars=request.warmup_bars,
         top_k=request.top_k,
         preselect=request.preselect,
-        top_trades_n=request.top_trades_n,
         ranking=_build_ranking_config(request=request.ranking),
     )
 
@@ -776,18 +748,30 @@ def _strip_internal_persisted_request_fields(
     Returns:
         Mapping[str, Any]: Copy of the payload without persisted-only internal keys.
     Assumptions:
-        Internal metadata remains top-level and additive so public request validation stays
-        backward compatible.
+        Internal metadata remains additive, and persisted compatibility may still carry removed
+        launch-only fields that must be stripped for legacy reads.
     Raises:
         None.
     Side Effects:
         None.
     """
-    return {
+    normalized_payload = {
         key: value
         for key, value in payload.items()
         if key not in _PERSISTED_REQUEST_INTERNAL_FIELDS
     }
+    ranking = normalized_payload.get("ranking")
+    if isinstance(ranking, Mapping) and "secondary_metric" in ranking:
+        stripped_ranking = {
+            key: value
+            for key, value in ranking.items()
+            if key != "secondary_metric"
+        }
+        if stripped_ranking:
+            normalized_payload["ranking"] = stripped_ranking
+        else:
+            normalized_payload.pop("ranking", None)
+    return normalized_payload
 
 
 def build_backtest_variant_report_run_request(
@@ -823,7 +807,6 @@ def build_backtest_variant_report_run_request(
             strategy_id=request.strategy_id,
             template=request.template,
             overrides=request.overrides,
-            warmup_bars=request.warmup_bars,
         )
     )
 
@@ -986,10 +969,8 @@ def build_backtests_post_response(
             symbol=str(response.instrument_id.symbol),
         ),
         timeframe=response.timeframe.code,
-        warmup_bars=response.warmup_bars,
         top_k=response.top_k,
         preselect=response.preselect,
-        top_trades_n=response.top_trades_n,
         run_id=launch_run_metadata.run_id,
         state=launch_run_metadata.state,
         execution_mode=launch_run_metadata.execution_mode,
@@ -1088,10 +1069,8 @@ def build_grid_request_hash(*, request: BacktestsPostRequest) -> str:
         "mode": "template",
         "time_range": request.time_range.model_dump(mode="json"),
         "template": request.template.model_dump(mode="json", exclude_none=True),
-        "warmup_bars": request.warmup_bars,
         "top_k": request.top_k,
         "preselect": request.preselect,
-        "top_trades_n": request.top_trades_n,
     }
     if request.ranking is not None:
         payload["ranking"] = request.ranking.model_dump(mode="json", exclude_none=True)
@@ -1327,7 +1306,6 @@ def _build_ranking_config(
         return None
     return BacktestRankingConfig(
         primary_metric=request.primary_metric,
-        secondary_metric=request.secondary_metric,
     )
 
 

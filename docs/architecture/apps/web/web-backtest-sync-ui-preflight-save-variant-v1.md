@@ -88,7 +88,7 @@ UI собирает `POST /api/backtests` request с `template` блоком:
 - instrument selection: `market_id`/`symbol` через `/api/market-data/*`
 - timeframe (только из backend contract `15m|30m|1h|2h|4h|6h|8h|1d|2d|3d`)
 - `indicator_grids[]` (compute axes)
-- optional advanced: execution/risk_grid/direction/sizing/top_k/preselect/top_trades_n/warmup_bars + ranking (`primary_metric`, `secondary_metric`)
+- optional advanced: execution/risk_grid/direction/sizing/top_k/preselect + ranking (`primary_metric`)
 
 Индикаторы и `inputs.source` UI берёт из `GET /api/backtests/runtime-defaults`:
 
@@ -114,7 +114,7 @@ UI выбирает стратегию из `GET /api/strategies` и запус�
 
 - `strategy_id`
 - `overrides?` (advanced блок)
-- `ranking?` (`primary_metric`, `secondary_metric`)
+- `ranking?` (`primary_metric`)
 
 Preflight в saved-mode не применяется (endpoint требует indicator grids).
 
@@ -260,7 +260,8 @@ Prefill payload переносится между страницами чере�
 
 - Все JSON API вызовы из UI идут на `/api/...` с `credentials: 'include'`.
 - `POST /api/backtests` mode selection: `strategy_id xor template`.
-- `POST /api/backtests` может содержать `ranking.primary_metric` и `ranking.secondary_metric`.
+- `POST /api/backtests` может содержать только `ranking.primary_metric`; deterministic tie-break
+  остается внутренним runtime behavior.
 - `POST /api/backtests/variant-report` вызывается только по explicit user action (`Load report`).
 - Preflight обязателен только для template-mode.
 - `limit`/guards semantics обрабатываются и показываются пользователю как 422 (deterministic payload).
@@ -303,7 +304,7 @@ Manual smoke (через same-origin `/api/*`):
 1) Открыть `/backtests` после логина.
 2) Template-mode: выбрать market/symbol/timeframe, добавить индикаторы.
 3) Нажать preflight (estimate), убедиться что run разрешается только после успешного preflight.
-4) В Advanced выбрать `primary_metric` / `secondary_metric`, запустить sync backtest.
+4) В Advanced выбрать `primary_metric`, запустить sync backtest.
 5) Для выбранной строки нажать `Load report`, убедиться что отчет загружается и рендерится.
 6) Повторно нажать `Load report`, убедиться что UI показывает cache-hit по `variant_key`.
 7) Нажать `Save as Strategy` на варианте и убедиться что `/strategies/new` предзаполнен.

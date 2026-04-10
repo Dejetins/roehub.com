@@ -134,7 +134,6 @@ def test_build_backtest_run_request_normalizes_ranking_metrics() -> None:
             },
             "ranking": {
                 "primary_metric": "SHARPE_TRADES",
-                "secondary_metric": "WIN_RATE_PCT",
             },
         }
     )
@@ -142,7 +141,7 @@ def test_build_backtest_run_request_normalizes_ranking_metrics() -> None:
     built = build_backtest_run_request(request=request)
     assert built.ranking is not None
     assert built.ranking.primary_metric == "sharpe_trades"
-    assert built.ranking.secondary_metric == "win_rate_pct"
+    assert built.ranking.secondary_metric is None
 
 
 def test_decode_backtest_request_payload_reuses_strict_post_backtests_contract() -> None:
@@ -181,12 +180,92 @@ def test_decode_backtest_request_payload_reuses_strict_post_backtests_contract()
     )
 
     assert built.mode == "template"
-    assert built.warmup_bars == 144
+    assert built.warmup_bars is None
     assert built.template is not None
     assert built.template.instrument_id == InstrumentId(
         market_id=MarketId(1),
         symbol=Symbol("BTCUSDT"),
     )
+
+
+def test_backtests_post_request_rejects_public_warmup_bars_field() -> None:
+    """
+    Verify strict public request validation rejects removed `warmup_bars` input.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Warmup is now derived internally instead of accepted from the public launch request.
+    Raises:
+        AssertionError: If removed field is still accepted by the public DTO.
+    Side Effects:
+        None.
+    """
+    with pytest.raises(ValidationError, match="warmup_bars"):
+        BacktestsPostRequest.model_validate(
+            {
+                "time_range": {
+                    "start": datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc),
+                    "end": datetime(2026, 2, 24, 1, 0, tzinfo=timezone.utc),
+                },
+                "template": {
+                    "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                    "timeframe": "1m",
+                    "indicator_grids": [
+                        {
+                            "indicator_id": "ma.sma",
+                            "params": {"window": {"mode": "explicit", "values": [20]}},
+                        }
+                    ],
+                },
+                "warmup_bars": 144,
+            }
+        )
+
+
+def test_decode_backtest_request_payload_strips_legacy_secondary_metric_for_reads() -> None:
+    """
+    Verify persisted read compatibility strips legacy `ranking.secondary_metric` before decode.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Historical `request_json` rows may still carry the removed ranking field.
+    Raises:
+        AssertionError: If persisted decode keeps depending on the removed public field.
+    Side Effects:
+        None.
+    """
+    built = decode_backtest_request_payload(
+        payload={
+            "time_range": {
+                "start": datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2026, 2, 24, 1, 0, tzinfo=timezone.utc),
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1m",
+                "indicator_grids": [
+                    {
+                        "indicator_id": "ma.sma",
+                        "params": {"window": {"mode": "explicit", "values": [20]}},
+                    }
+                ],
+            },
+            "ranking": {
+                "primary_metric": "SHARPE_TRADES",
+                "secondary_metric": "WIN_RATE_PCT",
+            },
+        }
+    )
+
+    assert built.ranking is not None
+    assert built.ranking.primary_metric == "sharpe_trades"
+    assert built.ranking.secondary_metric is None
 
 
 def test_backtests_post_request_rejects_unknown_ranking_metric() -> None:
@@ -230,22 +309,22 @@ def test_backtests_post_request_rejects_unknown_ranking_metric() -> None:
         )
 
 
-def test_backtests_post_request_rejects_duplicate_ranking_metrics() -> None:
+def test_backtests_post_request_rejects_removed_secondary_metric_field() -> None:
     """
-    Verify strict request validation forbids duplicate primary and secondary ranking metrics.
+    Verify strict request validation rejects the removed `ranking.secondary_metric` field.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Secondary metric duplicates primary metric only when both identifiers normalize equally.
+        New launch requests must use `primary_metric` only.
     Raises:
-        AssertionError: If duplicate metrics are accepted.
+        AssertionError: If the removed field is still accepted in public requests.
     Side Effects:
         None.
     """
-    with pytest.raises(ValidationError, match="secondary_metric must be different"):
+    with pytest.raises(ValidationError, match="secondary_metric"):
         BacktestsPostRequest.model_validate(
             {
                 "time_range": {
@@ -266,7 +345,7 @@ def test_backtests_post_request_rejects_duplicate_ranking_metrics() -> None:
                 },
                 "ranking": {
                     "primary_metric": "total_return_pct",
-                    "secondary_metric": "TOTAL_RETURN_PCT",
+                    "secondary_metric": "win_rate_pct",
                 },
             }
         )
@@ -472,10 +551,8 @@ def test_build_backtests_post_response_maps_persisted_sync_inline_metadata() -> 
         strategy_id=UUID("00000000-0000-0000-0000-000000000123"),
         instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
         timeframe=Timeframe("1m"),
-        warmup_bars=200,
         top_k=1,
         preselect=100,
-        top_trades_n=1,
         variants=(
             BacktestVariantPreview(
                 variant_index=0,
@@ -549,6 +626,8 @@ def test_build_backtests_post_response_maps_persisted_sync_inline_metadata() -> 
     assert built.artifact_manifest_hash == "c" * 64
     assert built.spec_hash == build_sha256_from_payload(payload=snapshot_payload)
     assert built.engine_params_hash == "d" * 64
+    assert "warmup_bars" not in built.model_dump(mode="json")
+    assert "top_trades_n" not in built.model_dump(mode="json")
 
 
 def test_build_backtests_post_response_maps_background_auto_launch_metadata() -> None:
@@ -589,10 +668,8 @@ def test_build_backtests_post_response_maps_background_auto_launch_metadata() ->
         strategy_id=None,
         instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
         timeframe=Timeframe("1m"),
-        warmup_bars=200,
         top_k=1,
         preselect=100,
-        top_trades_n=1,
         variants=tuple(),
         total_indicator_compute_calls=0,
         run_id=UUID("00000000-0000-0000-0000-000000000911"),
@@ -620,6 +697,8 @@ def test_build_backtests_post_response_maps_background_auto_launch_metadata() ->
     assert built.grid_request_hash is not None
     assert built.engine_params_hash == "d" * 64
     assert built.variants == []
+    assert "warmup_bars" not in built.model_dump(mode="json")
+    assert "top_trades_n" not in built.model_dump(mode="json")
 
 
 def test_build_backtests_post_response_rejects_missing_persisted_sync_metadata() -> None:
@@ -660,10 +739,8 @@ def test_build_backtests_post_response_rejects_missing_persisted_sync_metadata()
         strategy_id=None,
         instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
         timeframe=Timeframe("1m"),
-        warmup_bars=200,
         top_k=1,
         preselect=100,
-        top_trades_n=1,
         variants=(
             BacktestVariantPreview(
                 variant_index=0,

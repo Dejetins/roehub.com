@@ -61,7 +61,6 @@ _SHARPE_TRADES_METRIC_KEY_LITERAL = "sharpe_trades"
 _WIN_RATE_PCT_METRIC_KEY_LITERAL = "win_rate_pct"
 _DIRECTION_ASC_LITERAL = "ASC"
 _DIRECTION_DESC_LITERAL = "DESC"
-_SECONDARY_METRIC_COMPONENT_DEFAULT = 0.0
 _STAGE_A_DISABLED_RISK_PARAMS_V2: Mapping[str, BacktestVariantScalar] = MappingProxyType(
     {
         "sl_enabled": False,
@@ -102,12 +101,10 @@ _SCORER_METRIC_KEYS_BY_LITERAL_V2 = MappingProxyType(
 
 StageAHeapEntryV2 = tuple[
     float,
-    float,
     tuple[int, ...],
     "BacktestStageAScoredVariantV2",
 ]
 StageBHeapEntryV2 = tuple[
-    float,
     float,
     tuple[int, ...],
     "BacktestStageBScoredVariantV2",
@@ -186,7 +183,6 @@ class _StageBParallelHeapEntrySnapshotV2:
     """
 
     primary_component: float
-    secondary_component: float
     descending_variant_key: tuple[int, ...]
     variant_index: int
     indicator_variant_key: str
@@ -268,9 +264,6 @@ class ResolvedRankingPlanV2:
     primary_metric: str
     primary_direction: str
     primary_scorer_metric_keys: tuple[str, ...]
-    secondary_metric: str | None
-    secondary_direction: str | None
-    secondary_scorer_metric_keys: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -407,7 +400,7 @@ class BacktestArtifactRuntimeRunnerV2:
             scorer: Artifact-backed Stage B scorer contract implementation.
             top_k_limit: Maximum number of Stage B rows retained in memory.
             ranking:
-                Optional ranking config (`primary_metric`, optional `secondary_metric`).
+                Optional ranking config (`primary_metric` only).
             batch_size: Optional checkpoint boundary override.
             cancel_checker: Optional cooperative cancellation callback by stage.
             on_checkpoint:
@@ -850,7 +843,7 @@ class BacktestArtifactRuntimeRunnerV2:
         def _materialize_ranked_rows() -> tuple[BacktestStageBScoredVariantV2, ...]:
             nonlocal rows_cache
             if rows_cache is None:
-                rows_cache = tuple(entry[3] for entry in _sorted_entries())
+                rows_cache = tuple(entry[2] for entry in _sorted_entries())
             return rows_cache
 
         def _materialize_tasks() -> Mapping[str, BacktestStageBTaskV2]:
@@ -1321,10 +1314,9 @@ def _stage_b_parallel_heap_entry_snapshot_v2(
     Side Effects:
         None.
     """
-    primary_component, secondary_component, descending_variant_key, row, task = entry
+    primary_component, descending_variant_key, row, task = entry
     return _StageBParallelHeapEntrySnapshotV2(
         primary_component=primary_component,
-        secondary_component=secondary_component,
         descending_variant_key=descending_variant_key,
         variant_index=row.variant_index,
         indicator_variant_key=row.indicator_variant_key,
@@ -1366,7 +1358,6 @@ def _stage_b_heap_entry_from_parallel_snapshot_v2(
     """
     return (
         snapshot.primary_component,
-        snapshot.secondary_component,
         snapshot.descending_variant_key,
         BacktestStageBScoredVariantV2(
             variant_index=snapshot.variant_index,
@@ -1411,7 +1402,7 @@ def configure_stage_ranking_context_if_supported_v2(
     ranking_plan: ResolvedRankingPlanV2,
 ) -> None:
     """
-    Forward active stage ranking literals to scorers with additive ranking-context support.
+    Forward the active single-metric ranking literal to scorers with ranking-context support.
 
     Args:
         scorer: Stage scorer implementation used by the current loop.
@@ -1432,7 +1423,6 @@ def configure_stage_ranking_context_if_supported_v2(
     configure_method(
         stage=stage,
         primary_metric=ranking_plan.primary_metric,
-        secondary_metric=ranking_plan.secondary_metric,
     )
 
 
@@ -1450,7 +1440,8 @@ def effective_ranking_config_v2(
     Returns:
         BacktestRankingConfig: Effective ranking config used by runtime loops.
     Assumptions:
-        Legacy deterministic behavior remains `total_return_pct DESC`.
+        Legacy deterministic behavior remains `total_return_pct DESC` with deterministic
+        tie-breaks by canonical variant keys.
     Raises:
         ValueError: If resulting ranking config cannot be normalized.
     Side Effects:
@@ -1472,7 +1463,7 @@ def resolve_ranking_plan_v2(*, ranking: BacktestRankingConfig) -> ResolvedRankin
     Assumptions:
         Ranking literals were normalized by DTO/config contracts before this step.
     Raises:
-        ValueError: If one ranking metric is unsupported.
+        ValueError: If the primary ranking metric is unsupported.
     Side Effects:
         None.
     """
@@ -1482,23 +1473,10 @@ def resolve_ranking_plan_v2(*, ranking: BacktestRankingConfig) -> ResolvedRankin
     if primary_direction is None or primary_keys is None:
         raise ValueError(f"unsupported primary ranking metric: {primary_metric!r}")
 
-    secondary_metric = ranking.secondary_metric
-    secondary_direction: str | None = None
-    secondary_keys: tuple[str, ...] = ()
-    if secondary_metric is not None:
-        secondary_direction = _METRIC_DIRECTION_BY_LITERAL_V2.get(secondary_metric)
-        resolved_secondary_keys = _SCORER_METRIC_KEYS_BY_LITERAL_V2.get(secondary_metric)
-        if secondary_direction is None or resolved_secondary_keys is None:
-            raise ValueError(f"unsupported secondary ranking metric: {secondary_metric!r}")
-        secondary_keys = resolved_secondary_keys
-
     return ResolvedRankingPlanV2(
         primary_metric=primary_metric,
         primary_direction=primary_direction,
         primary_scorer_metric_keys=primary_keys,
-        secondary_metric=secondary_metric,
-        secondary_direction=secondary_direction,
-        secondary_scorer_metric_keys=secondary_keys,
     )
 
 
@@ -1811,13 +1789,13 @@ def stage_a_heap_entry_v2(
     Args:
         row: Scored Stage A row.
         metrics: Raw scorer metrics payload.
-        ranking_plan: Pre-resolved ranking plan.
+        ranking_plan: Pre-resolved single-metric ranking plan.
     Returns:
         StageAHeapEntryV2: Heap entry preserving deterministic tie-break by base key.
     Assumptions:
         Final tie-break for Stage A is `base_variant_key ASC`.
     Raises:
-        ValueError: If one ranking metric is missing or non-numeric.
+        ValueError: If the ranking metric is missing or non-numeric.
     Side Effects:
         None.
     """
@@ -1827,17 +1805,8 @@ def stage_a_heap_entry_v2(
         metric_direction=ranking_plan.primary_direction,
         scorer_metric_keys=ranking_plan.primary_scorer_metric_keys,
     )
-    secondary_component = _SECONDARY_METRIC_COMPONENT_DEFAULT
-    if ranking_plan.secondary_metric is not None and ranking_plan.secondary_direction is not None:
-        secondary_component = heap_metric_component_from_literal_v2(
-            metrics=metrics,
-            metric_literal=ranking_plan.secondary_metric,
-            metric_direction=ranking_plan.secondary_direction,
-            scorer_metric_keys=ranking_plan.secondary_scorer_metric_keys,
-        )
     return (
         primary_component,
-        secondary_component,
         descending_text_key_v2(value=row.base_variant.base_variant_key),
         row,
     )
@@ -1857,13 +1826,13 @@ def stage_b_heap_entry_v2(
         row: Scored Stage B row.
         task: Stage B task payload corresponding to the scored row.
         metrics: Raw scorer metrics payload.
-        ranking_plan: Pre-resolved ranking plan.
+        ranking_plan: Pre-resolved single-metric ranking plan.
     Returns:
         StageBHeapEntryV2: Heap entry preserving deterministic tie-break by variant key.
     Assumptions:
         Final tie-break for Stage B is always `variant_key ASC`.
     Raises:
-        ValueError: If one ranking metric is missing or non-numeric.
+        ValueError: If the ranking metric is missing or non-numeric.
     Side Effects:
         None.
     """
@@ -1873,17 +1842,8 @@ def stage_b_heap_entry_v2(
         metric_direction=ranking_plan.primary_direction,
         scorer_metric_keys=ranking_plan.primary_scorer_metric_keys,
     )
-    secondary_component = _SECONDARY_METRIC_COMPONENT_DEFAULT
-    if ranking_plan.secondary_metric is not None and ranking_plan.secondary_direction is not None:
-        secondary_component = heap_metric_component_from_literal_v2(
-            metrics=metrics,
-            metric_literal=ranking_plan.secondary_metric,
-            metric_direction=ranking_plan.secondary_direction,
-            scorer_metric_keys=ranking_plan.secondary_scorer_metric_keys,
-        )
     return (
         primary_component,
-        secondary_component,
         descending_text_key_v2(value=row.variant_key),
         row,
         task,
@@ -1910,7 +1870,7 @@ def heap_entry_outranks_v2(
     Side Effects:
         None.
     """
-    return candidate[:3] > baseline[:3]
+    return candidate[:2] > baseline[:2]
 
 
 def heap_metric_component_from_literal_v2(
@@ -2050,7 +2010,7 @@ def stage_a_rows_from_heap_v2(
     Side Effects:
         None.
     """
-    return tuple(entry[3] for entry in sorted(heap, key=lambda item: item[:3], reverse=True))
+    return tuple(entry[2] for entry in sorted(heap, key=lambda item: item[:2], reverse=True))
 
 
 def stage_b_rows_from_heap_v2(
@@ -2071,7 +2031,7 @@ def stage_b_rows_from_heap_v2(
     Side Effects:
         None.
     """
-    return tuple(entry[3] for entry in sorted_stage_b_heap_entries_v2(heap=heap))
+    return tuple(entry[2] for entry in sorted_stage_b_heap_entries_v2(heap=heap))
 
 
 def sorted_stage_b_heap_entries_v2(
@@ -2092,7 +2052,7 @@ def sorted_stage_b_heap_entries_v2(
     Side Effects:
         None.
     """
-    return tuple(sorted(heap, key=lambda item: item[:3], reverse=True))
+    return tuple(sorted(heap, key=lambda item: item[:2], reverse=True))
 
 
 def stage_b_tasks_from_heap_v2(
@@ -2135,7 +2095,7 @@ def stage_b_tasks_from_sorted_entries_v2(
         None.
     """
     mapping: dict[str, BacktestStageBTaskV2] = {}
-    for _, _, _, row, task in entries:
+    for _, _, row, task in entries:
         if row.variant_key in mapping:
             raise ValueError("duplicate Stage-B variant_key is not allowed")
         mapping[row.variant_key] = task

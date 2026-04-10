@@ -13,6 +13,13 @@
 - Historical scope kept here:
   - current browser prefill defaults already loaded on API startup,
   - legacy `top_k_*` fields required for backward compatibility.
+- A2/A3 redesign anchoring note:
+  - target public vocabulary is now anchored in
+    `docs/architecture/backtest/backtest-engine-vnext.md`;
+  - this endpoint document still records the current shipped defaults payload, but the target
+    public surface keeps `primary_metric` and removes `secondary_metric`, `warmup_bars`, and
+    `top_trades_n`;
+  - default launch/top-row behavior remains `summary-only`, while full trades stay on-demand only.
 - R9-01 rollout note:
   - `/backtests` launch form consumes `contracts.request_timeframes.allowed`,
     `contracts.summary.ranking_metrics`, `contracts.summary.top_n_default`,
@@ -87,15 +94,17 @@
 
 ## Response contract v1 + R0 additive freeze
 
+Ниже показан текущий shipped payload.
+Он не должен читаться как target redesign surface для Milestone A: target public defaults
+сохраняют `primary_metric`, `top_k` / top-N semantics, и `summary-only` launch behavior, но не
+сохраняют `secondary_metric`, `warmup_bars`, или `top_trades_n` как будущие публичные knobs.
+
 ```json
 {
-  "warmup_bars_default": 200,
   "top_k_default": 300,
   "preselect_default": 20000,
-  "top_trades_n_default": 3,
   "ranking": {
-    "primary_metric_default": "total_return_pct",
-    "secondary_metric_default": null
+    "primary_metric_default": "total_return_pct"
   },
   "execution": {
     "init_cash_quote_default": 10000.0,
@@ -342,12 +351,10 @@
 
 ## Поля и инварианты
 
-- `warmup_bars_default` <- `backtest.warmup_bars_default`
 - `top_k_default` <- `backtest.top_k_default`
 - `preselect_default` <- `backtest.preselect_default`
-- `top_trades_n_default` <- `backtest.reporting.top_trades_n_default`
 - `ranking.primary_metric_default` <- `backtest.ranking.primary_metric_default`
-- `ranking.secondary_metric_default` <- `backtest.ranking.secondary_metric_default`
+  Public launch surface keeps only `primary_metric`; deterministic tie-break remains internal.
 - `execution.init_cash_quote_default` <- `backtest.execution.init_cash_quote_default`
 - `execution.fixed_quote_default` <- `backtest.execution.fixed_quote_default`
 - `execution.safe_profit_percent_default` <- `backtest.execution.safe_profit_percent_default`

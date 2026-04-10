@@ -589,7 +589,7 @@ def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -
     assert created.job_id == UUID("00000000-0000-0000-0000-000000000901")
     assert created.mode == "template"
     assert created.state == "queued"
-    assert created.request_json["warmup_bars"] == 200
+    assert "warmup_bars" not in created.request_json
     assert created.request_json["top_k"] == 5
     assert created.request_json["preselect"] == 20000
     assert created.request_json["top_trades_n"] == 2

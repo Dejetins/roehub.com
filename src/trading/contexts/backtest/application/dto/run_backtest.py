@@ -343,7 +343,6 @@ class RunBacktestRequest:
     warmup_bars: int | None = None
     top_k: int | None = None
     preselect: int | None = None
-    top_trades_n: int | None = None
     ranking: BacktestRankingConfig | None = None
 
     def __post_init__(self) -> None:
@@ -378,7 +377,6 @@ class RunBacktestRequest:
         _validate_positive_optional_int(name="warmup_bars", value=self.warmup_bars)
         _validate_positive_optional_int(name="top_k", value=self.top_k)
         _validate_positive_optional_int(name="preselect", value=self.preselect)
-        _validate_positive_optional_int(name="top_trades_n", value=self.top_trades_n)
 
     @property
     def mode(self) -> str:
@@ -687,10 +685,8 @@ class RunBacktestResponse:
     instrument_id: InstrumentId
     timeframe: Timeframe
     strategy_id: UUID | None
-    warmup_bars: int
     top_k: int
     preselect: int
-    top_trades_n: int
     variants: tuple[BacktestVariantPreview, ...]
     total_indicator_compute_calls: int
     direction_mode: str | None = None
@@ -734,16 +730,10 @@ class RunBacktestResponse:
         if self.timeframe is None:  # type: ignore[truthy-bool]
             raise ValueError("RunBacktestResponse.timeframe is required")
 
-        if self.warmup_bars <= 0:
-            raise ValueError("RunBacktestResponse.warmup_bars must be > 0")
         if self.top_k <= 0:
             raise ValueError("RunBacktestResponse.top_k must be > 0")
         if self.preselect <= 0:
             raise ValueError("RunBacktestResponse.preselect must be > 0")
-        if self.top_trades_n <= 0:
-            raise ValueError("RunBacktestResponse.top_trades_n must be > 0")
-        if self.top_trades_n > self.top_k:
-            raise ValueError("RunBacktestResponse.top_trades_n must be <= top_k")
         if self.total_indicator_compute_calls < 0:
             raise ValueError("RunBacktestResponse.total_indicator_compute_calls must be >= 0")
 

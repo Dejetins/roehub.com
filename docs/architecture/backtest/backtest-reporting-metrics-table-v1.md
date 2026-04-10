@@ -42,9 +42,8 @@ EPIC-06 добавляет слой “reporting” поверх существ�
   - таблица метрик `|Metric|Value|` (строго фиксированный порядок и формат).
 - Для grid запуска:
   - отчёт строится по explicit запросу `POST /api/backtests/variant-report`,
-  - sync eager reports включаются только через
-    `backtest.reporting.eager_top_reports_enabled=true`,
-  - trades включаются по `include_trades` (variant-report) или по `top_trades_n` в eager policy.
+  - `POST /api/backtests` остаётся `summary-only` и не materialize-ит eager reports,
+  - trades включаются только по explicit `include_trades` во `variant-report`.
 - Метрики v1 (минимум, фиксированный список):
   - PnL/Return,
   - drawdowns + drawdown durations,
@@ -210,10 +209,8 @@ Reporting v1 возвращает таблицу в виде:
 
 - `POST /backtests` по умолчанию возвращает только ranking summary (`total_return_pct` + payload).
 - Детальный отчёт (`rows/table_md/trades`) строится on-demand через `variant-report`.
-- В legacy eager policy trades остаются ограничены `top_trades_n_default`, чтобы payload не разрастался.
-
-Рекомендуемый runtime default:
-- `backtest.reporting.top_trades_n_default = 3`.
+- Launch path остаётся `summary-only`; полный trades payload доступен только по explicit
+  on-demand detail request.
 
 ## Контракты и инварианты
 

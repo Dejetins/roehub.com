@@ -449,13 +449,10 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
     assert response_one.status_code == 200
     assert response_one.json() == response_two.json()
     assert response_one.json() == {
-        "warmup_bars_default": 200,
         "top_k_default": 300,
         "preselect_default": 20000,
-        "top_trades_n_default": 3,
         "ranking": {
             "primary_metric_default": "total_return_pct",
-            "secondary_metric_default": None,
         },
         "execution": {
             "init_cash_quote_default": 10000.0,
@@ -724,6 +721,7 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
             },
         },
     }
+    assert "secondary_metric_default" not in response_one.json()["ranking"]
     assert list(
         response_one.json()["execution"]["fee_pct_default_by_market_id"].keys()
     ) == ["1", "2", "3", "4"]
@@ -1119,6 +1117,7 @@ def test_post_backtests_saved_response_includes_hashes_and_explicit_payload() ->
     assert body["spec_hash"] == build_sha256_from_payload(payload=snapshot_payload)
     assert body["grid_request_hash"] is None
     assert body["engine_params_hash"] == "e" * 64
+    assert "warmup_bars" not in body
     assert body["variants"][0]["payload"] == {
         "indicator_selections": [
             {
@@ -1189,6 +1188,7 @@ def test_post_backtests_returns_202_for_explicit_background_auto_launch() -> Non
     assert body["artifact_manifest_hash"] == "c" * 64
     assert body["grid_request_hash"] is not None
     assert body["engine_params_hash"] == "e" * 64
+    assert "warmup_bars" not in body
     assert body["variants"] == []
 
 
@@ -1262,18 +1262,18 @@ def test_post_backtests_lazy_mode_hides_eager_report_payloads() -> None:
     assert response.json()["variants"][0]["total_return_pct"] == 12.0
 
 
-def test_post_backtests_eager_flag_keeps_report_payloads_for_migration() -> None:
+def test_post_backtests_eager_flag_does_not_break_summary_only_launch() -> None:
     """
-    Verify migration flag keeps legacy eager report payload in sync endpoint response.
+    Verify legacy eager flag no longer overrides the summary-only launch contract.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        `backtest.reporting.eager_top_reports_enabled` temporarily restores old behavior.
+        Summary rows stay report-free even when old eager wiring remains enabled.
     Raises:
-        AssertionError: If report body is unexpectedly dropped in eager mode.
+        AssertionError: If sync launch still materializes report bodies.
     Side Effects:
         None.
     """
@@ -1295,8 +1295,7 @@ def test_post_backtests_eager_flag_keeps_report_payloads_for_migration() -> None
     )
 
     assert response.status_code == 200
-    assert response.json()["variants"][0]["report"] is not None
-    assert response.json()["variants"][0]["report"]["table_md"] is not None
+    assert response.json()["variants"][0]["report"] is None
 
 
 def test_post_backtests_variant_report_returns_rows_table_and_trades() -> None:
@@ -1475,7 +1474,6 @@ def _variant_report_payload() -> dict[str, Any]:
             "end": "2026-02-16T01:00:00Z",
         },
         "template": _template_payload(),
-        "warmup_bars": 200,
         "include_trades": True,
         "variant": {
             "indicator_selections": [
@@ -1624,10 +1622,8 @@ def _saved_mode_response() -> RunBacktestResponse:
         strategy_id=UUID("00000000-0000-0000-0000-000000000123"),
         instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
         timeframe=Timeframe("1m"),
-        warmup_bars=200,
         top_k=2,
         preselect=100,
-        top_trades_n=1,
         variants=(
             _variant(variant_index=0, variant_key="a" * 64, total_return_pct=12.0),
             _variant(variant_index=1, variant_key="b" * 64, total_return_pct=10.0),
@@ -1665,10 +1661,8 @@ def _template_mode_response() -> RunBacktestResponse:
         strategy_id=None,
         instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
         timeframe=Timeframe("1m"),
-        warmup_bars=200,
         top_k=2,
         preselect=100,
-        top_trades_n=1,
         variants=(
             _variant(variant_index=0, variant_key="a" * 64, total_return_pct=12.0),
         ),
@@ -1705,10 +1699,8 @@ def _template_mode_two_variant_response() -> RunBacktestResponse:
         strategy_id=None,
         instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
         timeframe=Timeframe("1m"),
-        warmup_bars=200,
         top_k=2,
         preselect=100,
-        top_trades_n=1,
         variants=(
             _variant(variant_index=0, variant_key="a" * 64, total_return_pct=12.0),
             _variant(variant_index=1, variant_key="b" * 64, total_return_pct=12.0),
@@ -1746,10 +1738,8 @@ def _template_background_auto_response() -> RunBacktestResponse:
         strategy_id=None,
         instrument_id=InstrumentId(market_id=MarketId(1), symbol=Symbol("BTCUSDT")),
         timeframe=Timeframe("1m"),
-        warmup_bars=200,
         top_k=2,
         preselect=100,
-        top_trades_n=1,
         variants=tuple(),
         total_indicator_compute_calls=0,
         run_id=UUID("00000000-0000-0000-0000-000000000911"),

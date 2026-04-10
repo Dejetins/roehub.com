@@ -400,6 +400,7 @@ def test_get_backtest_runs_returns_history_page_with_public_run_metadata() -> No
     assert body["items"][0]["requested_top_n"] == 25
     assert body["items"][0]["progress_percent"] == 0
     assert body["items"][0]["eta_seconds"] is None
+    assert "ranking_secondary_metric" not in body["items"][0]
     assert body["next_cursor"] == encode_backtest_runs_cursor(cursor=cursor)
     assert resolved_list_fake.last_state == "running"
     assert resolved_list_fake.last_cursor == cursor
@@ -445,6 +446,7 @@ def test_get_backtest_run_status_returns_failed_payload_with_public_fields() -> 
         "details": {"stage": "stage_b"},
     }
     assert "request_hash" not in body
+    assert "ranking_secondary_metric" not in body
 
 
 def test_get_backtest_run_top_returns_summary_only_rows_with_persisted_metrics() -> None:
@@ -576,6 +578,7 @@ def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_field
     assert body["execution_profile_mode"] == "exact_parallel"
     assert body["progress_percent"] == 65
     assert body["eta_seconds"] == 33
+    assert "ranking_secondary_metric" not in body
 
 
 def test_get_backtest_run_status_uses_benchmark_eta_fallback_when_timeline_signal_is_too_early(
@@ -643,6 +646,7 @@ def test_get_backtest_run_status_uses_benchmark_eta_fallback_when_timeline_signa
     assert response.status_code == 200
     body = response.json()
     assert body["execution_profile_mode"] == "exact_parallel"
+    assert "ranking_secondary_metric" not in body
     assert body["progress_percent"] == 35
     assert body["eta_seconds"] == 34
 
