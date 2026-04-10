@@ -1495,7 +1495,10 @@ def _index_for_rate_v2(
     normalized = np.asarray(values, dtype=np.float64)
     matches = np.flatnonzero(np.isclose(normalized, rate, rtol=0.0, atol=1e-8))
     if matches.size == 0:
-        raise ValueError(f"{field_name}={rate * 100.0:.12g}% is absent from shipped artifact grid")
+        raise ValueError(
+            f"{field_name}={rate * 100.0:.12g}% is absent from shipped artifact grid "
+            f"(levels={normalized.shape[0]})"
+        )
     return int(matches[0])
 
 

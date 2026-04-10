@@ -284,6 +284,9 @@ R6-03 shipped boundary:
 - `TP/SL lookup starts at entry_exec + 1` явно enforced в runtime kernel;
 - `signal exit wins on equal bar`;
 - `SL wins TP tie`;
+- Stage B runtime remains `grid-agnostic`: local kernels read `tp_values`, `sl_values`, and
+  table widths from shipped `hit_times/1m` artifact arrays/manifests instead of fixed table
+  literals;
 - `close_on_end = 1` остаётся explicit notebook-derived default;
 - ranking hot path может использовать fast `total_return_pct` lookup только для pinned
   artifact-backed Stage B scorer и только при primary=`total_return_pct`, secondary=`None`;

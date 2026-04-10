@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from trading.contexts.backtest.application.services.v2 import (
+    ArtifactHitTimesArraysV2,
     StageACompactTradeV2,
+    BacktestArtifactBackedStageBScorerV2,
     StageBBestCellReplayCaseV2,
     StageBHitTimesFixtureV2,
     StageBHitTimesSliceV2,
@@ -18,6 +21,7 @@ from trading.contexts.backtest.application.services.v2 import (
     replay_risk_cell_exact_v2,
     resolve_risk_trade_exit_1m_v2,
     search_risk_cells_total_return_fast_v2,
+    slice_hit_times_to_execution_window_v2,
 )
 
 _FIXTURE_PATH = Path(__file__).with_name("fixtures") / "stage_b_golden_fixtures_v2.json"
@@ -202,6 +206,200 @@ def test_search_risk_cells_total_return_fast_v2_matches_bruteforce_exact_replay(
         rel=1e-9,
         abs=1e-9,
     )
+
+
+def test_slice_hit_times_to_execution_window_v2_accepts_widened_artifact_grid() -> None:
+    """
+    Verify Stage B stays grid-agnostic when `hit_times/1m` artifacts publish wider TP/SL grids.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Stage B must read `tp_values` and `sl_values` from artifact arrays/manifests and keep
+        fast search plus exact replay deterministic after local window rebasing.
+    Raises:
+        AssertionError: If widened artifact grids drift during local slicing or fast search.
+    Side Effects:
+        Allocates widened synthetic `hit_times/1m` artifact arrays in memory only.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+    tp_values = np.asarray((0.01, 0.02, 0.03, 0.04, 0.05), dtype=np.float32)
+    sl_values = np.asarray((0.01, 0.02, 0.03, 0.04), dtype=np.float32)
+    local_long_tp = np.asarray(
+        (
+            (0, 1, 2, 3),
+            (1, 2, 3, 4),
+            (1, 2, 4, 4),
+            (2, 3, 4, 4),
+            (4, 4, 4, 4),
+        ),
+        dtype=np.int64,
+    )
+    local_long_sl = np.asarray(
+        (
+            (0, 1, 2, 3),
+            (1, 2, 3, 4),
+            (2, 3, 4, 4),
+            (4, 4, 4, 4),
+        ),
+        dtype=np.int64,
+    )
+    global_sentinel_index = 8
+    exec_target_slice = slice(2, 6)
+    local_sentinel_index = int(exec_target_slice.stop - exec_target_slice.start)
+    global_long_tp = np.full(
+        (tp_values.shape[0], global_sentinel_index),
+        global_sentinel_index,
+        dtype=np.uint32,
+    )
+    global_long_sl = np.full(
+        (sl_values.shape[0], global_sentinel_index),
+        global_sentinel_index,
+        dtype=np.uint32,
+    )
+    for level_index in range(local_long_tp.shape[0]):
+        for time_index in range(local_sentinel_index):
+            local_hit = int(local_long_tp[level_index, time_index])
+            global_long_tp[level_index, exec_target_slice.start + time_index] = (
+                global_sentinel_index
+                if local_hit == local_sentinel_index
+                else exec_target_slice.start + local_hit
+            )
+    for level_index in range(local_long_sl.shape[0]):
+        for time_index in range(local_sentinel_index):
+            local_hit = int(local_long_sl[level_index, time_index])
+            global_long_sl[level_index, exec_target_slice.start + time_index] = (
+                global_sentinel_index
+                if local_hit == local_sentinel_index
+                else exec_target_slice.start + local_hit
+            )
+    artifact_hit_times = ArtifactHitTimesArraysV2(
+        manifest=SimpleNamespace(sentinel_index=global_sentinel_index),
+        tp_values=tp_values,
+        sl_values=sl_values,
+        long_tp=global_long_tp,
+        long_sl=global_long_sl,
+        short_tp=global_long_tp,
+        short_sl=global_long_sl,
+    )
+
+    hit_times = slice_hit_times_to_execution_window_v2(
+        hit_times_arrays=artifact_hit_times,
+        exec_target_slice=exec_target_slice,
+    )
+
+    np.testing.assert_array_equal(hit_times.tp_values, tp_values)
+    np.testing.assert_array_equal(hit_times.sl_values, sl_values)
+    np.testing.assert_array_equal(hit_times.long_tp, local_long_tp)
+    np.testing.assert_array_equal(hit_times.long_sl, local_long_sl)
+    np.testing.assert_array_equal(hit_times.short_tp, local_long_tp)
+    np.testing.assert_array_equal(hit_times.short_sl, local_long_sl)
+    assert hit_times.long_tp.shape == (5, 4)
+    assert hit_times.long_sl.shape == (4, 4)
+    assert hit_times.short_tp.shape == (5, 4)
+    assert hit_times.short_sl.shape == (4, 4)
+
+    compact_trades = (
+        StageACompactTradeV2(
+            entry_signal_idx=0,
+            entry_exec_idx=0,
+            direction=1,
+            sig_exit_signal_idx=None,
+            sig_exit_exec_idx=local_sentinel_index,
+        ),
+    )
+    exec_open = np.asarray((100.0, 100.0, 100.0, 100.0), dtype=np.float64)
+    exec_close = np.asarray((100.0, 100.0, 100.0, 100.0), dtype=np.float64)
+    fast_result = search_risk_cells_total_return_fast_v2(
+        compact_trades=compact_trades,
+        hit_times=hit_times,
+        exec_open=exec_open,
+        exec_close=exec_close,
+        fee_rate=0.0,
+        close_on_end=False,
+    )
+
+    brute_force = np.empty_like(fast_result.total_return_pct, dtype=np.float64)
+    for tp_index in range(hit_times.tp_values.shape[0]):
+        for sl_index in range(hit_times.sl_values.shape[0]):
+            replay = replay_risk_cell_exact_v2(
+                compact_trades=compact_trades,
+                hit_times=hit_times,
+                exec_open=exec_open,
+                exec_close=exec_close,
+                tp_index=tp_index,
+                sl_index=sl_index,
+                close_on_end=False,
+            )
+            brute_force[tp_index, sl_index] = compute_stage_b_metrics_v2(
+                replay=replay,
+                fee_rate=0.0,
+            ).total_return_pct
+
+    assert fast_result.total_return_pct.shape == (5, 4)
+    np.testing.assert_allclose(
+        fast_result.total_return_pct,
+        brute_force,
+        rtol=1e-9,
+        atol=1e-9,
+    )
+    expected_flat = int(np.argmax(brute_force))
+    expected_tp_index, expected_sl_index = np.unravel_index(expected_flat, brute_force.shape)
+    assert fast_result.best_tp_index == int(expected_tp_index)
+    assert fast_result.best_sl_index == int(expected_sl_index)
+
+
+def test_artifact_backed_stage_b_scorer_v2_resolves_widened_grid_risk_indexes() -> None:
+    """
+    Verify the artifact-backed Stage B scorer resolves TP/SL indexes from widened artifact grids.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Runtime risk payloads keep human-percent units while artifact `tp_values` and `sl_values`
+        stay in decimal-rate form.
+    Raises:
+        AssertionError: If widened artifact-grid values cannot be matched by the scorer.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+    """
+    scorer = object.__new__(BacktestArtifactBackedStageBScorerV2)
+    scorer._local_hit_times = StageBHitTimesSliceV2(
+        tp_values=np.asarray((0.01, 0.02, 0.03, 0.04, 0.05), dtype=np.float32),
+        sl_values=np.asarray((0.01, 0.02, 0.03, 0.04), dtype=np.float32),
+        long_tp=np.ones((5, 1), dtype=np.int64),
+        long_sl=np.ones((4, 1), dtype=np.int64),
+        short_tp=np.ones((5, 1), dtype=np.int64),
+        short_sl=np.ones((4, 1), dtype=np.int64),
+        sentinel_index=1,
+    )
+
+    tp_index, sl_index = scorer._resolve_risk_level_indexes_v2(
+        risk_params={
+            "tp_enabled": True,
+            "tp_pct": 4.0,
+            "sl_enabled": True,
+            "sl_pct": 3.0,
+        }
+    )
+
+    assert tp_index == 3
+    assert sl_index == 2
 
 
 def test_replay_best_risk_cell_exact_v2_matches_best_cell_golden_fixture() -> None:

@@ -49,9 +49,17 @@ def slice_hit_times_to_execution_window_v2(
         field_name="exec_target_slice",
     )
     sentinel_index = stop - start
+    tp_values = _normalize_hit_times_level_grid_v2(
+        field_name="tp_values",
+        values=hit_times_arrays.tp_values,
+    )
+    sl_values = _normalize_hit_times_level_grid_v2(
+        field_name="sl_values",
+        values=hit_times_arrays.sl_values,
+    )
     return StageBHitTimesSliceV2(
-        tp_values=np.asarray(hit_times_arrays.tp_values, dtype=np.float32),
-        sl_values=np.asarray(hit_times_arrays.sl_values, dtype=np.float32),
+        tp_values=tp_values,
+        sl_values=sl_values,
         long_tp=_rebase_hit_times_table_v2(
             values=hit_times_arrays.long_tp,
             start=start,
@@ -684,7 +692,7 @@ def _rebase_hit_times_table_v2(
     Assumptions:
         Hits outside `[start, stop)` must map to the local sentinel.
     Raises:
-        ValueError: If the source table is not 2D.
+        ValueError: If the source table is not 2D or does not cover the requested local window.
     Side Effects:
         Allocates a rebased integer array.
     Docs:
@@ -696,6 +704,11 @@ def _rebase_hit_times_table_v2(
     """
     if values.ndim != 2:
         raise ValueError("hit-times table must be 2D")
+    if start < 0 or stop < start or stop > values.shape[1]:
+        raise ValueError(
+            "hit-times table width must cover exec_target_slice; "
+            f"got slice({start}, {stop}), width={values.shape[1]}"
+        )
     window = np.asarray(values[:, start:stop], dtype=np.int64)
     rebased = np.where(
         (window >= start) & (window < stop),
@@ -703,6 +716,41 @@ def _rebase_hit_times_table_v2(
         local_sentinel_index,
     )
     return np.asarray(rebased, dtype=np.int64)
+
+
+def _normalize_hit_times_level_grid_v2(
+    *,
+    field_name: str,
+    values: np.ndarray,
+) -> np.ndarray:
+    """
+    Normalize one artifact-backed TP/SL level grid for grid-agnostic Stage B runtime use.
+
+    Args:
+        field_name: Deterministic diagnostics field label.
+        values: Candidate artifact `tp_values` or `sl_values` vector.
+    Returns:
+        np.ndarray: Canonical one-dimensional `np.float32` level grid.
+    Assumptions:
+        Shipped `hit_times/1m` artifacts publish TP/SL levels as explicit 1D arrays and Stage B
+        reads grid shape from those artifact arrays instead of fixed-size literals.
+    Raises:
+        ValueError: If the grid is not one-dimensional or has no levels.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/contracts.py
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+    """
+    normalized = np.asarray(values, dtype=np.float32)
+    if normalized.ndim != 1:
+        raise ValueError(f"{field_name} must be a 1D array")
+    if normalized.shape[0] <= 0:
+        raise ValueError(f"{field_name} must contain at least one level")
+    return normalized
 
 
 def _normalize_execution_prices_v2(
