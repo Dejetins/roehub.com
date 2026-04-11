@@ -284,7 +284,7 @@ class PreparedIndicatorRowPlanV2:
 @dataclass(frozen=True, slots=True)
 class PreparedIndicatorChunkInputsV2:
     """
-    Per-indicator Stage A chunk inputs carrying signal rows and optional warm-cache feature access.
+    Per-indicator Stage A chunk inputs carrying signal rows, row addressing, and warm-cache access.
 
     Docs:
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
@@ -297,10 +297,53 @@ class PreparedIndicatorChunkInputsV2:
 
     indicator_id: str
     signal_rows: np.ndarray
+    signal_row_selection: tuple[int, ...] | None = None
     signal_features_loader: BacktestSignalFeaturesLoaderV2 | None = None
     signal_features_context: ArtifactSlotPinnedRuntimeContextV2 | None = None
     signal_features_access: BacktestSignalFeaturesAccessPlanV2 | None = None
     signal_feature_row_selection: slice | tuple[int, ...] | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate one prepared chunk input and keep retained row addressing explicit.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Explicit `signal_row_selection` remains 1:1 aligned with `signal_rows` so later
+            Stage A steps can rebuild exact retained batches without retaining full
+            `final_signal_row` buffers, while omitted selections fall back to batch-local ordinal
+            positions for additive compatibility with older callers.
+        Raises:
+            ValueError: If `signal_rows` is not 2D, row selection is empty, or alignment drifts.
+        Side Effects:
+            Normalizes `signal_row_selection` to builtin `int` values.
+        """
+        normalized_signal_rows = np.asarray(self.signal_rows, dtype=np.int8)
+        if normalized_signal_rows.ndim != 2:
+            raise ValueError("PreparedIndicatorChunkInputsV2.signal_rows must be 2D")
+        raw_row_selection = self.signal_row_selection
+        normalized_row_selection = (
+            tuple(range(int(normalized_signal_rows.shape[0])))
+            if raw_row_selection is None
+            else tuple(int(value) for value in raw_row_selection)
+        )
+        if len(normalized_row_selection) == 0:
+            raise ValueError(
+                "PreparedIndicatorChunkInputsV2.signal_row_selection must be non-empty"
+            )
+        if any(value < 0 for value in normalized_row_selection):
+            raise ValueError(
+                "PreparedIndicatorChunkInputsV2.signal_row_selection must be >= 0"
+            )
+        if len(normalized_row_selection) != int(normalized_signal_rows.shape[0]):
+            raise ValueError(
+                "PreparedIndicatorChunkInputsV2.signal_row_selection must align with signal_rows"
+            )
+        object.__setattr__(self, "signal_rows", normalized_signal_rows)
+        object.__setattr__(self, "signal_row_selection", normalized_row_selection)
 
     def load_signal_feature_rows(self) -> ArtifactSignalFeaturesRowsV2 | None:
         """
@@ -312,8 +355,9 @@ class PreparedIndicatorChunkInputsV2:
             ArtifactSignalFeaturesRowsV2 | None: Selected feature rows when the additive
                 `signal_features` family is available for this indicator, else `None`.
         Assumptions:
-            `signal_feature_row_selection` stays aligned with `signal_rows` ordering for the same
-            chunk variants, and feature matrices should stay lazy until this method is called.
+            `signal_row_selection` and optional `signal_feature_row_selection` stay aligned with
+            `signal_rows` ordering for the same chunk variants, and feature matrices should stay
+            lazy until this method is called.
         Raises:
             ValueError: If lazy feature-access metadata is only partially populated.
         Side Effects:
@@ -440,6 +484,49 @@ class RetainedIndicatorRowFrontierV2:
 
 
 @dataclass(frozen=True, slots=True)
+class _RetainedExactCandidateAddressV2:
+    """
+    Minimal deterministic row-address metadata for one retained Stage A exact candidate.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py
+    """
+
+    indicator_row_indexes: tuple[int, ...]
+
+    def __post_init__(self) -> None:
+        """
+        Validate one retained exact-candidate address and keep it compact.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Each retained exact candidate needs only per-indicator row indexes to rebuild its
+            Stage A `final_signal` deterministically during exact evaluation.
+        Raises:
+            ValueError: If the retained address is empty or contains negative row indexes.
+        Side Effects:
+            Normalizes `indicator_row_indexes` to builtin `int` values.
+        """
+        normalized_row_indexes = tuple(int(value) for value in self.indicator_row_indexes)
+        if len(normalized_row_indexes) == 0:
+            raise ValueError(
+                "_RetainedExactCandidateAddressV2.indicator_row_indexes must be non-empty"
+            )
+        if any(value < 0 for value in normalized_row_indexes):
+            raise ValueError(
+                "_RetainedExactCandidateAddressV2.indicator_row_indexes must be >= 0"
+            )
+        object.__setattr__(self, "indicator_row_indexes", normalized_row_indexes)
+
+
+@dataclass(frozen=True, slots=True)
 class _RetainedExactCandidateV2:
     """
     One deterministic combo proxy prefilter survivor retained for exact candidate evaluation.
@@ -454,7 +541,7 @@ class _RetainedExactCandidateV2:
 
     base_variant: BacktestStageABaseVariantV2
     proxy_score: float
-    final_signal_row: np.ndarray = field(repr=False, compare=False)
+    retained_address: _RetainedExactCandidateAddressV2
 
     def __post_init__(self) -> None:
         """
@@ -465,26 +552,17 @@ class _RetainedExactCandidateV2:
         Returns:
             None.
         Assumptions:
-            The retained frontier stores only compact final-signal rows so the exact path can
-            remain authoritative without reloading the full row-prefiltered cartesian search.
+            The retained frontier stores only minimal row-address metadata so exact scoring can
+            reload deterministic signal rows without retaining full `final_signal_row` buffers.
         Raises:
-            ValueError: If the proxy score is non-finite or the final signal row is not 1D.
+            ValueError: If the proxy score is non-finite.
         Side Effects:
-            Normalizes `proxy_score` to builtin `float` and copies `final_signal_row` to compact
-            contiguous `np.int8`.
+            Normalizes `proxy_score` to builtin `float`.
         """
         proxy_score = float(self.proxy_score)
         if not math.isfinite(proxy_score):
             raise ValueError("_RetainedExactCandidateV2.proxy_score must be finite")
-        normalized_signal_row = np.asarray(self.final_signal_row, dtype=np.int8)
-        if normalized_signal_row.ndim != 1:
-            raise ValueError("_RetainedExactCandidateV2.final_signal_row must be 1D")
         object.__setattr__(self, "proxy_score", proxy_score)
-        object.__setattr__(
-            self,
-            "final_signal_row",
-            np.ascontiguousarray(normalized_signal_row),
-        )
 
     def sort_key(self) -> tuple[float, int, str]:
         """
@@ -507,6 +585,176 @@ class _RetainedExactCandidateV2:
             self.base_variant.stage_a_index,
             self.base_variant.base_variant_key,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class StageARetainedFrontierMemoryShapeV2:
+    """
+    Contract-level memory-shape snapshot for the Stage A retained frontier.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-engine-vnext.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+
+    candidate_count: int
+    indicator_count_per_candidate: int
+    retained_address_value_count: int
+    signal_bar_count: int
+    legacy_final_signal_value_count: int
+    legacy_to_address_value_ratio: float | None
+    stores_full_final_signal_rows: bool
+
+    def __post_init__(self) -> None:
+        """
+        Validate one additive retained-frontier memory-shape snapshot.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            This snapshot measures contract-level retained payload shape only; it does not claim to
+            model full Python object overhead or process RSS.
+        Raises:
+            ValueError: If counts are negative or the legacy-to-address ratio is invalid.
+        Side Effects:
+            None.
+        """
+        if self.candidate_count < 0:
+            raise ValueError("StageARetainedFrontierMemoryShapeV2.candidate_count must be >= 0")
+        if self.indicator_count_per_candidate < 0:
+            raise ValueError(
+                "StageARetainedFrontierMemoryShapeV2.indicator_count_per_candidate must be >= 0"
+            )
+        if self.retained_address_value_count < 0:
+            raise ValueError(
+                "StageARetainedFrontierMemoryShapeV2.retained_address_value_count must be >= 0"
+            )
+        if self.signal_bar_count < 0:
+            raise ValueError(
+                "StageARetainedFrontierMemoryShapeV2.signal_bar_count must be >= 0"
+            )
+        if self.legacy_final_signal_value_count < 0:
+            raise ValueError(
+                "StageARetainedFrontierMemoryShapeV2.legacy_final_signal_value_count must be >= 0"
+            )
+        if (
+            self.legacy_to_address_value_ratio is not None
+            and self.legacy_to_address_value_ratio <= 0.0
+        ):
+            raise ValueError(
+                "StageARetainedFrontierMemoryShapeV2.legacy_to_address_value_ratio must be > 0"
+            )
+
+
+def describe_stage_a_retained_frontier_memory_shape_v2(
+    *,
+    retained_exact_candidates: Sequence[_RetainedExactCandidateV2],
+    signal_bar_count: int,
+) -> StageARetainedFrontierMemoryShapeV2:
+    """
+    Describe the retained frontier `memory shape` after full `final_signal_row` removal.
+
+    Args:
+        retained_exact_candidates: Deterministic retained exact candidates emitted by Stage A.
+        signal_bar_count: Signal-timeline bar count that the legacy retained contract would have
+            stored per survivor as a full `final_signal_row`.
+    Returns:
+        StageARetainedFrontierMemoryShapeV2: Additive benchmark evidence comparing retained
+            addressing cardinality against the removed legacy retained payload shape.
+    Assumptions:
+        Exact candidates now retain only per-indicator row addresses, while the legacy contract
+        retained one full `final_signal_row` value per signal bar and survivor.
+    Raises:
+        ValueError: If `signal_bar_count` is negative or candidate address widths are inconsistent.
+    Side Effects:
+        None.
+    """
+    if signal_bar_count < 0:
+        raise ValueError("Stage A retained frontier signal_bar_count must be >= 0")
+    candidate_count = len(retained_exact_candidates)
+    if candidate_count == 0:
+        return StageARetainedFrontierMemoryShapeV2(
+            candidate_count=0,
+            indicator_count_per_candidate=0,
+            retained_address_value_count=0,
+            signal_bar_count=int(signal_bar_count),
+            legacy_final_signal_value_count=0,
+            legacy_to_address_value_ratio=None,
+            stores_full_final_signal_rows=False,
+        )
+    indicator_count_per_candidate = len(
+        retained_exact_candidates[0].retained_address.indicator_row_indexes
+    )
+    for candidate in retained_exact_candidates[1:]:
+        if (
+            len(candidate.retained_address.indicator_row_indexes)
+            != indicator_count_per_candidate
+        ):
+            raise ValueError(
+                "Stage A retained frontier requires uniform retained address width"
+            )
+    retained_address_value_count = candidate_count * indicator_count_per_candidate
+    legacy_final_signal_value_count = candidate_count * int(signal_bar_count)
+    legacy_to_address_value_ratio = (
+        None
+        if retained_address_value_count == 0 or legacy_final_signal_value_count == 0
+        else float(legacy_final_signal_value_count) / float(retained_address_value_count)
+    )
+    return StageARetainedFrontierMemoryShapeV2(
+        candidate_count=candidate_count,
+        indicator_count_per_candidate=indicator_count_per_candidate,
+        retained_address_value_count=retained_address_value_count,
+        signal_bar_count=int(signal_bar_count),
+        legacy_final_signal_value_count=legacy_final_signal_value_count,
+        legacy_to_address_value_ratio=legacy_to_address_value_ratio,
+        stores_full_final_signal_rows=False,
+    )
+
+
+def _retained_exact_candidate_addresses_for_chunk_v2(
+    *,
+    chunk_inputs: Sequence[PreparedIndicatorChunkInputsV2],
+) -> tuple[_RetainedExactCandidateAddressV2, ...]:
+    """
+    Transpose per-indicator chunk selections into per-candidate retained row addresses.
+
+    Args:
+        chunk_inputs: Per-indicator Stage A chunk inputs aligned to the same variant order.
+    Returns:
+        tuple[_RetainedExactCandidateAddressV2, ...]: One retained row-address payload per chunk
+            variant in deterministic Stage A order.
+    Assumptions:
+        Every prepared indicator input exposes the same variant count and preserves the authored
+        indicator-plan order used by Stage A aggregation.
+    Raises:
+        ValueError: If the chunk is empty or indicator chunk sizes drift.
+    Side Effects:
+        None.
+    """
+    if len(chunk_inputs) == 0:
+        raise ValueError("Stage A retained address derivation requires non-empty chunk_inputs")
+    chunk_row_count = len(chunk_inputs[0].signal_row_selection)
+    if chunk_row_count == 0:
+        raise ValueError("Stage A retained address derivation requires at least one chunk row")
+    for chunk_input in chunk_inputs[1:]:
+        if len(chunk_input.signal_row_selection) != chunk_row_count:
+            raise ValueError(
+                "Stage A retained address derivation requires aligned signal_row_selection sizes"
+            )
+    return tuple(
+        _RetainedExactCandidateAddressV2(
+            indicator_row_indexes=tuple(int(value) for value in row_indexes)
+        )
+        for row_indexes in zip(
+            *(chunk_input.signal_row_selection for chunk_input in chunk_inputs),
+            strict=True,
+        )
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -729,7 +977,10 @@ class BacktestStageAShortlistBuilderV2:
             shortlist_heap: list[StageAHeapEntryV2] = []
             self._score_retained_exact_candidates_into_heap(
                 retained_exact_candidates=retained_exact_candidates,
+                row_plans=row_plans,
                 grid_context=grid_context,
+                artifact_context=artifact_context,
+                signal_target_slice=signal_target_slice,
                 local_bar_close_1m_idx=local_bar_close_1m_idx,
                 sentinel_index=sentinel_index,
                 local_exec_open=local_exec_open,
@@ -852,8 +1103,8 @@ class BacktestStageAShortlistBuilderV2:
         Raises:
             ValueError: If the exact-candidate limit is non-positive or no candidates survive.
         Side Effects:
-            Reads retained signal-row subsets and stores compact `final_signal` rows for exact
-            survivor evaluation.
+            Reads retained signal-row subsets, computes combo proxy scores, and stores only
+            minimal retained row-address metadata for later exact survivor evaluation.
         """
         if exact_candidates_limit <= 0:
             raise ValueError(
@@ -886,12 +1137,18 @@ class BacktestStageAShortlistBuilderV2:
                     artifact_context=artifact_context,
                     signal_target_slice=signal_target_slice,
                 )
+                retained_candidate_addresses = (
+                    _retained_exact_candidate_addresses_for_chunk_v2(
+                        chunk_inputs=chunk_inputs
+                    )
+                )
                 selected_signal_rows = {
                     prepared_input.indicator_id: prepared_input.signal_rows
                     for prepared_input in chunk_inputs
                 }
                 self._merge_combo_proxy_chunk_into_frontier(
                     chunk_variants=retained_chunk_variants,
+                    retained_candidate_addresses=retained_candidate_addresses,
                     final_signal=aggregate_final_signal_rows_v2(
                         selected_signal_rows=selected_signal_rows
                     ),
@@ -999,6 +1256,7 @@ class BacktestStageAShortlistBuilderV2:
         self,
         *,
         chunk_variants: Sequence[BacktestStageABaseVariantV2],
+        retained_candidate_addresses: Sequence[_RetainedExactCandidateAddressV2],
         final_signal: np.ndarray,
         local_signal_close: np.ndarray,
         execution_params: ExecutionParamsV1,
@@ -1010,6 +1268,8 @@ class BacktestStageAShortlistBuilderV2:
 
         Args:
             chunk_variants: Deterministic Stage A base variants surviving row prefilter.
+            retained_candidate_addresses: Minimal retained row-address metadata aligned to
+                `chunk_variants`.
             final_signal: Aggregated Stage A `final_signal[V, T_signal]` for the same variants.
             local_signal_close: Request-timeframe close prices aligned to `final_signal`.
             execution_params: Immutable execution settings supplying the fee penalty.
@@ -1021,10 +1281,16 @@ class BacktestStageAShortlistBuilderV2:
             The combo proxy prefilter uses only cheap request-timeframe signals and explicit
             stable tie-breaks to build a deterministic retained frontier.
         Raises:
-            ValueError: If the final-signal row count drifts from `chunk_variants`.
+            ValueError: If the retained address or final-signal row count drifts from
+                `chunk_variants`.
         Side Effects:
             Mutates `frontier_heap` in place.
         """
+        if len(retained_candidate_addresses) != len(chunk_variants):
+            raise ValueError(
+                "Stage A combo proxy prefilter requires retained_candidate_addresses to match "
+                "chunk_variants"
+            )
         if int(final_signal.shape[0]) != len(chunk_variants):
             raise ValueError(
                 "Stage A combo proxy prefilter requires final_signal rows to match "
@@ -1052,7 +1318,7 @@ class BacktestStageAShortlistBuilderV2:
             candidate = _RetainedExactCandidateV2(
                 base_variant=base_variant,
                 proxy_score=float(proxy_scores[row_index]),
-                final_signal_row=np.asarray(final_signal[row_index, :], dtype=np.int8),
+                retained_address=retained_candidate_addresses[row_index],
             )
             heap_entry = (
                 candidate.proxy_score,
@@ -1557,6 +1823,7 @@ class BacktestStageAShortlistBuilderV2:
                 PreparedIndicatorChunkInputsV2(
                     indicator_id=row_plan.indicator_id,
                     signal_rows=signal_rows,
+                    signal_row_selection=row_indexes,
                     signal_features_loader=(
                         self.signal_features_loader
                         if (
@@ -1585,6 +1852,73 @@ class BacktestStageAShortlistBuilderV2:
                 )
             )
         return tuple(prepared_inputs)
+
+    def _load_retained_exact_final_signal_batch(
+        self,
+        *,
+        retained_exact_candidates: Sequence[_RetainedExactCandidateV2],
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
+        grid_context: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        signal_target_slice: slice,
+    ) -> np.ndarray:
+        """
+        Rebuild one retained exact batch's `final_signal` from compact row-address metadata.
+
+        Args:
+            retained_exact_candidates: Retained exact candidates for one deterministic batch.
+            row_plans: Prepared per-indicator row-addressing plans in aggregation order.
+            grid_context: Stage A runtime plan owning the request timeframe literal.
+            artifact_context: Slot-pinned runtime context for explicit signal-row reads.
+            signal_target_slice: Target request slice in the signal timeline.
+        Returns:
+            np.ndarray: Aggregated `final_signal[V, T_signal]` rows for the retained batch.
+        Assumptions:
+            Candidate row addresses are already deterministic and aligned to the same indicator
+            plan order used during combo proxy prefiltering.
+        Raises:
+            ValueError: If the retained batch is empty or one candidate address width drifts from
+                `row_plans`.
+        Side Effects:
+            Reloads only the retained signal-row subsets needed for the exact batch.
+        """
+        if len(retained_exact_candidates) == 0:
+            raise ValueError(
+                "Stage A exact retained-candidate evaluation requires non-empty retained batches"
+            )
+        expected_indicator_count = len(row_plans)
+        if expected_indicator_count <= 0:
+            raise ValueError(
+                "Stage A exact retained-candidate evaluation requires non-empty row_plans"
+            )
+        for candidate in retained_exact_candidates:
+            if (
+                len(candidate.retained_address.indicator_row_indexes)
+                != expected_indicator_count
+            ):
+                raise ValueError(
+                    "Stage A exact retained-candidate evaluation requires retained addresses "
+                    "to align with row_plans"
+                )
+        selected_signal_rows: dict[str, np.ndarray] = {}
+        for plan_position, row_plan in enumerate(row_plans):
+            indicator_row_indexes = np.fromiter(
+                (
+                    candidate.retained_address.indicator_row_indexes[plan_position]
+                    for candidate in retained_exact_candidates
+                ),
+                dtype=np.int64,
+                count=len(retained_exact_candidates),
+            )
+            selected_signal_rows[row_plan.indicator_id] = _load_chunk_signal_rows_v2(
+                signal_matrix_loader=self.signal_matrix_loader,
+                artifact_context=artifact_context,
+                timeframe=grid_context.timeframe_code,
+                indicator_id=row_plan.indicator_id,
+                indicator_row_indexes=indicator_row_indexes,
+                signal_target_slice=signal_target_slice,
+            )
+        return aggregate_final_signal_rows_v2(selected_signal_rows=selected_signal_rows)
 
     def _resolve_batch_size(
         self,
@@ -1685,7 +2019,10 @@ class BacktestStageAShortlistBuilderV2:
         self,
         *,
         retained_exact_candidates: Sequence[_RetainedExactCandidateV2],
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
         grid_context: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        signal_target_slice: slice,
         local_bar_close_1m_idx: np.ndarray,
         sentinel_index: int,
         local_exec_open: np.ndarray,
@@ -1702,7 +2039,10 @@ class BacktestStageAShortlistBuilderV2:
 
         Args:
             retained_exact_candidates: Deterministic combo proxy prefilter survivors.
+            row_plans: Prepared per-indicator row-addressing plans in aggregation order.
             grid_context: Stage A grid context with direction-mode metadata.
+            artifact_context: Slot-pinned runtime context for explicit retained-row reads.
+            signal_target_slice: Target request slice in the signal timeline.
             local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
             sentinel_index: Local execution sentinel index.
             local_exec_open: Local execution-bar open prices.
@@ -1719,10 +2059,12 @@ class BacktestStageAShortlistBuilderV2:
             Exact survivors are already bounded and ordered by combo proxy prefilter, but the
             existing exact no-risk evaluation remains authoritative for final Stage A ranking.
         Raises:
-            ValueError: If retained final-signal rows cannot be stacked consistently.
+            ValueError: If retained row addresses cannot be rebuilt into exact batches
+                consistently.
         Side Effects:
-            Mutates `shortlist_heap` in place while preserving the retained exact payload on each
-            shortlisted row for downstream Stage B exact scoring.
+            Mutates `shortlist_heap` in place while reloading only retained signal-row subsets and
+            preserving the retained exact payload on each shortlisted row for downstream Stage B
+            exact scoring.
         """
         for offset in range(0, len(retained_exact_candidates), batch_size):
             if cancel_checker is not None:
@@ -1732,14 +2074,12 @@ class BacktestStageAShortlistBuilderV2:
                 chunk_variants=tuple(
                     candidate.base_variant for candidate in candidate_batch
                 ),
-                final_signal=np.ascontiguousarray(
-                    np.stack(
-                        tuple(
-                            candidate.final_signal_row for candidate in candidate_batch
-                        ),
-                        axis=0,
-                    ),
-                    dtype=np.int8,
+                final_signal=self._load_retained_exact_final_signal_batch(
+                    retained_exact_candidates=candidate_batch,
+                    row_plans=row_plans,
+                    grid_context=grid_context,
+                    artifact_context=artifact_context,
+                    signal_target_slice=signal_target_slice,
                 ),
                 grid_context=grid_context,
                 local_bar_close_1m_idx=local_bar_close_1m_idx,

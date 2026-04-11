@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
 
 from trading.contexts.backtest.application.services import (
     BacktestNotebookParityMeasurementV2,
@@ -9,6 +11,9 @@ from trading.contexts.backtest.application.services import (
     read_backtest_notebook_parity_benchmark_corpus_payload_v2,
     serialize_backtest_notebook_parity_benchmark_corpus_payload_v2,
     serialize_backtest_notebook_parity_measurements_v2,
+)
+from trading.contexts.backtest.application.services.v2 import (
+    stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
 )
 
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -257,6 +262,67 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
         b"  ]\n"
         b"}\n"
     )
+
+
+def test_stage_a_retained_frontier_memory_shape_is_observable_for_benchmarks() -> None:
+    """
+    Verify perf-smoke can observe the retained frontier `memory shape` improvement additively.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-engine-vnext.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The retained frontier now stores only deterministic per-indicator row addresses, while the
+        removed legacy contract would have retained one full `final_signal_row` value per bar.
+    Raises:
+        AssertionError: If the additive benchmark evidence no longer reflects the cutover.
+    Side Effects:
+        None.
+    """
+    retained_exact_candidates = (
+        stage_a_shortlist_builder_module._RetainedExactCandidateV2(
+            base_variant=cast(
+                Any,
+                SimpleNamespace(stage_a_index=0, base_variant_key="0" * 64),
+            ),
+            proxy_score=3.0,
+            retained_address=stage_a_shortlist_builder_module._RetainedExactCandidateAddressV2(
+                indicator_row_indexes=(1, 4, 7)
+            ),
+        ),
+        stage_a_shortlist_builder_module._RetainedExactCandidateV2(
+            base_variant=cast(
+                Any,
+                SimpleNamespace(stage_a_index=1, base_variant_key="1" * 64),
+            ),
+            proxy_score=2.0,
+            retained_address=stage_a_shortlist_builder_module._RetainedExactCandidateAddressV2(
+                indicator_row_indexes=(1, 5, 6)
+            ),
+        ),
+    )
+
+    memory_shape = (
+        stage_a_shortlist_builder_module.describe_stage_a_retained_frontier_memory_shape_v2(
+            retained_exact_candidates=retained_exact_candidates,
+            signal_bar_count=4_096,
+        )
+    )
+
+    assert memory_shape.candidate_count == 2
+    assert memory_shape.indicator_count_per_candidate == 3
+    assert memory_shape.retained_address_value_count == 6
+    assert memory_shape.signal_bar_count == 4_096
+    assert memory_shape.legacy_final_signal_value_count == 8_192
+    assert round(memory_shape.legacy_to_address_value_ratio or 0.0, 2) == 1365.33
+    assert memory_shape.stores_full_final_signal_rows is False
 
 
 def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shape_gates() -> None:

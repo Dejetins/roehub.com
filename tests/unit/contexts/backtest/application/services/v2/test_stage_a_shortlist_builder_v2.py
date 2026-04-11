@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime, timezone
 from itertools import product
 from types import SimpleNamespace
@@ -743,7 +743,11 @@ def test_stage_a_shortlist_builder_v2_uses_subset_row_loading_for_selected_varia
     )
 
     assert len(shortlist) == 1
-    assert recording_loader.calls == [("ma.ema", (0,)), ("ma.ema", (0,))]
+    assert recording_loader.calls == [
+        ("ma.ema", (0,)),
+        ("ma.ema", (0,)),
+        ("ma.ema", (0,)),
+    ]
 
 
 def test_stage_a_shortlist_builder_v2_prefilters_rows_before_exact_evaluation(
@@ -784,7 +788,11 @@ def test_stage_a_shortlist_builder_v2_prefilters_rows_before_exact_evaluation(
 
     assert len(shortlist) == 1
     assert shortlist[0].base_variant.stage_a_index == 1
-    assert recording_loader.calls == [("ma.ema", (0, 1)), ("ma.ema", (1,))]
+    assert recording_loader.calls == [
+        ("ma.ema", (0, 1)),
+        ("ma.ema", (1,)),
+        ("ma.ema", (1,)),
+    ]
 
 
 def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
@@ -1151,6 +1159,7 @@ def test_stage_a_shortlist_builder_v2_exposes_optional_signal_features_warm_cach
 
     assert len(chunk_inputs) == 1
     assert isinstance(chunk_inputs[0], PreparedIndicatorChunkInputsV2)
+    assert chunk_inputs[0].signal_row_selection == (0,)
     feature_rows = chunk_inputs[0].load_signal_feature_rows()
     assert feature_rows is not None
     assert feature_rows.feature_names == (
@@ -1165,6 +1174,30 @@ def test_stage_a_shortlist_builder_v2_exposes_optional_signal_features_warm_cach
         feature_rows.rows,
         np.array(((1.0, 0.0, 1.0, 0.5, -1.0, 1.0),), dtype=np.float32),
     )
+
+
+def test_prepared_indicator_chunk_inputs_v2_keeps_signal_row_selection_additive() -> None:
+    """
+    Verify retained row-address metadata stays additive on prepared chunk inputs.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Older callers may construct prepared chunk inputs without explicit row addressing, and the
+        retained-frontier cutover should not force them to pass new constructor arguments.
+    Raises:
+        AssertionError: If omitted row-address metadata no longer defaults deterministically.
+    Side Effects:
+        None.
+    """
+    chunk_inputs = PreparedIndicatorChunkInputsV2(
+        indicator_id="ma.ema",
+        signal_rows=np.zeros((2, 3), dtype=np.int8),
+    )
+
+    assert chunk_inputs.signal_row_selection == (0, 1)
 
 
 def test_stage_a_shortlist_builder_v2_keeps_signal_features_lazy_until_explicit_access(
@@ -1397,6 +1430,47 @@ def test_stage_a_shortlist_builder_v2_combo_proxy_frontier_order_is_batch_invari
     ) == tuple(row.base_variant.base_variant_key for row in large_batch_shortlist)
 
 
+def test_stage_a_shortlist_builder_v2_combo_proxy_retains_only_addressing_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify the retained frontier stores deterministic row addressing instead of `final_signal_row`.
+
+    Args:
+        monkeypatch: pytest fixture used to inspect retained exact candidates before exact scoring.
+    Returns:
+        None.
+    Assumptions:
+        The combo proxy fixture keeps the first four Stage A variants as retained survivors, and
+        each retained candidate should expose only compact per-indicator row indexes.
+    Raises:
+        AssertionError: If retained candidates still carry `final_signal_row` or lose addressing.
+    Side Effects:
+        Monkeypatches one builder method for retained-candidate inspection.
+    """
+    retained_addresses = _record_retained_exact_candidate_addresses(monkeypatch)
+
+    BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=_combo_proxy_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, _combo_proxy_grid_context()),
+        artifact_context=cast(Any, _combo_proxy_artifact_context()),
+        target_time_range=_combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=8,
+    )
+
+    retained_candidate_field_names = {
+        current_field.name
+        for current_field in fields(stage_a_shortlist_builder_module._RetainedExactCandidateV2)
+    }
+
+    assert retained_addresses == [((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1))]
+    assert "retained_address" in retained_candidate_field_names
+    assert "final_signal_row" not in retained_candidate_field_names
+
+
 def test_stage_a_shortlist_builder_v2_materializes_exact_payloads_only_for_shortlisted_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1603,6 +1677,66 @@ def _record_retained_exact_candidate_frontiers(
         _recording_method,
     )
     return retained_frontiers
+
+
+def _record_retained_exact_candidate_addresses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[tuple[int, ...], ...]]:
+    """
+    Record retained exact-candidate row addresses emitted by combo proxy prefilter.
+
+    Args:
+        monkeypatch: pytest fixture used to wrap the builder method.
+    Returns:
+        list[tuple[tuple[int, ...], ...]]: Retained per-candidate row addresses captured for each
+            Stage A build.
+    Assumptions:
+        Retained exact candidates should expose compact row-address metadata and no
+        `final_signal_row` field after the retained frontier cutover.
+    Raises:
+        AssertionError: If one retained candidate still exposes `final_signal_row`.
+    Side Effects:
+        Monkeypatches `BacktestStageAShortlistBuilderV2._score_retained_exact_candidates_into_heap`.
+    """
+    retained_addresses: list[tuple[tuple[int, ...], ...]] = []
+    original_method = (
+        BacktestStageAShortlistBuilderV2._score_retained_exact_candidates_into_heap
+    )
+
+    def _recording_method(self: Any, **kwargs: Any) -> None:
+        """
+        Record retained row addresses before delegating to the exact scorer.
+
+        Args:
+            self: Builder instance under test.
+            **kwargs: Exact-scoring keyword arguments including `retained_exact_candidates`.
+        Returns:
+            None.
+        Assumptions:
+            Candidate address tuples preserve authored indicator-plan order and replace the legacy
+            retained `final_signal_row` contract completely.
+        Raises:
+            AssertionError: If one candidate still exposes `final_signal_row`.
+        Side Effects:
+            Appends retained row-address tuples to the in-memory log.
+        """
+        retained_exact_candidates = kwargs["retained_exact_candidates"]
+        for candidate in retained_exact_candidates:
+            assert not hasattr(candidate, "final_signal_row")
+        retained_addresses.append(
+            tuple(
+                candidate.retained_address.indicator_row_indexes
+                for candidate in retained_exact_candidates
+            )
+        )
+        original_method(self, **kwargs)
+
+    monkeypatch.setattr(
+        BacktestStageAShortlistBuilderV2,
+        "_score_retained_exact_candidates_into_heap",
+        _recording_method,
+    )
+    return retained_addresses
 
 
 def _attach_signal_features_access(*, grid_context: _FakeGridContext) -> None:
