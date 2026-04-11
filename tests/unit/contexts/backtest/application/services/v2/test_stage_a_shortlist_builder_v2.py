@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from itertools import product
 from types import SimpleNamespace
 from typing import Any, Mapping, cast
 
@@ -412,6 +413,176 @@ class _ZeroSignalLoader:
         """
         row_selection = tuple(int(value) for value in kwargs["row_selection"])
         return np.zeros((len(row_selection), 2), dtype=np.int8)
+
+
+class _InMemorySignalRowsLoader:
+    """
+    Minimal in-memory signal-row loader for deterministic combo proxy prefilter tests.
+    """
+
+    def __init__(self, *, matrices_by_indicator: Mapping[str, np.ndarray]) -> None:
+        """
+        Initialize one deterministic in-memory signal catalog keyed by indicator id.
+
+        Args:
+            matrices_by_indicator: Full signal matrices keyed by indicator id.
+        Returns:
+            None.
+        Assumptions:
+            Combo proxy prefilter tests need explicit subset row reads without artifact IO.
+        Raises:
+            None.
+        Side Effects:
+            Stores normalized matrices and initializes an in-memory call log.
+        """
+        self._matrices_by_indicator = {
+            indicator_id: np.asarray(matrix, dtype=np.int8)
+            for indicator_id, matrix in matrices_by_indicator.items()
+        }
+        self.calls: list[tuple[str, tuple[int, ...]]] = []
+
+    def load_signal_matrix(self, **kwargs: Any) -> Any:
+        """
+        Reject unexpected full-matrix loads in combo proxy prefilter tests.
+
+        Args:
+            **kwargs: Ignored loader keyword arguments.
+        Returns:
+            Any: Never returns.
+        Assumptions:
+            Stage A shortlist builder should use subset row loading only on this path.
+        Raises:
+            AssertionError: Always.
+        Side Effects:
+            None.
+        """
+        _ = kwargs
+        raise AssertionError("Stage A shortlist builder must not call load_signal_matrix")
+
+    def load_signal_rows(self, **kwargs: Any) -> np.ndarray:
+        """
+        Return deterministic selected signal rows and record the explicit row selection.
+
+        Args:
+            **kwargs: Loader keyword arguments carrying `indicator_id` and `row_selection`.
+        Returns:
+            np.ndarray: Selected `np.int8` signal rows in the requested order.
+        Assumptions:
+            Combo proxy prefilter tests keep signal matrices fully in memory.
+        Raises:
+            KeyError: If the indicator id is unknown in the test fixture.
+        Side Effects:
+            Appends one `(indicator_id, row_selection)` tuple to the in-memory log.
+        """
+        indicator_id = str(kwargs["indicator_id"])
+        row_selection = tuple(int(value) for value in kwargs["row_selection"])
+        self.calls.append((indicator_id, row_selection))
+        matrix = self._matrices_by_indicator[indicator_id]
+        return np.asarray(matrix[row_selection, :], dtype=np.int8)
+
+
+class _ComboProxyPriceLoader:
+    """
+    Minimal price loader returning deterministic rising timelines for combo proxy tests.
+    """
+
+    def load_price_arrays(
+        self,
+        *,
+        context: Any,
+        timeframe: str,
+    ) -> Any:
+        """
+        Return deterministic request-timeframe and `1m` execution prices for combo tests.
+
+        Args:
+            context: Ignored artifact context fixture.
+            timeframe: Requested timeframe literal.
+        Returns:
+            Any: Namespace carrying `close_time` and `ohlcv`.
+        Assumptions:
+            Rising prices make stronger confirmation-heavy combos outrank weaker combos.
+        Raises:
+            ValueError: If an unsupported timeframe is requested.
+        Side Effects:
+            None.
+        """
+        _ = context
+        if timeframe == "15m":
+            return SimpleNamespace(
+                close_time=np.array([2_599, 4_599, 6_599], dtype=np.int64),
+                ohlcv=np.array(
+                    [
+                        [1.0, 1.0, 1.0, 1.0, 1.0],
+                        [2.0, 2.0, 2.0, 2.0, 2.0],
+                        [4.0, 4.0, 4.0, 4.0, 4.0],
+                    ],
+                    dtype=np.float32,
+                ),
+            )
+        if timeframe == "1m":
+            return SimpleNamespace(
+                close_time=np.array(
+                    [1_599, 2_599, 3_599, 4_599, 5_599, 6_599],
+                    dtype=np.int64,
+                ),
+                ohlcv=np.array(
+                    [
+                        [1.00, 1.00, 1.00, 1.05, 1.00],
+                        [1.05, 1.05, 1.05, 1.10, 1.00],
+                        [1.10, 1.10, 1.10, 1.20, 1.00],
+                        [1.20, 1.20, 1.20, 1.30, 1.00],
+                        [1.30, 1.30, 1.30, 1.40, 1.00],
+                        [1.40, 1.40, 1.40, 1.50, 1.00],
+                    ],
+                    dtype=np.float32,
+                ),
+            )
+        raise ValueError(f"unsupported timeframe: {timeframe}")
+
+    def load_mapping_arrays(
+        self,
+        *,
+        context: Any,
+        timeframe: str,
+    ) -> Any:
+        """
+        Return deterministic request-timeframe to `1m` close mappings for combo tests.
+
+        Args:
+            context: Ignored artifact context fixture.
+            timeframe: Requested timeframe literal.
+        Returns:
+            Any: Namespace carrying `bar_close_1m_idx`.
+        Assumptions:
+            Combo proxy prefilter integration tests use three request-timeframe bars.
+        Raises:
+            ValueError: If an unsupported timeframe is requested.
+        Side Effects:
+            None.
+        """
+        _ = context
+        if timeframe != "15m":
+            raise ValueError(f"unsupported timeframe: {timeframe}")
+        return SimpleNamespace(bar_close_1m_idx=np.array([1, 3, 5], dtype=np.uint32))
+
+    def load_hit_times_arrays(self, *, context: Any) -> Any:
+        """
+        Reject unsupported hit-times loading in combo proxy prefilter tests.
+
+        Args:
+            context: Ignored artifact context fixture.
+        Returns:
+            Any: Never returns.
+        Assumptions:
+            Stage A shortlist flow must not touch hit-times artifacts here.
+        Raises:
+            AssertionError: Always.
+        Side Effects:
+            None.
+        """
+        _ = context
+        raise AssertionError("Stage A shortlist builder must not load hit_times/1m artifacts")
 
 
 @pytest.fixture()
@@ -832,6 +1003,88 @@ def test_stage_a_shortlist_builder_v2_breaks_metric_ties_by_base_variant_key() -
     assert tuple(row.base_variant.base_variant_key for row in shortlist) == ("a" * 64, "b" * 64)
 
 
+def test_stage_a_shortlist_builder_v2_combo_proxy_prefilters_exact_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify combo proxy prefilter narrows exact survivors after row prefiltering.
+
+    Args:
+        monkeypatch: pytest fixture used to record the retained exact-candidate frontier.
+    Returns:
+        None.
+    Assumptions:
+        The three-indicator fixture keeps all rows through row prefilter but should retain only a
+        bounded deterministic combo proxy prefilter frontier before exact evaluation.
+    Raises:
+        AssertionError: If exact survivors are not pruned or the frontier order drifts.
+    Side Effects:
+        Monkeypatches one builder method for retained-frontier inspection.
+    """
+    retained_frontiers = _record_retained_exact_candidate_frontiers(monkeypatch)
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=_combo_proxy_signal_loader(),
+    )
+
+    shortlist = builder.build_shortlist(
+        grid_context=cast(Any, _combo_proxy_grid_context()),
+        artifact_context=cast(Any, _combo_proxy_artifact_context()),
+        target_time_range=_combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=1,
+    )
+
+    assert retained_frontiers == [(0, 1, 2, 3)]
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
+
+
+def test_stage_a_shortlist_builder_v2_combo_proxy_frontier_order_is_batch_invariant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify combo proxy prefilter keeps retained-frontier ordering deterministic across batches.
+
+    Args:
+        monkeypatch: pytest fixture used to record the retained exact-candidate frontier.
+    Returns:
+        None.
+    Assumptions:
+        The same retained frontier should emerge from identical inputs whether Stage A scans one
+        variant at a time or the full cartesian chunk at once.
+    Raises:
+        AssertionError: If retained-frontier ordering or exact shortlist results drift.
+    Side Effects:
+        Monkeypatches one builder method for retained-frontier inspection.
+    """
+    retained_frontiers = _record_retained_exact_candidate_frontiers(monkeypatch)
+    small_batch_shortlist = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=_combo_proxy_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, _combo_proxy_grid_context()),
+        artifact_context=cast(Any, _combo_proxy_artifact_context()),
+        target_time_range=_combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=1,
+    )
+    large_batch_shortlist = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=_combo_proxy_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, _combo_proxy_grid_context()),
+        artifact_context=cast(Any, _combo_proxy_artifact_context()),
+        target_time_range=_combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=8,
+    )
+
+    assert retained_frontiers == [(0, 1, 2, 3), (0, 1, 2, 3)]
+    assert tuple(
+        row.base_variant.base_variant_key for row in small_batch_shortlist
+    ) == tuple(row.base_variant.base_variant_key for row in large_batch_shortlist)
+
+
 def _inactive_context(store: SyntheticArtifactStoreV2) -> ArtifactSlotPinnedRuntimeContextV2:
     """
     Resolve one deterministic pinned context for the synthetic inactive slot.
@@ -857,6 +1110,60 @@ def _inactive_context(store: SyntheticArtifactStoreV2) -> ArtifactSlotPinnedRunt
             artifact_manifest_hash="b" * 64,
         ),
     )
+
+
+def _record_retained_exact_candidate_frontiers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> list[tuple[int, ...]]:
+    """
+    Record retained exact-candidate frontier ordering emitted by combo proxy prefilter.
+
+    Args:
+        monkeypatch: pytest fixture used to wrap the builder method.
+    Returns:
+        list[tuple[int, ...]]: Retained frontier stage-A indexes captured for each build.
+    Assumptions:
+        Combo proxy prefilter hands the full retained frontier into exact evaluation in one call.
+    Raises:
+        None.
+    Side Effects:
+        Monkeypatches `BacktestStageAShortlistBuilderV2._score_retained_exact_candidates_into_heap`.
+    """
+    retained_frontiers: list[tuple[int, ...]] = []
+    original_method = (
+        BacktestStageAShortlistBuilderV2._score_retained_exact_candidates_into_heap
+    )
+
+    def _recording_method(self: Any, **kwargs: Any) -> None:
+        """
+        Record retained frontier ordering before delegating to the exact scorer.
+
+        Args:
+            self: Builder instance under test.
+            **kwargs: Exact-scoring keyword arguments including `retained_exact_candidates`.
+        Returns:
+            None.
+        Assumptions:
+            Retained exact candidates stay in deterministic combo proxy prefilter order.
+        Raises:
+            None.
+        Side Effects:
+            Appends retained frontier stage-A indexes to the in-memory log.
+        """
+        retained_frontiers.append(
+            tuple(
+                candidate.base_variant.stage_a_index
+                for candidate in kwargs["retained_exact_candidates"]
+            )
+        )
+        original_method(self, **kwargs)
+
+    monkeypatch.setattr(
+        BacktestStageAShortlistBuilderV2,
+        "_score_retained_exact_candidates_into_heap",
+        _recording_method,
+    )
+    return retained_frontiers
 
 
 def _attach_signal_features_access(*, grid_context: _FakeGridContext) -> None:
@@ -952,6 +1259,150 @@ def _grid_context_for_windows(*, windows: tuple[int, ...]) -> _FakeGridContext:
     )
 
 
+def _combo_proxy_grid_context() -> _FakeGridContext:
+    """
+    Build a three-indicator Stage A grid context for combo proxy prefilter tests.
+
+    Args:
+        None.
+    Returns:
+        _FakeGridContext: Deterministic three-indicator cartesian Stage A fixture.
+    Assumptions:
+        Every indicator keeps both rows through row prefilter so combo proxy prefilter becomes the
+        first narrowing layer that reduces the retained exact-candidate frontier.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    indicator_rows = (
+        ("alpha", (10, 20)),
+        ("beta", (5, 15)),
+        ("gamma", (1, 2)),
+    )
+    base_variants = tuple(
+        _combo_proxy_base_variant(
+            stage_a_index=stage_a_index,
+            alpha_window=alpha_window,
+            beta_window=beta_window,
+            gamma_window=gamma_window,
+        )
+        for stage_a_index, (alpha_window, beta_window, gamma_window) in enumerate(
+            product(*(rows for _, rows in indicator_rows))
+        )
+    )
+    return _FakeGridContext(
+        base_variants=base_variants,
+        indicator_plans=tuple(
+            _FakeIndicatorPlan(
+                indicator_id=indicator_id,
+                axes=(_FakeAxis(name="window", values=windows),),
+            )
+            for indicator_id, windows in indicator_rows
+        ),
+    )
+
+
+def _combo_proxy_base_variant(
+    *,
+    stage_a_index: int,
+    alpha_window: int,
+    beta_window: int,
+    gamma_window: int,
+) -> BacktestStageABaseVariant:
+    """
+    Build one deterministic three-indicator Stage A base variant for combo proxy tests.
+
+    Args:
+        stage_a_index: Stage A flat index.
+        alpha_window: `alpha.window` parameter value.
+        beta_window: `beta.window` parameter value.
+        gamma_window: `gamma.window` parameter value.
+    Returns:
+        BacktestStageABaseVariant: Minimal three-indicator Stage A base variant fixture.
+    Assumptions:
+        Indicator ordering must stay explicit so retained-frontier ordering remains reviewable.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return BacktestStageABaseVariant(
+        stage_a_index=stage_a_index,
+        indicator_selections=(
+            IndicatorVariantSelection(
+                indicator_id="alpha",
+                inputs={"source": "close"},
+                params={"window": alpha_window},
+            ),
+            IndicatorVariantSelection(
+                indicator_id="beta",
+                inputs={"source": "close"},
+                params={"window": beta_window},
+            ),
+            IndicatorVariantSelection(
+                indicator_id="gamma",
+                inputs={"source": "close"},
+                params={"window": gamma_window},
+            ),
+        ),
+        signal_params={},
+        indicator_variant_key=f"{stage_a_index:x}" * 64,
+        base_variant_key=f"{stage_a_index + 8:x}" * 64,
+    )
+
+
+def _combo_proxy_signal_loader() -> _InMemorySignalRowsLoader:
+    """
+    Build one deterministic in-memory signal loader for combo proxy prefilter tests.
+
+    Args:
+        None.
+    Returns:
+        _InMemorySignalRowsLoader: Loader carrying aligned three-indicator test matrices.
+    Assumptions:
+        Each indicator's second row weakens consensus after the first bar while still surviving
+        row prefilter, making combo proxy prefilter the first narrowing step.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    strong_then_hold = np.array((1, 1, 1), dtype=np.int8)
+    weak_open_only = np.array((1, 0, 0), dtype=np.int8)
+    return _InMemorySignalRowsLoader(
+        matrices_by_indicator={
+            "alpha": np.vstack((strong_then_hold, weak_open_only)),
+            "beta": np.vstack((strong_then_hold, weak_open_only)),
+            "gamma": np.vstack((strong_then_hold, weak_open_only)),
+        }
+    )
+
+
+def _combo_proxy_artifact_context() -> Any:
+    """
+    Build one minimal artifact context fixture for combo proxy prefilter tests.
+
+    Args:
+        None.
+    Returns:
+        Any: Namespace exposing only the coordinates fields required by the builder.
+    Assumptions:
+        Combo proxy tests use in-memory loaders and therefore need only market-id resolution.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return SimpleNamespace(
+        coordinates=SimpleNamespace(
+            exchange="binance",
+            market_type="spot",
+            symbol="BTCUSDT",
+        )
+    )
+
+
 def _base_variant(
     *,
     stage_a_index: int,
@@ -1007,4 +1458,25 @@ def _synthetic_target_time_range() -> TimeRange:
     return TimeRange(
         start=UtcTimestamp(datetime(1970, 1, 1, 0, 0, 2, tzinfo=timezone.utc)),
         end=UtcTimestamp(datetime(1970, 1, 1, 0, 0, 5, tzinfo=timezone.utc)),
+    )
+
+
+def _combo_proxy_target_time_range() -> TimeRange:
+    """
+    Build the deterministic target range selecting all combo proxy test bars.
+
+    Args:
+        None.
+    Returns:
+        TimeRange: Requested `[Start, End)` window covering all synthetic combo-proxy bars.
+    Assumptions:
+        Combo proxy tests use request-timeframe close times `[2599, 4599, 6599]`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return TimeRange(
+        start=UtcTimestamp(datetime(1970, 1, 1, 0, 0, 2, tzinfo=timezone.utc)),
+        end=UtcTimestamp(datetime(1970, 1, 1, 0, 0, 7, tzinfo=timezone.utc)),
     )

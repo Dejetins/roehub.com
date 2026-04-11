@@ -1,4 +1,4 @@
-"""Artifact-backed Stage A shortlist builder with row-local prefilter before exact path."""
+"""Artifact-backed Stage A shortlist builder with row and combo proxy prefiltering."""
 
 from __future__ import annotations
 
@@ -69,6 +69,7 @@ _DEFAULT_FEE_PCT_BY_MARKET_ID_V2: Mapping[int, float] = MappingProxyType(
         4: 0.1,
     }
 )
+_COMBO_PROXY_PREFILTER_SURVIVOR_MULTIPLIER_V2 = 2
 
 StageACancelCheckerV2 = Callable[[str], None]
 StageACheckpointCallbackV2 = Callable[[int, int], None]
@@ -356,6 +357,76 @@ class RetainedIndicatorRowFrontierV2:
 
 
 @dataclass(frozen=True, slots=True)
+class _RetainedExactCandidateV2:
+    """
+    One deterministic combo proxy prefilter survivor retained for exact candidate evaluation.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+      - docs/architecture/backtest/backtest-engine-vnext.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py
+    """
+
+    base_variant: BacktestStageABaseVariantV2
+    proxy_score: float
+    final_signal_row: np.ndarray = field(repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        """
+        Validate one retained exact candidate emitted by combo proxy prefilter.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            The retained frontier stores only compact final-signal rows so the exact path can
+            remain authoritative without reloading the full row-prefiltered cartesian search.
+        Raises:
+            ValueError: If the proxy score is non-finite or the final signal row is not 1D.
+        Side Effects:
+            Normalizes `proxy_score` to builtin `float` and copies `final_signal_row` to compact
+            contiguous `np.int8`.
+        """
+        proxy_score = float(self.proxy_score)
+        if not math.isfinite(proxy_score):
+            raise ValueError("_RetainedExactCandidateV2.proxy_score must be finite")
+        normalized_signal_row = np.asarray(self.final_signal_row, dtype=np.int8)
+        if normalized_signal_row.ndim != 1:
+            raise ValueError("_RetainedExactCandidateV2.final_signal_row must be 1D")
+        object.__setattr__(self, "proxy_score", proxy_score)
+        object.__setattr__(
+            self,
+            "final_signal_row",
+            np.ascontiguousarray(normalized_signal_row),
+        )
+
+    def sort_key(self) -> tuple[float, int, str]:
+        """
+        Return one explicit deterministic retained-frontier ordering key.
+
+        Args:
+            None.
+        Returns:
+            tuple[float, int, str]: Descending proxy-score order with explicit stable tie-breaks.
+        Assumptions:
+            The combo proxy prefilter must keep retained frontier ordering reviewable and
+            reproducible across chunk sizes.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return (
+            -self.proxy_score,
+            self.base_variant.stage_a_index,
+            self.base_variant.base_variant_key,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestStageAShortlistBuilderV2:
     """
     Build deterministic Stage A shortlist rows with row-local prefilter before exact path.
@@ -545,46 +616,37 @@ class BacktestStageAShortlistBuilderV2:
             cancel_checker=cancel_checker,
         )
 
+        retained_exact_candidates = self._build_combo_proxy_prefilter_frontier(
+            row_plans=row_plans,
+            grid_context=grid_context,
+            artifact_context=artifact_context,
+            signal_target_slice=signal_target_slice,
+            local_signal_close=local_signal_close,
+            execution_params=execution_params,
+            row_prefilter_frontier=row_prefilter_frontier,
+            exact_candidates_limit=self._target_combo_prefilter_exact_candidates(
+                grid_context=grid_context,
+                shortlist_limit=shortlist_limit,
+            ),
+            batch_size=effective_batch_size,
+            cancel_checker=cancel_checker,
+            on_checkpoint=on_checkpoint,
+        )
         shortlist_heap: list[StageAHeapEntryV2] = []
-        chunk_variants: list[BacktestStageABaseVariantV2] = []
-        total = int(grid_context.stage_a_variants_total)
-        processed = 0
-
-        for base_variant in grid_context.iter_stage_a_variants():
-            chunk_variants.append(base_variant)
-            if (
-                len(chunk_variants) < effective_batch_size
-                and (processed + len(chunk_variants)) < total
-            ):
-                continue
-            if cancel_checker is not None:
-                cancel_checker(STAGE_A_LITERAL_V2)
-            retained_chunk_variants = self._filter_chunk_variants_by_row_prefilter(
-                row_plans=row_plans,
-                chunk_variants=chunk_variants,
-                row_prefilter_frontier=row_prefilter_frontier,
-            )
-            if retained_chunk_variants:
-                self._score_chunk_into_heap(
-                    row_plans=row_plans,
-                    chunk_variants=retained_chunk_variants,
-                    grid_context=grid_context,
-                    artifact_context=artifact_context,
-                    signal_target_slice=signal_target_slice,
-                    local_bar_close_1m_idx=local_bar_close_1m_idx,
-                    sentinel_index=sentinel_index,
-                    local_exec_open=local_exec_open,
-                    local_exec_close=local_exec_close,
-                    execution_params=execution_params,
-                    ranking_plan=ranking_plan,
-                    shortlist_limit=shortlist_limit,
-                    shortlist_heap=shortlist_heap,
-                )
-            processed += len(chunk_variants)
-            if on_checkpoint is not None:
-                on_checkpoint(processed, total)
-            chunk_variants.clear()
-
+        self._score_retained_exact_candidates_into_heap(
+            retained_exact_candidates=retained_exact_candidates,
+            grid_context=grid_context,
+            local_bar_close_1m_idx=local_bar_close_1m_idx,
+            sentinel_index=sentinel_index,
+            local_exec_open=local_exec_open,
+            local_exec_close=local_exec_close,
+            execution_params=execution_params,
+            ranking_plan=ranking_plan,
+            shortlist_limit=shortlist_limit,
+            shortlist_heap=shortlist_heap,
+            batch_size=effective_batch_size,
+            cancel_checker=cancel_checker,
+        )
         return stage_a_rows_from_heap_v2(heap=shortlist_heap)
 
     def _build_row_prefilter_frontier(
@@ -655,6 +717,111 @@ class BacktestStageAShortlistBuilderV2:
                 ),
             )
         return MappingProxyType(retained_frontier)
+
+    def _build_combo_proxy_prefilter_frontier(
+        self,
+        *,
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
+        grid_context: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        signal_target_slice: slice,
+        local_signal_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        row_prefilter_frontier: Mapping[str, RetainedIndicatorRowFrontierV2],
+        exact_candidates_limit: int,
+        batch_size: int,
+        cancel_checker: StageACancelCheckerV2 | None,
+        on_checkpoint: StageACheckpointCallbackV2 | None,
+    ) -> tuple[_RetainedExactCandidateV2, ...]:
+        """
+        Build the deterministic retained frontier for combo proxy prefilter before exact work.
+
+        Args:
+            row_plans: Prepared per-indicator row-addressing plans.
+            grid_context: Stage A runtime plan owning deterministic variant enumeration.
+            artifact_context: Slot-pinned runtime context for strict signal-row reads.
+            signal_target_slice: Target request slice in the signal timeline.
+            local_signal_close: Request-timeframe close prices aligned to `signal_target_slice`.
+            execution_params: Immutable execution settings supplying the fee penalty.
+            row_prefilter_frontier: Deterministic per-indicator retained row frontier.
+            exact_candidates_limit: Maximum retained exact-candidate count after combo pruning.
+            batch_size: Deterministic chunk size used while scanning Stage A variants.
+            cancel_checker: Optional cooperative cancellation callback by stage literal.
+            on_checkpoint: Optional progress callback `(processed, total)` after each scan chunk.
+        Returns:
+            tuple[_RetainedExactCandidateV2, ...]: Deterministic retained frontier sorted by
+                combo proxy prefilter score.
+        Assumptions:
+            The combo proxy prefilter narrows only Stage A exact survivors; final exact authority
+            remains unchanged because retained candidates still flow through the existing exact
+            no-risk evaluation.
+        Raises:
+            ValueError: If the exact-candidate limit is non-positive or no candidates survive.
+        Side Effects:
+            Reads retained signal-row subsets and stores compact `final_signal` rows for exact
+            survivor evaluation.
+        """
+        if exact_candidates_limit <= 0:
+            raise ValueError(
+                "Stage A combo proxy prefilter requires exact_candidates_limit > 0"
+            )
+        frontier_heap: list[tuple[float, int, _RetainedExactCandidateV2]] = []
+        chunk_variants: list[BacktestStageABaseVariantV2] = []
+        total = int(grid_context.stage_a_variants_total)
+        processed = 0
+
+        for base_variant in grid_context.iter_stage_a_variants():
+            chunk_variants.append(base_variant)
+            if (
+                len(chunk_variants) < batch_size
+                and (processed + len(chunk_variants)) < total
+            ):
+                continue
+            if cancel_checker is not None:
+                cancel_checker(STAGE_A_LITERAL_V2)
+            retained_chunk_variants = self._filter_chunk_variants_by_row_prefilter(
+                row_plans=row_plans,
+                chunk_variants=chunk_variants,
+                row_prefilter_frontier=row_prefilter_frontier,
+            )
+            if retained_chunk_variants:
+                chunk_inputs = self.load_chunk_runtime_inputs(
+                    row_plans=row_plans,
+                    chunk_variants=retained_chunk_variants,
+                    grid_context=grid_context,
+                    artifact_context=artifact_context,
+                    signal_target_slice=signal_target_slice,
+                )
+                selected_signal_rows = {
+                    prepared_input.indicator_id: prepared_input.signal_rows
+                    for prepared_input in chunk_inputs
+                }
+                self._merge_combo_proxy_chunk_into_frontier(
+                    chunk_variants=retained_chunk_variants,
+                    final_signal=aggregate_final_signal_rows_v2(
+                        selected_signal_rows=selected_signal_rows
+                    ),
+                    local_signal_close=local_signal_close,
+                    execution_params=execution_params,
+                    exact_candidates_limit=exact_candidates_limit,
+                    frontier_heap=frontier_heap,
+                )
+            processed += len(chunk_variants)
+            if on_checkpoint is not None:
+                on_checkpoint(processed, total)
+            chunk_variants.clear()
+
+        retained_exact_candidates = tuple(
+            sorted(
+                (candidate for _, _, candidate in frontier_heap),
+                key=lambda candidate: candidate.sort_key(),
+            )
+        )
+        if len(retained_exact_candidates) == 0:
+            raise ValueError(
+                "Stage A combo proxy prefilter retained no exact survivors"
+            )
+        return retained_exact_candidates
 
     def _retain_indicator_rows(
         self,
@@ -732,6 +899,62 @@ class BacktestStageAShortlistBuilderV2:
                 f"Stage A row prefilter retained no rows for {row_plan.indicator_id!r}"
             )
         return tuple(row.row_index for row in ranked_rows[:retained_count])
+
+    def _merge_combo_proxy_chunk_into_frontier(
+        self,
+        *,
+        chunk_variants: Sequence[BacktestStageABaseVariantV2],
+        final_signal: np.ndarray,
+        local_signal_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        exact_candidates_limit: int,
+        frontier_heap: list[tuple[float, int, _RetainedExactCandidateV2]],
+    ) -> None:
+        """
+        Merge one chunk of combo proxy scores into the bounded retained exact-candidate frontier.
+
+        Args:
+            chunk_variants: Deterministic Stage A base variants surviving row prefilter.
+            final_signal: Aggregated Stage A `final_signal[V, T_signal]` for the same variants.
+            local_signal_close: Request-timeframe close prices aligned to `final_signal`.
+            execution_params: Immutable execution settings supplying the fee penalty.
+            exact_candidates_limit: Maximum retained exact-candidate count after combo pruning.
+            frontier_heap: Mutable bounded combo frontier heap updated in place.
+        Returns:
+            None.
+        Assumptions:
+            The combo proxy prefilter uses only cheap request-timeframe signals and explicit
+            stable tie-breaks to build a deterministic retained frontier.
+        Raises:
+            ValueError: If the final-signal row count drifts from `chunk_variants`.
+        Side Effects:
+            Mutates `frontier_heap` in place.
+        """
+        if int(final_signal.shape[0]) != len(chunk_variants):
+            raise ValueError(
+                "Stage A combo proxy prefilter requires final_signal rows to match "
+                "chunk_variants"
+            )
+        for row_index, base_variant in enumerate(chunk_variants):
+            candidate = _RetainedExactCandidateV2(
+                base_variant=base_variant,
+                proxy_score=self._proxy_score_for_signal_row(
+                    signal_row=final_signal[row_index, :],
+                    local_signal_close=local_signal_close,
+                    execution_params=execution_params,
+                    error_prefix="Stage A combo proxy prefilter",
+                ),
+                final_signal_row=np.asarray(final_signal[row_index, :], dtype=np.int8),
+            )
+            heap_entry = (
+                candidate.proxy_score,
+                -candidate.base_variant.stage_a_index,
+                candidate,
+            )
+            if len(frontier_heap) < exact_candidates_limit:
+                heappush(frontier_heap, heap_entry)
+            elif heap_entry[:2] > frontier_heap[0][:2]:
+                heapreplace(frontier_heap, heap_entry)
 
     def _row_scoring_inputs_for_prefilter(
         self,
@@ -864,13 +1087,49 @@ class BacktestStageAShortlistBuilderV2:
             raise ValueError("Stage A row prefilter row_index is outside signal_rows")
         if signal_rows.ndim != 2:
             raise ValueError("Stage A row prefilter requires 2D signal_rows")
-        if int(signal_rows.shape[1]) != int(local_signal_close.shape[0]):
+        return self._proxy_score_for_signal_row(
+            signal_row=signal_rows[row_index, :],
+            local_signal_close=local_signal_close,
+            execution_params=execution_params,
+            error_prefix="Stage A row prefilter",
+        )
+
+    def _proxy_score_for_signal_row(
+        self,
+        *,
+        signal_row: np.ndarray,
+        local_signal_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        error_prefix: str,
+    ) -> float:
+        """
+        Compute one cheap deterministic proxy score for a single retained signal row.
+
+        Args:
+            signal_row: One deterministic signal timeline in `{-1, 0, 1}` order.
+            local_signal_close: Request-timeframe close prices aligned to `signal_row`.
+            execution_params: Immutable execution settings supplying the fee penalty.
+            error_prefix: Error-message prefix describing the calling prefilter stage.
+        Returns:
+            float: Fee-adjusted proxy score for deterministic narrowing.
+        Assumptions:
+            Both row-level and combo-level proxy prefilters reuse the same cheap next-bar proxy so
+            later tuning remains benchmarkable and explicit.
+        Raises:
+            ValueError: If the signal row is not 1D or does not align with close prices.
+        Side Effects:
+            None.
+        """
+        normalized_signal_row = np.asarray(signal_row, dtype=np.int8)
+        if normalized_signal_row.ndim != 1:
+            raise ValueError(f"{error_prefix} requires 1D signal_row")
+        if int(normalized_signal_row.shape[0]) != int(local_signal_close.shape[0]):
             raise ValueError(
-                "Stage A row prefilter requires signal rows and close prices to share length"
+                f"{error_prefix} requires signal rows and close prices to share length"
             )
-        if signal_rows.shape[1] < 2:
+        if normalized_signal_row.shape[0] < 2:
             return 0.0
-        eval_signal_row = np.asarray(signal_rows[row_index, :-1], dtype=np.float64)
+        eval_signal_row = np.asarray(normalized_signal_row[:-1], dtype=np.float64)
         prior_close = np.asarray(local_signal_close[:-1], dtype=np.float64)
         next_close = np.asarray(local_signal_close[1:], dtype=np.float64)
         close_returns = np.divide(
@@ -919,6 +1178,46 @@ class BacktestStageAShortlistBuilderV2:
         )
         effective_shortlist_limit = min(shortlist_limit, stage_a_variants_total)
         return max(1, int(math.ceil(effective_shortlist_limit / signal_variants_total)))
+
+    def _target_combo_prefilter_exact_candidates(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+        shortlist_limit: int,
+    ) -> int:
+        """
+        Resolve how many exact survivors the combo proxy prefilter should retain globally.
+
+        Args:
+            grid_context: Stage A runtime plan owning deterministic variant cardinality.
+            shortlist_limit: Final Stage A shortlist cap requested by the caller.
+        Returns:
+            int: Global retained-frontier budget for exact survivor evaluation.
+        Assumptions:
+            Combo proxy prefilter should remain conservative by over-retaining a small explicit
+            multiple of the final shortlist rather than handing the full row-prefiltered search
+            space to exact evaluation.
+        Raises:
+            ValueError: If the requested shortlist limit is non-positive.
+        Side Effects:
+            None.
+        """
+        if shortlist_limit <= 0:
+            raise ValueError(
+                "Stage A combo proxy prefilter requires shortlist_limit > 0"
+            )
+        stage_a_variants_total = int(
+            getattr(grid_context, "stage_a_variants_total", shortlist_limit)
+        )
+        effective_shortlist_limit = min(shortlist_limit, stage_a_variants_total)
+        return min(
+            stage_a_variants_total,
+            max(
+                effective_shortlist_limit,
+                effective_shortlist_limit
+                * _COMBO_PROXY_PREFILTER_SURVIVOR_MULTIPLIER_V2,
+            ),
+        )
 
     def _filter_chunk_variants_by_row_prefilter(
         self,
@@ -1290,8 +1589,137 @@ class BacktestStageAShortlistBuilderV2:
             prepared_input.indicator_id: prepared_input.signal_rows
             for prepared_input in chunk_inputs
         }
+        self._merge_final_signal_chunk_into_heap(
+            chunk_variants=chunk_variants,
+            final_signal=aggregate_final_signal_rows_v2(
+                selected_signal_rows=selected_signal_rows
+            ),
+            grid_context=grid_context,
+            local_bar_close_1m_idx=local_bar_close_1m_idx,
+            sentinel_index=sentinel_index,
+            local_exec_open=local_exec_open,
+            local_exec_close=local_exec_close,
+            execution_params=execution_params,
+            ranking_plan=ranking_plan,
+            shortlist_limit=shortlist_limit,
+            shortlist_heap=shortlist_heap,
+        )
 
-        final_signal = aggregate_final_signal_rows_v2(selected_signal_rows=selected_signal_rows)
+    def _score_retained_exact_candidates_into_heap(
+        self,
+        *,
+        retained_exact_candidates: Sequence[_RetainedExactCandidateV2],
+        grid_context: BacktestArtifactRuntimePlanV2,
+        local_bar_close_1m_idx: np.ndarray,
+        sentinel_index: int,
+        local_exec_open: np.ndarray,
+        local_exec_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        ranking_plan: ResolvedRankingPlanV2,
+        shortlist_limit: int,
+        shortlist_heap: list[StageAHeapEntryV2],
+        batch_size: int,
+        cancel_checker: StageACancelCheckerV2 | None,
+    ) -> None:
+        """
+        Exact-score the retained frontier after combo proxy prefiltering.
+
+        Args:
+            retained_exact_candidates: Deterministic combo proxy prefilter survivors.
+            grid_context: Stage A grid context with direction-mode metadata.
+            local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
+            sentinel_index: Local execution sentinel index.
+            local_exec_open: Local execution-bar open prices.
+            local_exec_close: Local execution-bar close prices.
+            execution_params: Immutable no-risk execution settings.
+            ranking_plan: Pre-resolved staged ranking plan from shared Stage A machinery.
+            shortlist_limit: Maximum retained shortlist size.
+            shortlist_heap: Mutable bounded shortlist heap updated in place.
+            batch_size: Deterministic exact-evaluation chunk size for retained candidates.
+            cancel_checker: Optional cooperative cancellation callback by stage literal.
+        Returns:
+            None.
+        Assumptions:
+            Exact survivors are already bounded and ordered by combo proxy prefilter, but the
+            existing exact no-risk evaluation remains authoritative for final Stage A ranking.
+        Raises:
+            ValueError: If retained final-signal rows cannot be stacked consistently.
+        Side Effects:
+            Mutates `shortlist_heap` in place.
+        """
+        for offset in range(0, len(retained_exact_candidates), batch_size):
+            if cancel_checker is not None:
+                cancel_checker(STAGE_A_LITERAL_V2)
+            candidate_batch = retained_exact_candidates[offset : offset + batch_size]
+            self._merge_final_signal_chunk_into_heap(
+                chunk_variants=tuple(
+                    candidate.base_variant for candidate in candidate_batch
+                ),
+                final_signal=np.ascontiguousarray(
+                    np.stack(
+                        tuple(
+                            candidate.final_signal_row for candidate in candidate_batch
+                        ),
+                        axis=0,
+                    ),
+                    dtype=np.int8,
+                ),
+                grid_context=grid_context,
+                local_bar_close_1m_idx=local_bar_close_1m_idx,
+                sentinel_index=sentinel_index,
+                local_exec_open=local_exec_open,
+                local_exec_close=local_exec_close,
+                execution_params=execution_params,
+                ranking_plan=ranking_plan,
+                shortlist_limit=shortlist_limit,
+                shortlist_heap=shortlist_heap,
+            )
+
+    def _merge_final_signal_chunk_into_heap(
+        self,
+        *,
+        chunk_variants: Sequence[BacktestStageABaseVariantV2],
+        final_signal: np.ndarray,
+        grid_context: BacktestArtifactRuntimePlanV2,
+        local_bar_close_1m_idx: np.ndarray,
+        sentinel_index: int,
+        local_exec_open: np.ndarray,
+        local_exec_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        ranking_plan: ResolvedRankingPlanV2,
+        shortlist_limit: int,
+        shortlist_heap: list[StageAHeapEntryV2],
+    ) -> None:
+        """
+        Exact-score one prepared `final_signal` chunk and merge results into the shortlist heap.
+
+        Args:
+            chunk_variants: Deterministic Stage A base variants aligned to `final_signal`.
+            final_signal: Prepared Stage A `final_signal[V, T_signal]` rows for exact scoring.
+            grid_context: Stage A grid context with direction-mode metadata.
+            local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
+            sentinel_index: Local execution sentinel index.
+            local_exec_open: Local execution-bar open prices.
+            local_exec_close: Local execution-bar close prices.
+            execution_params: Immutable no-risk execution settings.
+            ranking_plan: Pre-resolved staged ranking plan from shared Stage A machinery.
+            shortlist_limit: Maximum retained shortlist size.
+            shortlist_heap: Mutable bounded shortlist heap updated in place.
+        Returns:
+            None.
+        Assumptions:
+            The combo proxy prefilter may narrow candidates first, but the retained exact
+            survivors still use the existing compact-trade and no-risk metric kernels unchanged.
+        Raises:
+            ValueError: If `final_signal` row count drifts from `chunk_variants`.
+        Side Effects:
+            Mutates `shortlist_heap` in place.
+        """
+        if int(final_signal.shape[0]) != len(chunk_variants):
+            raise ValueError(
+                "Stage A exact retained-candidate evaluation requires final_signal rows to "
+                "match chunk_variants"
+            )
         compact_trades_by_variant = build_compact_trade_list_v2(
             final_signal=final_signal,
             bar_close_1m_idx=local_bar_close_1m_idx,
