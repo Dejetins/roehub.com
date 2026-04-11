@@ -10,10 +10,10 @@ from trading.contexts.backtest.application.services import (
     compute_no_risk_metrics_v2,
     no_risk_metrics_to_ranking_payload_v2,
 )
+from trading.contexts.backtest.application.services.v2.contracts import StageACompactTradeV2
 from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
     build_compact_exact_payloads_v2,
 )
-from trading.contexts.backtest.application.services.v2.contracts import StageACompactTradeV2
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
 

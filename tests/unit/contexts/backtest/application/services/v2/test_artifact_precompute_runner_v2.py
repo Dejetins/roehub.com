@@ -1569,7 +1569,12 @@ def test_backtest_artifact_precompute_runner_v2_builds_widened_hit_times_manifes
         ),
     )
 
-    runner.export_canonical_price_1m(_request_v2(fixture=fixture, end_minute=_FULL_BUILD_MINUTES_V2))
+    runner.export_canonical_price_1m(
+        _request_v2(
+            fixture=fixture,
+            end_minute=_FULL_BUILD_MINUTES_V2,
+        )
+    )
 
     hit_times_manifest = fixture.loader.load_hit_times_manifest(
         fixture.coordinates,

@@ -445,8 +445,7 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_rows[0].best_sl_pct == 2.0
 
 
-def test_create_and_run_backtest_sync_inline_overrides_internal_exact_profile_with_redesigned_sync_mode(
-) -> None:
+def test_create_and_run_backtest_sync_inline_forces_redesigned_internal_profile() -> None:
     """
     Verify persisted `POST /backtests` sync launch forces the redesigned internal profile.
 
