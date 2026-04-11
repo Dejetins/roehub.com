@@ -28,6 +28,7 @@ from .artifact_runtime_plan_v2 import (
     BacktestRiskVariantV2,
     BacktestStageABaseVariantV2,
 )
+from .trade_compactor_kernel import StageACompactExactPayloadV2
 
 StageACheckpointCallbackV2 = Callable[[int, int], None]
 StageBCheckpointRowsMaterializerV2 = Callable[
@@ -149,6 +150,7 @@ class _StageBParallelTaskSnapshotV2:
     indicator_selections: tuple[_StageBParallelIndicatorSelectionSnapshotV2, ...]
     signal_params: tuple[tuple[str, tuple[tuple[str, BacktestVariantScalar], ...]], ...]
     risk_params: tuple[tuple[str, BacktestVariantScalar], ...]
+    retained_exact_payload: StageACompactExactPayloadV2 | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -282,6 +284,7 @@ class BacktestStageAScoredVariantV2:
 
     base_variant: BacktestStageABaseVariantV2
     total_return_pct: float
+    retained_exact_payload: StageACompactExactPayloadV2 | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -304,6 +307,7 @@ class BacktestStageBTaskV2:
     indicator_selections: tuple[IndicatorVariantSelection, ...]
     signal_params: Mapping[str, Mapping[str, BacktestVariantScalar]]
     risk_params: Mapping[str, BacktestVariantScalar]
+    retained_exact_payload: StageACompactExactPayloadV2 | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -517,7 +521,7 @@ class BacktestArtifactRuntimeRunnerV2:
         Raises:
             ValueError: If scorer payload is malformed.
         Side Effects:
-            None.
+            May prime scorer-local retained exact payload cache before exact Stage B scoring.
         """
         score_variant_metric = resolve_score_variant_metric_fn_v2(scorer=scorer)
         top_heap: list[StageBHeapEntryV2] = []
@@ -529,6 +533,10 @@ class BacktestArtifactRuntimeRunnerV2:
         ):
             if cancel_checker is not None:
                 cancel_checker(STAGE_B_LITERAL_V2)
+            prime_retained_exact_payload_if_supported_v2(
+                scorer=scorer,
+                task=task,
+            )
             row, metrics = score_stage_b_task_with_metrics_v2(
                 task=task,
                 candles=candles,
@@ -1119,6 +1127,7 @@ def _iter_stage_b_parallel_chunks_v2(
                             direction_mode=direction_mode,
                             sizing_mode=sizing_mode,
                             execution_params=execution_params,
+                            retained_exact_payload=stage_a_row.retained_exact_payload,
                         )
                     )
                 )
@@ -1157,7 +1166,8 @@ def _score_stage_b_parallel_chunk_v2(
     Raises:
         ValueError: If the worker scorer is unavailable or returns malformed metrics.
     Side Effects:
-        Reuses worker-local scorer caches while processing this chunk.
+        Reuses worker-local scorer caches while processing this chunk and may prime retained exact
+        payload cache entries ahead of exact Stage B scoring.
     """
     worker_state = _require_stage_b_parallel_worker_state_v2()
     configure_stage_ranking_context_if_supported_v2(
@@ -1169,6 +1179,10 @@ def _score_stage_b_parallel_chunk_v2(
     local_heap: list[StageBHeapEntryV2] = []
     for task_snapshot in chunk.tasks:
         task = _stage_b_task_from_parallel_snapshot_v2(snapshot=task_snapshot)
+        prime_retained_exact_payload_if_supported_v2(
+            scorer=worker_state.scorer,
+            task=task,
+        )
         row, metrics = score_stage_b_task_with_metrics_v2(
             task=task,
             candles=worker_state.candles,
@@ -1212,7 +1226,8 @@ def _stage_b_parallel_task_snapshot_from_task_v2(
     Returns:
         _StageBParallelTaskSnapshotV2: Picklable spawned-worker snapshot.
     Assumptions:
-        Snapshot ordering is stable because nested mappings are serialized by sorted keys.
+        Snapshot ordering is stable because nested mappings are serialized by sorted keys, while
+        the retained exact payload stays internal and additive when available.
     Raises:
         None.
     Side Effects:
@@ -1242,6 +1257,7 @@ def _stage_b_parallel_task_snapshot_from_task_v2(
             for indicator_id, params in sorted(task.signal_params.items())
         ),
         risk_params=tuple(sorted((str(name), value) for name, value in task.risk_params.items())),
+        retained_exact_payload=task.retained_exact_payload,
     )
 
 
@@ -1264,7 +1280,8 @@ def _stage_b_task_from_parallel_snapshot_v2(
     Returns:
         BacktestStageBTaskV2: Canonical in-process Stage B task payload.
     Assumptions:
-        Snapshot values already preserve deterministic ordering and scalar normalization.
+        Snapshot values already preserve deterministic ordering and scalar normalization, while
+        the retained exact payload remains optional for persisted-compatibility fallbacks.
     Raises:
         None.
     Side Effects:
@@ -1287,6 +1304,7 @@ def _stage_b_task_from_parallel_snapshot_v2(
             for indicator_id, params in snapshot.signal_params
         },
         risk_params=dict(snapshot.risk_params),
+        retained_exact_payload=snapshot.retained_exact_payload,
     )
 
 
@@ -1423,6 +1441,39 @@ def configure_stage_ranking_context_if_supported_v2(
     configure_method(
         stage=stage,
         primary_metric=ranking_plan.primary_metric,
+    )
+
+
+def prime_retained_exact_payload_if_supported_v2(
+    *,
+    scorer: MetricScorerV2,
+    task: BacktestStageBTaskV2,
+) -> None:
+    """
+    Forward one retained exact-candidate payload to scorers that can reuse it for Stage B.
+
+    Args:
+        scorer: Stage scorer implementation used by the current loop.
+        task: Stage B task that may carry an internal retained exact payload.
+    Returns:
+        None.
+    Assumptions:
+        The retained payload is internal-only, additive, and safe to ignore when the scorer does
+        not expose a compatible priming hook or the task originated from persisted snapshots.
+    Raises:
+        None.
+    Side Effects:
+        May seed scorer-local Stage B compact-trade caches for exact replay and fast search.
+    """
+    if task.retained_exact_payload is None:
+        return
+    prime_method = getattr(scorer, "prime_retained_exact_payload", None)
+    if prime_method is None:
+        return
+    prime_method(
+        indicator_variant_key=task.indicator_variant_key,
+        signal_params=task.signal_params,
+        retained_exact_payload=task.retained_exact_payload,
     )
 
 
@@ -1585,7 +1636,8 @@ def _iter_stage_b_tasks_stream_v2(
         Iterator[BacktestStageBTaskV2]: Deterministic Stage B task iterator.
     Assumptions:
         Streaming preserves the canonical `(shortlist_index * risk_total) + risk_index` ordering
-        while reducing transient Python object churn on the exact path.
+        while reducing transient Python object churn on the exact path and preserving any internal
+        retained exact payload already attached to shortlisted Stage A rows.
     Raises:
         None.
     Side Effects:
@@ -1613,6 +1665,7 @@ def _iter_stage_b_tasks_stream_v2(
                 direction_mode=direction_mode,
                 sizing_mode=sizing_mode,
                 execution_params=execution_params,
+                retained_exact_payload=stage_a_row.retained_exact_payload,
             )
 
 
@@ -1625,6 +1678,7 @@ def _stage_b_task_from_variant_v2(
     direction_mode: str,
     sizing_mode: str,
     execution_params: Mapping[str, BacktestVariantScalar],
+    retained_exact_payload: StageACompactExactPayloadV2 | None,
 ) -> BacktestStageBTaskV2:
     """
     Build one deterministic Stage B task from Stage A base variant and risk variant.
@@ -1637,10 +1691,12 @@ def _stage_b_task_from_variant_v2(
         direction_mode: Effective direction mode literal.
         sizing_mode: Effective sizing mode literal.
         execution_params: Effective execution params mapping.
+        retained_exact_payload: Optional internal retained exact payload forwarded from Stage A.
     Returns:
         BacktestStageBTaskV2: Deterministic Stage B task payload.
     Assumptions:
-        Full variant-key semantics remain aligned with existing v1 payload contract.
+        Full variant-key semantics remain aligned with existing v1 payload contract, while the
+        retained exact payload remains internal-only and additive.
     Raises:
         None.
     Side Effects:
@@ -1662,6 +1718,7 @@ def _stage_b_task_from_variant_v2(
         indicator_selections=base_variant.indicator_selections,
         signal_params=base_variant.signal_params,
         risk_params=risk_variant.risk_params,
+        retained_exact_payload=retained_exact_payload,
     )
 
 

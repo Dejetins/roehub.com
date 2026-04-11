@@ -1569,7 +1569,8 @@ class BacktestStageAShortlistBuilderV2:
         Raises:
             ValueError: If retained final-signal rows cannot be stacked consistently.
         Side Effects:
-            Mutates `shortlist_heap` in place.
+            Mutates `shortlist_heap` in place while preserving the retained exact payload on each
+            shortlisted row for downstream Stage B exact scoring.
         """
         for offset in range(0, len(retained_exact_candidates), batch_size):
             if cancel_checker is not None:
@@ -1699,6 +1700,7 @@ class BacktestStageAShortlistBuilderV2:
             row = BacktestStageAScoredVariantV2(
                 base_variant=base_variant,
                 total_return_pct=metrics.total_return_pct,
+                retained_exact_payload=exact_payload,
             )
             heap_entry = stage_a_heap_entry_v2(
                 row=row,

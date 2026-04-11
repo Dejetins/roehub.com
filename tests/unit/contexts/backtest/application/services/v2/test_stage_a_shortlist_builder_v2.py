@@ -18,6 +18,7 @@ from trading.contexts.backtest.application.services import (
     ArtifactPinnedIdentityV2,
     ArtifactSlotPinnedRuntimeContextV2,
     ArtifactSlotResolverV2,
+    BacktestArtifactBackedStageBScorerV2,
     BacktestSignalFeaturesAccessPlanV2,
     BacktestStageABaseVariant,
     BacktestStageAShortlistBuilderV2,
@@ -28,6 +29,9 @@ from trading.contexts.backtest.application.services import (
     PreparedIndicatorRowPlanV2,
     artifact_market_id_from_coordinates_v2,
     compute_target_slice_by_close_time_v2,
+)
+from trading.contexts.backtest.application.services.v2 import (
+    artifact_runtime_core_v2 as artifact_runtime_core_module,
 )
 from trading.contexts.backtest.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
@@ -279,6 +283,50 @@ class _RecordingSignalFeaturesLoader:
         row_selection = cast(tuple[int, ...] | slice, kwargs["row_selection"])
         self.row_calls.append((indicator_id, row_selection))
         return self._wrapped.try_load_signal_feature_rows(**kwargs)
+
+
+class _FailingSignalMatrixLoader:
+    """
+    Signal loader stub that fails fast when Stage B unexpectedly rebuilds retained candidates.
+    """
+
+    def load_signal_matrix(self, **kwargs: Any) -> Any:
+        """
+        Fail fast on full-matrix reads because retained candidates must not rebuild here.
+
+        Args:
+            **kwargs: Loader keyword arguments.
+        Returns:
+            Any: This method never returns.
+        Assumptions:
+            The retained exact payload should already satisfy the Stage B scorer for this test.
+        Raises:
+            AssertionError: Always, because Stage B must not request full signal matrices here.
+        Side Effects:
+            None.
+        """
+        raise AssertionError(
+            "Stage B should not load full signal matrices when retained exact payload is present"
+        )
+
+    def load_signal_rows(self, **kwargs: Any) -> np.ndarray:
+        """
+        Fail fast on subset-row reads because retained candidates must not rebuild here.
+
+        Args:
+            **kwargs: Loader keyword arguments.
+        Returns:
+            np.ndarray: This method never returns.
+        Assumptions:
+            The retained exact payload should already satisfy the Stage B scorer for this test.
+        Raises:
+            AssertionError: Always, because Stage B must not reload retained signal rows here.
+        Side Effects:
+            None.
+        """
+        raise AssertionError(
+            "Stage B should consume retained exact payload without reloading signal rows"
+        )
 
 
 class _FlatPriceLoader:
@@ -736,6 +784,119 @@ def test_stage_a_shortlist_builder_v2_prefilters_rows_before_exact_evaluation(
     assert len(shortlist) == 1
     assert shortlist[0].base_variant.stage_a_index == 1
     assert recording_loader.calls == [("ma.ema", (0, 1)), ("ma.ema", (1,))]
+
+
+def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify retained candidates carry an internal exact payload into Stage B exact scoring.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+    Returns:
+        None.
+    Assumptions:
+        The in-memory Stage A shortlist is the new internal hand-off surface for retained
+        candidates, while Stage B exact scoring must remain authoritative for final metrics.
+    Raises:
+        AssertionError: If the retained payload is dropped or Stage B falls back to signal reloads.
+    Side Effects:
+        Memory-maps strict artifact arrays from the synthetic store.
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    target_time_range = _synthetic_target_time_range()
+    grid_context = _grid_context_for_windows(windows=(20,))
+    price_loader = MmapPriceArraysLoaderV2(artifact_loader=store.loader)
+    shortlist = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=price_loader,
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+    ).build_shortlist(
+        grid_context=cast(Any, grid_context),
+        artifact_context=context,
+        target_time_range=target_time_range,
+        shortlist_limit=1,
+        batch_size=1,
+    )
+
+    assert len(shortlist) == 1
+    assert shortlist[0].retained_exact_payload is not None
+
+    signal_prices = price_loader.load_price_arrays(
+        context=context,
+        timeframe=grid_context.timeframe_code,
+    )
+    scorer = BacktestArtifactBackedStageBScorerV2(
+        price_arrays_loader=price_loader,
+        signal_matrix_loader=cast(Any, _FailingSignalMatrixLoader()),
+        artifact_context=context,
+        target_time_range=target_time_range,
+        report_target_slice=compute_target_slice_by_close_time_v2(
+            close_time=signal_prices.close_time,
+            target_time_range=target_time_range,
+        ),
+        direction_mode=grid_context.direction_mode,
+        sizing_mode=grid_context.sizing_mode,
+        execution_params=grid_context.execution_params,
+        market_id=artifact_market_id_from_coordinates_v2(store.coordinates),
+        signal_timeframe=grid_context.timeframe_code,
+        indicator_grids=(),
+    )
+    tp_pct = float(scorer._local_hit_times.tp_values[0] * 100.0)
+    sl_pct = float(scorer._local_hit_times.sl_values[0] * 100.0)
+
+    stage_b_tasks = artifact_runtime_core_module.iter_stage_b_tasks_v2(
+        template=cast(
+            Any,
+            SimpleNamespace(
+                direction_mode=grid_context.direction_mode,
+                sizing_mode=grid_context.sizing_mode,
+                execution_params=grid_context.execution_params,
+            ),
+        ),
+        runtime_plan=cast(
+            Any,
+            SimpleNamespace(
+                risk_variants=(
+                    SimpleNamespace(
+                        risk_index=0,
+                        risk_params={
+                            "tp_enabled": True,
+                            "tp_pct": tp_pct,
+                            "sl_enabled": True,
+                            "sl_pct": sl_pct,
+                        },
+                    ),
+                )
+            ),
+        ),
+        shortlist=shortlist,
+    )
+    assert len(stage_b_tasks) == 1
+    task = stage_b_tasks[0]
+    assert task.retained_exact_payload == shortlist[0].retained_exact_payload
+
+    artifact_runtime_core_module.prime_retained_exact_payload_if_supported_v2(
+        scorer=scorer,
+        task=task,
+    )
+    scorer.configure_stage_ranking_context(
+        stage="stage_b",
+        primary_metric="total_return_pct",
+    )
+    scored_row, metrics = artifact_runtime_core_module.score_stage_b_task_with_metrics_v2(
+        task=task,
+        candles=cast(Any, SimpleNamespace()),
+        score_variant_metric=scorer.score_variant_metric,
+    )
+
+    assert scored_row.variant_key == task.variant_key
+    assert scored_row.best_tp_pct == tp_pct
+    assert scored_row.best_sl_pct == sl_pct
+    assert "trade_count" in metrics
+    assert metrics["total_return_pct"] == scored_row.total_return_pct
+    assert "trade_count" in scored_row.summary_metrics_json
 
 
 def test_stage_a_shortlist_builder_v2_keeps_retained_frontier_row_order_explicit(
