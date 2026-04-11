@@ -96,6 +96,8 @@ bootstrap_service() {
   local label=""
   label="$(service_label_from_plist "$service")"
   plutil -lint "${plist_path}" >/dev/null
+  echo "enable ${label}"
+  launchctl enable "gui/${UID_VALUE}/${label}" || true
   if service_is_loaded "$label"; then
     echo "bootstrap preflight ${label}: service still loaded, forcing service-target bootout"
     launchctl bootout "gui/${UID_VALUE}/${label}" || true
