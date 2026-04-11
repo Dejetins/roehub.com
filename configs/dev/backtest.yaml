@@ -198,8 +198,8 @@ backtest:
           parallel_stage_b_enabled: false
           family_plugin_enabled: true
   guards:
-    max_variants_per_compute: 600000
-    max_compute_bytes_total: 5368709120
+    max_variants_per_compute: 60000000
+    max_compute_bytes_total: 5368709120999999
   cpu:
     max_numba_threads: 4
   sync:
