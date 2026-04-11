@@ -26,6 +26,13 @@
   - `small_grid_overhead` remains the lightweight small-run overhead check;
   - neither slice changes active default profile selection or implies rollout of `exact_parallel`
     launch policy by itself.
+- Milestone A / A1 notebook-parity adds one more additive benchmark surface:
+  - `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
+  - `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
+  - internal measurement helpers under
+    `src/trading/contexts/backtest/application/services/v2/notebook_parity_benchmark_corpus_v2.py`
+  - this surface establishes benchmark authority for `NR2`, `RG-TTR`, and `RG-ALT` without
+    changing active runtime behavior yet.
 
 ## Цель
 
@@ -103,6 +110,75 @@ R6-04 фиксирует полный runtime ranking contract и summary-only t
 - `indicator_compute_calls`: локальный proxy для текущего v1 signal/score compute path.
 
 R0 intentionally не фиксирует machine-specific SLA. Проверяется наличие метрик, shape и стабильность протокола, а не одинаковые абсолютные миллисекунды между машинами.
+
+## Notebook-parity benchmark contract (A1)
+
+Этот additive contract не заменяет R0. Он фиксирует новый benchmark authority для performance
+program из `backtest-engine-vnext-notebook-parity-plan-v1.md`.
+
+### Canonical classes
+
+- `NR2`: no-risk two-indicator parity class anchored to
+  `tests/notebook_tests/new_engine/02_run_f7d2_btcusdt_15m_no_risk_probe.ipynb`
+- `RG-TTR`: risk-grid `total_return_pct` parity class anchored to
+  `tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`
+- `RG-ALT`: risk-grid alternative-metric functional class for
+  `max_drawdown_pct`, `return_over_max_drawdown`, `profit_factor`, `sharpe_trades`,
+  `win_rate_pct`
+
+### Measurement contract
+
+Committed fixture:
+- `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
+
+Executable perf-smoke harness:
+- `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
+
+Required runtime-shape measurement fields:
+- `wall_clock_seconds`
+- `cpu_time_seconds`
+- `peak_rss_bytes`
+- `numba_threads_used`
+- `max_python_processes_seen`
+- `stage_b_execution_mode`
+- `exact_replay_count`
+
+The contract is intentionally internal-only. These fields are benchmark-only evidence and MUST NOT
+be exposed through public API routes by this prompt.
+
+### Equal-thread-budget normalization
+
+All notebook-parity comparisons are valid only under `equal thread budget` rules:
+
+- same host class
+- same artifact slot
+- identical `numba_threads_used`
+- comparable runtime surfaces (`sync`, `worker`, `notebook`) interpreted together with
+  `stage_b_execution_mode`
+
+Invalid example:
+- notebook on `12` threads vs backend on `4` threads
+
+### Explicit baseline comparison points
+
+The committed benchmark corpus stores explicit reviewable comparison points instead of relying on
+memory or prose:
+
+- `NR2` keeps current backend `181.3s` on `4` threads plus notebook references `7.54s` on
+  `4` threads and `5.63s` on `12` threads, all on `macstudio-class`
+- `RG-TTR` keeps current default process-fan-out baseline:
+  `max_python_processes_seen = 5`, `stage_b_execution_mode = process_pool`
+- `RG-ALT` keeps the functional first-wave guardrail:
+  `runtime_regression_ratio <= 1.10` vs the equal-thread-budget backend baseline
+
+### Acceptance intent
+
+- `NR2`: `wall_clock_ratio <= 1.18`, `peak_rss_ratio <= 1.35`, single-process default,
+  `stage_b_execution_mode = bypassed_no_risk`
+- `RG-TTR`: `wall_clock_ratio <= 1.18`, single-process default,
+  `stage_b_execution_mode = in_process`
+- `RG-ALT`: correctness first, runtime regression no worse than `10%`, no notebook-parity claim in
+  the first wave
 
 ## R10-03 closure protocol
 
@@ -206,11 +282,17 @@ R10-03 не меняет runtime/API contract. Closure фиксируется ч
   `tests/perf_smoke/contexts/backtest/fixtures/r0_parity_scope.json`
 - Runtime-acceleration benchmark corpus for later exact/hybrid/plugin rollout work:
   `tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json`
+- Notebook-parity benchmark corpus for A1 measurement authority:
+  `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
 - Executable local baseline:
   `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py`
+- Executable notebook-parity perf smoke:
+  `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
 - Notebook references:
   `tests/notebook_tests/06_backtest_compute.ipynb`
   `tests/notebook_tests/05_hit_time_grid.ipynb`
+  `tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`
+  `tests/notebook_tests/new_engine/02_run_f7d2_btcusdt_15m_no_risk_probe.ipynb`
 
 ## Reproducible execution protocol
 
@@ -230,7 +312,17 @@ uv run pytest -q \
   tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py
 ```
 
-3. Сохранить measurement snapshot в файл:
+3. Проверить A1 notebook-parity benchmark authority:
+
+```bash
+uv run pytest -q tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+```
+
+Этот harness пока не обещает, что runtime уже достиг parity. Он гарантирует, что benchmark
+surface, runtime-shape payload, equal-thread-budget rules и committed comparison points уже
+детерминированы и исполнимы.
+
+4. Сохранить measurement snapshot в файл:
 
 ```bash
 ROEHUB_R0_BASELINE_PRINT=1 \
@@ -238,7 +330,7 @@ uv run pytest -q -s tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline
 > /tmp/roehub-backtest-r0-baseline.json
 ```
 
-4. Проверить runtime/config freeze и additive runtime-defaults payload:
+5. Проверить runtime/config freeze и additive runtime-defaults payload:
 
 ```bash
 uv run pytest -q \
@@ -246,7 +338,7 @@ uv run pytest -q \
   tests/unit/apps/api/test_backtests_routes.py
 ```
 
-5. Проверить R6-01 loader/bootstrap guardrails:
+6. Проверить R6-01 loader/bootstrap guardrails:
 
 ```bash
 uv run pytest -q \
@@ -257,7 +349,7 @@ uv run pytest -q \
   tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
 ```
 
-6. Проверить R6-02 Stage A kernels и additive shortlist bridge:
+7. Проверить R6-02 Stage A kernels и additive shortlist bridge:
 
 ```bash
 uv run pytest -q \

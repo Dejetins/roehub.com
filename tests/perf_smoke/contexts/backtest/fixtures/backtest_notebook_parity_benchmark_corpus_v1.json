@@ -1,0 +1,262 @@
+{
+  "schema_version": 1,
+  "fixture_contract": "backtest_notebook_parity_benchmark_corpus_v1",
+  "milestone_id": "A1",
+  "status": "active",
+  "reference_docs": [
+    "docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md",
+    "docs/architecture/backtest/backtest-v2-benchmarks.md",
+    "docs/architecture/backtest/backtest-engine-vnext.md"
+  ],
+  "measurement_contract": {
+    "required_fields": [
+      "wall_clock_seconds",
+      "cpu_time_seconds",
+      "peak_rss_bytes",
+      "numba_threads_used",
+      "max_python_processes_seen",
+      "stage_b_execution_mode",
+      "exact_replay_count"
+    ],
+    "system_scan_fields": [
+      "peak_rss_bytes",
+      "numba_threads_used",
+      "max_python_processes_seen",
+      "stage_b_execution_mode",
+      "exact_replay_count"
+    ],
+    "notes": "Runtime-shape measurements are internal-only benchmark payloads. They must report wall time, CPU time, peak RSS, Numba thread count, maximum Python process fan-out, stage_b_execution_mode, and exact_replay_count."
+  },
+  "source_fixtures": {
+    "perf_smoke_harness": "tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py",
+    "nr2_notebook_anchor": "tests/notebook_tests/new_engine/02_run_f7d2_btcusdt_15m_no_risk_probe.ipynb",
+    "rg_ttr_notebook_anchor": "tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb"
+  },
+  "equal_thread_budget_rule": {
+    "rule_id": "equal_thread_budget",
+    "literal": "equal thread budget",
+    "comparison_field": "numba_threads_used",
+    "same_host_required": true,
+    "same_artifact_slot_required": true,
+    "comparable_runtime_surfaces": [
+      "sync",
+      "worker",
+      "notebook"
+    ],
+    "invalid_examples": [
+      "notebook on 12 threads vs backend on 4 threads is invalid",
+      "sync and worker measurements from different artifact slots are invalid"
+    ],
+    "notes": "Compare backend and notebook only when host, artifact slot, and numba_threads_used all match exactly. Sync and worker backend measurements are comparable when those constraints hold and stage_b_execution_mode is reviewed together."
+  },
+  "scenario_order": [
+    "nr2",
+    "rg_ttr",
+    "rg_alt"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "nr2",
+      "benchmark_class": "NR2",
+      "comparison_mode": "notebook_parity",
+      "primary_metric": "total_return_pct",
+      "supported_primary_metrics": [
+        "total_return_pct"
+      ],
+      "canonical_backend_surface": "sync",
+      "anchor_notebook": "tests/notebook_tests/new_engine/02_run_f7d2_btcusdt_15m_no_risk_probe.ipynb",
+      "equal_thread_budget_rule_id": "equal_thread_budget",
+      "baseline_reference_points": [
+        {
+          "reference_id": "nr2_backend_macstudio_4_threads",
+          "source_kind": "backend",
+          "metric_label": "backend_pre_cutover",
+          "host_label": "macstudio-class",
+          "runtime_surface": "sync",
+          "numba_threads_used": 4,
+          "wall_clock_seconds": 181.3,
+          "peak_rss_bytes": null,
+          "max_python_processes_seen": 5,
+          "stage_b_execution_mode": "process_pool",
+          "runtime_regression_ratio_limit": null,
+          "notes": "Current backend run f7d2c378-bca2-46fe-b5a6-47062fb75140 on the canonical host remains a generic multi-process shape and is the pre-cutover comparison point."
+        },
+        {
+          "reference_id": "nr2_notebook_macstudio_4_threads",
+          "source_kind": "notebook",
+          "metric_label": "notebook_reference",
+          "host_label": "macstudio-class",
+          "runtime_surface": "notebook",
+          "numba_threads_used": 4,
+          "wall_clock_seconds": 7.54,
+          "peak_rss_bytes": null,
+          "max_python_processes_seen": 1,
+          "stage_b_execution_mode": "bypassed_no_risk",
+          "runtime_regression_ratio_limit": null,
+          "notes": "Canonical NR2 notebook anchor measured on the same host with four Numba threads."
+        },
+        {
+          "reference_id": "nr2_notebook_macstudio_12_threads",
+          "source_kind": "notebook",
+          "metric_label": "notebook_reference",
+          "host_label": "macstudio-class",
+          "runtime_surface": "notebook",
+          "numba_threads_used": 12,
+          "wall_clock_seconds": 5.63,
+          "peak_rss_bytes": null,
+          "max_python_processes_seen": 1,
+          "stage_b_execution_mode": "bypassed_no_risk",
+          "runtime_regression_ratio_limit": null,
+          "notes": "Canonical NR2 notebook anchor measured on the same host with twelve Numba threads."
+        }
+      ],
+      "acceptance_gates": [
+        {
+          "gate_id": "nr2_wall_clock_ratio",
+          "metric": "wall_clock_ratio",
+          "max_ratio": 1.18,
+          "max_value": null,
+          "expected_value": null,
+          "notes": "Backend end-to-end runtime must stay within 1.18x of the notebook runtime on the equal thread budget."
+        },
+        {
+          "gate_id": "nr2_peak_rss_ratio",
+          "metric": "peak_rss_ratio",
+          "max_ratio": 1.35,
+          "max_value": null,
+          "expected_value": null,
+          "notes": "Backend peak_rss_bytes must stay within 1.35x of the notebook peak RSS on the equal thread budget."
+        },
+        {
+          "gate_id": "nr2_max_python_processes_seen",
+          "metric": "max_python_processes_seen",
+          "max_ratio": null,
+          "max_value": 1,
+          "expected_value": null,
+          "notes": "NR2 must remain single-process by default on the benchmark-sized path."
+        },
+        {
+          "gate_id": "nr2_stage_b_execution_mode",
+          "metric": "stage_b_execution_mode",
+          "max_ratio": null,
+          "max_value": null,
+          "expected_value": "bypassed_no_risk",
+          "notes": "NR2 should resolve in the no-risk terminal path instead of generic Stage B."
+        }
+      ],
+      "notes": "NR2 is the canonical no-risk two-indicator parity class. The committed comparison points show the current backend-vs-notebook gap and keep both 4-thread and 12-thread notebook references reviewable."
+    },
+    {
+      "scenario_id": "rg_ttr",
+      "benchmark_class": "RG-TTR",
+      "comparison_mode": "notebook_parity",
+      "primary_metric": "total_return_pct",
+      "supported_primary_metrics": [
+        "total_return_pct"
+      ],
+      "canonical_backend_surface": "sync",
+      "anchor_notebook": "tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb",
+      "equal_thread_budget_rule_id": "equal_thread_budget",
+      "baseline_reference_points": [
+        {
+          "reference_id": "rg_ttr_backend_default_fanout",
+          "source_kind": "backend",
+          "metric_label": "backend_pre_cutover_shape",
+          "host_label": "macstudio-class",
+          "runtime_surface": "sync",
+          "numba_threads_used": 4,
+          "wall_clock_seconds": null,
+          "peak_rss_bytes": null,
+          "max_python_processes_seen": 5,
+          "stage_b_execution_mode": "process_pool",
+          "runtime_regression_ratio_limit": null,
+          "notes": "Current benchmark-host shape shows four to five large Python processes by default, which is the baseline comparison point that later prompts must retire."
+        },
+        {
+          "reference_id": "rg_ttr_notebook_single_process_shape",
+          "source_kind": "notebook",
+          "metric_label": "notebook_reference_shape",
+          "host_label": "macstudio-class",
+          "runtime_surface": "notebook",
+          "numba_threads_used": 4,
+          "wall_clock_seconds": null,
+          "peak_rss_bytes": null,
+          "max_python_processes_seen": 1,
+          "stage_b_execution_mode": "in_process",
+          "runtime_regression_ratio_limit": null,
+          "notes": "The canonical RG-TTR notebook anchor is a single-process multi-thread exact shape and provides the comparison point for process fan-out and stage_b_execution_mode."
+        }
+      ],
+      "acceptance_gates": [
+        {
+          "gate_id": "rg_ttr_wall_clock_ratio",
+          "metric": "wall_clock_ratio",
+          "max_ratio": 1.18,
+          "max_value": null,
+          "expected_value": null,
+          "notes": "RG-TTR backend runtime must stay within 1.18x of the notebook runtime on the equal thread budget."
+        },
+        {
+          "gate_id": "rg_ttr_max_python_processes_seen",
+          "metric": "max_python_processes_seen",
+          "max_ratio": null,
+          "max_value": 1,
+          "expected_value": null,
+          "notes": "Benchmark-sized RG-TTR workloads must not fan out into multiple Python worker processes by default."
+        },
+        {
+          "gate_id": "rg_ttr_stage_b_execution_mode",
+          "metric": "stage_b_execution_mode",
+          "max_ratio": null,
+          "max_value": null,
+          "expected_value": "in_process",
+          "notes": "Benchmark-sized RG-TTR workloads should keep Stage B in-process by default."
+        }
+      ],
+      "notes": "RG-TTR is the canonical risk-grid parity class. A1 stores the current process-fan-out baseline explicitly so later prompts can fail on unexpected worker amplification."
+    },
+    {
+      "scenario_id": "rg_alt",
+      "benchmark_class": "RG-ALT",
+      "comparison_mode": "functional_baseline",
+      "primary_metric": "max_drawdown_pct",
+      "supported_primary_metrics": [
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct"
+      ],
+      "canonical_backend_surface": "sync",
+      "anchor_notebook": "tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb",
+      "equal_thread_budget_rule_id": "equal_thread_budget",
+      "baseline_reference_points": [
+        {
+          "reference_id": "rg_alt_runtime_regression_limit",
+          "source_kind": "gate",
+          "metric_label": "pre_cutover_runtime_regression_limit",
+          "host_label": "macstudio-class",
+          "runtime_surface": "sync",
+          "numba_threads_used": 4,
+          "wall_clock_seconds": null,
+          "peak_rss_bytes": null,
+          "max_python_processes_seen": 5,
+          "stage_b_execution_mode": "process_pool",
+          "runtime_regression_ratio_limit": 1.1,
+          "notes": "RG-ALT is functional-first in the first wave. Runtime may not regress by more than 10% against the pre-cutover backend baseline on the same host and equal thread budget."
+        }
+      ],
+      "acceptance_gates": [
+        {
+          "gate_id": "rg_alt_runtime_regression_ratio",
+          "metric": "runtime_regression_ratio",
+          "max_ratio": 1.1,
+          "max_value": null,
+          "expected_value": null,
+          "notes": "RG-ALT keeps functional coverage only in the first wave, but runtime must not regress by more than 10% against the backend baseline."
+        }
+      ],
+      "notes": "RG-ALT keeps the alternative ranking metrics reviewable without claiming notebook parity in the first wave. Measurements must still emit the full runtime-shape payload, including stage_b_execution_mode and exact_replay_count."
+    }
+  ]
+}

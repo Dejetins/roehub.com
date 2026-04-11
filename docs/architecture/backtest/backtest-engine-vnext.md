@@ -43,6 +43,43 @@ That notebook is the approved source for the universal engine patterns that the 
 
 The historical notebook `tests/notebook_tests/06_backtest_compute.ipynb` may still be cited only as historical background. It is not the canonical redesign anchor for new prompts, new handoff docs, or future cutover work.
 
+## 2.1 Notebook-parity benchmark authority
+
+The redesign now also has one additive benchmark authority for performance work before any
+architecture cutover:
+
+- committed corpus:
+  `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
+- executable harness:
+  `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
+
+Canonical classes:
+
+- `NR2`
+- `RG-TTR`
+- `RG-ALT`
+
+Required runtime-shape fields for benchmark evidence:
+
+- `wall_clock_seconds`
+- `cpu_time_seconds`
+- `peak_rss_bytes`
+- `numba_threads_used`
+- `max_python_processes_seen`
+- `stage_b_execution_mode`
+- `exact_replay_count`
+
+Normalization rules:
+
+- every backend-vs-notebook comparison uses `equal thread budget`
+- `numba_threads_used` must match exactly
+- host and artifact slot must match exactly
+- sync and worker measurements are comparable only when the same host, artifact slot, and
+  `stage_b_execution_mode` are preserved
+
+This benchmark surface is internal-only and additive. It is meant to make later prompts
+verifiable; it does not imply that the current runtime already meets the parity target.
+
 ## 3. Target architecture summary
 
 The target engine keeps one deterministic staged runtime with one final exact authority.
