@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from itertools import product
 from types import SimpleNamespace
@@ -718,7 +718,9 @@ def test_stage_a_shortlist_builder_v2_uses_subset_row_loading_for_selected_varia
     Returns:
         None.
     Assumptions:
-        One selected variant should request only its own signal row from the mmap loader.
+        One selected variant should request only its own signal row from the mmap loader, and
+        streaming exact scoring should reuse that retained chunk instead of reloading a deferred
+        replay batch.
     Raises:
         AssertionError: If builder loads unrelated rows or uses full-matrix reads.
     Side Effects:
@@ -746,7 +748,6 @@ def test_stage_a_shortlist_builder_v2_uses_subset_row_loading_for_selected_varia
     assert recording_loader.calls == [
         ("ma.ema", (0,)),
         ("ma.ema", (0,)),
-        ("ma.ema", (0,)),
     ]
 
 
@@ -762,7 +763,8 @@ def test_stage_a_shortlist_builder_v2_prefilters_rows_before_exact_evaluation(
         None.
     Assumptions:
         The synthetic store's rising second bar should make the long row survive the price-aware
-        row-local prefilter while the short row is removed before exact work.
+        row-local prefilter while the short row is removed before exact work, and streaming exact
+        scoring should avoid a later retained-batch reload.
     Raises:
         AssertionError: If the retained frontier is not narrowed deterministically.
     Side Effects:
@@ -790,7 +792,6 @@ def test_stage_a_shortlist_builder_v2_prefilters_rows_before_exact_evaluation(
     assert shortlist[0].base_variant.stage_a_index == 1
     assert recording_loader.calls == [
         ("ma.ema", (0, 1)),
-        ("ma.ema", (1,)),
         ("ma.ema", (1,)),
     ]
 
@@ -1348,25 +1349,25 @@ def test_stage_a_shortlist_builder_v2_breaks_metric_ties_by_base_variant_key() -
     assert tuple(row.base_variant.base_variant_key for row in shortlist) == ("a" * 64, "b" * 64)
 
 
-def test_stage_a_shortlist_builder_v2_combo_proxy_prefilters_exact_candidates(
+def test_stage_a_shortlist_builder_v2_streaming_exact_scoring_runs_per_retained_chunk(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    Verify combo proxy prefilter narrows exact survivors after row prefiltering.
+    Verify Stage A exact scoring streams per retained chunk instead of deferred replay.
 
     Args:
-        monkeypatch: pytest fixture used to record the retained exact-candidate frontier.
+        monkeypatch: pytest fixture used to record streaming exact chunk merges.
     Returns:
         None.
     Assumptions:
-        The three-indicator fixture keeps all rows through row prefilter but should retain only a
-        bounded deterministic combo proxy prefilter frontier before exact evaluation.
+        The three-indicator fixture keeps all rows through row prefilter, then combo proxy
+        prefilter should retain chunk-local exact work immediately in deterministic Stage A order.
     Raises:
-        AssertionError: If exact survivors are not pruned or the frontier order drifts.
+        AssertionError: If Stage A falls back to one deferred replay batch or chunk order drifts.
     Side Effects:
-        Monkeypatches one builder method for retained-frontier inspection.
+        Monkeypatches one builder method for streaming exact-merge inspection.
     """
-    retained_frontiers = _record_retained_exact_candidate_frontiers(monkeypatch)
+    streaming_exact_chunks = _record_streaming_exact_chunks(monkeypatch)
     builder = BacktestStageAShortlistBuilderV2(
         price_arrays_loader=_ComboProxyPriceLoader(),
         signal_matrix_loader=_combo_proxy_signal_loader(),
@@ -1377,32 +1378,29 @@ def test_stage_a_shortlist_builder_v2_combo_proxy_prefilters_exact_candidates(
         artifact_context=cast(Any, _combo_proxy_artifact_context()),
         target_time_range=_combo_proxy_target_time_range(),
         shortlist_limit=2,
-        batch_size=1,
+        batch_size=6,
     )
 
-    assert retained_frontiers == [(0, 1, 2, 3)]
+    assert streaming_exact_chunks == [(0, 1, 2, 3), (6, 7)]
     assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
 
 
-def test_stage_a_shortlist_builder_v2_combo_proxy_frontier_order_is_batch_invariant(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_stage_a_shortlist_builder_v2_streaming_exact_shortlist_is_batch_invariant() -> None:
     """
-    Verify combo proxy prefilter keeps retained-frontier ordering deterministic across batches.
+    Verify streaming exact scoring keeps the deterministic Stage A shortlist stable across batches.
 
     Args:
-        monkeypatch: pytest fixture used to record the retained exact-candidate frontier.
+        None.
     Returns:
         None.
     Assumptions:
-        The same retained frontier should emerge from identical inputs whether Stage A scans one
-        variant at a time or the full cartesian chunk at once.
+        The active Stage A path now exact-scores retained chunks immediately, but the final
+        shortlist identity should remain deterministic across scan chunk sizes.
     Raises:
-        AssertionError: If retained-frontier ordering or exact shortlist results drift.
+        AssertionError: If streaming exact scoring changes the final shortlist across batches.
     Side Effects:
-        Monkeypatches one builder method for retained-frontier inspection.
+        None.
     """
-    retained_frontiers = _record_retained_exact_candidate_frontiers(monkeypatch)
     small_batch_shortlist = BacktestStageAShortlistBuilderV2(
         price_arrays_loader=_ComboProxyPriceLoader(),
         signal_matrix_loader=_combo_proxy_signal_loader(),
@@ -1424,66 +1422,52 @@ def test_stage_a_shortlist_builder_v2_combo_proxy_frontier_order_is_batch_invari
         batch_size=8,
     )
 
-    assert retained_frontiers == [(0, 1, 2, 3), (0, 1, 2, 3)]
     assert tuple(
         row.base_variant.base_variant_key for row in small_batch_shortlist
     ) == tuple(row.base_variant.base_variant_key for row in large_batch_shortlist)
 
 
-def test_stage_a_shortlist_builder_v2_combo_proxy_retains_only_addressing_metadata(
-    monkeypatch: pytest.MonkeyPatch,
+def test_stage_a_shortlist_builder_v2_streaming_exact_scoring_removes_deferred_replay_helpers(
 ) -> None:
     """
-    Verify the retained frontier stores deterministic row addressing instead of `final_signal_row`.
+    Verify Stage A no longer exposes deferred retained replay helpers on the active builder.
 
     Args:
-        monkeypatch: pytest fixture used to inspect retained exact candidates before exact scoring.
+        None.
     Returns:
         None.
     Assumptions:
-        The combo proxy fixture keeps the first four Stage A variants as retained survivors, and
-        each retained candidate should expose only compact per-indicator row indexes.
+        Streaming exact scoring should replace the helper pair that rebuilt retained exact batches
+        after scanning the full Stage A space.
     Raises:
-        AssertionError: If retained candidates still carry `final_signal_row` or lose addressing.
+        AssertionError: If the deferred replay helpers remain reachable on the builder.
     Side Effects:
-        Monkeypatches one builder method for retained-candidate inspection.
+        None.
     """
-    retained_addresses = _record_retained_exact_candidate_addresses(monkeypatch)
-
-    BacktestStageAShortlistBuilderV2(
-        price_arrays_loader=_ComboProxyPriceLoader(),
-        signal_matrix_loader=_combo_proxy_signal_loader(),
-    ).build_shortlist(
-        grid_context=cast(Any, _combo_proxy_grid_context()),
-        artifact_context=cast(Any, _combo_proxy_artifact_context()),
-        target_time_range=_combo_proxy_target_time_range(),
-        shortlist_limit=2,
-        batch_size=8,
+    assert not hasattr(
+        BacktestStageAShortlistBuilderV2,
+        "_load_retained_exact_final_signal_batch",
     )
-
-    retained_candidate_field_names = {
-        current_field.name
-        for current_field in fields(stage_a_shortlist_builder_module._RetainedExactCandidateV2)
-    }
-
-    assert retained_addresses == [((0, 0, 0), (0, 0, 1), (0, 1, 0), (0, 1, 1))]
-    assert "retained_address" in retained_candidate_field_names
-    assert "final_signal_row" not in retained_candidate_field_names
+    assert not hasattr(
+        BacktestStageAShortlistBuilderV2,
+        "_score_retained_exact_candidates_into_heap",
+    )
 
 
 def test_stage_a_shortlist_builder_v2_materializes_exact_payloads_only_for_shortlisted_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    Verify dense retained exact work only materializes payload objects for shortlisted rows.
+    Verify dense retained exact chunk work only materializes payload objects for shortlisted rows.
 
     Args:
         monkeypatch: pytest fixture used to record retained exact batch and payload calls.
     Returns:
         None.
     Assumptions:
-        The combo proxy fixture retains four exact candidates out of eight Stage A variants, and
-        only the final deterministic shortlist should receive internal exact payload objects.
+        The combo proxy fixture retains four exact candidates inside one retained chunk out of
+        eight Stage A variants, and only the final deterministic shortlist should receive
+        internal exact payload objects.
     Raises:
         AssertionError: If retained exact batching sees the full breadth or materializes payloads
             for non-shortlisted rows.
@@ -1504,7 +1488,7 @@ def test_stage_a_shortlist_builder_v2_materializes_exact_payloads_only_for_short
         Returns:
             Any: Original dense batch object wrapped with payload-materialization logging.
         Assumptions:
-            The retained exact batch builder receives only combo proxy survivors after narrowing.
+            The retained exact batch builder receives only one retained chunk after combo pruning.
         Raises:
             None.
         Side Effects:
@@ -1625,118 +1609,60 @@ def _inactive_context(store: SyntheticArtifactStoreV2) -> ArtifactSlotPinnedRunt
     )
 
 
-def _record_retained_exact_candidate_frontiers(
+def _record_streaming_exact_chunks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> list[tuple[int, ...]]:
     """
-    Record retained exact-candidate frontier ordering emitted by combo proxy prefilter.
+    Record Stage A streaming exact chunk ordering emitted by combo proxy prefilter.
 
     Args:
         monkeypatch: pytest fixture used to wrap the builder method.
     Returns:
-        list[tuple[int, ...]]: Retained frontier stage-A indexes captured for each build.
+        list[tuple[int, ...]]: Stage A indexes exact-scored in each retained chunk merge.
     Assumptions:
-        Combo proxy prefilter hands the full retained frontier into exact evaluation in one call.
+        Streaming exact scoring should merge each retained chunk separately instead of stacking
+        one deferred replay batch.
     Raises:
         None.
     Side Effects:
-        Monkeypatches `BacktestStageAShortlistBuilderV2._score_retained_exact_candidates_into_heap`.
+        Monkeypatches
+        `BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap`.
     """
-    retained_frontiers: list[tuple[int, ...]] = []
+    streaming_exact_chunks: list[tuple[int, ...]] = []
     original_method = (
-        BacktestStageAShortlistBuilderV2._score_retained_exact_candidates_into_heap
+        BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap
     )
 
     def _recording_method(self: Any, **kwargs: Any) -> None:
         """
-        Record retained frontier ordering before delegating to the exact scorer.
+        Record one retained chunk before delegating to the exact scorer.
 
         Args:
             self: Builder instance under test.
-            **kwargs: Exact-scoring keyword arguments including `retained_exact_candidates`.
+            **kwargs: Exact-scoring keyword arguments including `chunk_variants`.
         Returns:
             None.
         Assumptions:
-            Retained exact candidates stay in deterministic combo proxy prefilter order.
+            Retained chunk order should stay deterministic and should surface multiple calls when
+            Stage A avoids deferred replay.
         Raises:
             None.
         Side Effects:
-            Appends retained frontier stage-A indexes to the in-memory log.
+            Appends exact-scored Stage A indexes to the in-memory log.
         """
-        retained_frontiers.append(
+        streaming_exact_chunks.append(
             tuple(
-                candidate.base_variant.stage_a_index
-                for candidate in kwargs["retained_exact_candidates"]
+                variant.stage_a_index for variant in kwargs["chunk_variants"]
             )
         )
         original_method(self, **kwargs)
 
     monkeypatch.setattr(
         BacktestStageAShortlistBuilderV2,
-        "_score_retained_exact_candidates_into_heap",
+        "_merge_retained_exact_payload_chunk_into_heap",
         _recording_method,
     )
-    return retained_frontiers
-
-
-def _record_retained_exact_candidate_addresses(
-    monkeypatch: pytest.MonkeyPatch,
-) -> list[tuple[tuple[int, ...], ...]]:
-    """
-    Record retained exact-candidate row addresses emitted by combo proxy prefilter.
-
-    Args:
-        monkeypatch: pytest fixture used to wrap the builder method.
-    Returns:
-        list[tuple[tuple[int, ...], ...]]: Retained per-candidate row addresses captured for each
-            Stage A build.
-    Assumptions:
-        Retained exact candidates should expose compact row-address metadata and no
-        `final_signal_row` field after the retained frontier cutover.
-    Raises:
-        AssertionError: If one retained candidate still exposes `final_signal_row`.
-    Side Effects:
-        Monkeypatches `BacktestStageAShortlistBuilderV2._score_retained_exact_candidates_into_heap`.
-    """
-    retained_addresses: list[tuple[tuple[int, ...], ...]] = []
-    original_method = (
-        BacktestStageAShortlistBuilderV2._score_retained_exact_candidates_into_heap
-    )
-
-    def _recording_method(self: Any, **kwargs: Any) -> None:
-        """
-        Record retained row addresses before delegating to the exact scorer.
-
-        Args:
-            self: Builder instance under test.
-            **kwargs: Exact-scoring keyword arguments including `retained_exact_candidates`.
-        Returns:
-            None.
-        Assumptions:
-            Candidate address tuples preserve authored indicator-plan order and replace the legacy
-            retained `final_signal_row` contract completely.
-        Raises:
-            AssertionError: If one candidate still exposes `final_signal_row`.
-        Side Effects:
-            Appends retained row-address tuples to the in-memory log.
-        """
-        retained_exact_candidates = kwargs["retained_exact_candidates"]
-        for candidate in retained_exact_candidates:
-            assert not hasattr(candidate, "final_signal_row")
-        retained_addresses.append(
-            tuple(
-                candidate.retained_address.indicator_row_indexes
-                for candidate in retained_exact_candidates
-            )
-        )
-        original_method(self, **kwargs)
-
-    monkeypatch.setattr(
-        BacktestStageAShortlistBuilderV2,
-        "_score_retained_exact_candidates_into_heap",
-        _recording_method,
-    )
-    return retained_addresses
+    return streaming_exact_chunks
 
 
 def _attach_signal_features_access(*, grid_context: _FakeGridContext) -> None:

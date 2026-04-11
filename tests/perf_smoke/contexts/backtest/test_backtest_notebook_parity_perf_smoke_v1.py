@@ -4,6 +4,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+import pytest
+
+from tests.unit.contexts.backtest.application.services.v2 import (
+    test_stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_testkit,
+)
 from trading.contexts.backtest.application.services import (
     BacktestNotebookParityMeasurementV2,
     evaluate_backtest_notebook_parity_scenario_v2,
@@ -323,6 +328,124 @@ def test_stage_a_retained_frontier_memory_shape_is_observable_for_benchmarks() -
     assert memory_shape.legacy_final_signal_value_count == 8_192
     assert round(memory_shape.legacy_to_address_value_ratio or 0.0, 2) == 1365.33
     assert memory_shape.stores_full_final_signal_rows is False
+
+
+def test_stage_a_streaming_exact_runtime_shape_is_observable_for_benchmarks() -> None:
+    """
+    Verify perf-smoke can distinguish Stage A streaming exact scoring from deferred replay.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Stage A exact work now runs trade-list-first over each retained chunk immediately, so the
+        additive runtime shape should report streaming exact scoring with no deferred replay.
+    Raises:
+        AssertionError: If the additive runtime-shape contract drifts from the streaming cutover.
+    Side Effects:
+        None.
+    """
+    runtime_shape = (
+        stage_a_shortlist_builder_module.describe_stage_a_streaming_exact_runtime_shape_v2(
+            retained_chunk_sizes=(4, 2),
+        )
+    )
+
+    assert runtime_shape.exact_scoring_mode == "streaming exact scoring"
+    assert runtime_shape.retained_chunk_count == 2
+    assert runtime_shape.retained_candidate_count == 6
+    assert runtime_shape.max_retained_chunk_size == 4
+    assert runtime_shape.deferred_replay_count == 0
+
+
+def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify perf-smoke derives streaming exact shape from the live Stage A path.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
+    Args:
+        monkeypatch: pytest fixture used to record retained chunk merges on the live Stage A path.
+    Returns:
+        None.
+    Assumptions:
+        Perf-smoke should fail if the active Stage A path stops merging retained chunks directly
+        into the shortlist heap and returns to deferred replay.
+    Raises:
+        AssertionError: If the live Stage A path no longer exposes the expected streaming shape.
+    Side Effects:
+        Monkeypatches the retained chunk heap-merge helper during one in-memory Stage A run.
+    """
+    retained_chunk_sizes: list[int] = []
+    original_method = (
+        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap
+    )
+
+    def _recording_method(self: Any, **kwargs: Any) -> None:
+        """
+        Record one retained chunk size before delegating to the live exact merge helper.
+
+        Args:
+            self: Stage A shortlist builder under test.
+            **kwargs: Exact merge keyword arguments including `chunk_variants`.
+        Returns:
+            None.
+        Assumptions:
+            Each merge call corresponds to one retained chunk selected by combo proxy prefilter.
+        Raises:
+            None.
+        Side Effects:
+            Appends one retained chunk size to the in-memory log.
+        """
+        retained_chunk_sizes.append(len(kwargs["chunk_variants"]))
+        original_method(self, **kwargs)
+
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2,
+        "_merge_retained_exact_payload_chunk_into_heap",
+        _recording_method,
+    )
+
+    shortlist = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=stage_a_shortlist_builder_testkit._ComboProxyPriceLoader(),
+        signal_matrix_loader=stage_a_shortlist_builder_testkit._combo_proxy_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, stage_a_shortlist_builder_testkit._combo_proxy_grid_context()),
+        artifact_context=cast(
+            Any,
+            stage_a_shortlist_builder_testkit._combo_proxy_artifact_context(),
+        ),
+        target_time_range=stage_a_shortlist_builder_testkit._combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=6,
+    )
+
+    runtime_shape = (
+        stage_a_shortlist_builder_module.describe_stage_a_streaming_exact_runtime_shape_v2(
+            retained_chunk_sizes=tuple(retained_chunk_sizes),
+        )
+    )
+
+    assert retained_chunk_sizes == [4, 2]
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
+    assert runtime_shape.exact_scoring_mode == "streaming exact scoring"
+    assert runtime_shape.retained_chunk_count == 2
+    assert runtime_shape.retained_candidate_count == 6
+    assert runtime_shape.max_retained_chunk_size == 4
+    assert runtime_shape.deferred_replay_count == 0
 
 
 def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shape_gates() -> None:

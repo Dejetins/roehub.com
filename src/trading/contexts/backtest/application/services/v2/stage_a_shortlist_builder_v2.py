@@ -716,6 +716,98 @@ def describe_stage_a_retained_frontier_memory_shape_v2(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class StageAStreamingExactRuntimeShapeV2:
+    """
+    Additive runtime-shape snapshot for Stage A streaming exact scoring.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+
+    exact_scoring_mode: str
+    retained_chunk_count: int
+    retained_candidate_count: int
+    max_retained_chunk_size: int
+    deferred_replay_count: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one additive Stage A runtime-shape snapshot.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Stage A exact work should report streaming exact scoring over retained chunk batches,
+            and no deferred replay remains in the active trade-list-first path.
+        Raises:
+            ValueError: If one count is negative or the mode literal is empty.
+        Side Effects:
+            None.
+        """
+        if not self.exact_scoring_mode:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.exact_scoring_mode must be non-empty"
+            )
+        if self.retained_chunk_count < 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.retained_chunk_count must be >= 0"
+            )
+        if self.retained_candidate_count < 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.retained_candidate_count must be >= 0"
+            )
+        if self.max_retained_chunk_size < 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.max_retained_chunk_size must be >= 0"
+            )
+        if self.deferred_replay_count < 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.deferred_replay_count must be >= 0"
+            )
+
+
+def describe_stage_a_streaming_exact_runtime_shape_v2(
+    *,
+    retained_chunk_sizes: Sequence[int],
+) -> StageAStreamingExactRuntimeShapeV2:
+    """
+    Describe Stage A streaming exact scoring shape for perf-smoke benchmarks.
+
+    Args:
+        retained_chunk_sizes: Exact retained chunk sizes observed as Stage A streams trade-list-
+            first exact scoring into the shortlist heap.
+    Returns:
+        StageAStreamingExactRuntimeShapeV2: Additive runtime-shape evidence for streaming exact
+            scoring with no deferred replay.
+    Assumptions:
+        The active Stage A path exact-scores each retained chunk immediately and keeps deferred
+        replay count at zero.
+    Raises:
+        ValueError: If one retained chunk size is negative.
+    Side Effects:
+        None.
+    """
+    normalized_chunk_sizes = tuple(int(value) for value in retained_chunk_sizes)
+    if any(value < 0 for value in normalized_chunk_sizes):
+        raise ValueError(
+            "Stage A streaming exact scoring retained_chunk_sizes must be >= 0"
+        )
+    return StageAStreamingExactRuntimeShapeV2(
+        exact_scoring_mode="streaming exact scoring",
+        retained_chunk_count=len(normalized_chunk_sizes),
+        retained_candidate_count=sum(normalized_chunk_sizes),
+        max_retained_chunk_size=max(normalized_chunk_sizes, default=0),
+        deferred_replay_count=0,
+    )
+
+
 def _retained_exact_candidate_addresses_for_chunk_v2(
     *,
     chunk_inputs: Sequence[PreparedIndicatorChunkInputsV2],
@@ -958,39 +1050,29 @@ class BacktestStageAShortlistBuilderV2:
                 cancel_checker=cancel_checker,
             )
 
-            retained_exact_candidates = self._build_combo_proxy_prefilter_frontier(
+            shortlist_heap: list[StageAHeapEntryV2] = []
+            self._stream_combo_proxy_exact_chunks_into_heap(
                 row_plans=row_plans,
                 grid_context=grid_context,
                 artifact_context=artifact_context,
                 signal_target_slice=signal_target_slice,
                 local_signal_close=local_signal_close,
+                local_bar_close_1m_idx=local_bar_close_1m_idx,
+                sentinel_index=sentinel_index,
+                local_exec_open=local_exec_open,
+                local_exec_close=local_exec_close,
                 execution_params=execution_params,
                 row_prefilter_frontier=row_prefilter_frontier,
-                exact_candidates_limit=self._target_combo_prefilter_exact_candidates(
+                ranking_plan=ranking_plan,
+                shortlist_limit=shortlist_limit,
+                shortlist_heap=shortlist_heap,
+                retained_chunk_limit=self._target_combo_prefilter_exact_candidates(
                     grid_context=grid_context,
                     shortlist_limit=shortlist_limit,
                 ),
                 batch_size=effective_batch_size,
                 cancel_checker=cancel_checker,
                 on_checkpoint=on_checkpoint,
-            )
-            shortlist_heap: list[StageAHeapEntryV2] = []
-            self._score_retained_exact_candidates_into_heap(
-                retained_exact_candidates=retained_exact_candidates,
-                row_plans=row_plans,
-                grid_context=grid_context,
-                artifact_context=artifact_context,
-                signal_target_slice=signal_target_slice,
-                local_bar_close_1m_idx=local_bar_close_1m_idx,
-                sentinel_index=sentinel_index,
-                local_exec_open=local_exec_open,
-                local_exec_close=local_exec_close,
-                execution_params=execution_params,
-                ranking_plan=ranking_plan,
-                shortlist_limit=shortlist_limit,
-                shortlist_heap=shortlist_heap,
-                batch_size=effective_batch_size,
-                cancel_checker=cancel_checker,
             )
             return stage_a_rows_from_heap_v2(heap=shortlist_heap)
 
@@ -1063,7 +1145,7 @@ class BacktestStageAShortlistBuilderV2:
             )
         return MappingProxyType(retained_frontier)
 
-    def _build_combo_proxy_prefilter_frontier(
+    def _stream_combo_proxy_exact_chunks_into_heap(
         self,
         *,
         row_plans: Sequence[PreparedIndicatorRowPlanV2],
@@ -1071,15 +1153,22 @@ class BacktestStageAShortlistBuilderV2:
         artifact_context: ArtifactSlotPinnedRuntimeContextV2,
         signal_target_slice: slice,
         local_signal_close: np.ndarray,
+        local_bar_close_1m_idx: np.ndarray,
+        sentinel_index: int,
+        local_exec_open: np.ndarray,
+        local_exec_close: np.ndarray,
         execution_params: ExecutionParamsV1,
         row_prefilter_frontier: Mapping[str, RetainedIndicatorRowFrontierV2],
-        exact_candidates_limit: int,
+        ranking_plan: ResolvedRankingPlanV2,
+        shortlist_limit: int,
+        shortlist_heap: list[StageAHeapEntryV2],
+        retained_chunk_limit: int,
         batch_size: int,
         cancel_checker: StageACancelCheckerV2 | None,
         on_checkpoint: StageACheckpointCallbackV2 | None,
-    ) -> tuple[_RetainedExactCandidateV2, ...]:
+    ) -> None:
         """
-        Build the deterministic retained frontier for combo proxy prefilter before exact work.
+        Stream Stage A exact scoring per retained combo chunk with no deferred replay.
 
         Args:
             row_plans: Prepared per-indicator row-addressing plans.
@@ -1087,30 +1176,35 @@ class BacktestStageAShortlistBuilderV2:
             artifact_context: Slot-pinned runtime context for strict signal-row reads.
             signal_target_slice: Target request slice in the signal timeline.
             local_signal_close: Request-timeframe close prices aligned to `signal_target_slice`.
-            execution_params: Immutable execution settings supplying the fee penalty.
+            local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
+            sentinel_index: Local execution sentinel index.
+            local_exec_open: Local execution-bar open prices.
+            local_exec_close: Local execution-bar close prices.
+            execution_params: Immutable no-risk execution settings.
             row_prefilter_frontier: Deterministic per-indicator retained row frontier.
-            exact_candidates_limit: Maximum retained exact-candidate count after combo pruning.
+            ranking_plan: Pre-resolved staged ranking plan from shared Stage A machinery.
+            shortlist_limit: Maximum retained shortlist size.
+            shortlist_heap: Mutable bounded shortlist heap updated in place.
+            retained_chunk_limit: Maximum exact-candidate count retained inside one combo chunk.
             batch_size: Deterministic chunk size used while scanning Stage A variants.
             cancel_checker: Optional cooperative cancellation callback by stage literal.
             on_checkpoint: Optional progress callback `(processed, total)` after each scan chunk.
         Returns:
-            tuple[_RetainedExactCandidateV2, ...]: Deterministic retained frontier sorted by
-                combo proxy prefilter score.
+            None.
         Assumptions:
-            The combo proxy prefilter narrows only Stage A exact survivors; final exact authority
-            remains unchanged because retained candidates still flow through the existing exact
-            no-risk evaluation.
+            Combo proxy prefilter narrows one retained chunk at a time, then Stage A exact work
+            runs trade-list-first immediately so no deferred replay batch remains on the active
+            path.
         Raises:
-            ValueError: If the exact-candidate limit is non-positive or no candidates survive.
+            ValueError: If the retained chunk limit is non-positive.
         Side Effects:
-            Reads retained signal-row subsets, computes combo proxy scores, and stores only
-            minimal retained row-address metadata for later exact survivor evaluation.
+            Reads retained signal-row subsets, exact-scores each retained chunk immediately, and
+            mutates `shortlist_heap` in place.
         """
-        if exact_candidates_limit <= 0:
+        if retained_chunk_limit <= 0:
             raise ValueError(
-                "Stage A combo proxy prefilter requires exact_candidates_limit > 0"
+                "Stage A combo proxy prefilter requires retained_chunk_limit > 0"
             )
-        frontier_heap: list[tuple[float, int, _RetainedExactCandidateV2]] = []
         chunk_variants: list[BacktestStageABaseVariantV2] = []
         total = int(grid_context.stage_a_variants_total)
         processed = 0
@@ -1137,42 +1231,48 @@ class BacktestStageAShortlistBuilderV2:
                     artifact_context=artifact_context,
                     signal_target_slice=signal_target_slice,
                 )
-                retained_candidate_addresses = (
-                    _retained_exact_candidate_addresses_for_chunk_v2(
-                        chunk_inputs=chunk_inputs
-                    )
-                )
                 selected_signal_rows = {
                     prepared_input.indicator_id: prepared_input.signal_rows
                     for prepared_input in chunk_inputs
                 }
-                self._merge_combo_proxy_chunk_into_frontier(
+                final_signal = aggregate_final_signal_rows_v2(
+                    selected_signal_rows=selected_signal_rows
+                )
+                retained_row_indexes = self._select_combo_proxy_retained_chunk_row_indexes(
                     chunk_variants=retained_chunk_variants,
-                    retained_candidate_addresses=retained_candidate_addresses,
-                    final_signal=aggregate_final_signal_rows_v2(
-                        selected_signal_rows=selected_signal_rows
-                    ),
+                    final_signal=final_signal,
                     local_signal_close=local_signal_close,
                     execution_params=execution_params,
-                    exact_candidates_limit=exact_candidates_limit,
-                    frontier_heap=frontier_heap,
+                    retained_chunk_limit=retained_chunk_limit,
                 )
+                if retained_row_indexes:
+                    retained_row_selection = np.asarray(
+                        retained_row_indexes,
+                        dtype=np.int64,
+                    )
+                    self._merge_retained_exact_payload_chunk_into_heap(
+                        chunk_variants=tuple(
+                            retained_chunk_variants[row_index]
+                            for row_index in retained_row_indexes
+                        ),
+                        final_signal=np.ascontiguousarray(
+                            final_signal[retained_row_selection, :],
+                            dtype=np.int8,
+                        ),
+                        grid_context=grid_context,
+                        local_bar_close_1m_idx=local_bar_close_1m_idx,
+                        sentinel_index=sentinel_index,
+                        local_exec_open=local_exec_open,
+                        local_exec_close=local_exec_close,
+                        execution_params=execution_params,
+                        ranking_plan=ranking_plan,
+                        shortlist_limit=shortlist_limit,
+                        shortlist_heap=shortlist_heap,
+                    )
             processed += len(chunk_variants)
             if on_checkpoint is not None:
                 on_checkpoint(processed, total)
             chunk_variants.clear()
-
-        retained_exact_candidates = tuple(
-            sorted(
-                (candidate for _, _, candidate in frontier_heap),
-                key=lambda candidate: candidate.sort_key(),
-            )
-        )
-        if len(retained_exact_candidates) == 0:
-            raise ValueError(
-                "Stage A combo proxy prefilter retained no exact survivors"
-            )
-        return retained_exact_candidates
 
     def _retain_indicator_rows(
         self,
@@ -1252,44 +1352,39 @@ class BacktestStageAShortlistBuilderV2:
         retained_row_indexes = scorer_sorted_row_indexes[stable_proxy_order[:retained_count]]
         return tuple(int(row_index) for row_index in retained_row_indexes.tolist())
 
-    def _merge_combo_proxy_chunk_into_frontier(
+    def _select_combo_proxy_retained_chunk_row_indexes(
         self,
         *,
         chunk_variants: Sequence[BacktestStageABaseVariantV2],
-        retained_candidate_addresses: Sequence[_RetainedExactCandidateAddressV2],
         final_signal: np.ndarray,
         local_signal_close: np.ndarray,
         execution_params: ExecutionParamsV1,
-        exact_candidates_limit: int,
-        frontier_heap: list[tuple[float, int, _RetainedExactCandidateV2]],
-    ) -> None:
+        retained_chunk_limit: int,
+    ) -> tuple[int, ...]:
         """
-        Merge one chunk of combo proxy scores into the bounded retained exact-candidate frontier.
+        Select one deterministic retained chunk for immediate Stage A exact scoring.
 
         Args:
             chunk_variants: Deterministic Stage A base variants surviving row prefilter.
-            retained_candidate_addresses: Minimal retained row-address metadata aligned to
-                `chunk_variants`.
             final_signal: Aggregated Stage A `final_signal[V, T_signal]` for the same variants.
             local_signal_close: Request-timeframe close prices aligned to `final_signal`.
             execution_params: Immutable execution settings supplying the fee penalty.
-            exact_candidates_limit: Maximum retained exact-candidate count after combo pruning.
-            frontier_heap: Mutable bounded combo frontier heap updated in place.
+            retained_chunk_limit: Maximum exact-candidate count retained inside one combo chunk.
         Returns:
-            None.
+            tuple[int, ...]: Selected chunk-local row indexes in original Stage A chunk order.
         Assumptions:
-            The combo proxy prefilter uses only cheap request-timeframe signals and explicit
-            stable tie-breaks to build a deterministic retained frontier.
+            Combo proxy prefilter narrows only the current retained chunk, while exact scoring
+            remains authoritative because retained rows flow immediately into the trade-list-first
+            path with no deferred replay.
         Raises:
-            ValueError: If the retained address or final-signal row count drifts from
+            ValueError: If the retained chunk limit is non-positive or `final_signal` drifts from
                 `chunk_variants`.
         Side Effects:
-            Mutates `frontier_heap` in place.
+            None.
         """
-        if len(retained_candidate_addresses) != len(chunk_variants):
+        if retained_chunk_limit <= 0:
             raise ValueError(
-                "Stage A combo proxy prefilter requires retained_candidate_addresses to match "
-                "chunk_variants"
+                "Stage A combo proxy prefilter requires retained_chunk_limit > 0"
             )
         if int(final_signal.shape[0]) != len(chunk_variants):
             raise ValueError(
@@ -1311,27 +1406,15 @@ class BacktestStageAShortlistBuilderV2:
         ranked_row_indexes = stage_order[
             np.argsort(-proxy_scores[stage_order], kind="mergesort")
         ]
-        ranked_row_limit = min(len(chunk_variants), exact_candidates_limit)
-        for ranked_row_index in ranked_row_indexes[:ranked_row_limit]:
-            row_index = int(ranked_row_index)
-            base_variant = chunk_variants[row_index]
-            candidate = _RetainedExactCandidateV2(
-                base_variant=base_variant,
-                proxy_score=float(proxy_scores[row_index]),
-                retained_address=retained_candidate_addresses[row_index],
-            )
-            heap_entry = (
-                candidate.proxy_score,
-                -candidate.base_variant.stage_a_index,
-                candidate,
-            )
-            if len(frontier_heap) < exact_candidates_limit:
-                heappush(frontier_heap, heap_entry)
-                continue
-            if heap_entry[:2] <= frontier_heap[0][:2]:
-                break
-            if heap_entry[:2] > frontier_heap[0][:2]:
-                heapreplace(frontier_heap, heap_entry)
+        retained_row_count = min(len(chunk_variants), retained_chunk_limit)
+        selected_row_indexes = np.sort(
+            np.asarray(
+                ranked_row_indexes[:retained_row_count],
+                dtype=np.int64,
+            ),
+            kind="mergesort",
+        )
+        return tuple(int(row_index) for row_index in selected_row_indexes.tolist())
 
     def _row_scoring_inputs_for_prefilter(
         self,
@@ -1605,17 +1688,17 @@ class BacktestStageAShortlistBuilderV2:
         shortlist_limit: int,
     ) -> int:
         """
-        Resolve how many exact survivors the combo proxy prefilter should retain globally.
+        Resolve how many exact survivors the combo proxy prefilter should retain per chunk.
 
         Args:
             grid_context: Stage A runtime plan owning deterministic variant cardinality.
             shortlist_limit: Final Stage A shortlist cap requested by the caller.
         Returns:
-            int: Global retained-frontier budget for exact survivor evaluation.
+            int: Retained chunk budget for immediate exact survivor evaluation.
         Assumptions:
             Combo proxy prefilter should remain conservative by over-retaining a small explicit
-            multiple of the final shortlist rather than handing the full row-prefiltered search
-            space to exact evaluation.
+            multiple of the final shortlist inside each chunk before Stage A exact scoring runs
+            immediately with no deferred replay.
         Raises:
             ValueError: If the requested shortlist limit is non-positive.
         Side Effects:
@@ -1853,73 +1936,6 @@ class BacktestStageAShortlistBuilderV2:
             )
         return tuple(prepared_inputs)
 
-    def _load_retained_exact_final_signal_batch(
-        self,
-        *,
-        retained_exact_candidates: Sequence[_RetainedExactCandidateV2],
-        row_plans: Sequence[PreparedIndicatorRowPlanV2],
-        grid_context: BacktestArtifactRuntimePlanV2,
-        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
-        signal_target_slice: slice,
-    ) -> np.ndarray:
-        """
-        Rebuild one retained exact batch's `final_signal` from compact row-address metadata.
-
-        Args:
-            retained_exact_candidates: Retained exact candidates for one deterministic batch.
-            row_plans: Prepared per-indicator row-addressing plans in aggregation order.
-            grid_context: Stage A runtime plan owning the request timeframe literal.
-            artifact_context: Slot-pinned runtime context for explicit signal-row reads.
-            signal_target_slice: Target request slice in the signal timeline.
-        Returns:
-            np.ndarray: Aggregated `final_signal[V, T_signal]` rows for the retained batch.
-        Assumptions:
-            Candidate row addresses are already deterministic and aligned to the same indicator
-            plan order used during combo proxy prefiltering.
-        Raises:
-            ValueError: If the retained batch is empty or one candidate address width drifts from
-                `row_plans`.
-        Side Effects:
-            Reloads only the retained signal-row subsets needed for the exact batch.
-        """
-        if len(retained_exact_candidates) == 0:
-            raise ValueError(
-                "Stage A exact retained-candidate evaluation requires non-empty retained batches"
-            )
-        expected_indicator_count = len(row_plans)
-        if expected_indicator_count <= 0:
-            raise ValueError(
-                "Stage A exact retained-candidate evaluation requires non-empty row_plans"
-            )
-        for candidate in retained_exact_candidates:
-            if (
-                len(candidate.retained_address.indicator_row_indexes)
-                != expected_indicator_count
-            ):
-                raise ValueError(
-                    "Stage A exact retained-candidate evaluation requires retained addresses "
-                    "to align with row_plans"
-                )
-        selected_signal_rows: dict[str, np.ndarray] = {}
-        for plan_position, row_plan in enumerate(row_plans):
-            indicator_row_indexes = np.fromiter(
-                (
-                    candidate.retained_address.indicator_row_indexes[plan_position]
-                    for candidate in retained_exact_candidates
-                ),
-                dtype=np.int64,
-                count=len(retained_exact_candidates),
-            )
-            selected_signal_rows[row_plan.indicator_id] = _load_chunk_signal_rows_v2(
-                signal_matrix_loader=self.signal_matrix_loader,
-                artifact_context=artifact_context,
-                timeframe=grid_context.timeframe_code,
-                indicator_id=row_plan.indicator_id,
-                indicator_row_indexes=indicator_row_indexes,
-                signal_target_slice=signal_target_slice,
-            )
-        return aggregate_final_signal_rows_v2(selected_signal_rows=selected_signal_rows)
-
     def _resolve_batch_size(
         self,
         *,
@@ -2015,83 +2031,6 @@ class BacktestStageAShortlistBuilderV2:
             ),
         )
 
-    def _score_retained_exact_candidates_into_heap(
-        self,
-        *,
-        retained_exact_candidates: Sequence[_RetainedExactCandidateV2],
-        row_plans: Sequence[PreparedIndicatorRowPlanV2],
-        grid_context: BacktestArtifactRuntimePlanV2,
-        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
-        signal_target_slice: slice,
-        local_bar_close_1m_idx: np.ndarray,
-        sentinel_index: int,
-        local_exec_open: np.ndarray,
-        local_exec_close: np.ndarray,
-        execution_params: ExecutionParamsV1,
-        ranking_plan: ResolvedRankingPlanV2,
-        shortlist_limit: int,
-        shortlist_heap: list[StageAHeapEntryV2],
-        batch_size: int,
-        cancel_checker: StageACancelCheckerV2 | None,
-    ) -> None:
-        """
-        Exact-score the retained frontier after combo proxy prefiltering.
-
-        Args:
-            retained_exact_candidates: Deterministic combo proxy prefilter survivors.
-            row_plans: Prepared per-indicator row-addressing plans in aggregation order.
-            grid_context: Stage A grid context with direction-mode metadata.
-            artifact_context: Slot-pinned runtime context for explicit retained-row reads.
-            signal_target_slice: Target request slice in the signal timeline.
-            local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
-            sentinel_index: Local execution sentinel index.
-            local_exec_open: Local execution-bar open prices.
-            local_exec_close: Local execution-bar close prices.
-            execution_params: Immutable no-risk execution settings.
-            ranking_plan: Pre-resolved staged ranking plan from shared Stage A machinery.
-            shortlist_limit: Maximum retained shortlist size.
-            shortlist_heap: Mutable bounded shortlist heap updated in place.
-            batch_size: Deterministic exact-evaluation chunk size for retained candidates.
-            cancel_checker: Optional cooperative cancellation callback by stage literal.
-        Returns:
-            None.
-        Assumptions:
-            Exact survivors are already bounded and ordered by combo proxy prefilter, but the
-            existing exact no-risk evaluation remains authoritative for final Stage A ranking.
-        Raises:
-            ValueError: If retained row addresses cannot be rebuilt into exact batches
-                consistently.
-        Side Effects:
-            Mutates `shortlist_heap` in place while reloading only retained signal-row subsets and
-            preserving the retained exact payload on each shortlisted row for downstream Stage B
-            exact scoring.
-        """
-        for offset in range(0, len(retained_exact_candidates), batch_size):
-            if cancel_checker is not None:
-                cancel_checker(STAGE_A_LITERAL_V2)
-            candidate_batch = retained_exact_candidates[offset : offset + batch_size]
-            self._merge_retained_exact_payload_chunk_into_heap(
-                chunk_variants=tuple(
-                    candidate.base_variant for candidate in candidate_batch
-                ),
-                final_signal=self._load_retained_exact_final_signal_batch(
-                    retained_exact_candidates=candidate_batch,
-                    row_plans=row_plans,
-                    grid_context=grid_context,
-                    artifact_context=artifact_context,
-                    signal_target_slice=signal_target_slice,
-                ),
-                grid_context=grid_context,
-                local_bar_close_1m_idx=local_bar_close_1m_idx,
-                sentinel_index=sentinel_index,
-                local_exec_open=local_exec_open,
-                local_exec_close=local_exec_close,
-                execution_params=execution_params,
-                ranking_plan=ranking_plan,
-                shortlist_limit=shortlist_limit,
-                shortlist_heap=shortlist_heap,
-            )
-
     def _build_retained_exact_batch(
         self,
         *,
@@ -2114,7 +2053,8 @@ class BacktestStageAShortlistBuilderV2:
             _CompactTradeBatchV2: Dense internal exact batch aligned to `chunk_variants`.
         Assumptions:
             Trade-list-first remains internal-only and is built only after row and combo
-            prefiltering retain the exact frontier.
+            prefiltering retain the current chunk for streaming exact scoring with no deferred
+            replay.
         Raises:
             ValueError: If `final_signal` row count drifts from `chunk_variants`.
         Side Effects:
@@ -2166,13 +2106,13 @@ class BacktestStageAShortlistBuilderV2:
         Returns:
             None.
         Assumptions:
-            The combo proxy prefilter narrows candidates first, and only the retained frontier
+            The combo proxy prefilter narrows candidates first, and only the retained chunk
             receives internal compact exact payload construction before Stage A no-risk ranking.
         Raises:
             ValueError: If `final_signal` row count drifts from `chunk_variants`.
         Side Effects:
             Mutates `shortlist_heap` in place and materializes internal exact payloads only for
-            rows that enter the deterministic shortlist.
+            rows that enter the deterministic shortlist during streaming exact scoring.
         """
         exact_batch = self._build_retained_exact_batch(
             chunk_variants=chunk_variants,
