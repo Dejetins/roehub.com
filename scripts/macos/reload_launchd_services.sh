@@ -63,6 +63,47 @@ render_worker_services() {
     --clean
 }
 
+service_label_from_plist() {
+  local service="$1"
+  printf '%s\n' "${service%.plist}"
+}
+
+service_is_loaded() {
+  local label="$1"
+  launchctl print "gui/${UID_VALUE}/${label}" >/dev/null 2>&1
+}
+
+bootout_service() {
+  local service="$1"
+  local plist_path="${LAUNCH_AGENTS_DIR}/${service}"
+  local label=""
+  label="$(service_label_from_plist "$service")"
+  if ! service_is_loaded "$label"; then
+    echo "bootout skip ${label}: service not loaded"
+    return 0
+  fi
+  echo "bootout ${label}"
+  if launchctl bootout "gui/${UID_VALUE}" "${plist_path}"; then
+    return 0
+  fi
+  echo "bootout path failed for ${label}; retrying by service target" >&2
+  launchctl bootout "gui/${UID_VALUE}/${label}"
+}
+
+bootstrap_service() {
+  local service="$1"
+  local plist_path="${LAUNCH_AGENTS_DIR}/${service}"
+  local label=""
+  label="$(service_label_from_plist "$service")"
+  plutil -lint "${plist_path}" >/dev/null
+  if service_is_loaded "$label"; then
+    echo "bootstrap preflight ${label}: service still loaded, forcing service-target bootout"
+    launchctl bootout "gui/${UID_VALUE}/${label}" || true
+  fi
+  echo "bootstrap ${label}"
+  launchctl bootstrap "gui/${UID_VALUE}" "${plist_path}"
+}
+
 reload_profile() {
   local profile="$1"
   local -a static_services=()
@@ -89,7 +130,7 @@ reload_profile() {
   echo "reloading ${profile} static services: ${#static_services[@]}"
   echo "reloading ${profile} backtest-job-runner fleet (existing instances): ${#existing_worker_services[@]}"
   for service in "${static_services[@]}" "${existing_worker_services[@]}"; do
-    launchctl bootout "gui/${UID_VALUE}" "${LAUNCH_AGENTS_DIR}/${service}" || true
+    bootout_service "${service}" || true
   done
 
   while IFS= read -r service; do
@@ -97,7 +138,7 @@ reload_profile() {
   done < <(render_worker_services "$profile")
   echo "reloading ${profile} backtest-job-runner fleet (desired instances): ${#worker_services[@]}"
   for service in "${static_services[@]}" "${worker_services[@]}"; do
-    launchctl bootstrap "gui/${UID_VALUE}" "${LAUNCH_AGENTS_DIR}/${service}"
+    bootstrap_service "${service}"
   done
 }
 
