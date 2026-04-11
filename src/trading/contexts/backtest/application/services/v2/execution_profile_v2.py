@@ -941,18 +941,20 @@ def _default_progress_weights_for_mode_v2(
     Returns:
         BacktestJobStageWeights: Deterministic progress weights summing to `100`.
     Assumptions:
-        Progress weights live inside the profile contract once profile selection becomes active.
+        Progress weights live inside the profile contract once profile selection becomes active,
+        while internal row prefilter, combo prefilter, and retained-candidate exact work remain
+        collapsed into stable public `stage_a` / `stage_b` vocabulary.
     Raises:
         ValueError: If the mode literal is unsupported.
     Side Effects:
         None.
     """
     weights_by_mode: dict[ExecutionProfileModeLiteralV2, BacktestJobStageWeights] = {
-        "exact_small": BacktestJobStageWeights(stage_a=25, stage_b=70, finalizing=5),
-        "exact_parallel": BacktestJobStageWeights(stage_a=35, stage_b=60, finalizing=5),
+        "exact_small": BacktestJobStageWeights(stage_a=40, stage_b=55, finalizing=5),
+        "exact_parallel": BacktestJobStageWeights(stage_a=45, stage_b=50, finalizing=5),
         "hybrid_conservative": BacktestJobStageWeights(
-            stage_a=50,
-            stage_b=45,
+            stage_a=55,
+            stage_b=40,
             finalizing=5,
         ),
         "hybrid_family": BacktestJobStageWeights(stage_a=60, stage_b=35, finalizing=5),

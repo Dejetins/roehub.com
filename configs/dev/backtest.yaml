@@ -92,8 +92,8 @@ backtest:
           max_stage_b_variants_total: 12000
           max_estimated_memory_bytes: 268435456
         progress:
-          stage_a: 25
-          stage_b: 70
+          stage_a: 40
+          stage_b: 55
           finalizing: 5
         parallelism:
           stage_a_workers: 1
@@ -122,8 +122,8 @@ backtest:
           max_stage_b_variants_total: 180000
           max_estimated_memory_bytes: 1610612736
         progress:
-          stage_a: 35
-          stage_b: 60
+          stage_a: 45
+          stage_b: 50
           finalizing: 5
         parallelism:
           stage_a_workers: 1
@@ -154,8 +154,8 @@ backtest:
           max_stage_b_variants_total: 250000
           max_estimated_memory_bytes: 2147483648
         progress:
-          stage_a: 50
-          stage_b: 45
+          stage_a: 55
+          stage_b: 40
           finalizing: 5
         parallelism:
           stage_a_workers: 1

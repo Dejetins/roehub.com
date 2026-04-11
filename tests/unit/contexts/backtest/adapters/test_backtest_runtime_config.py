@@ -148,7 +148,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         config.execution_profiles.available_profiles[1].launch_budget.max_stage_b_variants_total
         == 180000
     )
-    assert config.execution_profiles.available_profiles[1].progress_weights.stage_a == 35
+    assert config.execution_profiles.available_profiles[1].progress_weights.stage_a == 45
     assert (
         config.execution_profiles.default_profile().planning_budget_ms
         == 25
@@ -382,7 +382,7 @@ backtest:
         config.execution_profiles.default_profile().launch_budget.max_stage_a_variants_total
         == 1500
     )
-    assert config.execution_profiles.default_profile().progress_weights.stage_b == 70
+    assert config.execution_profiles.default_profile().progress_weights.stage_b == 55
     assert (
         config.execution_profiles.default_profile().shortlist_config.scoring
         .active_span_ratio_weight

@@ -296,6 +296,7 @@ class AdaptiveSelectorPlanningEvidenceV2:
     estimated_memory_bytes: int
     runtime_mode: AdaptiveSelectorRuntimeModeLiteralV2
     indicator_ids: tuple[str, ...] = ()
+    stage_a_cost_units: int | None = None
 
     def __post_init__(self) -> None:
         """
@@ -316,7 +317,9 @@ class AdaptiveSelectorPlanningEvidenceV2:
             None.
         Assumptions:
             All evidence is available before runtime execution and must stay cheap to derive from
-            the prepared plan; indicator ids remain internal-only metadata.
+            the prepared plan; indicator ids remain internal-only metadata, while
+            `stage_a_cost_units` may collapse retained-frontier row/combo/exact work back under
+            stable public `stage_a` semantics for hybrid classification only.
         Raises:
             ValueError: If one cost-model dimension is non-positive or indicator ids are blank.
         Side Effects:
@@ -332,6 +335,11 @@ class AdaptiveSelectorPlanningEvidenceV2:
                 raise ValueError(
                     f"AdaptiveSelectorPlanningEvidenceV2.{field_name} must be > 0"
                 )
+        if self.stage_a_cost_units is not None and self.stage_a_cost_units <= 0:
+            raise ValueError(
+                "AdaptiveSelectorPlanningEvidenceV2.stage_a_cost_units must be > 0 when "
+                "provided"
+            )
         object.__setattr__(
             self,
             "runtime_mode",
@@ -353,6 +361,25 @@ class AdaptiveSelectorPlanningEvidenceV2:
                 "AdaptiveSelectorPlanningEvidenceV2.indicator_ids must not contain blanks"
             )
         object.__setattr__(self, "indicator_ids", normalized_indicator_ids)
+
+    def effective_stage_a_cost_units(self) -> int:
+        """
+        Return the Stage A cost signal used by hybrid candidate classification.
+
+        Args:
+            None.
+        Returns:
+            int: Retained-frontier-aware Stage A cost units when present, else the raw Stage A
+                variants total.
+        Assumptions:
+            Public `stage_a` vocabulary remains stable even when planner internals distinguish row
+            prefilter, combo prefilter, and retained-candidate exact work.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self.stage_a_cost_units or self.stage_a_variants_total
 
 
 @dataclass(frozen=True, slots=True)
@@ -930,7 +957,7 @@ class CostModelAdaptiveExecutionSelectorV2:
         exceeded_signals = 0
         if evidence.grid_cardinality >= policy.min_grid_cardinality:
             exceeded_signals += 1
-        if evidence.stage_a_variants_total >= policy.min_stage_a_variants_total:
+        if evidence.effective_stage_a_cost_units() >= policy.min_stage_a_variants_total:
             exceeded_signals += 1
         if evidence.stage_b_variants_total >= policy.min_stage_b_variants_total:
             exceeded_signals += 1

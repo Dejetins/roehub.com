@@ -35,6 +35,7 @@ from trading.contexts.backtest.application.services import (
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
+    BacktestJobStageWeights,
     BacktestJobState,
     BacktestJobTopVariant,
 )
@@ -146,9 +147,9 @@ class BacktestRunProgressSnapshotBuilder:
             None.
         """
         execution_profile_mode = self._resolve_execution_profile_mode(run=run)
-        stage_weights = self._execution_profiles.profile_for_mode(
-            mode=execution_profile_mode
-        ).progress_weights
+        stage_weights = self._progress_weights_for_execution_profile_mode(
+            execution_profile_mode=execution_profile_mode
+        )
         eta_seconds = run.eta_seconds(stage_weights=stage_weights, now=self._now())
         if eta_seconds is None:
             eta_seconds = self._benchmark_eta_seconds(
@@ -191,6 +192,30 @@ class BacktestRunProgressSnapshotBuilder:
             except ValueError:
                 pass
         return self._execution_profiles.default_mode
+
+    def _progress_weights_for_execution_profile_mode(
+        self,
+        *,
+        execution_profile_mode: ExecutionProfileModeLiteralV2,
+    ) -> BacktestJobStageWeights:
+        """
+        Resolve outward progress weights for one profile while collapsing internal sub-stages.
+
+        Args:
+            execution_profile_mode: Effective execution-profile mode already resolved for the run.
+        Returns:
+            BacktestJobStageWeights: Public `stage_a` / `stage_b` weights for progress and ETA.
+        Assumptions:
+            Internal row prefilter, combo prefilter, and retained-candidate exact planner stages
+            stay hidden behind stable public `stage_a` semantics on persisted history surfaces.
+        Raises:
+            ValueError: If the execution-profile catalog does not contain the requested mode.
+        Side Effects:
+            None.
+        """
+        return self._execution_profiles.profile_for_mode(
+            mode=execution_profile_mode
+        ).progress_weights
 
     def _benchmark_eta_seconds(
         self,

@@ -779,8 +779,8 @@ def test_run_progress_snapshot_builder_uses_request_profile_override_for_weights
     ).build(run=running)
 
     assert progress.execution_profile_mode == "exact_parallel"
-    assert progress.progress_percent == 65
-    assert progress.eta_seconds == 33
+    assert progress.progress_percent == 70
+    assert progress.eta_seconds == 26
 
 
 def test_run_progress_snapshot_builder_falls_back_to_catalog_default_mode() -> None:
@@ -875,8 +875,82 @@ def test_run_progress_snapshot_builder_uses_benchmark_fallback_before_throughput
     ).build(run=running)
 
     assert progress.execution_profile_mode == "exact_parallel"
-    assert progress.progress_percent == 35
+    assert progress.progress_percent == 45
     assert progress.eta_seconds == 34
+
+
+def test_run_progress_snapshot_builder_keeps_progress_bounded_and_monotonic_across_public_stages(
+) -> None:
+    """
+    Verify retained-frontier-aware default weights stay bounded and monotonic across public stages.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Internal row prefilter, combo prefilter, and retained-candidate exact work may reshape
+        the Stage A share, but persisted history must still expose monotonic `stage_a -> stage_b`
+        progress on the stable public stage vocabulary.
+    Raises:
+        AssertionError: If progress leaves `[0, 100]` or regresses across the public stages.
+    Side Effects:
+        None.
+    """
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000967"),
+        user_id=owner_user_id,
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 55, tzinfo=timezone.utc),
+        request_json={
+            "mode": "template",
+            "top_k": 25,
+            "execution_profile_mode": "exact_parallel",
+        },
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        execution_mode="sync_inline",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+    claimed = queued.claim(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        locked_by="worker-test-1",
+        lease_expires_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+    )
+    running_stage_a = claimed.update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 0, 20, tzinfo=timezone.utc),
+        stage="stage_a",
+        processed_units=8,
+        total_units=20,
+    )
+    running_stage_b_start = running_stage_a.update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 0, 40, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=0,
+        total_units=48,
+    )
+    running_stage_b_mid = running_stage_b_start.update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=12,
+        total_units=24,
+    )
+
+    builder = BacktestRunProgressSnapshotBuilder()
+    stage_a_progress = builder.build(run=running_stage_a).progress_percent
+    stage_b_start_progress = builder.build(run=running_stage_b_start).progress_percent
+    stage_b_mid_progress = builder.build(run=running_stage_b_mid).progress_percent
+
+    assert 0 <= stage_a_progress < stage_b_start_progress < stage_b_mid_progress <= 100
 
 
 def test_run_progress_snapshot_builder_reads_weights_from_execution_profile_catalog() -> None:
@@ -1426,7 +1500,6 @@ def _saved_request() -> RunBacktestRequest:
         ),
         warmup_bars=144,
         top_k=25,
-        top_trades_n=3,
     )
 
 

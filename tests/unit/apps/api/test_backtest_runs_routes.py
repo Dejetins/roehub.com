@@ -576,8 +576,8 @@ def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_field
     assert body["processed_units"] == 10
     assert body["total_units"] == 20
     assert body["execution_profile_mode"] == "exact_parallel"
-    assert body["progress_percent"] == 65
-    assert body["eta_seconds"] == 33
+    assert body["progress_percent"] == 70
+    assert body["eta_seconds"] == 26
     assert "ranking_secondary_metric" not in body
 
 
@@ -647,7 +647,7 @@ def test_get_backtest_run_status_uses_benchmark_eta_fallback_when_timeline_signa
     body = response.json()
     assert body["execution_profile_mode"] == "exact_parallel"
     assert "ranking_secondary_metric" not in body
-    assert body["progress_percent"] == 35
+    assert body["progress_percent"] == 45
     assert body["eta_seconds"] == 34
 
 

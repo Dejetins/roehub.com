@@ -52,6 +52,10 @@ _FLOAT32_BYTES = 4
 _CANDLES_BYTES_PER_STEP = (5 * _FLOAT32_BYTES) + 8
 _RESERVE_FACTOR = 0.20
 _RESERVE_FIXED_BYTES = 64 * 1024**2
+_COMBO_PROXY_PREFILTER_SURVIVOR_MULTIPLIER_V2 = 2
+_ROW_PREFILTER_COST_WEIGHT_V2 = 1
+_COMBO_PREFILTER_COST_WEIGHT_V2 = 1
+_RETAINED_STAGE_A_EXACT_COST_WEIGHT_V2 = 4
 _STAGE_A_DISABLED_RISK_PARAMS_V2: Mapping[str, BacktestVariantScalar] = MappingProxyType(
     {
         "sl_enabled": False,
@@ -253,6 +257,53 @@ class BacktestSignalFeaturesAccessPlanV2:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestRuntimeStageCostModelV2:
+    """
+    Internal retained-frontier cost model collapsed under stable public stage vocabulary.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+      - docs/architecture/backtest/backtest-engine-vnext.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
+    """
+
+    row_prefilter_rows_total: int
+    combo_prefilter_variants_total: int
+    retained_exact_candidates_total: int
+    stage_a_cost_units: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate retained-frontier stage cost totals used only for internal planning.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Public `stage_a` remains stable while planner math separately tracks row prefilter,
+            combo prefilter, and retained-candidate exact work as positive deterministic counts.
+        Raises:
+            ValueError: If one internal stage total is non-positive.
+        Side Effects:
+            None.
+        """
+        for field_name in (
+            "row_prefilter_rows_total",
+            "combo_prefilter_variants_total",
+            "retained_exact_candidates_total",
+            "stage_a_cost_units",
+        ):
+            if getattr(self, field_name) <= 0:
+                raise ValueError(
+                    f"BacktestRuntimeStageCostModelV2.{field_name} must be > 0"
+                )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestArtifactRuntimePlanV2:
     """
     Deterministic artifact-backed runtime plan for Stage A enumeration and Stage B expansion.
@@ -283,6 +334,7 @@ class BacktestArtifactRuntimePlanV2:
         default=(),
     )
     adaptive_selector_decision: AdaptiveSelectorDecisionV2 | None = None
+    stage_cost_model: BacktestRuntimeStageCostModelV2 | None = None
 
     def __post_init__(self) -> None:
         """
@@ -341,6 +393,15 @@ class BacktestArtifactRuntimePlanV2:
         if self.indicator_estimate_calls < 0:
             raise ValueError(
                 "BacktestArtifactRuntimePlanV2.indicator_estimate_calls must be >= 0"
+            )
+        if (
+            self.stage_cost_model is not None
+            and self.stage_cost_model.retained_exact_candidates_total
+            > self.stage_a_variants_total
+        ):
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.stage_cost_model retained frontier cannot "
+                "exceed stage_a_variants_total"
             )
         object.__setattr__(
             self,
@@ -655,6 +716,7 @@ class BacktestArtifactRuntimePlannerV2:
         stage_a_variants_total: int | None = None,
         stage_b_variants_total: int | None = None,
         estimated_memory_bytes: int | None = None,
+        stage_a_cost_units: int | None = None,
         requested_execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
         indicator_ids: tuple[str, ...] | None = None,
     ) -> ExecutionProfileV2:
@@ -675,6 +737,10 @@ class BacktestArtifactRuntimePlannerV2:
             stage_a_variants_total: Optional prepared Stage A variants count for future policy.
             stage_b_variants_total: Optional prepared Stage B variants count.
             estimated_memory_bytes: Optional prepared deterministic memory estimate.
+            stage_a_cost_units:
+                Optional retained-frontier-aware Stage A cost units collapsing row prefilter,
+                combo prefilter, and retained-candidate exact work under stable public
+                `stage_a` semantics for adaptive classification only.
             requested_execution_profile_mode:
                 Optional internal-only requested execution profile mode. When present, automatic
                 exact-profile selection is bypassed and the requested profile is validated against
@@ -748,6 +814,7 @@ class BacktestArtifactRuntimePlannerV2:
             stage_a_variants_total=stage_a_variants_total,
             stage_b_variants_total=stage_b_variants_total,
             estimated_memory_bytes=estimated_memory_bytes,
+            stage_a_cost_units=stage_a_cost_units,
             indicator_ids=indicator_ids,
         )[0]
 
@@ -757,6 +824,7 @@ class BacktestArtifactRuntimePlannerV2:
         stage_a_variants_total: int,
         stage_b_variants_total: int,
         estimated_memory_bytes: int,
+        stage_a_cost_units: int | None = None,
         indicator_ids: tuple[str, ...] | None = None,
     ) -> tuple[ExecutionProfileV2, AdaptiveSelectorDecisionV2]:
         """
@@ -775,6 +843,10 @@ class BacktestArtifactRuntimePlannerV2:
             stage_a_variants_total: Prepared Stage A variants count.
             stage_b_variants_total: Prepared Stage B variants count.
             estimated_memory_bytes: Deterministic memory estimate.
+            stage_a_cost_units:
+                Optional retained-frontier-aware Stage A cost units collapsing row prefilter,
+                combo prefilter, and retained-candidate exact work under stable public
+                `stage_a` semantics for adaptive classification only.
             indicator_ids: Optional deterministic indicator ids from the prepared plan.
         Returns:
             tuple[ExecutionProfileV2, AdaptiveSelectorDecisionV2]: Effective execution profile
@@ -799,6 +871,7 @@ class BacktestArtifactRuntimePlannerV2:
                     else "background_capable"
                 ),
                 indicator_ids=indicator_ids or (),
+                stage_a_cost_units=stage_a_cost_units,
             ),
             execution_profiles=self._execution_profiles,
             policy=self._adaptive_selector_policy,
@@ -901,6 +974,12 @@ class BacktestArtifactRuntimePlannerV2:
 
         risk_variants = _risk_variants_from_template_v2(template=template)
         shortlist_len = min(preselect, stage_a_variants_total)
+        stage_cost_model = _build_stage_cost_model_v2(
+            indicator_plans=indicator_plans,
+            signal_axes=signal_axes,
+            stage_a_variants_total=stage_a_variants_total,
+            shortlist_len=shortlist_len,
+        )
         stage_b_variants_total = shortlist_len * len(risk_variants)
         if stage_b_variants_total > max_variants_per_compute:
             raise _variants_guard_error_v2(
@@ -916,6 +995,7 @@ class BacktestArtifactRuntimePlannerV2:
                     stage_a_variants_total=stage_a_variants_total,
                     stage_b_variants_total=stage_b_variants_total,
                     estimated_memory_bytes=estimated_memory_bytes,
+                    stage_a_cost_units=stage_cost_model.stage_a_cost_units,
                     indicator_ids=tuple(plan.indicator_id for plan in indicator_plans),
                 )
             )
@@ -951,6 +1031,7 @@ class BacktestArtifactRuntimePlannerV2:
             estimated_memory_bytes=estimated_memory_bytes,
             indicator_estimate_calls=len(indicator_plans),
             adaptive_selector_decision=adaptive_selector_decision,
+            stage_cost_model=stage_cost_model,
         )
 
     def build(
@@ -1558,6 +1639,139 @@ def _product_v2(*, values: tuple[int, ...]) -> int:
             raise ValueError("product values must be >= 0")
         product *= value
     return product
+
+
+def _build_stage_cost_model_v2(
+    *,
+    indicator_plans: tuple[BacktestIndicatorPlanV2, ...],
+    signal_axes: tuple[BacktestSignalAxisPlanV2, ...],
+    stage_a_variants_total: int,
+    shortlist_len: int,
+) -> BacktestRuntimeStageCostModelV2:
+    """
+    Build retained-frontier Stage A cost evidence without widening public stage literals.
+
+    Args:
+        indicator_plans: Deterministic indicator plans used for compute-row cardinality.
+        signal_axes: Deterministic signal-axis plans that survive row prefilter unchanged.
+        stage_a_variants_total: Public Stage A cartesian total used by runtime progress counters.
+        shortlist_len: Final Stage A shortlist envelope before Stage B risk expansion.
+    Returns:
+        BacktestRuntimeStageCostModelV2: Internal cost model for planner-only classification.
+    Assumptions:
+        Public `stage_a` still maps to the full outward stage while internal cost evidence tracks
+        row prefilter, combo prefilter, and retained-candidate exact work separately.
+    Raises:
+        ValueError: If one derived retained-frontier total is non-positive.
+    Side Effects:
+        None.
+    """
+    signal_variants_total = _signal_variants_total_for_axes_v2(signal_axes=signal_axes)
+    row_variants = tuple(plan.variants for plan in indicator_plans)
+    target_compute_variants = max(1, int(math.ceil(shortlist_len / signal_variants_total)))
+    retained_row_limits = _retained_row_limits_for_stage_cost_model_v2(
+        row_variants=row_variants,
+        target_compute_variants=target_compute_variants,
+    )
+    combo_prefilter_variants_total = min(
+        stage_a_variants_total,
+        int(math.prod(retained_row_limits)) * signal_variants_total,
+    )
+    retained_exact_candidates_total = min(
+        stage_a_variants_total,
+        max(
+            shortlist_len,
+            shortlist_len * _COMBO_PROXY_PREFILTER_SURVIVOR_MULTIPLIER_V2,
+        ),
+    )
+    row_prefilter_rows_total = sum(row_variants)
+    stage_a_cost_units = (
+        row_prefilter_rows_total * _ROW_PREFILTER_COST_WEIGHT_V2
+        + combo_prefilter_variants_total * _COMBO_PREFILTER_COST_WEIGHT_V2
+        + retained_exact_candidates_total * _RETAINED_STAGE_A_EXACT_COST_WEIGHT_V2
+    )
+    return BacktestRuntimeStageCostModelV2(
+        row_prefilter_rows_total=row_prefilter_rows_total,
+        combo_prefilter_variants_total=combo_prefilter_variants_total,
+        retained_exact_candidates_total=retained_exact_candidates_total,
+        stage_a_cost_units=stage_a_cost_units,
+    )
+
+
+def _signal_variants_total_for_axes_v2(
+    *,
+    signal_axes: tuple[BacktestSignalAxisPlanV2, ...],
+) -> int:
+    """
+    Compute deterministic signal-axis cardinality for retained-frontier budgeting.
+
+    Args:
+        signal_axes: Deterministic signal-axis plans in planner order.
+    Returns:
+        int: Product of signal-axis cardinalities (`1` when no signal axes are configured).
+    Assumptions:
+        Row prefilter preserves signal-axis combinations unchanged, so planner budgeting uses the
+        same multiplicative signal cardinality as the live Stage A builder.
+    Raises:
+        ValueError: If one signal axis has no values.
+    Side Effects:
+        None.
+    """
+    signal_variants_total = 1
+    for axis in signal_axes:
+        axis_cardinality = len(axis.values)
+        if axis_cardinality <= 0:
+            raise ValueError("signal axes must define at least one value")
+        signal_variants_total *= axis_cardinality
+    return signal_variants_total
+
+
+def _retained_row_limits_for_stage_cost_model_v2(
+    *,
+    row_variants: tuple[int, ...],
+    target_compute_variants: int,
+) -> tuple[int, ...]:
+    """
+    Mirror deterministic retained-row budgeting used by the live row-prefilter frontier.
+
+    Args:
+        row_variants: Indicator-local row counts in planner order.
+        target_compute_variants: Minimum compute-variant budget that should survive row pruning.
+    Returns:
+        tuple[int, ...]: Deterministic retained-row caps aligned to `row_variants`.
+    Assumptions:
+        Planner cost evidence must stay shape-compatible with the live Stage A builder without
+        importing the runtime module and creating an import cycle.
+    Raises:
+        ValueError: If one row count or the target budget is non-positive.
+    Side Effects:
+        None.
+    """
+    if target_compute_variants <= 0:
+        raise ValueError("target_compute_variants must be > 0")
+    if len(row_variants) == 0:
+        return ()
+    if any(variants <= 0 for variants in row_variants):
+        raise ValueError("row_variants must all be > 0")
+    base_limit = max(
+        1,
+        int(math.ceil(target_compute_variants ** (1.0 / len(row_variants)))),
+    )
+    retained_limits = [min(variants, base_limit) for variants in row_variants]
+    retained_product = math.prod(retained_limits)
+    while retained_product < target_compute_variants:
+        grew = False
+        for index, variants in enumerate(row_variants):
+            if retained_limits[index] >= variants:
+                continue
+            retained_limits[index] += 1
+            retained_product = math.prod(retained_limits)
+            grew = True
+            if retained_product >= target_compute_variants:
+                break
+        if not grew:
+            break
+    return tuple(retained_limits)
 
 
 def _instrument_id_literal_v2(*, template: RunBacktestTemplate) -> str:
