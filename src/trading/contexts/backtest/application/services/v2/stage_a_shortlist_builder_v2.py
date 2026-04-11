@@ -1,8 +1,9 @@
-"""Artifact-backed Stage A shortlist builder using pure aggregation and no-risk kernels."""
+"""Artifact-backed Stage A shortlist builder with row-local prefilter before exact path."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import math
+from dataclasses import dataclass, field
 from heapq import heappush, heapreplace
 from types import MappingProxyType
 from typing import Callable, Mapping, Sequence, cast
@@ -44,6 +45,11 @@ from .contracts import (
     BacktestSignalFeaturesLoaderV2,
     BacktestSignalMatrixLoaderV2,
     artifact_market_id_from_coordinates_v2,
+)
+from .generic_row_scorer_v2 import (
+    GenericRowScorerV2,
+    GenericRowScoringInputV2,
+    build_generic_row_signal_features_mapping_v2,
 )
 from .price_arrays_loader import MmapPriceArraysLoaderV2
 from .signal_aggregator_kernel import aggregate_final_signal_rows_v2
@@ -269,9 +275,90 @@ class PreparedIndicatorChunkInputsV2:
 
 
 @dataclass(frozen=True, slots=True)
+class RetainedIndicatorRowFrontierV2:
+    """
+    Deterministic retained frontier for one indicator family after row-local prefiltering.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+    """
+
+    indicator_id: str
+    retained_row_indexes: tuple[int, ...]
+    retained_row_lookup: frozenset[int] = field(init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        """
+        Validate one retained frontier and keep both explicit ordering and fast membership.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Retained row ordering must stay explicit and stable for reviewability, while exact
+            chunk filtering still benefits from constant-time membership checks.
+        Raises:
+            ValueError: If the indicator id is blank, the frontier is empty, or row indexes are
+                negative/duplicated.
+        Side Effects:
+            Normalizes retained row indexes to builtin `int` and derives a lookup set.
+        """
+        indicator_id = self.indicator_id.strip()
+        if not indicator_id:
+            raise ValueError("RetainedIndicatorRowFrontierV2.indicator_id must be non-empty")
+        object.__setattr__(self, "indicator_id", indicator_id)
+        normalized_row_indexes = tuple(int(value) for value in self.retained_row_indexes)
+        if len(normalized_row_indexes) == 0:
+            raise ValueError(
+                "RetainedIndicatorRowFrontierV2.retained_row_indexes must be non-empty"
+            )
+        if any(value < 0 for value in normalized_row_indexes):
+            raise ValueError(
+                "RetainedIndicatorRowFrontierV2.retained_row_indexes must be >= 0"
+            )
+        if len(set(normalized_row_indexes)) != len(normalized_row_indexes):
+            raise ValueError(
+                "RetainedIndicatorRowFrontierV2.retained_row_indexes must be unique"
+            )
+        object.__setattr__(self, "retained_row_indexes", normalized_row_indexes)
+        object.__setattr__(
+            self,
+            "retained_row_lookup",
+            frozenset(normalized_row_indexes),
+        )
+
+    def contains_row_index(
+        self,
+        *,
+        row_index: int,
+    ) -> bool:
+        """
+        Check whether one indicator-local row index survived deterministic prefiltering.
+
+        Args:
+            row_index: Indicator-local row index to test.
+        Returns:
+            bool: `True` when the row remains inside the retained frontier.
+        Assumptions:
+            Membership checks should not depend on tuple scanning because exact Stage A may still
+            inspect many variants against the retained frontier.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return int(row_index) in self.retained_row_lookup
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestStageAShortlistBuilderV2:
     """
-    Build deterministic Stage A shortlist rows from artifacts-only inputs and pure kernels.
+    Build deterministic Stage A shortlist rows with row-local prefilter before exact path.
 
     Docs:
       - docs/architecture/backtest/backtest-runtime-kernels-v2.md
@@ -286,6 +373,7 @@ class BacktestStageAShortlistBuilderV2:
     price_arrays_loader: BacktestPriceArraysLoaderV2
     signal_matrix_loader: BacktestSignalMatrixLoaderV2
     signal_features_loader: BacktestSignalFeaturesLoaderV2 | None = None
+    row_scorer: GenericRowScorerV2 = field(default_factory=GenericRowScorerV2)
     configurable_ranking_enabled: bool = True
     chunk_size_default: int = 2048
     init_cash_quote_default: float = 10000.0
@@ -319,6 +407,8 @@ class BacktestStageAShortlistBuilderV2:
             raise ValueError("BacktestStageAShortlistBuilderV2 requires price_arrays_loader")
         if self.signal_matrix_loader is None:  # type: ignore[truthy-bool]
             raise ValueError("BacktestStageAShortlistBuilderV2 requires signal_matrix_loader")
+        if self.row_scorer is None:  # type: ignore[truthy-bool]
+            raise ValueError("BacktestStageAShortlistBuilderV2 requires row_scorer")
         if self.chunk_size_default <= 0:
             raise ValueError("BacktestStageAShortlistBuilderV2.chunk_size_default must be > 0")
         if self.init_cash_quote_default <= 0.0:
@@ -431,6 +521,10 @@ class BacktestStageAShortlistBuilderV2:
             execution_prices.ohlcv[exec_target_slice, 3],
             dtype=np.float64,
         )
+        local_signal_close = np.asarray(
+            signal_prices.ohlcv[signal_target_slice, 3],
+            dtype=np.float64,
+        )
         sentinel_index = int(local_exec_open.shape[0])
         execution_params = self._resolve_execution_params(
             grid_context=grid_context,
@@ -439,6 +533,16 @@ class BacktestStageAShortlistBuilderV2:
         row_plans = tuple(
             PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
             for plan in grid_context.indicator_plans
+        )
+        row_prefilter_frontier = self._build_row_prefilter_frontier(
+            row_plans=row_plans,
+            grid_context=grid_context,
+            artifact_context=artifact_context,
+            signal_target_slice=signal_target_slice,
+            local_signal_close=local_signal_close,
+            execution_params=execution_params,
+            shortlist_limit=shortlist_limit,
+            cancel_checker=cancel_checker,
         )
 
         shortlist_heap: list[StageAHeapEntryV2] = []
@@ -455,27 +559,479 @@ class BacktestStageAShortlistBuilderV2:
                 continue
             if cancel_checker is not None:
                 cancel_checker(STAGE_A_LITERAL_V2)
-            self._score_chunk_into_heap(
+            retained_chunk_variants = self._filter_chunk_variants_by_row_prefilter(
                 row_plans=row_plans,
                 chunk_variants=chunk_variants,
-                grid_context=grid_context,
-                artifact_context=artifact_context,
-                signal_target_slice=signal_target_slice,
-                local_bar_close_1m_idx=local_bar_close_1m_idx,
-                sentinel_index=sentinel_index,
-                local_exec_open=local_exec_open,
-                local_exec_close=local_exec_close,
-                execution_params=execution_params,
-                ranking_plan=ranking_plan,
-                shortlist_limit=shortlist_limit,
-                shortlist_heap=shortlist_heap,
+                row_prefilter_frontier=row_prefilter_frontier,
             )
+            if retained_chunk_variants:
+                self._score_chunk_into_heap(
+                    row_plans=row_plans,
+                    chunk_variants=retained_chunk_variants,
+                    grid_context=grid_context,
+                    artifact_context=artifact_context,
+                    signal_target_slice=signal_target_slice,
+                    local_bar_close_1m_idx=local_bar_close_1m_idx,
+                    sentinel_index=sentinel_index,
+                    local_exec_open=local_exec_open,
+                    local_exec_close=local_exec_close,
+                    execution_params=execution_params,
+                    ranking_plan=ranking_plan,
+                    shortlist_limit=shortlist_limit,
+                    shortlist_heap=shortlist_heap,
+                )
             processed += len(chunk_variants)
             if on_checkpoint is not None:
                 on_checkpoint(processed, total)
             chunk_variants.clear()
 
         return stage_a_rows_from_heap_v2(heap=shortlist_heap)
+
+    def _build_row_prefilter_frontier(
+        self,
+        *,
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
+        grid_context: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        signal_target_slice: slice,
+        local_signal_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        shortlist_limit: int,
+        cancel_checker: StageACancelCheckerV2 | None,
+    ) -> Mapping[str, RetainedIndicatorRowFrontierV2]:
+        """
+        Build the deterministic retained frontier for row-local prefilter before exact path.
+
+        Args:
+            row_plans: Prepared per-indicator row-addressing plans.
+            grid_context: Stage A runtime plan owning indicator ordering and optional caches.
+            artifact_context: Slot-pinned runtime context for strict artifact reads.
+            signal_target_slice: Target request slice in the signal timeline.
+            local_signal_close: Request-timeframe close prices aligned to `signal_target_slice`.
+            execution_params: Immutable execution settings used for fee-aware proxy scoring.
+            shortlist_limit: Final Stage A shortlist cap used to bound retained compute rows.
+            cancel_checker: Optional cooperative cancellation callback by stage literal.
+        Returns:
+            Mapping[str, RetainedIndicatorRowFrontierV2]: Immutable retained frontier keyed by
+                indicator id with explicit ranked row ordering.
+        Assumptions:
+            Each indicator family can be ranked independently with cheap row-local scoring before
+            the existing exact Stage A path evaluates retained combinations.
+        Raises:
+            ValueError: If one indicator row pool is empty or artifact row shapes drift.
+        Side Effects:
+            Reads deterministic signal-row subsets and optional additive `signal_features` rows.
+        """
+        target_compute_variants = self._target_prefilter_compute_variants(
+            grid_context=grid_context,
+            shortlist_limit=shortlist_limit,
+        )
+        retained_row_limits = _retained_row_limits_v2(
+            row_variants=tuple(
+                int(math.prod(row_plan.axis_radices)) for row_plan in row_plans
+            ),
+            target_compute_variants=target_compute_variants,
+        )
+        scorer = self._row_scorer_for_grid_context(grid_context=grid_context)
+        retained_frontier: dict[str, RetainedIndicatorRowFrontierV2] = {}
+        for row_plan, retained_rows_limit in zip(
+            row_plans,
+            retained_row_limits,
+            strict=True,
+        ):
+            if cancel_checker is not None:
+                cancel_checker(STAGE_A_LITERAL_V2)
+            retained_frontier[row_plan.indicator_id] = RetainedIndicatorRowFrontierV2(
+                indicator_id=row_plan.indicator_id,
+                retained_row_indexes=self._retain_indicator_rows(
+                    row_plan=row_plan,
+                    grid_context=grid_context,
+                    artifact_context=artifact_context,
+                    signal_target_slice=signal_target_slice,
+                    local_signal_close=local_signal_close,
+                    execution_params=execution_params,
+                    retained_rows_limit=retained_rows_limit,
+                    scorer=scorer,
+                ),
+            )
+        return MappingProxyType(retained_frontier)
+
+    def _retain_indicator_rows(
+        self,
+        *,
+        row_plan: PreparedIndicatorRowPlanV2,
+        grid_context: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        signal_target_slice: slice,
+        local_signal_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        retained_rows_limit: int,
+        scorer: GenericRowScorerV2,
+    ) -> tuple[int, ...]:
+        """
+        Rank one indicator family's rows and retain the deterministic frontier for exact work.
+
+        Args:
+            row_plan: Prepared row-addressing metadata for one indicator family.
+            grid_context: Stage A runtime plan owning timeframe and optional feature access.
+            artifact_context: Slot-pinned runtime context for strict artifact reads.
+            signal_target_slice: Target request slice in the signal timeline.
+            local_signal_close: Request-timeframe close prices aligned to `signal_target_slice`.
+            execution_params: Immutable execution settings used for fee-aware proxy scoring.
+            retained_rows_limit: Maximum retained row count for this indicator family.
+            scorer: Rehydrated generic row scorer used for structural row-local ranking.
+        Returns:
+            tuple[int, ...]: Deterministic retained row indexes in ranked frontier order.
+        Assumptions:
+            The retained frontier uses a cheap price-aware proxy with the generic row scorer as an
+            explicit deterministic tie-break.
+        Raises:
+            ValueError: If the indicator pool is empty or one loaded row payload is malformed.
+        Side Effects:
+            Reads one indicator's selected signal rows and optional additive feature rows.
+        """
+        total_rows = int(math.prod(row_plan.axis_radices))
+        row_indexes = np.arange(total_rows, dtype=np.int64)
+        signal_rows = _load_chunk_signal_rows_v2(
+            signal_matrix_loader=self.signal_matrix_loader,
+            artifact_context=artifact_context,
+            timeframe=grid_context.timeframe_code,
+            indicator_id=row_plan.indicator_id,
+            indicator_row_indexes=row_indexes,
+            signal_target_slice=signal_target_slice,
+        )
+        scored_rows = scorer.score_rows(
+            rows=self._row_scoring_inputs_for_prefilter(
+                indicator_id=row_plan.indicator_id,
+                signal_rows=signal_rows,
+                signal_feature_rows=self._load_prefilter_signal_feature_rows(
+                    grid_context=grid_context,
+                    artifact_context=artifact_context,
+                    indicator_id=row_plan.indicator_id,
+                    row_indexes=tuple(int(value) for value in row_indexes.tolist()),
+                ),
+            )
+        )
+        ranked_rows = tuple(
+            sorted(
+                scored_rows,
+                key=lambda payload: (
+                    -self._prefilter_proxy_score_for_row(
+                        row_index=payload.row_index,
+                        signal_rows=signal_rows,
+                        local_signal_close=local_signal_close,
+                        execution_params=execution_params,
+                    ),
+                    *payload.sort_key(),
+                ),
+            )
+        )
+        retained_count = min(retained_rows_limit, len(ranked_rows))
+        if retained_count <= 0:
+            raise ValueError(
+                f"Stage A row prefilter retained no rows for {row_plan.indicator_id!r}"
+            )
+        return tuple(row.row_index for row in ranked_rows[:retained_count])
+
+    def _row_scoring_inputs_for_prefilter(
+        self,
+        *,
+        indicator_id: str,
+        signal_rows: np.ndarray,
+        signal_feature_rows: ArtifactSignalFeaturesRowsV2 | None,
+    ) -> tuple[GenericRowScoringInputV2, ...]:
+        """
+        Build deterministic row-scoring inputs for one indicator family's prefilter pool.
+
+        Args:
+            indicator_id: Indicator id whose artifact rows are being ranked.
+            signal_rows: Target-sliced signal rows in artifact row order.
+            signal_feature_rows: Optional additive cached feature rows in the same order.
+        Returns:
+            tuple[GenericRowScoringInputV2, ...]: Deterministic row-local scoring inputs.
+        Assumptions:
+            Optional feature rows stay strictly 1:1 aligned with `signal_rows` when available.
+        Raises:
+            ValueError: If the signal rows are not 2D or feature-row alignment drifts.
+        Side Effects:
+            None.
+        """
+        if signal_rows.ndim != 2:
+            raise ValueError("Stage A row prefilter requires 2D signal_rows")
+        if (
+            signal_feature_rows is not None
+            and signal_feature_rows.rows.shape[0] != signal_rows.shape[0]
+        ):
+            raise ValueError(
+                "Stage A row prefilter requires signal_features rows to align with signal_rows"
+            )
+        return tuple(
+            GenericRowScoringInputV2(
+                indicator_id=indicator_id,
+                row_index=row_index,
+                stable_identity=f"{indicator_id}:{row_index}",
+                signal_row=np.asarray(signal_rows[row_index, :], dtype=np.int8),
+                signal_features=(
+                    build_generic_row_signal_features_mapping_v2(
+                        feature_names=signal_feature_rows.feature_names,
+                        feature_values=tuple(
+                            float(value)
+                            for value in signal_feature_rows.rows[row_index, :].tolist()
+                        ),
+                    )
+                    if signal_feature_rows is not None
+                    else None
+                ),
+            )
+            for row_index in range(int(signal_rows.shape[0]))
+        )
+
+    def _load_prefilter_signal_feature_rows(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        indicator_id: str,
+        row_indexes: tuple[int, ...],
+    ) -> ArtifactSignalFeaturesRowsV2 | None:
+        """
+        Load optional cached feature rows for one indicator family's retained frontier scoring.
+
+        Args:
+            grid_context: Stage A runtime plan owning optional feature-access metadata.
+            artifact_context: Slot-pinned runtime context for strict artifact reads.
+            indicator_id: Indicator id whose feature rows are requested.
+            row_indexes: Deterministic row indexes aligned to the prefilter signal-row pool.
+        Returns:
+            ArtifactSignalFeaturesRowsV2 | None: Selected feature rows or `None` when optional
+                warm-cache access is unavailable.
+        Assumptions:
+            `signal_features` remain non-mandatory for this milestone and must fall back to
+            runtime row-local derivation when absent.
+        Raises:
+            FileNotFoundError: If a declared strict feature family is missing on disk.
+            ValueError: If feature-row selection metadata is invalid.
+        Side Effects:
+            May memory-map one additive `signal_features` matrix on first explicit access.
+        """
+        signal_features_access = _signal_features_access_plan_for_indicator_v2(
+            grid_context=grid_context,
+            indicator_id=indicator_id,
+        )
+        if signal_features_access is None or self.signal_features_loader is None:
+            return None
+        if signal_features_access.optional:
+            return self.signal_features_loader.try_load_signal_feature_rows(
+                context=artifact_context,
+                timeframe=signal_features_access.timeframe,
+                indicator_id=indicator_id,
+                row_selection=row_indexes,
+            )
+        return self.signal_features_loader.load_signal_feature_rows(
+            context=artifact_context,
+            timeframe=signal_features_access.timeframe,
+            indicator_id=indicator_id,
+            row_selection=row_indexes,
+        )
+
+    def _prefilter_proxy_score_for_row(
+        self,
+        *,
+        row_index: int,
+        signal_rows: np.ndarray,
+        local_signal_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+    ) -> float:
+        """
+        Compute one cheap deterministic row-local proxy score before exact evaluation.
+
+        Args:
+            row_index: Indicator-local row index inside `signal_rows`.
+            signal_rows: Target-sliced signal rows in artifact row order.
+            local_signal_close: Request-timeframe close prices aligned to `signal_rows` columns.
+            execution_params: Immutable execution settings supplying the fee penalty.
+        Returns:
+            float: Fee-adjusted proxy score for deterministic single-row prefilter ranking.
+        Assumptions:
+            The cheap proxy approximates next-bar profitability using request-timeframe closes and
+            is used only to narrow candidates before the exact path remains authoritative.
+        Raises:
+            ValueError: If row or price-array shapes drift.
+        Side Effects:
+            None.
+        """
+        if row_index < 0 or row_index >= int(signal_rows.shape[0]):
+            raise ValueError("Stage A row prefilter row_index is outside signal_rows")
+        if signal_rows.ndim != 2:
+            raise ValueError("Stage A row prefilter requires 2D signal_rows")
+        if int(signal_rows.shape[1]) != int(local_signal_close.shape[0]):
+            raise ValueError(
+                "Stage A row prefilter requires signal rows and close prices to share length"
+            )
+        if signal_rows.shape[1] < 2:
+            return 0.0
+        eval_signal_row = np.asarray(signal_rows[row_index, :-1], dtype=np.float64)
+        prior_close = np.asarray(local_signal_close[:-1], dtype=np.float64)
+        next_close = np.asarray(local_signal_close[1:], dtype=np.float64)
+        close_returns = np.divide(
+            next_close - prior_close,
+            prior_close,
+            out=np.zeros_like(prior_close, dtype=np.float64),
+            where=prior_close != 0.0,
+        )
+        proxy_score = float(np.dot(eval_signal_row, close_returns))
+        fee_rate = float(execution_params.fee_pct) / 100.0
+        activity_penalty = fee_rate * float(np.count_nonzero(eval_signal_row != 0.0))
+        return proxy_score - activity_penalty
+
+    def _target_prefilter_compute_variants(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+        shortlist_limit: int,
+    ) -> int:
+        """
+        Resolve how many compute variants the retained frontier should preserve before exact work.
+
+        Args:
+            grid_context: Stage A runtime plan owning signal-axis metadata when available.
+            shortlist_limit: Final Stage A shortlist cap requested by the caller.
+        Returns:
+            int: Minimum retained compute-variant budget needed before exact evaluation.
+        Assumptions:
+            Signal-axis variants survive the row prefilter unchanged, so only compute variants
+            need to be budgeted here.
+        Raises:
+            ValueError: If the computed signal-axis cardinality is non-positive.
+        Side Effects:
+            None.
+        """
+        signal_axes = getattr(grid_context, "signal_axes", ())
+        signal_variants_total = 1
+        for signal_axis in signal_axes:
+            signal_variants_total *= len(signal_axis.values)
+        if signal_variants_total <= 0:
+            raise ValueError(
+                "Stage A row prefilter requires positive signal-axis cardinality"
+            )
+        stage_a_variants_total = int(
+            getattr(grid_context, "stage_a_variants_total", shortlist_limit)
+        )
+        effective_shortlist_limit = min(shortlist_limit, stage_a_variants_total)
+        return max(1, int(math.ceil(effective_shortlist_limit / signal_variants_total)))
+
+    def _filter_chunk_variants_by_row_prefilter(
+        self,
+        *,
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
+        chunk_variants: Sequence[BacktestStageABaseVariantV2],
+        row_prefilter_frontier: Mapping[str, RetainedIndicatorRowFrontierV2],
+    ) -> tuple[BacktestStageABaseVariantV2, ...]:
+        """
+        Keep only chunk variants whose indicator rows stay inside the retained frontier.
+
+        Args:
+            row_plans: Prepared per-indicator row-addressing plans.
+            chunk_variants: Deterministic raw Stage A variants from the current batch.
+            row_prefilter_frontier: Retained row membership keyed by indicator id.
+        Returns:
+            tuple[BacktestStageABaseVariantV2, ...]: Exact-path candidates that survived
+                deterministic single-row prefiltering.
+        Assumptions:
+            Chunk order stays unchanged for retained survivors to preserve deterministic exact
+            ordering and checkpoint semantics.
+        Raises:
+            ValueError: If one retained-frontier indicator id is missing.
+        Side Effects:
+            None.
+        """
+        return tuple(
+            base_variant
+            for base_variant in chunk_variants
+            if self._variant_passes_row_prefilter(
+                row_plans=row_plans,
+                base_variant=base_variant,
+                row_prefilter_frontier=row_prefilter_frontier,
+            )
+        )
+
+    def _variant_passes_row_prefilter(
+        self,
+        *,
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
+        base_variant: BacktestStageABaseVariantV2,
+        row_prefilter_frontier: Mapping[str, RetainedIndicatorRowFrontierV2],
+    ) -> bool:
+        """
+        Check whether one Stage A base variant belongs to the retained row frontier.
+
+        Args:
+            row_plans: Prepared per-indicator row-addressing plans.
+            base_variant: One deterministic Stage A base variant.
+            row_prefilter_frontier: Retained row membership keyed by indicator id.
+        Returns:
+            bool: `True` when every indicator row for the variant survived prefiltering.
+        Assumptions:
+            The retained frontier is authoritative only for Stage A narrowing; Stage B semantics
+            remain unchanged and exact.
+        Raises:
+            ValueError: If the frontier does not contain one required indicator id.
+        Side Effects:
+            None.
+        """
+        for plan_position, row_plan in enumerate(row_plans):
+            retained_frontier = row_prefilter_frontier.get(row_plan.indicator_id)
+            if retained_frontier is None:
+                raise ValueError(
+                    "Stage A row prefilter is missing retained rows for "
+                    f"{row_plan.indicator_id!r}"
+                )
+            row_index = row_plan.row_index_for_selection(
+                selection=_indicator_selection_for_plan_v2(
+                    base_variant=base_variant,
+                    indicator_position=plan_position,
+                    indicator_id=row_plan.indicator_id,
+                )
+            )
+            if not retained_frontier.contains_row_index(row_index=row_index):
+                return False
+        return True
+
+    def _row_scorer_for_grid_context(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+    ) -> GenericRowScorerV2:
+        """
+        Rehydrate the generic row scorer with runtime-plan shortlist weights when available.
+
+        Args:
+            grid_context: Stage A runtime plan that may expose execution-profile shortlist weights.
+        Returns:
+            GenericRowScorerV2: Deterministic row scorer used by row-local prefiltering.
+        Assumptions:
+            Threshold literals remain owned by the builder, while runtime profiles may override
+            additive shortlist-scoring weights.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        execution_profile = getattr(grid_context, "execution_profile", None)
+        shortlist_config = getattr(execution_profile, "shortlist_config", None)
+        scoring = (
+            shortlist_config.scoring
+            if shortlist_config is not None
+            else self.row_scorer.scoring
+        )
+        return GenericRowScorerV2(
+            scoring=scoring,
+            low_activity_threshold=self.row_scorer.low_activity_threshold,
+            high_activity_threshold=self.row_scorer.high_activity_threshold,
+            direction_balance_threshold=self.row_scorer.direction_balance_threshold,
+            low_transition_ratio_threshold=self.row_scorer.low_transition_ratio_threshold,
+            high_transition_ratio_threshold=self.row_scorer.high_transition_ratio_threshold,
+        )
 
     def load_chunk_runtime_inputs(
         self,
@@ -710,7 +1266,8 @@ class BacktestStageAShortlistBuilderV2:
         Returns:
             None.
         Assumptions:
-            Chunk order already matches deterministic Stage A enumeration order.
+            Chunk order already matches deterministic Stage A enumeration order after the
+            retained frontier removes rows before exact path.
         Raises:
             ValueError: If chunk variants drift from indicator plans or row addressing fails.
         Side Effects:
@@ -762,6 +1319,58 @@ class BacktestStageAShortlistBuilderV2:
                 heappush(shortlist_heap, heap_entry)
             elif heap_entry_outranks_v2(candidate=heap_entry, baseline=shortlist_heap[0]):
                 heapreplace(shortlist_heap, heap_entry)
+
+
+def _retained_row_limits_v2(
+    *,
+    row_variants: Sequence[int],
+    target_compute_variants: int,
+) -> tuple[int, ...]:
+    """
+    Resolve deterministic per-indicator retained-row caps for the retained frontier.
+
+    Args:
+        row_variants: Indicator-local row counts in the original planner order.
+        target_compute_variants: Minimum compute-variant budget that should survive prefiltering.
+    Returns:
+        tuple[int, ...]: Deterministic retained-row limits aligned to `row_variants`.
+    Assumptions:
+        The retained frontier should stay as small as practical while still preserving at least
+        the requested compute-variant budget before exact evaluation.
+    Raises:
+        ValueError: If one row count or the target budget is non-positive.
+    Side Effects:
+        None.
+    """
+    if target_compute_variants <= 0:
+        raise ValueError("Stage A retained frontier target_compute_variants must be > 0")
+    if len(row_variants) == 0:
+        return ()
+    normalized_variants = tuple(int(value) for value in row_variants)
+    if any(value <= 0 for value in normalized_variants):
+        raise ValueError("Stage A retained frontier row_variants must all be > 0")
+    base_limit = max(
+        1,
+        int(math.ceil(target_compute_variants ** (1.0 / len(normalized_variants)))),
+    )
+    retained_limits = [
+        min(variants, base_limit) for variants in normalized_variants
+    ]
+    retained_product = math.prod(retained_limits)
+    while retained_product < target_compute_variants:
+        grew = False
+        for index, variants in enumerate(normalized_variants):
+            if retained_limits[index] >= variants:
+                continue
+            retained_limits[index] += 1
+            retained_product = math.prod(retained_limits)
+            grew = True
+            if retained_product >= target_compute_variants:
+                break
+        if not grew:
+            break
+    return tuple(retained_limits)
+
 
 def build_default_stage_a_shortlist_builder_v2(
     *,

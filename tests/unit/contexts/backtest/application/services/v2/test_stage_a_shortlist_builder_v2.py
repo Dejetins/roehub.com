@@ -25,6 +25,7 @@ from trading.contexts.backtest.application.services import (
     MmapSignalMatrixLoaderV2,
     PreparedIndicatorChunkInputsV2,
     PreparedIndicatorRowPlanV2,
+    artifact_market_id_from_coordinates_v2,
     compute_target_slice_by_close_time_v2,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
@@ -519,7 +520,105 @@ def test_stage_a_shortlist_builder_v2_uses_subset_row_loading_for_selected_varia
     )
 
     assert len(shortlist) == 1
-    assert recording_loader.calls == [("ma.ema", (0,))]
+    assert recording_loader.calls == [("ma.ema", (0,)), ("ma.ema", (0,))]
+
+
+def test_stage_a_shortlist_builder_v2_prefilters_rows_before_exact_evaluation(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify Stage A narrows the retained frontier before exact evaluation and keeps it deterministic.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+    Returns:
+        None.
+    Assumptions:
+        The synthetic store's rising second bar should make the long row survive the price-aware
+        row-local prefilter while the short row is removed before exact work.
+    Raises:
+        AssertionError: If the retained frontier is not narrowed deterministically.
+    Side Effects:
+        Memory-maps strict artifact arrays from the synthetic store.
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    recording_loader = _RecordingSignalMatrixLoader(
+        wrapped=MmapSignalMatrixLoaderV2(artifact_loader=store.loader)
+    )
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=store.loader),
+        signal_matrix_loader=recording_loader,
+    )
+
+    shortlist = builder.build_shortlist(
+        grid_context=cast(Any, _grid_context_for_windows(windows=(10, 20))),
+        artifact_context=context,
+        target_time_range=_synthetic_target_time_range(),
+        shortlist_limit=1,
+        batch_size=1,
+    )
+
+    assert len(shortlist) == 1
+    assert shortlist[0].base_variant.stage_a_index == 1
+    assert recording_loader.calls == [("ma.ema", (0, 1)), ("ma.ema", (1,))]
+
+
+def test_stage_a_shortlist_builder_v2_keeps_retained_frontier_row_order_explicit(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify the retained frontier keeps deterministic ranked row ordering explicit and stable.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+    Returns:
+        None.
+    Assumptions:
+        The synthetic long row should outrank the short row in row-local prefilter order.
+    Raises:
+        AssertionError: If the retained frontier loses its explicit deterministic row ordering.
+    Side Effects:
+        Memory-maps strict artifact arrays from the synthetic store.
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    grid_context = _grid_context_for_windows(windows=(10, 20))
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=store.loader),
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+    )
+    signal_prices = builder.price_arrays_loader.load_price_arrays(
+        context=context,
+        timeframe="15m",
+    )
+    signal_target_slice = compute_target_slice_by_close_time_v2(
+        close_time=signal_prices.close_time,
+        target_time_range=_synthetic_target_time_range(),
+    )
+    row_plans = tuple(
+        PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
+        for plan in cast(Any, grid_context).indicator_plans
+    )
+
+    retained_frontier = builder._build_row_prefilter_frontier(
+        row_plans=row_plans,
+        grid_context=cast(Any, grid_context),
+        artifact_context=context,
+        signal_target_slice=signal_target_slice,
+        local_signal_close=np.asarray(
+            signal_prices.ohlcv[signal_target_slice, 3],
+            dtype=np.float64,
+        ),
+        execution_params=builder._resolve_execution_params(
+            grid_context=cast(Any, grid_context),
+            market_id=artifact_market_id_from_coordinates_v2(context.coordinates),
+        ),
+        shortlist_limit=2,
+        cancel_checker=None,
+    )
+
+    assert retained_frontier["ma.ema"].retained_row_indexes == (1, 0)
 
 
 def test_stage_a_shortlist_builder_v2_exposes_optional_signal_features_warm_cache(
