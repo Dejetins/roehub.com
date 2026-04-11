@@ -17,11 +17,11 @@ from trading.contexts.backtest.application.ports import (
     CurrentUser,
 )
 from trading.contexts.backtest.application.services import ArtifactCoordinatesV2
-from trading.contexts.backtest.application.services.grid_builder_v1 import (
-    BacktestStageABaseVariant,
+from trading.contexts.backtest.application.services.v2.artifact_runtime_core_v2 import (
+    BacktestStageAScoredVariantV2,
 )
-from trading.contexts.backtest.application.services.staged_core_runner_v1 import (
-    BacktestStageAScoredVariantV1,
+from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
+    BacktestStageABaseVariantV2,
 )
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.backtest.application.use_cases import run_backtest as run_backtest_module
@@ -136,7 +136,7 @@ class _RecordingStageAShortlistBuilder:
     def __init__(
         self,
         *,
-        rows: tuple[BacktestStageAScoredVariantV1, ...],
+        rows: tuple[BacktestStageAScoredVariantV2, ...],
     ) -> None:
         """
         Initialize fake builder with deterministic shortlist rows.
@@ -166,7 +166,7 @@ class _RecordingStageAShortlistBuilder:
         batch_size: int | None = None,
         cancel_checker: Any = None,
         on_checkpoint: Any = None,
-    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+    ) -> tuple[BacktestStageAScoredVariantV2, ...]:
         """
         Record one shortlist build call and return the predefined deterministic rows.
 
@@ -180,7 +180,7 @@ class _RecordingStageAShortlistBuilder:
             cancel_checker: Optional cancellation hook.
             on_checkpoint: Optional checkpoint hook.
         Returns:
-            tuple[BacktestStageAScoredVariantV1, ...]: Prebuilt deterministic Stage A rows.
+            tuple[BacktestStageAScoredVariantV2, ...]: Prebuilt deterministic Stage A rows.
         Assumptions:
             Fake builder does not execute kernels and therefore ignores runtime hooks.
         Raises:
@@ -296,7 +296,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
         batch_size: int | None = None,
         cancel_checker: Any = None,
         on_checkpoint: Any = None,
-    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+    ) -> tuple[BacktestStageAScoredVariantV2, ...]:
         """
         Build deterministic shortlist rows directly from runtime-plan Stage A variants.
 
@@ -310,7 +310,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
             cancel_checker: Optional cancellation hook.
             on_checkpoint: Optional checkpoint hook.
         Returns:
-            tuple[BacktestStageAScoredVariantV1, ...]: Deterministic shortlist rows.
+            tuple[BacktestStageAScoredVariantV2, ...]: Deterministic shortlist rows.
         Assumptions:
             Tests only need stable shortlist materialization and not real Stage A kernel math.
         Raises:
@@ -323,7 +323,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
             cancel_checker("stage_a")
         base_variants = tuple(grid_context.iter_stage_a_variants())[:shortlist_limit]
         rows = tuple(
-            BacktestStageAScoredVariantV1(
+            BacktestStageAScoredVariantV2(
                 base_variant=cast(Any, base_variant),
                 total_return_pct=float(base_variant.indicator_selections[0].params["window"]),
             )
@@ -1023,7 +1023,6 @@ def test_run_backtest_use_case_sync_summary_path_stays_summary_only() -> None:
     """
     use_case = _build_use_case(
         staged_scorer=_DeterministicScorerWithDetails(),
-        top_trades_n_default=2,
         eager_top_reports_enabled=True,
     )
     request = RunBacktestRequest(
@@ -1077,8 +1076,8 @@ def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_avai
     )
     shortlist_builder = _RecordingStageAShortlistBuilder(
         rows=(
-            BacktestStageAScoredVariantV1(
-                base_variant=BacktestStageABaseVariant(
+            BacktestStageAScoredVariantV2(
+                base_variant=BacktestStageABaseVariantV2(
                     stage_a_index=0,
                     indicator_selections=(
                         IndicatorVariantSelection(
@@ -1233,7 +1232,6 @@ def test_run_backtest_use_case_lazy_mode_omits_eager_reports_by_default() -> Non
     """
     use_case = _build_use_case(
         staged_scorer=_DeterministicScorerWithDetails(),
-        top_trades_n_default=2,
     )
     request = RunBacktestRequest(
         time_range=TimeRange(

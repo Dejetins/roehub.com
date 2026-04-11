@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import numpy as np
 import pytest
 
 from trading.contexts.backtest.application.services.v2 import (
     ArtifactHitTimesArraysV2,
+    ArtifactHitTimesManifestDocumentV2,
     BacktestArtifactBackedStageBScorerV2,
     StageACompactTradeV2,
     StageBBestCellReplayCaseV2,
@@ -352,7 +354,10 @@ def test_slice_hit_times_to_execution_window_v2_accepts_widened_artifact_grid() 
                 else exec_target_slice.start + local_hit
             )
     artifact_hit_times = ArtifactHitTimesArraysV2(
-        manifest=SimpleNamespace(sentinel_index=global_sentinel_index),
+        manifest=cast(
+            ArtifactHitTimesManifestDocumentV2,
+            SimpleNamespace(sentinel_index=global_sentinel_index),
+        ),
         tp_values=tp_values,
         sl_values=sl_values,
         long_tp=global_long_tp,

@@ -558,7 +558,6 @@ def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -
         warmup_bars_default=200,
         top_k_default=300,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -574,7 +573,6 @@ def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -
         time_range=_time_range(),
         template=_template(),
         top_k=5,
-        top_trades_n=2,
     )
     command = CreateBacktestJobCommand(
         run_request=run_request,
@@ -592,7 +590,7 @@ def test_create_backtest_job_use_case_persists_effective_snapshot_and_hashes() -
     assert "warmup_bars" not in created.request_json
     assert created.request_json["top_k"] == 5
     assert created.request_json["preselect"] == 20000
-    assert created.request_json["top_trades_n"] == 2
+    assert "top_trades_n" not in created.request_json
     assert created.request_json["template"]["execution"] == {
         "fee_pct": 0.075,
         "fixed_quote": 100.0,
@@ -645,7 +643,6 @@ def test_create_backtest_job_use_case_artifact_pin_converts_to_pinned_identity_v
         warmup_bars_default=200,
         top_k_default=300,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -718,7 +715,6 @@ def test_create_backtest_job_use_case_saved_mode_persists_spec_hash_and_snapshot
         warmup_bars_default=200,
         top_k_default=300,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -794,7 +790,6 @@ def test_create_backtest_job_use_case_accepts_background_auto_execution_mode() -
         warmup_bars_default=200,
         top_k_default=300,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -849,7 +844,6 @@ def test_create_backtest_job_use_case_excludes_execution_profile_mode_from_reque
         warmup_bars_default=200,
         top_k_default=300,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -907,7 +901,6 @@ def test_create_backtest_job_use_case_rejects_missing_current_yaml_for_pinning()
         warmup_bars_default=200,
         top_k_default=300,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -969,7 +962,6 @@ def test_create_backtest_job_use_case_rejects_top_k_above_persisted_cap() -> Non
         warmup_bars_default=200,
         top_k_default=10,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -1030,7 +1022,6 @@ def test_create_backtest_job_use_case_rejects_active_quota_exceeded() -> None:
         warmup_bars_default=200,
         top_k_default=10,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -1086,7 +1077,6 @@ def test_create_backtest_job_use_case_rejects_removed_indicator_id() -> None:
         warmup_bars_default=200,
         top_k_default=10,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
@@ -1161,7 +1151,6 @@ def test_create_backtest_job_use_case_rejects_default_only_signal_override() -> 
         warmup_bars_default=200,
         top_k_default=10,
         preselect_default=20000,
-        top_trades_n_default=3,
         init_cash_quote_default=10000.0,
         fixed_quote_default=100.0,
         safe_profit_percent_default=30.0,
