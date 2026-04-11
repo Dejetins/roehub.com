@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
@@ -554,8 +554,8 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "max_estimated_memory_bytes": 268435456,
                         },
                         "progress_weights": {
-                            "stage_a": 25,
-                            "stage_b": 70,
+                            "stage_a": 40,
+                            "stage_b": 55,
                             "finalizing": 5,
                         },
                         "family_plugin_budget_ms": 10,
@@ -596,8 +596,8 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "max_estimated_memory_bytes": 1610612736,
                         },
                         "progress_weights": {
-                            "stage_a": 35,
-                            "stage_b": 60,
+                            "stage_a": 45,
+                            "stage_b": 50,
                             "finalizing": 5,
                         },
                         "family_plugin_budget_ms": 20,
@@ -638,8 +638,8 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             "max_estimated_memory_bytes": 2147483648,
                         },
                         "progress_weights": {
-                            "stage_a": 50,
-                            "stage_b": 45,
+                            "stage_a": 55,
+                            "stage_b": 40,
                             "finalizing": 5,
                         },
                         "family_plugin_budget_ms": 30,
@@ -1190,6 +1190,50 @@ def test_post_backtests_returns_202_for_explicit_background_auto_launch() -> Non
     assert body["engine_params_hash"] == "e" * 64
     assert "warmup_bars" not in body
     assert body["variants"] == []
+
+
+def test_post_backtests_keeps_public_summary_shape_when_sync_uses_redesigned_engine() -> None:
+    """
+    Verify internal sync-engine cutover does not widen the public `POST /backtests` response.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The redesigned sync path changes only internal execution-profile selection, not transport.
+    Raises:
+        AssertionError: If route starts exposing internal execution-profile metadata or stops being
+            summary-only.
+    Side Effects:
+        None.
+    """
+    client = _build_client(
+        use_case=_FakeRunBacktestUseCase(
+            result=replace(
+                _template_mode_response(),
+                execution_profile_mode="hybrid_conservative",
+            )
+        )
+    )
+
+    response = client.post(
+        "/backtests",
+        json={
+            "time_range": {
+                "start": "2026-02-16T00:00:00Z",
+                "end": "2026-02-16T01:00:00Z",
+            },
+            "template": _template_payload(),
+        },
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["execution_mode"] == "sync_inline"
+    assert body["variants"][0]["report"] is None
+    assert "execution_profile_mode" not in body
 
 
 def test_post_backtests_preserves_application_variant_order() -> None:

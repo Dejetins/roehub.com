@@ -45,6 +45,7 @@ _AUTO_FALLBACK_ELIGIBLE_ERRORS = frozenset(
         "background_auto_required",
     }
 )
+_SYNC_INLINE_REDESIGNED_EXECUTION_PROFILE_MODE = "hybrid_conservative"
 
 
 class BacktestRunsApiUseCase(Protocol):
@@ -484,12 +485,19 @@ class CreateAndRunBacktestSyncInlineUseCase:
         Args:
             request: Parsed application request DTO.
             current_user: Authenticated owner identity.
-            request_payload: Strict API payload snapshot used to persist canonical `request_json`.
+            request_payload:
+                Strict API payload snapshot used to persist canonical `request_json`. The
+                sync-inline wrapper also injects the server-owned internal
+                `execution_profile_mode=hybrid_conservative` marker here so `POST /backtests`
+                runs through the redesigned prefilter-first sync engine without changing the
+                public transport contract.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             RunBacktestResponse: Sync response enriched with persisted run identity metadata.
         Assumptions:
-            Internal preflight remains delegated to the existing sync `RunBacktestUseCase`.
+            Internal preflight remains delegated to the existing sync `RunBacktestUseCase`, while
+            the effective sync execution profile stays internal-only and excluded from request-hash
+            semantics.
         Raises:
             BacktestValidationError: If persisted metadata cannot be built deterministically.
             RoehubError: Propagates canonical validation/not-found/forbidden failures
@@ -510,9 +518,13 @@ class CreateAndRunBacktestSyncInlineUseCase:
             )
 
         created_at = self._now()
+        effective_request_payload = _with_sync_inline_redesigned_engine_request_payload(
+            request_payload=request_payload
+        )
         base_response = self._run_use_case.execute(
             request=request,
             current_user=current_user,
+            request_payload=effective_request_payload,
             run_control=run_control,
         )
         finished_at = self._now()
@@ -520,7 +532,7 @@ class CreateAndRunBacktestSyncInlineUseCase:
         artifact_pin = _artifact_pin_from_response(response=base_response)
         request_json = _build_request_json_payload(
             request=request,
-            request_payload=request_payload,
+            request_payload=effective_request_payload,
             response=base_response,
         )
         engine_params_hash = _build_engine_params_hash(response=base_response)
@@ -669,6 +681,42 @@ def _execution_profile_mode_from_error(*, error: RoehubError) -> str | None:
         return validate_execution_profile_mode_v2(value=raw_mode)
     except ValueError:
         return None
+
+
+def _with_sync_inline_redesigned_engine_request_payload(
+    *,
+    request_payload: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """
+    Force persisted sync-inline launches onto the redesigned prefilter-first engine profile.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-engine-vnext.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - apps/api/routes/backtests.py
+    Args:
+        request_payload: Strict API request snapshot captured before sync launch orchestration.
+    Returns:
+        Mapping[str, Any]: Canonical payload copy with internal
+            `execution_profile_mode=hybrid_conservative`.
+    Assumptions:
+        `POST /backtests` keeps the same public request/response shape; the Milestone F1 sync
+        cutover is represented only by additive internal metadata that stays excluded from
+        canonical request-hash semantics.
+    Raises:
+        ValueError: Propagated if the configured internal execution-profile literal is invalid.
+    Side Effects:
+        None.
+    """
+    normalized_payload = dict(_normalize_json_mapping(values=request_payload))
+    normalized_payload["execution_profile_mode"] = validate_execution_profile_mode_v2(
+        value=_SYNC_INLINE_REDESIGNED_EXECUTION_PROFILE_MODE
+    )
+    return normalized_payload
 
 
 def _build_background_auto_launch_response(

@@ -56,6 +56,7 @@ class _FakeRunUseCase:
 
     response: RunBacktestResponse | None = None
     error: Exception | None = None
+    last_request_payload: Mapping[str, Any] | None = None
 
     def execute(
         self,
@@ -80,9 +81,10 @@ class _FakeRunUseCase:
         Raises:
             Exception: Propagates configured fake error.
         Side Effects:
-            None.
+            Stores the last captured `request_payload` for orchestration assertions.
         """
-        _ = request, current_user, request_payload, run_control
+        _ = request, current_user, run_control
+        self.last_request_payload = request_payload
         if self.error is not None:
             raise self.error
         assert self.response is not None
@@ -380,8 +382,9 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
             datetime(2026, 3, 28, 12, 0, 3, tzinfo=timezone.utc),
         )
     )
+    run_use_case = _FakeRunUseCase(response=response)
     use_case = CreateAndRunBacktestSyncInlineUseCase(
-        run_use_case=_FakeRunUseCase(response=response),
+        run_use_case=run_use_case,
         job_repository=repo,
         backtest_runtime_config_hash="f" * 64,
         engine_version="signal_tf + 1m_risk",
@@ -400,11 +403,14 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert persisted.run_id == UUID("00000000-0000-0000-0000-000000000910")
     assert persisted.state == "succeeded"
     assert persisted.execution_mode == "sync_inline"
+    assert persisted.execution_profile_mode == "hybrid_conservative"
     assert persisted.engine_version == "signal_tf + 1m_risk"
     assert persisted.artifact_slot == "slot_b"
     assert persisted.artifact_slot_generation == 11
     assert persisted.artifact_asof_date == "2026-03-28"
     assert persisted.artifact_manifest_hash == "c" * 64
+    assert run_use_case.last_request_payload is not None
+    assert run_use_case.last_request_payload["execution_profile_mode"] == "hybrid_conservative"
     assert repo.created_job is not None
     assert repo.created_job.execution_mode == "sync_inline"
     assert repo.created_job.state == "succeeded"
@@ -421,7 +427,7 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_job.artifact_pin.artifact_asof_date == "2026-03-28"
     assert repo.created_job.request_json["template"]["execution"]["fee_pct"] == 0.075
     assert repo.created_job.request_json["template"]["direction_mode"] == "long-short"
-    assert repo.created_job.request_json["execution_profile_mode"] == "exact_small"
+    assert repo.created_job.request_json["execution_profile_mode"] == "hybrid_conservative"
     assert repo.created_job.request_hash == _build_sha256_from_payload(
         payload={
             key: value
@@ -437,6 +443,52 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_rows[0].summary_metrics_json["win_rate_pct"] == 60.0
     assert repo.created_rows[0].best_tp_pct == 4.0
     assert repo.created_rows[0].best_sl_pct == 2.0
+
+
+def test_create_and_run_backtest_sync_inline_overrides_internal_exact_profile_with_redesigned_sync_mode(
+) -> None:
+    """
+    Verify persisted `POST /backtests` sync launch forces the redesigned internal profile.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public launch payload stays unchanged, so the sync cutover must happen via additive
+        internal metadata only.
+    Raises:
+        AssertionError: If sync-inline launch forwards or persists an old exact profile instead of
+            the redesigned `hybrid_conservative` mode.
+    Side Effects:
+        None.
+    """
+    repo = _FakeJobRepository()
+    run_use_case = _FakeRunUseCase(response=_template_run_response())
+    use_case = CreateAndRunBacktestSyncInlineUseCase(
+        run_use_case=run_use_case,
+        job_repository=repo,
+        backtest_runtime_config_hash="f" * 64,
+        engine_version="signal_tf + 1m_risk",
+        now_provider=lambda: datetime(2026, 3, 28, 12, 0, 0, tzinfo=timezone.utc),
+        run_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000910"),
+    )
+
+    use_case.execute(
+        request=_template_request(),
+        current_user=CurrentUser(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+        ),
+        request_payload={
+            **_template_request_payload(),
+            "execution_profile_mode": "exact_parallel",
+        },
+    )
+
+    assert run_use_case.last_request_payload is not None
+    assert run_use_case.last_request_payload["execution_profile_mode"] == "hybrid_conservative"
+    assert repo.created_job is not None
+    assert repo.created_job.request_json["execution_profile_mode"] == "hybrid_conservative"
 
 
 def test_request_hash_ignores_internal_execution_profile_mode_across_exact_and_hybrid_modes(
@@ -978,7 +1030,7 @@ def _template_run_response() -> RunBacktestResponse:
         artifact_slot_generation=11,
         artifact_asof_date="2026-03-28",
         artifact_manifest_hash="c" * 64,
-        execution_profile_mode="exact_small",
+        execution_profile_mode="hybrid_conservative",
     )
 
 

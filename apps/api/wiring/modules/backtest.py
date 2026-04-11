@@ -8,7 +8,7 @@ Docs:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Mapping
 
 from fastapi import APIRouter
@@ -201,10 +201,30 @@ def build_backtest_router(
         )
     )
     artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
+    sync_execution_profiles = replace(
+        runtime_config.execution_profiles,
+        available_profiles=tuple(
+            replace(
+                profile,
+                feature_flags=replace(
+                    profile.feature_flags,
+                    runtime_enabled=True,
+                    heuristic_shortlist_enabled=True,
+                ),
+            )
+            if profile.mode == "hybrid_conservative"
+            else profile
+            for profile in runtime_config.execution_profiles.available_profiles
+        ),
+    )
+    sync_adaptive_selector_policy = replace(
+        runtime_config.adaptive_selector_policy,
+        mode="active",
+    )
     sync_runtime_planner = BacktestArtifactRuntimePlannerV2(
-        execution_profiles=runtime_config.execution_profiles,
+        execution_profiles=sync_execution_profiles,
         launch_budget_mode="sync_inline",
-        adaptive_selector_policy=runtime_config.adaptive_selector_policy,
+        adaptive_selector_policy=sync_adaptive_selector_policy,
     )
     background_runtime_planner = BacktestArtifactRuntimePlannerV2(
         execution_profiles=runtime_config.execution_profiles,

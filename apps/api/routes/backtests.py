@@ -152,6 +152,8 @@ def build_backtests_router(
                 response with reproducibility hashes.
         Assumptions:
             `POST /backtests` mode selection is `strategy_id xor template`.
+            Internal sync execution-profile selection remains server-owned and stays hidden from
+            the public transport contract after the redesigned sync-engine cutover.
         Raises:
             RoehubError: Deterministic mapped validation/not_found/forbidden/conflict errors.
         Side Effects:

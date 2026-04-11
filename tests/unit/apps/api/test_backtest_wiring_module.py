@@ -598,6 +598,13 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         ).resolve_execution_profile().mode
         == "exact_small"
     )
+    assert (
+        cast(
+            Any,
+            captured_run_use_case_kwargs[0]["runtime_planner"],
+        ).resolve_execution_profile(requested_execution_profile_mode="hybrid_conservative").mode
+        == "hybrid_conservative"
+    )
     assert captured_run_use_case_kwargs[1]["candle_feed"] is None
     assert captured_run_use_case_kwargs[1]["max_variants_per_compute"] == 101
     assert captured_run_use_case_kwargs[1]["max_compute_bytes_total"] == 1001
@@ -651,7 +658,7 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     assert (
         runtime_defaults_response.contracts.execution.available_execution_profiles[1]
         .progress_weights.stage_b
-        == 60
+        == 50
     )
     assert (
         runtime_defaults_response.contracts.execution.available_execution_profiles[3]

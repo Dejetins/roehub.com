@@ -379,6 +379,9 @@ class RunBacktestUseCase:
                 persisted-run orchestrators. Sync execution also honors the internal-only
                 `execution_profile_mode` override when present; this field is not part of the
                 public `/backtests` request contract and must stay excluded from request hashes.
+                After Milestone F / EPIC F1 the persisted sync-inline launch wrapper uses this
+                additive metadata to pin `POST /backtests` onto the redesigned
+                `hybrid_conservative` prefilter-first engine path.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             RunBacktestResponse: Deterministic staged response with ranked top-k variants.
@@ -1341,7 +1344,8 @@ def _requested_execution_profile_mode_from_payload_v2(
             override, or `None`.
     Assumptions:
         `execution_profile_mode` is internal metadata only; it is not part of the public
-        `/backtests` request DTO and must remain excluded from request-hash semantics.
+        `/backtests` request DTO and must remain excluded from request-hash semantics, even when
+        the persisted sync-inline launch path pins the redesigned `hybrid_conservative` profile.
     Raises:
         BacktestValidationError: If the internal override exists but is not a valid mode string.
     Side Effects:

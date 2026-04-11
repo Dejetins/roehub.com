@@ -123,11 +123,19 @@ deterministic `422` ошибками.
   - effective `execution_profile_mode` is persisted into unified run storage for later
     `/backtests/runs*` progress/history rendering.
 - D2 hybrid rollout note:
-  - `hybrid_conservative` now exists as an internal opt-in runtime path for benchmark/manual
-    wiring, but public `POST /backtests` still does not expose a profile selector;
-  - ordinary public launch routing remains exact-first and server-owned;
+  - `hybrid_conservative` remains an internal-only runtime profile, but sync `POST /backtests`
+    now server-pins that profile for the redesigned prefilter-first launch path;
+  - public `POST /backtests` still does not expose a profile selector;
   - internal-only `execution_profile_mode` metadata may be persisted in `request_json`, but it
     must stay out of public request validation and out of request-hash semantics.
+- F1 sync cutover note:
+  - sync `POST /backtests` launch now executes through the redesigned prefilter-first exact
+    pipeline by forcing internal `execution_profile_mode=hybrid_conservative` inside the
+    persisted sync-inline wrapper;
+  - public request/response transport remains unchanged:
+    no new public launch fields, launch stays `summary-only`, and persisted top rows stay
+    `summary-only`;
+  - claimed worker/background cutover remains deferred to the separate F2 milestone.
 
 ## Цель
 
@@ -157,9 +165,9 @@ deterministic `422` ошибками.
 - Current exact runtime-enabled launch profiles are:
   - `exact_small`
   - `exact_parallel`
-- `hybrid_conservative` is now a runtime-enabled internal opt-in profile for benchmark/manual
-  hybrid rollout work, but it still does not participate in default public `POST /backtests`
-  routing and does not add a public request field.
+- `hybrid_conservative` is now the server-owned internal sync-launch profile for
+  `POST /backtests`; it still does not add a public request field or a user-selectable profile
+  knob.
 - `hybrid_family` remains future rollout surface only.
 - Варианты детерминированы, guards применяются в sync режиме:
   - `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md`
