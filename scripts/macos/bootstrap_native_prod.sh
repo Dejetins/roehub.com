@@ -31,7 +31,10 @@ do
   install -m 0644 "$REPO_ROOT/infra/macos/launchd/$plist" "$LAUNCH_AGENTS_DIR/$plist"
 done
 
-mapfile -t worker_plists < <(
+worker_plists=()
+while IFS= read -r worker_plist; do
+  worker_plists+=("$worker_plist")
+done < <(
   "$PYTHON_BIN" "$REPO_ROOT/scripts/macos/render_backtest_job_runner_launchd.py" \
     --profile prod \
     --repo-root "$REPO_ROOT" \

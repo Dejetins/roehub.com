@@ -122,7 +122,10 @@ launchctl list | grep backtest-job-runner
 ```bash
 cd /opt/roehub/app
 base_metrics_port=9204
-mapfile -t worker_runtime < <(
+worker_runtime=()
+while IFS= read -r runtime_value; do
+  worker_runtime+=("${runtime_value}")
+done < <(
   /opt/roehub/app/.venv/bin/python -c "from trading.contexts.backtest.adapters.outbound import load_backtest_runtime_config; config = load_backtest_runtime_config('/opt/roehub/app/configs/prod/backtest.yaml'); print('1' if config.jobs.enabled else '0'); print(config.jobs.worker_processes)"
 )
 jobs_enabled="${worker_runtime[0]}"
