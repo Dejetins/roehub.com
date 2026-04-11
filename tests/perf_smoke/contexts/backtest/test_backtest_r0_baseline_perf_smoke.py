@@ -34,12 +34,20 @@ from trading.contexts.backtest.application.services import (
     read_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
     serialize_backtest_runtime_acceleration_benchmark_corpus_payload_v2,
 )
+from trading.contexts.backtest.application.services.v2 import (
+    StageACompactTradeV2,
+    StageBHitTimesSliceV2,
+    run_reference_vs_fast_self_check_v2,
+)
 from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlannerV2,
 )
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
     ExecutionProfilesCatalogV2,
     default_execution_profiles_catalog_v2,
+)
+from trading.contexts.backtest.application.services.v2.stage_b_golden_fixtures_v2 import (
+    load_stage_b_best_cell_replay_reference_case_v2,
 )
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.indicators.application.dto import (
@@ -64,6 +72,17 @@ from trading.shared_kernel.primitives import (
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 _BENCHMARK_CORPUS_FIXTURE_PATH = (
     _FIXTURES_DIR / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
+)
+_UNIT_STAGE_B_GOLDEN_FIXTURE_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "unit"
+    / "contexts"
+    / "backtest"
+    / "application"
+    / "services"
+    / "v2"
+    / "fixtures"
+    / "stage_b_golden_fixtures_v2.json"
 )
 _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _ONE_MINUTE = timedelta(minutes=1)
@@ -740,6 +759,83 @@ def test_r5_stage_b_golden_fixture_manifest_tracks_contract_fixture_bytes() -> N
     ]
 
 
+def test_r5_reference_vs_fast_self_check_runs_on_bounded_subset_only() -> None:
+    """
+    Verify perf smoke keeps the reference-vs-fast self-check on a deterministic bounded subset.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+      - tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Perf smoke must exercise the explicit self-check without moving the slow reference onto
+        the default production hot path, so it validates only a smaller bounded subset.
+    Raises:
+        AssertionError: If the self-check stops honoring the requested bounded subset or parity.
+    Side Effects:
+        Reads the committed Stage B golden fixture catalog from repository.
+    """
+    best_cell_case = load_stage_b_best_cell_replay_reference_case_v2(
+        path=_UNIT_STAGE_B_GOLDEN_FIXTURE_PATH
+    )
+    compact_trades = tuple(
+        StageACompactTradeV2(
+            entry_signal_idx=index,
+            entry_exec_idx=trade.entry_exec,
+            direction=trade.direction,
+            sig_exit_signal_idx=None,
+            sig_exit_exec_idx=trade.sig_exit_exec,
+        )
+        for index, trade in enumerate(best_cell_case.compact_trades)
+    )
+    hit_times = StageBHitTimesSliceV2(
+        tp_values=np.asarray(
+            tuple(float(value) - 1.0 for value in best_cell_case.level_factors.long_tp),
+            dtype=np.float32,
+        ),
+        sl_values=np.asarray(
+            tuple(1.0 - float(value) for value in best_cell_case.level_factors.long_sl),
+            dtype=np.float32,
+        ),
+        long_tp=np.asarray(best_cell_case.hit_times.long_tp, dtype=np.int64),
+        long_sl=np.asarray(best_cell_case.hit_times.long_sl, dtype=np.int64),
+        short_tp=np.asarray(best_cell_case.hit_times.short_tp, dtype=np.int64),
+        short_sl=np.asarray(best_cell_case.hit_times.short_sl, dtype=np.int64),
+        sentinel_index=best_cell_case.hit_times.sentinel_index,
+    )
+    bounded_trade_count = max(1, len(compact_trades) - 1)
+    bounded_tp_level_count = max(1, int(hit_times.tp_values.shape[0]) - 1)
+    bounded_sl_level_count = max(1, int(hit_times.sl_values.shape[0]) - 1)
+
+    self_check = run_reference_vs_fast_self_check_v2(
+        compact_trades=compact_trades,
+        hit_times=hit_times,
+        exec_open=np.asarray(best_cell_case.prices.exec_open, dtype=np.float64),
+        exec_close=np.asarray(best_cell_case.prices.exec_close, dtype=np.float64),
+        fee_rate=float(best_cell_case.fee_rate),
+        max_trade_count=bounded_trade_count,
+        max_tp_level_count=bounded_tp_level_count,
+        max_sl_level_count=bounded_sl_level_count,
+        close_on_end=best_cell_case.close_on_end,
+    )
+
+    assert self_check.bounded_trade_count == bounded_trade_count
+    assert self_check.bounded_tp_level_count == bounded_tp_level_count
+    assert self_check.bounded_sl_level_count == bounded_sl_level_count
+    assert self_check.bounded_trade_count < self_check.total_trade_count
+    assert self_check.bounded_tp_level_count < self_check.total_tp_level_count
+    assert self_check.bounded_sl_level_count < self_check.total_sl_level_count
+    assert abs(self_check.max_abs_total_return_diff) <= 1e-9
+
+
 def test_a3_runtime_acceleration_benchmark_corpus_manifest_is_complete() -> None:
     """
     Verify the D2+D3 benchmark corpus publishes deterministic exact and hybrid rollout slices.
@@ -1138,7 +1234,6 @@ def _collect_artifact_v2_scenario_measurement(
             warmup_bars_default=scenario.warmup_bars,
             top_k_default=scenario.top_k,
             preselect_default=scenario.preselect,
-            top_trades_n_default=scenario.top_trades_n,
             eager_top_reports_enabled=False,
         )
 
@@ -1309,7 +1404,6 @@ def _build_request(*, scenario: _R0BenchmarkScenario) -> RunBacktestRequest:
         warmup_bars=scenario.warmup_bars,
         top_k=scenario.top_k,
         preselect=scenario.preselect,
-        top_trades_n=scenario.top_trades_n,
     )
 
 

@@ -17,6 +17,9 @@ from trading.contexts.backtest.application.services.v2 import (
     serialize_stage_b_golden_fixture_payload_v2,
     validate_stage_b_golden_fixture_payload_v2,
 )
+from trading.contexts.backtest.application.services.v2.stage_b_golden_fixtures_v2 import (
+    load_stage_b_best_cell_replay_reference_case_v2,
+)
 
 _FIXTURE_PATH = Path(__file__).with_name("fixtures") / "stage_b_golden_fixtures_v2.json"
 _PERF_MANIFEST_PATH = (
@@ -72,6 +75,40 @@ def test_stage_b_golden_fixture_catalog_executes_all_cases_deterministically() -
 
     for case in catalog.cases:
         _assert_case_result_matches_expected(case=case)
+
+
+def test_stage_b_golden_fixture_catalog_exposes_best_cell_reference_case_for_self_check() -> None:
+    """
+    Verify the golden catalog keeps one best-cell reference case usable for a bounded subset.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The repository uses the committed best-cell replay fixture as the canonical anchor for the
+        reference-vs-fast self-check, so the case must keep enough trades and grid levels to slice
+        a smaller deterministic subset.
+    Raises:
+        AssertionError: If the catalog no longer exposes a usable best-cell reference case.
+    Side Effects:
+        Reads one JSON fixture catalog from repository.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb
+      - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
+    """
+    best_cell_case = load_stage_b_best_cell_replay_reference_case_v2(path=_FIXTURE_PATH)
+
+    assert isinstance(best_cell_case, StageBBestCellReplayCaseV2)
+    assert best_cell_case.case_id == "exact_best_cell_replay_metrics"
+    assert len(best_cell_case.compact_trades) >= 2
+    assert len(best_cell_case.level_factors.long_tp) >= 2
+    assert len(best_cell_case.level_factors.long_sl) >= 2
+    assert "exact best-cell replay" in best_cell_case.coverage
+    assert "metrics over compact trades" in best_cell_case.coverage
 
 
 def test_stage_b_golden_fixture_catalog_serialization_is_byte_stable() -> None:

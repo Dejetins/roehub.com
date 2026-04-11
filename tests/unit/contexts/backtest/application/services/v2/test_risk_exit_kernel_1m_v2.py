@@ -8,8 +8,8 @@ import pytest
 
 from trading.contexts.backtest.application.services.v2 import (
     ArtifactHitTimesArraysV2,
-    StageACompactTradeV2,
     BacktestArtifactBackedStageBScorerV2,
+    StageACompactTradeV2,
     StageBBestCellReplayCaseV2,
     StageBHitTimesFixtureV2,
     StageBHitTimesSliceV2,
@@ -20,8 +20,12 @@ from trading.contexts.backtest.application.services.v2 import (
     replay_best_risk_cell_exact_v2,
     replay_risk_cell_exact_v2,
     resolve_risk_trade_exit_1m_v2,
+    run_reference_vs_fast_self_check_v2,
     search_risk_cells_total_return_fast_v2,
     slice_hit_times_to_execution_window_v2,
+)
+from trading.contexts.backtest.application.services.v2.stage_b_golden_fixtures_v2 import (
+    load_stage_b_best_cell_replay_reference_case_v2,
 )
 
 _FIXTURE_PATH = Path(__file__).with_name("fixtures") / "stage_b_golden_fixtures_v2.json"
@@ -205,6 +209,73 @@ def test_search_risk_cells_total_return_fast_v2_matches_bruteforce_exact_replay(
         float(brute_force[expected_tp_index, expected_sl_index]),
         rel=1e-9,
         abs=1e-9,
+    )
+
+
+def test_run_reference_vs_fast_self_check_v2_validates_bounded_subset() -> None:
+    """
+    Verify the explicit reference-vs-fast self-check compares a bounded subset deterministically.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The new self-check surface stays debug/test-only, uses exact replay as the slow
+        reference, and keeps the bounded subset smaller than the full fixture on at least one
+        axis.
+    Raises:
+        AssertionError: If the bounded subset diagnostics or deterministic parity drift.
+    Side Effects:
+        Reads the committed Stage B golden fixture catalog from repository.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb
+    """
+    case = _best_cell_case_v2()
+    compact_trades = _compact_trades_from_best_cell_case_v2(case=case)
+    hit_times = _hit_times_slice_from_fixture_v2(
+        hit_times=case.hit_times,
+        level_factors=case.level_factors,
+    )
+    bounded_trade_count = max(1, len(compact_trades) - 1)
+    bounded_tp_level_count = max(1, int(hit_times.tp_values.shape[0]) - 1)
+    bounded_sl_level_count = max(1, int(hit_times.sl_values.shape[0]) - 1)
+
+    self_check = run_reference_vs_fast_self_check_v2(
+        compact_trades=compact_trades,
+        hit_times=hit_times,
+        exec_open=np.asarray(case.prices.exec_open, dtype=np.float64),
+        exec_close=np.asarray(case.prices.exec_close, dtype=np.float64),
+        fee_rate=float(case.fee_rate),
+        max_trade_count=bounded_trade_count,
+        max_tp_level_count=bounded_tp_level_count,
+        max_sl_level_count=bounded_sl_level_count,
+        close_on_end=case.close_on_end,
+    )
+
+    assert self_check.total_trade_count == len(compact_trades)
+    assert self_check.bounded_trade_count == bounded_trade_count
+    assert self_check.total_tp_level_count == int(hit_times.tp_values.shape[0])
+    assert self_check.bounded_tp_level_count == bounded_tp_level_count
+    assert self_check.total_sl_level_count == int(hit_times.sl_values.shape[0])
+    assert self_check.bounded_sl_level_count == bounded_sl_level_count
+    assert self_check.fast_result.best_tp_index == self_check.reference_best_tp_index
+    assert self_check.fast_result.best_sl_index == self_check.reference_best_sl_index
+    assert self_check.fast_result.best_total_return_pct == pytest.approx(
+        self_check.reference_best_total_return_pct,
+        rel=0.0,
+        abs=1e-9,
+    )
+    assert self_check.max_abs_total_return_diff == pytest.approx(0.0, rel=0.0, abs=1e-9)
+    np.testing.assert_allclose(
+        self_check.fast_result.total_return_pct,
+        self_check.reference_total_return_pct,
+        rtol=0.0,
+        atol=1e-9,
     )
 
 
@@ -573,7 +644,7 @@ def _best_cell_case_v2() -> StageBBestCellReplayCaseV2:
     Assumptions:
         The golden catalog contains exactly one best-cell replay case for R5-03 semantics.
     Raises:
-        AssertionError: If the expected best-cell replay case is missing.
+        ValueError: If the expected best-cell replay case is missing or duplicated.
     Side Effects:
         Reads the committed Stage B golden fixture catalog from repository.
     Docs:
@@ -583,11 +654,7 @@ def _best_cell_case_v2() -> StageBBestCellReplayCaseV2:
       - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
     """
-    catalog = load_stage_b_golden_fixture_catalog_v2(path=_FIXTURE_PATH)
-    for case in catalog.cases:
-        if isinstance(case, StageBBestCellReplayCaseV2):
-            return case
-    raise AssertionError("best-cell replay case is missing from the golden catalog")
+    return load_stage_b_best_cell_replay_reference_case_v2(path=_FIXTURE_PATH)
 
 
 def _hit_times_slice_from_fixture_v2(

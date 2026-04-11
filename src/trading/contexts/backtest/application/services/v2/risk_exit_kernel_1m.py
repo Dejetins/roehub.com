@@ -11,9 +11,11 @@ from .contracts import (
     StageACompactTradeV2,
     StageBFastSearchResultV2,
     StageBHitTimesSliceV2,
+    StageBReferenceVsFastSelfCheckResultV2,
     StageBReplayPayloadV2,
     StageBTradeExitV2,
 )
+from .metrics_kernel import compute_stage_b_metrics_v2
 
 
 def slice_hit_times_to_execution_window_v2(
@@ -630,6 +632,123 @@ def replay_best_risk_cell_exact_v2(
     )
 
 
+def run_reference_vs_fast_self_check_v2(
+    *,
+    compact_trades: tuple[StageACompactTradeV2, ...],
+    hit_times: StageBHitTimesSliceV2,
+    exec_open: np.ndarray,
+    exec_close: np.ndarray,
+    fee_rate: float,
+    max_trade_count: int | None = None,
+    max_tp_level_count: int | None = None,
+    max_sl_level_count: int | None = None,
+    close_on_end: bool = True,
+    return_tolerance: float = 1e-9,
+) -> StageBReferenceVsFastSelfCheckResultV2:
+    """
+    Execute the Stage B reference-vs-fast self-check on one deterministic bounded subset.
+
+    Args:
+        compact_trades: Ordered compact trades from the exact-risk pipeline.
+        hit_times: Local `1m hit-times` slice for the execution window.
+        exec_open: Local `1m` execution opens.
+        exec_close: Local `1m` execution closes.
+        fee_rate: Per-side fee rate expressed as decimal fraction.
+        max_trade_count: Optional leading-trade cap for the bounded subset.
+        max_tp_level_count: Optional leading-TP cap for the bounded subset.
+        max_sl_level_count: Optional leading-SL cap for the bounded subset.
+        close_on_end: Explicit notebook-derived `close_on_end = 1` runtime switch.
+        return_tolerance: Allowed absolute total-return drift for deterministic parity checks.
+    Returns:
+        StageBReferenceVsFastSelfCheckResultV2: Diagnostics for the bounded subset and both
+            fast/reference winners.
+    Assumptions:
+        This helper is test/debug-oriented, uses exact replay as the slow reference, and must stay
+        off the default production hot path.
+    Raises:
+        ValueError: If one requested bound or the return tolerance is invalid.
+        AssertionError: If the reference-vs-fast self-check fails deterministic parity.
+    Side Effects:
+        Allocates bounded matrices and exact replay payloads for the bounded subset only.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+    """
+    total_trade_count = len(compact_trades)
+    total_tp_level_count = int(hit_times.tp_values.shape[0])
+    total_sl_level_count = int(hit_times.sl_values.shape[0])
+    bounded_trade_count = _normalize_optional_trade_count_v2(
+        total_count=total_trade_count,
+        requested_count=max_trade_count,
+        field_name="max_trade_count",
+    )
+    bounded_tp_level_count = _normalize_bounded_level_count_v2(
+        total_count=total_tp_level_count,
+        requested_count=max_tp_level_count,
+        field_name="max_tp_level_count",
+    )
+    bounded_sl_level_count = _normalize_bounded_level_count_v2(
+        total_count=total_sl_level_count,
+        requested_count=max_sl_level_count,
+        field_name="max_sl_level_count",
+    )
+    bounded_compact_trades = compact_trades[:bounded_trade_count]
+    bounded_hit_times = _slice_hit_times_level_subset_v2(
+        hit_times=hit_times,
+        tp_level_count=bounded_tp_level_count,
+        sl_level_count=bounded_sl_level_count,
+    )
+    fast_result = search_risk_cells_total_return_fast_v2(
+        compact_trades=bounded_compact_trades,
+        hit_times=bounded_hit_times,
+        exec_open=exec_open,
+        exec_close=exec_close,
+        fee_rate=fee_rate,
+        close_on_end=close_on_end,
+    )
+    reference_total_return_pct = _build_reference_total_return_matrix_v2(
+        compact_trades=bounded_compact_trades,
+        hit_times=bounded_hit_times,
+        exec_open=exec_open,
+        exec_close=exec_close,
+        fee_rate=fee_rate,
+        close_on_end=close_on_end,
+    )
+    reference_flat_index = int(np.argmax(reference_total_return_pct))
+    reference_best_tp_index, reference_best_sl_index = np.unravel_index(
+        reference_flat_index,
+        reference_total_return_pct.shape,
+    )
+    reference_best_total_return_pct = float(
+        reference_total_return_pct[reference_best_tp_index, reference_best_sl_index]
+    )
+    max_abs_total_return_diff = _assert_reference_vs_fast_self_check_parity_v2(
+        fast_result=fast_result,
+        reference_total_return_pct=reference_total_return_pct,
+        reference_best_tp_index=int(reference_best_tp_index),
+        reference_best_sl_index=int(reference_best_sl_index),
+        reference_best_total_return_pct=reference_best_total_return_pct,
+        return_tolerance=return_tolerance,
+    )
+    return StageBReferenceVsFastSelfCheckResultV2(
+        total_trade_count=total_trade_count,
+        bounded_trade_count=bounded_trade_count,
+        total_tp_level_count=total_tp_level_count,
+        bounded_tp_level_count=bounded_tp_level_count,
+        total_sl_level_count=total_sl_level_count,
+        bounded_sl_level_count=bounded_sl_level_count,
+        fast_result=fast_result,
+        reference_total_return_pct=reference_total_return_pct,
+        reference_best_tp_index=int(reference_best_tp_index),
+        reference_best_sl_index=int(reference_best_sl_index),
+        reference_best_total_return_pct=reference_best_total_return_pct,
+        max_abs_total_return_diff=max_abs_total_return_diff,
+    )
+
+
 def _normalize_explicit_slice_v2(
     *,
     target_slice: slice,
@@ -670,6 +789,133 @@ def _normalize_explicit_slice_v2(
             f"got slice({start}, {stop}, {target_slice.step})"
         )
     return (start, stop)
+
+
+def _normalize_optional_trade_count_v2(
+    *,
+    total_count: int,
+    requested_count: int | None,
+    field_name: str,
+) -> int:
+    """
+    Normalize one optional compact-trade bound for the self-check bounded subset.
+
+    Args:
+        total_count: Total number of compact trades available to the caller.
+        requested_count: Optional requested leading-trade count.
+        field_name: Deterministic diagnostics field label.
+    Returns:
+        int: Normalized leading-trade count in `[0, total_count]`.
+    Assumptions:
+        The reference-vs-fast self-check may intentionally validate an empty trade subset.
+    Raises:
+        ValueError: If the requested count is non-numeric, negative, or larger than `total_count`.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
+    """
+    if total_count < 0:
+        raise ValueError("total_count must be >= 0")
+    if requested_count is None:
+        return total_count
+    if isinstance(requested_count, bool) or not isinstance(requested_count, int):
+        raise ValueError(f"{field_name} must be an integer when set")
+    if requested_count < 0 or requested_count > total_count:
+        raise ValueError(f"{field_name} must satisfy 0 <= value <= {total_count}")
+    return requested_count
+
+
+def _normalize_bounded_level_count_v2(
+    *,
+    total_count: int,
+    requested_count: int | None,
+    field_name: str,
+) -> int:
+    """
+    Normalize one TP/SL grid bound for the self-check bounded subset.
+
+    Args:
+        total_count: Total number of TP or SL levels available to the caller.
+        requested_count: Optional requested leading-level count.
+        field_name: Deterministic diagnostics field label.
+    Returns:
+        int: Normalized leading-level count in `[1, total_count]`.
+    Assumptions:
+        The bounded subset must keep at least one TP level and one SL level for exact replay.
+    Raises:
+        ValueError: If the requested count is non-numeric, non-positive, or larger than total.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+    """
+    if total_count <= 0:
+        raise ValueError(f"{field_name} total_count must be > 0")
+    if requested_count is None:
+        return total_count
+    if isinstance(requested_count, bool) or not isinstance(requested_count, int):
+        raise ValueError(f"{field_name} must be an integer when set")
+    if requested_count <= 0 or requested_count > total_count:
+        raise ValueError(f"{field_name} must satisfy 1 <= value <= {total_count}")
+    return requested_count
+
+
+def _slice_hit_times_level_subset_v2(
+    *,
+    hit_times: StageBHitTimesSliceV2,
+    tp_level_count: int,
+    sl_level_count: int,
+) -> StageBHitTimesSliceV2:
+    """
+    Slice the Stage B hit-times grid to a leading bounded subset of TP and SL levels.
+
+    Args:
+        hit_times: Full local `1m hit-times` slice for one execution window.
+        tp_level_count: Number of leading TP levels to retain.
+        sl_level_count: Number of leading SL levels to retain.
+    Returns:
+        StageBHitTimesSliceV2: Bounded subset with the original execution sentinel preserved.
+    Assumptions:
+        Level ordering is deterministic, so prefix slicing keeps reviewable parity semantics.
+    Raises:
+        ValueError: If one requested level count is out of bounds for the source grid.
+    Side Effects:
+        Allocates a small Stage B slice wrapper over the bounded subset.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb
+    """
+    normalized_tp_level_count = _normalize_bounded_level_count_v2(
+        total_count=int(hit_times.tp_values.shape[0]),
+        requested_count=tp_level_count,
+        field_name="tp_level_count",
+    )
+    normalized_sl_level_count = _normalize_bounded_level_count_v2(
+        total_count=int(hit_times.sl_values.shape[0]),
+        requested_count=sl_level_count,
+        field_name="sl_level_count",
+    )
+    return StageBHitTimesSliceV2(
+        tp_values=hit_times.tp_values[:normalized_tp_level_count],
+        sl_values=hit_times.sl_values[:normalized_sl_level_count],
+        long_tp=hit_times.long_tp[:normalized_tp_level_count, :],
+        long_sl=hit_times.long_sl[:normalized_sl_level_count, :],
+        short_tp=hit_times.short_tp[:normalized_tp_level_count, :],
+        short_sl=hit_times.short_sl[:normalized_sl_level_count, :],
+        sentinel_index=hit_times.sentinel_index,
+    )
 
 
 def _rebase_hit_times_table_v2(
@@ -751,6 +997,132 @@ def _normalize_hit_times_level_grid_v2(
     if normalized.shape[0] <= 0:
         raise ValueError(f"{field_name} must contain at least one level")
     return normalized
+
+
+def _build_reference_total_return_matrix_v2(
+    *,
+    compact_trades: tuple[StageACompactTradeV2, ...],
+    hit_times: StageBHitTimesSliceV2,
+    exec_open: np.ndarray,
+    exec_close: np.ndarray,
+    fee_rate: float,
+    close_on_end: bool,
+) -> np.ndarray:
+    """
+    Build the slow exact-replay total-return matrix for a bounded Stage B subset.
+
+    Args:
+        compact_trades: Ordered compact trades already reduced to the bounded subset.
+        hit_times: Bounded local `1m hit-times` slice for the self-check.
+        exec_open: Local `1m` execution opens.
+        exec_close: Local `1m` execution closes.
+        fee_rate: Per-side fee rate expressed as decimal fraction.
+        close_on_end: Explicit notebook-derived `close_on_end = 1` runtime switch.
+    Returns:
+        np.ndarray: Exact total-return matrix shaped `[n_tp_subset, n_sl_subset]`.
+    Assumptions:
+        This helper exists only for the reference-vs-fast self-check and therefore favors exact
+        replay over production-path speed.
+    Raises:
+        ValueError: Propagated from exact replay or metric computation on invalid inputs.
+    Side Effects:
+        Allocates one dense matrix by running exact replay for every bounded TP/SL cell.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+      - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
+    """
+    total_return_pct = np.empty(
+        (hit_times.tp_values.shape[0], hit_times.sl_values.shape[0]),
+        dtype=np.float64,
+    )
+    for tp_index in range(hit_times.tp_values.shape[0]):
+        for sl_index in range(hit_times.sl_values.shape[0]):
+            replay = replay_risk_cell_exact_v2(
+                compact_trades=compact_trades,
+                hit_times=hit_times,
+                exec_open=exec_open,
+                exec_close=exec_close,
+                tp_index=tp_index,
+                sl_index=sl_index,
+                close_on_end=close_on_end,
+            )
+            total_return_pct[tp_index, sl_index] = compute_stage_b_metrics_v2(
+                replay=replay,
+                fee_rate=fee_rate,
+            ).total_return_pct
+    return total_return_pct
+
+
+def _assert_reference_vs_fast_self_check_parity_v2(
+    *,
+    fast_result: StageBFastSearchResultV2,
+    reference_total_return_pct: np.ndarray,
+    reference_best_tp_index: int,
+    reference_best_sl_index: int,
+    reference_best_total_return_pct: float,
+    return_tolerance: float,
+) -> float:
+    """
+    Assert deterministic parity between fast search and the slow exact-replay reference matrix.
+
+    Args:
+        fast_result: Fast-search result over the bounded subset.
+        reference_total_return_pct: Slow exact-replay matrix over the same bounded subset.
+        reference_best_tp_index: Reference best TP index from the bounded subset.
+        reference_best_sl_index: Reference best SL index from the bounded subset.
+        reference_best_total_return_pct: Reference best total return for the bounded subset.
+        return_tolerance: Allowed absolute total-return drift between fast and reference outputs.
+    Returns:
+        float: Maximum absolute total-return difference across the bounded subset.
+    Assumptions:
+        Both matrices already cover the same bounded subset and use the same deterministic order.
+    Raises:
+        ValueError: If `return_tolerance` is invalid.
+        AssertionError: If best-cell coordinates or matrix values drift beyond tolerance.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+    """
+    if isinstance(return_tolerance, bool) or not isinstance(return_tolerance, int | float):
+        raise ValueError("return_tolerance must be numeric")
+    normalized_tolerance = float(return_tolerance)
+    if normalized_tolerance < 0.0:
+        raise ValueError("return_tolerance must be >= 0")
+    if fast_result.total_return_pct.shape != reference_total_return_pct.shape:
+        raise AssertionError(
+            "reference-vs-fast self-check matrix shape drifted on the bounded subset"
+        )
+    if fast_result.best_tp_index != reference_best_tp_index:
+        raise AssertionError(
+            "reference-vs-fast self-check best_tp_index drifted on the bounded subset"
+        )
+    if fast_result.best_sl_index != reference_best_sl_index:
+        raise AssertionError(
+            "reference-vs-fast self-check best_sl_index drifted on the bounded subset"
+        )
+    best_total_return_diff = abs(
+        fast_result.best_total_return_pct - reference_best_total_return_pct
+    )
+    if best_total_return_diff > normalized_tolerance:
+        raise AssertionError(
+            "reference-vs-fast self-check best_total_return_pct drifted on the bounded subset"
+        )
+    max_abs_total_return_diff = float(
+        np.max(np.abs(fast_result.total_return_pct - reference_total_return_pct))
+    )
+    if max_abs_total_return_diff > normalized_tolerance:
+        raise AssertionError(
+            "reference-vs-fast self-check total_return_pct matrix drifted on the bounded subset"
+        )
+    return max_abs_total_return_diff
 
 
 def _normalize_execution_prices_v2(
@@ -1532,6 +1904,7 @@ __all__ = [
     "replay_best_risk_cell_exact_v2",
     "replay_risk_cell_exact_v2",
     "resolve_risk_trade_exit_1m_v2",
+    "run_reference_vs_fast_self_check_v2",
     "search_risk_cells_total_return_fast_v2",
     "slice_hit_times_to_execution_window_v2",
 ]

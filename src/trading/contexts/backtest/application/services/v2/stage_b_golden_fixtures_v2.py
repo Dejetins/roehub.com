@@ -384,6 +384,42 @@ def load_stage_b_golden_fixture_catalog_v2(*, path: Path) -> StageBGoldenFixture
     )
 
 
+def load_stage_b_best_cell_replay_reference_case_v2(
+    *,
+    path: Path,
+) -> StageBBestCellReplayCaseV2:
+    """
+    Load the canonical Stage B best-cell replay reference case for bounded self-checks.
+
+    Args:
+        path: Repository path to the committed Stage B golden fixture catalog.
+    Returns:
+        StageBBestCellReplayCaseV2: The single committed best-cell replay reference case.
+    Assumptions:
+        The golden catalog keeps exactly one canonical `best_cell_replay` case that anchors the
+        `reference-vs-fast self-check` surface on a bounded subset.
+    Raises:
+        ValueError: If the catalog contains zero or multiple best-cell replay cases.
+    Side Effects:
+        Reads and validates the committed Stage B golden fixture catalog from repository.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+    """
+    catalog = load_stage_b_golden_fixture_catalog_v2(path=path)
+    best_cell_cases = tuple(
+        case for case in catalog.cases if isinstance(case, StageBBestCellReplayCaseV2)
+    )
+    if len(best_cell_cases) != 1:
+        raise ValueError(
+            "Stage B golden fixture catalog must contain exactly one best_cell_replay case"
+        )
+    return best_cell_cases[0]
+
+
 def validate_stage_b_golden_fixture_payload_v2(
     *,
     payload: dict[str, object],
@@ -2612,6 +2648,7 @@ __all__ = [
     "build_compact_trade_list_from_final_signal_v2",
     "evaluate_stage_b_trade_exit_v2",
     "execute_stage_b_golden_case_v2",
+    "load_stage_b_best_cell_replay_reference_case_v2",
     "load_stage_b_golden_fixture_catalog_v2",
     "map_bar_close_1m_idx_to_entry_exec_v2",
     "map_signal_bars_to_entry_exec_v2",

@@ -4466,6 +4466,140 @@ class StageBReplayPayloadV2:
 
 
 @dataclass(frozen=True, slots=True)
+class StageBReferenceVsFastSelfCheckResultV2:
+    """
+    Diagnostics emitted by one bounded reference-vs-fast self-check over Stage B risk search.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+      - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
+    """
+
+    total_trade_count: int
+    bounded_trade_count: int
+    total_tp_level_count: int
+    bounded_tp_level_count: int
+    total_sl_level_count: int
+    bounded_sl_level_count: int
+    fast_result: StageBFastSearchResultV2
+    reference_total_return_pct: np.ndarray
+    reference_best_tp_index: int
+    reference_best_sl_index: int
+    reference_best_total_return_pct: float
+    max_abs_total_return_diff: float
+
+    def __post_init__(self) -> None:
+        """
+        Validate one deterministic parity payload for the Stage B bounded subset self-check.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            The bounded subset keeps at least one TP level and one SL level, while trades may be
+            empty for degenerate debug/test probes.
+        Raises:
+            ValueError: If bounded counts drift from totals or matrix shapes become inconsistent.
+        Side Effects:
+            Normalizes numeric diagnostics to builtin `float`.
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
+          - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+        """
+        if self.total_trade_count < 0:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.total_trade_count must be >= 0"
+            )
+        if self.bounded_trade_count < 0:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.bounded_trade_count must be >= 0"
+            )
+        if self.bounded_trade_count > self.total_trade_count:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.bounded_trade_count must be <= "
+                "total_trade_count"
+            )
+        if self.total_tp_level_count <= 0:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.total_tp_level_count must be > 0"
+            )
+        if self.bounded_tp_level_count <= 0:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.bounded_tp_level_count must be > 0"
+            )
+        if self.bounded_tp_level_count > self.total_tp_level_count:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.bounded_tp_level_count must be <= "
+                "total_tp_level_count"
+            )
+        if self.total_sl_level_count <= 0:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.total_sl_level_count must be > 0"
+            )
+        if self.bounded_sl_level_count <= 0:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.bounded_sl_level_count must be > 0"
+            )
+        if self.bounded_sl_level_count > self.total_sl_level_count:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.bounded_sl_level_count must be <= "
+                "total_sl_level_count"
+            )
+        if self.reference_total_return_pct.ndim != 2:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.reference_total_return_pct "
+                "must be a 2D array"
+            )
+        expected_shape = (self.bounded_tp_level_count, self.bounded_sl_level_count)
+        if self.reference_total_return_pct.shape != expected_shape:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.reference_total_return_pct "
+                "shape must match the bounded subset"
+            )
+        if self.fast_result.total_return_pct.shape != expected_shape:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.fast_result shape must match "
+                "the bounded subset"
+            )
+        if (
+            self.reference_best_tp_index < 0
+            or self.reference_best_tp_index >= self.bounded_tp_level_count
+        ):
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.reference_best_tp_index is out of range"
+            )
+        if (
+            self.reference_best_sl_index < 0
+            or self.reference_best_sl_index >= self.bounded_sl_level_count
+        ):
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.reference_best_sl_index is out of range"
+            )
+        numeric_fields = (
+            "reference_best_total_return_pct",
+            "max_abs_total_return_diff",
+        )
+        for field_name in numeric_fields:
+            value = getattr(self, field_name)
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                raise ValueError(
+                    f"StageBReferenceVsFastSelfCheckResultV2.{field_name} must be numeric"
+                )
+            object.__setattr__(self, field_name, float(value))
+        if self.max_abs_total_return_diff < 0.0:
+            raise ValueError(
+                "StageBReferenceVsFastSelfCheckResultV2.max_abs_total_return_diff must be >= 0"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class StageBMetricsV2:
     """
     Deterministic Stage B metrics computed from one exact replay payload.
