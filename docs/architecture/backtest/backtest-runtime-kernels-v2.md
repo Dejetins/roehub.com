@@ -177,6 +177,25 @@ B2 активирует executable `exact_parallel` semantics для уже reso
   evidence surface, не меняя active runtime default и не conflating `exact_baseline` anchor with
   rollout policy.
 
+## P2 conservative parallelism tuning
+
+После того как `stage_a_workers` стал реальным runtime knob, production-style tuning фиксируется
+как явный contract, а не как скрытая надежда на глобальный `numba.set_num_threads(...)`.
+
+- `backtest.cpu.max_numba_threads=4` остаётся общим ceiling для `dev`, `test`, и `prod`, чтобы
+  Stage A не oversubscribe'ил типичные 4-vCPU среды по умолчанию;
+- `exact_small` остаётся serial profile: `stage_a_workers=1`, `stage_b_workers=1`;
+- `exact_parallel` использует полный ceiling для breadth/exact workload:
+  `stage_a_workers=4`, `stage_b_workers=4`;
+- `hybrid_conservative` отдаёт Stage A полный ceiling, но держит Stage B чуть уже после
+  shortlist narrowing: `stage_a_workers=4`, `stage_b_workers=3`;
+- `hybrid_family` остаётся самым узким shipped hybrid profile:
+  `stage_a_workers=3`, `stage_b_workers=2`.
+
+Эти значения выбраны консервативно: Stage A теперь действительно масштабируется по профилю, но
+hybrid Stage B получает уже narrowed frontier, поэтому worker counts intentionally stay below the
+`exact_parallel` cap вместо агрессивного max-out по всем режимам.
+
 ## Milestone D hybrid shortlist note
 
 Milestone D добавляет первый approximate runtime path, но не меняет canonical default:

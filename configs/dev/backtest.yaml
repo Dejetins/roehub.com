@@ -126,7 +126,7 @@ backtest:
           stage_b: 50
           finalizing: 5
         parallelism:
-          stage_a_workers: 1
+          stage_a_workers: 4
           stage_b_workers: 4
         feature_flags:
           runtime_enabled: true
@@ -158,8 +158,8 @@ backtest:
           stage_b: 40
           finalizing: 5
         parallelism:
-          stage_a_workers: 1
-          stage_b_workers: 4
+          stage_a_workers: 4
+          stage_b_workers: 3
         feature_flags:
           runtime_enabled: true
           heuristic_shortlist_enabled: true
@@ -190,8 +190,8 @@ backtest:
           stage_b: 35
           finalizing: 5
         parallelism:
-          stage_a_workers: 1
-          stage_b_workers: 4
+          stage_a_workers: 3
+          stage_b_workers: 2
         feature_flags:
           runtime_enabled: true
           heuristic_shortlist_enabled: true

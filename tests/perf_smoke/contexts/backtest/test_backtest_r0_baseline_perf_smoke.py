@@ -705,6 +705,77 @@ def test_r0_parity_scope_fixture_manifest_is_complete() -> None:
     )
 
 
+def test_r10_parallel_tuning_contract_is_explicit_and_aligned() -> None:
+    """
+    Verify the post-P1 Stage A / Stage B tuning is explicit across defaults and env configs.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - configs/dev/backtest.yaml
+      - configs/test/backtest.yaml
+      - configs/prod/backtest.yaml
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        P2 tuning keeps `exact_small` serial, gives broader profiles real Stage A parallelism, and
+        keeps every Stage A worker target at or below the shared `max_numba_threads` ceiling.
+    Raises:
+        AssertionError: If default catalog values or committed env configs drift from the tuned
+            contract.
+    Side Effects:
+        Reads committed YAML config files from the repository.
+    """
+    expected_parallelism = {
+        "exact_small": (1, 1),
+        "exact_parallel": (4, 4),
+        "hybrid_conservative": (4, 3),
+        "hybrid_family": (3, 2),
+    }
+    catalog = default_execution_profiles_catalog_v2()
+
+    for mode, (expected_stage_a_workers, expected_stage_b_workers) in expected_parallelism.items():
+        profile = catalog.profile_for_mode(mode=mode)
+        assert profile.parallelism.stage_a_workers == expected_stage_a_workers
+        assert profile.parallelism.stage_b_workers == expected_stage_b_workers
+
+    repo_root = Path(__file__).resolve().parents[4]
+    for env_name in ("dev", "test", "prod"):
+        payload = yaml.safe_load(
+            (repo_root / f"configs/{env_name}/backtest.yaml").read_text(encoding="utf-8")
+        )
+        execution_profiles = payload["backtest"]["execution_profiles"]
+        cpu_ceiling = int(payload["backtest"]["cpu"]["max_numba_threads"])
+        profiles_by_mode = {
+            profile_payload["mode"]: profile_payload
+            for profile_payload in execution_profiles["profiles"]
+        }
+        assert cpu_ceiling == 4
+
+        for mode, (
+            expected_stage_a_workers,
+            expected_stage_b_workers,
+        ) in expected_parallelism.items():
+            profile_parallelism = profiles_by_mode[mode]["parallelism"]
+            assert int(profile_parallelism["stage_a_workers"]) == expected_stage_a_workers
+            assert int(profile_parallelism["stage_b_workers"]) == expected_stage_b_workers
+            assert int(profile_parallelism["stage_a_workers"]) <= cpu_ceiling
+
+        assert (
+            int(profiles_by_mode["exact_parallel"]["parallelism"]["stage_a_workers"])
+            > int(profiles_by_mode["exact_small"]["parallelism"]["stage_a_workers"])
+        )
+        assert (
+            int(profiles_by_mode["hybrid_conservative"]["parallelism"]["stage_b_workers"])
+            < int(profiles_by_mode["exact_parallel"]["parallelism"]["stage_b_workers"])
+        )
+
+
 def test_r5_stage_b_golden_fixture_manifest_tracks_contract_fixture_bytes() -> None:
     """
     Verify the R5-03 Stage B manifest points to the canonical contract fixture and published SHA.

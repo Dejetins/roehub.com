@@ -1027,9 +1027,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
         ExecutionProfilesCatalogV2: Default catalog with all known profile literals in
             deterministic order.
     Assumptions:
-        `exact_small` remains the active default exact baseline, while `exact_parallel` is also
-        runtime-enabled and may activate process-based Stage B when later runtime selection
-        resolves that profile explicitly.
+        `exact_small` remains the active default exact baseline, while larger profiles now expose
+        conservative Stage A / Stage B parallelism that stays reviewable against the shared
+        process-level Numba ceiling and does not alter rollout policy.
     Raises:
         ValueError: If one default profile literal violates catalog invariants.
     Side Effects:
@@ -1072,7 +1072,7 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     retention=ExecutionProfileShortlistRetentionConfigV2(),
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
-                    stage_a_workers=1,
+                    stage_a_workers=4,
                     stage_b_workers=4,
                 ),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
@@ -1105,8 +1105,8 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     ),
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
-                    stage_a_workers=1,
-                    stage_b_workers=4,
+                    stage_a_workers=4,
+                    stage_b_workers=3,
                 ),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
                     runtime_enabled=False,
@@ -1142,8 +1142,8 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     ),
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
-                    stage_a_workers=1,
-                    stage_b_workers=4,
+                    stage_a_workers=3,
+                    stage_b_workers=2,
                 ),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
                     runtime_enabled=False,
