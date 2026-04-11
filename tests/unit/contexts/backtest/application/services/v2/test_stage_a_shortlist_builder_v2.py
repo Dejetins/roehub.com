@@ -29,6 +29,9 @@ from trading.contexts.backtest.application.services import (
     artifact_market_id_from_coordinates_v2,
     compute_target_slice_by_close_time_v2,
 )
+from trading.contexts.backtest.application.services.v2 import (
+    stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
+)
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
@@ -1083,6 +1086,71 @@ def test_stage_a_shortlist_builder_v2_combo_proxy_frontier_order_is_batch_invari
     assert tuple(
         row.base_variant.base_variant_key for row in small_batch_shortlist
     ) == tuple(row.base_variant.base_variant_key for row in large_batch_shortlist)
+
+
+def test_stage_a_shortlist_builder_v2_builds_compact_payloads_only_for_retained_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify non-retained candidates do not receive internal compact exact payload work.
+
+    Args:
+        monkeypatch: pytest fixture used to record retained-candidate compact payload batches.
+    Returns:
+        None.
+    Assumptions:
+        The combo proxy fixture retains four exact candidates out of eight Stage A variants, so
+        compact payload construction should touch only those four survivors.
+    Raises:
+        AssertionError: If compact payload construction still sees the full Stage A breadth.
+    Side Effects:
+        Monkeypatches the internal retained-candidate payload builder used by Stage A.
+    """
+    grid_context = _combo_proxy_grid_context()
+    compact_payload_row_counts: list[int] = []
+    original_builder = stage_a_shortlist_builder_module.build_compact_exact_payloads_v2
+
+    def _recording_builder(**kwargs: Any) -> Any:
+        """
+        Record how many retained candidates enter compact payload construction per call.
+
+        Args:
+            **kwargs: Compact payload builder keyword arguments including `final_signal`.
+        Returns:
+            Any: Original payload-builder result for the retained candidates.
+        Assumptions:
+            The exact payload builder receives only retained candidates after combo proxy
+            prefiltering.
+        Raises:
+            None.
+        Side Effects:
+            Appends the current retained-candidate row count to the in-memory log.
+        """
+        compact_payload_row_counts.append(int(np.asarray(kwargs["final_signal"]).shape[0]))
+        return original_builder(**kwargs)
+
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "build_compact_exact_payloads_v2",
+        _recording_builder,
+    )
+
+    shortlist = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=_combo_proxy_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, grid_context),
+        artifact_context=cast(Any, _combo_proxy_artifact_context()),
+        target_time_range=_combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=8,
+    )
+
+    assert compact_payload_row_counts == [4]
+    assert sum(compact_payload_row_counts) == 4
+    assert grid_context.stage_a_variants_total == 8
+    assert sum(compact_payload_row_counts) < grid_context.stage_a_variants_total
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
 
 
 def _inactive_context(store: SyntheticArtifactStoreV2) -> ArtifactSlotPinnedRuntimeContextV2:

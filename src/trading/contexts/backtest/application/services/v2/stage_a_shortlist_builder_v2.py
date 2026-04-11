@@ -56,7 +56,8 @@ from .signal_aggregator_kernel import aggregate_final_signal_rows_v2
 from .signal_features_loader_v2 import MmapSignalFeaturesLoaderV2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .trade_compactor_kernel import (
-    build_compact_trade_list_v2,
+    StageACompactExactPayloadV2,
+    build_compact_exact_payloads_v2,
     compute_no_risk_metrics_v2,
     no_risk_metrics_to_ranking_payload_v2,
 )
@@ -1528,83 +1529,6 @@ class BacktestStageAShortlistBuilderV2:
             ),
         )
 
-    def _score_chunk_into_heap(
-        self,
-        *,
-        row_plans: Sequence[PreparedIndicatorRowPlanV2],
-        chunk_variants: Sequence[BacktestStageABaseVariantV2],
-        grid_context: BacktestArtifactRuntimePlanV2,
-        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
-        signal_target_slice: slice,
-        local_bar_close_1m_idx: np.ndarray,
-        sentinel_index: int,
-        local_exec_open: np.ndarray,
-        local_exec_close: np.ndarray,
-        execution_params: ExecutionParamsV1,
-        ranking_plan: ResolvedRankingPlanV2,
-        shortlist_limit: int,
-        shortlist_heap: list[StageAHeapEntryV2],
-    ) -> None:
-        """
-        Score one Stage A chunk and merge ranked rows into the bounded shortlist heap.
-
-        Args:
-            row_plans: Prepared per-indicator row-addressing plans.
-            chunk_variants: Deterministic chunk of Stage A base variants.
-            grid_context: Stage A grid context with indicator/timeframe metadata.
-            artifact_context: Slot-pinned runtime context for loader calls.
-            signal_target_slice: Target request slice in the signal timeline.
-            local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
-            sentinel_index: Local execution sentinel index.
-            local_exec_open: Local execution-bar open prices.
-            local_exec_close: Local execution-bar close prices.
-            execution_params: Immutable no-risk execution settings.
-            ranking_plan: Pre-resolved staged ranking plan from shared Stage A machinery.
-            shortlist_limit: Maximum retained shortlist size.
-            shortlist_heap: Mutable bounded shortlist heap updated in place.
-        Returns:
-            None.
-        Assumptions:
-            Chunk order already matches deterministic Stage A enumeration order after the
-            retained frontier removes rows before exact path.
-        Raises:
-            ValueError: If chunk variants drift from indicator plans or row addressing fails.
-        Side Effects:
-            Mutates `shortlist_heap` in place.
-        Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-v2-benchmarks.md
-        Related:
-          - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
-          - src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py
-        """
-        chunk_inputs = self.load_chunk_runtime_inputs(
-            row_plans=row_plans,
-            chunk_variants=chunk_variants,
-            grid_context=grid_context,
-            artifact_context=artifact_context,
-            signal_target_slice=signal_target_slice,
-        )
-        selected_signal_rows = {
-            prepared_input.indicator_id: prepared_input.signal_rows
-            for prepared_input in chunk_inputs
-        }
-        self._merge_final_signal_chunk_into_heap(
-            chunk_variants=chunk_variants,
-            final_signal=aggregate_final_signal_rows_v2(
-                selected_signal_rows=selected_signal_rows
-            ),
-            grid_context=grid_context,
-            local_bar_close_1m_idx=local_bar_close_1m_idx,
-            sentinel_index=sentinel_index,
-            local_exec_open=local_exec_open,
-            local_exec_close=local_exec_close,
-            execution_params=execution_params,
-            ranking_plan=ranking_plan,
-            shortlist_limit=shortlist_limit,
-            shortlist_heap=shortlist_heap,
-        )
-
     def _score_retained_exact_candidates_into_heap(
         self,
         *,
@@ -1651,7 +1575,7 @@ class BacktestStageAShortlistBuilderV2:
             if cancel_checker is not None:
                 cancel_checker(STAGE_A_LITERAL_V2)
             candidate_batch = retained_exact_candidates[offset : offset + batch_size]
-            self._merge_final_signal_chunk_into_heap(
+            self._merge_retained_exact_payload_chunk_into_heap(
                 chunk_variants=tuple(
                     candidate.base_variant for candidate in candidate_batch
                 ),
@@ -1675,7 +1599,48 @@ class BacktestStageAShortlistBuilderV2:
                 shortlist_heap=shortlist_heap,
             )
 
-    def _merge_final_signal_chunk_into_heap(
+    def _build_retained_exact_payloads(
+        self,
+        *,
+        chunk_variants: Sequence[BacktestStageABaseVariantV2],
+        final_signal: np.ndarray,
+        local_bar_close_1m_idx: np.ndarray,
+        sentinel_index: int,
+        direction_mode: str,
+    ) -> tuple[StageACompactExactPayloadV2, ...]:
+        """
+        Build internal compact exact payloads only for retained candidates.
+
+        Args:
+            chunk_variants: Retained exact candidates aligned to `final_signal`.
+            final_signal: Prepared Stage A `final_signal[V, T_signal]` rows for exact work.
+            local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
+            sentinel_index: Local execution sentinel index.
+            direction_mode: Strategy direction policy used by compact-trade construction.
+        Returns:
+            tuple[StageACompactExactPayloadV2, ...]: Internal compact exact payloads aligned to
+                `chunk_variants`.
+        Assumptions:
+            Compact trade representation remains internal-only and is built only after row and
+            combo prefiltering retain the exact frontier.
+        Raises:
+            ValueError: If `final_signal` row count drifts from `chunk_variants`.
+        Side Effects:
+            None.
+        """
+        if int(final_signal.shape[0]) != len(chunk_variants):
+            raise ValueError(
+                "Stage A exact retained-candidate evaluation requires final_signal rows to "
+                "match chunk_variants"
+            )
+        return build_compact_exact_payloads_v2(
+            final_signal=final_signal,
+            bar_close_1m_idx=local_bar_close_1m_idx,
+            sentinel_index=sentinel_index,
+            direction_mode=direction_mode,
+        )
+
+    def _merge_retained_exact_payload_chunk_into_heap(
         self,
         *,
         chunk_variants: Sequence[BacktestStageABaseVariantV2],
@@ -1695,7 +1660,8 @@ class BacktestStageAShortlistBuilderV2:
 
         Args:
             chunk_variants: Deterministic Stage A base variants aligned to `final_signal`.
-            final_signal: Prepared Stage A `final_signal[V, T_signal]` rows for exact scoring.
+            final_signal: Prepared Stage A `final_signal[V, T_signal]` rows for exact payload
+                construction.
             grid_context: Stage A grid context with direction-mode metadata.
             local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
             sentinel_index: Local execution sentinel index.
@@ -1708,27 +1674,23 @@ class BacktestStageAShortlistBuilderV2:
         Returns:
             None.
         Assumptions:
-            The combo proxy prefilter may narrow candidates first, but the retained exact
-            survivors still use the existing compact-trade and no-risk metric kernels unchanged.
+            The combo proxy prefilter narrows candidates first, and only the retained frontier
+            receives internal compact exact payload construction before Stage A no-risk ranking.
         Raises:
             ValueError: If `final_signal` row count drifts from `chunk_variants`.
         Side Effects:
             Mutates `shortlist_heap` in place.
         """
-        if int(final_signal.shape[0]) != len(chunk_variants):
-            raise ValueError(
-                "Stage A exact retained-candidate evaluation requires final_signal rows to "
-                "match chunk_variants"
-            )
-        compact_trades_by_variant = build_compact_trade_list_v2(
+        exact_payloads = self._build_retained_exact_payloads(
+            chunk_variants=chunk_variants,
             final_signal=final_signal,
-            bar_close_1m_idx=local_bar_close_1m_idx,
+            local_bar_close_1m_idx=local_bar_close_1m_idx,
             sentinel_index=sentinel_index,
             direction_mode=grid_context.direction_mode,
         )
-        for base_variant, compact_trades in zip(chunk_variants, compact_trades_by_variant):
+        for base_variant, exact_payload in zip(chunk_variants, exact_payloads, strict=True):
             metrics = compute_no_risk_metrics_v2(
-                compact_trades=compact_trades,
+                compact_trades=exact_payload.compact_trades,
                 exec_open=local_exec_open,
                 exec_close=local_exec_close,
                 sentinel_index=sentinel_index,

@@ -1,8 +1,9 @@
-"""Pure Stage A compact-trade and no-risk metric kernels for artifacts-only inputs."""
+"""Pure Stage A compact-trade, internal exact-payload, and no-risk metric kernels."""
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
@@ -20,6 +21,47 @@ from .contracts import (
 )
 
 _BARS_PER_YEAR_EXEC_1M_V2 = 365.0 * 24.0 * 60.0
+
+
+@dataclass(frozen=True, slots=True)
+class StageACompactExactPayloadV2:
+    """
+    Internal compact exact payload for one retained Stage A candidate.
+
+    Args:
+        compact_trades: Ordered compact trade representation for one retained candidate.
+    Returns:
+        None.
+    Assumptions:
+        This payload remains internal-only and summary-only launch surfaces must not materialize
+        it as user-facing trades by default.
+    Raises:
+        ValueError: If the payload is initialized with `None`.
+    Side Effects:
+        Normalizes `compact_trades` into an immutable tuple.
+    """
+
+    compact_trades: tuple[StageACompactTradeV2, ...]
+
+    def __post_init__(self) -> None:
+        """
+        Validate one compact exact payload used behind the retained-candidate frontier.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Retained exact payloads hold only compact internal trades and must stay detached from
+            any default user-visible materialization path.
+        Raises:
+            ValueError: If `compact_trades` is `None`.
+        Side Effects:
+            Normalizes `compact_trades` into an immutable tuple.
+        """
+        if self.compact_trades is None:  # type: ignore[truthy-bool]
+            raise ValueError("StageACompactExactPayloadV2.compact_trades is required")
+        object.__setattr__(self, "compact_trades", tuple(self.compact_trades))
 
 
 def build_compact_trade_list_v2(
@@ -71,6 +113,43 @@ def build_compact_trade_list_v2(
             direction_mode=resolved_direction_mode,
         )
         for final_signal_row in normalized_signal
+    )
+
+
+def build_compact_exact_payloads_v2(
+    *,
+    final_signal: np.ndarray,
+    bar_close_1m_idx: np.ndarray,
+    sentinel_index: int,
+    direction_mode: str = "long-short",
+) -> tuple[StageACompactExactPayloadV2, ...]:
+    """
+    Build internal compact exact payloads for retained candidates only.
+
+    Args:
+        final_signal: Aggregated retained-candidate signal matrix shaped `[V, T_signal]`.
+        bar_close_1m_idx: Local execution-timeline close mapping for the same `T_signal` bars.
+        sentinel_index: Local execution timeline length used as the sentinel fallback.
+        direction_mode: Strategy direction policy (`long-only`, `short-only`, `long-short`).
+    Returns:
+        tuple[StageACompactExactPayloadV2, ...]: One internal compact payload per retained
+            candidate row.
+    Assumptions:
+        The payload stays internal and exists only for retained exact candidates after prefilter;
+        summary-only launch outputs remain unchanged.
+    Raises:
+        ValueError: Propagated when compact-trade construction input shapes or indexes drift.
+    Side Effects:
+        None.
+    """
+    return tuple(
+        StageACompactExactPayloadV2(compact_trades=compact_trades)
+        for compact_trades in build_compact_trade_list_v2(
+            final_signal=final_signal,
+            bar_close_1m_idx=bar_close_1m_idx,
+            sentinel_index=sentinel_index,
+            direction_mode=direction_mode,
+        )
     )
 
 

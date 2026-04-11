@@ -10,6 +10,9 @@ from trading.contexts.backtest.application.services import (
     compute_no_risk_metrics_v2,
     no_risk_metrics_to_ranking_payload_v2,
 )
+from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
+    build_compact_exact_payloads_v2,
+)
 from trading.contexts.backtest.application.services.v2.contracts import StageACompactTradeV2
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
@@ -95,6 +98,36 @@ def test_build_compact_trade_list_v2_respects_exit_only_direction_modes() -> Non
             ),
         ),
     )
+
+
+def test_build_compact_exact_payloads_v2_wraps_internal_compact_trade_representation() -> None:
+    """
+    Verify retained-candidate exact payloads wrap compact trades without user-facing expansion.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The compactor kernel should expose an internal payload container while preserving the
+        existing compact trade representation as its only payload body.
+    Raises:
+        AssertionError: If the payload wrapper drifts from the underlying compact trade rows.
+    Side Effects:
+        None.
+    """
+    compact_trades = build_compact_trade_list_v2(
+        final_signal=np.array([[1, 1, -1, 0]], dtype=np.int8),
+        bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+        sentinel_index=5,
+    )
+    payloads = build_compact_exact_payloads_v2(
+        final_signal=np.array([[1, 1, -1, 0]], dtype=np.int8),
+        bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+        sentinel_index=5,
+    )
+
+    assert tuple(payload.compact_trades for payload in payloads) == compact_trades
 
 
 def test_compute_no_risk_metrics_v2_is_deterministic_and_shortlist_ready() -> None:
