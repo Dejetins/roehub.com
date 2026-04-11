@@ -1,5 +1,5 @@
 """
-Backtests API routes for sync, runtime-defaults, and lazy `variant-report` endpoints.
+Backtests API routes for summary-only launch, runtime-defaults, and compatibility detail wiring.
 
 Docs:
   - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -203,7 +203,7 @@ def build_backtests_router(
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> BacktestReportResponse:
         """
-        Build one on-demand report via `POST /api/backtests/variant-report`.
+        Build one compatibility report via legacy `POST /api/backtests/variant-report`.
 
         Docs:
           - docs/architecture/backtest/
@@ -219,9 +219,12 @@ def build_backtests_router(
             request: Parsed strict API payload with run-context and explicit variant block.
             principal: Authenticated user principal resolved by identity dependency.
         Returns:
-            BacktestReportResponse: Deterministic report payload (`rows/table_md/trades`).
+            BacktestReportResponse:
+                Deterministic report payload (`rows/table_md/trades`) for one explicit variant.
         Assumptions:
-            Mode selection follows `strategy_id xor template` as in sync endpoint.
+            Active full-detail UX should prefer the run-scoped
+            `POST /api/backtests/runs/{run_id}/variant-report` flow; this endpoint remains
+            behavior-compatible for older clients that still send the full run envelope.
         Raises:
             RoehubError: Deterministic mapped validation/not_found/forbidden/conflict errors.
         Side Effects:

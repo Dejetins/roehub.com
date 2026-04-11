@@ -15,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initBacktestPage(pageRoot) {
   const backtestsPath = requireDataAttr(pageRoot, "apiBacktestsPath");
-  const backtestVariantReportPath = requireDataAttr(pageRoot, "apiBacktestVariantReportPath");
   const strategiesPath = requireDataAttr(pageRoot, "apiStrategiesPath");
   const marketsPath = requireDataAttr(pageRoot, "apiMarketsPath");
   const instrumentsPath = requireDataAttr(pageRoot, "apiInstrumentsPath");
@@ -23,6 +22,7 @@ function initBacktestPage(pageRoot) {
   const strategyBuilderPath = requireDataAttr(pageRoot, "strategyBuilderPath");
   const historyPath = requireDataAttr(pageRoot, "historyPath");
   const runSummaryPathTemplate = requireDataAttr(pageRoot, "runSummaryPathTemplate");
+  const runVariantDetailPathTemplate = requireDataAttr(pageRoot, "runVariantDetailPathTemplate");
   const jobsListPath = requireDataAttr(pageRoot, "jobsListPath");
   const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
   const prefillStorage = requireDataAttr(pageRoot, "prefillStorage");
@@ -156,14 +156,9 @@ function initBacktestPage(pageRoot) {
     searchDebounceId: 0,
     instrumentsAbortController: null,
     latestRun: null,
-    latestRunToken: 0,
     runtimeDefaults: null,
     executionFeeDirty: false,
     applyingFeeDefault: false,
-    reportCacheByVariantKey: new Map(),
-    reportLoadingKeys: new Set(),
-    reportErrorsByVariantKey: new Map(),
-    reportCacheHitKeys: new Set(),
   };
 
   const hideLaunchStatus = () => {
@@ -1728,182 +1723,12 @@ function initBacktestPage(pageRoot) {
     }
   };
 
-  const renderVariantReport = (report) => {
-    const reportNode = document.createElement("div");
-    if (!report || typeof report !== "object") {
-      reportNode.textContent = "No report.";
-      return reportNode;
-    }
-
-    const rows = Array.isArray(report.rows) ? report.rows : [];
-    if (rows.length > 0) {
-      const list = document.createElement("ul");
-      list.className = "compact-list";
-      rows.forEach((row) => {
-        const item = document.createElement("li");
-        const rowRecord = asRecord(row);
-        item.textContent = `${String(rowRecord.metric || "")}: ${String(rowRecord.value || "")}`;
-        list.appendChild(item);
-      });
-      reportNode.appendChild(list);
-    }
-
-    const tableMarkdown = String(report.table_md || "").trim();
-    if (tableMarkdown.length > 0) {
-      const tableDetails = document.createElement("details");
-      tableDetails.className = "panel panel--soft";
-      const summary = document.createElement("summary");
-      summary.textContent = "table_md";
-      tableDetails.appendChild(summary);
-      const content = document.createElement("div");
-      content.className = "markdown-report";
-      content.innerHTML = renderMarkdownToSafeHtml(tableMarkdown);
-      tableDetails.appendChild(content);
-      reportNode.appendChild(tableDetails);
-    }
-
-    const trades = Array.isArray(report.trades) ? report.trades : [];
-    if (trades.length > 0) {
-      const tradesDetails = document.createElement("details");
-      tradesDetails.className = "panel panel--soft";
-      const summary = document.createElement("summary");
-      summary.textContent = `trades (${trades.length})`;
-      tradesDetails.appendChild(summary);
-      const pre = document.createElement("pre");
-      pre.className = "json-pre";
-      pre.textContent = JSON.stringify(trades, null, 2);
-      tradesDetails.appendChild(pre);
-      reportNode.appendChild(tradesDetails);
-    }
-    if (reportNode.childElementCount === 0) {
-      reportNode.textContent = "Report is empty.";
-    }
-    return reportNode;
-  };
-
-  const readVariantReportStateByKey = (variantKey) => ({
-    isLoading: state.reportLoadingKeys.has(variantKey),
-    report: state.reportCacheByVariantKey.get(variantKey) || null,
-    error: state.reportErrorsByVariantKey.get(variantKey) || null,
-    cacheHit: state.reportCacheHitKeys.has(variantKey),
-  });
-
-  const buildVariantReportRequestPayload = ({ variantRecord }) => {
-    if (state.latestRun === null) {
-      throw new Error("Backtest result context is unavailable.");
-    }
-
-    const latestRunRecord = asRecord(state.latestRun);
-    const runRequestPayload = asRecord(latestRunRecord.requestPayload);
-    const runResponsePayload = asRecord(latestRunRecord.response);
-    const variantPayload = asRecord(variantRecord.payload);
-    if (Object.keys(variantPayload).length === 0) {
-      throw new Error("Variant payload is unavailable.");
-    }
-
-    const payload = {
-      time_range: normalizeJsonLikeValue(asRecord(runRequestPayload.time_range)),
-      variant: normalizeJsonLikeValue(variantPayload),
-      include_trades: true,
-    };
-
-    const strategyId = String(runRequestPayload.strategy_id || "").trim();
-    const templatePayload = asRecord(runRequestPayload.template);
-    const hasTemplatePayload = Object.keys(templatePayload).length > 0;
-    if (strategyId.length > 0 && hasTemplatePayload) {
-      throw new Error("Report request mode conflict: both strategy_id and template are set.");
-    }
-    if (strategyId.length === 0 && !hasTemplatePayload) {
-      throw new Error("Report request mode is missing: strategy_id or template is required.");
-    }
-    if (strategyId.length > 0) {
-      payload.strategy_id = strategyId;
-    }
-
-    if (hasTemplatePayload) {
-      payload.template = normalizeJsonLikeValue(templatePayload);
-    }
-
-    const overridesPayload = asRecord(runRequestPayload.overrides);
-    if (Object.keys(overridesPayload).length > 0) {
-      payload.overrides = normalizeJsonLikeValue(overridesPayload);
-    }
-    return payload;
-  };
-
-  const loadVariantReport = async (variantIndex) => {
-    if (state.latestRun === null) {
-      showPageError(pageRoot, "Backtest result is unavailable.", []);
-      return;
-    }
-
-    const latestRunRecord = asRecord(state.latestRun);
-    const response = asRecord(latestRunRecord.response);
-    const variants = Array.isArray(response.variants) ? response.variants : [];
-    const variant = variants[variantIndex];
-    if (!variant) {
-      showPageError(pageRoot, "Variant is unavailable.", []);
-      return;
-    }
-    const variantRecord = asRecord(variant);
-    const variantKey = String(variantRecord.variant_key || "").trim();
-    if (variantKey.length === 0) {
-      showPageError(pageRoot, "variant_key is required for report loading.", []);
-      return;
-    }
-
-    if (state.reportLoadingKeys.has(variantKey)) {
-      return;
-    }
-    if (state.reportCacheByVariantKey.has(variantKey)) {
-      state.reportErrorsByVariantKey.delete(variantKey);
-      state.reportCacheHitKeys.add(variantKey);
-      renderResults(response);
-      return;
-    }
-
-    const runToken = state.latestRunToken;
-    state.reportLoadingKeys.add(variantKey);
-    state.reportErrorsByVariantKey.delete(variantKey);
-    state.reportCacheHitKeys.delete(variantKey);
-    renderResults(response);
-
-    try {
-      const reportRequestPayload = buildVariantReportRequestPayload({ variantRecord });
-      const reportResponse = await fetch(backtestVariantReportPath, {
-        method: "POST",
-        credentials: 'include',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(reportRequestPayload),
-      });
-      if (!reportResponse.ok) {
-        throw await buildHttpError(reportResponse);
-      }
-      const reportPayload = asRecord(await reportResponse.json());
-      if (runToken !== state.latestRunToken) {
-        return;
-      }
-      state.reportCacheByVariantKey.set(variantKey, reportPayload);
-    } catch (error) {
-      if (runToken !== state.latestRunToken) {
-        return;
-      }
-      const normalized = normalizeError(error);
-      state.reportErrorsByVariantKey.set(variantKey, normalized);
-    } finally {
-      if (runToken !== state.latestRunToken) {
-        return;
-      }
-      state.reportLoadingKeys.delete(variantKey);
-      renderResults(asRecord(state.latestRun).response);
-    }
-  };
-
   const renderResults = (responsePayload) => {
     const response = asRecord(responsePayload);
+    const runId = String(response.run_id || "").trim();
     const metaPayload = {
       schema_version: response.schema_version,
-      run_id: response.run_id || null,
+      run_id: runId || null,
       state: response.state || null,
       execution_mode: response.execution_mode || null,
       mode: response.mode,
@@ -1929,7 +1754,13 @@ function initBacktestPage(pageRoot) {
       variants.forEach((variant, index) => {
         const variantRecord = asRecord(variant);
         const variantKey = String(variantRecord.variant_key || "").trim();
-        const reportState = readVariantReportStateByKey(variantKey);
+        const detailPath = (
+          runId.length > 0 && variantKey.length > 0
+            ? String(runVariantDetailPathTemplate || "")
+              .replace("{run_id}", encodeURIComponent(runId))
+              .replace("{variant_key}", encodeURIComponent(variantKey))
+            : ""
+        );
         const row = document.createElement("tr");
         row.appendChild(buildCell(String(variantRecord.variant_index ?? index)));
         row.appendChild(buildCell(String(variantRecord.total_return_pct ?? "")));
@@ -1939,43 +1770,26 @@ function initBacktestPage(pageRoot) {
         const reportCell = document.createElement("td");
         if (variantKey.length === 0) {
           reportCell.textContent = "variant_key is missing.";
-        } else if (reportState.isLoading) {
-          reportCell.textContent = "Loading report...";
-        } else if (reportState.error !== null) {
-          reportCell.textContent = String(reportState.error.message || "Report load failed.");
-          const errorDetails = Array.isArray(reportState.error.details) ? reportState.error.details : [];
-          if (errorDetails.length > 0) {
-            const detailsList = document.createElement("ul");
-            detailsList.className = "compact-list";
-            errorDetails.forEach((detail) => {
-              const item = document.createElement("li");
-              item.textContent = String(detail);
-              detailsList.appendChild(item);
-            });
-            reportCell.appendChild(detailsList);
-          }
-        } else if (reportState.report !== null) {
-          const cacheLabel = document.createElement("p");
-          cacheLabel.className = "muted-text";
-          cacheLabel.textContent = reportState.cacheHit
-            ? "Loaded from cache by variant_key."
-            : "Cached by variant_key.";
-          reportCell.appendChild(cacheLabel);
-          reportCell.appendChild(renderVariantReport(reportState.report));
+        } else if (runId.length === 0) {
+          reportCell.textContent = "run_id is missing.";
         } else {
-          reportCell.textContent = "Not loaded. Use Load report action.";
+          reportCell.textContent = (
+            "Summary-only launch rows stay report-free. Open the dedicated variant page for on-demand detail and trades."
+          );
         }
         row.appendChild(reportCell);
 
         const actionsCell = document.createElement("td");
-        const loadReportButton = buildActionButton({
-          label: "Load report",
-          disabled: variantKey.length === 0 || reportState.isLoading,
+        const openDetailButton = buildActionButton({
+          label: "Open detail",
+          disabled: detailPath.length === 0,
           onClick: () => {
-            loadVariantReport(index);
+            if (detailPath.length > 0) {
+              window.location.assign(detailPath);
+            }
           },
         });
-        actionsCell.appendChild(loadReportButton);
+        actionsCell.appendChild(openDetailButton);
         const saveButton = buildActionButton({
           label: "Save as Strategy",
           className: "button-link--secondary",
@@ -2231,16 +2045,10 @@ function initBacktestPage(pageRoot) {
           persistJobContext({ jobId: runId, request });
         }
       }
-      state.latestRunToken += 1;
       state.latestRun = {
         response: payload,
         context: request.context,
-        requestPayload: normalizeJsonLikeValue(request.payload),
       };
-      state.reportCacheByVariantKey.clear();
-      state.reportLoadingKeys.clear();
-      state.reportErrorsByVariantKey.clear();
-      state.reportCacheHitKeys.clear();
       renderLaunchOutcome({ payload, responseStatus: response.status });
       renderResults(payload);
     } finally {
@@ -2379,62 +2187,6 @@ function initBacktestPage(pageRoot) {
     ]);
   };
   void bootstrap();
-}
-
-function renderMarkdownToSafeHtml(markdown) {
-  const content = String(markdown || "");
-  if (content.length === 0) {
-    return "";
-  }
-
-  let rendered = `<p>${escapeHtml(content)}</p>`;
-  if (window.marked && typeof window.marked.parse === "function") {
-    const renderer = new window.marked.Renderer();
-    renderer.html = (token) => {
-      if (token !== null && typeof token === "object") {
-        if (typeof token.text === "string") {
-          return escapeHtml(token.text);
-        }
-        if (typeof token.raw === "string") {
-          return escapeHtml(token.raw);
-        }
-      }
-      return escapeHtml(String(token || ""));
-    };
-    const parsed = window.marked.parse(content, {
-      renderer,
-      gfm: true,
-      breaks: false,
-      async: false,
-    });
-    rendered = typeof parsed === "string" ? parsed : String(parsed || "");
-  }
-
-  if (window.DOMPurify && typeof window.DOMPurify.sanitize === "function") {
-    return window.DOMPurify.sanitize(rendered, {
-      ALLOWED_TAGS: [
-        "a",
-        "blockquote",
-        "br",
-        "code",
-        "em",
-        "li",
-        "ol",
-        "p",
-        "pre",
-        "strong",
-        "table",
-        "tbody",
-        "td",
-        "th",
-        "thead",
-        "tr",
-        "ul",
-      ],
-      ALLOWED_ATTR: ["href", "title", "target", "rel"],
-    });
-  }
-  return rendered;
 }
 
 function buildHttpError(response) {

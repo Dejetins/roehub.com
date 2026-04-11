@@ -1,9 +1,9 @@
 # Backtest Engine vNext
 
-Canonical redesign document for the target backtest engine shape defined by Milestone A / EPIC A1 before runtime cutover begins.
+Canonical redesign document for the `backtest-engine-vnext` shape after Milestone G / H closure aligned the active launch, detail, and worker contracts.
 
-Status: approved target architecture for Milestone A / EPIC A1  
-Implementation state: target-only redesign document; current production runtime behavior remains defined by the active v2 runtime/API/worker contracts  
+Status: canonical redesign baseline after Milestone G / H closure  
+Implementation state: active `summary-only` launch, `on-demand` variant detail, and shared sync/worker runtime are aligned with the shipped v2 runtime/API/worker contracts  
 Canonical experimental anchor: `tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`
 
 ## 1. Role of this document
@@ -13,13 +13,13 @@ This document is the canonical redesign source of truth for the next backtest en
 It exists to:
 
 - move redesign planning onto the approved `01_run_322...` notebook anchor;
-- describe the staged target engine in implementation-ready terms before code migration;
+- describe the staged engine shape in implementation-ready terms for future follow-up work;
 - freeze the agreed vocabulary for launch shape, internal exact payloads, and shared runtime boundaries;
 - prevent later implementation prompts from mixing current production behavior with target redesign intent.
 
-This document does not claim that the redesign is already implemented.
+This document does not replace the shipped runtime/API/worker contracts as the source of active behavior.
 
-Current active behavior remains governed by:
+Current shipped behavior remains governed by:
 
 - [Backtest Runtime Kernels V2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
 - [Backtest API v1 — `POST /backtests`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-api-post-backtests-v1.md)
@@ -85,9 +85,9 @@ Non-negotiable redesign rules:
 | Launch result shape | Active launch and persisted top rows are `summary-only` | vNext keeps launch `summary-only` and makes this an explicit product rule, not an accidental optimization |
 | Trade details | Full detail/trades are loaded through explicit detail/report flows | vNext keeps full trades on-demand only and rejects eager top-row trade materialization |
 | Sync vs worker execution | Active sync and claimed background execution already share the artifact-backed runtime family | vNext keeps one shared planner and one shared engine for sync and job-runner execution |
-| Ranking knobs | Current public surface still documents `primary_metric` plus historical `secondary_metric` and old launch baggage in some places | vNext target public surface keeps only `primary_metric` with deterministic tie-break |
-| Warmup input | Current public contract still exposes historical `warmup_bars` | vNext derives warmup internally from effective indicator requirements |
-| Trade eager detail knob | Current public/detail flow still carries historical `top_trades_n` semantics in active docs | vNext removes `top_trades_n` from the target public launch surface because launch remains `summary-only` |
+| Ranking knobs | Active public surface keeps only `primary_metric` with deterministic tie-break | vNext keeps `primary_metric` as the steady-state public ranking selector |
+| Warmup input | Active public contract derives warmup internally from effective indicator requirements | vNext keeps warmup internal to runtime planning and execution |
+| Trade eager detail knob | Active public launch/detail docs keep full trades on-demand only and do not expose `top_trades_n` | vNext keeps `top_trades_n` out of the public launch/detail surface because launch remains `summary-only` |
 
 ## 6. Public and runtime decisions fixed by this redesign
 

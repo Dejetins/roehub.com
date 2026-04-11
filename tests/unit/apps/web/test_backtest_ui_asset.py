@@ -149,3 +149,32 @@ def test_backtest_ui_asset_surfaces_background_auto_202_and_toggles_risk_visibil
     assert "Open run" in source
     assert "updateRiskUiVisibility" in source
     assert "toggleNodesVisibility" in source
+
+
+def test_backtest_ui_asset_keeps_launch_summary_only_and_deep_links_detail() -> None:
+    """
+    Verify launch asset keeps results summary-only and deep-links to persisted variant detail.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Full report/trades materialization now belongs only to the persisted variant-detail path.
+    Raises:
+        AssertionError: If launch asset keeps legacy inline-report wiring or removed input literals.
+    Side Effects:
+        None.
+    """
+    source = _read_backtest_ui_asset()
+
+    assert "runVariantDetailPathTemplate" in source
+    assert "Open detail" in source
+    assert "Load report" not in source
+    assert "apiBacktestVariantReportPath" not in source
+    assert "/api/backtests/variant-report" not in source
+    assert "include_trades" not in source
+    assert "Summary-only launch rows stay report-free." in source
+    assert "secondary_metric" not in source
+    assert "warmup_bars" not in source
+    assert "top_trades_n" not in source

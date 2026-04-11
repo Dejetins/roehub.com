@@ -26,6 +26,8 @@ lazy detail page для одного persisted variant.
   - legacy `/backtests/jobs*` remains compatibility surface during migration and may still expose
     legacy report/cancel tooling.
 - Summary-only note:
+  - `/backtests` launch page keeps sync results summary-only and deep-links selected rows into
+    `/backtests/runs/{run_id}/variants/{variant_key}` for on-demand detail;
   - `/backtests/runs/{run_id}` stays summary-only and never depends on persisted
     `report_table_md` or `trades_json`;
   - one-variant detail lives only on `/backtests/runs/{run_id}/variants/{variant_key}`.
@@ -161,6 +163,8 @@ lazy detail page для одного persisted variant.
   - missing run -> `404 not_found`
   - foreign existing run -> `403 forbidden`
 - Summary table на `/backtests/runs/{run_id}` остаётся trades-free и report-free.
+- `/backtests` launch page не materialize'ит report/trades inline; detail lives only on the
+  dedicated persisted variant page.
 - Detail endpoint пересчитывает ровно один selected variant.
 - Detail payload не сохраняется в PG как часть persisted run history.
 - Opening detail page не запускает full top-N recompute.

@@ -78,10 +78,10 @@ deterministic `422` ошибками.
 - A2/A3 redesign anchoring note:
   - target redesign vocabulary is now anchored in
     `docs/architecture/backtest/backtest-engine-vnext.md`;
-  - this v1 document still records the shipped request/response shape, but target public-surface
-    planning must treat `secondary_metric`, `warmup_bars`, and `top_trades_n` as redesign
-    removals rather than future knobs;
-  - the target launch rule remains `summary-only`, with full trades available only on-demand for
+  - this v1 document still records the shipped request/response shape, but active launch wording
+    keeps only the current public fields and the summary-only launch rule;
+  - the active full-detail path is
+    `POST /backtests/runs/{run_id}/variant-report`, with full trades available only on-demand for
     an explicitly requested variant.
 - R9-01 web-launch note:
   - `/backtests` browser UX now launches only through `POST /api/backtests`,
@@ -201,10 +201,9 @@ deterministic `422` ошибками.
   - deterministic tie-break: `variant_key` (ASC),
   - `report` и `trades` в runtime summary response не materialize'ятся.
 - A2/A3 target note:
-  - current v1 compatibility fields may still mention `warmup_bars`, `top_trades_n`, and
-    `secondary_metric`, but the target public redesign keeps only `primary_metric`;
-  - `secondary_metric`, `warmup_bars`, and `top_trades_n` are documented redesign removals in
-    `backtest-engine-vnext.md`, not additions planned for a future public launch surface;
+  - current public redesign keeps only `primary_metric` plus the shipped `top_k` / `preselect`
+    launch inputs;
+  - removed legacy launch knobs stay out of active request/response/runtime-defaults wording;
   - full trades remain on-demand only; default launch and persisted top rows stay `summary-only`.
 - Unified errors:
   - 422 payload детерминированный и единый через `RoehubError`.
@@ -331,18 +330,15 @@ R9-01 launch UX note:
   - backend возвращает canonical deterministic `422`,
   - persisted run row не создаётся.
 
-### 7) Sync response остаётся summary-only; full report грузится on-demand
+### 7) Sync response остаётся summary-only; detail lives on-demand
 
 - По умолчанию `POST /backtests` возвращает ranking + payload summary без `report` body.
-- Поля `rows/table_md/trades` загружаются on-demand через `POST /api/backtests/variant-report`.
-- После R7-04 public clients SHOULD prefer
-  `POST /api/backtests/runs/{run_id}/variant-report`, где `run_id` приходит из persisted runs
-  history/status/top API, а body содержит только `variant + include_trades`.
+- Поля `rows/table_md/trades` загружаются on-demand через
+  `POST /api/backtests/runs/{run_id}/variant-report`.
+- Legacy `POST /api/backtests/variant-report` остаётся compatibility-only endpoint для старых
+  клиентов, которые всё ещё отправляют full run envelope.
 - Runtime flag `backtest.reporting.eager_top_reports_enabled` остаётся только как compatibility
   knob для переходного wiring, но summary path R6-04 всё равно не строит `report`/`trades` тела.
-- Current v1 compatibility surface всё ещё может передавать `top_trades_n` в downstream
-  detail/report wiring, но target redesign убирает `top_trades_n` из публичной launch/defaults
-  vocabulary и не возвращает его как future public knob.
 - Этот summary-only shape совпадает с R7-01 persisted top-row contract:
   в storage сохраняются только `payload_json`, `summary_metrics_json`, `best_tp_pct`,
   `best_sl_pct`; `report/trades` не становятся частью persisted summary rows.
@@ -401,8 +397,8 @@ Common fields:
 
 - `time_range`: `{start, end}` (UTC, half-open `[start, end)`).
 - current active launch fields: `top_k?`, `preselect?`, `ranking?`.
-- target redesign keeps `top_k`/top-N semantics and `ranking.primary_metric`, but removes
-  `warmup_bars`, `top_trades_n`, and `ranking.secondary_metric` from the public launch surface.
+- target redesign keeps `top_k`/top-N semantics and `ranking.primary_metric`, while removed legacy
+  launch knobs stay outside the public launch surface.
 
 Mode selection:
 
@@ -445,8 +441,6 @@ Ranking override:
 - Если ranking не задан, применяются runtime defaults:
   `primary_metric=total_return_pct`.
 - deterministic tie-break остается внутренним runtime behavior и не добавляет новых public fields.
-- `secondary_metric` removed from the active public launch surface and must not be treated as part
-  of the current request vocabulary.
 
 ### Response (v1)
 
@@ -475,10 +469,10 @@ Response содержит:
 - `execution_profile_mode` не добавляется в public launch response, чтобы сохранить backward
   compatibility shape; effective profile instead persists in unified run storage and читается через
   additive `/backtests/runs*` fields.
-- `warmup_bars` больше не входит в public launch response; runtime derives it internally from the
-  effective indicator requirements and MAY keep it only in internal/debug metadata.
-- `top_trades_n` is stripped from active launch requests/responses; legacy persisted payloads MAY
-  still carry it only for read compatibility and request-hash normalization.
+- launch response stays summary-only: runtime-owned warmup derivation and eager-detail controls do
+  not appear in public request/response payloads.
+- legacy persisted payloads MAY still carry extra internal-only read-compatibility fields outside
+  the active launch contract.
 
 Каждый `variants[i]` содержит:
 
