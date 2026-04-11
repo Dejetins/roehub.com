@@ -8,6 +8,7 @@ from heapq import heappush, heapreplace
 from types import MappingProxyType
 from typing import Callable, Mapping, Sequence, cast
 
+import numba as nb
 import numpy as np
 
 from trading.contexts.backtest.application.dto import BacktestRankingConfig
@@ -56,9 +57,9 @@ from .signal_aggregator_kernel import aggregate_final_signal_rows_v2
 from .signal_features_loader_v2 import MmapSignalFeaturesLoaderV2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .trade_compactor_kernel import (
-    StageACompactExactPayloadV2,
-    build_compact_exact_payloads_v2,
-    compute_no_risk_metrics_v2,
+    _CompactTradeBatchV2,
+    build_compact_trade_batch_v2,
+    compute_no_risk_metrics_for_trade_batch_v2,
     no_risk_metrics_to_ranking_payload_v2,
 )
 
@@ -74,6 +75,82 @@ _COMBO_PROXY_PREFILTER_SURVIVOR_MULTIPLIER_V2 = 2
 
 StageACancelCheckerV2 = Callable[[str], None]
 StageACheckpointCallbackV2 = Callable[[int, int], None]
+
+
+def _close_returns_for_proxy_score_v2(
+    *,
+    local_signal_close: np.ndarray,
+    error_prefix: str,
+) -> np.ndarray:
+    """
+    Compute deterministic next-bar close returns for Stage A proxy-score evaluation.
+
+    Args:
+        local_signal_close: Request-timeframe close prices aligned to the signal timeline.
+        error_prefix: Error-message prefix describing the calling proxy stage.
+    Returns:
+        np.ndarray: Float64 close-return vector aligned to `signal_row[:-1]`.
+    Assumptions:
+        Stage A proxy scoring evaluates only next-bar returns, so one close-return value exists
+        for every signal interval except the final bar.
+    Raises:
+        ValueError: If close prices are not one-dimensional.
+    Side Effects:
+        None.
+    """
+    normalized_local_signal_close = np.asarray(local_signal_close, dtype=np.float64)
+    if normalized_local_signal_close.ndim != 1:
+        raise ValueError(f"{error_prefix} requires 1D local_signal_close")
+    if normalized_local_signal_close.shape[0] < 2:
+        return np.empty(0, dtype=np.float64)
+    prior_close = np.ascontiguousarray(normalized_local_signal_close[:-1], dtype=np.float64)
+    next_close = np.ascontiguousarray(normalized_local_signal_close[1:], dtype=np.float64)
+    return np.divide(
+        next_close - prior_close,
+        prior_close,
+        out=np.zeros_like(prior_close, dtype=np.float64),
+        where=prior_close != 0.0,
+    )
+
+
+@nb.njit(parallel=True, cache=True)
+def _batch_proxy_scores_for_signal_rows_kernel_v2(
+    *,
+    signal_rows_i8: np.ndarray,
+    close_returns_f64: np.ndarray,
+    fee_rate: float,
+) -> np.ndarray:
+    """
+    Compute fee-adjusted proxy scores for one Stage A signal-row matrix in parallel.
+
+    Args:
+        signal_rows_i8: Int8 matrix shaped `[row, time]` on the request signal timeline.
+        close_returns_f64: Float64 close-return vector aligned to `signal_rows_i8[:, :-1]`.
+        fee_rate: Decimal per-side fee penalty applied per non-zero signal.
+    Returns:
+        np.ndarray: Float64 proxy score per row in the original deterministic row order.
+    Assumptions:
+        The final signal bar has no next-bar return, so the kernel evaluates only the first
+        `close_returns_f64.shape[0]` intervals from each row.
+    Raises:
+        None.
+    Side Effects:
+        Allocates one float64 score vector and may trigger Numba compilation on first use.
+    """
+    row_count = int(signal_rows_i8.shape[0])
+    interval_count = int(close_returns_f64.shape[0])
+    scores = np.empty(row_count, dtype=np.float64)
+    for row_index in nb.prange(row_count):
+        proxy_score = 0.0
+        activity_count = 0
+        for interval_index in range(interval_count):
+            signal_value = int(signal_rows_i8[row_index, interval_index])
+            if signal_value == 0:
+                continue
+            proxy_score += float(signal_value) * close_returns_f64[interval_index]
+            activity_count += 1
+        scores[row_index] = proxy_score - (fee_rate * float(activity_count))
+    return scores
 
 
 @dataclass(frozen=True, slots=True)
@@ -868,38 +945,39 @@ class BacktestStageAShortlistBuilderV2:
             indicator_row_indexes=row_indexes,
             signal_target_slice=signal_target_slice,
         )
+        signal_feature_rows = self._load_prefilter_signal_feature_rows(
+            grid_context=grid_context,
+            artifact_context=artifact_context,
+            indicator_id=row_plan.indicator_id,
+            row_indexes=tuple(int(value) for value in row_indexes.tolist()),
+        )
         scored_rows = scorer.score_rows(
             rows=self._row_scoring_inputs_for_prefilter(
                 indicator_id=row_plan.indicator_id,
                 signal_rows=signal_rows,
-                signal_feature_rows=self._load_prefilter_signal_feature_rows(
-                    grid_context=grid_context,
-                    artifact_context=artifact_context,
-                    indicator_id=row_plan.indicator_id,
-                    row_indexes=tuple(int(value) for value in row_indexes.tolist()),
-                ),
+                signal_feature_rows=signal_feature_rows,
             )
         )
-        ranked_rows = tuple(
-            sorted(
-                scored_rows,
-                key=lambda payload: (
-                    -self._prefilter_proxy_score_for_row(
-                        row_index=payload.row_index,
-                        signal_rows=signal_rows,
-                        local_signal_close=local_signal_close,
-                        execution_params=execution_params,
-                    ),
-                    *payload.sort_key(),
-                ),
-            )
+        proxy_scores = self._prefilter_proxy_scores_for_rows(
+            signal_rows=signal_rows,
+            local_signal_close=local_signal_close,
+            execution_params=execution_params,
         )
-        retained_count = min(retained_rows_limit, len(ranked_rows))
+        scorer_sorted_row_indexes = np.asarray(
+            [payload.row_index for payload in scored_rows],
+            dtype=np.int64,
+        )
+        stable_proxy_order = np.argsort(
+            -proxy_scores[scorer_sorted_row_indexes],
+            kind="mergesort",
+        )
+        retained_count = min(retained_rows_limit, len(scored_rows))
         if retained_count <= 0:
             raise ValueError(
                 f"Stage A row prefilter retained no rows for {row_plan.indicator_id!r}"
             )
-        return tuple(row.row_index for row in ranked_rows[:retained_count])
+        retained_row_indexes = scorer_sorted_row_indexes[stable_proxy_order[:retained_count]]
+        return tuple(int(row_index) for row_index in retained_row_indexes.tolist())
 
     def _merge_combo_proxy_chunk_into_frontier(
         self,
@@ -936,15 +1014,28 @@ class BacktestStageAShortlistBuilderV2:
                 "Stage A combo proxy prefilter requires final_signal rows to match "
                 "chunk_variants"
             )
-        for row_index, base_variant in enumerate(chunk_variants):
+        proxy_scores = self._prefilter_proxy_scores_for_rows(
+            signal_rows=final_signal,
+            local_signal_close=local_signal_close,
+            execution_params=execution_params,
+            error_prefix="Stage A combo proxy prefilter",
+        )
+        stage_a_indexes = np.fromiter(
+            (variant.stage_a_index for variant in chunk_variants),
+            dtype=np.int64,
+            count=len(chunk_variants),
+        )
+        stage_order = np.argsort(stage_a_indexes, kind="mergesort")
+        ranked_row_indexes = stage_order[
+            np.argsort(-proxy_scores[stage_order], kind="mergesort")
+        ]
+        ranked_row_limit = min(len(chunk_variants), exact_candidates_limit)
+        for ranked_row_index in ranked_row_indexes[:ranked_row_limit]:
+            row_index = int(ranked_row_index)
+            base_variant = chunk_variants[row_index]
             candidate = _RetainedExactCandidateV2(
                 base_variant=base_variant,
-                proxy_score=self._proxy_score_for_signal_row(
-                    signal_row=final_signal[row_index, :],
-                    local_signal_close=local_signal_close,
-                    execution_params=execution_params,
-                    error_prefix="Stage A combo proxy prefilter",
-                ),
+                proxy_score=float(proxy_scores[row_index]),
                 final_signal_row=np.asarray(final_signal[row_index, :], dtype=np.int8),
             )
             heap_entry = (
@@ -954,7 +1045,10 @@ class BacktestStageAShortlistBuilderV2:
             )
             if len(frontier_heap) < exact_candidates_limit:
                 heappush(frontier_heap, heap_entry)
-            elif heap_entry[:2] > frontier_heap[0][:2]:
+                continue
+            if heap_entry[:2] <= frontier_heap[0][:2]:
+                break
+            if heap_entry[:2] > frontier_heap[0][:2]:
                 heapreplace(frontier_heap, heap_entry)
 
     def _row_scoring_inputs_for_prefilter(
@@ -1095,6 +1189,52 @@ class BacktestStageAShortlistBuilderV2:
             error_prefix="Stage A row prefilter",
         )
 
+    def _prefilter_proxy_scores_for_rows(
+        self,
+        *,
+        signal_rows: np.ndarray,
+        local_signal_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        error_prefix: str = "Stage A row prefilter",
+    ) -> np.ndarray:
+        """
+        Compute deterministic Stage A row-prefilter proxy scores for one full indicator family.
+
+        Args:
+            signal_rows: Target-sliced signal rows in artifact row order.
+            local_signal_close: Request-timeframe close prices aligned to `signal_rows`.
+            execution_params: Immutable execution settings supplying the fee penalty.
+            error_prefix: Error-message prefix describing the calling proxy stage.
+        Returns:
+            np.ndarray: Float64 proxy score per row in artifact row order.
+        Assumptions:
+            Both row and combo proxy prefilters should batch score computation across the full
+            signal matrix so the hot path is parallel-capable instead of dominated by scalar
+            Python work.
+        Raises:
+            ValueError: If signal rows are not 2D or timeline alignment drifts.
+        Side Effects:
+            May trigger Numba compilation on first use.
+        """
+        normalized_signal_rows = np.asarray(signal_rows, dtype=np.int8)
+        if normalized_signal_rows.ndim != 2:
+            raise ValueError(f"{error_prefix} requires 2D signal_rows")
+        if int(normalized_signal_rows.shape[1]) != int(local_signal_close.shape[0]):
+            raise ValueError(
+                f"{error_prefix} requires signal rows and close prices to share length"
+            )
+        close_returns = _close_returns_for_proxy_score_v2(
+            local_signal_close=local_signal_close,
+            error_prefix=error_prefix,
+        )
+        if close_returns.size == 0:
+            return np.zeros(int(normalized_signal_rows.shape[0]), dtype=np.float64)
+        return _batch_proxy_scores_for_signal_rows_kernel_v2(
+            signal_rows_i8=np.ascontiguousarray(normalized_signal_rows, dtype=np.int8),
+            close_returns_f64=np.ascontiguousarray(close_returns, dtype=np.float64),
+            fee_rate=float(execution_params.fee_rate),
+        )
+
     def _proxy_score_for_signal_row(
         self,
         *,
@@ -1128,19 +1268,15 @@ class BacktestStageAShortlistBuilderV2:
             raise ValueError(
                 f"{error_prefix} requires signal rows and close prices to share length"
             )
-        if normalized_signal_row.shape[0] < 2:
+        close_returns = _close_returns_for_proxy_score_v2(
+            local_signal_close=local_signal_close,
+            error_prefix=error_prefix,
+        )
+        if close_returns.size == 0:
             return 0.0
         eval_signal_row = np.asarray(normalized_signal_row[:-1], dtype=np.float64)
-        prior_close = np.asarray(local_signal_close[:-1], dtype=np.float64)
-        next_close = np.asarray(local_signal_close[1:], dtype=np.float64)
-        close_returns = np.divide(
-            next_close - prior_close,
-            prior_close,
-            out=np.zeros_like(prior_close, dtype=np.float64),
-            where=prior_close != 0.0,
-        )
         proxy_score = float(np.dot(eval_signal_row, close_returns))
-        fee_rate = float(execution_params.fee_pct) / 100.0
+        fee_rate = float(execution_params.fee_rate)
         activity_penalty = fee_rate * float(np.count_nonzero(eval_signal_row != 0.0))
         return proxy_score - activity_penalty
 
@@ -1600,7 +1736,7 @@ class BacktestStageAShortlistBuilderV2:
                 shortlist_heap=shortlist_heap,
             )
 
-    def _build_retained_exact_payloads(
+    def _build_retained_exact_batch(
         self,
         *,
         chunk_variants: Sequence[BacktestStageABaseVariantV2],
@@ -1608,9 +1744,9 @@ class BacktestStageAShortlistBuilderV2:
         local_bar_close_1m_idx: np.ndarray,
         sentinel_index: int,
         direction_mode: str,
-    ) -> tuple[StageACompactExactPayloadV2, ...]:
+    ) -> _CompactTradeBatchV2:
         """
-        Build internal compact exact payloads only for retained candidates.
+        Build dense internal trade-list-first batch state only for retained candidates.
 
         Args:
             chunk_variants: Retained exact candidates aligned to `final_signal`.
@@ -1619,22 +1755,21 @@ class BacktestStageAShortlistBuilderV2:
             sentinel_index: Local execution sentinel index.
             direction_mode: Strategy direction policy used by compact-trade construction.
         Returns:
-            tuple[StageACompactExactPayloadV2, ...]: Internal compact exact payloads aligned to
-                `chunk_variants`.
+            _CompactTradeBatchV2: Dense internal exact batch aligned to `chunk_variants`.
         Assumptions:
-            Compact trade representation remains internal-only and is built only after row and
-            combo prefiltering retain the exact frontier.
+            Trade-list-first remains internal-only and is built only after row and combo
+            prefiltering retain the exact frontier.
         Raises:
             ValueError: If `final_signal` row count drifts from `chunk_variants`.
         Side Effects:
-            None.
+            May trigger Numba compilation on first use.
         """
         if int(final_signal.shape[0]) != len(chunk_variants):
             raise ValueError(
                 "Stage A exact retained-candidate evaluation requires final_signal rows to "
                 "match chunk_variants"
             )
-        return build_compact_exact_payloads_v2(
+        return build_compact_trade_batch_v2(
             final_signal=final_signal,
             bar_close_1m_idx=local_bar_close_1m_idx,
             sentinel_index=sentinel_index,
@@ -1680,37 +1815,68 @@ class BacktestStageAShortlistBuilderV2:
         Raises:
             ValueError: If `final_signal` row count drifts from `chunk_variants`.
         Side Effects:
-            Mutates `shortlist_heap` in place.
+            Mutates `shortlist_heap` in place and materializes internal exact payloads only for
+            rows that enter the deterministic shortlist.
         """
-        exact_payloads = self._build_retained_exact_payloads(
+        exact_batch = self._build_retained_exact_batch(
             chunk_variants=chunk_variants,
             final_signal=final_signal,
             local_bar_close_1m_idx=local_bar_close_1m_idx,
             sentinel_index=sentinel_index,
             direction_mode=grid_context.direction_mode,
         )
-        for base_variant, exact_payload in zip(chunk_variants, exact_payloads, strict=True):
-            metrics = compute_no_risk_metrics_v2(
-                compact_trades=exact_payload.compact_trades,
-                exec_open=local_exec_open,
-                exec_close=local_exec_close,
-                sentinel_index=sentinel_index,
-                execution_params=execution_params,
-            )
+        exact_metrics = compute_no_risk_metrics_for_trade_batch_v2(
+            compact_trade_batch=exact_batch,
+            exec_open=local_exec_open,
+            exec_close=local_exec_close,
+            sentinel_index=sentinel_index,
+            execution_params=execution_params,
+        )
+        for row_index, (base_variant, metrics) in enumerate(
+            zip(chunk_variants, exact_metrics, strict=True)
+        ):
             row = BacktestStageAScoredVariantV2(
                 base_variant=base_variant,
                 total_return_pct=metrics.total_return_pct,
-                retained_exact_payload=exact_payload,
+                retained_exact_payload=None,
             )
+            ranking_payload = no_risk_metrics_to_ranking_payload_v2(metrics=metrics)
             heap_entry = stage_a_heap_entry_v2(
                 row=row,
-                metrics=no_risk_metrics_to_ranking_payload_v2(metrics=metrics),
+                metrics=ranking_payload,
                 ranking_plan=ranking_plan,
             )
             if len(shortlist_heap) < shortlist_limit:
-                heappush(shortlist_heap, heap_entry)
-            elif heap_entry_outranks_v2(candidate=heap_entry, baseline=shortlist_heap[0]):
-                heapreplace(shortlist_heap, heap_entry)
+                heappush(
+                    shortlist_heap,
+                    stage_a_heap_entry_v2(
+                        row=BacktestStageAScoredVariantV2(
+                            base_variant=base_variant,
+                            total_return_pct=metrics.total_return_pct,
+                            retained_exact_payload=exact_batch.exact_payload_at(
+                                row_index=row_index
+                            ),
+                        ),
+                        metrics=ranking_payload,
+                        ranking_plan=ranking_plan,
+                    ),
+                )
+                continue
+            if heap_entry_outranks_v2(candidate=heap_entry, baseline=shortlist_heap[0]):
+                heapreplace(
+                    shortlist_heap,
+                    stage_a_heap_entry_v2(
+                        row=BacktestStageAScoredVariantV2(
+                            base_variant=base_variant,
+                            total_return_pct=metrics.total_return_pct,
+                            retained_exact_payload=exact_batch.exact_payload_at(
+                                row_index=row_index
+                            ),
+                        ),
+                        metrics=ranking_payload,
+                        ranking_plan=ranking_plan,
+                    ),
+                )
 
 
 def _retained_row_limits_v2(

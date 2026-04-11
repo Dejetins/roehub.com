@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
+import numba as nb
 import numpy as np
 
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
@@ -21,6 +22,9 @@ from .contracts import (
 )
 
 _BARS_PER_YEAR_EXEC_1M_V2 = 365.0 * 24.0 * 60.0
+_DIRECTION_MODE_LONG_SHORT_CODE_V2 = 0
+_DIRECTION_MODE_LONG_ONLY_CODE_V2 = 1
+_DIRECTION_MODE_SHORT_ONLY_CODE_V2 = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +68,693 @@ class StageACompactExactPayloadV2:
         object.__setattr__(self, "compact_trades", tuple(self.compact_trades))
 
 
+@dataclass(frozen=True, slots=True)
+class _CompactTradeBatchV2:
+    """
+    Dense internal trade-list-first batch state for retained exact-candidate evaluation.
+
+    Args:
+        entry_signal_idx: Dense `[V, max_trades]` entry-signal indexes with `-1` padding.
+        entry_exec_idx: Dense `[V, max_trades]` entry execution indexes.
+        direction: Dense `[V, max_trades]` trade directions in `{-1, 0, 1}`.
+        sig_exit_signal_idx: Dense `[V, max_trades]` signal-exit indexes with `-1` for sentinel.
+        sig_exit_exec_idx: Dense `[V, max_trades]` exit execution indexes.
+        trade_count: Per-row retained compact-trade counts.
+    Returns:
+        None.
+    Assumptions:
+        This batch state remains internal-only so trade-list-first extraction can stay dense and
+        batch-friendly until shortlisted rows need an internal exact payload object.
+    Raises:
+        None.
+    Side Effects:
+        Holds dense NumPy arrays for later metric scoring and selective payload materialization.
+    """
+
+    entry_signal_idx: np.ndarray
+    entry_exec_idx: np.ndarray
+    direction: np.ndarray
+    sig_exit_signal_idx: np.ndarray
+    sig_exit_exec_idx: np.ndarray
+    trade_count: np.ndarray
+
+    def trade_row_at(self, *, row_index: int) -> tuple[StageACompactTradeV2, ...]:
+        """
+        Materialize one retained candidate's compact trade row from dense batch state.
+
+        Args:
+            row_index: Batch-local retained candidate index.
+        Returns:
+            tuple[StageACompactTradeV2, ...]: Ordered compact trades for the requested row.
+        Assumptions:
+            Dense arrays are already aligned by retained-candidate row and padded beyond
+            `trade_count[row_index]`.
+        Raises:
+            ValueError: If `row_index` is outside the retained batch bounds.
+        Side Effects:
+            Materializes immutable compact-trade objects for one row only.
+        """
+        row_count = int(self.trade_count.shape[0])
+        if row_index < 0 or row_index >= row_count:
+            raise ValueError(
+                f"row_index must stay within [0, {row_count}), got {row_index}"
+            )
+        retained_trade_count = int(self.trade_count[row_index])
+        return tuple(
+            StageACompactTradeV2(
+                entry_signal_idx=int(self.entry_signal_idx[row_index, trade_index]),
+                entry_exec_idx=int(self.entry_exec_idx[row_index, trade_index]),
+                direction=int(self.direction[row_index, trade_index]),
+                sig_exit_signal_idx=(
+                    None
+                    if int(self.sig_exit_signal_idx[row_index, trade_index]) < 0
+                    else int(self.sig_exit_signal_idx[row_index, trade_index])
+                ),
+                sig_exit_exec_idx=int(self.sig_exit_exec_idx[row_index, trade_index]),
+            )
+            for trade_index in range(retained_trade_count)
+        )
+
+    def exact_payload_at(self, *, row_index: int) -> StageACompactExactPayloadV2:
+        """
+        Materialize one internal exact payload from dense trade-list-first batch state.
+
+        Args:
+            row_index: Batch-local retained candidate index.
+        Returns:
+            StageACompactExactPayloadV2: Internal exact payload for the requested retained row.
+        Assumptions:
+            Payload materialization should happen only for rows that survive shortlist ranking.
+        Raises:
+            ValueError: Propagated if `row_index` is outside batch bounds.
+        Side Effects:
+            Allocates one immutable payload wrapper around the selected compact trade row.
+        """
+        return StageACompactExactPayloadV2(
+            compact_trades=self.trade_row_at(row_index=row_index)
+        )
+
+    def materialize_trade_list(self) -> tuple[tuple[StageACompactTradeV2, ...], ...]:
+        """
+        Materialize all compact trade rows from dense batch state.
+
+        Args:
+            None.
+        Returns:
+            tuple[tuple[StageACompactTradeV2, ...], ...]: One ordered trade row per retained
+                candidate.
+        Assumptions:
+            This helper preserves the public compact-trade API while dense kernels own the hot
+            extraction work internally.
+        Raises:
+            None.
+        Side Effects:
+            Allocates immutable compact-trade tuples for every retained candidate row.
+        """
+        return tuple(
+            self.trade_row_at(row_index=row_index)
+            for row_index in range(int(self.trade_count.shape[0]))
+        )
+
+    def materialize_exact_payloads(self) -> tuple[StageACompactExactPayloadV2, ...]:
+        """
+        Materialize all internal exact payloads from dense batch state.
+
+        Args:
+            None.
+        Returns:
+            tuple[StageACompactExactPayloadV2, ...]: One internal exact payload per retained
+                candidate row.
+        Assumptions:
+            Public callers that still need all payloads can reuse the same dense trade-list-first
+            extraction without re-running the hot path.
+        Raises:
+            None.
+        Side Effects:
+            Allocates immutable payload wrappers for every retained candidate row.
+        """
+        return tuple(
+            self.exact_payload_at(row_index=row_index)
+            for row_index in range(int(self.trade_count.shape[0]))
+        )
+
+
+@nb.njit(cache=True)
+def _direction_allowed_code_v2(direction: int, direction_mode_code: int) -> bool:
+    """
+    Resolve whether one signal direction may open a trade for the encoded direction mode.
+
+    Args:
+        direction: Raw signal direction (`-1` or `1`).
+        direction_mode_code: Encoded direction-mode literal used inside batch kernels.
+    Returns:
+        bool: `True` when the signal may open a new trade.
+    Assumptions:
+        The encoded mode preserves the same semantics as the public direction-mode literals.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if direction_mode_code == _DIRECTION_MODE_LONG_ONLY_CODE_V2:
+        return direction == 1
+    if direction_mode_code == _DIRECTION_MODE_SHORT_ONLY_CODE_V2:
+        return direction == -1
+    return True
+
+
+@nb.njit(cache=True)
+def _trade_sharpe_kernel_v2(
+    trade_count: int,
+    sum_trade_return: float,
+    sum_trade_return_squared: float,
+    bars_per_year_exec: float,
+    sentinel_index: int,
+) -> float:
+    """
+    Compute Stage A trade-level Sharpe inside Numba batch metric kernels.
+
+    Args:
+        trade_count: Number of closed trades in one retained candidate row.
+        sum_trade_return: Sum of per-trade returns after fees.
+        sum_trade_return_squared: Sum of squared per-trade returns after fees.
+        bars_per_year_exec: Annualization denominator in execution bars.
+        sentinel_index: Total execution bars in the retained replay window.
+    Returns:
+        float: Deterministic trade-level Sharpe ratio.
+    Assumptions:
+        Batch no-risk scoring must match the scalar Stage A metric semantics exactly.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if trade_count <= 1:
+        return 0.0
+    mean_trade_return = sum_trade_return / float(trade_count)
+    variance = (sum_trade_return_squared / float(trade_count)) - (
+        mean_trade_return * mean_trade_return
+    )
+    if variance <= 0.0:
+        return 0.0
+    years = float(sentinel_index) / float(bars_per_year_exec)
+    if years <= 0.0:
+        years = 1.0
+    trades_per_year = float(trade_count) / years
+    return (mean_trade_return / math.sqrt(variance)) * math.sqrt(trades_per_year)
+
+
+@nb.njit(parallel=True, cache=True)
+def _build_compact_trade_batch_kernel_v2(
+    *,
+    final_signal_i8: np.ndarray,
+    entry_exec_idx_i64: np.ndarray,
+    sentinel_index: int,
+    direction_mode_code: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Build dense trade-list-first rows for one retained exact-candidate matrix in parallel.
+
+    Args:
+        final_signal_i8: Canonical `int8` retained `final_signal[V, T_signal]` matrix.
+        entry_exec_idx_i64: Canonical local entry indexes aligned to `T_signal`.
+        sentinel_index: Local execution timeline length.
+        direction_mode_code: Encoded direction-mode literal.
+    Returns:
+        tuple[np.ndarray, ...]: Dense trade fields plus per-row trade counts.
+    Assumptions:
+        Each retained row is independent, so dense trade extraction can parallelize across rows
+        while preserving the authored signal timeline order inside each row.
+    Raises:
+        None.
+    Side Effects:
+        Allocates dense trade-field arrays for the retained batch.
+    """
+    row_count = int(final_signal_i8.shape[0])
+    signal_count = int(final_signal_i8.shape[1])
+    entry_signal_idx = np.full((row_count, signal_count), -1, dtype=np.int64)
+    entry_exec_idx = np.zeros((row_count, signal_count), dtype=np.int64)
+    direction = np.zeros((row_count, signal_count), dtype=np.int8)
+    sig_exit_signal_idx = np.full((row_count, signal_count), -1, dtype=np.int64)
+    sig_exit_exec_idx = np.zeros((row_count, signal_count), dtype=np.int64)
+    trade_count = np.zeros(row_count, dtype=np.int64)
+
+    for row_index in nb.prange(row_count):
+        current_direction = 0
+        current_entry_signal_idx = 0
+        current_entry_exec_idx = 0
+        row_trade_count = 0
+        for signal_bar_idx in range(signal_count):
+            raw_direction = int(final_signal_i8[row_index, signal_bar_idx])
+            if raw_direction == SIGNAL_CODE_NEUTRAL_V2:
+                continue
+            mapped_entry_exec_idx = int(entry_exec_idx_i64[signal_bar_idx])
+            if mapped_entry_exec_idx >= sentinel_index:
+                break
+            if current_direction == 0:
+                if _direction_allowed_code_v2(raw_direction, direction_mode_code):
+                    current_direction = raw_direction
+                    current_entry_signal_idx = signal_bar_idx
+                    current_entry_exec_idx = mapped_entry_exec_idx
+                continue
+            if raw_direction == current_direction:
+                continue
+            entry_signal_idx[row_index, row_trade_count] = current_entry_signal_idx
+            entry_exec_idx[row_index, row_trade_count] = current_entry_exec_idx
+            direction[row_index, row_trade_count] = current_direction
+            sig_exit_signal_idx[row_index, row_trade_count] = signal_bar_idx
+            sig_exit_exec_idx[row_index, row_trade_count] = mapped_entry_exec_idx
+            row_trade_count += 1
+            if _direction_allowed_code_v2(raw_direction, direction_mode_code):
+                current_direction = raw_direction
+                current_entry_signal_idx = signal_bar_idx
+                current_entry_exec_idx = mapped_entry_exec_idx
+            else:
+                current_direction = 0
+        if current_direction != 0:
+            entry_signal_idx[row_index, row_trade_count] = current_entry_signal_idx
+            entry_exec_idx[row_index, row_trade_count] = current_entry_exec_idx
+            direction[row_index, row_trade_count] = current_direction
+            sig_exit_signal_idx[row_index, row_trade_count] = -1
+            sig_exit_exec_idx[row_index, row_trade_count] = sentinel_index
+            row_trade_count += 1
+        trade_count[row_index] = row_trade_count
+
+    return (
+        entry_signal_idx,
+        entry_exec_idx,
+        direction,
+        sig_exit_signal_idx,
+        sig_exit_exec_idx,
+        trade_count,
+    )
+
+
+@nb.njit(parallel=True, cache=True)
+def _batch_no_risk_metrics_kernel_v2(
+    *,
+    trade_count_i64: np.ndarray,
+    entry_exec_idx_i64: np.ndarray,
+    direction_i8: np.ndarray,
+    sig_exit_exec_idx_i64: np.ndarray,
+    exec_open_f64: np.ndarray,
+    exec_close_f64: np.ndarray,
+    sentinel_index: int,
+    init_cash_quote: float,
+    fixed_quote: float,
+    fee_rate: float,
+    slippage_rate: float,
+    safe_profit_percent: float,
+    use_fixed_quote: bool,
+    use_profit_lock: bool,
+    bars_per_year_exec: float,
+    close_on_end: bool,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+    np.ndarray,
+]:
+    """
+    Compute deterministic Stage A no-risk metrics for one retained trade batch in parallel.
+
+    Args:
+        trade_count_i64: Per-row compact-trade counts.
+        entry_exec_idx_i64: Dense entry execution indexes.
+        direction_i8: Dense trade directions.
+        sig_exit_exec_idx_i64: Dense signal-exit execution indexes.
+        exec_open_f64: Local execution open prices.
+        exec_close_f64: Local execution close prices.
+        sentinel_index: Local execution timeline length.
+        init_cash_quote: Initial quote balance from execution settings.
+        fixed_quote: Fixed quote allocation when fixed sizing is active.
+        fee_rate: Decimal per-side fee rate.
+        slippage_rate: Decimal slippage rate.
+        safe_profit_percent: Locked-profit percentage for profit-lock sizing.
+        use_fixed_quote: Whether entry sizing uses `fixed_quote`.
+        use_profit_lock: Whether profitable trades lock safe quote.
+        bars_per_year_exec: Annualization denominator in execution bars.
+        close_on_end: Whether sentinel trades close on the last execution close.
+    Returns:
+        tuple[np.ndarray, ...]: Dense metric columns aligned to retained candidate row order.
+    Assumptions:
+        Each retained candidate is independent, so no-risk scoring can parallelize across rows
+        after dense trade-list-first extraction.
+    Raises:
+        None.
+    Side Effects:
+        Allocates dense metric arrays for the retained batch.
+    """
+    row_count = int(trade_count_i64.shape[0])
+    total_return_pct = np.zeros(row_count, dtype=np.float64)
+    max_drawdown_pct = np.zeros(row_count, dtype=np.float64)
+    return_over_max_drawdown = np.zeros(row_count, dtype=np.float64)
+    profit_factor = np.zeros(row_count, dtype=np.float64)
+    trade_count = np.zeros(row_count, dtype=np.int64)
+    sharpe_trades = np.zeros(row_count, dtype=np.float64)
+    win_rate_pct = np.zeros(row_count, dtype=np.float64)
+    avg_trade_ret_pct = np.zeros(row_count, dtype=np.float64)
+    avg_trade_exec_bars = np.zeros(row_count, dtype=np.float64)
+    exposure_pct = np.zeros(row_count, dtype=np.float64)
+
+    for row_index in nb.prange(row_count):
+        available_quote = init_cash_quote
+        safe_quote = 0.0
+        equity = init_cash_quote
+        peak_equity = equity
+        row_max_drawdown_pct = 0.0
+        gross_profit_quote = 0.0
+        gross_loss_quote = 0.0
+        closed_trade_count = 0
+        win_count = 0
+        sum_trade_return = 0.0
+        sum_trade_return_squared = 0.0
+        total_trade_return_pct = 0.0
+        total_trade_exec_bars = 0.0
+        exposure_bars = 0.0
+
+        for trade_index in range(int(trade_count_i64[row_index])):
+            entry_exec_idx = int(entry_exec_idx_i64[row_index, trade_index])
+            if entry_exec_idx >= sentinel_index:
+                continue
+
+            signal_exit_exec_idx = int(sig_exit_exec_idx_i64[row_index, trade_index])
+            if signal_exit_exec_idx < sentinel_index:
+                exit_exec_idx = signal_exit_exec_idx
+                exit_price_raw = exec_open_f64[exit_exec_idx]
+            elif close_on_end and sentinel_index > 0:
+                exit_exec_idx = sentinel_index - 1
+                exit_price_raw = exec_close_f64[exit_exec_idx]
+            else:
+                continue
+
+            if available_quote <= 0.0:
+                continue
+            quote_amount = available_quote
+            if use_fixed_quote and fixed_quote < quote_amount:
+                quote_amount = fixed_quote
+            if quote_amount <= 0.0:
+                continue
+
+            trade_direction = int(direction_i8[row_index, trade_index])
+            entry_price_raw = exec_open_f64[entry_exec_idx]
+            entry_fill_price = entry_price_raw
+            if trade_direction == 1:
+                entry_fill_price *= 1.0 + slippage_rate
+            else:
+                entry_fill_price *= 1.0 - slippage_rate
+            exit_fill_price = exit_price_raw
+            if trade_direction == -1:
+                exit_fill_price *= 1.0 + slippage_rate
+            else:
+                exit_fill_price *= 1.0 - slippage_rate
+
+            qty_base = quote_amount / entry_fill_price
+            entry_fee_quote = quote_amount * fee_rate
+            available_quote -= quote_amount + entry_fee_quote
+
+            exit_quote_amount = qty_base * exit_fill_price
+            exit_fee_quote = exit_quote_amount * fee_rate
+            if trade_direction == 1:
+                gross_pnl_quote = exit_quote_amount - quote_amount
+            else:
+                gross_pnl_quote = quote_amount - exit_quote_amount
+            available_quote += quote_amount + gross_pnl_quote - exit_fee_quote
+            net_pnl_quote = gross_pnl_quote - entry_fee_quote - exit_fee_quote
+
+            if use_profit_lock and net_pnl_quote > 0.0:
+                locked_profit_quote = net_pnl_quote * (safe_profit_percent / 100.0)
+                available_quote -= locked_profit_quote
+                safe_quote += locked_profit_quote
+
+            equity = available_quote + safe_quote
+            if equity > peak_equity:
+                peak_equity = equity
+            elif peak_equity > 0.0:
+                drawdown_pct = ((peak_equity - equity) / peak_equity) * 100.0
+                if drawdown_pct > row_max_drawdown_pct:
+                    row_max_drawdown_pct = drawdown_pct
+
+            trade_return_pct = (net_pnl_quote / quote_amount) * 100.0
+            trade_return = net_pnl_quote / quote_amount
+            bars_held = float(exit_exec_idx - entry_exec_idx)
+            if bars_held < 0.0:
+                bars_held = 0.0
+            closed_trade_count += 1
+            if net_pnl_quote > 0.0:
+                win_count += 1
+                gross_profit_quote += net_pnl_quote
+            elif net_pnl_quote < 0.0:
+                gross_loss_quote += abs(net_pnl_quote)
+            sum_trade_return += trade_return
+            sum_trade_return_squared += trade_return * trade_return
+            total_trade_return_pct += trade_return_pct
+            total_trade_exec_bars += bars_held
+            exposure_bars += bars_held
+
+        row_total_return_pct = ((equity / init_cash_quote) - 1.0) * 100.0
+        total_return_pct[row_index] = row_total_return_pct
+        max_drawdown_pct[row_index] = row_max_drawdown_pct
+        trade_count[row_index] = closed_trade_count
+        if closed_trade_count > 0:
+            win_rate_pct[row_index] = (float(win_count) / float(closed_trade_count)) * 100.0
+            avg_trade_ret_pct[row_index] = total_trade_return_pct / float(closed_trade_count)
+            avg_trade_exec_bars[row_index] = total_trade_exec_bars / float(
+                closed_trade_count
+            )
+        if gross_loss_quote > 0.0:
+            profit_factor[row_index] = gross_profit_quote / gross_loss_quote
+        elif gross_profit_quote > 0.0:
+            profit_factor[row_index] = np.inf
+        else:
+            profit_factor[row_index] = 0.0
+        if row_max_drawdown_pct > 0.0:
+            return_over_max_drawdown[row_index] = (
+                row_total_return_pct / row_max_drawdown_pct
+            )
+        elif row_total_return_pct > 0.0:
+            return_over_max_drawdown[row_index] = np.inf
+        else:
+            return_over_max_drawdown[row_index] = 0.0
+        exposure_pct[row_index] = (
+            (exposure_bars / float(sentinel_index)) * 100.0 if sentinel_index > 0 else 0.0
+        )
+        sharpe_trades[row_index] = _trade_sharpe_kernel_v2(
+            closed_trade_count,
+            sum_trade_return,
+            sum_trade_return_squared,
+            bars_per_year_exec,
+            sentinel_index,
+        )
+
+    return (
+        total_return_pct,
+        max_drawdown_pct,
+        return_over_max_drawdown,
+        profit_factor,
+        trade_count,
+        sharpe_trades,
+        win_rate_pct,
+        avg_trade_ret_pct,
+        avg_trade_exec_bars,
+        exposure_pct,
+    )
+
+
+def _direction_mode_code_v2(*, direction_mode: StageADirectionModeLiteralV2) -> int:
+    """
+    Encode one validated direction-mode literal for dense internal batch kernels.
+
+    Args:
+        direction_mode: Canonical lower-case direction-mode literal.
+    Returns:
+        int: Dense kernel code representing the same direction-mode semantics.
+    Assumptions:
+        Encoded direction modes stay internal-only and never replace the public literal surface.
+    Raises:
+        ValueError: If the validated direction mode is unsupported.
+    Side Effects:
+        None.
+    """
+    if direction_mode == "long-short":
+        return _DIRECTION_MODE_LONG_SHORT_CODE_V2
+    if direction_mode == "long-only":
+        return _DIRECTION_MODE_LONG_ONLY_CODE_V2
+    if direction_mode == "short-only":
+        return _DIRECTION_MODE_SHORT_ONLY_CODE_V2
+    raise ValueError(
+        "direction_mode must be one of ('long-only', 'short-only', 'long-short')"
+    )
+
+
+def build_compact_trade_batch_v2(
+    *,
+    final_signal: np.ndarray,
+    bar_close_1m_idx: np.ndarray,
+    sentinel_index: int,
+    direction_mode: str = "long-short",
+) -> _CompactTradeBatchV2:
+    """
+    Build dense internal trade-list-first batch state for retained exact candidates.
+
+    Args:
+        final_signal: Aggregated retained-candidate signal matrix shaped `[V, T_signal]`.
+        bar_close_1m_idx: Local execution-timeline close mapping for the same `T_signal` bars.
+        sentinel_index: Local execution timeline length used as the sentinel fallback.
+        direction_mode: Strategy direction policy (`long-only`, `short-only`, `long-short`).
+    Returns:
+        _CompactTradeBatchV2: Dense internal batch state aligned to retained candidate row order.
+    Assumptions:
+        Trade-list-first stays internal-only and exists to make retained exact payload work batch-
+        friendly before any shortlisted rows need payload objects.
+    Raises:
+        ValueError: Propagated when signal or mapping inputs drift from compact-trade contracts.
+    Side Effects:
+        May trigger Numba compilation on first use.
+    """
+    normalized_signal = _normalize_final_signal_matrix_v2(values=final_signal)
+    normalized_mapping = _normalize_bar_close_1m_idx_v2(
+        values=bar_close_1m_idx,
+        expected_length=normalized_signal.shape[1],
+        sentinel_index=sentinel_index,
+    )
+    resolved_direction_mode = _validate_direction_mode_v2(direction_mode=direction_mode)
+    direction_mode_code = _direction_mode_code_v2(direction_mode=resolved_direction_mode)
+    entry_exec_idx = np.minimum(normalized_mapping + 1, sentinel_index).astype(
+        np.int64,
+        copy=False,
+    )
+    (
+        entry_signal_idx,
+        entry_exec_idx_by_trade,
+        direction,
+        sig_exit_signal_idx,
+        sig_exit_exec_idx,
+        trade_count,
+    ) = _build_compact_trade_batch_kernel_v2(
+        final_signal_i8=np.ascontiguousarray(normalized_signal, dtype=np.int8),
+        entry_exec_idx_i64=np.ascontiguousarray(entry_exec_idx, dtype=np.int64),
+        sentinel_index=sentinel_index,
+        direction_mode_code=direction_mode_code,
+    )
+    return _CompactTradeBatchV2(
+        entry_signal_idx=entry_signal_idx,
+        entry_exec_idx=entry_exec_idx_by_trade,
+        direction=direction,
+        sig_exit_signal_idx=sig_exit_signal_idx,
+        sig_exit_exec_idx=sig_exit_exec_idx,
+        trade_count=trade_count,
+    )
+
+
+def compute_no_risk_metrics_for_trade_batch_v2(
+    *,
+    compact_trade_batch: _CompactTradeBatchV2,
+    exec_open: np.ndarray,
+    exec_close: np.ndarray,
+    sentinel_index: int,
+    execution_params: ExecutionParamsV1,
+    bars_per_year_exec: float = _BARS_PER_YEAR_EXEC_1M_V2,
+    close_on_end: bool = True,
+) -> tuple[StageANoRiskMetricsV2, ...]:
+    """
+    Compute deterministic Stage A no-risk metrics for one dense retained trade batch.
+
+    Args:
+        compact_trade_batch: Dense internal trade-list-first batch state.
+        exec_open: Local execution-timeline open prices.
+        exec_close: Local execution-timeline close prices.
+        sentinel_index: Local execution timeline length (`T_exec`).
+        execution_params: Resolved execution defaults for sizing, fees, and slippage.
+        bars_per_year_exec: Annualization denominator in execution bars for `sharpe_trades`.
+        close_on_end: Whether open trades close on the last execution close when no signal exit
+            exists.
+    Returns:
+        tuple[StageANoRiskMetricsV2, ...]: One no-risk metric payload per retained candidate row.
+    Assumptions:
+        Dense trade-list-first extraction already validated the retained frontier, so this helper
+        can batch no-risk scoring across candidates without materializing user-facing trades.
+    Raises:
+        ValueError:
+            If execution arrays drift from `sentinel_index` or annualization denominator is
+            invalid.
+    Side Effects:
+        May trigger Numba compilation on first use.
+    """
+    normalized_exec_open = _normalize_execution_prices_v2(
+        field_name="exec_open",
+        values=exec_open,
+        sentinel_index=sentinel_index,
+    )
+    normalized_exec_close = _normalize_execution_prices_v2(
+        field_name="exec_close",
+        values=exec_close,
+        sentinel_index=sentinel_index,
+    )
+    if bars_per_year_exec <= 0.0:
+        raise ValueError("bars_per_year_exec must be > 0")
+    use_fixed_quote = execution_params.sizing_mode == "fixed_quote"
+    use_profit_lock = execution_params.sizing_mode == "strategy_compound_profit_lock"
+    metric_columns = _batch_no_risk_metrics_kernel_v2(
+        trade_count_i64=np.ascontiguousarray(compact_trade_batch.trade_count, dtype=np.int64),
+        entry_exec_idx_i64=np.ascontiguousarray(
+            compact_trade_batch.entry_exec_idx,
+            dtype=np.int64,
+        ),
+        direction_i8=np.ascontiguousarray(compact_trade_batch.direction, dtype=np.int8),
+        sig_exit_exec_idx_i64=np.ascontiguousarray(
+            compact_trade_batch.sig_exit_exec_idx,
+            dtype=np.int64,
+        ),
+        exec_open_f64=np.ascontiguousarray(normalized_exec_open, dtype=np.float64),
+        exec_close_f64=np.ascontiguousarray(normalized_exec_close, dtype=np.float64),
+        sentinel_index=sentinel_index,
+        init_cash_quote=float(execution_params.init_cash_quote),
+        fixed_quote=float(execution_params.fixed_quote),
+        fee_rate=float(execution_params.fee_rate),
+        slippage_rate=float(execution_params.slippage_rate),
+        safe_profit_percent=float(execution_params.safe_profit_percent),
+        use_fixed_quote=use_fixed_quote,
+        use_profit_lock=use_profit_lock,
+        bars_per_year_exec=bars_per_year_exec,
+        close_on_end=close_on_end,
+    )
+    (
+        total_return_pct,
+        max_drawdown_pct,
+        return_over_max_drawdown,
+        profit_factor,
+        trade_count,
+        sharpe_trades,
+        win_rate_pct,
+        avg_trade_ret_pct,
+        avg_trade_exec_bars,
+        exposure_pct,
+    ) = metric_columns
+    row_count = int(compact_trade_batch.trade_count.shape[0])
+    return tuple(
+        StageANoRiskMetricsV2(
+            total_return_pct=float(total_return_pct[row_index]),
+            max_drawdown_pct=float(max_drawdown_pct[row_index]),
+            return_over_max_drawdown=float(return_over_max_drawdown[row_index]),
+            profit_factor=float(profit_factor[row_index]),
+            trade_count=int(trade_count[row_index]),
+            sharpe_trades=float(sharpe_trades[row_index]),
+            win_rate_pct=float(win_rate_pct[row_index]),
+            avg_trade_ret_pct=float(avg_trade_ret_pct[row_index]),
+            avg_trade_exec_bars=float(avg_trade_exec_bars[row_index]),
+            exposure_pct=float(exposure_pct[row_index]),
+        )
+        for row_index in range(row_count)
+    )
+
+
 def build_compact_trade_list_v2(
     *,
     final_signal: np.ndarray,
@@ -97,23 +788,12 @@ def build_compact_trade_list_v2(
       - src/trading/contexts/backtest/application/services/v2/signal_aggregator_kernel.py
       - tests/unit/contexts/backtest/application/services/v2/test_trade_compactor_kernel_v2.py
     """
-    normalized_signal = _normalize_final_signal_matrix_v2(values=final_signal)
-    normalized_mapping = _normalize_bar_close_1m_idx_v2(
-        values=bar_close_1m_idx,
-        expected_length=normalized_signal.shape[1],
+    return build_compact_trade_batch_v2(
+        final_signal=final_signal,
+        bar_close_1m_idx=bar_close_1m_idx,
         sentinel_index=sentinel_index,
-    )
-    resolved_direction_mode = _validate_direction_mode_v2(direction_mode=direction_mode)
-    entry_exec_idx = np.minimum(normalized_mapping + 1, sentinel_index).astype(np.int64, copy=False)
-    return tuple(
-        _build_compact_trade_row_v2(
-            final_signal_row=final_signal_row,
-            entry_exec_idx=entry_exec_idx,
-            sentinel_index=sentinel_index,
-            direction_mode=resolved_direction_mode,
-        )
-        for final_signal_row in normalized_signal
-    )
+        direction_mode=direction_mode,
+    ).materialize_trade_list()
 
 
 def build_compact_exact_payloads_v2(
@@ -142,15 +822,12 @@ def build_compact_exact_payloads_v2(
     Side Effects:
         None.
     """
-    return tuple(
-        StageACompactExactPayloadV2(compact_trades=compact_trades)
-        for compact_trades in build_compact_trade_list_v2(
-            final_signal=final_signal,
-            bar_close_1m_idx=bar_close_1m_idx,
-            sentinel_index=sentinel_index,
-            direction_mode=direction_mode,
-        )
-    )
+    return build_compact_trade_batch_v2(
+        final_signal=final_signal,
+        bar_close_1m_idx=bar_close_1m_idx,
+        sentinel_index=sentinel_index,
+        direction_mode=direction_mode,
+    ).materialize_exact_payloads()
 
 
 def compute_no_risk_metrics_v2(

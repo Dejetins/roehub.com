@@ -36,6 +36,7 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
 )
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
@@ -956,6 +957,153 @@ def test_stage_a_shortlist_builder_v2_keeps_retained_frontier_row_order_explicit
     assert retained_frontier["ma.ema"].retained_row_indexes == (1, 0)
 
 
+def test_stage_a_shortlist_builder_v2_batch_prefilter_proxy_scores_match_scalar_reference() -> None:
+    """
+    Verify batched Stage A row-prefilter proxy scores match the scalar reference helper.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The new batch-friendly kernel must preserve the exact same fee-adjusted proxy score as
+        the scalar reference path for every retained row.
+    Raises:
+        AssertionError: If the batched proxy scores drift from scalar reference results.
+    Side Effects:
+        May trigger Numba compilation on first use.
+    """
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=cast(Any, object()),
+        signal_matrix_loader=cast(Any, object()),
+    )
+    signal_rows = np.asarray(
+        (
+            (1, 1, 0, -1, 0),
+            (0, 1, 1, 0, 0),
+            (-1, 0, 1, 1, 0),
+        ),
+        dtype=np.int8,
+    )
+    local_signal_close = np.asarray(
+        (100.0, 101.0, 102.0, 99.0, 103.0),
+        dtype=np.float64,
+    )
+    execution_params = ExecutionParamsV1(
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        init_cash_quote=10000.0,
+        fixed_quote=100.0,
+        safe_profit_percent=30.0,
+        fee_pct=0.075,
+        slippage_pct=0.01,
+    )
+
+    batch_scores = builder._prefilter_proxy_scores_for_rows(
+        signal_rows=signal_rows,
+        local_signal_close=local_signal_close,
+        execution_params=execution_params,
+    )
+    scalar_scores = np.asarray(
+        [
+            builder._prefilter_proxy_score_for_row(
+                row_index=row_index,
+                signal_rows=signal_rows,
+                local_signal_close=local_signal_close,
+                execution_params=execution_params,
+            )
+            for row_index in range(int(signal_rows.shape[0]))
+        ],
+        dtype=np.float64,
+    )
+
+    np.testing.assert_allclose(batch_scores, scalar_scores)
+
+
+def test_stage_a_shortlist_builder_v2_row_prefilter_uses_batch_proxy_scores(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify Stage A row prefilter avoids the scalar per-row proxy helper in the hot path.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+        monkeypatch: Pytest fixture used to fail fast if the scalar helper is called.
+    Returns:
+        None.
+    Assumptions:
+        Stage A row prefilter should rank rows through the batch-friendly proxy-score path while
+        preserving the same deterministic retained order.
+    Raises:
+        AssertionError: If the row-prefilter path falls back to scalar proxy scoring.
+    Side Effects:
+        Memory-maps strict artifact arrays from the synthetic store.
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    grid_context = _grid_context_for_windows(windows=(10, 20))
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=store.loader),
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+    )
+    signal_prices = builder.price_arrays_loader.load_price_arrays(
+        context=context,
+        timeframe="15m",
+    )
+    signal_target_slice = compute_target_slice_by_close_time_v2(
+        close_time=signal_prices.close_time,
+        target_time_range=_synthetic_target_time_range(),
+    )
+    row_plans = tuple(
+        PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
+        for plan in cast(Any, grid_context).indicator_plans
+    )
+
+    def _raise_scalar_proxy_call(*args: Any, **kwargs: Any) -> float:
+        """
+        Fail fast if the deprecated scalar row-prefilter proxy helper is used.
+
+        Args:
+            *args: Ignored positional arguments from the patched method call.
+            **kwargs: Ignored keyword arguments from the patched method call.
+        Returns:
+            float: This helper never returns successfully.
+        Assumptions:
+            The batch-friendly proxy-score path is the only acceptable hot-path implementation.
+        Raises:
+            AssertionError: Always, because the scalar path should stay unused here.
+        Side Effects:
+            None.
+        """
+        raise AssertionError("Stage A row prefilter should use batch proxy scores")
+
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2,
+        "_prefilter_proxy_score_for_row",
+        _raise_scalar_proxy_call,
+    )
+
+    retained_frontier = builder._build_row_prefilter_frontier(
+        row_plans=row_plans,
+        grid_context=cast(Any, grid_context),
+        artifact_context=context,
+        signal_target_slice=signal_target_slice,
+        local_signal_close=np.asarray(
+            signal_prices.ohlcv[signal_target_slice, 3],
+            dtype=np.float64,
+        ),
+        execution_params=builder._resolve_execution_params(
+            grid_context=cast(Any, grid_context),
+            market_id=artifact_market_id_from_coordinates_v2(context.coordinates),
+        ),
+        shortlist_limit=2,
+        cancel_checker=None,
+    )
+
+    assert retained_frontier["ma.ema"].retained_row_indexes == (1, 0)
+
+
 def test_stage_a_shortlist_builder_v2_exposes_optional_signal_features_warm_cache(
     synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
 ) -> None:
@@ -1249,50 +1397,111 @@ def test_stage_a_shortlist_builder_v2_combo_proxy_frontier_order_is_batch_invari
     ) == tuple(row.base_variant.base_variant_key for row in large_batch_shortlist)
 
 
-def test_stage_a_shortlist_builder_v2_builds_compact_payloads_only_for_retained_candidates(
+def test_stage_a_shortlist_builder_v2_materializes_exact_payloads_only_for_shortlisted_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    Verify non-retained candidates do not receive internal compact exact payload work.
+    Verify dense retained exact work only materializes payload objects for shortlisted rows.
 
     Args:
-        monkeypatch: pytest fixture used to record retained-candidate compact payload batches.
+        monkeypatch: pytest fixture used to record retained exact batch and payload calls.
     Returns:
         None.
     Assumptions:
-        The combo proxy fixture retains four exact candidates out of eight Stage A variants, so
-        compact payload construction should touch only those four survivors.
+        The combo proxy fixture retains four exact candidates out of eight Stage A variants, and
+        only the final deterministic shortlist should receive internal exact payload objects.
     Raises:
-        AssertionError: If compact payload construction still sees the full Stage A breadth.
+        AssertionError: If retained exact batching sees the full breadth or materializes payloads
+            for non-shortlisted rows.
     Side Effects:
-        Monkeypatches the internal retained-candidate payload builder used by Stage A.
+        Monkeypatches the internal retained exact batch builder used by Stage A.
     """
     grid_context = _combo_proxy_grid_context()
-    compact_payload_row_counts: list[int] = []
-    original_builder = stage_a_shortlist_builder_module.build_compact_exact_payloads_v2
+    retained_batch_row_counts: list[int] = []
+    materialized_payload_row_indexes: list[int] = []
+    original_builder = stage_a_shortlist_builder_module.build_compact_trade_batch_v2
 
     def _recording_builder(**kwargs: Any) -> Any:
         """
-        Record how many retained candidates enter compact payload construction per call.
+        Record retained exact batch size and selective payload materialization.
 
         Args:
-            **kwargs: Compact payload builder keyword arguments including `final_signal`.
+            **kwargs: Dense retained-batch builder keyword arguments including `final_signal`.
         Returns:
-            Any: Original payload-builder result for the retained candidates.
+            Any: Original dense batch object wrapped with payload-materialization logging.
         Assumptions:
-            The exact payload builder receives only retained candidates after combo proxy
-            prefiltering.
+            The retained exact batch builder receives only combo proxy survivors after narrowing.
         Raises:
             None.
         Side Effects:
-            Appends the current retained-candidate row count to the in-memory log.
+            Appends the retained batch row count and later payload row indexes to in-memory logs.
         """
-        compact_payload_row_counts.append(int(np.asarray(kwargs["final_signal"]).shape[0]))
-        return original_builder(**kwargs)
+        retained_batch_row_counts.append(int(np.asarray(kwargs["final_signal"]).shape[0]))
+        wrapped_batch = original_builder(**kwargs)
+
+        class _RecordingBatch:
+            """
+            Minimal proxy recording which retained rows materialize internal exact payloads.
+            """
+
+            def __init__(self, *, wrapped: Any) -> None:
+                """
+                Initialize proxy wrapper around one dense retained exact batch object.
+
+                Args:
+                    wrapped: Dense retained exact batch object returned by the real builder.
+                Returns:
+                    None.
+                Assumptions:
+                    Stage A accesses batch arrays directly and calls `exact_payload_at(...)` only
+                    for shortlisted rows.
+                Raises:
+                    None.
+                Side Effects:
+                    Stores one wrapped batch reference.
+                """
+                self._wrapped = wrapped
+
+            def __getattr__(self, name: str) -> Any:
+                """
+                Delegate all non-overridden attribute access to the wrapped batch object.
+
+                Args:
+                    name: Attribute name requested by Stage A.
+                Returns:
+                    Any: Attribute value from the wrapped batch object.
+                Assumptions:
+                    Dense batch arrays and helper methods live on the wrapped object.
+                Raises:
+                    AttributeError: Propagated when the wrapped object lacks the attribute.
+                Side Effects:
+                    None.
+                """
+                return getattr(self._wrapped, name)
+
+            def exact_payload_at(self, *, row_index: int) -> Any:
+                """
+                Record one shortlisted payload materialization before delegating.
+
+                Args:
+                    row_index: Batch-local retained candidate index being materialized.
+                Returns:
+                    Any: Wrapped exact payload for the same retained row.
+                Assumptions:
+                    Materialization order should follow the deterministic shortlist decisions.
+                Raises:
+                    None.
+                Side Effects:
+                    Appends the row index to the in-memory materialization log.
+                """
+                materialized_payload_row_indexes.append(row_index)
+                return self._wrapped.exact_payload_at(row_index=row_index)
+
+        return _RecordingBatch(wrapped=wrapped_batch)
 
     monkeypatch.setattr(
         stage_a_shortlist_builder_module,
-        "build_compact_exact_payloads_v2",
+        "build_compact_trade_batch_v2",
         _recording_builder,
     )
 
@@ -1307,10 +1516,11 @@ def test_stage_a_shortlist_builder_v2_builds_compact_payloads_only_for_retained_
         batch_size=8,
     )
 
-    assert compact_payload_row_counts == [4]
-    assert sum(compact_payload_row_counts) == 4
+    assert retained_batch_row_counts == [4]
+    assert sum(retained_batch_row_counts) == 4
     assert grid_context.stage_a_variants_total == 8
-    assert sum(compact_payload_row_counts) < grid_context.stage_a_variants_total
+    assert sum(retained_batch_row_counts) < grid_context.stage_a_variants_total
+    assert materialized_payload_row_indexes == [0, 1]
     assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
 
 

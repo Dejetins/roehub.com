@@ -12,7 +12,9 @@ from trading.contexts.backtest.application.services import (
 )
 from trading.contexts.backtest.application.services.v2.contracts import StageACompactTradeV2
 from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
+    build_compact_trade_batch_v2,
     build_compact_exact_payloads_v2,
+    compute_no_risk_metrics_for_trade_batch_v2,
 )
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
@@ -199,6 +201,77 @@ def test_compute_no_risk_metrics_v2_is_deterministic_and_shortlist_ready() -> No
         "avg_trade_exec_bars",
         "exposure_pct",
     )
+
+
+def test_compute_no_risk_metrics_for_trade_batch_v2_matches_scalar_rows() -> None:
+    """
+    Verify batched retained exact scoring matches the scalar no-risk metric contract row-by-row.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Dense trade-list-first batch scoring must preserve the scalar metric semantics used by the
+        deterministic shortlist.
+    Raises:
+        AssertionError: If one batched metric drifts from the scalar row result.
+    Side Effects:
+        None.
+    """
+    execution_params = ExecutionParamsV1(
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        init_cash_quote=1000.0,
+        fixed_quote=100.0,
+        safe_profit_percent=30.0,
+        fee_pct=0.0,
+        slippage_pct=0.0,
+    )
+    batch = build_compact_trade_batch_v2(
+        final_signal=np.array([[1, 1, -1, 0], [0, -1, -1, 1]], dtype=np.int8),
+        bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+        sentinel_index=5,
+    )
+
+    batch_metrics = compute_no_risk_metrics_for_trade_batch_v2(
+        compact_trade_batch=batch,
+        exec_open=np.array([100.0, 110.0, 120.0, 105.0, 115.0], dtype=np.float64),
+        exec_close=np.array([102.0, 112.0, 118.0, 108.0, 117.0], dtype=np.float64),
+        sentinel_index=5,
+        execution_params=execution_params,
+    )
+    scalar_metrics = tuple(
+        compute_no_risk_metrics_v2(
+            compact_trades=batch.exact_payload_at(row_index=row_index).compact_trades,
+            exec_open=np.array([100.0, 110.0, 120.0, 105.0, 115.0], dtype=np.float64),
+            exec_close=np.array([102.0, 112.0, 118.0, 108.0, 117.0], dtype=np.float64),
+            sentinel_index=5,
+            execution_params=execution_params,
+        )
+        for row_index in range(2)
+    )
+
+    assert tuple(batch.exact_payload_at(row_index=0).compact_trades) == tuple(
+        build_compact_exact_payloads_v2(
+            final_signal=np.array([[1, 1, -1, 0]], dtype=np.int8),
+            bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+            sentinel_index=5,
+        )[0].compact_trades
+    )
+    for batched, scalar in zip(batch_metrics, scalar_metrics, strict=True):
+        assert batched.total_return_pct == pytest.approx(scalar.total_return_pct)
+        assert batched.max_drawdown_pct == pytest.approx(scalar.max_drawdown_pct)
+        assert batched.return_over_max_drawdown == pytest.approx(
+            scalar.return_over_max_drawdown
+        )
+        assert batched.profit_factor == pytest.approx(scalar.profit_factor)
+        assert batched.trade_count == scalar.trade_count
+        assert batched.sharpe_trades == pytest.approx(scalar.sharpe_trades)
+        assert batched.win_rate_pct == pytest.approx(scalar.win_rate_pct)
+        assert batched.avg_trade_ret_pct == pytest.approx(scalar.avg_trade_ret_pct)
+        assert batched.avg_trade_exec_bars == pytest.approx(scalar.avg_trade_exec_bars)
+        assert batched.exposure_pct == pytest.approx(scalar.exposure_pct)
 
 
 def test_build_compact_trade_list_v2_rejects_out_of_range_mapping_indexes() -> None:
