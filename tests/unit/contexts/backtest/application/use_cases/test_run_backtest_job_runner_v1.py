@@ -204,6 +204,7 @@ class _RecordingStageAShortlistBuilder:
         target_time_range: TimeRange,
         shortlist_limit: int,
         ranking: Any = None,
+        parallelism: Any = None,
         batch_size: int | None = None,
         cancel_checker: Any = None,
         on_checkpoint: Any = None,
@@ -217,6 +218,7 @@ class _RecordingStageAShortlistBuilder:
             target_time_range: Requested trading window.
             shortlist_limit: Stage A shortlist cap.
             ranking: Optional ranking config.
+            parallelism: Optional Stage A parallelism contract forwarded by runtime orchestration.
             batch_size: Optional chunk size override.
             cancel_checker: Optional cancellation hook.
             on_checkpoint: Optional checkpoint hook.
@@ -236,6 +238,7 @@ class _RecordingStageAShortlistBuilder:
                 "target_time_range": target_time_range,
                 "shortlist_limit": shortlist_limit,
                 "ranking": ranking,
+                "parallelism": parallelism,
             }
         )
         if cancel_checker is not None:
@@ -381,6 +384,7 @@ class _FakeGridContext:
             if execution_profile is not None
             else _build_fake_execution_profile(
                 mode="exact_small",
+                stage_a_workers=1,
                 stage_b_workers=1,
                 parallel_stage_b_enabled=False,
             )
@@ -407,6 +411,7 @@ class _FakeGridContext:
 def _build_fake_execution_profile(
     *,
     mode: str,
+    stage_a_workers: int,
     stage_b_workers: int,
     parallel_stage_b_enabled: bool,
 ) -> Any:
@@ -415,6 +420,7 @@ def _build_fake_execution_profile(
 
     Args:
         mode: Stable profile mode literal.
+        stage_a_workers: Configured Stage A worker count.
         stage_b_workers: Configured Stage B worker count.
         parallel_stage_b_enabled: Whether process-based Stage B is enabled for the profile.
     Returns:
@@ -431,7 +437,10 @@ def _build_fake_execution_profile(
     shortlist_enabled = mode in {"hybrid_conservative", "hybrid_family"}
     return SimpleNamespace(
         mode=mode,
-        parallelism=SimpleNamespace(stage_b_workers=stage_b_workers),
+        parallelism=SimpleNamespace(
+            stage_a_workers=stage_a_workers,
+            stage_b_workers=stage_b_workers,
+        ),
         shortlist_config=SimpleNamespace(enabled=shortlist_enabled),
         feature_flags=SimpleNamespace(
             runtime_enabled=True,
@@ -720,6 +729,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
         target_time_range: TimeRange,
         shortlist_limit: int,
         ranking: Any = None,
+        parallelism: Any = None,
         batch_size: int | None = None,
         cancel_checker: Any = None,
         on_checkpoint: Any = None,
@@ -733,6 +743,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
             target_time_range: Requested trading window.
             shortlist_limit: Maximum number of rows to retain.
             ranking: Optional ranking config.
+            parallelism: Optional Stage A parallelism contract forwarded by runtime orchestration.
             batch_size: Optional chunk size.
             cancel_checker: Optional cooperative cancellation hook.
             on_checkpoint: Optional checkpoint hook.
@@ -745,7 +756,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
         Side Effects:
             Invokes provided cancellation and checkpoint hooks.
         """
-        _ = artifact_context, target_time_range, ranking, batch_size
+        _ = artifact_context, target_time_range, ranking, parallelism, batch_size
         if cancel_checker is not None:
             cancel_checker("stage_a")
         base_variants = tuple(grid_context.iter_stage_a_variants())[:shortlist_limit]
@@ -2457,6 +2468,7 @@ def test_process_claimed_job_exact_parallel_matches_serial_stage_b_frontiers(
             risk_variants=risk_variants,
             execution_profile=_build_fake_execution_profile(
                 mode="exact_small",
+                stage_a_workers=1,
                 stage_b_workers=1,
                 parallel_stage_b_enabled=False,
             ),
@@ -2479,6 +2491,7 @@ def test_process_claimed_job_exact_parallel_matches_serial_stage_b_frontiers(
             risk_variants=risk_variants,
             execution_profile=_build_fake_execution_profile(
                 mode="exact_parallel",
+                stage_a_workers=1,
                 stage_b_workers=2,
                 parallel_stage_b_enabled=True,
             ),
@@ -3013,6 +3026,12 @@ def test_process_claimed_job_uses_artifact_stage_a_shortlist_builder_when_availa
         grid_context=_FakeGridContext(
             base_variants=_build_stage_a_variants(),
             risk_variants=_build_risk_variants(),
+            execution_profile=_build_fake_execution_profile(
+                mode="exact_small",
+                stage_a_workers=2,
+                stage_b_workers=1,
+                parallel_stage_b_enabled=False,
+            ),
         ),
         scorer=_DeterministicScorerWithDetails(
             stage_a_scores={
@@ -3037,6 +3056,11 @@ def test_process_claimed_job_uses_artifact_stage_a_shortlist_builder_when_availa
     assert shortlist_builder.calls[0]["artifact_context"] == pinned_context
     assert shortlist_builder.calls[0]["target_time_range"] == request.time_range
     assert shortlist_builder.calls[0]["shortlist_limit"] == 2
+    assert shortlist_builder.calls[0]["parallelism"].stage_a_workers == 2
+    assert shortlist_builder.calls[0]["parallelism"].numba_threads == min(
+        2,
+        run_backtest_job_runner_module._DEFAULT_MAX_NUMBA_THREADS,
+    )
     assert results_repository.shortlist_calls[0]["shortlist"].stage_a_indexes == (1,)
 
 

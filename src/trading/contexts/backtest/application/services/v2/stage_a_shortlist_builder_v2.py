@@ -20,6 +20,11 @@ from trading.contexts.indicators.application.dto import IndicatorVariantSelectio
 from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.shared_kernel.primitives import TimeRange
 
+from ..numba_runtime_v1 import (
+    BacktestStageAParallelismConfigV1,
+    backtest_stage_a_numba_threads_scope_v1,
+    resolve_backtest_stage_a_parallelism_v1,
+)
 from .artifact_runtime_core_v2 import (
     BacktestStageAScoredVariantV2,
     ResolvedRankingPlanV2,
@@ -594,6 +599,7 @@ class BacktestStageAShortlistBuilderV2:
         target_time_range: TimeRange,
         shortlist_limit: int,
         ranking: BacktestRankingConfig | None = None,
+        parallelism: BacktestStageAParallelismConfigV1 | None = None,
         batch_size: int | None = None,
         cancel_checker: StageACancelCheckerV2 | None = None,
         on_checkpoint: StageACheckpointCallbackV2 | None = None,
@@ -607,6 +613,9 @@ class BacktestStageAShortlistBuilderV2:
             target_time_range: Requested trading window used for local signal/exec rebasing.
             shortlist_limit: Maximum number of retained Stage A rows.
             ranking: Optional Stage A ranking config.
+            parallelism:
+                Optional resolved Stage A parallel contract carrying `stage_a_workers` and the
+                effective Stage A Numba thread cap.
             batch_size: Optional chunk override for `chunked variant processing`.
             cancel_checker: Optional cooperative cancellation callback by stage literal.
             on_checkpoint: Optional progress callback `(processed, total)` after each chunk.
@@ -629,103 +638,110 @@ class BacktestStageAShortlistBuilderV2:
         if shortlist_limit <= 0:
             raise ValueError("BacktestStageAShortlistBuilderV2.shortlist_limit must be > 0")
         effective_batch_size = self._resolve_batch_size(batch_size=batch_size)
+        effective_parallelism = (
+            parallelism
+            or resolve_backtest_stage_a_parallelism_v1(
+                execution_profile=getattr(grid_context, "execution_profile", None)
+            )
+        )
         ranking_plan = resolve_ranking_plan_v2(
             ranking=effective_ranking_config_v2(
                 ranking=ranking,
                 configurable_ranking_enabled=self.configurable_ranking_enabled,
             )
         )
-        if cancel_checker is not None:
-            cancel_checker(STAGE_A_LITERAL_V2)
+        with backtest_stage_a_numba_threads_scope_v1(parallelism=effective_parallelism):
+            if cancel_checker is not None:
+                cancel_checker(STAGE_A_LITERAL_V2)
 
-        signal_prices = self.price_arrays_loader.load_price_arrays(
-            context=artifact_context,
-            timeframe=grid_context.timeframe_code,
-        )
-        mapping_arrays = self.price_arrays_loader.load_mapping_arrays(
-            context=artifact_context,
-            timeframe=grid_context.timeframe_code,
-        )
-        execution_prices = self.price_arrays_loader.load_price_arrays(
-            context=artifact_context,
-            timeframe="1m",
-        )
-        signal_target_slice = compute_target_slice_by_close_time_v2(
-            close_time=signal_prices.close_time,
-            target_time_range=target_time_range,
-        )
-        exec_target_slice = compute_target_slice_by_close_time_v2(
-            close_time=execution_prices.close_time,
-            target_time_range=target_time_range,
-        )
-        local_bar_close_1m_idx = rebase_bar_close_mapping_v2(
-            mapping_values=mapping_arrays.bar_close_1m_idx[signal_target_slice],
-            exec_target_slice=exec_target_slice,
-        )
-        local_exec_open = np.asarray(
-            execution_prices.ohlcv[exec_target_slice, 0],
-            dtype=np.float64,
-        )
-        local_exec_close = np.asarray(
-            execution_prices.ohlcv[exec_target_slice, 3],
-            dtype=np.float64,
-        )
-        local_signal_close = np.asarray(
-            signal_prices.ohlcv[signal_target_slice, 3],
-            dtype=np.float64,
-        )
-        sentinel_index = int(local_exec_open.shape[0])
-        execution_params = self._resolve_execution_params(
-            grid_context=grid_context,
-            market_id=artifact_market_id_from_coordinates_v2(artifact_context.coordinates),
-        )
-        row_plans = tuple(
-            PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
-            for plan in grid_context.indicator_plans
-        )
-        row_prefilter_frontier = self._build_row_prefilter_frontier(
-            row_plans=row_plans,
-            grid_context=grid_context,
-            artifact_context=artifact_context,
-            signal_target_slice=signal_target_slice,
-            local_signal_close=local_signal_close,
-            execution_params=execution_params,
-            shortlist_limit=shortlist_limit,
-            cancel_checker=cancel_checker,
-        )
-
-        retained_exact_candidates = self._build_combo_proxy_prefilter_frontier(
-            row_plans=row_plans,
-            grid_context=grid_context,
-            artifact_context=artifact_context,
-            signal_target_slice=signal_target_slice,
-            local_signal_close=local_signal_close,
-            execution_params=execution_params,
-            row_prefilter_frontier=row_prefilter_frontier,
-            exact_candidates_limit=self._target_combo_prefilter_exact_candidates(
+            signal_prices = self.price_arrays_loader.load_price_arrays(
+                context=artifact_context,
+                timeframe=grid_context.timeframe_code,
+            )
+            mapping_arrays = self.price_arrays_loader.load_mapping_arrays(
+                context=artifact_context,
+                timeframe=grid_context.timeframe_code,
+            )
+            execution_prices = self.price_arrays_loader.load_price_arrays(
+                context=artifact_context,
+                timeframe="1m",
+            )
+            signal_target_slice = compute_target_slice_by_close_time_v2(
+                close_time=signal_prices.close_time,
+                target_time_range=target_time_range,
+            )
+            exec_target_slice = compute_target_slice_by_close_time_v2(
+                close_time=execution_prices.close_time,
+                target_time_range=target_time_range,
+            )
+            local_bar_close_1m_idx = rebase_bar_close_mapping_v2(
+                mapping_values=mapping_arrays.bar_close_1m_idx[signal_target_slice],
+                exec_target_slice=exec_target_slice,
+            )
+            local_exec_open = np.asarray(
+                execution_prices.ohlcv[exec_target_slice, 0],
+                dtype=np.float64,
+            )
+            local_exec_close = np.asarray(
+                execution_prices.ohlcv[exec_target_slice, 3],
+                dtype=np.float64,
+            )
+            local_signal_close = np.asarray(
+                signal_prices.ohlcv[signal_target_slice, 3],
+                dtype=np.float64,
+            )
+            sentinel_index = int(local_exec_open.shape[0])
+            execution_params = self._resolve_execution_params(
                 grid_context=grid_context,
+                market_id=artifact_market_id_from_coordinates_v2(artifact_context.coordinates),
+            )
+            row_plans = tuple(
+                PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
+                for plan in grid_context.indicator_plans
+            )
+            row_prefilter_frontier = self._build_row_prefilter_frontier(
+                row_plans=row_plans,
+                grid_context=grid_context,
+                artifact_context=artifact_context,
+                signal_target_slice=signal_target_slice,
+                local_signal_close=local_signal_close,
+                execution_params=execution_params,
                 shortlist_limit=shortlist_limit,
-            ),
-            batch_size=effective_batch_size,
-            cancel_checker=cancel_checker,
-            on_checkpoint=on_checkpoint,
-        )
-        shortlist_heap: list[StageAHeapEntryV2] = []
-        self._score_retained_exact_candidates_into_heap(
-            retained_exact_candidates=retained_exact_candidates,
-            grid_context=grid_context,
-            local_bar_close_1m_idx=local_bar_close_1m_idx,
-            sentinel_index=sentinel_index,
-            local_exec_open=local_exec_open,
-            local_exec_close=local_exec_close,
-            execution_params=execution_params,
-            ranking_plan=ranking_plan,
-            shortlist_limit=shortlist_limit,
-            shortlist_heap=shortlist_heap,
-            batch_size=effective_batch_size,
-            cancel_checker=cancel_checker,
-        )
-        return stage_a_rows_from_heap_v2(heap=shortlist_heap)
+                cancel_checker=cancel_checker,
+            )
+
+            retained_exact_candidates = self._build_combo_proxy_prefilter_frontier(
+                row_plans=row_plans,
+                grid_context=grid_context,
+                artifact_context=artifact_context,
+                signal_target_slice=signal_target_slice,
+                local_signal_close=local_signal_close,
+                execution_params=execution_params,
+                row_prefilter_frontier=row_prefilter_frontier,
+                exact_candidates_limit=self._target_combo_prefilter_exact_candidates(
+                    grid_context=grid_context,
+                    shortlist_limit=shortlist_limit,
+                ),
+                batch_size=effective_batch_size,
+                cancel_checker=cancel_checker,
+                on_checkpoint=on_checkpoint,
+            )
+            shortlist_heap: list[StageAHeapEntryV2] = []
+            self._score_retained_exact_candidates_into_heap(
+                retained_exact_candidates=retained_exact_candidates,
+                grid_context=grid_context,
+                local_bar_close_1m_idx=local_bar_close_1m_idx,
+                sentinel_index=sentinel_index,
+                local_exec_open=local_exec_open,
+                local_exec_close=local_exec_close,
+                execution_params=execution_params,
+                ranking_plan=ranking_plan,
+                shortlist_limit=shortlist_limit,
+                shortlist_heap=shortlist_heap,
+                batch_size=effective_batch_size,
+                cancel_checker=cancel_checker,
+            )
+            return stage_a_rows_from_heap_v2(heap=shortlist_heap)
 
     def _build_row_prefilter_frontier(
         self,

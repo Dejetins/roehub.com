@@ -163,6 +163,7 @@ class _RecordingStageAShortlistBuilder:
         target_time_range: TimeRange,
         shortlist_limit: int,
         ranking: Any = None,
+        parallelism: Any = None,
         batch_size: int | None = None,
         cancel_checker: Any = None,
         on_checkpoint: Any = None,
@@ -176,6 +177,7 @@ class _RecordingStageAShortlistBuilder:
             target_time_range: Requested trading window.
             shortlist_limit: Requested shortlist cap.
             ranking: Optional ranking config.
+            parallelism: Optional Stage A parallelism contract forwarded by runtime orchestration.
             batch_size: Optional chunk size override.
             cancel_checker: Optional cancellation hook.
             on_checkpoint: Optional checkpoint hook.
@@ -195,6 +197,7 @@ class _RecordingStageAShortlistBuilder:
                 "target_time_range": target_time_range,
                 "shortlist_limit": shortlist_limit,
                 "ranking": ranking,
+                "parallelism": parallelism,
             }
         )
         return self.rows
@@ -293,6 +296,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
         target_time_range: TimeRange,
         shortlist_limit: int,
         ranking: Any = None,
+        parallelism: Any = None,
         batch_size: int | None = None,
         cancel_checker: Any = None,
         on_checkpoint: Any = None,
@@ -306,6 +310,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
             target_time_range: Requested trading/reporting window.
             shortlist_limit: Maximum shortlist size.
             ranking: Optional ranking config.
+            parallelism: Optional Stage A parallelism contract forwarded by runtime orchestration.
             batch_size: Optional chunk size override.
             cancel_checker: Optional cancellation hook.
             on_checkpoint: Optional checkpoint hook.
@@ -318,7 +323,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
         Side Effects:
             May invoke provided cancellation/checkpoint hooks.
         """
-        _ = artifact_context, target_time_range, ranking, batch_size
+        _ = artifact_context, target_time_range, ranking, parallelism, batch_size
         if cancel_checker is not None:
             cancel_checker("stage_a")
         base_variants = tuple(grid_context.iter_stage_a_variants())[:shortlist_limit]
@@ -332,6 +337,150 @@ class _ArtifactOnlyStageAShortlistBuilder:
         if on_checkpoint is not None:
             on_checkpoint(len(rows), len(tuple(grid_context.iter_stage_a_variants())))
         return rows
+
+
+class _StaticRuntimePlanner:
+    """
+    Runtime planner fake returning one prebuilt runtime plan for sync orchestration tests.
+    """
+
+    def __init__(self, *, runtime_plan: Any) -> None:
+        """
+        Initialize planner fake with one deterministic runtime-plan payload.
+
+        Args:
+            runtime_plan: Prebuilt runtime plan returned for every build call.
+        Returns:
+            None.
+        Assumptions:
+            Sync wiring tests verify planner forwarding and do not need real estimate math here.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call log.
+        """
+        self._runtime_plan = runtime_plan
+        self.calls: list[dict[str, Any]] = []
+
+    def build(
+        self,
+        *,
+        template: Any,
+        candles: Any,
+        indicator_compute: Any,
+        preselect: int,
+        requested_execution_profile_mode: str | None = None,
+        defaults_provider: Any = None,
+        max_variants_per_compute: int,
+        max_compute_bytes_total: int,
+    ) -> Any:
+        """
+        Record one sync planner call and return the configured runtime plan.
+
+        Args:
+            template: Effective run template.
+            candles: Warmup-aware artifact candles.
+            indicator_compute: Indicator compute dependency.
+            preselect: Requested Stage A shortlist cap.
+            requested_execution_profile_mode: Optional internal profile override.
+            defaults_provider: Optional runtime defaults provider.
+            max_variants_per_compute: Deterministic Stage A variants guard.
+            max_compute_bytes_total: Deterministic memory guard.
+        Returns:
+            Any: Prebuilt runtime plan fixture.
+        Assumptions:
+            Tests only need the resolved execution profile carried by the returned runtime plan.
+        Raises:
+            None.
+        Side Effects:
+            Appends build metadata to the in-memory call log.
+        """
+        _ = template, candles, indicator_compute, defaults_provider
+        self.calls.append(
+            {
+                "preselect": preselect,
+                "requested_execution_profile_mode": requested_execution_profile_mode,
+                "max_variants_per_compute": max_variants_per_compute,
+                "max_compute_bytes_total": max_compute_bytes_total,
+            }
+        )
+        return self._runtime_plan
+
+
+class _StaticRuntimeRunner:
+    """
+    Runtime runner fake returning fixed Stage B rows/tasks for sync orchestration tests.
+    """
+
+    def __init__(
+        self,
+        *,
+        ranked_rows: tuple[Any, ...],
+        ranked_tasks: Mapping[str, Any],
+    ) -> None:
+        """
+        Initialize runner fake with deterministic Stage B payloads.
+
+        Args:
+            ranked_rows: Ranked Stage B rows returned by every run.
+            ranked_tasks: Deterministic task mapping keyed by `variant_key`.
+        Returns:
+            None.
+        Assumptions:
+            Sync wiring tests only need preview-building compatibility, not real Stage B scoring.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call log.
+        """
+        self._ranked_rows = ranked_rows
+        self._ranked_tasks = ranked_tasks
+        self.calls: list[dict[str, Any]] = []
+
+    def run_stage_b(
+        self,
+        *,
+        template: Any,
+        runtime_plan: Any,
+        shortlist: Any,
+        candles: Any,
+        scorer: Any,
+        top_k_limit: int,
+        ranking: Any = None,
+        cancel_checker: Any = None,
+    ) -> tuple[tuple[Any, ...], Mapping[str, Any]]:
+        """
+        Record one Stage B invocation and return fixed ranking payloads.
+
+        Args:
+            template: Effective run template.
+            runtime_plan: Resolved runtime plan used for the sync run.
+            shortlist: Deterministic Stage A shortlist rows.
+            candles: Warmup-aware candles payload.
+            scorer: Resolved scorer dependency.
+            top_k_limit: Requested top-k cap.
+            ranking: Optional ranking config.
+            cancel_checker: Optional cancellation hook.
+        Returns:
+            tuple[tuple[Any, ...], Mapping[str, Any]]: Fixed ranked rows and task mapping.
+        Assumptions:
+            Preview-building tests need only stable `variant_key` alignment.
+        Raises:
+            None.
+        Side Effects:
+            Appends run metadata to the in-memory call log.
+        """
+        _ = template, candles, scorer, ranking
+        self.calls.append(
+            {
+                "runtime_plan": runtime_plan,
+                "shortlist": shortlist,
+                "top_k_limit": top_k_limit,
+            }
+        )
+        if cancel_checker is not None:
+            cancel_checker("stage_b")
+        return (self._ranked_rows, self._ranked_tasks)
 
 
 class _AlignedOnlyCandleFeed:
@@ -1049,7 +1198,7 @@ def test_run_backtest_use_case_sync_summary_path_stays_summary_only() -> None:
 
 def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_available() -> None:
     """
-    Verify sync use-case forwards pinned context and request range into artifact Stage A builder.
+    Verify sync use-case forwards pinned context, request range, and Stage A parallelism contract.
 
     Args:
         None.
@@ -1074,25 +1223,55 @@ def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_avai
         artifact_asof_date="2026-03-29",
         artifact_manifest_hash="a" * 64,
     )
-    shortlist_builder = _RecordingStageAShortlistBuilder(
-        rows=(
-            BacktestStageAScoredVariantV2(
-                base_variant=BacktestStageABaseVariantV2(
-                    stage_a_index=0,
-                    indicator_selections=(
-                        IndicatorVariantSelection(
-                            indicator_id="ema",
-                            inputs={"source": "close"},
-                            params={"window": 20},
-                        ),
-                    ),
-                    signal_params={},
-                    indicator_variant_key="1" * 64,
-                    base_variant_key="2" * 64,
+    stage_a_row = BacktestStageAScoredVariantV2(
+        base_variant=BacktestStageABaseVariantV2(
+            stage_a_index=0,
+            indicator_selections=(
+                IndicatorVariantSelection(
+                    indicator_id="ema",
+                    inputs={"source": "close"},
+                    params={"window": 20},
                 ),
-                total_return_pct=20.0,
+            ),
+            signal_params={},
+            indicator_variant_key="1" * 64,
+            base_variant_key="2" * 64,
+        ),
+        total_return_pct=20.0,
+    )
+    shortlist_builder = _RecordingStageAShortlistBuilder(rows=(stage_a_row,))
+    runtime_plan = SimpleNamespace(
+        indicator_estimate_calls=0,
+        execution_profile=SimpleNamespace(
+            mode="exact_small",
+            parallelism=SimpleNamespace(stage_a_workers=2),
+            shortlist_config=SimpleNamespace(enabled=False),
+            feature_flags=SimpleNamespace(
+                runtime_enabled=True,
+                heuristic_shortlist_enabled=False,
+                family_plugin_enabled=False,
             ),
         )
+    )
+    runtime_runner = _StaticRuntimeRunner(
+        ranked_rows=(
+            SimpleNamespace(
+                variant_index=stage_a_row.base_variant.stage_a_index,
+                variant_key=stage_a_row.base_variant.base_variant_key,
+                indicator_variant_key=stage_a_row.base_variant.indicator_variant_key,
+                total_return_pct=stage_a_row.total_return_pct,
+                summary_metrics_json={"Total Return [%]": stage_a_row.total_return_pct},
+                best_tp_pct=None,
+                best_sl_pct=None,
+            ),
+        ),
+        ranked_tasks={
+            stage_a_row.base_variant.base_variant_key: SimpleNamespace(
+                indicator_selections=stage_a_row.base_variant.indicator_selections,
+                signal_params=stage_a_row.base_variant.signal_params,
+                risk_params={},
+            )
+        },
     )
     request = RunBacktestRequest(
         time_range=TimeRange(
@@ -1110,6 +1289,8 @@ def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_avai
             _RecordingArtifactSlotResolver(context=pinned_context),
         ),
         stage_a_shortlist_builder=cast(Any, shortlist_builder),
+        runtime_planner=cast(Any, _StaticRuntimePlanner(runtime_plan=runtime_plan)),
+        runtime_runner=cast(Any, runtime_runner),
     )
 
     response = use_case.execute(
@@ -1121,6 +1302,11 @@ def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_avai
     assert shortlist_builder.calls[0]["artifact_context"] == pinned_context
     assert shortlist_builder.calls[0]["target_time_range"] == request.time_range
     assert shortlist_builder.calls[0]["shortlist_limit"] == 2
+    assert shortlist_builder.calls[0]["parallelism"].stage_a_workers == 2
+    assert shortlist_builder.calls[0]["parallelism"].numba_threads == min(
+        2,
+        run_backtest_module._DEFAULT_MAX_NUMBA_THREADS,
+    )
     assert len(response.variants) == 1
     assert response.variants[0].total_return_pct == 20.0
 

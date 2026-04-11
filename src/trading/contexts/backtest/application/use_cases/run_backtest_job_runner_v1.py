@@ -50,6 +50,7 @@ from trading.contexts.backtest.application.services.job_runner_streaming_v1 impo
 )
 from trading.contexts.backtest.application.services.numba_runtime_v1 import (
     apply_backtest_numba_threads,
+    resolve_backtest_stage_a_parallelism_v1,
 )
 from trading.contexts.backtest.application.services.v2.artifact_runtime_core_v2 import (
     BacktestArtifactRuntimeRunnerV2,
@@ -959,6 +960,10 @@ class RunBacktestJobRunnerV1:
             now=now,
         )
         heartbeat_at = now
+        stage_a_parallelism = resolve_backtest_stage_a_parallelism_v1(
+            execution_profile=runtime_plan.execution_profile,
+            max_numba_threads=self._max_numba_threads,
+        )
 
         def _on_stage_a_checkpoint(processed: int, total: int) -> None:
             nonlocal heartbeat_at
@@ -985,6 +990,7 @@ class RunBacktestJobRunnerV1:
             target_time_range=context.request.time_range,
             shortlist_limit=stage_limit,
             ranking=context.ranking,
+            parallelism=stage_a_parallelism,
             batch_size=self._stage_batch_size,
             cancel_checker=lambda stage: self._ensure_not_cancelled(
                 job=job,

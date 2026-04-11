@@ -45,6 +45,7 @@ from trading.contexts.backtest.application.services import (
 )
 from trading.contexts.backtest.application.services.numba_runtime_v1 import (
     apply_backtest_numba_threads,
+    resolve_backtest_stage_a_parallelism_v1,
 )
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.application.services.v2.artifact_runtime_core_v2 import (
@@ -457,12 +458,17 @@ class RunBacktestUseCase:
                 candles=timeline.candles,
                 run_control=run_control,
             )
+            stage_a_parallelism = resolve_backtest_stage_a_parallelism_v1(
+                execution_profile=effective_runtime_plan.execution_profile,
+                max_numba_threads=self._max_numba_threads,
+            )
             shortlist = self._stage_a_shortlist_builder.build_shortlist(
                 grid_context=effective_runtime_plan,
                 artifact_context=resolved.artifact_context,
                 target_time_range=request.time_range,
                 shortlist_limit=resolved.preselect,
                 ranking=resolved.ranking,
+                parallelism=stage_a_parallelism,
                 cancel_checker=_cancel_checker_from_run_control(run_control=run_control),
             )
             ranked_rows, ranked_tasks = self._runtime_runner.run_stage_b(
