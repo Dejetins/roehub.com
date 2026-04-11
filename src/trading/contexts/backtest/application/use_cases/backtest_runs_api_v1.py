@@ -486,11 +486,11 @@ class CreateAndRunBacktestSyncInlineUseCase:
             request: Parsed application request DTO.
             current_user: Authenticated owner identity.
             request_payload:
-                Strict API payload snapshot used to persist canonical `request_json`. The
-                sync-inline wrapper also injects the server-owned internal
-                `execution_profile_mode=hybrid_conservative` marker here so `POST /backtests`
-                runs through the redesigned prefilter-first sync engine without changing the
-                public transport contract.
+                Strict API payload snapshot used to persist canonical `request_json` after
+                storage-only metadata is stripped. The sync-inline wrapper also injects the
+                server-owned internal `execution_profile_mode=hybrid_conservative` marker into
+                the runtime payload so `POST /backtests` runs through the redesigned
+                prefilter-first sync engine without changing the public transport contract.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             RunBacktestResponse: Sync response enriched with persisted run identity metadata.
@@ -775,8 +775,8 @@ def _build_background_auto_launch_response(
         run_id=created_run.job_id,
         state=created_run.state,
         execution_mode=created_run.execution_mode,
-        execution_profile_mode=_require_execution_profile_mode_request_json(
-            request_json=created_run.request_json
+        execution_profile_mode=_require_persisted_execution_profile_mode(
+            created_run=created_run
         ),
         engine_version=engine_version,
         artifact_slot=artifact_pin.artifact_slot,
@@ -837,12 +837,12 @@ def _require_positive_int_request_json(
     return raw_value
 
 
-def _require_execution_profile_mode_request_json(
+def _require_persisted_execution_profile_mode(
     *,
-    request_json: Mapping[str, Any],
+    created_run: BacktestJob,
 ) -> str:
     """
-    Read one persisted effective execution-profile mode from canonical `request_json`.
+    Read one persisted effective execution-profile mode from additive run metadata.
 
     Docs:
       - docs/architecture/backtest/backtest-runs-history-v2.md
@@ -853,27 +853,33 @@ def _require_execution_profile_mode_request_json(
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
       - apps/api/dto/backtests.py
     Args:
-        request_json: Persisted canonical request payload.
+        created_run: Persisted run snapshot from unified jobs storage.
     Returns:
         str: Normalized execution-profile mode literal.
     Assumptions:
-        Profile-aware launch persistence stores the effective profile mode additively on every
-        `/backtests` persisted run row.
+        New rows store read-model profile metadata in additive fields first; queued launch rows
+        may still rely on the additive hint field, while historical rows may require explicit
+        `request_json.execution_profile_mode` fallback.
     Raises:
         BacktestValidationError: If the field is missing or invalid.
     Side Effects:
         None.
     """
-    raw_mode = request_json.get("execution_profile_mode")
+    raw_mode = created_run.effective_execution_profile_mode
+    if raw_mode is None:
+        raw_mode = created_run.execution_profile_mode_hint
+    if raw_mode is None:
+        legacy_mode = created_run.request_json.get("execution_profile_mode")
+        raw_mode = legacy_mode if isinstance(legacy_mode, str) else None
     if not isinstance(raw_mode, str) or not raw_mode.strip():
         raise BacktestValidationError(
-            "persisted run request_json requires execution_profile_mode"
+            "persisted run metadata requires additive execution-profile fields"
         )
     try:
         return validate_execution_profile_mode_v2(value=raw_mode)
     except ValueError as error:
         raise BacktestValidationError(
-            "persisted run request_json requires valid execution_profile_mode"
+            "persisted run metadata requires valid additive execution-profile fields"
         ) from error
 
 
@@ -1004,18 +1010,19 @@ def _build_request_json_payload(
     Returns:
         Mapping[str, Any]: Deterministic JSON-compatible request snapshot for persistence.
     Assumptions:
-        Sync-inline persistence keeps the same canonical request shape as the jobs storage family.
+        Sync-inline persistence keeps the same canonical request shape as the jobs storage family,
+        while live execution-profile metadata is stored additively outside `request_json`.
     Raises:
         BacktestValidationError: If template/saved mode payload cannot be reconstructed.
     Side Effects:
         None.
     """
     normalized_payload = _normalize_json_mapping(values=request_payload)
+    normalized_payload.pop("execution_profile_mode", None)
+    normalized_payload.pop("execution_profile_mode_hint", None)
+    normalized_payload.pop("effective_execution_profile_mode", None)
     normalized_payload["top_k"] = response.top_k
     normalized_payload["preselect"] = response.preselect
-    normalized_payload["execution_profile_mode"] = _require_response_execution_profile_mode(
-        response=response
-    )
 
     direction_mode = _require_direction_mode(response=response)
     sizing_mode = _require_sizing_mode(response=response)
@@ -1082,6 +1089,30 @@ def _require_response_execution_profile_mode(*, response: RunBacktestResponse) -
         raise BacktestValidationError(
             "sync_inline persisted run requires valid execution_profile_mode"
         ) from error
+
+
+def _resolve_sync_inline_persisted_execution_profile_metadata(
+    *,
+    response: RunBacktestResponse,
+) -> tuple[str, str]:
+    """
+    Build additive sync-inline execution-profile metadata persisted outside `request_json`.
+
+    Args:
+        response: Completed sync response carrying resolved runtime metadata.
+    Returns:
+        tuple[str, str]: Additive
+            `(execution_profile_mode_hint, effective_execution_profile_mode)` metadata tuple.
+    Assumptions:
+        The sync-inline path completes before persistence, so both launch-time and effective
+        profile metadata are known deterministically from the finished response.
+    Raises:
+        BacktestValidationError: If the response lacks a valid execution-profile mode.
+    Side Effects:
+        None.
+    """
+    execution_profile_mode = _require_response_execution_profile_mode(response=response)
+    return (execution_profile_mode, execution_profile_mode)
 
 
 def _build_engine_params_hash(*, response: RunBacktestResponse) -> str:
@@ -1166,6 +1197,10 @@ def _build_terminal_sync_inline_run(
         if request.ranking is not None
         else BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1
     )
+    (
+        execution_profile_mode_hint,
+        effective_execution_profile_mode,
+    ) = _resolve_sync_inline_persisted_execution_profile_metadata(response=response)
     spec_hash = response.spec_hash if request.mode == "saved" else None
     spec_payload_json = response.spec_payload_json if request.mode == "saved" else None
     if request.mode == "saved" and (spec_hash is None or spec_payload_json is None):
@@ -1186,6 +1221,8 @@ def _build_terminal_sync_inline_run(
         backtest_runtime_config_hash=backtest_runtime_config_hash,
         artifact_pin=artifact_pin,
         execution_mode="sync_inline",
+        execution_profile_mode_hint=execution_profile_mode_hint,
+        effective_execution_profile_mode=effective_execution_profile_mode,
         market_id=response.instrument_id.market_id.value,
         symbol=str(response.instrument_id.symbol),
         timeframe=str(response.timeframe),

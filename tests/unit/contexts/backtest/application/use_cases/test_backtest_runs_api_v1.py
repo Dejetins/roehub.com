@@ -427,14 +427,10 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_job.artifact_pin.artifact_asof_date == "2026-03-28"
     assert repo.created_job.request_json["template"]["execution"]["fee_pct"] == 0.075
     assert repo.created_job.request_json["template"]["direction_mode"] == "long-short"
-    assert repo.created_job.request_json["execution_profile_mode"] == "hybrid_conservative"
-    assert repo.created_job.request_hash == _build_sha256_from_payload(
-        payload={
-            key: value
-            for key, value in repo.created_job.request_json.items()
-            if key != "execution_profile_mode"
-        }
-    )
+    assert "execution_profile_mode" not in repo.created_job.request_json
+    assert repo.created_job.execution_profile_mode_hint == "hybrid_conservative"
+    assert repo.created_job.effective_execution_profile_mode == "hybrid_conservative"
+    assert repo.created_job.request_hash == _build_sha256_from_payload(payload=repo.created_job.request_json)
     assert len(repo.created_rows) == 1
     assert repo.created_rows[0].rank == 1
     assert repo.created_rows[0].variant_key == "a" * 64
@@ -487,7 +483,9 @@ def test_create_and_run_backtest_sync_inline_forces_redesigned_internal_profile(
     assert run_use_case.last_request_payload is not None
     assert run_use_case.last_request_payload["execution_profile_mode"] == "hybrid_conservative"
     assert repo.created_job is not None
-    assert repo.created_job.request_json["execution_profile_mode"] == "hybrid_conservative"
+    assert "execution_profile_mode" not in repo.created_job.request_json
+    assert repo.created_job.execution_profile_mode_hint == "hybrid_conservative"
+    assert repo.created_job.effective_execution_profile_mode == "hybrid_conservative"
 
 
 def test_request_hash_ignores_internal_execution_profile_mode_across_exact_and_hybrid_modes(
@@ -671,6 +669,7 @@ def test_launch_backtest_with_auto_fallback_routes_heavy_valid_request_to_backgr
     assert create_use_case.last_command.execution_mode == "background_auto"
     assert create_use_case.last_command.execution_profile_mode == "exact_parallel"
     assert launched.execution_mode == "background_auto"
+    assert launched.execution_profile_mode == "exact_parallel"
     assert launched.run_id == UUID("00000000-0000-0000-0000-000000000911")
 
 
@@ -737,6 +736,66 @@ def test_launch_backtest_with_auto_fallback_creates_background_auto_after_guard_
     assert launched.preselect == 100
     assert launched.variants == tuple()
     assert launched.engine_params_hash == "e" * 64
+
+
+def test_launch_backtest_with_auto_fallback_keeps_legacy_request_json_profile_fallback() -> None:
+    """
+    Verify queued launch response keeps explicit legacy `request_json` fallback for old rows.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Historical persisted rows may predate additive execution-profile metadata and still need
+        compatibility fallback during launch-response mapping.
+    Raises:
+        AssertionError: If the background launch response no longer accepts legacy row snapshots.
+    Side Effects:
+        None.
+    """
+    legacy_background_run = replace(
+        _background_auto_job(),
+        request_json={
+            **_template_request_payload(),
+            "execution_profile_mode": "exact_parallel",
+        },
+        execution_profile_mode_hint=None,
+        effective_execution_profile_mode=None,
+    )
+    preflight_use_case = _FakePreflightUseCase()
+    create_use_case = _FakeBackgroundCreateUseCase(created_job=legacy_background_run)
+    use_case = LaunchBacktestRunWithAutoFallbackUseCase(
+        sync_inline_use_case=_FakeRunUseCase(
+            error=RoehubError(
+                code="validation_error",
+                message="Backtest variants guard exceeded",
+                details={
+                    "error": "max_variants_per_compute_exceeded",
+                    "stage": "stage_a",
+                    "total_variants": 999,
+                    "max_variants_per_compute": 100,
+                    "execution_profile_mode": "exact_parallel",
+                },
+            )
+        ),
+        background_preflight_use_case=preflight_use_case,
+        background_create_use_case=create_use_case,
+        engine_version="signal_tf + 1m_risk",
+    )
+
+    launched = use_case.execute(
+        request=_template_request(),
+        current_user=CurrentUser(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+        ),
+        request_payload=_template_request_payload(),
+    )
+
+    assert preflight_use_case.calls == 1
+    assert create_use_case.calls == 1
+    assert launched.execution_mode == "background_auto"
+    assert launched.execution_profile_mode == "exact_parallel"
 
 
 def test_launch_backtest_with_auto_fallback_rethrows_full_budget_overflow_without_create() -> None:
@@ -1053,10 +1112,7 @@ def _background_auto_job() -> BacktestJob:
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000777"),
         mode="template",
         created_at=datetime(2026, 3, 28, 12, 0, 5, tzinfo=timezone.utc),
-        request_json={
-            **_template_request_payload(),
-            "execution_profile_mode": "exact_parallel",
-        },
+        request_json=_template_request_payload(),
         request_hash="f" * 64,
         spec_hash=None,
         spec_payload_json=None,
@@ -1069,6 +1125,8 @@ def _background_auto_job() -> BacktestJob:
             artifact_asof_date="2026-03-28",
         ),
         execution_mode="background_auto",
+        execution_profile_mode_hint="exact_parallel",
+        effective_execution_profile_mode="exact_parallel",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1m",

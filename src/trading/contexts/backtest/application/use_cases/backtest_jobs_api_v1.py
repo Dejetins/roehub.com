@@ -49,7 +49,14 @@ from .request_runtime_contract_v1 import (
 
 NowProvider = Callable[[], datetime]
 JobIdFactory = Callable[[], UUID]
-_REQUEST_HASH_INTERNAL_FIELDS = frozenset({"execution_profile_mode", "top_trades_n"})
+_REQUEST_HASH_INTERNAL_FIELDS = frozenset(
+    {
+        "execution_profile_mode",
+        "execution_profile_mode_hint",
+        "effective_execution_profile_mode",
+        "top_trades_n",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -343,7 +350,12 @@ class CreateBacktestJobUseCase:
             run_request=command.run_request,
             resolved=resolved,
             effective_execution_payload=effective_execution_payload,
-            execution_profile_mode=command.execution_profile_mode,
+        )
+        (
+            execution_profile_mode_hint,
+            effective_execution_profile_mode,
+        ) = _resolve_persisted_execution_profile_metadata(
+            execution_profile_mode=command.execution_profile_mode
         )
         artifact_pin = self._resolve_artifact_pin(
             template=resolved.template,
@@ -373,6 +385,8 @@ class CreateBacktestJobUseCase:
             backtest_runtime_config_hash=self._backtest_runtime_config_hash,
             artifact_pin=artifact_pin,
             execution_mode=command.execution_mode,
+            execution_profile_mode_hint=execution_profile_mode_hint,
+            effective_execution_profile_mode=effective_execution_profile_mode,
             market_id=resolved.template.instrument_id.market_id.value,
             symbol=str(resolved.template.instrument_id.symbol),
             timeframe=str(resolved.template.timeframe),
@@ -582,21 +596,20 @@ class CreateBacktestJobUseCase:
         run_request: RunBacktestRequest,
         resolved: _ResolvedJobCreationContext,
         effective_execution_payload: Mapping[str, float],
-        execution_profile_mode: str | None,
     ) -> Mapping[str, Any]:
         """
-        Build worker-compatible request snapshot payload with effective scalar defaults.
+        Build worker-compatible request snapshot payload with effective scalar defaults only.
 
         Args:
             request_payload: Strict API request mapping payload.
             run_request: Parsed application request DTO.
             resolved: Resolved create context.
             effective_execution_payload: Full execution mapping resolved with defaults.
-            execution_profile_mode: Optional effective exact execution profile mode literal.
         Returns:
             Mapping[str, Any]: Deterministic snapshot payload persisted in `request_json`.
         Assumptions:
-            Snapshot transport shape stays compatible with worker decoder API DTO.
+            Snapshot transport shape stays compatible with worker decoder API DTO, while
+            live execution-profile metadata is persisted additively outside `request_json`.
         Raises:
             BacktestValidationError: If required template payload is missing in template mode.
             ValueError: If payload normalization fails.
@@ -604,10 +617,11 @@ class CreateBacktestJobUseCase:
             None.
         """
         normalized_payload = _normalize_json_mapping(values=request_payload)
+        normalized_payload.pop("execution_profile_mode", None)
+        normalized_payload.pop("execution_profile_mode_hint", None)
+        normalized_payload.pop("effective_execution_profile_mode", None)
         normalized_payload["top_k"] = resolved.top_k
         normalized_payload["preselect"] = resolved.preselect
-        if execution_profile_mode is not None:
-            normalized_payload["execution_profile_mode"] = execution_profile_mode
 
         if resolved.mode == "template":
             raw_template = normalized_payload.get("template")
@@ -1598,8 +1612,9 @@ def _build_request_hash_from_request_json(*, payload: Mapping[str, Any]) -> str:
     Returns:
         str: Deterministic SHA-256 hash over canonical request semantics only.
     Assumptions:
-        Internal launch/read metadata like `execution_profile_mode` must not change request
-        identity for exact-equivalent runs.
+        Internal launch/read metadata like `execution_profile_mode`,
+        `execution_profile_mode_hint`, and `effective_execution_profile_mode` must not change
+        request identity for exact-equivalent runs.
     Raises:
         None.
     Side Effects:
@@ -1612,6 +1627,31 @@ def _build_request_hash_from_request_json(*, payload: Mapping[str, Any]) -> str:
             if key not in _REQUEST_HASH_INTERNAL_FIELDS
         }
     )
+
+
+def _resolve_persisted_execution_profile_metadata(
+    *,
+    execution_profile_mode: str | None,
+) -> tuple[str | None, str | None]:
+    """
+    Split launch-time execution-profile metadata away from canonical `request_json`.
+
+    Args:
+        execution_profile_mode: Optional normalized execution-profile mode chosen before enqueue.
+    Returns:
+        tuple[str | None, str | None]: Additive
+            `(execution_profile_mode_hint, effective_execution_profile_mode)` metadata tuple.
+    Assumptions:
+        Job creation has only launch-time metadata available, so the same validated literal is
+        mirrored into the effective read-model field when present.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if execution_profile_mode is None:
+        return (None, None)
+    return (execution_profile_mode, execution_profile_mode)
 
 
 

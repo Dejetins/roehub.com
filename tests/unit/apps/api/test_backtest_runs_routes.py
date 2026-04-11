@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
@@ -406,6 +406,49 @@ def test_get_backtest_runs_returns_history_page_with_public_run_metadata() -> No
     assert resolved_list_fake.last_cursor == cursor
 
 
+def test_get_backtest_runs_prefers_additive_execution_profile_metadata() -> None:
+    """
+    Verify history route projects `execution_profile_mode` from additive run metadata first.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        New persisted rows no longer need `request_json.execution_profile_mode` for list/history
+        rendering once additive metadata fields are available.
+    Raises:
+        AssertionError: If the route falls back to catalog defaults despite additive metadata.
+    Side Effects:
+        None.
+    """
+    list_fake = _ListUseCaseFake(
+        page=BacktestJobListPage(
+            items=(
+                replace(
+                    _queued_run(run_id=UUID("00000000-0000-0000-0000-000000000934")),
+                    execution_profile_mode_hint="exact_parallel",
+                    effective_execution_profile_mode="exact_parallel",
+                ),
+            ),
+            next_cursor=None,
+        )
+    )
+    client, _, _ = _build_client(list_use_case=list_fake)
+
+    response = client.get(
+        "/backtests/runs",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000111"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"][0]["run_id"] == "00000000-0000-0000-0000-000000000934"
+    assert body["items"][0]["execution_profile_mode"] == "exact_parallel"
+    assert body["items"][0]["progress_percent"] == 0
+    assert body["items"][0]["eta_seconds"] is None
+
+
 def test_get_backtest_run_status_returns_failed_payload_with_public_fields() -> None:
     """
     Verify `GET /backtests/runs/{run_id}` returns failure payload and persisted metadata.
@@ -531,7 +574,6 @@ def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_field
                 "timeframe": "1h",
             },
             "top_k": 25,
-            "execution_profile_mode": "exact_parallel",
         },
         request_hash="a" * 64,
         spec_hash=None,
@@ -545,6 +587,8 @@ def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_field
             artifact_asof_date="2026-03-29",
         ),
         execution_mode="sync_inline",
+        execution_profile_mode_hint="exact_parallel",
+        effective_execution_profile_mode="exact_parallel",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -605,7 +649,6 @@ def test_get_backtest_run_status_uses_benchmark_eta_fallback_when_timeline_signa
         created_at=datetime(2026, 3, 29, 11, 59, 55, tzinfo=timezone.utc),
         request_json={
             "top_k": 25,
-            "execution_profile_mode": "exact_parallel",
         },
         request_hash="a" * 64,
         spec_hash=None,
@@ -613,6 +656,8 @@ def test_get_backtest_run_status_uses_benchmark_eta_fallback_when_timeline_signa
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
         execution_mode="sync_inline",
+        execution_profile_mode_hint="exact_parallel",
+        effective_execution_profile_mode="exact_parallel",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",

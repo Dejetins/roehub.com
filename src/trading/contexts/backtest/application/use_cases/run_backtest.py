@@ -1344,8 +1344,9 @@ def _requested_execution_profile_mode_from_payload_v2(
             override, or `None`.
     Assumptions:
         `execution_profile_mode` is internal metadata only; it is not part of the public
-        `/backtests` request DTO and must remain excluded from request-hash semantics, even when
-        the persisted sync-inline launch path pins the redesigned `hybrid_conservative` profile.
+        `/backtests` request DTO and must remain excluded from request-hash semantics. Only this
+        explicit caller-supplied payload snapshot may carry a requested live override; persisted
+        job/read-model metadata must not be reinterpreted later by the worker.
     Raises:
         BacktestValidationError: If the internal override exists but is not a valid mode string.
     Side Effects:

@@ -49,6 +49,8 @@ _BACKTEST_JOB_SELECT_COLUMNS = """
     artifact_manifest_hash,
     artifact_asof_date,
     execution_mode,
+    execution_profile_mode_hint,
+    effective_execution_profile_mode,
     market_id,
     symbol,
     timeframe,
@@ -166,6 +168,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             artifact_manifest_hash,
             artifact_asof_date,
             execution_mode,
+            execution_profile_mode_hint,
+            effective_execution_profile_mode,
             market_id,
             symbol,
             timeframe,
@@ -206,6 +210,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             %(artifact_manifest_hash)s,
             %(artifact_asof_date)s,
             %(execution_mode)s,
+            %(execution_profile_mode_hint)s,
+            %(effective_execution_profile_mode)s,
             %(market_id)s,
             %(symbol)s,
             %(timeframe)s,
@@ -297,6 +303,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 artifact_manifest_hash,
                 artifact_asof_date,
                 execution_mode,
+                execution_profile_mode_hint,
+                effective_execution_profile_mode,
                 market_id,
                 symbol,
                 timeframe,
@@ -337,6 +345,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 %(artifact_manifest_hash)s,
                 %(artifact_asof_date)s,
                 %(execution_mode)s,
+                %(execution_profile_mode_hint)s,
+                %(effective_execution_profile_mode)s,
                 %(market_id)s,
                 %(symbol)s,
                 %(timeframe)s,
@@ -705,7 +715,9 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
     Returns:
         BacktestJob: Mapped immutable job aggregate.
     Assumptions:
-        Row schema follows additive Backtest jobs persisted-run storage contract.
+        Row schema follows additive Backtest jobs persisted-run storage contract, and legacy rows
+        may still require explicit `request_json.execution_profile_mode` fallback when the new
+        metadata columns are null.
     Raises:
         BacktestStorageError: If one field cannot be mapped.
     Side Effects:
@@ -737,6 +749,18 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
         )
         if request_payload is None:
             raise BacktestStorageError("backtest_jobs.request_json must be JSON object")
+        execution_profile_mode_hint = _normalize_optional_execution_profile_mode_metadata(
+            value=row.get("execution_profile_mode_hint"),
+            field_name="execution_profile_mode_hint",
+        )
+        effective_execution_profile_mode = _normalize_optional_execution_profile_mode_metadata(
+            value=row.get("effective_execution_profile_mode"),
+            field_name="effective_execution_profile_mode",
+        )
+        if effective_execution_profile_mode is None:
+            effective_execution_profile_mode = _legacy_execution_profile_mode_from_request_json(
+                request_json=request_payload
+            )
 
         spec_payload = _parse_json_object(
             value=row.get("spec_payload_json"),
@@ -786,6 +810,8 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
             backtest_runtime_config_hash=str(row["backtest_runtime_config_hash"]),
             artifact_pin=artifact_pin,
             execution_mode=_parse_execution_mode(value=row.get("execution_mode")),
+            execution_profile_mode_hint=execution_profile_mode_hint,
+            effective_execution_profile_mode=effective_execution_profile_mode,
             market_id=int(row["market_id"]) if row.get("market_id") is not None else None,
             symbol=str(row["symbol"]) if row.get("symbol") is not None else None,
             timeframe=str(row["timeframe"]) if row.get("timeframe") is not None else None,
@@ -883,6 +909,8 @@ def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
             job.artifact_pin.artifact_asof_date if job.artifact_pin is not None else None
         ),
         "execution_mode": job.execution_mode,
+        "execution_profile_mode_hint": job.execution_profile_mode_hint,
+        "effective_execution_profile_mode": job.effective_execution_profile_mode,
         "market_id": job.market_id,
         "symbol": job.symbol,
         "timeframe": job.timeframe,
@@ -903,6 +931,63 @@ def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
         if job.last_error_json is not None
         else None,
     }
+
+
+def _normalize_optional_execution_profile_mode_metadata(
+    *,
+    value: Any,
+    field_name: str,
+) -> str | None:
+    """
+    Normalize one optional persisted execution-profile metadata column from a SQL row.
+
+    Args:
+        value: Raw SQL row value.
+        field_name: Column name used in deterministic error messages.
+    Returns:
+        str | None: Lowercase stripped metadata literal, or `None`.
+    Assumptions:
+        Dedicated execution-profile metadata columns are additive and nullable for historical
+        rows.
+    Raises:
+        BacktestStorageError: If the column is present but normalizes to an empty string.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    if not normalized:
+        raise BacktestStorageError(f"backtest_jobs.{field_name} must be non-empty when set")
+    return normalized
+
+
+def _legacy_execution_profile_mode_from_request_json(
+    *,
+    request_json: Mapping[str, Any],
+) -> str | None:
+    """
+    Read legacy persisted execution-profile metadata from `request_json` as an explicit fallback.
+
+    Args:
+        request_json: Canonical persisted request payload.
+    Returns:
+        str | None: Lowercase execution-profile metadata literal, or `None`.
+    Assumptions:
+        Only historical rows use `request_json.execution_profile_mode`; new rows should hydrate
+        from dedicated metadata columns instead.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    raw_mode = request_json.get("execution_profile_mode")
+    if not isinstance(raw_mode, str):
+        return None
+    normalized = raw_mode.strip().lower()
+    if not normalized:
+        return None
+    return normalized
 
 
 def _serialize_top_rows(

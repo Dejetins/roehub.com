@@ -715,9 +715,9 @@ def test_get_top_use_case_returns_persisted_rows_in_repository_order() -> None:
     assert results_repository.last_limit == 2
 
 
-def test_run_progress_snapshot_builder_uses_request_profile_override_for_weights() -> None:
+def test_run_progress_snapshot_builder_uses_additive_effective_profile_for_weights() -> None:
     """
-    Verify additive progress builder honors persisted `execution_profile_mode` override.
+    Verify additive progress builder honors persisted additive effective profile metadata.
 
     Docs:
       - docs/architecture/backtest/backtest-runs-history-v2.md
@@ -731,8 +731,8 @@ def test_run_progress_snapshot_builder_uses_request_profile_override_for_weights
     Returns:
         None.
     Assumptions:
-        Persisted runs may later carry explicit profile literals in `request_json` without
-        changing the public route shape or storage schema.
+        New rows expose one stable public `execution_profile_mode` while storing its backing
+        source in additive execution-profile metadata outside `request_json`.
     Raises:
         AssertionError: If profile resolution, weighted progress, or ETA projection drifts.
     Side Effects:
@@ -741,6 +741,68 @@ def test_run_progress_snapshot_builder_uses_request_profile_override_for_weights
     owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
     queued = BacktestJob.create_queued(
         job_id=UUID("00000000-0000-0000-0000-000000000963"),
+        user_id=owner_user_id,
+        mode="template",
+        created_at=datetime(2026, 3, 29, 11, 55, tzinfo=timezone.utc),
+        request_json={
+            "mode": "template",
+            "top_k": 25,
+        },
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        execution_mode="sync_inline",
+        execution_profile_mode_hint="exact_parallel",
+        effective_execution_profile_mode="exact_parallel",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+    )
+    running = queued.claim(
+        changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
+        locked_by="worker-test-1",
+        lease_expires_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+    ).update_progress(
+        changed_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
+        stage="stage_b",
+        processed_units=10,
+        total_units=20,
+    )
+
+    progress = BacktestRunProgressSnapshotBuilder(
+        benchmark_corpus=_benchmark_corpus(),
+        now_provider=lambda: datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc)
+    ).build(run=running)
+
+    assert progress.execution_profile_mode == "exact_parallel"
+    assert progress.progress_percent == 70
+    assert progress.eta_seconds == 26
+
+
+def test_run_progress_snapshot_builder_keeps_legacy_request_json_profile_fallback() -> None:
+    """
+    Verify additive progress builder keeps explicit legacy `request_json` profile fallback.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Historical rows may still predate additive profile columns and must remain readable until
+        backfill or retention cleanup completes.
+    Raises:
+        AssertionError: If the compatibility branch for legacy rows disappears.
+    Side Effects:
+        None.
+    """
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
+    queued = BacktestJob.create_queued(
+        job_id=UUID("00000000-0000-0000-0000-000000000968"),
         user_id=owner_user_id,
         mode="template",
         created_at=datetime(2026, 3, 29, 11, 55, tzinfo=timezone.utc),
@@ -775,7 +837,7 @@ def test_run_progress_snapshot_builder_uses_request_profile_override_for_weights
 
     progress = BacktestRunProgressSnapshotBuilder(
         benchmark_corpus=_benchmark_corpus(),
-        now_provider=lambda: datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc)
+        now_provider=lambda: datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
     ).build(run=running)
 
     assert progress.execution_profile_mode == "exact_parallel"
@@ -843,7 +905,6 @@ def test_run_progress_snapshot_builder_uses_benchmark_fallback_before_throughput
         request_json={
             "mode": "template",
             "top_k": 25,
-            "execution_profile_mode": "exact_parallel",
         },
         request_hash="a" * 64,
         spec_hash=None,
@@ -851,6 +912,8 @@ def test_run_progress_snapshot_builder_uses_benchmark_fallback_before_throughput
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
         execution_mode="sync_inline",
+        execution_profile_mode_hint="exact_parallel",
+        effective_execution_profile_mode="exact_parallel",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -906,7 +969,6 @@ def test_run_progress_snapshot_builder_keeps_progress_bounded_and_monotonic_acro
         request_json={
             "mode": "template",
             "top_k": 25,
-            "execution_profile_mode": "exact_parallel",
         },
         request_hash="a" * 64,
         spec_hash=None,
@@ -914,6 +976,8 @@ def test_run_progress_snapshot_builder_keeps_progress_bounded_and_monotonic_acro
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
         execution_mode="sync_inline",
+        execution_profile_mode_hint="exact_parallel",
+        effective_execution_profile_mode="exact_parallel",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -978,7 +1042,6 @@ def test_run_progress_snapshot_builder_reads_weights_from_execution_profile_cata
         request_json={
             "mode": "template",
             "top_k": 25,
-            "execution_profile_mode": "exact_parallel",
         },
         request_hash="a" * 64,
         spec_hash=None,
@@ -986,6 +1049,8 @@ def test_run_progress_snapshot_builder_reads_weights_from_execution_profile_cata
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
         execution_mode="sync_inline",
+        execution_profile_mode_hint="exact_parallel",
+        effective_execution_profile_mode="exact_parallel",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",

@@ -175,15 +175,20 @@ class BacktestRunProgressSnapshotBuilder:
         Returns:
             ExecutionProfileModeLiteralV2: Stable execution-profile mode literal for UI rendering.
         Assumptions:
-            Profile-aware launch now persists effective profile selection in `request_json` for
-            `/backtests` runs, while older rows or unrelated legacy rows may still fall back to
-            the configured default exact profile.
+            New rows persist read-model profile metadata additively via
+            `effective_execution_profile_mode` and `execution_profile_mode_hint`; historical rows
+            may still require explicit `request_json.execution_profile_mode` fallback before the
+            configured default exact profile is used.
         Raises:
             None.
         Side Effects:
             None.
         """
-        raw_mode = run.request_json.get("execution_profile_mode")
+        raw_mode = run.effective_execution_profile_mode
+        if raw_mode is None:
+            raw_mode = run.execution_profile_mode_hint
+        if raw_mode is None:
+            raw_mode = run.request_json.get("execution_profile_mode")
         if isinstance(raw_mode, str) and raw_mode.strip():
             try:
                 normalized_mode = validate_execution_profile_mode_v2(value=raw_mode)

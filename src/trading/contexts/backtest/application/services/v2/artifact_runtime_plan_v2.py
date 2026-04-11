@@ -742,9 +742,10 @@ class BacktestArtifactRuntimePlannerV2:
                 combo prefilter, and retained-candidate exact work under stable public
                 `stage_a` semantics for adaptive classification only.
             requested_execution_profile_mode:
-                Optional internal-only requested execution profile mode. When present, automatic
-                exact-profile selection is bypassed and the requested profile is validated against
-                live runtime gating plus sync launch budgets.
+                Optional internal-only requested execution profile mode supplied explicitly by the
+                live caller. When present, automatic exact-profile selection is bypassed and the
+                requested profile is validated against live runtime gating plus sync launch
+                budgets.
             indicator_ids:
                 Optional deterministic indicator ids from the prepared plan. These stay internal
                 and are used only to validate `hybrid_family` plugin availability.
@@ -753,8 +754,8 @@ class BacktestArtifactRuntimePlannerV2:
         Assumptions:
             Requested exact-profile overrides keep precedence, while requested hybrid overrides are
             allowed only when selector rollout has reached explicit `opt_in` or `active`
-            semantics; automatic selection uses the typed adaptive selector only when planning
-            evidence is available.
+            semantics. Persisted read-model metadata is not a requested override input; automatic
+            selection uses the typed adaptive selector only when planning evidence is available.
         Raises:
             RoehubError: If sync launch budgets are exceeded and background routing is required.
             ValueError: If configured profiles cannot be resolved from the catalog.

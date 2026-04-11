@@ -120,14 +120,15 @@ deterministic `422` ошибками.
     and startup-validated execution-profile launch budgets;
   - heavy-but-valid exact requests are queued instead of being hard-rejected, while true full-budget
     guard violations still return canonical deterministic `422`;
-  - effective `execution_profile_mode` is persisted into unified run storage for later
+  - effective `execution_profile_mode` is persisted into additive unified-run metadata for later
     `/backtests/runs*` progress/history rendering.
 - D2 hybrid rollout note:
   - `hybrid_conservative` remains an internal-only runtime profile, but sync `POST /backtests`
     now server-pins that profile for the redesigned prefilter-first launch path;
   - public `POST /backtests` still does not expose a profile selector;
-  - internal-only `execution_profile_mode` metadata may be persisted in `request_json`, but it
-    must stay out of public request validation and out of request-hash semantics.
+  - internal-only execution-profile metadata must live in additive persisted fields outside
+    `request_json`, while legacy `request_json.execution_profile_mode` remains compatibility-only
+    for already stored rows and stays out of request-hash semantics.
 - F1 sync cutover note:
   - sync `POST /backtests` launch now executes through the redesigned prefilter-first exact
     pipeline by forcing internal `execution_profile_mode=hybrid_conservative` inside the
@@ -280,8 +281,9 @@ Response v1 включает:
 - ad-hoc mode: `grid_request_hash` (детерминированный hash от canonical request payload),
 - всегда: `engine_params_hash` (детерминированный hash от effective runtime settings, влияющих на результат).
 
-Persisted-only launch/read metadata such as `execution_profile_mode` may be stored in
-`request_json`, but it must stay out of `grid_request_hash` while exact result semantics remain
+Persisted-only launch/read metadata such as `execution_profile_mode` must be stored in additive
+fields like `execution_profile_mode_hint` / `effective_execution_profile_mode`, while any legacy
+`request_json` fallback must stay out of `grid_request_hash` while exact result semantics remain
 unchanged.
 
 Зачем:
@@ -322,8 +324,9 @@ R9-01 launch UX note:
     ещё до legacy overflow-style fallback reject,
   - выполняет full-budget preflight и создаёт queued row с `execution_mode=background_auto` как
     canonical background path,
-  - persist'ит effective `execution_profile_mode` в `request_json`, чтобы history/progress read path
-    не терял реальный selected profile,
+  - persist'ит effective `execution_profile_mode` в additive metadata
+    (`execution_profile_mode_hint` / `effective_execution_profile_mode`), чтобы history/progress
+    read path не терял реальный selected profile без засорения `request_json`,
   - возвращает `202 Accepted`,
   - `variants[]` остаётся пустым, потому что ranking summary ещё не materialize'ился.
 - Branch C: full budgets тоже не проходят

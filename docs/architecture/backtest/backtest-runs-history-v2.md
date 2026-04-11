@@ -68,10 +68,11 @@
   - `eta_seconds` использует precedence `current throughput -> benchmark fallback -> null`:
     сначала текущий run timeline, затем startup-loaded benchmark corpus, и только потом
     `null`, если ни один источник не даёт defensible estimate;
-  - read path берёт `execution_profile_mode` из persisted `request_json`, если B3 profile-aware
-    launch уже сохранил effective profile;
-  - для старых rows или unrelated legacy rows fallback остаётся configured default exact profile,
-    чтобы public contract был backward compatible.
+  - read path берёт `execution_profile_mode` сначала из additive persisted metadata
+    `effective_execution_profile_mode`, затем из `execution_profile_mode_hint`;
+  - для исторических rows explicit compatibility fallback в legacy
+    `request_json.execution_profile_mode` остаётся допустимым, после чего используется
+    configured default exact profile, чтобы public contract был backward compatible.
 - B3 additive exact-profile note:
   - `POST /backtests` now persists effective `execution_profile_mode` for both
     `sync_inline` and earlier queued `background_auto` exact runs;

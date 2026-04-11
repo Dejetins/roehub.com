@@ -35,14 +35,12 @@ from trading.contexts.backtest.application.services import (
     BacktestPriceArraysLoaderV2,
     BacktestReportingServiceV1,
     BacktestStageAShortlistBuilderV2,
-    ExecutionProfileModeLiteralV2,
     MmapPriceArraysLoaderV2,
     artifact_coordinates_from_market_id_v2,
     build_default_artifact_backed_stage_b_scorer_v2,
     build_default_hierarchical_shortlist_builder_v2,
     build_default_stage_a_shortlist_builder_v2,
     execution_profile_uses_hierarchical_shortlist_runtime_v2,
-    validate_execution_profile_mode_v2,
 )
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobSnapshotCadenceV1,
@@ -503,7 +501,6 @@ class RunBacktestJobRunnerV1:
             runtime_plan = self._plan_claimed_runtime(
                 context=context,
                 candles=timeline.candles,
-                request_json=job.request_json,
             )
             effective_runtime_plan = runtime_plan
             if execution_profile_uses_hierarchical_shortlist_runtime_v2(
@@ -650,7 +647,6 @@ class RunBacktestJobRunnerV1:
         *,
         context: _ResolvedJobRequestContext,
         candles: Any,
-        request_json: Mapping[str, Any],
     ) -> BacktestArtifactRuntimePlanV2:
         """
         Resolve the claimed-job runtime plan through the shared planner surface.
@@ -658,29 +654,25 @@ class RunBacktestJobRunnerV1:
         Args:
             context: Resolved deterministic job request context.
             candles: Warmup-aware artifact candle arrays already resolved for the claimed job.
-            request_json: Persisted canonical request JSON for the claimed job.
         Returns:
             BacktestArtifactRuntimePlanV2: Shared planner output consumed by the worker.
         Assumptions:
             The worker executes the plan chosen by the shared planner and does not own its own
             rollout table for `execution_profiles`, `adaptive_selector_policy`, `background_auto`,
-            or `opt_in`.
+            or `opt_in`; persisted request/read-model metadata must not be reinterpreted as a
+            requested live execution-profile override at claim time.
         Raises:
             RoehubError: Propagated from the shared planner when guard limits are exceeded.
-            ValueError: If persisted internal planner metadata is invalid.
         Side Effects:
             Calls the shared planner, which may perform deterministic estimate work through
             `IndicatorCompute.estimate(...)`.
         """
-        requested_execution_profile_mode = _requested_execution_profile_mode_from_request_json_v2(
-            request_json=request_json
-        )
         return self._shared_runtime_planner.plan(
             template=context.template,
             candles=candles,
             indicator_compute=self._indicator_compute,
             preselect=context.preselect,
-            requested_execution_profile_mode=requested_execution_profile_mode,
+            requested_execution_profile_mode=None,
             defaults_provider=self._defaults_provider,
             max_variants_per_compute=self._max_variants_per_compute,
             max_compute_bytes_total=self._max_compute_bytes_total,
@@ -2496,44 +2488,6 @@ def _optional_mode(*, payload: Mapping[str, Any], key: str, default: str) -> str
     if not normalized:
         return default
     return normalized
-
-
-def _requested_execution_profile_mode_from_request_json_v2(
-    *,
-    request_json: Mapping[str, Any],
-) -> ExecutionProfileModeLiteralV2 | None:
-    """
-    Resolve the internal-only execution-profile override from persisted request JSON.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-    Related:
-      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
-      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
-      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
-
-    Args:
-        request_json: Persisted canonical request JSON payload.
-    Returns:
-        ExecutionProfileModeLiteralV2 | None: Validated internal execution-profile mode
-            override, or `None`.
-    Assumptions:
-        Persisted `execution_profile_mode` is internal metadata only and remains excluded from
-        request-hash semantics and the public request DTO.
-    Raises:
-        ValueError: If the internal override exists but is not a valid mode string.
-    Side Effects:
-        None.
-    """
-    raw_mode = request_json.get("execution_profile_mode")
-    if raw_mode is None:
-        return None
-    if not isinstance(raw_mode, str):
-        raise ValueError("persisted execution_profile_mode must be a string when provided")
-    return validate_execution_profile_mode_v2(value=raw_mode)
-
-
 __all__ = [
     "BacktestJobRunReportV1",
     "BacktestJobRunStatus",

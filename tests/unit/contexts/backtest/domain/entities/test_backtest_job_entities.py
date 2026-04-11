@@ -228,6 +228,8 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
         engine_params_hash="b" * 64,
         backtest_runtime_config_hash="c" * 64,
         execution_mode="background_manual_legacy",
+        execution_profile_mode_hint="hybrid_conservative",
+        effective_execution_profile_mode="hybrid_conservative",
         market_id=1,
         symbol="btcusdt",
         timeframe="1H",
@@ -247,6 +249,8 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
     )
 
     assert queued.execution_mode == "background_manual_legacy"
+    assert queued.execution_profile_mode_hint == "hybrid_conservative"
+    assert queued.effective_execution_profile_mode == "hybrid_conservative"
     assert queued.market_id == 1
     assert queued.symbol == "BTCUSDT"
     assert queued.timeframe == "1h"
@@ -254,6 +258,11 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
     assert queued.ranking_primary_metric == "total_return_pct"
     assert queued.ranking_secondary_metric == "profit_factor"
     assert claimed.execution_mode == queued.execution_mode
+    assert claimed.execution_profile_mode_hint == queued.execution_profile_mode_hint
+    assert (
+        claimed.effective_execution_profile_mode
+        == queued.effective_execution_profile_mode
+    )
     assert claimed.market_id == queued.market_id
     assert claimed.symbol == queued.symbol
     assert claimed.timeframe == queued.timeframe
@@ -261,12 +270,54 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
     assert claimed.ranking_primary_metric == queued.ranking_primary_metric
     assert claimed.ranking_secondary_metric == queued.ranking_secondary_metric
     assert finished.execution_mode == queued.execution_mode
+    assert finished.execution_profile_mode_hint == queued.execution_profile_mode_hint
+    assert (
+        finished.effective_execution_profile_mode
+        == queued.effective_execution_profile_mode
+    )
     assert finished.market_id == queued.market_id
     assert finished.symbol == queued.symbol
     assert finished.timeframe == queued.timeframe
     assert finished.requested_top_n == queued.requested_top_n
     assert finished.ranking_primary_metric == queued.ranking_primary_metric
     assert finished.ranking_secondary_metric == queued.ranking_secondary_metric
+
+
+def test_backtest_job_rejects_execution_profile_metadata_without_persisted_run_metadata() -> None:
+    """
+    Verify additive execution-profile metadata requires the persisted-run metadata contract.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `execution_profile_mode_hint` and `effective_execution_profile_mode` are stored only for
+        persisted jobs/runs that already carry `execution_mode` and denormalized run metadata.
+    Raises:
+        AssertionError: If profile metadata is accepted on a plain queued snapshot.
+    Side Effects:
+        None.
+    """
+    now = datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc)
+
+    with pytest.raises(
+        BacktestJobTransitionError,
+        match="execution-profile metadata requires persisted run metadata",
+    ):
+        BacktestJob.create_queued(
+            job_id=UUID("00000000-0000-0000-0000-000000000954"),
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"),
+            mode="template",
+            created_at=now,
+            request_json={"mode": "template"},
+            request_hash="a" * 64,
+            spec_hash=None,
+            spec_payload_json=None,
+            engine_params_hash="b" * 64,
+            backtest_runtime_config_hash="c" * 64,
+            execution_profile_mode_hint="exact_parallel",
+        )
 
 
 def test_backtest_job_top_variant_rejects_legacy_report_and_keeps_summary_only_fields() -> None:

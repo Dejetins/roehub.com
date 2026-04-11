@@ -38,6 +38,7 @@ from trading.contexts.backtest.domain.entities import (
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
+from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import (
     InstrumentId,
     MarketId,
@@ -485,7 +486,7 @@ class _RecordingSharedRuntimePlanner:
             indicator_compute: Indicator compute dependency.
             preselect: Stage-A preselect value.
             requested_execution_profile_mode:
-                Optional explicit execution profile mode forwarded from persisted job payload.
+                Optional explicit execution profile mode forwarded from a live caller override.
             defaults_provider: Optional defaults provider.
             max_variants_per_compute: Variants guard.
             max_compute_bytes_total: Memory guard.
@@ -533,7 +534,7 @@ class _RecordingSharedRuntimePlanner:
             indicator_compute: Indicator compute dependency.
             preselect: Stage-A preselect value.
             requested_execution_profile_mode:
-                Optional explicit execution profile mode forwarded from persisted job payload.
+                Optional explicit execution profile mode forwarded from a live caller override.
             defaults_provider: Optional defaults provider.
             max_variants_per_compute: Variants guard.
             max_compute_bytes_total: Memory guard.
@@ -556,6 +557,69 @@ class _RecordingSharedRuntimePlanner:
             max_variants_per_compute=max_variants_per_compute,
             max_compute_bytes_total=max_compute_bytes_total,
         )
+
+
+class _ShadowRequestedHybridRejectingPlanner(_RecordingSharedRuntimePlanner):
+    """
+    Planner fake that mimics shadow rollout rejecting live requested hybrid overrides.
+    """
+
+    def plan(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        candles: Any,
+        indicator_compute: Any,
+        preselect: int,
+        requested_execution_profile_mode: str | None,
+        defaults_provider: Any,
+        max_variants_per_compute: int,
+        max_compute_bytes_total: int,
+    ) -> _FakeGridContext:
+        """
+        Reject shadow-gated requested hybrid overrides after recording the planner call.
+
+        Args:
+            template: Run template payload.
+            candles: Candle arrays payload.
+            indicator_compute: Indicator compute dependency.
+            preselect: Stage-A preselect value.
+            requested_execution_profile_mode:
+                Optional explicit execution profile mode forwarded from a live caller override.
+            defaults_provider: Optional defaults provider.
+            max_variants_per_compute: Variants guard.
+            max_compute_bytes_total: Memory guard.
+        Returns:
+            _FakeGridContext: Prebuilt runtime plan fixture when no shadow-gated override exists.
+        Assumptions:
+            `shadow` keeps live `hybrid_conservative` opt-in disabled even though read-model
+            metadata may already record that profile for persisted jobs.
+        Raises:
+            RoehubError: If the worker forwards a live requested hybrid override under `shadow`.
+        Side Effects:
+            Appends planner inputs to the in-memory call log before applying the gate.
+        """
+        runtime_plan = super().plan(
+            template=template,
+            candles=candles,
+            indicator_compute=indicator_compute,
+            preselect=preselect,
+            requested_execution_profile_mode=requested_execution_profile_mode,
+            defaults_provider=defaults_provider,
+            max_variants_per_compute=max_variants_per_compute,
+            max_compute_bytes_total=max_compute_bytes_total,
+        )
+        if requested_execution_profile_mode == "hybrid_conservative":
+            raise RoehubError(
+                code="validation_error",
+                message="Requested execution profile is not enabled for live runtime",
+                details={
+                    "error": "execution_profile_not_enabled",
+                    "execution_profile_mode": "hybrid_conservative",
+                    "adaptive_selector_policy_mode": "shadow",
+                },
+            )
+        return runtime_plan
 
 
 class _FakePriceArraysLoader:
@@ -2644,11 +2708,11 @@ def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime(
         ("background_manual_legacy",),
     ),
 )
-def test_process_claimed_job_forwards_internal_profile_override_to_shared_planner(
+def test_process_claimed_job_ignores_persisted_execution_profile_metadata_for_planner_override(
     execution_mode: BacktestJobExecutionMode,
 ) -> None:
     """
-    Verify claimed worker execution delegates internal profile selection to the shared planner.
+    Verify claimed worker execution does not treat persisted profile metadata as a live override.
 
     Args:
         execution_mode: Persisted background execution mode literal under test.
@@ -2658,8 +2722,8 @@ def test_process_claimed_job_forwards_internal_profile_override_to_shared_planne
         The worker may execute either `background_auto` or compatibility-only
         `background_manual_legacy`, but both must consume the same shared planner surface.
     Raises:
-        AssertionError: If the worker stops forwarding internal planner metadata or creates a
-            mode-specific profile-selection branch.
+        AssertionError: If the worker still reinterprets persisted profile metadata as a live
+            requested execution-profile override or creates a mode-specific planner branch.
     Side Effects:
         None.
     """
@@ -2670,6 +2734,8 @@ def test_process_claimed_job_forwards_internal_profile_override_to_shared_planne
             "mode": "template",
             "execution_profile_mode": requested_mode,
         },
+        execution_profile_mode_hint=requested_mode,
+        effective_execution_profile_mode=requested_mode,
     )
     request = _build_request(top_k=5, preselect=2, top_trades_n=1)
     planner = _RecordingSharedRuntimePlanner(
@@ -2706,9 +2772,75 @@ def test_process_claimed_job_forwards_internal_profile_override_to_shared_planne
 
     assert report.status == "succeeded"
     assert len(planner.calls) == 1
-    assert planner.calls[0]["requested_execution_profile_mode"] == requested_mode
+    assert planner.calls[0]["requested_execution_profile_mode"] is None
     assert planner.calls[0]["preselect"] == request.preselect
     assert job.execution_mode == execution_mode
+
+
+def test_process_claimed_job_background_auto_ignores_hybrid_metadata_under_shadow_rollout(
+) -> None:
+    """
+    Verify `background_auto` worker runs ignore persisted hybrid metadata under shadow rollout.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Persisted read-model metadata may already say `hybrid_conservative`, but only explicit
+        live launch overrides may request that profile while selector rollout is still `shadow`.
+    Raises:
+        AssertionError: If worker planning still reinterprets persisted metadata as a requested
+            live hybrid override and reproduces `execution_profile_not_enabled`.
+    Side Effects:
+        None.
+    """
+    requested_mode = "hybrid_conservative"
+    job = _build_running_job_with_artifact_pin(
+        execution_mode="background_auto",
+        request_json={
+            "mode": "template",
+            "execution_profile_mode": requested_mode,
+        },
+        execution_profile_mode_hint=requested_mode,
+        effective_execution_profile_mode=requested_mode,
+    )
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    planner = _ShadowRequestedHybridRejectingPlanner(
+        runtime_plan=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        )
+    )
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=_FakeResultsRepository(),
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+        ),
+        scorer=_DeterministicScorerWithDetails(
+            stage_a_scores={
+                _build_stage_a_variants()[0].base_variant_key: 3.0,
+                _build_stage_a_variants()[1].base_variant_key: 2.0,
+            }
+        ),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 47, 30)),
+        runtime_planner=planner,
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert len(planner.calls) == 1
+    assert planner.calls[0]["requested_execution_profile_mode"] is None
 
 
 def test_process_claimed_job_treats_background_manual_legacy_as_compatibility_only(
@@ -3176,6 +3308,8 @@ def _build_running_job(
     *,
     execution_mode: BacktestJobExecutionMode = "background_auto",
     request_json: Mapping[str, Any] | None = None,
+    execution_profile_mode_hint: str | None = None,
+    effective_execution_profile_mode: str | None = None,
 ) -> BacktestJob:
     """
     Build deterministic running Backtest job fixture with persisted artifact pin metadata.
@@ -3183,6 +3317,10 @@ def _build_running_job(
     Args:
         execution_mode: Background execution mode literal persisted on the claimed job.
         request_json: Optional persisted request payload override.
+        execution_profile_mode_hint:
+            Optional persisted launch-time execution-profile hint metadata.
+        effective_execution_profile_mode:
+            Optional persisted read-model execution-profile metadata.
     Returns:
         BacktestJob: Running claimed job fixture pinned to immutable artifact identity.
     Assumptions:
@@ -3211,6 +3349,8 @@ def _build_running_job(
             artifact_asof_date="2026-03-29",
         ),
         execution_mode=execution_mode,
+        execution_profile_mode_hint=execution_profile_mode_hint,
+        effective_execution_profile_mode=effective_execution_profile_mode,
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -3229,6 +3369,8 @@ def _build_running_job_with_artifact_pin(
     *,
     execution_mode: BacktestJobExecutionMode = "background_auto",
     request_json: Mapping[str, Any] | None = None,
+    execution_profile_mode_hint: str | None = None,
+    effective_execution_profile_mode: str | None = None,
 ) -> BacktestJob:
     """
     Build deterministic running Backtest job fixture with persisted artifact pin metadata.
@@ -3236,6 +3378,10 @@ def _build_running_job_with_artifact_pin(
     Args:
         execution_mode: Background execution mode literal persisted on the claimed job.
         request_json: Optional persisted request payload override.
+        execution_profile_mode_hint:
+            Optional persisted launch-time execution-profile hint metadata.
+        effective_execution_profile_mode:
+            Optional persisted read-model execution-profile metadata.
     Returns:
         BacktestJob: Running claimed job fixture with immutable artifact pin metadata.
     Assumptions:
@@ -3248,6 +3394,8 @@ def _build_running_job_with_artifact_pin(
     return _build_running_job(
         execution_mode=execution_mode,
         request_json=request_json,
+        execution_profile_mode_hint=execution_profile_mode_hint,
+        effective_execution_profile_mode=effective_execution_profile_mode,
     )
 
 

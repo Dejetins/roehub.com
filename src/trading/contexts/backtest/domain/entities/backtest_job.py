@@ -348,6 +348,8 @@ class BacktestJob:
     backtest_runtime_config_hash: str = ""
     artifact_pin: BacktestJobArtifactPin | None = None
     execution_mode: BacktestJobExecutionMode | None = None
+    execution_profile_mode_hint: str | None = None
+    effective_execution_profile_mode: str | None = None
     market_id: int | None = None
     symbol: str | None = None
     timeframe: str | None = None
@@ -557,6 +559,17 @@ class BacktestJob:
                 self.ranking_secondary_metric,
             )
         )
+        has_execution_profile_metadata = any(
+            item is not None
+            for item in (
+                self.execution_profile_mode_hint,
+                self.effective_execution_profile_mode,
+            )
+        )
+        if has_execution_profile_metadata and not has_persisted_run_metadata:
+            raise BacktestJobTransitionError(
+                "BacktestJob execution-profile metadata requires persisted run metadata"
+            )
         if has_persisted_run_metadata:
             if (
                 self.execution_mode is None
@@ -605,10 +618,30 @@ class BacktestJob:
                         "BacktestJob.ranking_secondary_metric must differ from "
                         "ranking_primary_metric"
                     )
+            normalized_execution_profile_mode_hint = _normalize_optional_profile_mode_literal(
+                name="execution_profile_mode_hint",
+                value=self.execution_profile_mode_hint,
+            )
+            normalized_effective_execution_profile_mode = (
+                _normalize_optional_profile_mode_literal(
+                    name="effective_execution_profile_mode",
+                    value=self.effective_execution_profile_mode,
+                )
+            )
             object.__setattr__(
                 self,
                 "execution_mode",
                 cast(BacktestJobExecutionMode, normalized_execution_mode),
+            )
+            object.__setattr__(
+                self,
+                "execution_profile_mode_hint",
+                normalized_execution_profile_mode_hint,
+            )
+            object.__setattr__(
+                self,
+                "effective_execution_profile_mode",
+                normalized_effective_execution_profile_mode,
             )
             object.__setattr__(self, "market_id", self.market_id)
             object.__setattr__(self, "symbol", normalized_symbol)
@@ -656,6 +689,8 @@ class BacktestJob:
         backtest_runtime_config_hash: str,
         artifact_pin: BacktestJobArtifactPin | None = None,
         execution_mode: BacktestJobExecutionMode | None = None,
+        execution_profile_mode_hint: str | None = None,
+        effective_execution_profile_mode: str | None = None,
         market_id: int | None = None,
         symbol: str | None = None,
         timeframe: str | None = None,
@@ -688,6 +723,10 @@ class BacktestJob:
             backtest_runtime_config_hash: Runtime result-affecting hash.
             artifact_pin: Optional strict artifact-slot identity pinned at job creation time.
             execution_mode: Optional persisted-run execution mode literal for R7-01 storage.
+            execution_profile_mode_hint:
+                Optional launch-time metadata hint persisted outside `request_json`.
+            effective_execution_profile_mode:
+                Optional read-model execution-profile metadata persisted outside `request_json`.
             market_id: Optional denormalized instrument market id for history reads.
             symbol: Optional denormalized instrument symbol for history reads.
             timeframe: Optional denormalized timeframe literal for history reads.
@@ -721,6 +760,8 @@ class BacktestJob:
             backtest_runtime_config_hash=backtest_runtime_config_hash,
             artifact_pin=artifact_pin,
             execution_mode=execution_mode,
+            execution_profile_mode_hint=execution_profile_mode_hint,
+            effective_execution_profile_mode=effective_execution_profile_mode,
             market_id=market_id,
             symbol=symbol,
             timeframe=timeframe,
@@ -1390,6 +1431,33 @@ def _normalize_ranking_metric_literal(*, name: str, value: str) -> str:
         raise BacktestJobTransitionError(
             f"BacktestJob.{name} must be one of {sorted(_ALLOWED_RANKING_METRICS)}"
         )
+    return normalized
+
+
+def _normalize_optional_profile_mode_literal(*, name: str, value: str | None) -> str | None:
+    """
+    Normalize one optional persisted execution-profile metadata literal.
+
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Optional raw execution-profile metadata literal.
+    Returns:
+        str | None: Lowercase normalized literal, or `None`.
+    Assumptions:
+        Validation of allowed execution-profile values happens in application/storage layers; the
+        aggregate only enforces explicit non-empty normalized string semantics.
+    Raises:
+        BacktestJobTransitionError: If the provided literal is blank or not a string.
+    Side Effects:
+        None.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise BacktestJobTransitionError(f"BacktestJob.{name} must be string when set")
+    normalized = value.strip().lower()
+    if not normalized:
+        raise BacktestJobTransitionError(f"BacktestJob.{name} must be non-empty when set")
     return normalized
 
 

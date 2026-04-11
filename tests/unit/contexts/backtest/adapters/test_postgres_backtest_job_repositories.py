@@ -274,6 +274,8 @@ def test_job_repository_create_serializes_mappingproxy_request_payload() -> None
             artifact_asof_date="2026-03-24",
         ),
         execution_mode="background_manual_legacy",
+        execution_profile_mode_hint="hybrid_conservative",
+        effective_execution_profile_mode="hybrid_conservative",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -295,12 +297,52 @@ def test_job_repository_create_serializes_mappingproxy_request_payload() -> None
     assert gateway.fetch_one_parameters[0]["artifact_slot_generation"] == 9
     assert gateway.fetch_one_parameters[0]["artifact_manifest_hash"] == "d" * 64
     assert gateway.fetch_one_parameters[0]["execution_mode"] == "background_manual_legacy"
+    assert gateway.fetch_one_parameters[0]["execution_profile_mode_hint"] == "hybrid_conservative"
+    assert (
+        gateway.fetch_one_parameters[0]["effective_execution_profile_mode"]
+        == "hybrid_conservative"
+    )
     assert gateway.fetch_one_parameters[0]["market_id"] == 1
     assert gateway.fetch_one_parameters[0]["symbol"] == "BTCUSDT"
     assert gateway.fetch_one_parameters[0]["timeframe"] == "1h"
     assert gateway.fetch_one_parameters[0]["requested_top_n"] == 25
     assert gateway.fetch_one_parameters[0]["ranking_primary_metric"] == "profit_factor"
     assert gateway.fetch_one_parameters[0]["ranking_secondary_metric"] == "win_rate_pct"
+
+
+def test_job_repository_get_uses_legacy_request_json_execution_profile_fallback() -> None:
+    """
+    Verify legacy rows still hydrate effective execution-profile metadata from `request_json`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Historical rows may predate the additive execution-profile metadata columns.
+    Raises:
+        AssertionError: If explicit legacy fallback is removed or no longer maps the profile.
+    Side Effects:
+        None.
+    """
+    row = dict(_build_job_row(state="queued"))
+    row["request_json"] = {
+        "mode": "template",
+        "execution_profile_mode": "exact_parallel",
+    }
+    row["execution_profile_mode_hint"] = None
+    row["effective_execution_profile_mode"] = None
+    gateway = _FakeGateway(fetch_one_results=[row])
+    repository = PostgresBacktestJobRepository(gateway=gateway)
+
+    loaded = repository.get(
+        job_id=UUID("00000000-0000-0000-0000-000000000810"),
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+    )
+
+    assert loaded is not None
+    assert loaded.execution_profile_mode_hint is None
+    assert loaded.effective_execution_profile_mode == "exact_parallel"
 
 
 def test_job_repository_create_with_top_variants_persists_terminal_sync_inline_rows_atomically(
@@ -893,6 +935,8 @@ def _build_job_row(*, state: str) -> Mapping[str, Any]:
         "artifact_manifest_hash": "d" * 64,
         "artifact_asof_date": "2026-03-24",
         "execution_mode": "background_manual_legacy",
+        "execution_profile_mode_hint": None,
+        "effective_execution_profile_mode": None,
         "market_id": 1,
         "symbol": "BTCUSDT",
         "timeframe": "1h",

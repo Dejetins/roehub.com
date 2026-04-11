@@ -820,7 +820,7 @@ def test_create_backtest_job_use_case_accepts_background_auto_execution_mode() -
 
 def test_create_backtest_job_use_case_excludes_execution_profile_mode_from_request_hash() -> None:
     """
-    Verify persisted-only `execution_profile_mode` metadata does not affect request identity.
+    Verify persisted execution-profile metadata stays out of `request_json` and request identity.
 
     Args:
         None.
@@ -830,7 +830,8 @@ def test_create_backtest_job_use_case_excludes_execution_profile_mode_from_reque
         Exact profile selection changes launch routing/read-model semantics, but not exact result
         semantics for the same canonical request payload.
     Raises:
-        AssertionError: If `request_hash` starts depending on persisted-only profile metadata.
+        AssertionError: If `request_json` still carries live profile metadata or if
+            `request_hash` starts depending on persisted-only profile metadata.
     Side Effects:
         None.
     """
@@ -868,13 +869,11 @@ def test_create_backtest_job_use_case_excludes_execution_profile_mode_from_reque
         current_user=CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")),
     )
 
-    assert created.request_json["execution_profile_mode"] == "exact_parallel"
+    assert "execution_profile_mode" not in created.request_json
+    assert created.execution_profile_mode_hint == "exact_parallel"
+    assert created.effective_execution_profile_mode == "exact_parallel"
     assert created.request_hash == _build_sha256_from_payload(
-        payload={
-            key: value
-            for key, value in created.request_json.items()
-            if key != "execution_profile_mode"
-        }
+        payload=dict(created.request_json)
     )
 
 
