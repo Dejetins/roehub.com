@@ -26,13 +26,13 @@
   - `small_grid_overhead` remains the lightweight small-run overhead check;
   - neither slice changes active default profile selection or implies rollout of `exact_parallel`
     launch policy by itself.
-- Milestone A / A1 notebook-parity adds one more additive benchmark surface:
+- Milestones A-G notebook parity closure keep one frozen benchmark surface:
   - `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
   - `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
   - internal measurement helpers under
     `src/trading/contexts/backtest/application/services/v2/notebook_parity_benchmark_corpus_v2.py`
-  - this surface establishes benchmark authority for `NR2`, `RG-TTR`, and `RG-ALT` without
-    changing active runtime behavior yet.
+  - this surface remains the benchmark authority for `NR2`, `RG-TTR`, and `RG-ALT` after the
+    accepted Stage A / Stage B cutover, and its gates stay blocking at closure time.
 
 ## Цель
 
@@ -111,10 +111,11 @@ R6-04 фиксирует полный runtime ranking contract и summary-only t
 
 R0 intentionally не фиксирует machine-specific SLA. Проверяется наличие метрик, shape и стабильность протокола, а не одинаковые абсолютные миллисекунды между машинами.
 
-## Notebook-parity benchmark contract (A1)
+## Notebook parity benchmark contract (A1 artifact, G1/G2 closure authority)
 
-Этот additive contract не заменяет R0. Он фиксирует новый benchmark authority для performance
-program из `backtest-engine-vnext-notebook-parity-plan-v1.md`.
+Этот contract не заменяет R0. Он сохраняет A1 fixture names, но на этапе closure фиксирует
+active benchmark authority для performance program из
+`backtest-engine-vnext-notebook-parity-plan-v1.md`.
 
 ### Canonical classes
 
@@ -141,6 +142,7 @@ Required runtime-shape measurement fields:
 - `numba_threads_used`
 - `max_python_processes_seen`
 - `stage_b_execution_mode`
+- `stage_b_process_fallback_threshold`
 - `exact_replay_count`
 
 The contract is intentionally internal-only. These fields are benchmark-only evidence and MUST NOT
@@ -154,7 +156,7 @@ All notebook-parity comparisons are valid only under `equal thread budget` rules
 - same artifact slot
 - identical `numba_threads_used`
 - comparable runtime surfaces (`sync`, `worker`, `notebook`) interpreted together with
-  `stage_b_execution_mode`
+  `stage_b_execution_mode` and `stage_b_process_fallback_threshold`
 - accepted benchmark thread budget currently freezes `max_numba_threads=4`,
   `stage_a_workers=4`, and `stage_b_workers=1` for the canonical `exact_parallel` backend shape
 
@@ -168,19 +170,30 @@ memory or prose:
 
 - `NR2` keeps current backend `181.3s` on `4` threads plus notebook references `7.54s` on
   `4` threads and `5.63s` on `12` threads, all on `macstudio-class`
-- `RG-TTR` keeps current default process-fan-out baseline:
-  `max_python_processes_seen = 5`, `stage_b_execution_mode = process_pool`
+- `RG-TTR` keeps the accepted single-process default comparison point:
+  `max_python_processes_seen = 1`, `stage_b_execution_mode = in_process`,
+  `stage_b_process_fallback_threshold = none`
 - `RG-ALT` keeps the functional first-wave guardrail:
   `runtime_regression_ratio <= 1.10` vs the equal-thread-budget backend baseline
 
 ### Acceptance intent
 
-- `NR2`: `wall_clock_ratio <= 1.18`, `peak_rss_ratio <= 1.35`, single-process default,
-  `stage_b_execution_mode = bypassed_no_risk`
-- `RG-TTR`: `wall_clock_ratio <= 1.18`, single-process default,
-  `stage_b_execution_mode = in_process`
-- `RG-ALT`: correctness first, runtime regression no worse than `10%`, no notebook-parity claim in
+- `NR2`: `wall_clock_ratio <= 1.18`, `peak_rss_ratio <= 1.35`, `single-process default`,
+  `stage_b_execution_mode = bypassed_no_risk`,
+  `stage_b_process_fallback_threshold = none`
+- `RG-TTR`: `wall_clock_ratio <= 1.18`, `single-process default`,
+  `stage_b_execution_mode = in_process`,
+  `stage_b_process_fallback_threshold = none`, `finalist-only exact replay`,
+  `exact_replay_count <= 64`
+- `RG-ALT`: correctness first, runtime regression no worse than `10%`, no notebook parity claim in
   the first wave
+
+### Rollout note
+
+Maintainers should treat
+`tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
+as the perf-smoke authority for notebook parity closure. Captured live benchmark runs remain
+incomplete if they fail any `NR2`, `RG-TTR`, or `RG-ALT` gate, even when the docs still match.
 
 ## R10-03 closure protocol
 
@@ -284,7 +297,7 @@ R10-03 не меняет runtime/API contract. Closure фиксируется ч
   `tests/perf_smoke/contexts/backtest/fixtures/r0_parity_scope.json`
 - Runtime-acceleration benchmark corpus for later exact/hybrid/plugin rollout work:
   `tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json`
-- Notebook-parity benchmark corpus for A1 measurement authority:
+- Notebook-parity benchmark corpus for notebook parity closure authority:
   `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
 - Executable local baseline:
   `tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py`
@@ -314,15 +327,16 @@ uv run pytest -q \
   tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py
 ```
 
-3. Проверить A1 notebook-parity benchmark authority:
+3. Проверить notebook parity benchmark authority:
 
 ```bash
 uv run pytest -q tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
 ```
 
-Этот harness пока не обещает, что runtime уже достиг parity. Он гарантирует, что benchmark
-surface, runtime-shape payload, equal-thread-budget rules и committed comparison points уже
-детерминированы и исполнимы.
+Этот harness является blocking perf-smoke authority для committed notebook parity contract.
+Он гарантирует, что benchmark surface, runtime-shape payload, equal-thread-budget rules и
+committed comparison points остаются детерминированы и исполнимы. Captured live measurements
+всё равно должны заполнить эти поля и пройти те же gates на benchmark host.
 
 4. Сохранить measurement snapshot в файл:
 

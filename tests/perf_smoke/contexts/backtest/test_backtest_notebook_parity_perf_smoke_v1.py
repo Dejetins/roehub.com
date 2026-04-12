@@ -34,7 +34,7 @@ _CORPUS_FIXTURE_PATH = _FIXTURES_DIR / "backtest_notebook_parity_benchmark_corpu
 
 def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     """
-    Verify the A1 notebook-parity corpus publishes the canonical benchmark classes and rules.
+    Verify the notebook-parity closure corpus publishes the canonical benchmark classes and rules.
 
     Docs:
       - docs/architecture/backtest/backtest-v2-benchmarks.md
@@ -50,8 +50,8 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     Returns:
         None.
     Assumptions:
-        A1 establishes the measurement authority and committed comparison points without claiming
-        that the current runtime already satisfies the future parity gates.
+        The committed corpus is the closure-time perf-smoke authority, while captured live
+        measurements still have to prove the same gates on the benchmark host.
     Raises:
         AssertionError: If one canonical scenario, measurement field, or equal-thread-budget rule
             is missing.
@@ -61,6 +61,13 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     corpus = _load_notebook_parity_benchmark_corpus()
 
     assert corpus.milestone_id == "A1"
+    assert corpus.status == "active_closure_authority"
+    assert corpus.reference_docs == (
+        "docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md",
+        "docs/architecture/backtest/backtest-v2-benchmarks.md",
+        "docs/architecture/backtest/backtest-engine-vnext.md",
+        "docs/architecture/backtest/backtest-runtime-kernels-v2.md",
+    )
     assert corpus.scenario_order == ("nr2", "rg_ttr", "rg_alt")
     assert corpus.measurement_contract.required_fields == (
         "wall_clock_seconds",
@@ -164,7 +171,7 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
 
 def test_notebook_parity_benchmark_corpus_serialization_is_byte_stable() -> None:
     """
-    Verify the committed A1 notebook-parity corpus keeps canonical byte-stable JSON formatting.
+    Verify the committed closure corpus keeps canonical byte-stable JSON formatting.
 
     Docs:
       - docs/architecture/backtest/backtest-v2-benchmarks.md
@@ -272,7 +279,7 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
     Returns:
         None.
     Assumptions:
-        Measurement serialization is part of the additive benchmark authority and should remain
+        Measurement serialization is part of the closure benchmark authority and should remain
         stable across local runs.
     Raises:
         AssertionError: If serialized measurement bytes drift or omit required system-scan
@@ -637,8 +644,9 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
     Returns:
         None.
     Assumptions:
-        A1 perf smoke verifies that the measurement authority can both pass and fail determinis-
-        tically before later prompts wire it into the live runtime.
+        Closure perf smoke verifies that the measurement authority can both pass and fail
+        deterministically, so the frozen gate set remains reviewable when live benchmark captures
+        are produced elsewhere.
     Raises:
         AssertionError: If equal-thread-budget checks or runtime-shape gates stop working.
     Side Effects:
@@ -1065,7 +1073,7 @@ def test_no_risk_alt_metric_runtime_guardrail_caps_regression(
 
 def _load_notebook_parity_benchmark_corpus():
     """
-    Load the committed notebook-parity benchmark corpus used by A1 perf-smoke coverage.
+    Load the committed notebook-parity benchmark corpus used by closure perf-smoke coverage.
 
     Docs:
       - docs/architecture/backtest/backtest-v2-benchmarks.md

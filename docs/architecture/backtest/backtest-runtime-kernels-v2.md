@@ -10,8 +10,8 @@
 а не активным implementation anchor для новых prompts.
 
 Статус: `Milestone R5 / EPIC R5-02`, `Milestone R6 / EPIC R6-01 + R6-02 + R6-03 + R6-04`,
-`Milestone R10 / EPIC R10-01 production hot-path cutover`  
-Следующий этап handoff: `R10-03 perf/runbook closure`
+`Milestone R10 / EPIC R10-01 production hot-path cutover`, `Milestone R10 / EPIC R10-03 notebook parity closure`  
+Closure authority: `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
 
 ## Status
 
@@ -69,6 +69,20 @@ Historical notebook references only:
 - Launch/persistence flows остаются `summary-only`; full user-facing trades/report bodies для
   выбранного варианта по-прежнему относятся к on-demand detail surfaces, а не к default runtime
   result.
+
+## Notebook parity closure note
+
+- `NR2`: canonical no-risk runs terminate in Stage A, publish
+  `stage_b_execution_mode = bypassed_no_risk`, keep the `single-process default`, and stay within
+  `1.18x` wall-clock plus `1.35x` peak RSS on the equal thread budget.
+- `RG-TTR`: canonical risk-grid runs keep Stage B `in_process` as the `single-process default`,
+  use `finalist-only exact replay` with `exact_replay_count <= 64`, and stay within `1.18x`
+  wall-clock on the equal thread budget.
+- `RG-ALT`: supported alternative ranking metrics remain correctness-first and must not regress
+  runtime by more than `10%`.
+- Rollout note: treat
+  `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
+  plus the committed benchmark corpus as the acceptance authority for this runtime shape.
 
 ## Канонический словарь
 
@@ -164,7 +178,7 @@ B2 активирует executable `exact_parallel` semantics для уже reso
 - coordinator merge происходит в canonical chunk order, поэтому completion order worker'ов не
   влияет на winners, persisted ordering или checkpoint frontier;
 - `exact_small` остаётся serial exact path;
-- canonical parity workloads по-прежнему идут через in-process Stage B по умолчанию;
+- canonical parity workloads по-прежнему держат `single-process default` Stage B path;
 - process-based Stage B остаётся только как explicit non-default fallback path для larger
   workloads, когда профиль одновременно включает `feature_flags.parallel_stage_b_enabled = true`,
   задаёт `parallelism.stage_b_workers > 1`, и пересекает explicit workload threshold
@@ -191,7 +205,7 @@ B2 активирует executable `exact_parallel` semantics для уже reso
 - `backtest.cpu.max_numba_threads=4` остаётся общим ceiling для `dev`, `test`, и `prod`, чтобы
   Stage A не oversubscribe'ил типичные 4-vCPU среды по умолчанию;
 - `exact_small` остаётся serial profile: `stage_a_workers=1`, `stage_b_workers=1`;
-- `exact_parallel` keeps Stage B in-process by default for canonical parity workloads:
+- `exact_parallel` keeps the `single-process default` Stage B path for canonical parity workloads:
   `stage_a_workers=4`, `stage_b_workers=1`;
 - `exact_parallel` may reopen process-based Stage B only as a non-default fallback path once the
   prepared workload crosses `stage_b_process_fallback.min_stage_b_variants_total=150000`;
@@ -203,7 +217,7 @@ B2 активирует executable `exact_parallel` semantics для уже reso
   `240000`.
 
 Эти значения выбраны консервативно: Stage A теперь действительно масштабируется по профилю, но
-canonical Stage B остаётся in-process по умолчанию, а fallback path включается только when the
+canonical Stage B остаётся `single-process default`, а fallback path включается только when the
 explicit workload threshold is crossed and the profile was deliberately opted back into
 process-based execution.
 
@@ -264,6 +278,8 @@ Stage A существует для batch-oriented работы на `signal tim
 - Незакрытая до конца позиция получает `sig_exit_exec = sentinel_index`.
 - В `long-only` и `short-only` режимах запрещённый противоположный сигнал работает только как
   signal exit и не открывает новую позицию.
+- Canonical no-risk classes завершаются на этом этапе: `stage_b_execution_mode` должен оставаться
+  `bypassed_no_risk`, а `stage_b_process_fallback_threshold` должен оставаться `none`.
 - Для shortlist ordering tie-break должен быть explicit и stable:
   ranking payload сортируется детерминированно, а при полном равенстве метрик сохраняется
   `base_variant_key ASC`.
@@ -306,7 +322,7 @@ artifacts, а не runtime recompute.
 1. Использовать `compact trade list` как единственный вход trade-state.
 2. Выполнить `fast TP/SL grid search` поверх `1m hit-times`.
 3. Найти лучшую TP/SL ячейку без полного replay всего grid.
-4. Выполнить `exact replay of best TP/SL cell`.
+4. Выполнить `finalist-only exact replay of best TP/SL cell`.
 5. Посчитать финальные `metrics over compact trades`.
 
 R6-03 shipped boundary:
@@ -320,8 +336,8 @@ R6-03 shipped boundary:
 - `close_on_end = 1` остаётся explicit notebook-derived default;
 - ranking hot path может использовать fast `total_return_pct` lookup только для pinned
   artifact-backed Stage B scorer и только при primary=`total_return_pct`, secondary=`None`;
-- любой другой Stage B ranking/details path делает exact replay только для уже выбранной explicit
-  cell / retained variant.
+- любой другой Stage B ranking/details path делает `finalist-only exact replay` только для уже
+  выбранной explicit cell / retained variant.
 
 Канонический Stage B flow:
 
@@ -329,7 +345,7 @@ R6-03 shipped boundary:
 load stage_a_output
   -> map entries to execution timeline
   -> fast TP/SL grid search on 1m hit-times
-  -> exact replay of best TP/SL cell
+  -> finalist-only exact replay of best TP/SL cell
   -> metrics over compact trades
 ```
 

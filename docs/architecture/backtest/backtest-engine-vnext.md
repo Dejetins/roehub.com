@@ -43,10 +43,9 @@ That notebook is the approved source for the universal engine patterns that the 
 
 The historical notebook `tests/notebook_tests/06_backtest_compute.ipynb` may still be cited only as historical background. It is not the canonical redesign anchor for new prompts, new handoff docs, or future cutover work.
 
-## 2.1 Notebook-parity benchmark authority
+## 2.1 Notebook parity benchmark authority
 
-The redesign now also has one additive benchmark authority for performance work before any
-architecture cutover:
+The redesign now has one frozen benchmark authority for notebook parity closure:
 
 - committed corpus:
   `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
@@ -67,6 +66,7 @@ Required runtime-shape fields for benchmark evidence:
 - `numba_threads_used`
 - `max_python_processes_seen`
 - `stage_b_execution_mode`
+- `stage_b_process_fallback_threshold`
 - `exact_replay_count`
 
 Normalization rules:
@@ -74,11 +74,25 @@ Normalization rules:
 - every backend-vs-notebook comparison uses `equal thread budget`
 - `numba_threads_used` must match exactly
 - host and artifact slot must match exactly
-- sync and worker measurements are comparable only when the same host, artifact slot, and
-  `stage_b_execution_mode` are preserved
+- sync and worker measurements are comparable only when the same host, artifact slot,
+  `stage_b_execution_mode`, and `stage_b_process_fallback_threshold` are preserved
 
-This benchmark surface is internal-only and additive. It is meant to make later prompts
-verifiable; it does not imply that the current runtime already meets the parity target.
+Accepted runtime-shape answer:
+
+- `NR2`: no-risk runs resolve on the Stage A no-risk terminal path,
+  `stage_b_execution_mode = bypassed_no_risk`, `single-process default`,
+  `wall_clock_ratio <= 1.18`, `peak_rss_ratio <= 1.35`
+- `RG-TTR`: risk-grid runs keep Stage B `in_process` as the `single-process default`,
+  preserve `finalist-only exact replay` with `exact_replay_count <= 64`,
+  and hold `wall_clock_ratio <= 1.18`
+- `RG-ALT`: alternative ranking metrics remain correctness-first and must not regress runtime by
+  more than `10%`
+
+This benchmark surface is internal-only, but it is no longer only additive: it is the blocking
+review surface for notebook parity. Maintainers should treat
+`tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
+as the acceptance authority, and rollout remains incomplete whenever its frozen gates or captured
+live benchmark measurements fail.
 
 ## 3. Target architecture summary
 
@@ -86,9 +100,12 @@ The target engine keeps one deterministic staged runtime with one final exact au
 
 Target shape:
 
-1. Stage A performs cheap narrowing on the request timeframe and avoids exact-first breadth scoring across the full grid.
-2. Stage A builds compact trade candidates from signal-timeline decisions before any full risk replay.
-3. Stage B expands shortlisted candidates across the risk grid using artifact-backed exact execution inputs.
+1. Stage A performs row prefilter and combo proxy narrowing on the request timeframe instead of
+   exact-first breadth scoring across the full grid.
+2. Stage A builds compact trade candidates from signal-timeline decisions, and no-risk classes
+   finalize here through the no-risk terminal path without entering generic Stage B.
+3. Stage B expands shortlisted risk-grid candidates across the published TP/SL grid using cheap
+   artifact-backed kernels, with finalist-only exact replay for the retained winners.
 4. The exact scorer remains the final authority for winners, persisted summary ordering, and on-demand detail.
 
 Non-negotiable redesign rules:
@@ -232,9 +249,9 @@ The following dependencies are part of the target architecture even though this 
 
 ASSUMPTION: later implementation prompts will update the active runtime/API/worker docs only when the underlying runtime code and public contract changes are ready to ship together.
 
-## 9. Scope boundaries for Milestone A / EPIC A1
+## 9. Historical scope boundaries for Milestone A / EPIC A1
 
-This prompt introduces only documentation foundation for the redesign.
+Milestone A introduced only the documentation foundation for the redesign.
 
 It does not:
 

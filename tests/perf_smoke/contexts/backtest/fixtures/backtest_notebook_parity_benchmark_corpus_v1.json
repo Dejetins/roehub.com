@@ -2,11 +2,12 @@
   "schema_version": 1,
   "fixture_contract": "backtest_notebook_parity_benchmark_corpus_v1",
   "milestone_id": "A1",
-  "status": "active",
+  "status": "active_closure_authority",
   "reference_docs": [
     "docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md",
     "docs/architecture/backtest/backtest-v2-benchmarks.md",
-    "docs/architecture/backtest/backtest-engine-vnext.md"
+    "docs/architecture/backtest/backtest-engine-vnext.md",
+    "docs/architecture/backtest/backtest-runtime-kernels-v2.md"
   ],
   "measurement_contract": {
     "required_fields": [
@@ -27,7 +28,7 @@
       "stage_b_process_fallback_threshold",
       "exact_replay_count"
     ],
-    "notes": "Runtime-shape measurements are internal-only benchmark payloads. They must report wall time, CPU time, peak RSS, Numba thread count, maximum Python process fan-out, stage_b_execution_mode, stage_b_process_fallback_threshold, and exact_replay_count."
+    "notes": "Runtime-shape measurements are the internal notebook parity closure payload. They must report wall time, CPU time, peak RSS, Numba thread count, maximum Python process fan-out, stage_b_execution_mode, stage_b_process_fallback_threshold, and exact_replay_count."
   },
   "source_fixtures": {
     "perf_smoke_harness": "tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py",
@@ -49,7 +50,7 @@
       "notebook on 12 threads vs backend on 4 threads is invalid",
       "sync and worker measurements from different artifact slots are invalid"
     ],
-    "notes": "Compare backend and notebook only when host, artifact slot, and numba_threads_used all match exactly. Accepted benchmark thread budget currently freezes max_numba_threads=4 with stage_a_workers=4 and stage_b_workers=1 for the canonical exact_parallel backend shape. Sync and worker backend measurements are comparable when those constraints hold and stage_b_execution_mode is reviewed together with stage_b_process_fallback_threshold."
+    "notes": "Compare backend and notebook only when host, artifact slot, and numba_threads_used all match exactly. Accepted benchmark thread budget currently freezes max_numba_threads=4 with stage_a_workers=4 and stage_b_workers=1 for the canonical exact_parallel backend shape. Closure accepts only the single-process default and finalist-only exact replay runtime shape when sync and worker backend measurements are reviewed together with stage_b_execution_mode and stage_b_process_fallback_threshold."
   },
   "scenario_order": [
     "nr2",
@@ -81,7 +82,7 @@
           "max_python_processes_seen": 5,
           "stage_b_execution_mode": "process_pool",
           "runtime_regression_ratio_limit": null,
-          "notes": "Current backend run f7d2c378-bca2-46fe-b5a6-47062fb75140 on the canonical host remains a generic multi-process shape and is the pre-cutover comparison point."
+          "notes": "Legacy backend run f7d2c378-bca2-46fe-b5a6-47062fb75140 on the canonical host remains the reviewable multi-process comparison point, but the accepted closure shape is no longer this pre-cutover runtime."
         },
         {
           "reference_id": "nr2_notebook_macstudio_4_threads",
@@ -241,7 +242,7 @@
           "notes": "RG-TTR breadth scoring must keep the fast Stage B path active so exact_replay_count stays within the finalist-only replay bound after the in-process default cutover."
         }
       ],
-      "notes": "RG-TTR is the canonical risk-grid parity class. The committed backend default now records the single-process in-process Stage B shape so future regressions fail on unexpected worker amplification."
+      "notes": "RG-TTR is the canonical risk-grid parity class. The committed backend default now records the single-process default in-process Stage B shape plus finalist-only exact replay so future regressions fail on unexpected worker amplification or replay breadth drift."
     },
     {
       "scenario_id": "rg_alt",
@@ -271,7 +272,7 @@
           "max_python_processes_seen": 5,
           "stage_b_execution_mode": "process_pool",
           "runtime_regression_ratio_limit": 1.1,
-          "notes": "RG-ALT is functional-first in the first wave. Runtime may not regress by more than 10% against the pre-cutover backend baseline on the same host and equal thread budget."
+          "notes": "RG-ALT is functional-first in the first wave. Runtime may not regress by more than 10% against the committed backend baseline on the same host and equal thread budget."
         }
       ],
       "acceptance_gates": [
