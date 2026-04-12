@@ -334,6 +334,12 @@ class _ArtifactOnlyStageAShortlistBuilder:
             )
             for base_variant in base_variants
         )
+        rows = tuple(
+            sorted(
+                rows,
+                key=lambda row: (-row.total_return_pct, row.base_variant.base_variant_key),
+            )
+        )
         if on_checkpoint is not None:
             on_checkpoint(len(rows), len(tuple(grid_context.iter_stage_a_variants())))
         return rows
@@ -481,6 +487,51 @@ class _StaticRuntimeRunner:
         if cancel_checker is not None:
             cancel_checker("stage_b")
         return (self._ranked_rows, self._ranked_tasks)
+
+    def run_stage_b_or_finalize_no_risk(
+        self,
+        *,
+        template: Any,
+        runtime_plan: Any,
+        shortlist: Any,
+        candles: Any,
+        scorer: Any,
+        top_k_limit: int,
+        ranking: Any = None,
+        cancel_checker: Any = None,
+    ) -> tuple[tuple[Any, ...], Mapping[str, Any]]:
+        """
+        Preserve compatibility with the no-risk-aware runtime runner entrypoint.
+
+        Args:
+            template: Effective run template.
+            runtime_plan: Resolved runtime plan used for the sync run.
+            shortlist: Deterministic Stage A shortlist rows.
+            candles: Warmup-aware candles payload.
+            scorer: Resolved scorer dependency.
+            top_k_limit: Requested top-k cap.
+            ranking: Optional ranking config.
+            cancel_checker: Optional cancellation hook.
+        Returns:
+            tuple[tuple[Any, ...], Mapping[str, Any]]: Fixed ranked rows and task mapping.
+        Assumptions:
+            This fake does not model the no-risk bypass separately and reuses the same
+            deterministic payload as `run_stage_b(...)`.
+        Raises:
+            None.
+        Side Effects:
+            Appends run metadata to the in-memory call log through `run_stage_b(...)`.
+        """
+        return self.run_stage_b(
+            template=template,
+            runtime_plan=runtime_plan,
+            shortlist=shortlist,
+            candles=candles,
+            scorer=scorer,
+            top_k_limit=top_k_limit,
+            ranking=ranking,
+            cancel_checker=cancel_checker,
+        )
 
 
 class _AlignedOnlyCandleFeed:

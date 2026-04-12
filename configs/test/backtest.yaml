@@ -207,7 +207,7 @@ backtest:
           min_stage_b_variants_total: 240000
   guards:
     max_variants_per_compute: 60000000
-    max_compute_bytes_total: 5368709120999999
+    max_compute_bytes_total: 5368709120
   cpu:
     max_numba_threads: 4
   sync:

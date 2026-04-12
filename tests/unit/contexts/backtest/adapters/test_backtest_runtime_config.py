@@ -189,7 +189,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         is True
     )
     assert config.guards.max_variants_per_compute == 60000000
-    assert config.guards.max_compute_bytes_total == 5368709120999999
+    assert config.guards.max_compute_bytes_total == 5 * 1024**3
     assert config.cpu.max_numba_threads == 4
     assert config.sync.sync_deadline_seconds == 55.0
     assert config.reporting.top_trades_n_default == 3
