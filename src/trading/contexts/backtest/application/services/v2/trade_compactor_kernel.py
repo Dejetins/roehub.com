@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Mapping
 
@@ -27,25 +27,69 @@ _DIRECTION_MODE_LONG_ONLY_CODE_V2 = 1
 _DIRECTION_MODE_SHORT_ONLY_CODE_V2 = 2
 
 
-@dataclass(frozen=True, slots=True)
+def _readonly_compact_trade_array_v2(
+    *,
+    field_name: str,
+    values: np.ndarray,
+) -> np.ndarray:
+    """
+    Normalize one retained compact-trade array into a readonly one-dimensional NumPy vector.
+
+    Args:
+        field_name: Payload field name used in fail-fast validation errors.
+        values: Candidate dense compact-trade vector for one retained finalist payload.
+    Returns:
+        np.ndarray: Contiguous readonly vector preserving the authored trade order.
+    Assumptions:
+        Stage A exact payloads trim compact-trade arrays down to one finalist row before this
+        helper runs, so the returned vector must not retain references to a larger batch matrix.
+    Raises:
+        ValueError: If `values` is not one-dimensional.
+    Side Effects:
+        Marks the returned array as readonly.
+    """
+    normalized = np.ascontiguousarray(values)
+    if normalized.ndim != 1:
+        raise ValueError(f"StageACompactExactPayloadV2.{field_name} must be 1D")
+    normalized.setflags(write=False)
+    return normalized
+
+
+@dataclass(frozen=True, slots=True, eq=False)
 class StageACompactExactPayloadV2:
     """
     Internal compact exact payload for one retained Stage A candidate.
 
     Args:
-        compact_trades: Ordered compact trade representation for one retained candidate.
+        entry_signal_idx: Dense compact-trade array of entry signal indexes.
+        entry_exec_idx: Dense compact-trade array of entry execution indexes.
+        direction: Dense compact-trade array of trade directions.
+        sig_exit_signal_idx: Dense compact-trade array of signal-exit indexes with `-1` sentinel.
+        sig_exit_exec_idx: Dense compact-trade array of signal-exit execution indexes.
+        memory_shape_bucket: Additive contract marker describing the retained payload memory shape.
     Returns:
         None.
     Assumptions:
-        This payload remains internal-only and summary-only launch surfaces must not materialize
-        it as user-facing trades by default.
+        This payload remains internal-only, keeps the risk path on compact trade arrays only, and
+        summary-only launch surfaces must not materialize it as user-facing trades by default.
     Raises:
-        ValueError: If the payload is initialized with `None`.
+        ValueError: If array lengths drift or the payload widens beyond compact-trade arrays.
     Side Effects:
-        Normalizes `compact_trades` into an immutable tuple.
+        Normalizes compact-trade arrays into readonly contiguous vectors.
     """
 
-    compact_trades: tuple[StageACompactTradeV2, ...]
+    entry_signal_idx: np.ndarray
+    entry_exec_idx: np.ndarray
+    direction: np.ndarray
+    sig_exit_signal_idx: np.ndarray
+    sig_exit_exec_idx: np.ndarray
+    memory_shape_bucket: str = "compact_trade_arrays"
+    _compact_trades_cache: tuple[StageACompactTradeV2, ...] | None = field(
+        default=None,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def __post_init__(self) -> None:
         """
@@ -56,16 +100,130 @@ class StageACompactExactPayloadV2:
         Returns:
             None.
         Assumptions:
-            Retained exact payloads hold only compact internal trades and must stay detached from
-            any default user-visible materialization path.
+            Retained exact payloads hold only compact-trade arrays and must stay detached from any
+            default user-visible materialization path.
         Raises:
-            ValueError: If `compact_trades` is `None`.
+            ValueError: If array lengths drift, values are invalid, or the memory-shape marker is
+                not the compact-trade-only literal.
         Side Effects:
-            Normalizes `compact_trades` into an immutable tuple.
+            Normalizes compact-trade arrays into readonly contiguous vectors.
         """
-        if self.compact_trades is None:  # type: ignore[truthy-bool]
-            raise ValueError("StageACompactExactPayloadV2.compact_trades is required")
-        object.__setattr__(self, "compact_trades", tuple(self.compact_trades))
+        entry_signal_idx = _readonly_compact_trade_array_v2(
+            field_name="entry_signal_idx",
+            values=np.asarray(self.entry_signal_idx, dtype=np.int64),
+        )
+        trade_count = int(entry_signal_idx.shape[0])
+        entry_exec_idx = _readonly_compact_trade_array_v2(
+            field_name="entry_exec_idx",
+            values=np.asarray(self.entry_exec_idx, dtype=np.int64),
+        )
+        direction = _readonly_compact_trade_array_v2(
+            field_name="direction",
+            values=np.asarray(self.direction, dtype=np.int8),
+        )
+        sig_exit_signal_idx = _readonly_compact_trade_array_v2(
+            field_name="sig_exit_signal_idx",
+            values=np.asarray(self.sig_exit_signal_idx, dtype=np.int64),
+        )
+        sig_exit_exec_idx = _readonly_compact_trade_array_v2(
+            field_name="sig_exit_exec_idx",
+            values=np.asarray(self.sig_exit_exec_idx, dtype=np.int64),
+        )
+        if self.memory_shape_bucket != "compact_trade_arrays":
+            raise ValueError(
+                "StageACompactExactPayloadV2.memory_shape_bucket must be "
+                "'compact_trade_arrays'"
+            )
+        if int(entry_exec_idx.shape[0]) != trade_count:
+            raise ValueError(
+                "StageACompactExactPayloadV2.entry_exec_idx must align with entry_signal_idx"
+            )
+        if int(direction.shape[0]) != trade_count:
+            raise ValueError(
+                "StageACompactExactPayloadV2.direction must align with entry_signal_idx"
+            )
+        if int(sig_exit_signal_idx.shape[0]) != trade_count:
+            raise ValueError(
+                "StageACompactExactPayloadV2.sig_exit_signal_idx must align with "
+                "entry_signal_idx"
+            )
+        if int(sig_exit_exec_idx.shape[0]) != trade_count:
+            raise ValueError(
+                "StageACompactExactPayloadV2.sig_exit_exec_idx must align with entry_signal_idx"
+            )
+        if np.any(entry_signal_idx < 0):
+            raise ValueError("StageACompactExactPayloadV2.entry_signal_idx must be >= 0")
+        if np.any(entry_exec_idx < 0):
+            raise ValueError("StageACompactExactPayloadV2.entry_exec_idx must be >= 0")
+        if np.any(np.logical_and(direction != -1, direction != 1)):
+            raise ValueError("StageACompactExactPayloadV2.direction must contain only -1 or 1")
+        if np.any(sig_exit_signal_idx < -1):
+            raise ValueError("StageACompactExactPayloadV2.sig_exit_signal_idx must be >= -1")
+        if np.any(sig_exit_exec_idx < entry_exec_idx):
+            raise ValueError(
+                "StageACompactExactPayloadV2.sig_exit_exec_idx must stay >= entry_exec_idx"
+            )
+        object.__setattr__(self, "entry_signal_idx", entry_signal_idx)
+        object.__setattr__(self, "entry_exec_idx", entry_exec_idx)
+        object.__setattr__(self, "direction", direction)
+        object.__setattr__(self, "sig_exit_signal_idx", sig_exit_signal_idx)
+        object.__setattr__(self, "sig_exit_exec_idx", sig_exit_exec_idx)
+        object.__setattr__(self, "memory_shape_bucket", "compact_trade_arrays")
+
+    @property
+    def trade_count(self) -> int:
+        """
+        Return the deterministic retained compact-trade count for this exact payload.
+
+        Args:
+            None.
+        Returns:
+            int: Count of compact trades stored in the retained payload.
+        Assumptions:
+            The retained payload keeps one trimmed row of compact-trade arrays only.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return int(self.entry_signal_idx.shape[0])
+
+    @property
+    def compact_trades(self) -> tuple[StageACompactTradeV2, ...]:
+        """
+        Materialize the compatibility compact-trade tuple view from retained compact arrays.
+
+        Args:
+            None.
+        Returns:
+            tuple[StageACompactTradeV2, ...]: Ordered compact trades for this retained payload.
+        Assumptions:
+            Stage B exact replay and tests may still consume compact trades as immutable objects,
+            while the retained payload itself stays compact-trade-array-first for memory shape.
+        Raises:
+            None.
+        Side Effects:
+            Memoizes one immutable compatibility tuple on first access.
+        """
+        cached = self._compact_trades_cache
+        if cached is not None:
+            return cached
+        materialized = tuple(
+            StageACompactTradeV2(
+                entry_signal_idx=int(self.entry_signal_idx[trade_index]),
+                entry_exec_idx=int(self.entry_exec_idx[trade_index]),
+                direction=int(self.direction[trade_index]),
+                sig_exit_signal_idx=(
+                    None
+                    if int(self.sig_exit_signal_idx[trade_index]) < 0
+                    else int(self.sig_exit_signal_idx[trade_index])
+                ),
+                sig_exit_exec_idx=int(self.sig_exit_exec_idx[trade_index]),
+            )
+            for trade_index in range(self.trade_count)
+        )
+        object.__setattr__(self, "_compact_trades_cache", materialized)
+        return materialized
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,14 +302,47 @@ class _CompactTradeBatchV2:
         Returns:
             StageACompactExactPayloadV2: Internal exact payload for the requested retained row.
         Assumptions:
-            Payload materialization should happen only for rows that survive shortlist ranking.
+            Payload materialization should happen only for rows that survive shortlist ranking and
+            must trim compact trade arrays so the retained risk path does not keep batch-shaped
+            baggage.
         Raises:
             ValueError: Propagated if `row_index` is outside batch bounds.
         Side Effects:
-            Allocates one immutable payload wrapper around the selected compact trade row.
+            Allocates one immutable payload wrapper around trimmed compact-trade arrays for the
+            selected row.
         """
+        row_count = int(self.trade_count.shape[0])
+        if row_index < 0 or row_index >= row_count:
+            raise ValueError(
+                f"row_index must stay within [0, {row_count}), got {row_index}"
+            )
+        retained_trade_count = int(self.trade_count[row_index])
         return StageACompactExactPayloadV2(
-            compact_trades=self.trade_row_at(row_index=row_index)
+            entry_signal_idx=np.array(
+                self.entry_signal_idx[row_index, :retained_trade_count],
+                dtype=np.int64,
+                copy=True,
+            ),
+            entry_exec_idx=np.array(
+                self.entry_exec_idx[row_index, :retained_trade_count],
+                dtype=np.int64,
+                copy=True,
+            ),
+            direction=np.array(
+                self.direction[row_index, :retained_trade_count],
+                dtype=np.int8,
+                copy=True,
+            ),
+            sig_exit_signal_idx=np.array(
+                self.sig_exit_signal_idx[row_index, :retained_trade_count],
+                dtype=np.int64,
+                copy=True,
+            ),
+            sig_exit_exec_idx=np.array(
+                self.sig_exit_exec_idx[row_index, :retained_trade_count],
+                dtype=np.int64,
+                copy=True,
+            ),
         )
 
     def materialize_trade_list(self) -> tuple[tuple[StageACompactTradeV2, ...], ...]:

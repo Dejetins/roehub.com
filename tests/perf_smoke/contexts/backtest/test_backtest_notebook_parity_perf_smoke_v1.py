@@ -485,6 +485,17 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
 
     assert retained_chunk_sizes == [4, 2]
     assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
+    assert tuple(
+        row.retained_exact_payload.memory_shape_bucket
+        for row in shortlist
+        if row.retained_exact_payload is not None
+    ) == ("compact_trade_arrays", "compact_trade_arrays")
+    assert all(
+        row.retained_exact_payload is not None
+        and row.retained_exact_payload.trade_count > 0
+        and not hasattr(row.retained_exact_payload, "final_signal_row")
+        for row in shortlist
+    )
     assert runtime_shape.exact_scoring_mode == "streaming exact scoring"
     assert runtime_shape.retained_chunk_count == 2
     assert runtime_shape.retained_candidate_count == 6

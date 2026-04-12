@@ -834,7 +834,11 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
     )
 
     assert len(shortlist) == 1
-    assert shortlist[0].retained_exact_payload is not None
+    retained_exact_payload = shortlist[0].retained_exact_payload
+    assert retained_exact_payload is not None
+    assert retained_exact_payload.memory_shape_bucket == "compact_trade_arrays"
+    assert retained_exact_payload.trade_count > 0
+    assert not hasattr(retained_exact_payload, "final_signal_row")
 
     signal_prices = price_loader.load_price_arrays(
         context=context,
@@ -888,7 +892,8 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
     )
     assert len(stage_b_tasks) == 1
     task = stage_b_tasks[0]
-    assert task.retained_exact_payload == shortlist[0].retained_exact_payload
+    assert task.retained_exact_payload is retained_exact_payload
+    assert task.retained_exact_payload.memory_shape_bucket == "compact_trade_arrays"
 
     artifact_runtime_core_module.prime_retained_exact_payload_if_supported_v2(
         scorer=scorer,

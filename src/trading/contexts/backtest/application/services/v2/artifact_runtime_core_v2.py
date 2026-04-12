@@ -1467,8 +1467,39 @@ def _stage_b_task_from_parallel_snapshot_v2(
             for indicator_id, params in snapshot.signal_params
         },
         risk_params=dict(snapshot.risk_params),
-        retained_exact_payload=snapshot.retained_exact_payload,
+        retained_exact_payload=_validated_retained_exact_payload_v2(
+            retained_exact_payload=snapshot.retained_exact_payload
+        ),
     )
+
+
+def _validated_retained_exact_payload_v2(
+    *,
+    retained_exact_payload: StageACompactExactPayloadV2 | None,
+) -> StageACompactExactPayloadV2 | None:
+    """
+    Validate the compact-trade-only retained exact payload contract accepted by the risk path.
+
+    Args:
+        retained_exact_payload: Optional internal retained payload forwarded from Stage A.
+    Returns:
+        StageACompactExactPayloadV2 | None: The same payload when it matches the compact-only
+            contract, otherwise `None` when no retained payload exists.
+    Assumptions:
+        Stage B must accept only compact-trade-array retained payloads and must not silently carry
+        legacy full signal-row baggage through the risk path.
+    Raises:
+        ValueError: If the retained payload exposes a non-compact memory-shape marker.
+    Side Effects:
+        None.
+    """
+    if retained_exact_payload is None:
+        return None
+    if retained_exact_payload.memory_shape_bucket != "compact_trade_arrays":
+        raise ValueError(
+            "retained_exact_payload must stay in the compact_trade_arrays memory shape"
+        )
+    return retained_exact_payload
 
 
 def _stage_b_parallel_heap_entry_snapshot_v2(
@@ -1903,7 +1934,9 @@ def _stage_b_task_from_variant_v2(
         indicator_selections=base_variant.indicator_selections,
         signal_params=base_variant.signal_params,
         risk_params=risk_variant.risk_params,
-        retained_exact_payload=retained_exact_payload,
+        retained_exact_payload=_validated_retained_exact_payload_v2(
+            retained_exact_payload=retained_exact_payload
+        ),
     )
 
 

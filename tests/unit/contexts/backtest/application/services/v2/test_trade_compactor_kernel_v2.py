@@ -12,8 +12,8 @@ from trading.contexts.backtest.application.services import (
 )
 from trading.contexts.backtest.application.services.v2.contracts import StageACompactTradeV2
 from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
-    build_compact_trade_batch_v2,
     build_compact_exact_payloads_v2,
+    build_compact_trade_batch_v2,
     compute_no_risk_metrics_for_trade_batch_v2,
 )
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
@@ -104,7 +104,7 @@ def test_build_compact_trade_list_v2_respects_exit_only_direction_modes() -> Non
 
 def test_build_compact_exact_payloads_v2_wraps_internal_compact_trade_representation() -> None:
     """
-    Verify retained-candidate exact payloads wrap compact trades without user-facing expansion.
+    Verify retained-candidate exact payloads keep compact-trade arrays without signal-row baggage.
 
     Args:
         None.
@@ -129,7 +129,23 @@ def test_build_compact_exact_payloads_v2_wraps_internal_compact_trade_representa
         sentinel_index=5,
     )
 
-    assert tuple(payload.compact_trades for payload in payloads) == compact_trades
+    assert len(payloads) == 1
+    payload = payloads[0]
+
+    np.testing.assert_array_equal(payload.entry_signal_idx, np.array([0, 2], dtype=np.int64))
+    np.testing.assert_array_equal(payload.entry_exec_idx, np.array([1, 3], dtype=np.int64))
+    np.testing.assert_array_equal(payload.direction, np.array([1, -1], dtype=np.int8))
+    np.testing.assert_array_equal(payload.sig_exit_signal_idx, np.array([2, -1], dtype=np.int64))
+    np.testing.assert_array_equal(payload.sig_exit_exec_idx, np.array([3, 5], dtype=np.int64))
+    assert payload.trade_count == 2
+    assert payload.memory_shape_bucket == "compact_trade_arrays"
+    assert payload.entry_signal_idx.flags.writeable is False
+    assert payload.entry_exec_idx.flags.writeable is False
+    assert payload.direction.flags.writeable is False
+    assert payload.sig_exit_signal_idx.flags.writeable is False
+    assert payload.sig_exit_exec_idx.flags.writeable is False
+    assert hasattr(payload, "final_signal_row") is False
+    assert payload.compact_trades == compact_trades[0]
 
 
 def test_compute_no_risk_metrics_v2_is_deterministic_and_shortlist_ready() -> None:
@@ -252,13 +268,19 @@ def test_compute_no_risk_metrics_for_trade_batch_v2_matches_scalar_rows() -> Non
         for row_index in range(2)
     )
 
-    assert tuple(batch.exact_payload_at(row_index=0).compact_trades) == tuple(
-        build_compact_exact_payloads_v2(
-            final_signal=np.array([[1, 1, -1, 0]], dtype=np.int8),
-            bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
-            sentinel_index=5,
-        )[0].compact_trades
-    )
+    payload = batch.exact_payload_at(row_index=0)
+    assert payload.trade_count == 2
+    assert payload.memory_shape_bucket == "compact_trade_arrays"
+    np.testing.assert_array_equal(payload.entry_signal_idx, np.array([0, 2], dtype=np.int64))
+    np.testing.assert_array_equal(payload.entry_exec_idx, np.array([1, 3], dtype=np.int64))
+    np.testing.assert_array_equal(payload.direction, np.array([1, -1], dtype=np.int8))
+    np.testing.assert_array_equal(payload.sig_exit_signal_idx, np.array([2, -1], dtype=np.int64))
+    np.testing.assert_array_equal(payload.sig_exit_exec_idx, np.array([3, 5], dtype=np.int64))
+    assert payload.compact_trades == build_compact_exact_payloads_v2(
+        final_signal=np.array([[1, 1, -1, 0]], dtype=np.int8),
+        bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+        sentinel_index=5,
+    )[0].compact_trades
     for batched, scalar in zip(batch_metrics, scalar_metrics, strict=True):
         assert batched.total_return_pct == pytest.approx(scalar.total_return_pct)
         assert batched.max_drawdown_pct == pytest.approx(scalar.max_drawdown_pct)
