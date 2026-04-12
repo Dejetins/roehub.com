@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import TypedDict
+from typing import TypedDict, cast
 from uuid import UUID
 
 import numpy as np
@@ -43,6 +43,7 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 
     BacktestArtifactRuntimePlannerV2,
 )
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+    ExecutionProfileModeLiteralV2,
     ExecutionProfilesCatalogV2,
     default_execution_profiles_catalog_v2,
 )
@@ -740,7 +741,9 @@ def test_r10_parallel_tuning_contract_is_explicit_and_aligned() -> None:
     catalog = default_execution_profiles_catalog_v2()
 
     for mode, (expected_stage_a_workers, expected_stage_b_workers) in expected_parallelism.items():
-        profile = catalog.profile_for_mode(mode=mode)
+        profile = catalog.profile_for_mode(
+            mode=cast(ExecutionProfileModeLiteralV2, mode)
+        )
         assert profile.parallelism.stage_a_workers == expected_stage_a_workers
         assert profile.parallelism.stage_b_workers == expected_stage_b_workers
 

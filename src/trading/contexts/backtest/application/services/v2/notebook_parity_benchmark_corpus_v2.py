@@ -921,7 +921,7 @@ def serialize_backtest_notebook_parity_measurements_v2(
     Side Effects:
         None.
     """
-    payload = {
+    payload: dict[str, object] = {
         "measurements": [*_measurement_payloads_v2(measurements=measurements)],
     }
     return serialize_backtest_notebook_parity_benchmark_corpus_payload_v2(payload=payload)

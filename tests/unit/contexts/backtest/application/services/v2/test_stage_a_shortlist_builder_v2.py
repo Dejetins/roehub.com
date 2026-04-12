@@ -896,6 +896,7 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
     assert len(stage_b_tasks) == 1
     task = stage_b_tasks[0]
     assert task.retained_exact_payload is retained_exact_payload
+    assert task.retained_exact_payload is not None
     assert task.retained_exact_payload.memory_shape_bucket == "compact_trade_arrays"
 
     artifact_runtime_core_module.prime_retained_exact_payload_if_supported_v2(

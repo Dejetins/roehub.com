@@ -858,11 +858,13 @@ def _retained_exact_candidate_addresses_for_chunk_v2(
     """
     if len(chunk_inputs) == 0:
         raise ValueError("Stage A retained address derivation requires non-empty chunk_inputs")
-    chunk_row_count = len(chunk_inputs[0].signal_row_selection)
+    first_row_selection = cast(tuple[int, ...], chunk_inputs[0].signal_row_selection)
+    chunk_row_count = len(first_row_selection)
     if chunk_row_count == 0:
         raise ValueError("Stage A retained address derivation requires at least one chunk row")
     for chunk_input in chunk_inputs[1:]:
-        if len(chunk_input.signal_row_selection) != chunk_row_count:
+        signal_row_selection = cast(tuple[int, ...], chunk_input.signal_row_selection)
+        if len(signal_row_selection) != chunk_row_count:
             raise ValueError(
                 "Stage A retained address derivation requires aligned signal_row_selection sizes"
             )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, cast
+
 import numpy as np
 import pytest
 
@@ -110,7 +112,9 @@ def test_aggregate_final_signal_rows_v2_uses_parallel_kernel_driven_stage_a_path
     )
 
     assert (
-        signal_aggregator_kernel_module._aggregate_final_signal_row_cube_kernel_v2.targetoptions[
+        cast(
+            Any, signal_aggregator_kernel_module._aggregate_final_signal_row_cube_kernel_v2
+        ).targetoptions[
             "parallel"
         ]
         is True

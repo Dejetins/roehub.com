@@ -2121,7 +2121,7 @@ def test_run_stage_b_or_finalize_no_risk_reuses_stage_a_alt_metric_payloads() ->
     runner = artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2()
     shortlist = (
         artifact_runtime_core_module.BacktestStageAScoredVariantV2(
-            base_variant=base_variants[1],
+            base_variant=cast(Any, base_variants[1]),
             total_return_pct=10.0,
             no_risk_metrics=StageANoRiskMetricsV2(
                 total_return_pct=10.0,
@@ -2137,7 +2137,7 @@ def test_run_stage_b_or_finalize_no_risk_reuses_stage_a_alt_metric_payloads() ->
             ),
         ),
         artifact_runtime_core_module.BacktestStageAScoredVariantV2(
-            base_variant=base_variants[0],
+            base_variant=cast(Any, base_variants[0]),
             total_return_pct=20.0,
             no_risk_metrics=StageANoRiskMetricsV2(
                 total_return_pct=20.0,
@@ -2161,7 +2161,7 @@ def test_run_stage_b_or_finalize_no_risk_reuses_stage_a_alt_metric_payloads() ->
 
     rows, tasks = runner.run_stage_b_or_finalize_no_risk(
         template=template,
-        runtime_plan=runtime_plan,
+        runtime_plan=cast(Any, runtime_plan),
         shortlist=shortlist,
         candles=cast(Any, SimpleNamespace()),
         scorer=cast(Any, scorer),
@@ -2170,7 +2170,7 @@ def test_run_stage_b_or_finalize_no_risk_reuses_stage_a_alt_metric_payloads() ->
     )
 
     assert tuple(
-        int(tasks[row.variant_key].signal_params["ema"]["threshold"]) for row in rows
+        cast(int, tasks[row.variant_key].signal_params["ema"]["threshold"]) for row in rows
     ) == (2, 1)
     assert tuple(row.total_return_pct for row in rows) == (10.0, 20.0)
     assert tuple(row.best_tp_pct for row in rows) == (None, None)

@@ -4,6 +4,7 @@ from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -257,15 +258,15 @@ def test_stage_b_fast_path_stays_enabled_with_retained_exact_payload_for_total_r
         stage="stage_b",
         primary_metric="total_return_pct",
     )
-    scorer._resolve_risk_level_indexes_v2 = lambda *, risk_params: (0, 0)
-    scorer._fast_stage_b_search_for_base_variant_v2 = (
+    cast(Any, scorer)._resolve_risk_level_indexes_v2 = lambda *, risk_params: (0, 0)
+    cast(Any, scorer)._fast_stage_b_search_for_base_variant_v2 = (
         lambda *, indicator_selections, signal_params, base_variant_key: SimpleNamespace(
             total_return_pct=np.asarray(((17.25,),), dtype=np.float64),
             base_variant_key=base_variant_key,
             retained_exact_payload="present",
         )
     )
-    scorer._exact_stage_b_cell_cache_v2 = (
+    cast(Any, scorer)._exact_stage_b_cell_cache_v2 = (
         lambda **kwargs: (_ for _ in ()).throw(
             AssertionError(
                 "retained_exact_payload must not disable the fast Stage B path for breadth scoring"
@@ -275,7 +276,7 @@ def test_stage_b_fast_path_stays_enabled_with_retained_exact_payload_for_total_r
 
     metrics = scorer.score_variant_metric(
         stage="stage_b",
-        candles=SimpleNamespace(),
+        candles=cast(Any, SimpleNamespace()),
         indicator_selections=(),
         signal_params={},
         risk_params={
@@ -336,7 +337,7 @@ def test_stage_b_details_path_keeps_exact_authority_with_retained_exact_payload(
     )
     scorer._local_exec_open = np.asarray((100.0,), dtype=np.float64)
     scorer._local_exec_close = np.asarray((101.0,), dtype=np.float64)
-    scorer._local_hit_times = SimpleNamespace(
+    cast(Any, scorer)._local_hit_times = SimpleNamespace(
         tp_values=np.asarray((0.01,), dtype=np.float32),
         sl_values=np.asarray((0.01,), dtype=np.float32),
     )
@@ -344,7 +345,7 @@ def test_stage_b_details_path_keeps_exact_authority_with_retained_exact_payload(
         lambda *, indicator_variant_key, signal_params: "base-variant-key"
     )
     exact_calls: list[str] = []
-    scorer._exact_stage_b_cell_cache_v2 = (
+    cast(Any, scorer)._exact_stage_b_cell_cache_v2 = (
         lambda **kwargs: exact_calls.append(kwargs["variant_key"])
         or SimpleNamespace(replay="exact-replay", metrics="exact-metrics")
     )
@@ -368,7 +369,7 @@ def test_stage_b_details_path_keeps_exact_authority_with_retained_exact_payload(
 
     details = scorer.score_variant_with_details(
         stage="stage_b",
-        candles=SimpleNamespace(),
+        candles=cast(Any, SimpleNamespace()),
         indicator_selections=(),
         signal_params={},
         risk_params={
@@ -384,7 +385,7 @@ def test_stage_b_details_path_keeps_exact_authority_with_retained_exact_payload(
     assert exact_calls == ["finalist-variant-key"]
     assert details.metrics["total_return_pct"] == 9.5
     assert details.metrics["trade_count"] == 3.0
-    assert details.execution_outcome.authority == "exact"
+    assert cast(Any, details.execution_outcome).authority == "exact"
 
 
 def test_stage_b_exact_replay_observability_is_finalist_only() -> None:
@@ -487,8 +488,8 @@ def test_stage_b_runtime_replays_exact_only_for_finalist_rows() -> None:
         execution_params={},
     )
     all_tasks = runtime_core_module.iter_stage_b_tasks_v2(
-        template=template,
-        runtime_plan=runtime_plan,
+        template=cast(Any, template),
+        runtime_plan=cast(Any, runtime_plan),
         shortlist=shortlist,
     )
     breadth_total_return_by_variant_key = {
@@ -513,11 +514,11 @@ def test_stage_b_runtime_replays_exact_only_for_finalist_rows() -> None:
     )
 
     rows, tasks_by_variant_key = runner.run_stage_b_or_finalize_no_risk(
-        template=template,
-        runtime_plan=runtime_plan,
+        template=cast(Any, template),
+        runtime_plan=cast(Any, runtime_plan),
         shortlist=shortlist,
-        candles=SimpleNamespace(),
-        scorer=scorer,
+        candles=cast(Any, SimpleNamespace()),
+        scorer=cast(Any, scorer),
         top_k_limit=2,
     )
 
