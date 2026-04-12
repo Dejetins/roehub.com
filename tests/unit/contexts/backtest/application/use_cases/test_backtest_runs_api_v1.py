@@ -430,7 +430,9 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert "execution_profile_mode" not in repo.created_job.request_json
     assert repo.created_job.execution_profile_mode_hint == "hybrid_conservative"
     assert repo.created_job.effective_execution_profile_mode == "hybrid_conservative"
-    assert repo.created_job.request_hash == _build_sha256_from_payload(payload=repo.created_job.request_json)
+    assert repo.created_job.request_hash == _build_sha256_from_payload(
+        payload=repo.created_job.request_json
+    )
     assert len(repo.created_rows) == 1
     assert repo.created_rows[0].rank == 1
     assert repo.created_rows[0].variant_key == "a" * 64

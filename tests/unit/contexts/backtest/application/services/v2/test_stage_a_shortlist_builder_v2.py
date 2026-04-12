@@ -803,7 +803,8 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
     synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
 ) -> None:
     """
-    Verify retained candidates keep fast Stage B breadth scoring while exact finalist replay stays available.
+    Verify retained candidates keep fast Stage B breadth scoring while exact
+    finalist replay stays available.
 
     Args:
         synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.

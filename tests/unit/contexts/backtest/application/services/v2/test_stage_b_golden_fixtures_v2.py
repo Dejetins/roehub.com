@@ -14,9 +14,6 @@ from trading.contexts.backtest.application.services.v2 import (
     StageBEntryMappingCaseV2,
     StageBTradeExitCaseV2,
     StageBTradeListCaseV2,
-    artifact_backed_stage_b_scorer_v2 as stage_b_scorer_module,
-    artifact_runtime_core_v2 as runtime_core_module,
-    artifact_runtime_plan_v2 as runtime_plan_module,
     execute_stage_b_golden_case_v2,
     load_backtest_runtime_acceleration_benchmark_corpus_v2,
     load_stage_b_golden_fixture_catalog_v2,
@@ -24,6 +21,15 @@ from trading.contexts.backtest.application.services.v2 import (
     read_stage_b_golden_fixture_payload_v2,
     serialize_stage_b_golden_fixture_payload_v2,
     validate_stage_b_golden_fixture_payload_v2,
+)
+from trading.contexts.backtest.application.services.v2 import (
+    artifact_backed_stage_b_scorer_v2 as stage_b_scorer_module,
+)
+from trading.contexts.backtest.application.services.v2 import (
+    artifact_runtime_core_v2 as runtime_core_module,
+)
+from trading.contexts.backtest.application.services.v2 import (
+    artifact_runtime_plan_v2 as runtime_plan_module,
 )
 from trading.contexts.backtest.application.services.v2.stage_b_golden_fixtures_v2 import (
     load_stage_b_best_cell_replay_reference_case_v2,
@@ -282,7 +288,12 @@ def test_stage_b_fast_path_stays_enabled_with_retained_exact_payload_for_total_r
         variant_key="stage-b-variant-key",
     )
 
-    assert scorer._stage_a_payload_cache_by_base_variant_key["base-variant-key"].compact_trades == ()
+    assert (
+        scorer._stage_a_payload_cache_by_base_variant_key[
+            "base-variant-key"
+        ].compact_trades
+        == ()
+    )
     assert metrics["total_return_pct"] == 17.25
     assert metrics["Total Return [%]"] == 17.25
 
