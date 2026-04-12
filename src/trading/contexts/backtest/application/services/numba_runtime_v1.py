@@ -17,7 +17,8 @@ class BacktestStageAParallelismConfigV1:
         None.
     Assumptions:
         Stage A worker intent is expressed through `stage_a_workers`, while `numba_threads`
-        remains capped by the process-wide `max_numba_threads` ceiling.
+        remains capped by the process-wide `max_numba_threads` ceiling and drives single-process
+        kernel-driven parallel Stage A work.
     Raises:
         ValueError: If either value is non-positive.
     Side Effects:
@@ -104,6 +105,25 @@ def _current_backtest_numba_threads() -> int:
     return current_threads
 
 
+def current_backtest_numba_threads_v1() -> int:
+    """
+    Read the current effective Numba thread count for live single-process Stage A work.
+
+    Args:
+        None.
+    Returns:
+        int: Current effective Numba thread count for the active Python process.
+    Assumptions:
+        Perf-smoke and unit tests may need an explicit observable `numba_threads_used` value to
+        prove that `stage_a_workers` maps to real in-process kernel parallelism.
+    Raises:
+        ValueError: Propagated if the runtime reports a non-positive thread count.
+    Side Effects:
+        Imports `numba` on first use through the shared runtime accessor.
+    """
+    return _current_backtest_numba_threads()
+
+
 def resolve_backtest_stage_a_parallelism_v1(
     *,
     execution_profile: Any | None,
@@ -131,7 +151,7 @@ def resolve_backtest_stage_a_parallelism_v1(
         Reads the current Numba thread count when `max_numba_threads` is omitted.
     """
     effective_max_numba_threads = (
-        _current_backtest_numba_threads()
+        current_backtest_numba_threads_v1()
         if max_numba_threads is None
         else int(max_numba_threads)
     )
@@ -177,7 +197,7 @@ def backtest_stage_a_numba_threads_scope_v1(
         Temporarily mutates the process-level Numba thread setting and restores the prior value on
         exit.
     """
-    previous_threads = _current_backtest_numba_threads()
+    previous_threads = current_backtest_numba_threads_v1()
     apply_backtest_numba_threads(max_numba_threads=parallelism.numba_threads)
     try:
         yield parallelism.numba_threads
@@ -188,5 +208,6 @@ __all__ = [
     "BacktestStageAParallelismConfigV1",
     "apply_backtest_numba_threads",
     "backtest_stage_a_numba_threads_scope_v1",
+    "current_backtest_numba_threads_v1",
     "resolve_backtest_stage_a_parallelism_v1",
 ]

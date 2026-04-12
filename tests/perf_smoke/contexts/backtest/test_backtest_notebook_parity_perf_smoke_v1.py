@@ -17,6 +17,9 @@ from trading.contexts.backtest.application.services import (
     serialize_backtest_notebook_parity_benchmark_corpus_payload_v2,
     serialize_backtest_notebook_parity_measurements_v2,
 )
+from trading.contexts.backtest.application.services import (
+    numba_runtime_v1 as numba_runtime_module,
+)
 from trading.contexts.backtest.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
 )
@@ -363,6 +366,10 @@ def test_stage_a_streaming_exact_runtime_shape_is_observable_for_benchmarks() ->
     assert runtime_shape.retained_candidate_count == 6
     assert runtime_shape.max_retained_chunk_size == 4
     assert runtime_shape.deferred_replay_count == 0
+    assert runtime_shape.execution_shape == "single-process parallel Stage A"
+    assert runtime_shape.frontier_compute_mode == "kernel-driven"
+    assert runtime_shape.stage_a_workers is None
+    assert runtime_shape.numba_threads_used is None
 
 
 def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
@@ -390,9 +397,11 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
         Monkeypatches the retained chunk heap-merge helper during one in-memory Stage A run.
     """
     retained_chunk_sizes: list[int] = []
+    observed_numba_threads: list[int] = []
     original_method = (
         stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap
     )
+    original_aggregate = stage_a_shortlist_builder_module.aggregate_ordered_final_signal_rows_v2
 
     def _recording_method(self: Any, **kwargs: Any) -> None:
         """
@@ -413,10 +422,41 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
         retained_chunk_sizes.append(len(kwargs["chunk_variants"]))
         original_method(self, **kwargs)
 
+    def _recording_aggregate(**kwargs: Any) -> Any:
+        """
+        Record the live Stage A `numba_threads_used` value before aggregation.
+
+        Args:
+            **kwargs: Ordered aggregation keyword arguments forwarded to the live helper.
+        Returns:
+            Any: Live aggregated `final_signal` matrix.
+        Assumptions:
+            The kernel-driven Stage A frontier should aggregate inside the active in-process Numba
+            thread scope, making the live thread budget observable to perf-smoke.
+        Raises:
+            None.
+        Side Effects:
+            Appends one observed thread count to the in-memory log.
+        """
+        observed_numba_threads.append(
+            numba_runtime_module.current_backtest_numba_threads_v1()
+        )
+        return original_aggregate(**kwargs)
+
     monkeypatch.setattr(
         stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2,
         "_merge_retained_exact_payload_chunk_into_heap",
         _recording_method,
+    )
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "aggregate_ordered_final_signal_rows_v2",
+        _recording_aggregate,
+    )
+
+    parallelism = numba_runtime_module.BacktestStageAParallelismConfigV1(
+        stage_a_workers=2,
+        numba_threads=2,
     )
 
     shortlist = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2(
@@ -431,11 +471,15 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
         target_time_range=stage_a_shortlist_builder_testkit._combo_proxy_target_time_range(),
         shortlist_limit=2,
         batch_size=6,
+        parallelism=parallelism,
     )
 
+    assert observed_numba_threads
     runtime_shape = (
         stage_a_shortlist_builder_module.describe_stage_a_streaming_exact_runtime_shape_v2(
             retained_chunk_sizes=tuple(retained_chunk_sizes),
+            stage_a_workers=parallelism.stage_a_workers,
+            numba_threads_used=max(observed_numba_threads),
         )
     )
 
@@ -446,6 +490,10 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
     assert runtime_shape.retained_candidate_count == 6
     assert runtime_shape.max_retained_chunk_size == 4
     assert runtime_shape.deferred_replay_count == 0
+    assert runtime_shape.execution_shape == "single-process parallel Stage A"
+    assert runtime_shape.frontier_compute_mode == "kernel-driven"
+    assert runtime_shape.stage_a_workers == 2
+    assert runtime_shape.numba_threads_used == 2
 
 
 def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shape_gates() -> None:

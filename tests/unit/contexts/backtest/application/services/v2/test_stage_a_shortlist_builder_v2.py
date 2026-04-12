@@ -30,6 +30,9 @@ from trading.contexts.backtest.application.services import (
     artifact_market_id_from_coordinates_v2,
     compute_target_slice_by_close_time_v2,
 )
+from trading.contexts.backtest.application.services import (
+    numba_runtime_v1 as numba_runtime_module,
+)
 from trading.contexts.backtest.application.services.v2 import (
     artifact_runtime_core_v2 as artifact_runtime_core_module,
 )
@@ -1425,6 +1428,76 @@ def test_stage_a_shortlist_builder_v2_streaming_exact_shortlist_is_batch_invaria
     assert tuple(
         row.base_variant.base_variant_key for row in small_batch_shortlist
     ) == tuple(row.base_variant.base_variant_key for row in large_batch_shortlist)
+
+
+def test_stage_a_shortlist_builder_v2_applies_stage_a_workers_to_live_kernel_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify live Stage A aggregation observes the configured in-process Numba thread budget.
+
+    Args:
+        monkeypatch: pytest fixture used to record live aggregation-thread observations.
+    Returns:
+        None.
+    Assumptions:
+        Parallel Stage A should stay single-process and drive kernel-backed aggregation under the
+        configured `stage_a_workers` budget instead of silently falling back to serial Python.
+    Raises:
+        AssertionError: If the live aggregation path does not observe the expected thread count.
+    Side Effects:
+        Monkeypatches the ordered aggregation helper during one in-memory Stage A run.
+    """
+    observed_numba_threads: list[int] = []
+    original_aggregate = (
+        stage_a_shortlist_builder_module.aggregate_ordered_final_signal_rows_v2
+    )
+
+    def _recording_aggregate(**kwargs: Any) -> np.ndarray:
+        """
+        Record the live Numba thread budget before delegating to the real aggregation helper.
+
+        Args:
+            **kwargs: Ordered aggregation keyword arguments forwarded to the live helper.
+        Returns:
+            np.ndarray: Aggregated Stage A `final_signal` matrix from the live helper.
+        Assumptions:
+            The builder invokes ordered final-signal aggregation inside the Stage A Numba thread
+            scope, so the observed thread count reflects `stage_a_workers` on the hot path.
+        Raises:
+            None.
+        Side Effects:
+            Appends one observed Numba thread count to the in-memory log.
+        """
+        observed_numba_threads.append(
+            numba_runtime_module.current_backtest_numba_threads_v1()
+        )
+        return original_aggregate(**kwargs)
+
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "aggregate_ordered_final_signal_rows_v2",
+        _recording_aggregate,
+    )
+
+    shortlist = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=_combo_proxy_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, _combo_proxy_grid_context()),
+        artifact_context=cast(Any, _combo_proxy_artifact_context()),
+        target_time_range=_combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=6,
+        parallelism=numba_runtime_module.BacktestStageAParallelismConfigV1(
+            stage_a_workers=2,
+            numba_threads=2,
+        ),
+    )
+
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
+    assert observed_numba_threads
+    assert max(observed_numba_threads) == 2
 
 
 def test_stage_a_shortlist_builder_v2_streaming_exact_scoring_removes_deferred_replay_helpers(

@@ -58,7 +58,7 @@ from .generic_row_scorer_v2 import (
     build_generic_row_signal_features_mapping_v2,
 )
 from .price_arrays_loader import MmapPriceArraysLoaderV2
-from .signal_aggregator_kernel import aggregate_final_signal_rows_v2
+from .signal_aggregator_kernel import aggregate_ordered_final_signal_rows_v2
 from .signal_features_loader_v2 import MmapSignalFeaturesLoaderV2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .trade_compactor_kernel import (
@@ -734,6 +734,10 @@ class StageAStreamingExactRuntimeShapeV2:
     retained_candidate_count: int
     max_retained_chunk_size: int
     deferred_replay_count: int
+    execution_shape: str = "single-process parallel Stage A"
+    frontier_compute_mode: str = "kernel-driven"
+    stage_a_workers: int | None = None
+    numba_threads_used: int | None = None
 
     def __post_init__(self) -> None:
         """
@@ -771,11 +775,30 @@ class StageAStreamingExactRuntimeShapeV2:
             raise ValueError(
                 "StageAStreamingExactRuntimeShapeV2.deferred_replay_count must be >= 0"
             )
+        if not self.execution_shape:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.execution_shape must be non-empty"
+            )
+        if not self.frontier_compute_mode:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.frontier_compute_mode must be non-empty"
+            )
+        if self.stage_a_workers is not None and self.stage_a_workers <= 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.stage_a_workers must be > 0 when provided"
+            )
+        if self.numba_threads_used is not None and self.numba_threads_used <= 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.numba_threads_used must be > 0 when "
+                "provided"
+            )
 
 
 def describe_stage_a_streaming_exact_runtime_shape_v2(
     *,
     retained_chunk_sizes: Sequence[int],
+    stage_a_workers: int | None = None,
+    numba_threads_used: int | None = None,
 ) -> StageAStreamingExactRuntimeShapeV2:
     """
     Describe Stage A streaming exact scoring shape for perf-smoke benchmarks.
@@ -783,12 +806,15 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
     Args:
         retained_chunk_sizes: Exact retained chunk sizes observed as Stage A streams trade-list-
             first exact scoring into the shortlist heap.
+        stage_a_workers: Optional configured Stage A worker budget for the measured run.
+        numba_threads_used: Optional effective in-process Numba thread count observed live.
     Returns:
         StageAStreamingExactRuntimeShapeV2: Additive runtime-shape evidence for streaming exact
             scoring with no deferred replay.
     Assumptions:
-        The active Stage A path exact-scores each retained chunk immediately and keeps deferred
-        replay count at zero.
+        The active Stage A path exact-scores each retained chunk immediately, keeps deferred
+        replay count at zero, and remains a single-process kernel-driven frontier when
+        `stage_a_workers` and `numba_threads_used` are supplied.
     Raises:
         ValueError: If one retained chunk size is negative.
     Side Effects:
@@ -805,6 +831,8 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
         retained_candidate_count=sum(normalized_chunk_sizes),
         max_retained_chunk_size=max(normalized_chunk_sizes, default=0),
         deferred_replay_count=0,
+        stage_a_workers=stage_a_workers,
+        numba_threads_used=numba_threads_used,
     )
 
 
@@ -1231,12 +1259,13 @@ class BacktestStageAShortlistBuilderV2:
                     artifact_context=artifact_context,
                     signal_target_slice=signal_target_slice,
                 )
-                selected_signal_rows = {
-                    prepared_input.indicator_id: prepared_input.signal_rows
-                    for prepared_input in chunk_inputs
-                }
-                final_signal = aggregate_final_signal_rows_v2(
-                    selected_signal_rows=selected_signal_rows
+                final_signal = aggregate_ordered_final_signal_rows_v2(
+                    ordered_signal_rows=tuple(
+                        prepared_input.signal_rows for prepared_input in chunk_inputs
+                    ),
+                    indicator_ids=tuple(
+                        prepared_input.indicator_id for prepared_input in chunk_inputs
+                    ),
                 )
                 retained_row_indexes = self._select_combo_proxy_retained_chunk_row_indexes(
                     chunk_variants=retained_chunk_variants,

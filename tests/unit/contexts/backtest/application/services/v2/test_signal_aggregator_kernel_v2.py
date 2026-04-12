@@ -4,6 +4,9 @@ import numpy as np
 import pytest
 
 from trading.contexts.backtest.application.services import aggregate_final_signal_rows_v2
+from trading.contexts.backtest.application.services.v2 import (
+    signal_aggregator_kernel as signal_aggregator_kernel_module,
+)
 
 
 def test_aggregate_final_signal_rows_v2_applies_consensus_and_is_order_independent() -> None:
@@ -81,3 +84,34 @@ def test_aggregate_final_signal_rows_v2_rejects_shape_drift() -> None:
                 "rsi": np.array([[1, 0], [0, -1]], dtype=np.int8),
             }
         )
+
+
+def test_aggregate_final_signal_rows_v2_uses_parallel_kernel_driven_stage_a_path() -> None:
+    """
+    Verify Stage A final-signal aggregation stays on the parallel kernel-driven hot path.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The dominant Stage A frontier aggregation should remain a single-process Numba kernel so
+        `stage_a_workers` can map to real in-process parallel work.
+    Raises:
+        AssertionError: If the kernel loses `parallel=True` configuration.
+    Side Effects:
+        Triggers one aggregation call so the kernel-backed path is exercised once.
+    """
+    aggregate_final_signal_rows_v2(
+        selected_signal_rows={
+            "ema": np.array([[1, 0, -1], [1, 1, -1]], dtype=np.int8),
+            "rsi": np.array([[1, 0, -1], [1, 0, -1]], dtype=np.int8),
+        }
+    )
+
+    assert (
+        signal_aggregator_kernel_module._aggregate_final_signal_row_cube_kernel_v2.targetoptions[
+            "parallel"
+        ]
+        is True
+    )
