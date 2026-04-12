@@ -586,7 +586,7 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             },
                         },
                         "parallelism": {
-                            "stage_a_workers": 1,
+                            "stage_a_workers": 4,
                             "stage_b_workers": 1,
                         },
                         "feature_flags": {
@@ -628,8 +628,8 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             },
                         },
                         "parallelism": {
-                            "stage_a_workers": 1,
-                            "stage_b_workers": 4,
+                            "stage_a_workers": 4,
+                            "stage_b_workers": 3,
                         },
                         "feature_flags": {
                             "runtime_enabled": False,
@@ -670,8 +670,8 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                             },
                         },
                         "parallelism": {
-                            "stage_a_workers": 1,
-                            "stage_b_workers": 4,
+                            "stage_a_workers": 3,
+                            "stage_b_workers": 2,
                         },
                         "feature_flags": {
                             "runtime_enabled": False,

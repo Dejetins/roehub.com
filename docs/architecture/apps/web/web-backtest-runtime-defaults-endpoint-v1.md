@@ -214,13 +214,13 @@
             }
           },
           "parallelism": {
-            "stage_a_workers": 1,
-            "stage_b_workers": 4
+            "stage_a_workers": 4,
+            "stage_b_workers": 1
           },
           "feature_flags": {
             "runtime_enabled": true,
             "heuristic_shortlist_enabled": false,
-            "parallel_stage_b_enabled": true,
+            "parallel_stage_b_enabled": false,
             "family_plugin_enabled": false
           },
           "launch_budget": {
@@ -229,8 +229,8 @@
             "max_estimated_memory_bytes": 1610612736
           },
           "progress_weights": {
-            "stage_a": 35,
-            "stage_b": 60,
+            "stage_a": 45,
+            "stage_b": 50,
             "finalizing": 5
           },
           "family_plugin_budget_ms": 20,
@@ -253,12 +253,12 @@
             }
           },
           "parallelism": {
-            "stage_a_workers": 1,
-            "stage_b_workers": 4
+            "stage_a_workers": 4,
+            "stage_b_workers": 3
           },
           "feature_flags": {
-            "runtime_enabled": true,
-            "heuristic_shortlist_enabled": true,
+            "runtime_enabled": false,
+            "heuristic_shortlist_enabled": false,
             "parallel_stage_b_enabled": false,
             "family_plugin_enabled": false
           },
@@ -292,14 +292,14 @@
             }
           },
           "parallelism": {
-            "stage_a_workers": 1,
-            "stage_b_workers": 4
+            "stage_a_workers": 3,
+            "stage_b_workers": 2
           },
           "feature_flags": {
-            "runtime_enabled": true,
-            "heuristic_shortlist_enabled": true,
+            "runtime_enabled": false,
+            "heuristic_shortlist_enabled": false,
             "parallel_stage_b_enabled": false,
-            "family_plugin_enabled": true
+            "family_plugin_enabled": false
           },
           "launch_budget": {
             "max_stage_a_variants_total": 75000,

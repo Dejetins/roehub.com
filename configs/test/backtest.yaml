@@ -129,7 +129,7 @@ backtest:
           finalizing: 5
         parallelism:
           stage_a_workers: 4
-          stage_b_workers: 4
+          stage_b_workers: 1
         feature_flags:
           runtime_enabled: true
           heuristic_shortlist_enabled: false

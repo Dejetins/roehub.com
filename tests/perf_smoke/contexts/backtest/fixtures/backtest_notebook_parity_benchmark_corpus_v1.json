@@ -49,7 +49,7 @@
       "notebook on 12 threads vs backend on 4 threads is invalid",
       "sync and worker measurements from different artifact slots are invalid"
     ],
-    "notes": "Compare backend and notebook only when host, artifact slot, and numba_threads_used all match exactly. Sync and worker backend measurements are comparable when those constraints hold and stage_b_execution_mode is reviewed together with stage_b_process_fallback_threshold."
+    "notes": "Compare backend and notebook only when host, artifact slot, and numba_threads_used all match exactly. Accepted benchmark thread budget currently freezes max_numba_threads=4 with stage_a_workers=4 and stage_b_workers=1 for the canonical exact_parallel backend shape. Sync and worker backend measurements are comparable when those constraints hold and stage_b_execution_mode is reviewed together with stage_b_process_fallback_threshold."
   },
   "scenario_order": [
     "nr2",

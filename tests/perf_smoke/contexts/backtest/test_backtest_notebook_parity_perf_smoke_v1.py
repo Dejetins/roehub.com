@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
+import yaml
 
 from tests.unit.contexts.backtest.application.services.v2 import (
     test_stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_testkit,
@@ -19,6 +20,9 @@ from trading.contexts.backtest.application.services import (
 )
 from trading.contexts.backtest.application.services import (
     numba_runtime_v1 as numba_runtime_module,
+)
+from trading.contexts.backtest.application.services.v2 import (
+    default_execution_profiles_catalog_v2,
 )
 from trading.contexts.backtest.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
@@ -89,6 +93,9 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert corpus.equal_thread_budget_rule.comparison_field == "numba_threads_used"
     assert corpus.equal_thread_budget_rule.same_host_required is True
     assert corpus.equal_thread_budget_rule.same_artifact_slot_required is True
+    assert "max_numba_threads=4" in corpus.equal_thread_budget_rule.notes
+    assert "stage_a_workers=4" in corpus.equal_thread_budget_rule.notes
+    assert "stage_b_workers=1" in corpus.equal_thread_budget_rule.notes
     assert "notebook on 12 threads vs backend on 4 threads is invalid" in (
         corpus.equal_thread_budget_rule.invalid_examples
     )
@@ -186,6 +193,67 @@ def test_notebook_parity_benchmark_corpus_serialization_is_byte_stable() -> None
     )
 
     assert canonical_bytes == _CORPUS_FIXTURE_PATH.read_bytes()
+
+
+def test_notebook_parity_thread_budget_contract_is_aligned_with_exact_parallel_defaults() -> None:
+    """
+    Verify canonical parity fixtures and runtime profiles freeze the accepted thread budget.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+    Related:
+      - configs/dev/backtest.yaml
+      - configs/test/backtest.yaml
+      - configs/prod/backtest.yaml
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical `NR2` and `RG-TTR` parity comparisons remain locked to the accepted
+        `thread budget` of four Numba threads, with `exact_parallel` keeping Stage B at one
+        worker by default.
+    Raises:
+        AssertionError: If fixture metadata, catalog defaults, or env configs drift from the
+            frozen parity thread-budget contract.
+    Side Effects:
+        Reads committed YAML config files from the repository.
+    """
+    accepted_thread_budget = 4
+    corpus = _load_notebook_parity_benchmark_corpus()
+    exact_parallel_profile = default_execution_profiles_catalog_v2().profile_for_mode(
+        mode="exact_parallel"
+    )
+
+    assert exact_parallel_profile.parallelism.stage_a_workers == accepted_thread_budget
+    assert exact_parallel_profile.parallelism.stage_b_workers == 1
+    assert (
+        corpus.scenario_for_id(scenario_id="nr2").baseline_reference_points[
+            1
+        ].numba_threads_used
+        == accepted_thread_budget
+    )
+    assert corpus.scenario_for_id(
+        scenario_id="rg_ttr"
+    ).baseline_reference_points[0].numba_threads_used == accepted_thread_budget
+
+    repo_root = Path(__file__).resolve().parents[4]
+    for env_name in ("dev", "test", "prod"):
+        payload = yaml.safe_load(
+            (repo_root / f"configs/{env_name}/backtest.yaml").read_text(encoding="utf-8")
+        )
+        profiles_by_mode = {
+            profile_payload["mode"]: profile_payload
+            for profile_payload in payload["backtest"]["execution_profiles"]["profiles"]
+        }
+
+        assert int(payload["backtest"]["cpu"]["max_numba_threads"]) == accepted_thread_budget
+        assert int(
+            profiles_by_mode["exact_parallel"]["parallelism"]["stage_a_workers"]
+        ) == accepted_thread_budget
+        assert int(profiles_by_mode["exact_parallel"]["parallelism"]["stage_b_workers"]) == 1
 
 
 def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
@@ -520,6 +588,37 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
     assert runtime_shape.frontier_compute_mode == "kernel-driven"
     assert runtime_shape.stage_a_workers == 2
     assert runtime_shape.numba_threads_used == 2
+
+
+def test_stage_a_parallelism_resolution_clamps_requested_workers_to_thread_budget() -> None:
+    """
+    Verify Stage A resolves to the live process thread budget instead of a higher raw request.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/numba_runtime_v1.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Equal-thread-budget parity should observe the resolved live Stage A worker budget instead
+        of a higher configured request that exceeds `max_numba_threads`.
+    Raises:
+        AssertionError: If Stage A reports a worker budget above the effective thread ceiling.
+    Side Effects:
+        None.
+    """
+    resolved_parallelism = numba_runtime_module.resolve_backtest_stage_a_parallelism_v1(
+        execution_profile=SimpleNamespace(parallelism=SimpleNamespace(stage_a_workers=8)),
+        max_numba_threads=4,
+    )
+
+    assert resolved_parallelism.stage_a_workers == 4
+    assert resolved_parallelism.numba_threads == 4
 
 
 def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shape_gates() -> None:

@@ -1229,6 +1229,65 @@ def _default_stage_b_process_fallback_for_mode_v2(
         ) from error
 
 
+def _default_parallelism_for_mode_v2(
+    *,
+    mode: ExecutionProfileModeLiteralV2,
+) -> ExecutionProfileParallelismConfigV2:
+    """
+    Return the reviewable Stage A / Stage B worker budget for one execution profile.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/numba_runtime_v1.py
+      - configs/prod/backtest.yaml
+
+    Args:
+        mode: Stable execution-profile mode literal.
+    Returns:
+        ExecutionProfileParallelismConfigV2:
+            Typed Stage A / Stage B worker budget for the selected mode.
+    Assumptions:
+        The canonical exact notebook-parity shape keeps `exact_parallel` at
+        `stage_a_workers=4`, `stage_b_workers=1`, while broader hybrid profiles retain their
+        explicit non-default fallback budgets without changing the default in-process Stage B
+        path.
+    Raises:
+        ValueError: If the mode literal is unsupported.
+    Side Effects:
+        None.
+    """
+    parallelism_by_mode: dict[
+        ExecutionProfileModeLiteralV2,
+        ExecutionProfileParallelismConfigV2,
+    ] = {
+        "exact_small": ExecutionProfileParallelismConfigV2(
+            stage_a_workers=1,
+            stage_b_workers=1,
+        ),
+        "exact_parallel": ExecutionProfileParallelismConfigV2(
+            stage_a_workers=4,
+            stage_b_workers=1,
+        ),
+        "hybrid_conservative": ExecutionProfileParallelismConfigV2(
+            stage_a_workers=4,
+            stage_b_workers=3,
+        ),
+        "hybrid_family": ExecutionProfileParallelismConfigV2(
+            stage_a_workers=3,
+            stage_b_workers=2,
+        ),
+    }
+    try:
+        return parallelism_by_mode[mode]
+    except KeyError as error:  # pragma: no cover - guarded by validated literal type
+        raise ValueError(
+            f"Unsupported execution profile mode for parallelism: {mode!r}"
+        ) from error
+
+
 def _default_family_plugin_budget_ms_for_mode_v2(
     *,
     mode: ExecutionProfileModeLiteralV2,
@@ -1308,10 +1367,7 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     scoring=ExecutionProfileShortlistScoringConfigV2(),
                     retention=ExecutionProfileShortlistRetentionConfigV2(),
                 ),
-                parallelism=ExecutionProfileParallelismConfigV2(
-                    stage_a_workers=1,
-                    stage_b_workers=1,
-                ),
+                parallelism=_default_parallelism_for_mode_v2(mode="exact_small"),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
                     runtime_enabled=True,
                     heuristic_shortlist_enabled=False,
@@ -1336,10 +1392,7 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     scoring=ExecutionProfileShortlistScoringConfigV2(),
                     retention=ExecutionProfileShortlistRetentionConfigV2(),
                 ),
-                parallelism=ExecutionProfileParallelismConfigV2(
-                    stage_a_workers=4,
-                    stage_b_workers=1,
-                ),
+                parallelism=_default_parallelism_for_mode_v2(mode="exact_parallel"),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
                     runtime_enabled=True,
                     heuristic_shortlist_enabled=False,
@@ -1372,9 +1425,8 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                         max_per_bucket=750,
                     ),
                 ),
-                parallelism=ExecutionProfileParallelismConfigV2(
-                    stage_a_workers=4,
-                    stage_b_workers=3,
+                parallelism=_default_parallelism_for_mode_v2(
+                    mode="hybrid_conservative"
                 ),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
                     runtime_enabled=False,
@@ -1412,10 +1464,7 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                         max_per_bucket=300,
                     ),
                 ),
-                parallelism=ExecutionProfileParallelismConfigV2(
-                    stage_a_workers=3,
-                    stage_b_workers=2,
-                ),
+                parallelism=_default_parallelism_for_mode_v2(mode="hybrid_family"),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
                     runtime_enabled=False,
                     heuristic_shortlist_enabled=False,

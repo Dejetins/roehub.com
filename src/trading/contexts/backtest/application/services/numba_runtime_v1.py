@@ -11,14 +11,14 @@ class BacktestStageAParallelismConfigV1:
     Immutable Stage A parallelism contract resolved from runtime profile and process ceiling.
 
     Args:
-        stage_a_workers: Requested Stage A worker count from the resolved execution profile.
+        stage_a_workers:
+            Resolved live Stage A worker budget after applying the process-level thread ceiling.
         numba_threads: Effective Numba thread count applied while Stage A is running.
     Returns:
         None.
     Assumptions:
-        Stage A worker intent is expressed through `stage_a_workers`, while `numba_threads`
-        remains capped by the process-wide `max_numba_threads` ceiling and drives single-process
-        kernel-driven parallel Stage A work.
+        `stage_a_workers` and `numba_threads` describe the same live Stage A thread budget after
+        the process-wide `max_numba_threads` ceiling has been applied.
     Raises:
         ValueError: If either value is non-positive.
     Side Effects:
@@ -140,10 +140,11 @@ def resolve_backtest_stage_a_parallelism_v1(
             Optional process-level Numba thread ceiling. When omitted, the current effective
             runtime thread count becomes the ceiling for the returned Stage A contract.
     Returns:
-        BacktestStageAParallelismConfigV1: Immutable Stage A runtime contract.
+        BacktestStageAParallelismConfigV1: Immutable Stage A runtime contract with the configured
+            worker target clamped to the effective thread ceiling.
     Assumptions:
-        Stage A ordering stays deterministic because this helper only resolves worker/thread
-        counts and does not alter variant enumeration or checkpoint boundaries.
+        Stage A ordering stays deterministic because this helper only resolves the live
+        worker/thread budget and does not alter variant enumeration or checkpoint boundaries.
     Raises:
         ValueError: If the ceiling is non-positive or the execution profile exposes invalid
             `stage_a_workers`.
@@ -170,9 +171,10 @@ def resolve_backtest_stage_a_parallelism_v1(
         stage_a_workers = int(raw_stage_a_workers)
     if stage_a_workers <= 0:
         raise ValueError("stage_a_workers must be > 0")
+    resolved_stage_a_workers = min(stage_a_workers, effective_max_numba_threads)
     return BacktestStageAParallelismConfigV1(
-        stage_a_workers=stage_a_workers,
-        numba_threads=min(stage_a_workers, effective_max_numba_threads),
+        stage_a_workers=resolved_stage_a_workers,
+        numba_threads=resolved_stage_a_workers,
     )
 
 

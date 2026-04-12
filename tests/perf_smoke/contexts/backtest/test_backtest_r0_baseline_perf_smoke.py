@@ -733,7 +733,7 @@ def test_r10_parallel_tuning_contract_is_explicit_and_aligned() -> None:
     """
     expected_parallelism = {
         "exact_small": (1, 1),
-        "exact_parallel": (4, 4),
+        "exact_parallel": (4, 1),
         "hybrid_conservative": (4, 3),
         "hybrid_family": (3, 2),
     }
@@ -771,8 +771,11 @@ def test_r10_parallel_tuning_contract_is_explicit_and_aligned() -> None:
             > int(profiles_by_mode["exact_small"]["parallelism"]["stage_a_workers"])
         )
         assert (
-            int(profiles_by_mode["hybrid_conservative"]["parallelism"]["stage_b_workers"])
-            < int(profiles_by_mode["exact_parallel"]["parallelism"]["stage_b_workers"])
+            int(profiles_by_mode["exact_parallel"]["parallelism"]["stage_a_workers"])
+            == cpu_ceiling
+        )
+        assert (
+            int(profiles_by_mode["exact_parallel"]["parallelism"]["stage_b_workers"]) == 1
         )
 
 

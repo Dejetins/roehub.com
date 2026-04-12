@@ -155,6 +155,8 @@ All notebook-parity comparisons are valid only under `equal thread budget` rules
 - identical `numba_threads_used`
 - comparable runtime surfaces (`sync`, `worker`, `notebook`) interpreted together with
   `stage_b_execution_mode`
+- accepted benchmark thread budget currently freezes `max_numba_threads=4`,
+  `stage_a_workers=4`, and `stage_b_workers=1` for the canonical `exact_parallel` backend shape
 
 Invalid example:
 - notebook on `12` threads vs backend on `4` threads
