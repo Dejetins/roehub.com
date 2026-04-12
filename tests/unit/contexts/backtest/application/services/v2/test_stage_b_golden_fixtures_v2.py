@@ -3,12 +3,18 @@ from __future__ import annotations
 from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
+from types import SimpleNamespace
+
+import numpy as np
+import pytest
 
 from trading.contexts.backtest.application.services.v2 import (
+    BacktestArtifactBackedStageBScorerV2,
     StageBBestCellReplayCaseV2,
     StageBEntryMappingCaseV2,
     StageBTradeExitCaseV2,
     StageBTradeListCaseV2,
+    artifact_backed_stage_b_scorer_v2 as stage_b_scorer_module,
     execute_stage_b_golden_case_v2,
     load_backtest_runtime_acceleration_benchmark_corpus_v2,
     load_stage_b_golden_fixture_catalog_v2,
@@ -20,6 +26,10 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.services.v2.stage_b_golden_fixtures_v2 import (
     load_stage_b_best_cell_replay_reference_case_v2,
 )
+from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
+    StageACompactExactPayloadV2,
+)
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
 _FIXTURE_PATH = Path(__file__).with_name("fixtures") / "stage_b_golden_fixtures_v2.json"
 _PERF_MANIFEST_PATH = (
@@ -38,6 +48,188 @@ _BENCHMARK_CORPUS_PATH = (
     / "fixtures"
     / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
 )
+
+
+def test_stage_b_fast_path_stays_enabled_with_retained_exact_payload_for_total_return_pct() -> None:
+    """
+    Verify retained_exact_payload warming does not disable the fast Stage B path for breadth work.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        RG-TTR breadth ranking with `primary_metric=total_return_pct` must keep using the fast
+        Stage B path even after Stage A primes `retained_exact_payload` for finalist authority.
+    Raises:
+        AssertionError: If retained payload re-disables fast-path breadth scoring.
+    Side Effects:
+        Populates one in-memory scorer cache with an empty retained payload seed.
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    """
+    scorer = object.__new__(BacktestArtifactBackedStageBScorerV2)
+    scorer._stage_a_payload_cache_by_base_variant_key = {}
+    scorer._local_exec_open = np.asarray((100.0,), dtype=np.float64)
+    scorer._local_exec_close = np.asarray((100.0,), dtype=np.float64)
+    scorer._sentinel_index = 1
+    scorer._execution_params = ExecutionParamsV1(
+        direction_mode="long-only",
+        sizing_mode="fixed_quote",
+        init_cash_quote=1_000.0,
+        fixed_quote=100.0,
+        safe_profit_percent=0.0,
+        fee_pct=0.0,
+        slippage_pct=0.0,
+    )
+    scorer._close_on_end = True
+    scorer._ranking_primary_by_stage = {}
+    scorer._base_variant_key_v2 = (
+        lambda *, indicator_variant_key, signal_params: "base-variant-key"
+    )
+
+    scorer.prime_retained_exact_payload(
+        indicator_variant_key="indicator-variant-key",
+        signal_params={},
+        retained_exact_payload=StageACompactExactPayloadV2(
+            entry_signal_idx=np.asarray((), dtype=np.int64),
+            entry_exec_idx=np.asarray((), dtype=np.int64),
+            direction=np.asarray((), dtype=np.int8),
+            sig_exit_signal_idx=np.asarray((), dtype=np.int64),
+            sig_exit_exec_idx=np.asarray((), dtype=np.int64),
+        ),
+    )
+    scorer.configure_stage_ranking_context(
+        stage="stage_b",
+        primary_metric="total_return_pct",
+    )
+    scorer._resolve_risk_level_indexes_v2 = lambda *, risk_params: (0, 0)
+    scorer._fast_stage_b_search_for_base_variant_v2 = (
+        lambda *, indicator_selections, signal_params, base_variant_key: SimpleNamespace(
+            total_return_pct=np.asarray(((17.25,),), dtype=np.float64),
+            base_variant_key=base_variant_key,
+            retained_exact_payload="present",
+        )
+    )
+    scorer._exact_stage_b_cell_cache_v2 = (
+        lambda **kwargs: (_ for _ in ()).throw(
+            AssertionError(
+                "retained_exact_payload must not disable the fast Stage B path for breadth scoring"
+            )
+        )
+    )
+
+    metrics = scorer.score_variant_metric(
+        stage="stage_b",
+        candles=SimpleNamespace(),
+        indicator_selections=(),
+        signal_params={},
+        risk_params={
+            "tp_enabled": True,
+            "tp_pct": 1.0,
+            "sl_enabled": True,
+            "sl_pct": 1.0,
+        },
+        indicator_variant_key="indicator-variant-key",
+        variant_key="stage-b-variant-key",
+    )
+
+    assert scorer._stage_a_payload_cache_by_base_variant_key["base-variant-key"].compact_trades == ()
+    assert metrics["total_return_pct"] == 17.25
+    assert metrics["Total Return [%]"] == 17.25
+
+
+def test_stage_b_details_path_keeps_exact_authority_with_retained_exact_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify finalist details still use exact replay even when breadth ranking takes the fast path.
+
+    Args:
+        monkeypatch: Pytest fixture used to replace exact-detail collaborators with local stubs.
+    Returns:
+        None.
+    Assumptions:
+        This prompt only restores the fast Stage B path for RG-TTR breadth ranking; finalist
+        detail authority must remain exact.
+    Raises:
+        AssertionError: If the details path stops calling the exact replay cache.
+    Side Effects:
+        Replaces two scorer-module helpers for the duration of the test.
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+    """
+    scorer = object.__new__(BacktestArtifactBackedStageBScorerV2)
+    scorer._ranking_primary_by_stage = {}
+    scorer._report_target_slice = slice(0, 1)
+    scorer._execution_params = ExecutionParamsV1(
+        direction_mode="long-only",
+        sizing_mode="fixed_quote",
+        init_cash_quote=1_000.0,
+        fixed_quote=100.0,
+        safe_profit_percent=0.0,
+        fee_pct=0.0,
+        slippage_pct=0.0,
+    )
+    scorer._local_exec_open = np.asarray((100.0,), dtype=np.float64)
+    scorer._local_exec_close = np.asarray((101.0,), dtype=np.float64)
+    scorer._local_hit_times = SimpleNamespace(
+        tp_values=np.asarray((0.01,), dtype=np.float32),
+        sl_values=np.asarray((0.01,), dtype=np.float32),
+    )
+    scorer._base_variant_key_v2 = (
+        lambda *, indicator_variant_key, signal_params: "base-variant-key"
+    )
+    exact_calls: list[str] = []
+    scorer._exact_stage_b_cell_cache_v2 = (
+        lambda **kwargs: exact_calls.append(kwargs["variant_key"])
+        or SimpleNamespace(replay="exact-replay", metrics="exact-metrics")
+    )
+    scorer.configure_stage_ranking_context(
+        stage="stage_b",
+        primary_metric="total_return_pct",
+    )
+    monkeypatch.setattr(
+        stage_b_scorer_module,
+        "stage_b_metrics_to_ranking_payload_v2",
+        lambda *, metrics: {
+            "total_return_pct": 9.5,
+            "trade_count": 3.0,
+        },
+    )
+    monkeypatch.setattr(
+        stage_b_scorer_module,
+        "build_execution_outcome_from_replay_v2",
+        lambda **kwargs: SimpleNamespace(authority="exact"),
+    )
+
+    details = scorer.score_variant_with_details(
+        stage="stage_b",
+        candles=SimpleNamespace(),
+        indicator_selections=(),
+        signal_params={},
+        risk_params={
+            "tp_enabled": True,
+            "tp_pct": 1.0,
+            "sl_enabled": True,
+            "sl_pct": 1.0,
+        },
+        indicator_variant_key="indicator-variant-key",
+        variant_key="finalist-variant-key",
+    )
+
+    assert exact_calls == ["finalist-variant-key"]
+    assert details.metrics["total_return_pct"] == 9.5
+    assert details.metrics["trade_count"] == 3.0
+    assert details.execution_outcome.authority == "exact"
 
 
 def test_stage_b_golden_fixture_catalog_executes_all_cases_deterministically() -> None:

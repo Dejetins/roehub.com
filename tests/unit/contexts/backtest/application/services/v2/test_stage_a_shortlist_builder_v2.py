@@ -803,7 +803,7 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
     synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
 ) -> None:
     """
-    Verify retained candidates carry an internal exact payload into Stage B exact scoring.
+    Verify retained candidates keep fast Stage B breadth scoring while exact finalist replay stays available.
 
     Args:
         synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
@@ -811,9 +811,11 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
         None.
     Assumptions:
         The in-memory Stage A shortlist is the new internal hand-off surface for retained
-        candidates, while Stage B exact scoring must remain authoritative for final metrics.
+        candidates, while Stage B breadth ranking should keep the fast Stage B path enabled for
+        `total_return_pct` and exact replay must remain authoritative for finalist details.
     Raises:
-        AssertionError: If the retained payload is dropped or Stage B falls back to signal reloads.
+        AssertionError: If the retained payload is dropped, breadth scoring falls back to signal
+            reloads, or exact finalist replay stops working.
     Side Effects:
         Memory-maps strict artifact arrays from the synthetic store.
     """
@@ -912,9 +914,24 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
     assert scored_row.variant_key == task.variant_key
     assert scored_row.best_tp_pct == tp_pct
     assert scored_row.best_sl_pct == sl_pct
-    assert "trade_count" in metrics
     assert metrics["total_return_pct"] == scored_row.total_return_pct
-    assert "trade_count" in scored_row.summary_metrics_json
+    assert "trade_count" not in metrics
+    assert scored_row.summary_metrics_json == {
+        "total_return_pct": scored_row.total_return_pct
+    }
+
+    details = scorer.score_variant_with_details(
+        stage="stage_b",
+        candles=cast(Any, SimpleNamespace()),
+        indicator_selections=task.indicator_selections,
+        signal_params=task.signal_params,
+        risk_params=task.risk_params,
+        indicator_variant_key=task.indicator_variant_key,
+        variant_key=task.variant_key,
+    )
+
+    assert details.metrics["total_return_pct"] == scored_row.total_return_pct
+    assert "trade_count" in details.metrics
 
 
 def test_stage_a_shortlist_builder_v2_keeps_retained_frontier_row_order_explicit(

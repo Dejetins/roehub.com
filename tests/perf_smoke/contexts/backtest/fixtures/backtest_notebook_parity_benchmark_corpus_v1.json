@@ -211,6 +211,14 @@
           "max_value": null,
           "expected_value": "in_process",
           "notes": "Benchmark-sized RG-TTR workloads should keep Stage B in-process by default."
+        },
+        {
+          "gate_id": "rg_ttr_exact_replay_count",
+          "metric": "exact_replay_count",
+          "max_ratio": null,
+          "max_value": 64,
+          "expected_value": null,
+          "notes": "RG-TTR breadth scoring must keep the fast Stage B path active so exact_replay_count stays well below broad over-replay levels before finalist-only replay lands."
         }
       ],
       "notes": "RG-TTR is the canonical risk-grid parity class. A1 stores the current process-fan-out baseline explicitly so later prompts can fail on unexpected worker amplification."

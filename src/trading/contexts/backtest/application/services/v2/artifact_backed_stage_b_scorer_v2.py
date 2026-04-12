@@ -346,7 +346,6 @@ class BacktestArtifactBackedStageBScorerV2(
         ] = {}
         self._stage_b_exact_cache_by_variant_key: dict[str, _ExactStageBCellCacheV2] = {}
         self._fast_search_cache_by_base_variant_key: dict[str, StageBFastSearchResultV2] = {}
-        self._retained_exact_payload_base_variant_keys: set[str] = set()
         self._ranking_primary_by_stage: dict[str, str] = {}
 
     def prepare_for_grid_context(
@@ -389,7 +388,6 @@ class BacktestArtifactBackedStageBScorerV2(
         self._stage_a_payload_cache_by_base_variant_key.clear()
         self._stage_b_exact_cache_by_variant_key.clear()
         self._fast_search_cache_by_base_variant_key.clear()
-        self._retained_exact_payload_base_variant_keys.clear()
 
     def configure_stage_ranking_context(
         self,
@@ -439,8 +437,9 @@ class BacktestArtifactBackedStageBScorerV2(
         Returns:
             None.
         Assumptions:
-            The retained payload is internal-only and additive; when present it should satisfy the
-            Stage B exact scorer before any artifact row reload/build fallback occurs.
+            The retained payload is internal-only and additive; when present it should warm the
+            Stage A compact-trade cache without disabling the fast Stage B path for
+            `primary_metric=total_return_pct`.
         Raises:
             None.
         Side Effects:
@@ -457,7 +456,6 @@ class BacktestArtifactBackedStageBScorerV2(
             signal_params=signal_params,
         )
         if base_variant_key in self._stage_a_payload_cache_by_base_variant_key:
-            self._retained_exact_payload_base_variant_keys.add(base_variant_key)
             return
         no_risk_metrics = compute_no_risk_metrics_v2(
             compact_trades=retained_exact_payload.compact_trades,
@@ -473,7 +471,6 @@ class BacktestArtifactBackedStageBScorerV2(
                 no_risk_metrics=no_risk_metrics,
             )
         )
-        self._retained_exact_payload_base_variant_keys.add(base_variant_key)
 
     def to_parallel_stage_b_worker_snapshot_v2(self) -> _ParallelStageBScorerSnapshotV2:
         """
@@ -645,8 +642,9 @@ class BacktestArtifactBackedStageBScorerV2(
         Returns:
             RankingMetricsV1: Deterministic metric payload compatible with staged runner ranking.
         Assumptions:
-            Stage A remains no-risk, while Stage B uses fast total-return lookup only when the
-            active ranking plan is exactly `total_return_pct DESC` with no secondary metric.
+            Stage A remains no-risk, while Stage B breadth scoring keeps the fast Stage B path
+            enabled when the active ranking plan is exactly `total_return_pct DESC`, including
+            cases where `retained_exact_payload` is already cached for finalist authority.
         Raises:
             ValueError: If stage, artifact row addressing, or exact replay contracts are invalid.
         Side Effects:
@@ -680,7 +678,7 @@ class BacktestArtifactBackedStageBScorerV2(
         tp_index, sl_index = self._resolve_risk_level_indexes_v2(risk_params=risk_params)
         if (
             self._can_use_stage_b_total_return_fast_path_v2()
-            and not self._should_force_exact_stage_b_v2(base_variant_key=base_variant_key)
+            and not self._should_force_exact_stage_b_v2()
             and tp_index is not None
             and sl_index is not None
         ):
@@ -1145,23 +1143,24 @@ class BacktestArtifactBackedStageBScorerV2(
             self._ranking_primary_by_stage.get(STAGE_B_LITERAL_V2) == "total_return_pct"
         )
 
-    def _should_force_exact_stage_b_v2(self, *, base_variant_key: str) -> bool:
+    def _should_force_exact_stage_b_v2(self) -> bool:
         """
         Check whether one Stage B base variant must bypass fast-path scoring and replay exactly.
 
         Args:
-            base_variant_key: Deterministic Stage A cache key with risk disabled.
+            None.
         Returns:
-            bool: `True` when the retained exact payload came from the redesigned Stage A hand-off.
+            bool: `False`, because retained exact payload must not disable breadth fast-path use.
         Assumptions:
-            Retained candidates from the redesigned Stage A path must keep exact Stage B as the
-            final result authority even when ranking still uses `primary_metric=total_return_pct`.
+            Exact Stage B authority remains available through the explicit details/finalist path,
+            while `total_return_pct` breadth ranking must keep the fast Stage B path enabled even
+            when `retained_exact_payload` is present.
         Raises:
             None.
         Side Effects:
             None.
         """
-        return base_variant_key in self._retained_exact_payload_base_variant_keys
+        return False
 
 
 def _prepared_indicator_row_plan_snapshot_v2(

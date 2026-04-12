@@ -128,6 +128,7 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert rg_ttr.acceptance_gates[0].max_ratio == 1.18
     assert rg_ttr.acceptance_gates[1].max_value == 1.0
     assert rg_ttr.acceptance_gates[2].expected_value == "in_process"
+    assert rg_ttr.acceptance_gates[3].max_value == 64.0
 
     rg_alt = corpus.scenario_for_id(scenario_id="rg_alt")
     assert rg_alt.benchmark_class == "RG-ALT"
@@ -618,6 +619,29 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
         stage_b_execution_mode="in_process",
         exact_replay_count=30,
     )
+    rg_ttr_fast_path_candidate = _build_measurement(
+        scenario_id="rg_ttr",
+        benchmark_class="RG-TTR",
+        measurement_source="backend",
+        runtime_surface="sync",
+        wall_clock_seconds=21.0,
+        cpu_time_seconds=19.0,
+        peak_rss_bytes=2_050,
+        numba_threads_used=4,
+        max_python_processes_seen=1,
+        stage_b_execution_mode="in_process",
+        exact_replay_count=64,
+    )
+    rg_ttr_fast_path_comparison = evaluate_backtest_notebook_parity_scenario_v2(
+        scenario=rg_ttr,
+        equal_thread_budget_rule=rule,
+        candidate=rg_ttr_fast_path_candidate,
+        reference=rg_ttr_reference,
+    )
+
+    assert rg_ttr_fast_path_comparison.failing_gate_ids == ()
+    assert rg_ttr_fast_path_comparison.passed is True
+
     rg_ttr_regressed = _build_measurement(
         scenario_id="rg_ttr",
         benchmark_class="RG-TTR",
@@ -641,6 +665,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
     assert rg_ttr_comparison.failing_gate_ids == (
         "rg_ttr_max_python_processes_seen",
         "rg_ttr_stage_b_execution_mode",
+        "rg_ttr_exact_replay_count",
     )
     assert rg_ttr_comparison.passed is False
 
