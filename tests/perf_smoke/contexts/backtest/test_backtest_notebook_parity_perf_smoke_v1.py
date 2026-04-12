@@ -722,6 +722,100 @@ def test_rg_alt_functional_baseline_guardrail_is_evaluable() -> None:
     assert bad_comparison.passed is False
 
 
+@pytest.mark.parametrize(
+    "primary_metric",
+    (
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct",
+    ),
+)
+def test_no_risk_alt_metric_runtime_guardrail_caps_regression(
+    primary_metric: str,
+) -> None:
+    """
+    Verify no-risk alternative metrics keep the Stage-A bypass and stay within a 10% runtime cap.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - data_load/promts/backtest_emgine_vnext/
+        28_codex_backtest_engine_vnext_parity_c1_no_risk_terminal_path_prompt.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+    Args:
+        primary_metric: Supported no-risk alternative ranking metric under guard.
+    Returns:
+        None.
+    Assumptions:
+        Alternative no-risk metrics should remain on the direct Stage-A terminal path, so backend
+        regression checks compare backend-vs-backend measurements with identical thread budgets.
+    Raises:
+        AssertionError: If the no-risk bypass drifts from `bypassed_no_risk` or runtime grows by
+            more than 10% versus the backend baseline.
+    Side Effects:
+        None.
+    """
+    baseline = _build_measurement(
+        scenario_id="nr2",
+        benchmark_class="NR2",
+        measurement_source="backend",
+        runtime_surface="sync",
+        wall_clock_seconds=9.0,
+        cpu_time_seconds=7.6,
+        peak_rss_bytes=1_750,
+        numba_threads_used=4,
+        max_python_processes_seen=1,
+        stage_b_execution_mode="bypassed_no_risk",
+        exact_replay_count=48,
+    )
+    candidate_ok = _build_measurement(
+        scenario_id="nr2",
+        benchmark_class="NR2",
+        measurement_source="backend",
+        runtime_surface="sync",
+        wall_clock_seconds=9.8,
+        cpu_time_seconds=7.9,
+        peak_rss_bytes=1_790,
+        numba_threads_used=4,
+        max_python_processes_seen=1,
+        stage_b_execution_mode="bypassed_no_risk",
+        exact_replay_count=48,
+    )
+    candidate_bad = _build_measurement(
+        scenario_id="nr2",
+        benchmark_class="NR2",
+        measurement_source="backend",
+        runtime_surface="sync",
+        wall_clock_seconds=10.2,
+        cpu_time_seconds=8.2,
+        peak_rss_bytes=1_820,
+        numba_threads_used=4,
+        max_python_processes_seen=1,
+        stage_b_execution_mode="bypassed_no_risk",
+        exact_replay_count=48,
+    )
+    ok_ratio = candidate_ok.wall_clock_seconds / baseline.wall_clock_seconds
+    bad_ratio = candidate_bad.wall_clock_seconds / baseline.wall_clock_seconds
+
+    assert primary_metric in (
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct",
+    )
+    assert candidate_ok.numba_threads_used == baseline.numba_threads_used
+    assert candidate_ok.stage_b_execution_mode == "bypassed_no_risk"
+    assert round(ok_ratio, 2) == 1.09
+    assert ok_ratio <= 1.10
+    assert candidate_bad.stage_b_execution_mode == "bypassed_no_risk"
+    assert round(bad_ratio, 2) == 1.13
+    assert bad_ratio > 1.10
+
+
 def _load_notebook_parity_benchmark_corpus():
     """
     Load the committed notebook-parity benchmark corpus used by A1 perf-smoke coverage.

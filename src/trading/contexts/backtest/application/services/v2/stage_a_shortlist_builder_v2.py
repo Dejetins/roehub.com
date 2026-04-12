@@ -2136,7 +2136,9 @@ class BacktestStageAShortlistBuilderV2:
             None.
         Assumptions:
             The combo proxy prefilter narrows candidates first, and only the retained chunk
-            receives internal compact exact payload construction before Stage A no-risk ranking.
+            receives internal compact exact payload construction before Stage A no-risk ranking,
+            with shortlisted rows carrying the same exact no-risk metric payload into the direct
+            no-risk finalization path.
         Raises:
             ValueError: If `final_signal` row count drifts from `chunk_variants`.
         Side Effects:
@@ -2164,6 +2166,7 @@ class BacktestStageAShortlistBuilderV2:
                 base_variant=base_variant,
                 total_return_pct=metrics.total_return_pct,
                 retained_exact_payload=None,
+                no_risk_metrics=metrics,
             )
             ranking_payload = no_risk_metrics_to_ranking_payload_v2(metrics=metrics)
             heap_entry = stage_a_heap_entry_v2(
@@ -2181,6 +2184,7 @@ class BacktestStageAShortlistBuilderV2:
                             retained_exact_payload=exact_batch.exact_payload_at(
                                 row_index=row_index
                             ),
+                            no_risk_metrics=metrics,
                         ),
                         metrics=ranking_payload,
                         ranking_plan=ranking_plan,
@@ -2197,6 +2201,7 @@ class BacktestStageAShortlistBuilderV2:
                             retained_exact_payload=exact_batch.exact_payload_at(
                                 row_index=row_index
                             ),
+                            no_risk_metrics=metrics,
                         ),
                         metrics=ranking_payload,
                         ranking_plan=ranking_plan,

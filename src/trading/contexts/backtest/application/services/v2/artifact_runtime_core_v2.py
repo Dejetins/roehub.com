@@ -28,7 +28,11 @@ from .artifact_runtime_plan_v2 import (
     BacktestRiskVariantV2,
     BacktestStageABaseVariantV2,
 )
-from .trade_compactor_kernel import StageACompactExactPayloadV2
+from .contracts import StageANoRiskMetricsV2
+from .trade_compactor_kernel import (
+    StageACompactExactPayloadV2,
+    no_risk_metrics_to_ranking_payload_v2,
+)
 
 StageACheckpointCallbackV2 = Callable[[int, int], None]
 StageBCheckpointRowsMaterializerV2 = Callable[
@@ -285,6 +289,7 @@ class BacktestStageAScoredVariantV2:
     base_variant: BacktestStageABaseVariantV2
     total_return_pct: float
     retained_exact_payload: StageACompactExactPayloadV2 | None = None
+    no_risk_metrics: StageANoRiskMetricsV2 | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -572,24 +577,20 @@ class BacktestArtifactRuntimeRunnerV2:
             tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
                 Deterministically ranked final rows and task mapping by `variant_key`.
         Assumptions:
-            Stage A shortlist order is already the exact final no-risk ranking, so the bypass only
-            materializes top rows and traceable `stage_b` payloads without entering generic Stage
-            B task expansion or spawned-worker execution.
+            Stage A shortlist order is already the exact final no-risk ranking, so the bypass
+            reuses Stage A no-risk metrics when available and only falls back to scorer-based
+            materialization for compatibility with older tests or staged fakes.
         Raises:
             ValueError: If the runtime plan drifts from the no-risk contract or scorer metrics are
                 malformed.
         Side Effects:
-            May populate scorer caches from retained Stage A exact payloads and emits one lazy
-            checkpoint that reports the full public Stage B total as processed.
+            May populate scorer caches from retained Stage A exact payloads when compatibility
+            fallback is needed and emits one lazy checkpoint that reports the full public Stage B
+            total as processed.
         """
         if not _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
             raise ValueError("_finalize_no_risk_stage_a_v2 requires no-risk runtime plan")
-        configure_stage_ranking_context_if_supported_v2(
-            scorer=scorer,
-            stage=STAGE_A_LITERAL_V2,
-            ranking_plan=ranking_plan,
-        )
-        score_variant_metric = resolve_score_variant_metric_fn_v2(scorer=scorer)
+        score_variant_metric: ScoreVariantMetricFnV2 | None = None
         ranked_rows: list[BacktestStageBScoredVariantV2] = []
         ranked_tasks: dict[str, BacktestStageBTaskV2] = {}
         for shortlist_index, stage_a_row in enumerate(shortlist[:top_k_limit]):
@@ -605,19 +606,31 @@ class BacktestArtifactRuntimeRunnerV2:
                 execution_params=template.execution_params or {},
                 retained_exact_payload=stage_a_row.retained_exact_payload,
             )
-            prime_retained_exact_payload_if_supported_v2(
-                scorer=scorer,
-                task=task,
-            )
-            metrics = score_variant_metric(
-                stage=STAGE_A_LITERAL_V2,
-                candles=candles,
-                indicator_selections=task.indicator_selections,
-                signal_params=task.signal_params,
-                risk_params=_STAGE_A_DISABLED_RISK_PARAMS_V2,
-                indicator_variant_key=task.indicator_variant_key,
-                variant_key=stage_a_row.base_variant.base_variant_key,
-            )
+            if stage_a_row.no_risk_metrics is not None:
+                metrics = no_risk_metrics_to_ranking_payload_v2(
+                    metrics=stage_a_row.no_risk_metrics
+                )
+            else:
+                prime_retained_exact_payload_if_supported_v2(
+                    scorer=scorer,
+                    task=task,
+                )
+                if score_variant_metric is None:
+                    configure_stage_ranking_context_if_supported_v2(
+                        scorer=scorer,
+                        stage=STAGE_A_LITERAL_V2,
+                        ranking_plan=ranking_plan,
+                    )
+                    score_variant_metric = resolve_score_variant_metric_fn_v2(scorer=scorer)
+                metrics = score_variant_metric(
+                    stage=STAGE_A_LITERAL_V2,
+                    candles=candles,
+                    indicator_selections=task.indicator_selections,
+                    signal_params=task.signal_params,
+                    risk_params=_STAGE_A_DISABLED_RISK_PARAMS_V2,
+                    indicator_variant_key=task.indicator_variant_key,
+                    variant_key=stage_a_row.base_variant.base_variant_key,
+                )
             row = _stage_b_row_from_metrics_v2(task=task, metrics=metrics)
             ranked_rows.append(row)
             ranked_tasks[row.variant_key] = task

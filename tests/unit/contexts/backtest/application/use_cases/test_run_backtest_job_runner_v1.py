@@ -25,6 +25,7 @@ from trading.contexts.backtest.application.services.staged_core_runner_v1 import
 from trading.contexts.backtest.application.services.v2 import (
     artifact_runtime_core_v2 as artifact_runtime_core_module,
 )
+from trading.contexts.backtest.application.services.v2.contracts import StageANoRiskMetricsV2
 from trading.contexts.backtest.application.use_cases import RunBacktestJobRunnerV1
 from trading.contexts.backtest.application.use_cases import (
     run_backtest_job_runner_v1 as run_backtest_job_runner_module,
@@ -426,6 +427,27 @@ def _unexpected_generic_stage_b_path(*args: Any, **kwargs: Any) -> Any:
     """
     _ = args, kwargs
     raise AssertionError("no-risk runs must bypass generic Stage B")
+
+
+def _unexpected_no_risk_stage_a_rescore(*args: Any, **kwargs: Any) -> Any:
+    """
+    Fail the test when no-risk finalization tries to rescore shortlisted Stage-A rows.
+
+    Args:
+        *args: Ignored positional arguments forwarded from scorer hooks.
+        **kwargs: Ignored keyword arguments forwarded from scorer hooks.
+    Returns:
+        Any: Never returns because the helper always raises.
+    Assumptions:
+        Direct no-risk finalization should reuse Stage-A metric payloads already carried by the
+        shortlist rows instead of calling back into metric-only scorer hooks.
+    Raises:
+        AssertionError: Always, to signal that no-risk direct finalization regressed.
+    Side Effects:
+        None.
+    """
+    _ = args, kwargs
+    raise AssertionError("no-risk finalization must reuse Stage-A metrics without rescoring")
 
 
 def _build_fake_execution_profile(
@@ -2062,6 +2084,89 @@ def test_process_claimed_job_no_risk_bypasses_generic_stage_b(
     assert all(row.best_sl_pct is None for row in running_rows)
     assert all(row.payload_json["risk_params"]["tp_enabled"] is False for row in running_rows)
     assert all(row.payload_json["risk_params"]["sl_enabled"] is False for row in running_rows)
+
+
+def test_run_stage_b_or_finalize_no_risk_reuses_stage_a_alt_metric_payloads() -> None:
+    """
+    Verify direct no-risk finalization keeps alternative primary metrics on the Stage-A path.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Shortlist rows are already ranked by the active no-risk primary metric, so finalization
+        should only materialize Stage-B-shaped rows from the retained Stage-A metric payloads.
+    Raises:
+        AssertionError: If finalization re-enters scorer-based metric hooks or reorders rows.
+    Side Effects:
+        None.
+    """
+    template = _build_request(top_k=2, preselect=2).template
+    assert template is not None
+    base_variants = _build_stage_a_variants()
+    no_risk_variant = _build_risk_variants()[0]
+    runner = artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2()
+    shortlist = (
+        artifact_runtime_core_module.BacktestStageAScoredVariantV2(
+            base_variant=base_variants[1],
+            total_return_pct=10.0,
+            no_risk_metrics=StageANoRiskMetricsV2(
+                total_return_pct=10.0,
+                max_drawdown_pct=2.0,
+                return_over_max_drawdown=5.0,
+                profit_factor=1.4,
+                trade_count=8,
+                sharpe_trades=1.6,
+                win_rate_pct=62.5,
+                avg_trade_ret_pct=1.25,
+                avg_trade_exec_bars=3.0,
+                exposure_pct=41.0,
+            ),
+        ),
+        artifact_runtime_core_module.BacktestStageAScoredVariantV2(
+            base_variant=base_variants[0],
+            total_return_pct=20.0,
+            no_risk_metrics=StageANoRiskMetricsV2(
+                total_return_pct=20.0,
+                max_drawdown_pct=7.0,
+                return_over_max_drawdown=20.0 / 7.0,
+                profit_factor=1.8,
+                trade_count=9,
+                sharpe_trades=1.8,
+                win_rate_pct=66.0,
+                avg_trade_ret_pct=1.5,
+                avg_trade_exec_bars=4.0,
+                exposure_pct=55.0,
+            ),
+        ),
+    )
+    runtime_plan = SimpleNamespace(
+        risk_variants=(no_risk_variant,),
+        stage_b_variants_total=len(shortlist),
+    )
+    scorer = SimpleNamespace(score_variant_metric=_unexpected_no_risk_stage_a_rescore)
+
+    rows, tasks = runner.run_stage_b_or_finalize_no_risk(
+        template=template,
+        runtime_plan=runtime_plan,
+        shortlist=shortlist,
+        candles=cast(Any, SimpleNamespace()),
+        scorer=cast(Any, scorer),
+        top_k_limit=2,
+        ranking=BacktestRankingConfig(primary_metric="max_drawdown_pct"),
+    )
+
+    assert tuple(
+        int(tasks[row.variant_key].signal_params["ema"]["threshold"]) for row in rows
+    ) == (2, 1)
+    assert tuple(row.total_return_pct for row in rows) == (10.0, 20.0)
+    assert tuple(row.best_tp_pct for row in rows) == (None, None)
+    assert tuple(row.best_sl_pct for row in rows) == (None, None)
+    assert tuple(row.summary_metrics_json["max_drawdown_pct"] for row in rows) == (2.0, 7.0)
+    assert tuple(row.summary_metrics_json["profit_factor"] for row in rows) == (1.4, 1.8)
+    assert tuple(row.summary_metrics_json["sharpe_trades"] for row in rows) == (1.6, 1.8)
+    assert tuple(row.summary_metrics_json["win_rate_pct"] for row in rows) == (62.5, 66.0)
 
 
 def test_process_claimed_job_does_not_claim_additional_jobs() -> None:

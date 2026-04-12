@@ -2,6 +2,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
+import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
@@ -260,12 +261,14 @@ class _FakeRunBacktestUseCase:
         Raises:
             None.
         Side Effects:
-            None.
+            Stores the last execute/build-variant-report request objects for route assertions.
         """
         self._result = result
         self._error = error
         self._variant_report_result = variant_report_result
         self._variant_report_error = variant_report_error
+        self.last_execute_request = None
+        self.last_execute_request_payload = None
 
     def execute(self, *, request, current_user, request_payload=None, run_control=None):
         """
@@ -283,9 +286,11 @@ class _FakeRunBacktestUseCase:
         Raises:
             Exception: Configured exception.
         Side Effects:
-            None.
+            Records the last mapped application request and optional strict payload snapshot.
         """
-        _ = request, current_user, request_payload, run_control
+        _ = current_user, run_control
+        self.last_execute_request = request
+        self.last_execute_request_payload = request_payload
         if self._error is not None:
             raise self._error
         return self._result
@@ -1143,6 +1148,57 @@ def test_post_backtests_saved_response_includes_hashes_and_explicit_payload() ->
         "direction_mode": "long-short",
         "sizing_mode": "all_in",
     }
+
+
+@pytest.mark.parametrize(
+    "primary_metric",
+    (
+        "total_return_pct",
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct",
+    ),
+)
+def test_post_backtests_accepts_supported_primary_metric_literals(
+    primary_metric: str,
+) -> None:
+    """
+    Verify `POST /backtests` keeps accepting every supported primary-metric request literal.
+
+    Args:
+        primary_metric: Supported ranking metric literal from the public request contract.
+    Returns:
+        None.
+    Assumptions:
+        Route validation should normalize and forward the ranking block without changing the
+        supported metric surface while no-risk internals evolve.
+    Raises:
+        AssertionError: If one supported metric starts failing validation or request mapping.
+    Side Effects:
+        None.
+    """
+    use_case = _FakeRunBacktestUseCase(result=_template_mode_response())
+    client = _build_client(use_case=use_case)
+
+    response = client.post(
+        "/backtests",
+        json={
+            "time_range": {
+                "start": "2026-02-16T00:00:00Z",
+                "end": "2026-02-16T01:00:00Z",
+            },
+            "template": _template_payload(),
+            "ranking": {"primary_metric": primary_metric},
+        },
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
+    )
+
+    assert response.status_code == 200
+    assert use_case.last_execute_request is not None
+    assert use_case.last_execute_request.ranking is not None
+    assert use_case.last_execute_request.ranking.primary_metric == primary_metric
 
 
 def test_post_backtests_returns_202_for_explicit_background_auto_launch() -> None:
