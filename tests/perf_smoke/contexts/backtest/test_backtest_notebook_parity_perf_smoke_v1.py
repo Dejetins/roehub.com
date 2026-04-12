@@ -121,8 +121,11 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert rg_ttr.benchmark_class == "RG-TTR"
     assert rg_ttr.comparison_mode == "notebook_parity"
     assert rg_ttr.anchor_notebook == corpus.source_fixtures.rg_ttr_notebook_anchor
-    assert rg_ttr.baseline_reference_points[0].max_python_processes_seen == 5
-    assert rg_ttr.baseline_reference_points[0].stage_b_execution_mode == "process_pool"
+    assert rg_ttr.baseline_reference_points[0].reference_id == (
+        "rg_ttr_backend_default_single_process"
+    )
+    assert rg_ttr.baseline_reference_points[0].max_python_processes_seen == 1
+    assert rg_ttr.baseline_reference_points[0].stage_b_execution_mode == "in_process"
     assert rg_ttr.baseline_reference_points[1].max_python_processes_seen == 1
     assert rg_ttr.baseline_reference_points[1].stage_b_execution_mode == "in_process"
     assert rg_ttr.acceptance_gates[0].max_ratio == 1.18

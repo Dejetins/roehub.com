@@ -527,8 +527,8 @@ class ExecutionProfileParallelismConfigV2:
         Returns:
             None.
         Assumptions:
-            Worker counts are strict-positive integers; resolved exact profiles may now activate
-            process-based Stage B according to these limits.
+            Worker counts are strict-positive integers; Stage B process fan-out stays available
+            only for explicit non-default profiles that opt into it alongside these limits.
         Raises:
             ValueError: If one worker count is non-positive.
         Side Effects:
@@ -576,8 +576,8 @@ class ExecutionProfileFeatureFlagsV2:
         Returns:
             None.
         Assumptions:
-            Exact profiles may now activate process-based Stage B through this feature-flag
-            contract when runtime planning resolves them explicitly.
+            Process-based Stage B is a non-default opt-in controlled by this feature-flag
+            contract and the configured Stage B worker count together.
         Raises:
             ValueError: If one field is not boolean.
         Side Effects:
@@ -1011,7 +1011,7 @@ def _default_family_plugin_budget_ms_for_mode_v2(
 
 def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
     """
-    Build the default ordered execution-profile catalog for executable exact parallel rollout.
+    Build the default ordered execution-profile catalog for the in-process exact Stage B rollout.
 
     Docs:
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
@@ -1027,9 +1027,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
         ExecutionProfilesCatalogV2: Default catalog with all known profile literals in
             deterministic order.
     Assumptions:
-        `exact_small` remains the active default exact baseline, while larger profiles now expose
-        conservative Stage A / Stage B parallelism that stays reviewable against the shared
-        process-level Numba ceiling and does not alter rollout policy.
+        `exact_small` remains the active default exact baseline, while `exact_parallel` keeps the
+        benchmark-sized Stage B path in-process by default and leaves process-pool fan-out as an
+        explicit non-default opt-in for later rollout policy work.
     Raises:
         ValueError: If one default profile literal violates catalog invariants.
     Side Effects:
@@ -1073,12 +1073,12 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                 ),
                 parallelism=ExecutionProfileParallelismConfigV2(
                     stage_a_workers=4,
-                    stage_b_workers=4,
+                    stage_b_workers=1,
                 ),
                 feature_flags=ExecutionProfileFeatureFlagsV2(
                     runtime_enabled=True,
                     heuristic_shortlist_enabled=False,
-                    parallel_stage_b_enabled=True,
+                    parallel_stage_b_enabled=False,
                     family_plugin_enabled=False,
                 ),
                 launch_budget=_default_launch_budget_for_mode_v2(mode="exact_parallel"),

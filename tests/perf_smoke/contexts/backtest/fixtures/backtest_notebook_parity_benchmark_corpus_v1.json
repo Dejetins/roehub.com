@@ -159,18 +159,18 @@
       "equal_thread_budget_rule_id": "equal_thread_budget",
       "baseline_reference_points": [
         {
-          "reference_id": "rg_ttr_backend_default_fanout",
+          "reference_id": "rg_ttr_backend_default_single_process",
           "source_kind": "backend",
-          "metric_label": "backend_pre_cutover_shape",
+          "metric_label": "backend_default_shape",
           "host_label": "macstudio-class",
           "runtime_surface": "sync",
           "numba_threads_used": 4,
           "wall_clock_seconds": null,
           "peak_rss_bytes": null,
-          "max_python_processes_seen": 5,
-          "stage_b_execution_mode": "process_pool",
+          "max_python_processes_seen": 1,
+          "stage_b_execution_mode": "in_process",
           "runtime_regression_ratio_limit": null,
-          "notes": "Current benchmark-host shape shows four to five large Python processes by default, which is the baseline comparison point that later prompts must retire."
+          "notes": "Current benchmark-host default keeps RG-TTR Stage B in-process, so the canonical parity shape stays in one Python process unless a non-default profile explicitly enables process fan-out."
         },
         {
           "reference_id": "rg_ttr_notebook_single_process_shape",
@@ -218,10 +218,10 @@
           "max_ratio": null,
           "max_value": 64,
           "expected_value": null,
-          "notes": "RG-TTR breadth scoring must keep the fast Stage B path active so exact_replay_count stays well below broad over-replay levels before finalist-only replay lands."
+          "notes": "RG-TTR breadth scoring must keep the fast Stage B path active so exact_replay_count stays within the finalist-only replay bound after the in-process default cutover."
         }
       ],
-      "notes": "RG-TTR is the canonical risk-grid parity class. A1 stores the current process-fan-out baseline explicitly so later prompts can fail on unexpected worker amplification."
+      "notes": "RG-TTR is the canonical risk-grid parity class. The committed backend default now records the single-process in-process Stage B shape so future regressions fail on unexpected worker amplification."
     },
     {
       "scenario_id": "rg_alt",

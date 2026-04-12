@@ -961,8 +961,8 @@ class BacktestArtifactRuntimeRunnerV2:
         Returns:
             bool: `True` when Stage B should use spawned workers, otherwise `False`.
         Assumptions:
-            Request classification stays unchanged; only already-resolved profiles may activate
-            this path.
+            Request classification stays unchanged; only already-resolved non-default profiles may
+            activate this path by opting into process-pool Stage B explicitly.
         Raises:
             None.
         Side Effects:
@@ -2612,7 +2612,8 @@ def _runtime_plan_stage_b_execution_mode_v2(
         str: Canonical `stage_b_execution_mode` literal used by shared runtime branching.
     Assumptions:
         Tests may supply lightweight fakes, so the shared core first prefers the typed runtime
-        helper and otherwise reconstructs the same classification from the available attributes.
+        helper and otherwise reconstructs the same classification from the available attributes,
+        with `process_pool` reserved for explicit non-default opt-in profiles.
     Raises:
         None.
     Side Effects:

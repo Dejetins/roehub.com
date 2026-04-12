@@ -587,12 +587,12 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                         },
                         "parallelism": {
                             "stage_a_workers": 1,
-                            "stage_b_workers": 4,
+                            "stage_b_workers": 1,
                         },
                         "feature_flags": {
                             "runtime_enabled": True,
                             "heuristic_shortlist_enabled": False,
-                            "parallel_stage_b_enabled": True,
+                            "parallel_stage_b_enabled": False,
                             "family_plugin_enabled": False,
                         },
                         "launch_budget": {

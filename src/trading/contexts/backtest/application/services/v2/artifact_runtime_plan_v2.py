@@ -581,7 +581,8 @@ class BacktestArtifactRuntimePlanV2:
             str: Canonical `stage_b_execution_mode` literal for orchestration and NR2 benchmarks.
         Assumptions:
             No-risk runs report `bypassed_no_risk`, while risk-grid runs stay `in_process` unless
-            the resolved execution profile explicitly enables process-pool Stage B workers.
+            the resolved execution profile explicitly opts into process-pool Stage B with both
+            `parallel_stage_b_enabled=True` and `stage_b_workers > 1`.
         Raises:
             None.
         Side Effects:

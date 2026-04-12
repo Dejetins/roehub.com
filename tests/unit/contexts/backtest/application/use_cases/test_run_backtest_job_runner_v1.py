@@ -2738,6 +2738,112 @@ def test_process_claimed_job_exact_parallel_matches_serial_stage_b_frontiers(
     assert _FakeProcessPoolExecutorV2.submitted_chunk_indexes == [0, 1]
 
 
+def test_process_claimed_job_exact_parallel_default_stays_in_process(
+    monkeypatch: Any,
+) -> None:
+    """
+    Verify the default exact-parallel worker profile now keeps Stage B in-process.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        The prompt-scoped default cutover keeps `exact_parallel` on the serial in-process Stage B
+        path unless a non-default profile explicitly opts back into process-pool fan-out.
+    Raises:
+        AssertionError: If the default exact-parallel shape diverges from the in-process serial
+            frontier sequence or still bootstraps `ProcessPoolExecutor`.
+    Side Effects:
+        Monkeypatches Stage B process-pool helpers so the test can detect unexpected worker
+        bootstrap without spawning real child processes.
+    """
+    _FakeProcessPoolExecutorV2.initializer_bootstraps = []
+    _FakeProcessPoolExecutorV2.submitted_chunk_indexes = []
+    monkeypatch.setattr(
+        artifact_runtime_core_module,
+        "ProcessPoolExecutor",
+        _FakeProcessPoolExecutorV2,
+    )
+
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    risk_variants = _build_risk_variants()
+    serial_results_repository = _FakeResultsRepository()
+    default_exact_parallel_results_repository = _FakeResultsRepository()
+
+    serial_use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=_build_running_job()),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=serial_results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=risk_variants,
+            execution_profile=_build_fake_execution_profile(
+                mode="exact_small",
+                stage_a_workers=1,
+                stage_b_workers=1,
+                parallel_stage_b_enabled=False,
+            ),
+        ),
+        scorer=_ParallelRankingAwareScorerWithDetails(),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=10_000,
+        snapshot_variants_step=1,
+        stage_batch_size=2,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 43, 0)),
+    )
+    default_exact_parallel_use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=_build_running_job()),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=default_exact_parallel_results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=risk_variants,
+            execution_profile=_build_fake_execution_profile(
+                mode="exact_parallel",
+                stage_a_workers=4,
+                stage_b_workers=1,
+                parallel_stage_b_enabled=False,
+            ),
+        ),
+        scorer=_ParallelRankingAwareScorerWithDetails(),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=10_000,
+        snapshot_variants_step=1,
+        stage_batch_size=2,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 44, 0)),
+    )
+
+    serial_report = serial_use_case.process_claimed_job(
+        job=_build_running_job(),
+        locked_by="worker-test-1",
+    )
+    default_exact_parallel_report = default_exact_parallel_use_case.process_claimed_job(
+        job=_build_running_job(),
+        locked_by="worker-test-1",
+    )
+
+    serial_frontiers = [
+        tuple(row.variant_key for row in call["rows"])
+        for call in serial_results_repository.replace_calls
+    ]
+    default_exact_parallel_frontiers = [
+        tuple(row.variant_key for row in call["rows"])
+        for call in default_exact_parallel_results_repository.replace_calls
+    ]
+
+    assert serial_report.status == "succeeded"
+    assert default_exact_parallel_report.status == "succeeded"
+    assert default_exact_parallel_frontiers == serial_frontiers
+    assert _FakeProcessPoolExecutorV2.initializer_bootstraps == []
+    assert _FakeProcessPoolExecutorV2.submitted_chunk_indexes == []
+
+
 def test_process_claimed_job_builds_runtime_candles_from_pinned_artifact_prices() -> None:
     """
     Verify claimed worker runtime loads pinned `prices/<tf>` artifacts instead of live timeline IO.
