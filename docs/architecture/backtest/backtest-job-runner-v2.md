@@ -270,7 +270,10 @@ It defines only the responsibility boundary:
 - the worker uses shared `adaptive_selector_policy`;
 - the worker does not own rollout phases;
 - the worker does not define `shadow`, `opt_in`, or `active` states by itself;
-- the worker executes a runtime plan already resolved by the shared planner and policy layer.
+- the worker executes a runtime plan already resolved by the shared planner and policy layer;
+- if a resolved profile re-enables process-based Stage B, the worker still obeys the same
+  explicit non-default workload threshold policy as sync execution and must surface the same
+  `stage_b_execution_mode` plus `stage_b_process_fallback_threshold` runtime facts.
 
 Detailed rollout rules, phase literals, benchmark gates, and promotion criteria belong in
 selector, runtime, and config documents rather than the worker architecture document.

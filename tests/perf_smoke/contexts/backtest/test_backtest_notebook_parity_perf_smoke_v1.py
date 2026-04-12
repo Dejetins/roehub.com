@@ -65,6 +65,7 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
         "numba_threads_used",
         "max_python_processes_seen",
         "stage_b_execution_mode",
+        "stage_b_process_fallback_threshold",
         "exact_replay_count",
     )
     assert corpus.measurement_contract.system_scan_fields == (
@@ -72,6 +73,7 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
         "numba_threads_used",
         "max_python_processes_seen",
         "stage_b_execution_mode",
+        "stage_b_process_fallback_threshold",
         "exact_replay_count",
     )
     assert corpus.source_fixtures.perf_smoke_harness == (
@@ -111,11 +113,13 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
         "nr2_peak_rss_ratio",
         "nr2_max_python_processes_seen",
         "nr2_stage_b_execution_mode",
+        "nr2_stage_b_process_fallback_threshold",
     ]
     assert nr2.acceptance_gates[0].max_ratio == 1.18
     assert nr2.acceptance_gates[1].max_ratio == 1.35
     assert nr2.acceptance_gates[2].max_value == 1.0
     assert nr2.acceptance_gates[3].expected_value == "bypassed_no_risk"
+    assert nr2.acceptance_gates[4].expected_value == "none"
 
     rg_ttr = corpus.scenario_for_id(scenario_id="rg_ttr")
     assert rg_ttr.benchmark_class == "RG-TTR"
@@ -126,12 +130,15 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     )
     assert rg_ttr.baseline_reference_points[0].max_python_processes_seen == 1
     assert rg_ttr.baseline_reference_points[0].stage_b_execution_mode == "in_process"
+    assert rg_ttr.baseline_reference_points[0].stage_b_process_fallback_threshold == "none"
     assert rg_ttr.baseline_reference_points[1].max_python_processes_seen == 1
     assert rg_ttr.baseline_reference_points[1].stage_b_execution_mode == "in_process"
+    assert rg_ttr.baseline_reference_points[1].stage_b_process_fallback_threshold == "none"
     assert rg_ttr.acceptance_gates[0].max_ratio == 1.18
     assert rg_ttr.acceptance_gates[1].max_value == 1.0
     assert rg_ttr.acceptance_gates[2].expected_value == "in_process"
-    assert rg_ttr.acceptance_gates[3].max_value == 64.0
+    assert rg_ttr.acceptance_gates[3].expected_value == "none"
+    assert rg_ttr.acceptance_gates[4].max_value == 64.0
 
     rg_alt = corpus.scenario_for_id(scenario_id="rg_alt")
     assert rg_alt.benchmark_class == "RG-ALT"
@@ -217,6 +224,7 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
             numba_threads_used=4,
             max_python_processes_seen=1,
             stage_b_execution_mode="bypassed_no_risk",
+            stage_b_process_fallback_threshold="none",
             exact_replay_count=48,
         ),
         _build_measurement(
@@ -230,6 +238,7 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
             numba_threads_used=4,
             max_python_processes_seen=1,
             stage_b_execution_mode="bypassed_no_risk",
+            stage_b_process_fallback_threshold="none",
             exact_replay_count=48,
         ),
     )
@@ -254,6 +263,7 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
         b'      "numba_threads_used": 4,\n'
         b'      "max_python_processes_seen": 1,\n'
         b'      "stage_b_execution_mode": "bypassed_no_risk",\n'
+        b'      "stage_b_process_fallback_threshold": "none",\n'
         b'      "exact_replay_count": 48\n'
         b"    },\n"
         b"    {\n"
@@ -269,6 +279,7 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
         b'      "numba_threads_used": 4,\n'
         b'      "max_python_processes_seen": 1,\n'
         b'      "stage_b_execution_mode": "bypassed_no_risk",\n'
+        b'      "stage_b_process_fallback_threshold": "none",\n'
         b'      "exact_replay_count": 48\n'
         b"    }\n"
         b"  ]\n"
@@ -549,6 +560,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="bypassed_no_risk",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=24,
     )
     backend_candidate = _build_measurement(
@@ -562,6 +574,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="bypassed_no_risk",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=24,
     )
     passing_comparison = evaluate_backtest_notebook_parity_scenario_v2(
@@ -589,6 +602,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
         numba_threads_used=12,
         max_python_processes_seen=4,
         stage_b_execution_mode="process_pool",
+        stage_b_process_fallback_threshold="stage_b_variants_total",
         exact_replay_count=200,
     )
     failing_comparison = evaluate_backtest_notebook_parity_scenario_v2(
@@ -605,6 +619,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
         "nr2_peak_rss_ratio",
         "nr2_max_python_processes_seen",
         "nr2_stage_b_execution_mode",
+        "nr2_stage_b_process_fallback_threshold",
     )
     assert failing_comparison.passed is False
 
@@ -620,6 +635,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="in_process",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=30,
     )
     rg_ttr_fast_path_candidate = _build_measurement(
@@ -633,6 +649,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="in_process",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=64,
     )
     rg_ttr_fast_path_comparison = evaluate_backtest_notebook_parity_scenario_v2(
@@ -644,6 +661,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
 
     assert rg_ttr_fast_path_comparison.failing_gate_ids == ()
     assert rg_ttr_fast_path_comparison.passed is True
+    assert rg_ttr_fast_path_candidate.stage_b_process_fallback_threshold == "none"
 
     rg_ttr_regressed = _build_measurement(
         scenario_id="rg_ttr",
@@ -656,6 +674,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
         numba_threads_used=4,
         max_python_processes_seen=5,
         stage_b_execution_mode="process_pool",
+        stage_b_process_fallback_threshold="stage_b_variants_total",
         exact_replay_count=500,
     )
     rg_ttr_comparison = evaluate_backtest_notebook_parity_scenario_v2(
@@ -668,9 +687,11 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
     assert rg_ttr_comparison.failing_gate_ids == (
         "rg_ttr_max_python_processes_seen",
         "rg_ttr_stage_b_execution_mode",
+        "rg_ttr_stage_b_process_fallback_threshold",
         "rg_ttr_exact_replay_count",
     )
     assert rg_ttr_comparison.passed is False
+    assert rg_ttr_regressed.stage_b_process_fallback_threshold == "stage_b_variants_total"
 
 
 def test_rg_ttr_exact_replay_bound_is_isolated_and_benchmark_visible() -> None:
@@ -703,6 +724,7 @@ def test_rg_ttr_exact_replay_bound_is_isolated_and_benchmark_visible() -> None:
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="in_process",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=30,
     )
     finalist_only_candidate = _build_measurement(
@@ -716,6 +738,7 @@ def test_rg_ttr_exact_replay_bound_is_isolated_and_benchmark_visible() -> None:
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="in_process",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=64,
     )
     finalist_only_comparison = evaluate_backtest_notebook_parity_scenario_v2(
@@ -739,6 +762,7 @@ def test_rg_ttr_exact_replay_bound_is_isolated_and_benchmark_visible() -> None:
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="in_process",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=65,
     )
     shortlist_breadth_comparison = evaluate_backtest_notebook_parity_scenario_v2(
@@ -789,6 +813,7 @@ def test_rg_alt_functional_baseline_guardrail_is_evaluable() -> None:
         numba_threads_used=4,
         max_python_processes_seen=2,
         stage_b_execution_mode="process_pool",
+        stage_b_process_fallback_threshold="stage_b_variants_total",
         exact_replay_count=64,
     )
     backend_candidate_ok = _build_measurement(
@@ -802,6 +827,7 @@ def test_rg_alt_functional_baseline_guardrail_is_evaluable() -> None:
         numba_threads_used=4,
         max_python_processes_seen=2,
         stage_b_execution_mode="process_pool",
+        stage_b_process_fallback_threshold="stage_b_variants_total",
         exact_replay_count=64,
     )
     ok_comparison = evaluate_backtest_notebook_parity_scenario_v2(
@@ -826,6 +852,7 @@ def test_rg_alt_functional_baseline_guardrail_is_evaluable() -> None:
         numba_threads_used=4,
         max_python_processes_seen=2,
         stage_b_execution_mode="process_pool",
+        stage_b_process_fallback_threshold="stage_b_variants_total",
         exact_replay_count=64,
     )
     bad_comparison = evaluate_backtest_notebook_parity_scenario_v2(
@@ -887,6 +914,7 @@ def test_no_risk_alt_metric_runtime_guardrail_caps_regression(
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="bypassed_no_risk",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=48,
     )
     candidate_ok = _build_measurement(
@@ -900,6 +928,7 @@ def test_no_risk_alt_metric_runtime_guardrail_caps_regression(
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="bypassed_no_risk",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=48,
     )
     candidate_bad = _build_measurement(
@@ -913,6 +942,7 @@ def test_no_risk_alt_metric_runtime_guardrail_caps_regression(
         numba_threads_used=4,
         max_python_processes_seen=1,
         stage_b_execution_mode="bypassed_no_risk",
+        stage_b_process_fallback_threshold="none",
         exact_replay_count=48,
     )
     ok_ratio = candidate_ok.wall_clock_seconds / baseline.wall_clock_seconds
@@ -973,6 +1003,7 @@ def _build_measurement(
     max_python_processes_seen: int,
     stage_b_execution_mode: str,
     exact_replay_count: int,
+    stage_b_process_fallback_threshold: str = "none",
 ) -> BacktestNotebookParityMeasurementV2:
     """
     Build one deterministic notebook-parity runtime-shape measurement for perf-smoke tests.
@@ -995,6 +1026,9 @@ def _build_measurement(
         numba_threads_used: Numba thread budget used by the sample.
         max_python_processes_seen: Maximum Python process count observed for the sample.
         stage_b_execution_mode: Stage B execution mode observed for the sample.
+        stage_b_process_fallback_threshold:
+            Explicit workload threshold that activated the non-default Stage B fallback path, or
+            `none` when the run stayed in-process.
         exact_replay_count: Exact replay count observed for the sample.
     Returns:
         BacktestNotebookParityMeasurementV2: Immutable measurement payload.
@@ -1019,5 +1053,8 @@ def _build_measurement(
         numba_threads_used=numba_threads_used,
         max_python_processes_seen=max_python_processes_seen,
         stage_b_execution_mode=stage_b_execution_mode,  # type: ignore[arg-type]
+        stage_b_process_fallback_threshold=(
+            stage_b_process_fallback_threshold  # type: ignore[arg-type]
+        ),
         exact_replay_count=exact_replay_count,
     )

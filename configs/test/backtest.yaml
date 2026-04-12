@@ -103,6 +103,8 @@ backtest:
           heuristic_shortlist_enabled: false
           parallel_stage_b_enabled: false
           family_plugin_enabled: false
+        stage_b_process_fallback:
+          min_stage_b_variants_total: 12000
       - mode: exact_parallel
         family_plugin_budget_ms: 20
         planning_budget_ms: 50
@@ -133,6 +135,8 @@ backtest:
           heuristic_shortlist_enabled: false
           parallel_stage_b_enabled: true
           family_plugin_enabled: false
+        stage_b_process_fallback:
+          min_stage_b_variants_total: 150000
       - mode: hybrid_conservative
         family_plugin_budget_ms: 30
         planning_budget_ms: 75
@@ -165,6 +169,8 @@ backtest:
           heuristic_shortlist_enabled: true
           parallel_stage_b_enabled: false
           family_plugin_enabled: false
+        stage_b_process_fallback:
+          min_stage_b_variants_total: 200000
       - mode: hybrid_family
         family_plugin_budget_ms: 40
         planning_budget_ms: 100
@@ -197,6 +203,8 @@ backtest:
           heuristic_shortlist_enabled: true
           parallel_stage_b_enabled: false
           family_plugin_enabled: true
+        stage_b_process_fallback:
+          min_stage_b_variants_total: 240000
   guards:
     max_variants_per_compute: 60000000
     max_compute_bytes_total: 5368709120999999

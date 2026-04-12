@@ -20,6 +20,10 @@ type ExecutionProfileModeLiteralV2 = Literal[
     "hybrid_conservative",
     "hybrid_family",
 ]
+type ExecutionProfileStageBProcessFallbackThresholdLiteralV2 = Literal[
+    "none",
+    "stage_b_variants_total",
+]
 type ExecutionProfileShortlistDiversityBucketLiteralV2 = Literal[
     "activity_band",
     "direction_band",
@@ -318,6 +322,104 @@ class ExecutionProfileLaunchBudgetV2:
         )
 
 
+@dataclass(frozen=True, slots=True)
+class ExecutionProfileStageBProcessFallbackConfigV2:
+    """
+    Explicit workload-threshold policy for the non-default Stage B process fallback path.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+    """
+
+    min_stage_b_variants_total: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate the explicit workload threshold for non-default Stage B process fallback.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/backtest-job-runner-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            The fallback path stays non-default and reviewable, so the workload threshold must be
+            an explicit strict-positive integer instead of a hidden heuristic.
+        Raises:
+            ValueError: If the workload threshold is non-positive.
+        Side Effects:
+            None.
+        """
+        if self.min_stage_b_variants_total <= 0:
+            raise ValueError(
+                "ExecutionProfileStageBProcessFallbackConfigV2.min_stage_b_variants_total "
+                "must be > 0"
+            )
+
+    def threshold_name_for(
+        self,
+        *,
+        stage_b_variants_total: int,
+    ) -> ExecutionProfileStageBProcessFallbackThresholdLiteralV2:
+        """
+        Resolve which explicit workload threshold, if any, activates process fallback.
+
+        Args:
+            stage_b_variants_total: Deterministic prepared Stage B workload size.
+        Returns:
+            ExecutionProfileStageBProcessFallbackThresholdLiteralV2:
+                `stage_b_variants_total` when the explicit workload threshold is met, otherwise
+                `none`.
+        Assumptions:
+            Benchmark-visible system scans need one stable literal that explains why the
+            non-default fallback path activated.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if stage_b_variants_total >= self.min_stage_b_variants_total:
+            return "stage_b_variants_total"
+        return "none"
+
+    def allows_process_pool(
+        self,
+        *,
+        stage_b_variants_total: int,
+    ) -> bool:
+        """
+        Return whether the explicit workload threshold allows non-default process fallback.
+
+        Args:
+            stage_b_variants_total: Deterministic prepared Stage B workload size.
+        Returns:
+            bool: `True` when the workload threshold is met, otherwise `False`.
+        Assumptions:
+            The Stage B process path survives only as a non-default fallback for larger
+            workloads.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return (
+            self.threshold_name_for(stage_b_variants_total=stage_b_variants_total)
+            == "stage_b_variants_total"
+        )
+
+
 def validate_execution_profile_mode_v2(
     *,
     value: str,
@@ -427,6 +529,110 @@ def execution_profile_supports_requested_runtime_v2(
     if profile.mode in _EXACT_EXECUTION_PROFILE_MODES_V2:
         return profile.feature_flags.runtime_enabled
     return execution_profile_uses_hierarchical_shortlist_runtime_v2(profile=profile)
+
+
+def execution_profile_stage_b_process_fallback_threshold_v2(
+    *,
+    profile: "ExecutionProfileV2",
+    stage_b_variants_total: int,
+) -> ExecutionProfileStageBProcessFallbackThresholdLiteralV2:
+    """
+    Resolve which explicit workload threshold activates non-default Stage B process fallback.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+    Args:
+        profile: Resolved execution profile candidate or duck-typed test double.
+        stage_b_variants_total: Deterministic prepared Stage B workload size.
+    Returns:
+        ExecutionProfileStageBProcessFallbackThresholdLiteralV2:
+            The explicit workload threshold literal that activated the non-default fallback path,
+            or `none` when Stage B must remain in-process.
+    Assumptions:
+        The threshold logic stays centralized here so runtime classification, worker execution,
+        config parsing, and benchmark-visible traces all use one rule.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if stage_b_variants_total <= 0:
+        return "none"
+    feature_flags = getattr(profile, "feature_flags", None)
+    parallelism = getattr(profile, "parallelism", None)
+    if feature_flags is None or parallelism is None:
+        return "none"
+    if not bool(getattr(feature_flags, "parallel_stage_b_enabled", False)):
+        return "none"
+    if int(getattr(parallelism, "stage_b_workers", 1)) <= 1:
+        return "none"
+    fallback_config = getattr(profile, "stage_b_process_fallback", None)
+    if fallback_config is None:
+        return "none"
+    threshold_name_for = getattr(fallback_config, "threshold_name_for", None)
+    if callable(threshold_name_for):
+        resolved_threshold = threshold_name_for(
+            stage_b_variants_total=stage_b_variants_total
+        )
+        if resolved_threshold in {"none", "stage_b_variants_total"}:
+            return cast(
+                ExecutionProfileStageBProcessFallbackThresholdLiteralV2,
+                resolved_threshold,
+            )
+    min_stage_b_variants_total = int(
+        getattr(fallback_config, "min_stage_b_variants_total", 0)
+    )
+    if (
+        min_stage_b_variants_total > 0
+        and stage_b_variants_total >= min_stage_b_variants_total
+    ):
+        return "stage_b_variants_total"
+    return "none"
+
+
+def execution_profile_uses_process_pool_stage_b_v2(
+    *,
+    profile: "ExecutionProfileV2",
+    stage_b_variants_total: int,
+) -> bool:
+    """
+    Return whether Stage B may use the non-default process fallback for this workload.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+
+    Args:
+        profile: Resolved execution profile candidate or duck-typed test double.
+        stage_b_variants_total: Deterministic prepared Stage B workload size.
+    Returns:
+        bool: `True` when the explicit workload threshold authorizes non-default process
+            fallback, otherwise `False`.
+    Assumptions:
+        Canonical parity workloads stay in-process by default even when process fallback remains
+        implemented for larger non-default workloads.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return (
+        execution_profile_stage_b_process_fallback_threshold_v2(
+            profile=profile,
+            stage_b_variants_total=stage_b_variants_total,
+        )
+        != "none"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -614,6 +820,7 @@ class ExecutionProfileV2:
     shortlist_config: ExecutionProfileShortlistConfigV2
     parallelism: ExecutionProfileParallelismConfigV2
     feature_flags: ExecutionProfileFeatureFlagsV2
+    stage_b_process_fallback: ExecutionProfileStageBProcessFallbackConfigV2
     launch_budget: ExecutionProfileLaunchBudgetV2
     progress_weights: BacktestJobStageWeights
     family_plugin_budget_ms: int
@@ -655,6 +862,8 @@ class ExecutionProfileV2:
             raise ValueError("ExecutionProfileV2.parallelism is required")
         if self.feature_flags is None:  # type: ignore[truthy-bool]
             raise ValueError("ExecutionProfileV2.feature_flags is required")
+        if self.stage_b_process_fallback is None:  # type: ignore[truthy-bool]
+            raise ValueError("ExecutionProfileV2.stage_b_process_fallback is required")
         if self.launch_budget is None:  # type: ignore[truthy-bool]
             raise ValueError("ExecutionProfileV2.launch_budget is required")
         if self.progress_weights is None:  # type: ignore[truthy-bool]
@@ -967,6 +1176,59 @@ def _default_progress_weights_for_mode_v2(
         ) from error
 
 
+def _default_stage_b_process_fallback_for_mode_v2(
+    *,
+    mode: ExecutionProfileModeLiteralV2,
+) -> ExecutionProfileStageBProcessFallbackConfigV2:
+    """
+    Return the explicit Stage B process-fallback workload threshold for one profile.
+
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-job-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - configs/prod/backtest.yaml
+
+    Args:
+        mode: Stable execution-profile mode literal.
+    Returns:
+        ExecutionProfileStageBProcessFallbackConfigV2:
+            Explicit non-default workload threshold for the process-based Stage B fallback path.
+    Assumptions:
+        Canonical parity workloads must stay in-process, so the non-default fallback opens only
+        near the upper end of each profile's prepared Stage B budget.
+    Raises:
+        ValueError: If the mode literal is unsupported.
+    Side Effects:
+        None.
+    """
+    fallback_by_mode: dict[
+        ExecutionProfileModeLiteralV2,
+        ExecutionProfileStageBProcessFallbackConfigV2,
+    ] = {
+        "exact_small": ExecutionProfileStageBProcessFallbackConfigV2(
+            min_stage_b_variants_total=12000
+        ),
+        "exact_parallel": ExecutionProfileStageBProcessFallbackConfigV2(
+            min_stage_b_variants_total=150000
+        ),
+        "hybrid_conservative": ExecutionProfileStageBProcessFallbackConfigV2(
+            min_stage_b_variants_total=200000
+        ),
+        "hybrid_family": ExecutionProfileStageBProcessFallbackConfigV2(
+            min_stage_b_variants_total=240000
+        ),
+    }
+    try:
+        return fallback_by_mode[mode]
+    except KeyError as error:  # pragma: no cover - guarded by validated literal type
+        raise ValueError(
+            f"Unsupported execution profile mode for Stage B process fallback: {mode!r}"
+        ) from error
+
+
 def _default_family_plugin_budget_ms_for_mode_v2(
     *,
     mode: ExecutionProfileModeLiteralV2,
@@ -1056,6 +1318,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     parallel_stage_b_enabled=False,
                     family_plugin_enabled=False,
                 ),
+                stage_b_process_fallback=_default_stage_b_process_fallback_for_mode_v2(
+                    mode="exact_small"
+                ),
                 launch_budget=_default_launch_budget_for_mode_v2(mode="exact_small"),
                 progress_weights=_default_progress_weights_for_mode_v2(mode="exact_small"),
                 family_plugin_budget_ms=_default_family_plugin_budget_ms_for_mode_v2(
@@ -1080,6 +1345,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     heuristic_shortlist_enabled=False,
                     parallel_stage_b_enabled=False,
                     family_plugin_enabled=False,
+                ),
+                stage_b_process_fallback=_default_stage_b_process_fallback_for_mode_v2(
+                    mode="exact_parallel"
                 ),
                 launch_budget=_default_launch_budget_for_mode_v2(mode="exact_parallel"),
                 progress_weights=_default_progress_weights_for_mode_v2(mode="exact_parallel"),
@@ -1113,6 +1381,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     heuristic_shortlist_enabled=False,
                     parallel_stage_b_enabled=False,
                     family_plugin_enabled=False,
+                ),
+                stage_b_process_fallback=_default_stage_b_process_fallback_for_mode_v2(
+                    mode="hybrid_conservative"
                 ),
                 launch_budget=_default_launch_budget_for_mode_v2(
                     mode="hybrid_conservative"
@@ -1151,6 +1422,9 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     parallel_stage_b_enabled=False,
                     family_plugin_enabled=False,
                 ),
+                stage_b_process_fallback=_default_stage_b_process_fallback_for_mode_v2(
+                    mode="hybrid_family"
+                ),
                 launch_budget=_default_launch_budget_for_mode_v2(mode="hybrid_family"),
                 progress_weights=_default_progress_weights_for_mode_v2(
                     mode="hybrid_family"
@@ -1172,6 +1446,8 @@ __all__ = [
     "ExecutionProfileLaunchBudgetV2",
     "ExecutionProfileModeLiteralV2",
     "ExecutionProfileParallelismConfigV2",
+    "ExecutionProfileStageBProcessFallbackConfigV2",
+    "ExecutionProfileStageBProcessFallbackThresholdLiteralV2",
     "ExecutionProfileShortlistDiversityBucketLiteralV2",
     "ExecutionProfileShortlistRetentionConfigV2",
     "ExecutionProfileShortlistScoringConfigV2",
@@ -1180,7 +1456,9 @@ __all__ = [
     "ExecutionProfilesCatalogV2",
     "default_execution_profiles_catalog_v2",
     "execution_profile_supports_requested_runtime_v2",
+    "execution_profile_stage_b_process_fallback_threshold_v2",
     "execution_profile_uses_hierarchical_shortlist_runtime_v2",
+    "execution_profile_uses_process_pool_stage_b_v2",
     "validate_execution_profile_shortlist_diversity_bucket_v2",
     "validate_execution_profile_mode_v2",
 ]

@@ -31,6 +31,7 @@ type NotebookParityMeasurementFieldLiteralV2 = Literal[
     "numba_threads_used",
     "max_python_processes_seen",
     "stage_b_execution_mode",
+    "stage_b_process_fallback_threshold",
     "exact_replay_count",
 ]
 type NotebookParityMeasurementSourceLiteralV2 = Literal["backend", "notebook"]
@@ -40,6 +41,10 @@ type NotebookParityStageBExecutionModeLiteralV2 = Literal[
     "bypassed_no_risk",
     "in_process",
     "process_pool",
+]
+type NotebookParityStageBProcessFallbackThresholdLiteralV2 = Literal[
+    "none",
+    "stage_b_variants_total",
 ]
 
 _ALLOWED_NOTEBOOK_PARITY_BENCHMARK_CLASSES_V2: tuple[
@@ -60,6 +65,7 @@ _ALLOWED_NOTEBOOK_PARITY_MEASUREMENT_FIELDS_V2: tuple[
     "numba_threads_used",
     "max_python_processes_seen",
     "stage_b_execution_mode",
+    "stage_b_process_fallback_threshold",
     "exact_replay_count",
 )
 _ALLOWED_NOTEBOOK_PARITY_MEASUREMENT_SOURCES_V2: tuple[
@@ -77,6 +83,12 @@ _ALLOWED_NOTEBOOK_PARITY_STAGE_B_EXECUTION_MODES_V2: tuple[
     "bypassed_no_risk",
     "in_process",
     "process_pool",
+)
+_ALLOWED_NOTEBOOK_PARITY_STAGE_B_PROCESS_FALLBACK_THRESHOLDS_V2: tuple[
+    NotebookParityStageBProcessFallbackThresholdLiteralV2, ...
+] = (
+    "none",
+    "stage_b_variants_total",
 )
 
 
@@ -379,6 +391,9 @@ class BacktestNotebookParityBaselineReferencePointV2:
     peak_rss_bytes: int | None = None
     max_python_processes_seen: int | None = None
     stage_b_execution_mode: NotebookParityStageBExecutionModeLiteralV2 | None = None
+    stage_b_process_fallback_threshold: (
+        NotebookParityStageBProcessFallbackThresholdLiteralV2 | None
+    ) = None
     runtime_regression_ratio_limit: float | None = None
     notes: str = ""
 
@@ -448,6 +463,7 @@ class BacktestNotebookParityBaselineReferencePointV2:
             and self.peak_rss_bytes is None
             and self.max_python_processes_seen is None
             and self.stage_b_execution_mode is None
+            and self.stage_b_process_fallback_threshold is None
             and self.runtime_regression_ratio_limit is None
         ):
             raise ValueError(
@@ -710,6 +726,7 @@ class BacktestNotebookParityMeasurementV2:
     numba_threads_used: int
     max_python_processes_seen: int
     stage_b_execution_mode: NotebookParityStageBExecutionModeLiteralV2
+    stage_b_process_fallback_threshold: NotebookParityStageBProcessFallbackThresholdLiteralV2
     exact_replay_count: int
 
     def __post_init__(self) -> None:
@@ -999,6 +1016,13 @@ def evaluate_backtest_notebook_parity_scenario_v2(
             ):
                 failing_gate_ids.append(gate.gate_id)
             continue
+        if gate.metric == "stage_b_process_fallback_threshold":
+            if (
+                gate.expected_value is not None
+                and candidate.stage_b_process_fallback_threshold != gate.expected_value
+            ):
+                failing_gate_ids.append(gate.gate_id)
+            continue
         if gate.metric == "exact_replay_count":
             if (
                 gate.max_value is not None
@@ -1250,6 +1274,10 @@ def _parse_notebook_parity_baseline_reference_point_v2(
         payload=raw_point,
         key="stage_b_execution_mode",
     )
+    stage_b_process_fallback_threshold = _require_optional_str(
+        payload=raw_point,
+        key="stage_b_process_fallback_threshold",
+    )
     return BacktestNotebookParityBaselineReferencePointV2(
         reference_id=_require_str(payload=raw_point, key="reference_id"),
         source_kind=_parse_notebook_parity_reference_source_kind_v2(
@@ -1276,6 +1304,13 @@ def _parse_notebook_parity_baseline_reference_point_v2(
         stage_b_execution_mode=(
             _parse_notebook_parity_stage_b_execution_mode_v2(value=stage_b_execution_mode)
             if stage_b_execution_mode is not None
+            else None
+        ),
+        stage_b_process_fallback_threshold=(
+            _parse_notebook_parity_stage_b_process_fallback_threshold_v2(
+                value=stage_b_process_fallback_threshold
+            )
+            if stage_b_process_fallback_threshold is not None
             else None
         ),
         runtime_regression_ratio_limit=_require_optional_float(
@@ -1346,6 +1381,9 @@ def _measurement_payloads_v2(
             "numba_threads_used": measurement.numba_threads_used,
             "max_python_processes_seen": measurement.max_python_processes_seen,
             "stage_b_execution_mode": measurement.stage_b_execution_mode,
+            "stage_b_process_fallback_threshold": (
+                measurement.stage_b_process_fallback_threshold
+            ),
             "exact_replay_count": measurement.exact_replay_count,
         }
         for measurement in measurements
@@ -1488,6 +1526,33 @@ def _parse_notebook_parity_stage_b_execution_mode_v2(
     if value not in _ALLOWED_NOTEBOOK_PARITY_STAGE_B_EXECUTION_MODES_V2:
         raise ValueError(f"unsupported stage_b_execution_mode: {value!r}")
     return cast(NotebookParityStageBExecutionModeLiteralV2, value)
+
+
+def _parse_notebook_parity_stage_b_process_fallback_threshold_v2(
+    *,
+    value: str,
+) -> NotebookParityStageBProcessFallbackThresholdLiteralV2:
+    """
+    Parse one notebook-parity Stage B process-fallback threshold literal.
+
+    Args:
+        value: Raw threshold literal from JSON.
+    Returns:
+        NotebookParityStageBProcessFallbackThresholdLiteralV2:
+            Supported benchmark-visible threshold literal.
+    Assumptions:
+        The benchmark surface must expose whether the fallback path stayed inactive or crossed the
+        explicit `stage_b_variants_total` workload threshold.
+    Raises:
+        ValueError: If the literal is unsupported.
+    Side Effects:
+        None.
+    """
+    if value not in _ALLOWED_NOTEBOOK_PARITY_STAGE_B_PROCESS_FALLBACK_THRESHOLDS_V2:
+        raise ValueError(
+            f"unsupported stage_b_process_fallback_threshold: {value!r}"
+        )
+    return cast(NotebookParityStageBProcessFallbackThresholdLiteralV2, value)
 
 
 def _require_mapping(
@@ -1782,6 +1847,7 @@ __all__ = [
     "NotebookParityReferenceSourceKindLiteralV2",
     "NotebookParityRuntimeSurfaceLiteralV2",
     "NotebookParityStageBExecutionModeLiteralV2",
+    "NotebookParityStageBProcessFallbackThresholdLiteralV2",
     "evaluate_backtest_notebook_parity_scenario_v2",
     "load_backtest_notebook_parity_benchmark_corpus_v2",
     "read_backtest_notebook_parity_benchmark_corpus_payload_v2",

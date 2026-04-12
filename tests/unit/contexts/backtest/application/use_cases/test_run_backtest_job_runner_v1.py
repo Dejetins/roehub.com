@@ -456,6 +456,7 @@ def _build_fake_execution_profile(
     stage_a_workers: int,
     stage_b_workers: int,
     parallel_stage_b_enabled: bool,
+    min_stage_b_variants_total: int = 1,
 ) -> Any:
     """
     Build minimal execution-profile fixture with only fields consumed by runtime core tests.
@@ -465,6 +466,9 @@ def _build_fake_execution_profile(
         stage_a_workers: Configured Stage A worker count.
         stage_b_workers: Configured Stage B worker count.
         parallel_stage_b_enabled: Whether process-based Stage B is enabled for the profile.
+        min_stage_b_variants_total:
+            Explicit workload threshold required before the non-default Stage B process fallback
+            may activate.
     Returns:
         Any: SimpleNamespace carrying the minimal execution-profile surface used by job-runner
             tests and runtime helpers.
@@ -489,6 +493,14 @@ def _build_fake_execution_profile(
             heuristic_shortlist_enabled=shortlist_enabled,
             parallel_stage_b_enabled=parallel_stage_b_enabled,
             family_plugin_enabled=mode == "hybrid_family",
+        ),
+        stage_b_process_fallback=SimpleNamespace(
+            min_stage_b_variants_total=min_stage_b_variants_total,
+            threshold_name_for=lambda *, stage_b_variants_total: (
+                "stage_b_variants_total"
+                if stage_b_variants_total >= min_stage_b_variants_total
+                else "none"
+            ),
         ),
     )
 
@@ -2840,6 +2852,70 @@ def test_process_claimed_job_exact_parallel_default_stays_in_process(
     assert serial_report.status == "succeeded"
     assert default_exact_parallel_report.status == "succeeded"
     assert default_exact_parallel_frontiers == serial_frontiers
+    assert _FakeProcessPoolExecutorV2.initializer_bootstraps == []
+    assert _FakeProcessPoolExecutorV2.submitted_chunk_indexes == []
+
+
+def test_process_claimed_job_non_default_fallback_stays_in_process_below_workload_threshold(
+    monkeypatch: Any,
+) -> None:
+    """
+    Verify non-default Stage B process fallback stays inactive below the explicit workload
+    threshold.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        The fallback path remains reviewable and non-default, so enabling process workers alone is
+        insufficient when the prepared Stage B workload stays below the explicit threshold.
+    Raises:
+        AssertionError: If below-threshold workloads still bootstrap `ProcessPoolExecutor`.
+    Side Effects:
+        Monkeypatches Stage B process-pool helpers so the test can detect unexpected worker
+        bootstrap without spawning real child processes.
+    """
+    _FakeProcessPoolExecutorV2.initializer_bootstraps = []
+    _FakeProcessPoolExecutorV2.submitted_chunk_indexes = []
+    monkeypatch.setattr(
+        artifact_runtime_core_module,
+        "ProcessPoolExecutor",
+        _FakeProcessPoolExecutorV2,
+    )
+
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=_build_running_job()),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=_FakeResultsRepository(),
+        grid_context=_FakeGridContext(
+            base_variants=_build_stage_a_variants(),
+            risk_variants=_build_risk_variants(),
+            execution_profile=_build_fake_execution_profile(
+                mode="exact_parallel",
+                stage_a_workers=4,
+                stage_b_workers=2,
+                parallel_stage_b_enabled=True,
+                min_stage_b_variants_total=5,
+            ),
+        ),
+        scorer=_ParallelRankingAwareScorerWithDetails(),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=10_000,
+        snapshot_variants_step=1,
+        stage_batch_size=2,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 45, 0)),
+    )
+
+    report = use_case.process_claimed_job(
+        job=_build_running_job(),
+        locked_by="worker-test-1",
+    )
+
+    assert report.status == "succeeded"
     assert _FakeProcessPoolExecutorV2.initializer_bootstraps == []
     assert _FakeProcessPoolExecutorV2.submitted_chunk_indexes == []
 

@@ -30,6 +30,10 @@ from .artifact_runtime_plan_v2 import (
     BacktestStageABaseVariantV2,
 )
 from .contracts import StageANoRiskMetricsV2
+from .execution_profile_v2 import (
+    execution_profile_stage_b_process_fallback_threshold_v2,
+    execution_profile_uses_process_pool_stage_b_v2,
+)
 from .trade_compactor_kernel import (
     StageACompactExactPayloadV2,
     no_risk_metrics_to_ranking_payload_v2,
@@ -2613,7 +2617,8 @@ def _runtime_plan_stage_b_execution_mode_v2(
     Assumptions:
         Tests may supply lightweight fakes, so the shared core first prefers the typed runtime
         helper and otherwise reconstructs the same classification from the available attributes,
-        with `process_pool` reserved for explicit non-default opt-in profiles.
+        with `process_pool` reserved for explicit non-default opt-in profiles whose workload
+        crosses the reviewable fallback path threshold.
     Raises:
         None.
     Side Effects:
@@ -2625,15 +2630,48 @@ def _runtime_plan_stage_b_execution_mode_v2(
     if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
         return "bypassed_no_risk"
     execution_profile = getattr(runtime_plan, "execution_profile", None)
-    feature_flags = getattr(execution_profile, "feature_flags", None)
-    parallelism = getattr(execution_profile, "parallelism", None)
-    if feature_flags is None or parallelism is None:
+    stage_b_variants_total = int(getattr(runtime_plan, "stage_b_variants_total", 0))
+    if execution_profile is None:
         return "in_process"
-    if not bool(getattr(feature_flags, "parallel_stage_b_enabled", False)):
-        return "in_process"
-    if int(getattr(parallelism, "stage_b_workers", 1)) <= 1:
-        return "in_process"
-    return "process_pool"
+    if execution_profile_uses_process_pool_stage_b_v2(
+        profile=execution_profile,
+        stage_b_variants_total=stage_b_variants_total,
+    ):
+        return "process_pool"
+    return "in_process"
+
+
+def _runtime_plan_stage_b_process_fallback_threshold_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+) -> str:
+    """
+    Resolve which explicit workload threshold activated the non-default Stage B fallback path.
+
+    Args:
+        runtime_plan: Shared runtime-plan object used by sync and worker orchestration.
+    Returns:
+        str: Canonical workload-threshold literal for runtime-shape traces and benchmarks.
+    Assumptions:
+        Shared traces must expose not only whether the fallback path exists, but also which
+        explicit workload threshold activated it.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    classifier = getattr(runtime_plan, "stage_b_process_fallback_threshold", None)
+    if callable(classifier):
+        return str(classifier())
+    if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
+        return "none"
+    execution_profile = getattr(runtime_plan, "execution_profile", None)
+    if execution_profile is None:
+        return "none"
+    return execution_profile_stage_b_process_fallback_threshold_v2(
+        profile=execution_profile,
+        stage_b_variants_total=int(getattr(runtime_plan, "stage_b_variants_total", 0)),
+    )
 
 
 __all__ = [

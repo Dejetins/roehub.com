@@ -16,6 +16,7 @@
       "numba_threads_used",
       "max_python_processes_seen",
       "stage_b_execution_mode",
+      "stage_b_process_fallback_threshold",
       "exact_replay_count"
     ],
     "system_scan_fields": [
@@ -23,9 +24,10 @@
       "numba_threads_used",
       "max_python_processes_seen",
       "stage_b_execution_mode",
+      "stage_b_process_fallback_threshold",
       "exact_replay_count"
     ],
-    "notes": "Runtime-shape measurements are internal-only benchmark payloads. They must report wall time, CPU time, peak RSS, Numba thread count, maximum Python process fan-out, stage_b_execution_mode, and exact_replay_count."
+    "notes": "Runtime-shape measurements are internal-only benchmark payloads. They must report wall time, CPU time, peak RSS, Numba thread count, maximum Python process fan-out, stage_b_execution_mode, stage_b_process_fallback_threshold, and exact_replay_count."
   },
   "source_fixtures": {
     "perf_smoke_harness": "tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py",
@@ -47,7 +49,7 @@
       "notebook on 12 threads vs backend on 4 threads is invalid",
       "sync and worker measurements from different artifact slots are invalid"
     ],
-    "notes": "Compare backend and notebook only when host, artifact slot, and numba_threads_used all match exactly. Sync and worker backend measurements are comparable when those constraints hold and stage_b_execution_mode is reviewed together."
+    "notes": "Compare backend and notebook only when host, artifact slot, and numba_threads_used all match exactly. Sync and worker backend measurements are comparable when those constraints hold and stage_b_execution_mode is reviewed together with stage_b_process_fallback_threshold."
   },
   "scenario_order": [
     "nr2",
@@ -142,6 +144,14 @@
           "max_value": null,
           "expected_value": "bypassed_no_risk",
           "notes": "NR2 should resolve in the no-risk terminal path instead of generic Stage B."
+        },
+        {
+          "gate_id": "nr2_stage_b_process_fallback_threshold",
+          "metric": "stage_b_process_fallback_threshold",
+          "max_ratio": null,
+          "max_value": null,
+          "expected_value": "none",
+          "notes": "No-risk runs must not cross any non-default Stage B process workload threshold."
         }
       ],
       "notes": "NR2 is the canonical no-risk two-indicator parity class. The committed comparison points show the current backend-vs-notebook gap and keep both 4-thread and 12-thread notebook references reviewable."
@@ -169,6 +179,7 @@
           "peak_rss_bytes": null,
           "max_python_processes_seen": 1,
           "stage_b_execution_mode": "in_process",
+          "stage_b_process_fallback_threshold": "none",
           "runtime_regression_ratio_limit": null,
           "notes": "Current benchmark-host default keeps RG-TTR Stage B in-process, so the canonical parity shape stays in one Python process unless a non-default profile explicitly enables process fan-out."
         },
@@ -183,6 +194,7 @@
           "peak_rss_bytes": null,
           "max_python_processes_seen": 1,
           "stage_b_execution_mode": "in_process",
+          "stage_b_process_fallback_threshold": "none",
           "runtime_regression_ratio_limit": null,
           "notes": "The canonical RG-TTR notebook anchor is a single-process multi-thread exact shape and provides the comparison point for process fan-out and stage_b_execution_mode."
         }
@@ -211,6 +223,14 @@
           "max_value": null,
           "expected_value": "in_process",
           "notes": "Benchmark-sized RG-TTR workloads should keep Stage B in-process by default."
+        },
+        {
+          "gate_id": "rg_ttr_stage_b_process_fallback_threshold",
+          "metric": "stage_b_process_fallback_threshold",
+          "max_ratio": null,
+          "max_value": null,
+          "expected_value": "none",
+          "notes": "Benchmark-sized RG-TTR workloads must stay below the non-default process fallback workload threshold."
         },
         {
           "gate_id": "rg_ttr_exact_replay_count",
@@ -264,7 +284,7 @@
           "notes": "RG-ALT keeps functional coverage only in the first wave, but runtime must not regress by more than 10% against the backend baseline."
         }
       ],
-      "notes": "RG-ALT keeps the alternative ranking metrics reviewable without claiming notebook parity in the first wave. Measurements must still emit the full runtime-shape payload, including stage_b_execution_mode and exact_replay_count."
+      "notes": "RG-ALT keeps the alternative ranking metrics reviewable without claiming notebook parity in the first wave. Measurements must still emit the full runtime-shape payload, including stage_b_execution_mode, stage_b_process_fallback_threshold, and exact_replay_count."
     }
   ]
 }

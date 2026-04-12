@@ -36,6 +36,7 @@ from trading.contexts.backtest.application.services.v2.execution_profile_v2 impo
     ExecutionProfileShortlistConfigV2,
     ExecutionProfileShortlistRetentionConfigV2,
     ExecutionProfileShortlistScoringConfigV2,
+    ExecutionProfileStageBProcessFallbackConfigV2,
     ExecutionProfileV2,
     default_execution_profiles_catalog_v2,
     validate_execution_profile_mode_v2,
@@ -1686,6 +1687,11 @@ def _parse_execution_profiles_catalog(
         shortlist_retention_map = _get_mapping(shortlist_map, "retention", required=False)
         parallelism_map = _get_mapping(profile_map, "parallelism", required=False)
         feature_flags_map = _get_mapping(profile_map, "feature_flags", required=False)
+        stage_b_process_fallback_map = _get_mapping(
+            profile_map,
+            "stage_b_process_fallback",
+            required=False,
+        )
         launch_budget_map = _get_mapping(profile_map, "launch_budget", required=False)
         progress_map = _get_mapping(profile_map, "progress", required=False)
         available_profiles.append(
@@ -1784,6 +1790,15 @@ def _parse_execution_profiles_catalog(
                         feature_flags_map,
                         "family_plugin_enabled",
                         default=False,
+                    ),
+                ),
+                stage_b_process_fallback=ExecutionProfileStageBProcessFallbackConfigV2(
+                    min_stage_b_variants_total=_get_int_with_default(
+                        stage_b_process_fallback_map,
+                        "min_stage_b_variants_total",
+                        default=(
+                            default_profile.stage_b_process_fallback.min_stage_b_variants_total
+                        ),
                     ),
                 ),
                 launch_budget=ExecutionProfileLaunchBudgetV2(

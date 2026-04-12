@@ -164,15 +164,21 @@ B2 активирует executable `exact_parallel` semantics для уже reso
 - coordinator merge происходит в canonical chunk order, поэтому completion order worker'ов не
   влияет на winners, persisted ordering или checkpoint frontier;
 - `exact_small` остаётся serial exact path;
-- active runtime default по-прежнему не меняется автоматически и request classification для
-  `exact_parallel` остаётся вне scope до следующего EPIC.
+- canonical parity workloads по-прежнему идут через in-process Stage B по умолчанию;
+- process-based Stage B остаётся только как explicit non-default fallback path для larger
+  workloads, когда профиль одновременно включает `feature_flags.parallel_stage_b_enabled = true`,
+  задаёт `parallelism.stage_b_workers > 1`, и пересекает explicit workload threshold
+  `stage_b_process_fallback.min_stage_b_variants_total`;
+- runtime-shape traces и benchmark scans обязаны публиковать не только
+  `stage_b_execution_mode`, но и `stage_b_process_fallback_threshold`, чтобы было видно, почему
+  сработал fallback path.
 
 Разрешённые exact-only internal optimizations для B1/B2:
 
 - reuse deterministic row/array plans across repeated `compute_index` / `signal_index` groups;
 - reuse already validated mmap payloads inside one pinned runtime instance;
 - process-parallel Stage B только для уже resolved profiles с
-  `feature_flags.parallel_stage_b_enabled = true`;
+  `feature_flags.parallel_stage_b_enabled = true` и explicit workload threshold policy;
 - использовать existing `exact_baseline` и `small_grid_overhead` benchmark vocabulary как
   evidence surface, не меняя active runtime default и не conflating `exact_baseline` anchor with
   rollout policy.
@@ -185,16 +191,21 @@ B2 активирует executable `exact_parallel` semantics для уже reso
 - `backtest.cpu.max_numba_threads=4` остаётся общим ceiling для `dev`, `test`, и `prod`, чтобы
   Stage A не oversubscribe'ил типичные 4-vCPU среды по умолчанию;
 - `exact_small` остаётся serial profile: `stage_a_workers=1`, `stage_b_workers=1`;
-- `exact_parallel` использует полный ceiling для breadth/exact workload:
-  `stage_a_workers=4`, `stage_b_workers=4`;
+- `exact_parallel` keeps Stage B in-process by default for canonical parity workloads:
+  `stage_a_workers=4`, `stage_b_workers=1`;
+- `exact_parallel` may reopen process-based Stage B only as a non-default fallback path once the
+  prepared workload crosses `stage_b_process_fallback.min_stage_b_variants_total=150000`;
 - `hybrid_conservative` отдаёт Stage A полный ceiling, но держит Stage B чуть уже после
-  shortlist narrowing: `stage_a_workers=4`, `stage_b_workers=3`;
+  shortlist narrowing: `stage_a_workers=4`, `stage_b_workers=3`, with non-default process
+  fallback threshold `200000`;
 - `hybrid_family` остаётся самым узким shipped hybrid profile:
-  `stage_a_workers=3`, `stage_b_workers=2`.
+  `stage_a_workers=3`, `stage_b_workers=2`, with non-default process fallback threshold
+  `240000`.
 
 Эти значения выбраны консервативно: Stage A теперь действительно масштабируется по профилю, но
-hybrid Stage B получает уже narrowed frontier, поэтому worker counts intentionally stay below the
-`exact_parallel` cap вместо агрессивного max-out по всем режимам.
+canonical Stage B остаётся in-process по умолчанию, а fallback path включается только when the
+explicit workload threshold is crossed and the profile was deliberately opted back into
+process-based execution.
 
 ## Milestone D hybrid shortlist note
 

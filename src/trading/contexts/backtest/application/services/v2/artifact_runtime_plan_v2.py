@@ -40,8 +40,10 @@ from .execution_profile_v2 import (
     ExecutionProfilesCatalogV2,
     ExecutionProfileV2,
     default_execution_profiles_catalog_v2,
+    execution_profile_stage_b_process_fallback_threshold_v2,
     execution_profile_supports_requested_runtime_v2,
     execution_profile_uses_hierarchical_shortlist_runtime_v2,
+    execution_profile_uses_process_pool_stage_b_v2,
 )
 
 STAGE_A_LITERAL_V2 = "stage_a"
@@ -581,8 +583,8 @@ class BacktestArtifactRuntimePlanV2:
             str: Canonical `stage_b_execution_mode` literal for orchestration and NR2 benchmarks.
         Assumptions:
             No-risk runs report `bypassed_no_risk`, while risk-grid runs stay `in_process` unless
-            the resolved execution profile explicitly opts into process-pool Stage B with both
-            `parallel_stage_b_enabled=True` and `stage_b_workers > 1`.
+            the resolved execution profile explicitly opts into the non-default process fallback
+            and the prepared workload crosses the explicit `stage_b_variants_total` threshold.
         Raises:
             None.
         Side Effects:
@@ -590,15 +592,35 @@ class BacktestArtifactRuntimePlanV2:
         """
         if self.uses_no_risk_terminal_path():
             return STAGE_B_EXECUTION_MODE_BYPASSED_NO_RISK_LITERAL_V2
-        feature_flags = getattr(self.execution_profile, "feature_flags", None)
-        parallelism = getattr(self.execution_profile, "parallelism", None)
-        if feature_flags is None or parallelism is None:
-            return STAGE_B_EXECUTION_MODE_IN_PROCESS_LITERAL_V2
-        if not bool(getattr(feature_flags, "parallel_stage_b_enabled", False)):
-            return STAGE_B_EXECUTION_MODE_IN_PROCESS_LITERAL_V2
-        if int(getattr(parallelism, "stage_b_workers", 1)) <= 1:
-            return STAGE_B_EXECUTION_MODE_IN_PROCESS_LITERAL_V2
-        return STAGE_B_EXECUTION_MODE_PROCESS_POOL_LITERAL_V2
+        if execution_profile_uses_process_pool_stage_b_v2(
+            profile=self.execution_profile,
+            stage_b_variants_total=self.stage_b_variants_total,
+        ):
+            return STAGE_B_EXECUTION_MODE_PROCESS_POOL_LITERAL_V2
+        return STAGE_B_EXECUTION_MODE_IN_PROCESS_LITERAL_V2
+
+    def stage_b_process_fallback_threshold(self) -> str:
+        """
+        Resolve which explicit workload threshold activated the non-default Stage B fallback.
+
+        Args:
+            None.
+        Returns:
+            str: Canonical threshold literal for runtime-shape scans and benchmark traces.
+        Assumptions:
+            Canonical parity workloads must report `none`, while larger non-default workloads may
+            report the explicit `stage_b_variants_total` threshold when process fallback is used.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self.uses_no_risk_terminal_path():
+            return "none"
+        return execution_profile_stage_b_process_fallback_threshold_v2(
+            profile=self.execution_profile,
+            stage_b_variants_total=self.stage_b_variants_total,
+        )
 
     def stage_a_variant_for_index(
         self,
