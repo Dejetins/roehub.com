@@ -46,6 +46,9 @@ from .execution_profile_v2 import (
 
 STAGE_A_LITERAL_V2 = "stage_a"
 STAGE_B_LITERAL_V2 = "stage_b"
+STAGE_B_EXECUTION_MODE_BYPASSED_NO_RISK_LITERAL_V2 = "bypassed_no_risk"
+STAGE_B_EXECUTION_MODE_IN_PROCESS_LITERAL_V2 = "in_process"
+STAGE_B_EXECUTION_MODE_PROCESS_POOL_LITERAL_V2 = "process_pool"
 PlannerLaunchBudgetModeV2 = Literal["ignore", "sync_inline"]
 
 _FLOAT32_BYTES = 4
@@ -546,6 +549,55 @@ class BacktestArtifactRuntimePlanV2:
             None.
         """
         return _product_v2(values=tuple(len(axis.values) for axis in self.signal_axes))
+
+    def uses_no_risk_terminal_path(self) -> bool:
+        """
+        Classify whether the shared runtime should finalize at the Stage A exact boundary.
+
+        Args:
+            None.
+        Returns:
+            bool: `True` when the prepared plan belongs to the no-risk class.
+        Assumptions:
+            The no-risk terminal path is valid only for a single disabled-risk cell where both TP
+            and SL remain off, letting sync and worker bypass heavy generic Stage B internally
+            while keeping public `stage_a` / `stage_b` vocabulary stable.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return len(self.risk_variants) == 1 and _risk_variant_is_no_risk_v2(
+            risk_variant=self.risk_variants[0]
+        )
+
+    def stage_b_execution_mode(self) -> str:
+        """
+        Resolve the deterministic `stage_b_execution_mode` classification for this runtime plan.
+
+        Args:
+            None.
+        Returns:
+            str: Canonical `stage_b_execution_mode` literal for orchestration and NR2 benchmarks.
+        Assumptions:
+            No-risk runs report `bypassed_no_risk`, while risk-grid runs stay `in_process` unless
+            the resolved execution profile explicitly enables process-pool Stage B workers.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self.uses_no_risk_terminal_path():
+            return STAGE_B_EXECUTION_MODE_BYPASSED_NO_RISK_LITERAL_V2
+        feature_flags = getattr(self.execution_profile, "feature_flags", None)
+        parallelism = getattr(self.execution_profile, "parallelism", None)
+        if feature_flags is None or parallelism is None:
+            return STAGE_B_EXECUTION_MODE_IN_PROCESS_LITERAL_V2
+        if not bool(getattr(feature_flags, "parallel_stage_b_enabled", False)):
+            return STAGE_B_EXECUTION_MODE_IN_PROCESS_LITERAL_V2
+        if int(getattr(parallelism, "stage_b_workers", 1)) <= 1:
+            return STAGE_B_EXECUTION_MODE_IN_PROCESS_LITERAL_V2
+        return STAGE_B_EXECUTION_MODE_PROCESS_POOL_LITERAL_V2
 
     def stage_a_variant_for_index(
         self,
@@ -1487,6 +1539,34 @@ def _risk_variants_from_template_v2(
             )
             variant_index += 1
     return tuple(variants)
+
+
+def _risk_variant_is_no_risk_v2(
+    *,
+    risk_variant: BacktestRiskVariantV2,
+) -> bool:
+    """
+    Check whether one prepared Stage B risk cell matches the canonical no-risk class.
+
+    Args:
+        risk_variant: Prepared runtime-plan risk cell.
+    Returns:
+        bool: `True` when both TP and SL are disabled and their percentages stay null.
+    Assumptions:
+        No-risk terminal-path routing must stay deterministic and shared across sync and worker
+        orchestration, so the classifier relies only on the prepared runtime-plan payload.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    risk_params = risk_variant.risk_params
+    return (
+        risk_params.get("sl_enabled") is False
+        and risk_params.get("sl_pct") is None
+        and risk_params.get("tp_enabled") is False
+        and risk_params.get("tp_pct") is None
+    )
 
 
 def _bool_scalar_v2(*, value: BacktestVariantScalar, field_name: str) -> bool:

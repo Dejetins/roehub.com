@@ -471,7 +471,7 @@ class RunBacktestUseCase:
                 parallelism=stage_a_parallelism,
                 cancel_checker=_cancel_checker_from_run_control(run_control=run_control),
             )
-            ranked_rows, ranked_tasks = self._runtime_runner.run_stage_b(
+            ranked_rows, ranked_tasks = self._runtime_runner.run_stage_b_or_finalize_no_risk(
                 template=resolved.template,
                 runtime_plan=effective_runtime_plan,
                 shortlist=shortlist,

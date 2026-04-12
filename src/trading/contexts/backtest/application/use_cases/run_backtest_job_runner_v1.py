@@ -1051,7 +1051,7 @@ class RunBacktestJobRunnerV1:
         last_heartbeat_at: datetime,
     ) -> datetime:
         """
-        Execute streaming Stage-B scoring with frontier-signature-gated snapshot persistence.
+        Execute the shared Stage-B or no-risk terminal path with snapshot persistence.
 
         Docs:
           - docs/architecture/backtest/backtest-job-runner-worker-v1.md
@@ -1177,7 +1177,7 @@ class RunBacktestJobRunnerV1:
             last_snapshot_at = now_local
             last_snapshot_processed = checkpoint_processed
 
-        ranked_rows, ranked_tasks = self._runtime_runner.run_stage_b(
+        ranked_rows, ranked_tasks = self._runtime_runner.run_stage_b_or_finalize_no_risk(
             template=context.template,
             runtime_plan=runtime_plan,
             shortlist=stage_a_shortlist,

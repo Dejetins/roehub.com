@@ -379,7 +379,7 @@ class BacktestArtifactRuntimeRunnerV2:
         self._batch_size_default = batch_size_default
         self._configurable_ranking_enabled = configurable_ranking_enabled
 
-    def run_stage_b(
+    def run_stage_b_or_finalize_no_risk(
         self,
         *,
         template: RunBacktestTemplate,
@@ -394,7 +394,7 @@ class BacktestArtifactRuntimeRunnerV2:
         on_checkpoint: StageBCheckpointCallbackV2 | None = None,
     ) -> tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
         """
-        Score Stage B variants through serial or process-parallel exact execution.
+        Execute the shared Stage B path or finalize no-risk runs directly from Stage A.
 
         Args:
             template: Effective run template used for deterministic variant-key build.
@@ -411,16 +411,15 @@ class BacktestArtifactRuntimeRunnerV2:
                 Optional checkpoint callback with lazy frontier materializers.
         Returns:
             tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
-                Deterministically ranked Stage B rows and task mapping by `variant_key`.
+                Deterministically ranked final rows and task mapping by `variant_key`.
         Assumptions:
-            Final deterministic tie-break for Stage B remains `variant_key ASC`, while
-            `exact_parallel` may activate process-based chunk scoring only when the resolved
-            execution profile explicitly enables it. Additive `signal_features` warm-cache access
-            carried by Stage A/runtime planning remains inactive for exact Stage B scoring.
+            Final deterministic tie-break remains `variant_key ASC`, while no-risk runs terminate
+            after Stage A exact scoring and risk-grid runs may still activate process-based
+            generic Stage B only when the resolved execution profile explicitly enables it.
         Raises:
             ValueError: If limits/batch-size are invalid or scorer payload is malformed.
         Side Effects:
-            May spawn process workers for deterministic exact-parallel Stage B scoring.
+            May spawn process workers only for deterministic exact-parallel risk-grid Stage B.
         Docs:
           - docs/architecture/backtest/backtest-runtime-kernels-v2.md
           - docs/architecture/backtest/backtest-job-runner-worker-v1.md
@@ -438,15 +437,28 @@ class BacktestArtifactRuntimeRunnerV2:
                 configurable_ranking_enabled=self._configurable_ranking_enabled,
             )
         )
+        effective_batch = self._resolve_batch_size(batch_size=batch_size)
+        total = int(runtime_plan.stage_b_variants_total)
+        if cancel_checker is not None:
+            cancel_checker(STAGE_B_LITERAL_V2)
+        if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
+            return self._finalize_no_risk_stage_a_v2(
+                template=template,
+                runtime_plan=runtime_plan,
+                shortlist=shortlist,
+                candles=candles,
+                scorer=scorer,
+                top_k_limit=top_k_limit,
+                ranking_plan=ranking_plan,
+                total=total,
+                cancel_checker=cancel_checker,
+                on_checkpoint=on_checkpoint,
+            )
         configure_stage_ranking_context_if_supported_v2(
             scorer=scorer,
             stage=STAGE_B_LITERAL_V2,
             ranking_plan=ranking_plan,
         )
-        effective_batch = self._resolve_batch_size(batch_size=batch_size)
-        total = int(runtime_plan.stage_b_variants_total)
-        if cancel_checker is not None:
-            cancel_checker(STAGE_B_LITERAL_V2)
         if self._should_run_stage_b_parallel_v2(runtime_plan=runtime_plan):
             return self._run_stage_b_parallel_v2(
                 template=template,
@@ -474,6 +486,153 @@ class BacktestArtifactRuntimeRunnerV2:
             cancel_checker=cancel_checker,
             on_checkpoint=on_checkpoint,
         )
+
+    def run_stage_b(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        shortlist: tuple[BacktestStageAScoredVariantV2, ...],
+        candles: CandleArrays,
+        scorer: MetricScorerV2,
+        top_k_limit: int,
+        ranking: BacktestRankingConfig | None = None,
+        batch_size: int | None = None,
+        cancel_checker: CancelCheckerV2 | None = None,
+        on_checkpoint: StageBCheckpointCallbackV2 | None = None,
+    ) -> tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+        """
+        Preserve the legacy Stage B entrypoint while delegating to the shared no-risk-aware path.
+
+        Args:
+            template: Effective run template used for deterministic variant-key build.
+            runtime_plan: Deterministic artifact-backed runtime plan.
+            shortlist: Deterministically ranked Stage A shortlist rows.
+            candles: Warmup-inclusive request-timeframe candles.
+            scorer: Artifact-backed Stage B scorer contract implementation.
+            top_k_limit: Maximum number of final rows retained in memory.
+            ranking: Optional ranking config (`primary_metric` only).
+            batch_size: Optional checkpoint boundary override.
+            cancel_checker: Optional cooperative cancellation callback by stage.
+            on_checkpoint: Optional checkpoint callback with lazy frontier materializers.
+        Returns:
+            tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+                Deterministically ranked final rows and task mapping by `variant_key`.
+        Assumptions:
+            Backward-compatible callers may still use `run_stage_b(...)`, but the shared runtime
+            owns the explicit no-risk terminal-path decision.
+        Raises:
+            ValueError: Propagates from the shared no-risk-aware runtime path.
+        Side Effects:
+            Delegates to the shared runtime path, which may spawn process workers for risk-grid
+            Stage B only.
+        """
+        return self.run_stage_b_or_finalize_no_risk(
+            template=template,
+            runtime_plan=runtime_plan,
+            shortlist=shortlist,
+            candles=candles,
+            scorer=scorer,
+            top_k_limit=top_k_limit,
+            ranking=ranking,
+            batch_size=batch_size,
+            cancel_checker=cancel_checker,
+            on_checkpoint=on_checkpoint,
+        )
+
+    def _finalize_no_risk_stage_a_v2(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        shortlist: tuple[BacktestStageAScoredVariantV2, ...],
+        candles: CandleArrays,
+        scorer: MetricScorerV2,
+        top_k_limit: int,
+        ranking_plan: ResolvedRankingPlanV2,
+        total: int,
+        cancel_checker: CancelCheckerV2 | None,
+        on_checkpoint: StageBCheckpointCallbackV2 | None,
+    ) -> tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+        """
+        Materialize final no-risk rows directly from the Stage A exact shortlist.
+
+        Args:
+            template: Effective run template used for deterministic variant-key build.
+            runtime_plan: Deterministic artifact-backed runtime plan already classified as no-risk.
+            shortlist: Deterministically ranked Stage A shortlist rows.
+            candles: Warmup-inclusive request-timeframe candles.
+            scorer: Artifact-backed scorer used for summary metrics materialization.
+            top_k_limit: Maximum number of final rows retained in memory.
+            ranking_plan: Pre-resolved ranking plan shared with the generic exact path.
+            total: Public Stage B total preserved for progress/checkpoint semantics.
+            cancel_checker: Optional cooperative cancellation callback by stage.
+            on_checkpoint: Optional checkpoint callback with lazy frontier materializers.
+        Returns:
+            tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+                Deterministically ranked final rows and task mapping by `variant_key`.
+        Assumptions:
+            Stage A shortlist order is already the exact final no-risk ranking, so the bypass only
+            materializes top rows and traceable `stage_b` payloads without entering generic Stage
+            B task expansion or spawned-worker execution.
+        Raises:
+            ValueError: If the runtime plan drifts from the no-risk contract or scorer metrics are
+                malformed.
+        Side Effects:
+            May populate scorer caches from retained Stage A exact payloads and emits one lazy
+            checkpoint that reports the full public Stage B total as processed.
+        """
+        if not _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
+            raise ValueError("_finalize_no_risk_stage_a_v2 requires no-risk runtime plan")
+        configure_stage_ranking_context_if_supported_v2(
+            scorer=scorer,
+            stage=STAGE_A_LITERAL_V2,
+            ranking_plan=ranking_plan,
+        )
+        score_variant_metric = resolve_score_variant_metric_fn_v2(scorer=scorer)
+        ranked_rows: list[BacktestStageBScoredVariantV2] = []
+        ranked_tasks: dict[str, BacktestStageBTaskV2] = {}
+        for shortlist_index, stage_a_row in enumerate(shortlist[:top_k_limit]):
+            if cancel_checker is not None:
+                cancel_checker(STAGE_B_LITERAL_V2)
+            task = _stage_b_task_from_variant_v2(
+                base_variant=stage_a_row.base_variant,
+                risk_variant=runtime_plan.risk_variants[0],
+                shortlist_index=shortlist_index,
+                risk_total=1,
+                direction_mode=template.direction_mode,
+                sizing_mode=template.sizing_mode,
+                execution_params=template.execution_params or {},
+                retained_exact_payload=stage_a_row.retained_exact_payload,
+            )
+            prime_retained_exact_payload_if_supported_v2(
+                scorer=scorer,
+                task=task,
+            )
+            metrics = score_variant_metric(
+                stage=STAGE_A_LITERAL_V2,
+                candles=candles,
+                indicator_selections=task.indicator_selections,
+                signal_params=task.signal_params,
+                risk_params=_STAGE_A_DISABLED_RISK_PARAMS_V2,
+                indicator_variant_key=task.indicator_variant_key,
+                variant_key=stage_a_row.base_variant.base_variant_key,
+            )
+            row = _stage_b_row_from_metrics_v2(task=task, metrics=metrics)
+            ranked_rows.append(row)
+            ranked_tasks[row.variant_key] = task
+        rows_result = tuple(ranked_rows)
+        if on_checkpoint is not None:
+            if cancel_checker is not None:
+                cancel_checker(STAGE_B_LITERAL_V2)
+            tasks_result: Mapping[str, BacktestStageBTaskV2] = dict(ranked_tasks)
+            on_checkpoint(
+                total,
+                total,
+                lambda: rows_result,
+                lambda: tasks_result,
+            )
+        return (rows_result, ranked_tasks)
 
     def _run_stage_b_serial_v2(
         self,
@@ -752,16 +911,7 @@ class BacktestArtifactRuntimeRunnerV2:
         Side Effects:
             None.
         """
-        execution_profile = getattr(runtime_plan, "execution_profile", None)
-        if execution_profile is None:
-            return False
-        feature_flags = getattr(execution_profile, "feature_flags", None)
-        parallelism = getattr(execution_profile, "parallelism", None)
-        if feature_flags is None or parallelism is None:
-            return False
-        if not bool(getattr(feature_flags, "parallel_stage_b_enabled", False)):
-            return False
-        return int(getattr(parallelism, "stage_b_workers", 1)) > 1
+        return _runtime_plan_stage_b_execution_mode_v2(runtime_plan=runtime_plan) == "process_pool"
 
     def _merge_stage_b_heap_entry_v2(
         self,
@@ -1563,28 +1713,50 @@ def score_stage_b_task_with_metrics_v2(
         indicator_variant_key=task.indicator_variant_key,
         variant_key=task.variant_key,
     )
-    return (
-        BacktestStageBScoredVariantV2(
-            variant_index=task.variant_index,
-            indicator_variant_key=task.indicator_variant_key,
-            variant_key=task.variant_key,
-            total_return_pct=extract_metric_value_for_literal_v2(
-                metrics=metrics,
-                metric_literal=_TOTAL_RETURN_METRIC_KEY_LITERAL,
-            ),
-            summary_metrics_json=summary_metrics_from_ranking_metrics_v2(metrics=metrics),
-            best_tp_pct=risk_pct_from_task_v2(
-                task=task,
-                flag_key="tp_enabled",
-                value_key="tp_pct",
-            ),
-            best_sl_pct=risk_pct_from_task_v2(
-                task=task,
-                flag_key="sl_enabled",
-                value_key="sl_pct",
-            ),
+    return (_stage_b_row_from_metrics_v2(task=task, metrics=metrics), metrics)
+
+
+def _stage_b_row_from_metrics_v2(
+    *,
+    task: BacktestStageBTaskV2,
+    metrics: RankingMetricsV1,
+) -> BacktestStageBScoredVariantV2:
+    """
+    Materialize one deterministic final row from scorer metrics and task identity payload.
+
+    Args:
+        task: Final task payload carrying deterministic identity and risk metadata.
+        metrics: Ranking metrics payload already produced by Stage A or Stage B scoring.
+    Returns:
+        BacktestStageBScoredVariantV2: Deterministic final row used by sync responses and worker
+            snapshots.
+    Assumptions:
+        No-risk terminal-path rows reuse the same final row contract as generic Stage B output,
+        differing only in how the metrics were obtained.
+    Raises:
+        ValueError: If ranking metrics are missing required summary fields.
+    Side Effects:
+        None.
+    """
+    return BacktestStageBScoredVariantV2(
+        variant_index=task.variant_index,
+        indicator_variant_key=task.indicator_variant_key,
+        variant_key=task.variant_key,
+        total_return_pct=extract_metric_value_for_literal_v2(
+            metrics=metrics,
+            metric_literal=_TOTAL_RETURN_METRIC_KEY_LITERAL,
         ),
-        metrics,
+        summary_metrics_json=summary_metrics_from_ranking_metrics_v2(metrics=metrics),
+        best_tp_pct=risk_pct_from_task_v2(
+            task=task,
+            flag_key="tp_enabled",
+            value_key="tp_pct",
+        ),
+        best_sl_pct=risk_pct_from_task_v2(
+            task=task,
+            flag_key="sl_enabled",
+            value_key="sl_pct",
+        ),
     )
 
 
@@ -2157,6 +2329,76 @@ def stage_b_tasks_from_sorted_entries_v2(
             raise ValueError("duplicate Stage-B variant_key is not allowed")
         mapping[row.variant_key] = task
     return mapping
+
+
+def _runtime_plan_uses_no_risk_terminal_path_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+) -> bool:
+    """
+    Resolve no-risk terminal-path classification for real or duck-typed runtime plans.
+
+    Args:
+        runtime_plan: Shared runtime-plan object used by sync and worker orchestration.
+    Returns:
+        bool: `True` when the plan belongs to the no-risk class and should bypass generic Stage B.
+    Assumptions:
+        Some unit tests supply lightweight runtime-plan fakes, so the shared core must tolerate
+        either the real typed helper method or the canonical single disabled-risk-cell fallback.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    classifier = getattr(runtime_plan, "uses_no_risk_terminal_path", None)
+    if callable(classifier):
+        return bool(classifier())
+    risk_variants = tuple(getattr(runtime_plan, "risk_variants", ()))
+    if len(risk_variants) != 1:
+        return False
+    risk_params = getattr(risk_variants[0], "risk_params", {})
+    return (
+        risk_params.get("sl_enabled") is False
+        and risk_params.get("sl_pct") is None
+        and risk_params.get("tp_enabled") is False
+        and risk_params.get("tp_pct") is None
+    )
+
+
+def _runtime_plan_stage_b_execution_mode_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+) -> str:
+    """
+    Resolve `stage_b_execution_mode` for real or duck-typed runtime plans.
+
+    Args:
+        runtime_plan: Shared runtime-plan object used by sync and worker orchestration.
+    Returns:
+        str: Canonical `stage_b_execution_mode` literal used by shared runtime branching.
+    Assumptions:
+        Tests may supply lightweight fakes, so the shared core first prefers the typed runtime
+        helper and otherwise reconstructs the same classification from the available attributes.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    classifier = getattr(runtime_plan, "stage_b_execution_mode", None)
+    if callable(classifier):
+        return str(classifier())
+    if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
+        return "bypassed_no_risk"
+    execution_profile = getattr(runtime_plan, "execution_profile", None)
+    feature_flags = getattr(execution_profile, "feature_flags", None)
+    parallelism = getattr(execution_profile, "parallelism", None)
+    if feature_flags is None or parallelism is None:
+        return "in_process"
+    if not bool(getattr(feature_flags, "parallel_stage_b_enabled", False)):
+        return "in_process"
+    if int(getattr(parallelism, "stage_b_workers", 1)) <= 1:
+        return "in_process"
+    return "process_pool"
 
 
 __all__ = [

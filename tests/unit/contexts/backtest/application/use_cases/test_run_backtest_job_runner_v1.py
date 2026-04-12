@@ -408,6 +408,26 @@ class _FakeGridContext:
         return self._base_variants
 
 
+def _unexpected_generic_stage_b_path(*args: Any, **kwargs: Any) -> Any:
+    """
+    Fail the test when no-risk orchestration falls through the generic Stage B machinery.
+
+    Args:
+        *args: Ignored bound-method positional arguments.
+        **kwargs: Ignored bound-method keyword arguments.
+    Returns:
+        Any: Never returns because the helper always raises.
+    Assumptions:
+        Worker no-risk tests patch both generic Stage B implementations with this helper.
+    Raises:
+        AssertionError: Always, to signal that no-risk bypass failed.
+    Side Effects:
+        None.
+    """
+    _ = args, kwargs
+    raise AssertionError("no-risk runs must bypass generic Stage B")
+
+
 def _build_fake_execution_profile(
     *,
     mode: str,
@@ -1959,6 +1979,89 @@ def test_process_claimed_job_persists_stage_progress_and_finalizing_policy() -> 
 
     assert len(results_repository.replace_calls) == 1
     assert reporting_service.calls == []
+
+
+def test_process_claimed_job_no_risk_bypasses_generic_stage_b(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify no-risk runs finalize from Stage A exact scoring without generic Stage B loops.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Public progress vocabulary remains `stage_a` / `stage_b` / `finalizing`, but no-risk
+        runs should materialize final rows directly from the Stage A shortlist.
+    Raises:
+        AssertionError: If worker orchestration still enters generic serial or parallel Stage B.
+    Side Effects:
+        Monkeypatches generic Stage B runner helpers for the duration of the test.
+    """
+    job = _build_running_job()
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    no_risk_variants = (_build_risk_variants()[0],)
+    scorer = _DeterministicScorerWithDetails(
+        stage_a_scores={
+            base_variants[0].base_variant_key: 1.0,
+            base_variants[1].base_variant_key: 2.0,
+        }
+    )
+    job_repository = _FakeJobRepository(default_job=job)
+    lease_repository = _FakeLeaseRepository()
+    results_repository = _FakeResultsRepository()
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_serial_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_parallel_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    use_case = _build_use_case(
+        request=request,
+        job_repository=job_repository,
+        lease_repository=lease_repository,
+        results_repository=results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=no_risk_variants,
+        ),
+        scorer=scorer,
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 1, 0)),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert results_repository.shortlist_calls[0]["shortlist"].risk_total == 1
+    assert _has_progress_call(
+        calls=lease_repository.update_progress_calls,
+        stage="stage_b",
+        processed_units=0,
+        total_units=2,
+    )
+    assert _has_progress_call(
+        calls=lease_repository.update_progress_calls,
+        stage="stage_b",
+        processed_units=2,
+        total_units=2,
+    )
+    running_rows = results_repository.replace_calls[0]["rows"]
+    assert len(running_rows) == 2
+    assert all(row.best_tp_pct is None for row in running_rows)
+    assert all(row.best_sl_pct is None for row in running_rows)
+    assert all(row.payload_json["risk_params"]["tp_enabled"] is False for row in running_rows)
+    assert all(row.payload_json["risk_params"]["sl_enabled"] is False for row in running_rows)
 
 
 def test_process_claimed_job_does_not_claim_additional_jobs() -> None:
