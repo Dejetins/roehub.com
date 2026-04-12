@@ -13,6 +13,7 @@ from typing import Any, Callable, Mapping, cast
 from trading.contexts.backtest.application.dto import BacktestRankingConfig, RunBacktestTemplate
 from trading.contexts.backtest.application.ports import (
     BacktestStagedVariantMetricScorer,
+    BacktestStagedVariantScorerWithDetails,
     RankingMetricsV1,
 )
 from trading.contexts.backtest.domain.value_objects import (
@@ -689,15 +690,18 @@ class BacktestArtifactRuntimeRunnerV2:
             tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
                 Deterministically ranked Stage B rows and task mapping by `variant_key`.
         Assumptions:
-            Final deterministic tie-break for Stage B remains `variant_key ASC`.
+            Final deterministic tie-break for Stage B remains `variant_key ASC`, and `RG-TTR`
+            breadth scoring may still replace retained finalist rows with exact final authority
+            after the cheap heap-selection pass completes.
         Raises:
             ValueError: If scorer payload is malformed.
         Side Effects:
-            May prime scorer-local retained exact payload cache before exact Stage B scoring.
+            May prime scorer-local retained exact payload cache and exact-replay finalists only.
         """
         score_variant_metric = resolve_score_variant_metric_fn_v2(scorer=scorer)
         top_heap: list[StageBHeapEntryV2] = []
         processed = 0
+        final_checkpoint_pending = False
         for task in _iter_stage_b_tasks_stream_v2(
             template=template,
             runtime_plan=runtime_plan,
@@ -728,6 +732,9 @@ class BacktestArtifactRuntimeRunnerV2:
             processed += 1
             if processed % effective_batch != 0 and processed != total:
                 continue
+            if processed == total:
+                final_checkpoint_pending = True
+                continue
             self._emit_stage_b_checkpoint_v2(
                 top_heap=top_heap,
                 processed=processed,
@@ -736,7 +743,23 @@ class BacktestArtifactRuntimeRunnerV2:
                 on_checkpoint=on_checkpoint,
             )
 
-        return self._materialize_stage_b_heap_v2(top_heap=top_heap)
+        rows_result, tasks_result = self._materialize_stage_b_result_v2(
+            top_heap=top_heap,
+            candles=candles,
+            scorer=scorer,
+            ranking_plan=ranking_plan,
+            cancel_checker=cancel_checker,
+        )
+        if final_checkpoint_pending and on_checkpoint is not None:
+            if cancel_checker is not None:
+                cancel_checker(STAGE_B_LITERAL_V2)
+            on_checkpoint(
+                total,
+                total,
+                lambda: rows_result,
+                lambda: tasks_result,
+            )
+        return (rows_result, tasks_result)
 
     def _run_stage_b_parallel_v2(
         self,
@@ -781,11 +804,13 @@ class BacktestArtifactRuntimeRunnerV2:
             tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
                 Deterministically ranked Stage B rows and task mapping by `variant_key`.
         Assumptions:
-            Worker completion order must not influence merged results or checkpoint frontiers.
+            Worker completion order must not influence merged results or checkpoint frontiers,
+            and finalist-only exact replay must happen after ordered chunk merge only.
         Raises:
             ValueError: If scorer does not expose spawned-worker snapshot support.
         Side Effects:
-            Spawns process workers via the `spawn` multiprocessing context.
+            Spawns process workers via the `spawn` multiprocessing context and may exact-replay
+            finalists only after breadth merge finishes.
         """
         worker_factory = resolve_parallel_stage_b_worker_factory_v2(scorer=scorer)
         if worker_factory is None:
@@ -821,6 +846,7 @@ class BacktestArtifactRuntimeRunnerV2:
         scorer_class, scorer_snapshot = worker_factory
         top_heap: list[StageBHeapEntryV2] = []
         processed = 0
+        final_checkpoint_pending = False
         next_merge_chunk_index = 0
         pending_futures: dict[Future[_StageBParallelChunkResultV2], int] = {}
         ready_results: dict[int, _StageBParallelChunkResultV2] = {}
@@ -885,7 +911,9 @@ class BacktestArtifactRuntimeRunnerV2:
                             top_k_limit=top_k_limit,
                         )
                     processed += chunk_result.task_count
-                    if processed % effective_batch == 0 or processed == total:
+                    if processed == total:
+                        final_checkpoint_pending = True
+                    elif processed % effective_batch == 0:
                         self._emit_stage_b_checkpoint_v2(
                             top_heap=top_heap,
                             processed=processed,
@@ -895,7 +923,23 @@ class BacktestArtifactRuntimeRunnerV2:
                         )
                     next_merge_chunk_index += 1
 
-        return self._materialize_stage_b_heap_v2(top_heap=top_heap)
+        rows_result, tasks_result = self._materialize_stage_b_result_v2(
+            top_heap=top_heap,
+            candles=candles,
+            scorer=scorer,
+            ranking_plan=ranking_plan,
+            cancel_checker=cancel_checker,
+        )
+        if final_checkpoint_pending and on_checkpoint is not None:
+            if cancel_checker is not None:
+                cancel_checker(STAGE_B_LITERAL_V2)
+            on_checkpoint(
+                total,
+                total,
+                lambda: rows_result,
+                lambda: tasks_result,
+            )
+        return (rows_result, tasks_result)
 
     def _should_run_stage_b_parallel_v2(
         self,
@@ -1028,6 +1072,125 @@ class BacktestArtifactRuntimeRunnerV2:
             total,
             _materialize_ranked_rows,
             _materialize_tasks,
+        )
+
+    def _materialize_stage_b_result_v2(
+        self,
+        *,
+        top_heap: list[StageBHeapEntryV2],
+        candles: CandleArrays,
+        scorer: MetricScorerV2,
+        ranking_plan: ResolvedRankingPlanV2,
+        cancel_checker: CancelCheckerV2 | None,
+    ) -> tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+        """
+        Materialize the final Stage B result, exact-replaying finalists only when required.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+
+        Args:
+            top_heap: Mutable retained Stage B heap built from breadth scoring.
+            candles: Warmup-inclusive request-timeframe candles.
+            scorer: Stage scorer implementation used by the current loop.
+            ranking_plan: Pre-resolved ranking plan.
+            cancel_checker: Optional cooperative cancellation callback by stage.
+        Returns:
+            tuple[tuple[BacktestStageBScoredVariantV2, ...], Mapping[str, BacktestStageBTaskV2]]:
+                Deterministically ranked final rows and task mapping by `variant_key`.
+        Assumptions:
+            `RG-TTR` breadth remains cheap and in-process, while final authority becomes exact only
+            for the retained finalist slice after heap selection is complete.
+        Raises:
+            ValueError: Propagated from the details scorer when finalist exact replay drifts.
+        Side Effects:
+            May invoke the exact details scorer for finalists only.
+        """
+        sorted_entries = sorted_stage_b_heap_entries_v2(heap=top_heap)
+        if not self._should_finalize_stage_b_finalists_exact_v2(
+            scorer=scorer,
+            ranking_plan=ranking_plan,
+            entries=sorted_entries,
+        ):
+            return self._materialize_stage_b_heap_v2(top_heap=top_heap)
+
+        details_scorer = resolve_stage_b_details_scorer_if_supported_v2(scorer=scorer)
+        if details_scorer is None:
+            return self._materialize_stage_b_heap_v2(top_heap=top_heap)
+
+        exact_entries: list[StageBHeapEntryV2] = []
+        for entry in sorted_entries:
+            if cancel_checker is not None:
+                cancel_checker(STAGE_B_LITERAL_V2)
+            task = entry[3]
+            details = details_scorer.score_variant_with_details(
+                stage=STAGE_B_LITERAL_V2,
+                candles=candles,
+                indicator_selections=task.indicator_selections,
+                signal_params=task.signal_params,
+                risk_params=task.risk_params,
+                indicator_variant_key=task.indicator_variant_key,
+                variant_key=task.variant_key,
+            )
+            exact_metrics = details.metrics
+            exact_row = _stage_b_row_from_metrics_v2(task=task, metrics=exact_metrics)
+            exact_entries.append(
+                stage_b_heap_entry_v2(
+                    row=exact_row,
+                    task=task,
+                    metrics=exact_metrics,
+                    ranking_plan=ranking_plan,
+                )
+            )
+        exact_sorted_entries = tuple(
+            sorted(exact_entries, key=lambda item: item[:2], reverse=True)
+        )
+        return (
+            tuple(entry[2] for entry in exact_sorted_entries),
+            stage_b_tasks_from_sorted_entries_v2(entries=exact_sorted_entries),
+        )
+
+    def _should_finalize_stage_b_finalists_exact_v2(
+        self,
+        *,
+        scorer: MetricScorerV2,
+        ranking_plan: ResolvedRankingPlanV2,
+        entries: tuple[StageBHeapEntryV2, ...],
+    ) -> bool:
+        """
+        Decide whether Stage B finalists should be replayed exactly before final output.
+
+        Docs:
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+
+        Args:
+            scorer: Stage scorer implementation used by the current loop.
+            ranking_plan: Pre-resolved ranking plan.
+            entries: Sorted retained frontier entries from Stage B breadth scoring.
+        Returns:
+            bool: `True` when Stage B should exact-replay finalists only before returning rows.
+        Assumptions:
+            The finalist-only exact replay cutover applies to `total_return_pct` breadth runs such
+            as `RG-TTR`; alternative-primary runs like `RG-ALT` keep their existing path.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return (
+            len(entries) > 0
+            and ranking_plan.primary_metric == _TOTAL_RETURN_METRIC_KEY_LITERAL
+            and resolve_stage_b_details_scorer_if_supported_v2(scorer=scorer) is not None
         )
 
     def _materialize_stage_b_heap_v2(
@@ -1605,6 +1768,31 @@ def resolve_score_variant_metric_fn_v2(*, scorer: MetricScorerV2) -> ScoreVarian
             "artifact-backed runtime scorer must expose score_variant_metric(...)"
         )
     return cast(ScoreVariantMetricFnV2, score_variant_metric)
+
+
+def resolve_stage_b_details_scorer_if_supported_v2(
+    *,
+    scorer: MetricScorerV2,
+) -> BacktestStagedVariantScorerWithDetails | None:
+    """
+    Resolve the optional details scorer used for finalist-only Stage B exact replay.
+
+    Args:
+        scorer: Scorer implementation selected for Stage B ranking.
+    Returns:
+        BacktestStagedVariantScorerWithDetails | None:
+            Details scorer when available, otherwise `None`.
+    Assumptions:
+        Finalist-only exact replay is additive and must not force a stronger scorer contract on
+        metric-only test doubles or legacy implementations.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if getattr(scorer, "score_variant_with_details", None) is None:
+        return None
+    return cast(BacktestStagedVariantScorerWithDetails, scorer)
 
 
 def configure_stage_ranking_context_if_supported_v2(

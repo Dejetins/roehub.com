@@ -15,6 +15,8 @@ from trading.contexts.backtest.application.services.v2 import (
     StageBTradeExitCaseV2,
     StageBTradeListCaseV2,
     artifact_backed_stage_b_scorer_v2 as stage_b_scorer_module,
+    artifact_runtime_core_v2 as runtime_core_module,
+    artifact_runtime_plan_v2 as runtime_plan_module,
     execute_stage_b_golden_case_v2,
     load_backtest_runtime_acceleration_benchmark_corpus_v2,
     load_stage_b_golden_fixture_catalog_v2,
@@ -48,6 +50,148 @@ _BENCHMARK_CORPUS_PATH = (
     / "fixtures"
     / "backtest_runtime_acceleration_benchmark_corpus_v1.json"
 )
+
+
+class _FinalistOnlyStageBScorerStubV2:
+    """
+    Minimal scorer stub proving finalist-only exact replay after Stage B breadth ranking.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py
+    """
+
+    def __init__(
+        self,
+        *,
+        breadth_metrics_by_variant_key: dict[str, float],
+        exact_metrics_by_variant_key: dict[str, dict[str, float]],
+    ) -> None:
+        """
+        Store deterministic breadth and exact metrics for one Stage B finalist-only test run.
+
+        Args:
+            breadth_metrics_by_variant_key:
+                Cheap breadth `total_return_pct` values keyed by `variant_key`.
+            exact_metrics_by_variant_key:
+                Exact finalist metrics keyed by `variant_key`.
+        Returns:
+            None.
+        Assumptions:
+            Breadth scoring is cheap and metric-light, while exact replay adds full summary
+            metrics only for finalists retained by the Stage B heap.
+        Raises:
+            None.
+        Side Effects:
+            Initializes in-memory traces for exact replay and ranking-context assertions.
+        """
+        self._breadth_metrics_by_variant_key = breadth_metrics_by_variant_key
+        self._exact_metrics_by_variant_key = exact_metrics_by_variant_key
+        self.exact_calls: list[str] = []
+        self.ranking_context_calls: list[tuple[str, str]] = []
+
+    def configure_stage_ranking_context(
+        self,
+        *,
+        stage: str,
+        primary_metric: str,
+    ) -> None:
+        """
+        Record the Stage B ranking context selected by the runtime.
+
+        Args:
+            stage: Stage literal passed by the runtime.
+            primary_metric: Primary ranking metric selected for the current run.
+        Returns:
+            None.
+        Assumptions:
+            The finalist-only replay cutover keeps the explicit Stage B ranking context unchanged.
+        Raises:
+            None.
+        Side Effects:
+            Appends one `(stage, primary_metric)` tuple to the in-memory trace.
+        """
+        self.ranking_context_calls.append((stage, primary_metric))
+
+    def score_variant_metric(
+        self,
+        *,
+        stage: str,
+        candles: SimpleNamespace,
+        indicator_selections: tuple[object, ...],
+        signal_params: dict[str, dict[str, object]],
+        risk_params: dict[str, object],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> dict[str, float]:
+        """
+        Return cheap breadth metrics without triggering exact replay.
+
+        Args:
+            stage: Stage literal supplied by the runtime.
+            candles: Unused candle payload for compatibility with the runtime signature.
+            indicator_selections: Unused indicator selections for compatibility.
+            signal_params: Unused signal params for compatibility.
+            risk_params: Unused risk params for compatibility.
+            indicator_variant_key: Unused indicator variant key for compatibility.
+            variant_key: Deterministic full Stage B variant key.
+        Returns:
+            dict[str, float]: Breadth-only metrics carrying total return only.
+        Assumptions:
+            `RG-TTR` breadth stays on the cheap Stage B path and must not increment exact replay.
+        Raises:
+            AssertionError: If the runtime calls the breadth hook for a non-Stage-B request.
+        Side Effects:
+            None.
+        """
+        _ = candles, indicator_selections, signal_params, risk_params, indicator_variant_key
+        if stage != "stage_b":
+            raise AssertionError("finalist-only scorer stub expects Stage B breadth scoring only")
+        total_return_pct = self._breadth_metrics_by_variant_key[variant_key]
+        return {
+            "total_return_pct": total_return_pct,
+            "Total Return [%]": total_return_pct,
+        }
+
+    def score_variant_with_details(
+        self,
+        *,
+        stage: str,
+        candles: SimpleNamespace,
+        indicator_selections: tuple[object, ...],
+        signal_params: dict[str, dict[str, object]],
+        risk_params: dict[str, object],
+        indicator_variant_key: str,
+        variant_key: str,
+    ) -> SimpleNamespace:
+        """
+        Return exact finalist metrics and record one exact replay for the requested variant.
+
+        Args:
+            stage: Stage literal supplied by the runtime.
+            candles: Unused candle payload for compatibility with the runtime signature.
+            indicator_selections: Unused indicator selections for compatibility.
+            signal_params: Unused signal params for compatibility.
+            risk_params: Unused risk params for compatibility.
+            indicator_variant_key: Unused indicator variant key for compatibility.
+            variant_key: Deterministic full Stage B variant key.
+        Returns:
+            SimpleNamespace: Details-like payload exposing exact metrics for the finalist variant.
+        Assumptions:
+            Finalist-only replay happens after breadth heap selection and only for retained rows.
+        Raises:
+            AssertionError: If the runtime calls the details hook for a non-Stage-B request.
+        Side Effects:
+            Appends the replayed `variant_key` to the in-memory `exact_calls` trace.
+        """
+        _ = candles, indicator_selections, signal_params, risk_params, indicator_variant_key
+        if stage != "stage_b":
+            raise AssertionError("finalist-only scorer stub expects Stage B details scoring only")
+        self.exact_calls.append(variant_key)
+        return SimpleNamespace(metrics=self._exact_metrics_by_variant_key[variant_key])
 
 
 def test_stage_b_fast_path_stays_enabled_with_retained_exact_payload_for_total_return_pct() -> None:
@@ -230,6 +374,153 @@ def test_stage_b_details_path_keeps_exact_authority_with_retained_exact_payload(
     assert details.metrics["total_return_pct"] == 9.5
     assert details.metrics["trade_count"] == 3.0
     assert details.execution_outcome.authority == "exact"
+
+
+def test_stage_b_exact_replay_observability_is_finalist_only() -> None:
+    """
+    Verify the scorer exposes benchmark-visible finalist-only exact replay metadata directly.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Benchmarks should not need private-cache introspection to observe `exact_replay_count`
+        and replay scope after Stage B finalist replay.
+    Raises:
+        AssertionError: If the scorer stops exposing the additive replay observability hooks.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    """
+    scorer = object.__new__(BacktestArtifactBackedStageBScorerV2)
+    scorer._stage_b_exact_cache_by_variant_key = {  # type: ignore[attr-defined]
+        "variant-a": SimpleNamespace(),
+        "variant-b": SimpleNamespace(),
+    }
+
+    assert scorer.stage_b_exact_replay_scope_v2() == "finalist-only"
+    assert scorer.stage_b_exact_replay_count_v2() == 2
+
+
+def test_stage_b_runtime_replays_exact_only_for_finalist_rows() -> None:
+    """
+    Verify the shared Stage B runtime exact-replays finalists only after cheap breadth ranking.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `RG-TTR` breadth ranking stays on the fast Stage B path, while exact replay upgrades only
+        the retained finalist rows to final authority before the runtime returns them.
+    Raises:
+        AssertionError: If exact replay expands back to shortlist breadth or finalist rows keep
+            breadth-only summary metrics.
+    Side Effects:
+        Exercises the shared Stage B runtime with a finalist-only scorer stub.
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
+    """
+    runner = runtime_core_module.BacktestArtifactRuntimeRunnerV2()
+    risk_variants = (
+        runtime_plan_module.BacktestRiskVariantV2(
+            risk_index=0,
+            risk_params={
+                "tp_enabled": True,
+                "tp_pct": 1.0,
+                "sl_enabled": True,
+                "sl_pct": 1.0,
+            },
+        ),
+        runtime_plan_module.BacktestRiskVariantV2(
+            risk_index=1,
+            risk_params={
+                "tp_enabled": True,
+                "tp_pct": 2.0,
+                "sl_enabled": True,
+                "sl_pct": 2.0,
+            },
+        ),
+    )
+    shortlist = tuple(
+        runtime_core_module.BacktestStageAScoredVariantV2(
+            base_variant=runtime_plan_module.BacktestStageABaseVariantV2(
+                stage_a_index=index,
+                indicator_selections=(),
+                signal_params={},
+                indicator_variant_key=f"{index + 1:064x}",
+                base_variant_key=f"{index + 101:064x}",
+            ),
+            total_return_pct=float(100 - index),
+        )
+        for index in range(3)
+    )
+    runtime_plan = SimpleNamespace(
+        stage_b_variants_total=len(shortlist) * len(risk_variants),
+        risk_variants=risk_variants,
+        stage_b_execution_mode=lambda: "in_process",
+    )
+    template = SimpleNamespace(
+        direction_mode="long-only",
+        sizing_mode="fixed_quote",
+        execution_params={},
+    )
+    all_tasks = runtime_core_module.iter_stage_b_tasks_v2(
+        template=template,
+        runtime_plan=runtime_plan,
+        shortlist=shortlist,
+    )
+    breadth_total_return_by_variant_key = {
+        all_tasks[0].variant_key: 5.0,
+        all_tasks[1].variant_key: 10.0,
+        all_tasks[2].variant_key: 7.0,
+        all_tasks[3].variant_key: 11.0,
+        all_tasks[4].variant_key: 4.0,
+        all_tasks[5].variant_key: 3.0,
+    }
+    exact_metrics_by_variant_key = {
+        task.variant_key: {
+            "total_return_pct": breadth_total_return_by_variant_key[task.variant_key],
+            "Total Return [%]": breadth_total_return_by_variant_key[task.variant_key],
+            "trade_count": float(task.variant_index + 10),
+        }
+        for task in all_tasks
+    }
+    scorer = _FinalistOnlyStageBScorerStubV2(
+        breadth_metrics_by_variant_key=breadth_total_return_by_variant_key,
+        exact_metrics_by_variant_key=exact_metrics_by_variant_key,
+    )
+
+    rows, tasks_by_variant_key = runner.run_stage_b_or_finalize_no_risk(
+        template=template,
+        runtime_plan=runtime_plan,
+        shortlist=shortlist,
+        candles=SimpleNamespace(),
+        scorer=scorer,
+        top_k_limit=2,
+    )
+
+    assert scorer.ranking_context_calls == [("stage_b", "total_return_pct")]
+    assert tuple(row.variant_key for row in rows) == (
+        all_tasks[3].variant_key,
+        all_tasks[1].variant_key,
+    )
+    assert scorer.exact_calls == [row.variant_key for row in rows]
+    assert tuple(sorted(tasks_by_variant_key.keys())) == tuple(
+        sorted(row.variant_key for row in rows)
+    )
+    assert rows[0].summary_metrics_json["trade_count"] == 13.0
+    assert rows[1].summary_metrics_json["trade_count"] == 11.0
 
 
 def test_stage_b_golden_fixture_catalog_executes_all_cases_deterministically() -> None:

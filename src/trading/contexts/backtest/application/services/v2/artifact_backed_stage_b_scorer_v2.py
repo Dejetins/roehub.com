@@ -87,6 +87,7 @@ _STAGE_A_DISABLED_RISK_PARAMS_V2: Mapping[str, BacktestVariantScalar] = MappingP
         "tp_pct": None,
     }
 )
+_STAGE_B_EXACT_REPLAY_SCOPE_LITERAL_V2 = "finalist-only"
 
 
 @dataclass(frozen=True, slots=True)
@@ -471,6 +472,55 @@ class BacktestArtifactBackedStageBScorerV2(
                 no_risk_metrics=no_risk_metrics,
             )
         )
+
+    def stage_b_exact_replay_count_v2(self) -> int:
+        """
+        Return the observable Stage B exact replay count for the current scorer run.
+
+        Args:
+            None.
+        Returns:
+            int: Number of unique Stage B variants already replayed exactly in this scorer.
+        Assumptions:
+            Exact replay results are cached by `variant_key`, so cache cardinality is the stable
+            additive `exact_replay_count` contract exposed to perf-smoke and benchmarks.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            artifact_backed_stage_b_scorer_v2.py
+          - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+        """
+        return len(getattr(self, "_stage_b_exact_cache_by_variant_key", {}))
+
+    def stage_b_exact_replay_scope_v2(self) -> str:
+        """
+        Return the observable Stage B exact replay scope literal for benchmarks.
+
+        Args:
+            None.
+        Returns:
+            str: Exact replay scope literal, currently `finalist-only`.
+        Assumptions:
+            Stage B breadth ranking stays on the cheap path for `RG-TTR`, while final authority
+            remains exact only for the retained finalist slice.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        Docs:
+          - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
+          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+          - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+        """
+        return _STAGE_B_EXACT_REPLAY_SCOPE_LITERAL_V2
 
     def to_parallel_stage_b_worker_snapshot_v2(self) -> _ParallelStageBScorerSnapshotV2:
         """

@@ -670,6 +670,85 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
     assert rg_ttr_comparison.passed is False
 
 
+def test_rg_ttr_exact_replay_bound_is_isolated_and_benchmark_visible() -> None:
+    """
+    Verify the RG-TTR benchmark contract can fail on `exact_replay_count` alone.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Finalist-only exact replay should stay within the committed RG-TTR upper bound, and the
+        benchmark layer must expose that count directly without relying on process-mode failures.
+    Raises:
+        AssertionError: If the RG-TTR gate stops isolating replay-count regressions.
+    Side Effects:
+        None.
+    """
+    corpus = _load_notebook_parity_benchmark_corpus()
+    rg_ttr = corpus.scenario_for_id(scenario_id="rg_ttr")
+    rule = corpus.equal_thread_budget_rule
+    notebook_reference = _build_measurement(
+        scenario_id="rg_ttr",
+        benchmark_class="RG-TTR",
+        measurement_source="notebook",
+        runtime_surface="notebook",
+        wall_clock_seconds=20.0,
+        cpu_time_seconds=18.0,
+        peak_rss_bytes=2_000,
+        numba_threads_used=4,
+        max_python_processes_seen=1,
+        stage_b_execution_mode="in_process",
+        exact_replay_count=30,
+    )
+    finalist_only_candidate = _build_measurement(
+        scenario_id="rg_ttr",
+        benchmark_class="RG-TTR",
+        measurement_source="backend",
+        runtime_surface="sync",
+        wall_clock_seconds=21.0,
+        cpu_time_seconds=19.0,
+        peak_rss_bytes=2_020,
+        numba_threads_used=4,
+        max_python_processes_seen=1,
+        stage_b_execution_mode="in_process",
+        exact_replay_count=64,
+    )
+    finalist_only_comparison = evaluate_backtest_notebook_parity_scenario_v2(
+        scenario=rg_ttr,
+        equal_thread_budget_rule=rule,
+        candidate=finalist_only_candidate,
+        reference=notebook_reference,
+    )
+
+    assert finalist_only_comparison.failing_gate_ids == ()
+    assert finalist_only_comparison.passed is True
+
+    shortlist_breadth_regressed = _build_measurement(
+        scenario_id="rg_ttr",
+        benchmark_class="RG-TTR",
+        measurement_source="backend",
+        runtime_surface="sync",
+        wall_clock_seconds=21.0,
+        cpu_time_seconds=19.0,
+        peak_rss_bytes=2_020,
+        numba_threads_used=4,
+        max_python_processes_seen=1,
+        stage_b_execution_mode="in_process",
+        exact_replay_count=65,
+    )
+    shortlist_breadth_comparison = evaluate_backtest_notebook_parity_scenario_v2(
+        scenario=rg_ttr,
+        equal_thread_budget_rule=rule,
+        candidate=shortlist_breadth_regressed,
+        reference=notebook_reference,
+    )
+
+    assert shortlist_breadth_comparison.failing_gate_ids == ("rg_ttr_exact_replay_count",)
+    assert shortlist_breadth_comparison.passed is False
+
+
 def test_rg_alt_functional_baseline_guardrail_is_evaluable() -> None:
     """
     Verify the RG-ALT functional guardrail can compare backend runs against backend baselines.
