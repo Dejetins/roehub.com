@@ -622,6 +622,8 @@ def test_stage_a_streaming_exact_runtime_shape_is_observable_for_benchmarks() ->
     runtime_shape = (
         stage_a_shortlist_builder_module.describe_stage_a_streaming_exact_runtime_shape_v2(
             retained_chunk_sizes=(4, 2),
+            narrowed_stage_a_variants_total=20164,
+            stage_a_variants_total=345744,
         )
     )
 
@@ -630,6 +632,9 @@ def test_stage_a_streaming_exact_runtime_shape_is_observable_for_benchmarks() ->
     assert runtime_shape.retained_candidate_count == 6
     assert runtime_shape.max_retained_chunk_size == 4
     assert runtime_shape.deferred_replay_count == 0
+    assert runtime_shape.narrowed_stage_a_variants_total == 20164
+    assert runtime_shape.stage_a_variants_total == 345744
+    assert runtime_shape.narrowed_stage_a_variants_total < runtime_shape.stage_a_variants_total
     assert runtime_shape.execution_shape == "single-process parallel Stage A"
     assert runtime_shape.frontier_compute_mode == "kernel-driven"
     assert runtime_shape.stage_a_workers is None
@@ -769,6 +774,105 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
     assert runtime_shape.frontier_compute_mode == "kernel-driven"
     assert runtime_shape.stage_a_workers == 2
     assert runtime_shape.numba_threads_used == 2
+
+
+def test_stage_a_streaming_exact_runtime_shape_tracks_narrowed_frontier_cardinality(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """
+    Verify perf-smoke can observe narrowed Stage A breadth on the live retained-frontier path.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
+    Args:
+        monkeypatch: pytest fixture used to record live retained exact chunk sizes.
+        tmp_path: Temporary directory used to build the strict synthetic artifact store.
+    Returns:
+        None.
+    Assumptions:
+        The synthetic narrowed-frontier fixture keeps raw `stage_a_variants_total=2`, while the
+        retained Stage A path should enumerate and exact-score only one surviving variant.
+    Raises:
+        AssertionError: If the live Stage A path stops exposing narrowed-frontier breadth.
+    Side Effects:
+        Creates a temporary synthetic artifact tree and monkeypatches one exact-merge helper.
+    """
+    retained_chunk_sizes: list[int] = []
+    checkpoints: list[tuple[int, int]] = []
+    original_method = (
+        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap
+    )
+
+    def _recording_method(self: Any, **kwargs: Any) -> None:
+        """
+        Record one retained exact chunk size before delegating to the live merge helper.
+
+        Args:
+            self: Stage A shortlist builder under test.
+            **kwargs: Exact merge keyword arguments including `chunk_variants`.
+        Returns:
+            None.
+        Assumptions:
+            The narrowed-frontier synthetic fixture emits only one retained exact chunk.
+        Raises:
+            None.
+        Side Effects:
+            Appends one retained chunk size to the in-memory log.
+        """
+        retained_chunk_sizes.append(len(kwargs["chunk_variants"]))
+        original_method(self, **kwargs)
+
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2,
+        "_merge_retained_exact_payload_chunk_into_heap",
+        _recording_method,
+    )
+
+    store = stage_a_shortlist_builder_testkit.build_synthetic_artifact_store_v2(
+        tmp_path=tmp_path
+    )
+    grid_context = stage_a_shortlist_builder_testkit._grid_context_for_windows(
+        windows=(10, 20)
+    )
+
+    shortlist = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=stage_a_shortlist_builder_testkit.MmapPriceArraysLoaderV2(
+            artifact_loader=store.loader
+        ),
+        signal_matrix_loader=stage_a_shortlist_builder_testkit.MmapSignalMatrixLoaderV2(
+            artifact_loader=store.loader
+        ),
+    ).build_shortlist(
+        grid_context=cast(Any, grid_context),
+        artifact_context=stage_a_shortlist_builder_testkit._inactive_context(store),
+        target_time_range=stage_a_shortlist_builder_testkit._synthetic_target_time_range(),
+        shortlist_limit=1,
+        batch_size=1,
+        on_checkpoint=lambda processed, total: checkpoints.append((processed, total)),
+    )
+
+    runtime_shape = (
+        stage_a_shortlist_builder_module.describe_stage_a_streaming_exact_runtime_shape_v2(
+            retained_chunk_sizes=tuple(retained_chunk_sizes),
+            narrowed_stage_a_variants_total=checkpoints[-1][1],
+            stage_a_variants_total=grid_context.stage_a_variants_total,
+        )
+    )
+
+    assert checkpoints == [(1, 1)]
+    assert retained_chunk_sizes == [1]
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (1,)
+    assert runtime_shape.retained_chunk_count == 1
+    assert runtime_shape.retained_candidate_count == 1
+    assert runtime_shape.max_retained_chunk_size == 1
+    assert runtime_shape.narrowed_stage_a_variants_total == 1
+    assert runtime_shape.stage_a_variants_total == 2
+    assert runtime_shape.narrowed_stage_a_variants_total < runtime_shape.stage_a_variants_total
 
 
 def test_stage_a_parallelism_resolution_clamps_requested_workers_to_thread_budget() -> None:

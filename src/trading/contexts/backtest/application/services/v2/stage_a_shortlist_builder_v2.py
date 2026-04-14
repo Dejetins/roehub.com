@@ -5,8 +5,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from heapq import heappush, heapreplace
+from itertools import product
 from types import MappingProxyType
-from typing import Callable, Mapping, Sequence, cast
+from typing import Callable, Iterator, Mapping, Sequence, cast
 
 import numba as nb
 import numpy as np
@@ -734,6 +735,8 @@ class StageAStreamingExactRuntimeShapeV2:
     retained_candidate_count: int
     max_retained_chunk_size: int
     deferred_replay_count: int
+    narrowed_stage_a_variants_total: int | None = None
+    stage_a_variants_total: int | None = None
     execution_shape: str = "single-process parallel Stage A"
     frontier_compute_mode: str = "kernel-driven"
     stage_a_workers: int | None = None
@@ -775,6 +778,28 @@ class StageAStreamingExactRuntimeShapeV2:
             raise ValueError(
                 "StageAStreamingExactRuntimeShapeV2.deferred_replay_count must be >= 0"
             )
+        if (
+            self.narrowed_stage_a_variants_total is not None
+            and self.narrowed_stage_a_variants_total <= 0
+        ):
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.narrowed_stage_a_variants_total must be > "
+                "0 when provided"
+            )
+        if self.stage_a_variants_total is not None and self.stage_a_variants_total <= 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.stage_a_variants_total must be > 0 when "
+                "provided"
+            )
+        if (
+            self.narrowed_stage_a_variants_total is not None
+            and self.stage_a_variants_total is not None
+            and self.narrowed_stage_a_variants_total > self.stage_a_variants_total
+        ):
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.narrowed_stage_a_variants_total cannot "
+                "exceed stage_a_variants_total"
+            )
         if not self.execution_shape:
             raise ValueError(
                 "StageAStreamingExactRuntimeShapeV2.execution_shape must be non-empty"
@@ -797,6 +822,8 @@ class StageAStreamingExactRuntimeShapeV2:
 def describe_stage_a_streaming_exact_runtime_shape_v2(
     *,
     retained_chunk_sizes: Sequence[int],
+    narrowed_stage_a_variants_total: int | None = None,
+    stage_a_variants_total: int | None = None,
     stage_a_workers: int | None = None,
     numba_threads_used: int | None = None,
 ) -> StageAStreamingExactRuntimeShapeV2:
@@ -806,6 +833,9 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
     Args:
         retained_chunk_sizes: Exact retained chunk sizes observed as Stage A streams trade-list-
             first exact scoring into the shortlist heap.
+        narrowed_stage_a_variants_total: Optional total Stage A breadth actually enumerated after
+            retained-frontier narrowing.
+        stage_a_variants_total: Optional raw public Stage A cartesian total for the same request.
         stage_a_workers: Optional configured Stage A worker budget for the measured run.
         numba_threads_used: Optional effective in-process Numba thread count observed live.
     Returns:
@@ -813,8 +843,9 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
             scoring with no deferred replay.
     Assumptions:
         The active Stage A path exact-scores each retained chunk immediately, keeps deferred
-        replay count at zero, and remains a single-process kernel-driven frontier when
-        `stage_a_workers` and `numba_threads_used` are supplied.
+        replay count at zero, can report narrowed-vs-raw Stage A breadth additively, and remains
+        a single-process kernel-driven frontier when `stage_a_workers` and `numba_threads_used`
+        are supplied.
     Raises:
         ValueError: If one retained chunk size is negative.
     Side Effects:
@@ -831,6 +862,14 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
         retained_candidate_count=sum(normalized_chunk_sizes),
         max_retained_chunk_size=max(normalized_chunk_sizes, default=0),
         deferred_replay_count=0,
+        narrowed_stage_a_variants_total=(
+            None
+            if narrowed_stage_a_variants_total is None
+            else int(narrowed_stage_a_variants_total)
+        ),
+        stage_a_variants_total=(
+            None if stage_a_variants_total is None else int(stage_a_variants_total)
+        ),
         stage_a_workers=stage_a_workers,
         numba_threads_used=numba_threads_used,
     )
@@ -1222,88 +1261,304 @@ class BacktestStageAShortlistBuilderV2:
         Returns:
             None.
         Assumptions:
-            Combo proxy prefilter narrows one retained chunk at a time, then Stage A exact work
-            runs trade-list-first immediately so no deferred replay batch remains on the active
-            path.
+            Stage A enumerates only retained-frontier variants, but it preserves the legacy raw
+            Stage A batch bucket boundaries so combo proxy retention, exact chunk order, and final
+            shortlist tie semantics stay stable while the runtime breadth shrinks to the narrowed
+            frontier.
         Raises:
             ValueError: If the retained chunk limit is non-positive.
         Side Effects:
-            Reads retained signal-row subsets, exact-scores each retained chunk immediately, and
-            mutates `shortlist_heap` in place.
+            Reads retained signal-row subsets, exact-scores each retained chunk immediately,
+            reports retained-frontier progress through `on_checkpoint`, and mutates
+            `shortlist_heap` in place.
         """
         if retained_chunk_limit <= 0:
             raise ValueError(
                 "Stage A combo proxy prefilter requires retained_chunk_limit > 0"
             )
-        chunk_variants: list[BacktestStageABaseVariantV2] = []
-        total = int(grid_context.stage_a_variants_total)
+        total = self._retained_stage_a_variants_total(
+            row_plans=row_plans,
+            grid_context=grid_context,
+            row_prefilter_frontier=row_prefilter_frontier,
+        )
         processed = 0
 
-        for base_variant in grid_context.iter_stage_a_variants():
-            chunk_variants.append(base_variant)
-            if (
-                len(chunk_variants) < batch_size
-                and (processed + len(chunk_variants)) < total
-            ):
-                continue
+        for chunk_variants in self._iter_retained_stage_a_variant_chunks(
+            row_plans=row_plans,
+            grid_context=grid_context,
+            row_prefilter_frontier=row_prefilter_frontier,
+            batch_size=batch_size,
+        ):
             if cancel_checker is not None:
                 cancel_checker(STAGE_A_LITERAL_V2)
-            retained_chunk_variants = self._filter_chunk_variants_by_row_prefilter(
+            chunk_inputs = self.load_chunk_runtime_inputs(
                 row_plans=row_plans,
                 chunk_variants=chunk_variants,
-                row_prefilter_frontier=row_prefilter_frontier,
+                grid_context=grid_context,
+                artifact_context=artifact_context,
+                signal_target_slice=signal_target_slice,
             )
-            if retained_chunk_variants:
-                chunk_inputs = self.load_chunk_runtime_inputs(
-                    row_plans=row_plans,
-                    chunk_variants=retained_chunk_variants,
+            final_signal = aggregate_ordered_final_signal_rows_v2(
+                ordered_signal_rows=tuple(
+                    prepared_input.signal_rows for prepared_input in chunk_inputs
+                ),
+                indicator_ids=tuple(
+                    prepared_input.indicator_id for prepared_input in chunk_inputs
+                ),
+            )
+            retained_row_indexes = self._select_combo_proxy_retained_chunk_row_indexes(
+                chunk_variants=chunk_variants,
+                final_signal=final_signal,
+                local_signal_close=local_signal_close,
+                execution_params=execution_params,
+                retained_chunk_limit=retained_chunk_limit,
+            )
+            if retained_row_indexes:
+                retained_row_selection = np.asarray(
+                    retained_row_indexes,
+                    dtype=np.int64,
+                )
+                self._merge_retained_exact_payload_chunk_into_heap(
+                    chunk_variants=tuple(
+                        chunk_variants[row_index]
+                        for row_index in retained_row_indexes
+                    ),
+                    final_signal=np.ascontiguousarray(
+                        final_signal[retained_row_selection, :],
+                        dtype=np.int8,
+                    ),
                     grid_context=grid_context,
-                    artifact_context=artifact_context,
-                    signal_target_slice=signal_target_slice,
-                )
-                final_signal = aggregate_ordered_final_signal_rows_v2(
-                    ordered_signal_rows=tuple(
-                        prepared_input.signal_rows for prepared_input in chunk_inputs
-                    ),
-                    indicator_ids=tuple(
-                        prepared_input.indicator_id for prepared_input in chunk_inputs
-                    ),
-                )
-                retained_row_indexes = self._select_combo_proxy_retained_chunk_row_indexes(
-                    chunk_variants=retained_chunk_variants,
-                    final_signal=final_signal,
-                    local_signal_close=local_signal_close,
+                    local_bar_close_1m_idx=local_bar_close_1m_idx,
+                    sentinel_index=sentinel_index,
+                    local_exec_open=local_exec_open,
+                    local_exec_close=local_exec_close,
                     execution_params=execution_params,
-                    retained_chunk_limit=retained_chunk_limit,
+                    ranking_plan=ranking_plan,
+                    shortlist_limit=shortlist_limit,
+                    shortlist_heap=shortlist_heap,
                 )
-                if retained_row_indexes:
-                    retained_row_selection = np.asarray(
-                        retained_row_indexes,
-                        dtype=np.int64,
-                    )
-                    self._merge_retained_exact_payload_chunk_into_heap(
-                        chunk_variants=tuple(
-                            retained_chunk_variants[row_index]
-                            for row_index in retained_row_indexes
-                        ),
-                        final_signal=np.ascontiguousarray(
-                            final_signal[retained_row_selection, :],
-                            dtype=np.int8,
-                        ),
-                        grid_context=grid_context,
-                        local_bar_close_1m_idx=local_bar_close_1m_idx,
-                        sentinel_index=sentinel_index,
-                        local_exec_open=local_exec_open,
-                        local_exec_close=local_exec_close,
-                        execution_params=execution_params,
-                        ranking_plan=ranking_plan,
-                        shortlist_limit=shortlist_limit,
-                        shortlist_heap=shortlist_heap,
-                    )
             processed += len(chunk_variants)
             if on_checkpoint is not None:
                 on_checkpoint(processed, total)
-            chunk_variants.clear()
+
+    def _iter_retained_stage_a_variant_chunks(
+        self,
+        *,
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
+        grid_context: BacktestArtifactRuntimePlanV2,
+        row_prefilter_frontier: Mapping[str, RetainedIndicatorRowFrontierV2],
+        batch_size: int,
+    ) -> Iterator[tuple[BacktestStageABaseVariantV2, ...]]:
+        """
+        Yield deterministic Stage A chunks directly from the retained frontier.
+
+        Args:
+            row_plans: Prepared per-indicator row-addressing plans in Stage A order.
+            grid_context: Stage A runtime plan used to rebuild exact variants by index.
+            row_prefilter_frontier: Deterministic retained row frontier keyed by indicator id.
+            batch_size: Raw Stage A bucket width whose boundaries must remain stable.
+        Returns:
+            Iterator[tuple[BacktestStageABaseVariantV2, ...]]: Retained-frontier Stage A chunks in
+                deterministic exact-evaluation order.
+        Assumptions:
+            Retained row pools may be ranked for observability, but exact enumeration must stay in
+            raw Stage A index order and keep the same raw-bucket chunk boundaries that the legacy
+            filtered loop exposed.
+        Raises:
+            ValueError: If one retained frontier entry is missing or `batch_size` is non-positive.
+        Side Effects:
+            May materialize exact Stage A base variants by stable index on demand.
+        """
+        if batch_size <= 0:
+            raise ValueError("Stage A retained-frontier chunk enumeration requires batch_size > 0")
+        signal_variants_total = self._signal_variants_total_for_grid_context(
+            grid_context=grid_context
+        )
+        compute_row_radices = tuple(
+            int(math.prod(row_plan.axis_radices)) for row_plan in row_plans
+        )
+        retained_row_pools = tuple(
+            self._retained_row_pool_for_stage_order(
+                indicator_id=row_plan.indicator_id,
+                row_prefilter_frontier=row_prefilter_frontier,
+            )
+            for row_plan in row_plans
+        )
+        current_batch_bucket: int | None = None
+        current_chunk: list[BacktestStageABaseVariantV2] = []
+        for compute_row_indexes in product(*retained_row_pools):
+            compute_index = _encode_mixed_radix_v2(
+                coordinates=tuple(int(value) for value in compute_row_indexes),
+                radices=compute_row_radices,
+            )
+            stage_a_index_base = compute_index * signal_variants_total
+            for signal_index in range(signal_variants_total):
+                stage_a_index = stage_a_index_base + signal_index
+                batch_bucket = stage_a_index // batch_size
+                if current_batch_bucket is None:
+                    current_batch_bucket = batch_bucket
+                elif batch_bucket != current_batch_bucket:
+                    yield tuple(current_chunk)
+                    current_chunk = []
+                    current_batch_bucket = batch_bucket
+                current_chunk.append(
+                    self._stage_a_variant_for_index(
+                        grid_context=grid_context,
+                        stage_a_index=stage_a_index,
+                    )
+                )
+        if current_chunk:
+            yield tuple(current_chunk)
+
+    def _retained_stage_a_variants_total(
+        self,
+        *,
+        row_plans: Sequence[PreparedIndicatorRowPlanV2],
+        grid_context: BacktestArtifactRuntimePlanV2,
+        row_prefilter_frontier: Mapping[str, RetainedIndicatorRowFrontierV2],
+    ) -> int:
+        """
+        Compute the deterministic Stage A breadth remaining after row prefilter.
+
+        Args:
+            row_plans: Prepared per-indicator row-addressing plans in Stage A order.
+            grid_context: Stage A runtime plan carrying signal-axis cardinality.
+            row_prefilter_frontier: Deterministic retained row frontier keyed by indicator id.
+        Returns:
+            int: Total retained Stage A variants across retained compute rows and signal axes.
+        Assumptions:
+            Row prefilter preserves the full signal-axis space, so narrowed Stage A breadth equals
+            the retained compute cartesian product multiplied by the signal-axis cardinality.
+        Raises:
+            ValueError: If the derived retained frontier total is non-positive.
+        Side Effects:
+            None.
+        """
+        retained_stage_a_variants_total = self._signal_variants_total_for_grid_context(
+            grid_context=grid_context
+        )
+        for row_plan in row_plans:
+            retained_stage_a_variants_total *= len(
+                self._retained_row_pool_for_stage_order(
+                    indicator_id=row_plan.indicator_id,
+                    row_prefilter_frontier=row_prefilter_frontier,
+                )
+            )
+        if retained_stage_a_variants_total <= 0:
+            raise ValueError("Stage A retained frontier total must be > 0")
+        return retained_stage_a_variants_total
+
+    def _retained_row_pool_for_stage_order(
+        self,
+        *,
+        indicator_id: str,
+        row_prefilter_frontier: Mapping[str, RetainedIndicatorRowFrontierV2],
+    ) -> tuple[int, ...]:
+        """
+        Resolve one retained row pool in raw row-index order for exact enumeration.
+
+        Args:
+            indicator_id: Canonical indicator id whose retained rows are requested.
+            row_prefilter_frontier: Deterministic retained row frontier keyed by indicator id.
+        Returns:
+            tuple[int, ...]: Retained row indexes sorted into raw artifact/stage order.
+        Assumptions:
+            The frontier keeps ranked order explicit for diagnostics, but exact enumeration must
+            re-sort by raw row index so Stage A chunk order matches the legacy filtered raw-grid
+            sequence.
+        Raises:
+            ValueError: If the retained frontier is missing or empty for the indicator.
+        Side Effects:
+            None.
+        """
+        retained_frontier = row_prefilter_frontier.get(indicator_id)
+        if retained_frontier is None:
+            raise ValueError(
+                "Stage A retained-frontier enumeration is missing retained rows for "
+                f"{indicator_id!r}"
+            )
+        retained_row_indexes = tuple(sorted(retained_frontier.retained_row_indexes))
+        if len(retained_row_indexes) == 0:
+            raise ValueError(
+                "Stage A retained-frontier enumeration requires non-empty retained row pools"
+            )
+        return retained_row_indexes
+
+    def _signal_variants_total_for_grid_context(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+    ) -> int:
+        """
+        Resolve deterministic Stage A signal-axis cardinality from the runtime plan surface.
+
+        Args:
+            grid_context: Stage A runtime plan or compatible test fixture.
+        Returns:
+            int: Product of signal-axis values, or `1` when no signal axes are configured.
+        Assumptions:
+            Real runtime plans expose `signal_variants_total()`, while lightweight test fixtures
+            may expose only `signal_axes` or nothing at all.
+        Raises:
+            ValueError: If the resolved signal-axis cardinality is non-positive.
+        Side Effects:
+            None.
+        """
+        signal_variants_total_getter = getattr(grid_context, "signal_variants_total", None)
+        if callable(signal_variants_total_getter):
+            typed_signal_variants_total_getter = cast(
+                Callable[[], int],
+                signal_variants_total_getter,
+            )
+            signal_variants_total = int(typed_signal_variants_total_getter())
+        else:
+            signal_variants_total = 1
+            for signal_axis in getattr(grid_context, "signal_axes", ()):
+                signal_variants_total *= len(signal_axis.values)
+        if signal_variants_total <= 0:
+            raise ValueError(
+                "Stage A retained-frontier enumeration requires positive signal-axis cardinality"
+            )
+        return signal_variants_total
+
+    def _stage_a_variant_for_index(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+        stage_a_index: int,
+    ) -> BacktestStageABaseVariantV2:
+        """
+        Materialize one deterministic Stage A base variant from a stable flat index.
+
+        Args:
+            grid_context: Stage A runtime plan or compatible test fixture.
+            stage_a_index: Zero-based Stage A index to resolve.
+        Returns:
+            BacktestStageABaseVariantV2: Exact Stage A base variant for the requested index.
+        Assumptions:
+            Canonical runtime plans expose `stage_a_variant_for_index(...)`; the compatibility
+            fallback exists only for older fixtures that still implement `iter_stage_a_variants()`.
+        Raises:
+            ValueError: If the variant index cannot be resolved from the runtime-plan surface.
+        Side Effects:
+            May build a temporary lookup map from existing Stage A variants for compatibility.
+        """
+        variant_for_index = getattr(grid_context, "stage_a_variant_for_index", None)
+        if callable(variant_for_index):
+            return cast(
+                BacktestStageABaseVariantV2,
+                variant_for_index(stage_a_index=stage_a_index),
+            )
+        variants_by_index = {
+            int(base_variant.stage_a_index): cast(BacktestStageABaseVariantV2, base_variant)
+            for base_variant in grid_context.iter_stage_a_variants()
+        }
+        if stage_a_index not in variants_by_index:
+            raise ValueError(
+                "Stage A retained-frontier enumeration could not resolve stage_a_index="
+                f"{stage_a_index}"
+            )
+        return variants_by_index[stage_a_index]
 
     def _retain_indicator_rows(
         self,

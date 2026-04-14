@@ -129,6 +129,32 @@ class _FakeGridContext:
         """
         return self._base_variants
 
+    def stage_a_variant_for_index(
+        self,
+        *,
+        stage_a_index: int,
+    ) -> BacktestStageABaseVariant:
+        """
+        Resolve one deterministic Stage A variant by its flat index.
+
+        Args:
+            stage_a_index: Zero-based Stage A index in fixture order.
+        Returns:
+            BacktestStageABaseVariant: Fixture variant for the requested Stage A index.
+        Assumptions:
+            Test fixtures keep `stage_a_index` aligned with tuple order so narrowed-frontier
+            enumeration can rebuild exact variants without scanning the full raw grid.
+        Raises:
+            ValueError: If the requested Stage A index falls outside the fixture range.
+        Side Effects:
+            None.
+        """
+        if stage_a_index < 0 or stage_a_index >= len(self._base_variants):
+            raise ValueError(
+                f"_FakeGridContext.stage_a_variant_for_index out of range: {stage_a_index}"
+            )
+        return self._base_variants[stage_a_index]
+
 
 class _RecordingSignalMatrixLoader:
     """
@@ -1410,6 +1436,47 @@ def test_stage_a_shortlist_builder_v2_streaming_exact_scoring_runs_per_retained_
 
     assert streaming_exact_chunks == [(0, 1, 2, 3), (6, 7)]
     assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
+
+
+def test_stage_a_shortlist_builder_v2_checkpoints_report_narrowed_frontier_cardinality(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify Stage A progress checkpoints expose retained-frontier breadth instead of raw-grid total.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+    Returns:
+        None.
+    Assumptions:
+        The synthetic row prefilter keeps only one of two raw Stage A rows, so retained-frontier
+        enumeration should report checkpoint totals of `1` instead of the raw
+        `stage_a_variants_total=2`.
+    Raises:
+        AssertionError: If Stage A silently falls back to raw-grid checkpoint totals.
+    Side Effects:
+        Memory-maps strict artifact arrays from the synthetic store.
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    grid_context = _grid_context_for_windows(windows=(10, 20))
+    checkpoints: list[tuple[int, int]] = []
+
+    shortlist = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=store.loader),
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+    ).build_shortlist(
+        grid_context=cast(Any, grid_context),
+        artifact_context=context,
+        target_time_range=_synthetic_target_time_range(),
+        shortlist_limit=1,
+        batch_size=1,
+        on_checkpoint=lambda processed, total: checkpoints.append((processed, total)),
+    )
+
+    assert checkpoints == [(1, 1)]
+    assert checkpoints[-1][1] < grid_context.stage_a_variants_total
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (1,)
 
 
 def test_stage_a_shortlist_builder_v2_streaming_exact_shortlist_is_batch_invariant() -> None:
