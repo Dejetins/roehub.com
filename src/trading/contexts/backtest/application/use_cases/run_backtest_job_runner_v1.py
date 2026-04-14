@@ -54,16 +54,17 @@ from trading.contexts.backtest.application.services.numba_runtime_v1 import (
 )
 from trading.contexts.backtest.application.services.v2.artifact_runtime_core_v2 import (
     BacktestArtifactRuntimeRunnerV2,
-    BacktestStageAScoredVariantV2,
     BacktestStageBScoredVariantV2,
     BacktestStageBTaskV2,
+    _runtime_plan_uses_no_risk_terminal_path_v2,
+    persisted_stage_a_no_risk_exact_rows_v2,
+    stage_a_rows_from_persisted_shortlist_v2,
 )
 from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
     STAGE_A_LITERAL_V2,
     STAGE_B_LITERAL_V2,
     BacktestArtifactRuntimePlannerV2,
     BacktestArtifactRuntimePlanV2,
-    BacktestStageABaseVariantV2,
 )
 from trading.contexts.backtest.application.services.v2.artifact_runtime_timeline_v2 import (
     BacktestArtifactRuntimeTimelineV2,
@@ -926,7 +927,7 @@ class RunBacktestJobRunnerV1:
         locked_by: str,
         context: _ResolvedJobRequestContext,
         runtime_plan: BacktestArtifactRuntimePlanV2,
-    ) -> tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
+    ) -> tuple[BacktestJobStageAShortlist, datetime]:
         """
         Execute streaming Stage-A shortlist build with deterministic ranking/persistence.
 
@@ -936,8 +937,8 @@ class RunBacktestJobRunnerV1:
             context: Resolved request context.
             runtime_plan: Prepared artifact-backed runtime plan.
         Returns:
-            tuple[tuple[BacktestJobTopVariantCandidateV1, ...], datetime]:
-                Ranked Stage-A shortlist candidates and last heartbeat timestamp.
+            tuple[BacktestJobStageAShortlist, datetime]:
+                Persisted Stage-A shortlist contract and last heartbeat timestamp.
         Assumptions:
             Stage-A final deterministic tie-break remains `base_variant_key ASC`.
         Raises:
@@ -999,33 +1000,20 @@ class RunBacktestJobRunnerV1:
             ),
             on_checkpoint=_on_stage_a_checkpoint,
         )
-        shortlist = tuple(
-            BacktestJobTopVariantCandidateV1(
-                variant_index=row.base_variant.stage_a_index,
-                variant_key=row.base_variant.base_variant_key,
-                indicator_variant_key=row.base_variant.indicator_variant_key,
-                total_return_pct=row.total_return_pct,
-                indicator_selections=row.base_variant.indicator_selections,
-                signal_params=row.base_variant.signal_params,
-                risk_params={
-                    "sl_enabled": False,
-                    "sl_pct": None,
-                    "tp_enabled": False,
-                    "tp_pct": None,
-                },
-            )
-            for row in shortlist_rows
-        )
-
         now = self._now()
         self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_A_LITERAL_V2)
         stage_a_shortlist = BacktestJobStageAShortlist(
             job_id=job.job_id,
-            stage_a_indexes=tuple(item.variant_index for item in shortlist),
+            stage_a_indexes=tuple(row.base_variant.stage_a_index for row in shortlist_rows),
             stage_a_variants_total=stage_total,
             risk_total=len(runtime_plan.risk_variants),
-            preselect_used=len(shortlist),
+            preselect_used=len(shortlist_rows),
             updated_at=now,
+            no_risk_exact_rows=(
+                persisted_stage_a_no_risk_exact_rows_v2(shortlist=shortlist_rows)
+                if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan)
+                else None
+            ),
         )
         saved = self._results_repository.save_stage_a_shortlist(
             job_id=job.job_id,
@@ -1036,7 +1024,18 @@ class RunBacktestJobRunnerV1:
         if not saved:
             raise _BacktestJobLeaseLost()
 
-        return (shortlist, heartbeat_at)
+        reloaded_stage_a_shortlist = stage_a_shortlist
+        if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
+            persisted_shortlist = self._results_repository.get_stage_a_shortlist(
+                job_id=job.job_id,
+            )
+            if persisted_shortlist is None:
+                raise ValueError(
+                    "saved Stage-A shortlist must be readable before no-risk worker finalization"
+                )
+            reloaded_stage_a_shortlist = persisted_shortlist
+
+        return (reloaded_stage_a_shortlist, heartbeat_at)
 
     def _run_stage_b(
         self,
@@ -1047,7 +1046,7 @@ class RunBacktestJobRunnerV1:
         timeline: BacktestArtifactRuntimeTimelineV2,
         scorer: MetricScorerV1,
         runtime_plan: BacktestArtifactRuntimePlanV2,
-        shortlist: tuple[BacktestJobTopVariantCandidateV1, ...],
+        shortlist: BacktestJobStageAShortlist,
         last_heartbeat_at: datetime,
     ) -> datetime:
         """
@@ -1069,7 +1068,7 @@ class RunBacktestJobRunnerV1:
             timeline: Built candle timeline payload.
             scorer: Deterministic staged scorer.
             runtime_plan: Prepared artifact-backed runtime plan.
-            shortlist: Stage-A shortlisted base variants.
+            shortlist: Persisted Stage-A shortlist contract.
             last_heartbeat_at: Last successful heartbeat timestamp.
         Returns:
             datetime: Updated heartbeat timestamp.
@@ -1099,19 +1098,17 @@ class RunBacktestJobRunnerV1:
         last_snapshot_processed = 0
         last_persisted_frontier_signature: FrontierSignatureV1 | None = None
         skipped_snapshot_writes = 0
-        stage_a_shortlist = tuple(
-            BacktestStageAScoredVariantV2(
-                base_variant=BacktestStageABaseVariantV2(
-                    stage_a_index=item.variant_index,
-                    indicator_selections=item.indicator_selections,
-                    signal_params=item.signal_params,
-                    indicator_variant_key=item.indicator_variant_key,
-                    base_variant_key=item.variant_key,
-                ),
-                total_return_pct=item.total_return_pct,
-            )
-            for item in shortlist
+        stage_a_shortlist = stage_a_rows_from_persisted_shortlist_v2(
+            runtime_plan=runtime_plan,
+            shortlist=shortlist,
         )
+        if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
+            _LOG.debug(
+                "event=job_no_risk_shortlist_reuse job_id=%s attempt=%s reused_persisted_exact=%s",
+                job.job_id,
+                job.attempt,
+                shortlist.no_risk_exact_rows is not None,
+            )
 
         def _on_stage_b_checkpoint(
             checkpoint_processed: int,

@@ -12,6 +12,7 @@ from .backtest_job import (
     is_backtest_job_state_terminal,
 )
 from .backtest_job_results import (
+    BacktestJobStageANoRiskExactRow,
     BacktestJobStageAShortlist,
     BacktestJobTopVariant,
     report_table_md_allowed_for_state,
@@ -38,6 +39,7 @@ __all__ = [
     "BacktestJobMode",
     "BacktestJobStage",
     "BacktestJobStageWeights",
+    "BacktestJobStageANoRiskExactRow",
     "BacktestJobStageAShortlist",
     "BacktestJobState",
     "BacktestJobTopVariant",

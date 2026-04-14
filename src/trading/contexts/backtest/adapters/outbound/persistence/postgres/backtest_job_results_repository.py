@@ -10,6 +10,7 @@ from trading.contexts.backtest.adapters.outbound.persistence.postgres.gateway im
 )
 from trading.contexts.backtest.application.ports import BacktestJobResultsRepository
 from trading.contexts.backtest.domain.entities import (
+    BacktestJobStageANoRiskExactRow,
     BacktestJobStageAShortlist,
     BacktestJobTopVariant,
 )
@@ -273,7 +274,8 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         Returns:
             bool: `True` when upsert is applied; `False` when lease is lost.
         Assumptions:
-            Stage-A shortlist uses deterministic ordered integer index array.
+            Stage-A shortlist uses deterministic ordered integer index array plus optional additive
+            compact exact no-risk rows.
         Raises:
             BacktestStorageError: If SQL write fails.
         Side Effects:
@@ -285,6 +287,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                 "PostgresBacktestJobResultsRepository.save_stage_a_shortlist"
                 " shortlist.job_id must match method job_id"
             )
+        no_risk_exact_rows_json = shortlist.to_no_risk_exact_rows_json_array()
 
         query = f"""
         WITH lease_owner AS (
@@ -300,6 +303,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         (
             job_id,
             stage_a_indexes_json,
+            no_risk_exact_rows_json,
             stage_a_variants_total,
             risk_total,
             preselect_used,
@@ -308,6 +312,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         SELECT
             %(job_id)s::uuid,
             %(stage_a_indexes_json)s::jsonb,
+            %(no_risk_exact_rows_json)s::jsonb,
             %(stage_a_variants_total)s,
             %(risk_total)s,
             %(preselect_used)s,
@@ -316,6 +321,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         ON CONFLICT (job_id)
         DO UPDATE SET
             stage_a_indexes_json = EXCLUDED.stage_a_indexes_json,
+            no_risk_exact_rows_json = EXCLUDED.no_risk_exact_rows_json,
             stage_a_variants_total = EXCLUDED.stage_a_variants_total,
             risk_total = EXCLUDED.risk_total,
             preselect_used = EXCLUDED.preselect_used,
@@ -333,6 +339,16 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                     sort_keys=True,
                     separators=(",", ":"),
                     ensure_ascii=True,
+                ),
+                "no_risk_exact_rows_json": (
+                    None
+                    if no_risk_exact_rows_json is None
+                    else json.dumps(
+                        no_risk_exact_rows_json,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=True,
+                    )
                 ),
                 "stage_a_variants_total": shortlist.stage_a_variants_total,
                 "risk_total": shortlist.risk_total,
@@ -360,6 +376,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         SELECT
             job_id,
             stage_a_indexes_json,
+            no_risk_exact_rows_json,
             stage_a_variants_total,
             risk_total,
             preselect_used,
@@ -563,7 +580,8 @@ def _map_stage_a_shortlist_row(*, row: Mapping[str, Any]) -> BacktestJobStageASh
     Returns:
         BacktestJobStageAShortlist: Mapped shortlist snapshot.
     Assumptions:
-        Row schema follows Backtest jobs v1 storage contract.
+        Row schema follows the additive Backtest jobs shortlist storage contract and remains
+        backward-readable when `no_risk_exact_rows_json` is absent or null.
     Raises:
         BacktestStorageError: If row cannot be mapped.
     Side Effects:
@@ -586,6 +604,23 @@ def _map_stage_a_shortlist_row(*, row: Mapping[str, Any]) -> BacktestJobStageASh
                     "backtest_job_stage_a_shortlist.stage_a_indexes_json must contain integers"
                 )
             indexes.append(raw_item)
+        raw_no_risk_exact_rows = _parse_json_array(
+            value=row.get("no_risk_exact_rows_json"),
+            field_name="no_risk_exact_rows_json",
+        )
+        no_risk_exact_rows: tuple[BacktestJobStageANoRiskExactRow, ...] | None = None
+        if raw_no_risk_exact_rows is not None:
+            mapped_rows: list[BacktestJobStageANoRiskExactRow] = []
+            for raw_item in raw_no_risk_exact_rows:
+                if not isinstance(raw_item, Mapping):
+                    raise BacktestStorageError(
+                        "backtest_job_stage_a_shortlist.no_risk_exact_rows_json must contain "
+                        "JSON objects"
+                    )
+                mapped_rows.append(
+                    BacktestJobStageANoRiskExactRow.from_json_object(value=dict(raw_item))
+                )
+            no_risk_exact_rows = tuple(mapped_rows)
 
         return BacktestJobStageAShortlist(
             job_id=UUID(str(row["job_id"])),
@@ -594,6 +629,7 @@ def _map_stage_a_shortlist_row(*, row: Mapping[str, Any]) -> BacktestJobStageASh
             risk_total=int(row["risk_total"]),
             preselect_used=int(row["preselect_used"]),
             updated_at=row["updated_at"],
+            no_risk_exact_rows=no_risk_exact_rows,
         )
     except Exception as error:  # noqa: BLE001
         if isinstance(error, BacktestStorageError):

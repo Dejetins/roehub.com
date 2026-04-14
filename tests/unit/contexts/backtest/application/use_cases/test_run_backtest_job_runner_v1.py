@@ -34,6 +34,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobExecutionMode,
+    BacktestJobStageAShortlist,
     TradeV1,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
@@ -407,6 +408,32 @@ class _FakeGridContext:
             None.
         """
         return self._base_variants
+
+    def stage_a_variant_for_index(
+        self,
+        *,
+        stage_a_index: int,
+    ) -> BacktestStageABaseVariant:
+        """
+        Resolve one deterministic Stage-A base variant by stable shortlist index.
+
+        Args:
+            stage_a_index: Zero-based Stage A index.
+        Returns:
+            BacktestStageABaseVariant: Base variant fixture for the requested index.
+        Assumptions:
+            Worker tests rebuild Stage A rows from the persisted shortlist contract instead of
+            carrying in-memory builder objects into Stage B.
+        Raises:
+            ValueError: If the requested index falls outside the fixture range.
+        Side Effects:
+            None.
+        """
+        if stage_a_index < 0 or stage_a_index >= len(self._base_variants):
+            raise ValueError(
+                f"_FakeGridContext.stage_a_variant_for_index out of range: {stage_a_index}"
+            )
+        return self._base_variants[stage_a_index]
 
 
 def _unexpected_generic_stage_b_path(*args: Any, **kwargs: Any) -> Any:
@@ -818,6 +845,82 @@ class _ArtifactOnlyStageAShortlistBuilder:
             BacktestStageAScoredVariantV1(
                 base_variant=base_variant,
                 total_return_pct=float(index + 1),
+            )
+            for index, base_variant in enumerate(base_variants)
+        )
+        if on_checkpoint is not None:
+            on_checkpoint(len(rows), int(grid_context.stage_a_variants_total))
+        return rows
+
+
+class _ArtifactExactNoRiskStageAShortlistBuilder:
+    """
+    Deterministic artifact-only Stage A builder fake carrying compact exact no-risk payloads.
+    """
+
+    def build_shortlist(
+        self,
+        *,
+        grid_context: Any,
+        artifact_context: Any,
+        target_time_range: TimeRange,
+        shortlist_limit: int,
+        ranking: Any = None,
+        parallelism: Any = None,
+        batch_size: int | None = None,
+        cancel_checker: Any = None,
+        on_checkpoint: Any = None,
+    ) -> tuple[Any, ...]:
+        """
+        Build deterministic shortlist rows with additive compact exact/no-risk payloads attached.
+
+        Args:
+            grid_context: Prepared Stage A grid context.
+            artifact_context: Resolved slot-pinned runtime context.
+            target_time_range: Requested trading window.
+            shortlist_limit: Maximum number of rows to retain.
+            ranking: Optional ranking config.
+            parallelism: Optional Stage A parallelism contract forwarded by runtime orchestration.
+            batch_size: Optional chunk size.
+            cancel_checker: Optional cooperative cancellation hook.
+            on_checkpoint: Optional checkpoint hook.
+        Returns:
+            tuple[Any, ...]: Deterministic shortlist rows with compact exact no-risk payloads.
+        Assumptions:
+            Tests exercise persisted worker reuse only, so one-trade compact payload per row is
+            sufficient to prove the additive contract.
+        Raises:
+            None.
+        Side Effects:
+            Invokes provided cancellation and checkpoint hooks.
+        """
+        _ = artifact_context, target_time_range, ranking, parallelism, batch_size
+        if cancel_checker is not None:
+            cancel_checker("stage_a")
+        base_variants = tuple(grid_context.iter_stage_a_variants())[:shortlist_limit]
+        rows = tuple(
+            artifact_runtime_core_module.BacktestStageAScoredVariantV2(
+                base_variant=cast(Any, base_variant),
+                total_return_pct=float(12 - (index * 3)),
+                retained_exact_payload=artifact_runtime_core_module.StageACompactExactPayloadV2(
+                    entry_signal_idx=np.array([index], dtype=np.int64),
+                    entry_exec_idx=np.array([index + 1], dtype=np.int64),
+                    direction=np.array([1], dtype=np.int8),
+                    sig_exit_signal_idx=np.array([index + 2], dtype=np.int64),
+                    sig_exit_exec_idx=np.array([index + 3], dtype=np.int64),
+                ),
+                no_risk_metrics=StageANoRiskMetricsV2(
+                    total_return_pct=float(12 - (index * 3)),
+                    max_drawdown_pct=float(index + 1),
+                    return_over_max_drawdown=float(12 - (index * 3)) / float(index + 1),
+                    profit_factor=float(2 + index),
+                    trade_count=1,
+                    sharpe_trades=1.5 + float(index),
+                    win_rate_pct=60.0 + float(index),
+                    avg_trade_ret_pct=2.0 - (0.25 * float(index)),
+                    avg_trade_exec_bars=3.0 + float(index),
+                    exposure_pct=40.0 + float(index),
+                ),
             )
             for index, base_variant in enumerate(base_variants)
         )
@@ -1775,6 +1878,7 @@ class _FakeResultsRepository:
         self._fail_replace_call_numbers = set(fail_replace_call_numbers)
         self.replace_calls: list[dict[str, Any]] = []
         self.shortlist_calls: list[dict[str, Any]] = []
+        self.shortlist_get_calls: list[dict[str, Any]] = []
 
     def replace_top_variants_snapshot(
         self,
@@ -1846,6 +1950,28 @@ class _FakeResultsRepository:
             }
         )
         return True
+
+    def get_stage_a_shortlist(self, *, job_id: UUID) -> Any:
+        """
+        Return the latest persisted Stage-A shortlist payload for one job id.
+
+        Args:
+            job_id: Job id.
+        Returns:
+            Any: Latest recorded shortlist payload for the requested job, or `None`.
+        Assumptions:
+            Worker C4 review requires the no-risk path to read back the persisted shortlist before
+            finalization rather than relying only on the in-memory save input.
+        Raises:
+            None.
+        Side Effects:
+            Appends one shortlist-read call to the in-memory log.
+        """
+        self.shortlist_get_calls.append({"job_id": job_id})
+        for call in reversed(self.shortlist_calls):
+            if call["job_id"] == job_id:
+                return call["shortlist"]
+        return None
 
 
 @dataclass
@@ -2179,6 +2305,123 @@ def test_run_stage_b_or_finalize_no_risk_reuses_stage_a_alt_metric_payloads() ->
     assert tuple(row.summary_metrics_json["profit_factor"] for row in rows) == (1.4, 1.8)
     assert tuple(row.summary_metrics_json["sharpe_trades"] for row in rows) == (1.6, 1.8)
     assert tuple(row.summary_metrics_json["win_rate_pct"] for row in rows) == (62.5, 66.0)
+
+
+def test_stage_a_rows_from_persisted_shortlist_v2_supports_legacy_index_only_rows() -> None:
+    """
+    Verify legacy shortlist rows without additive exact payload remain readable for worker fallback.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Old `stage_a_indexes`-only rows must still materialize base variants in deterministic
+        order even though they no longer carry compact exact no-risk data.
+    Raises:
+        AssertionError: If persisted index order or legacy fallback payload shape drifts.
+    Side Effects:
+        None.
+    """
+    base_variants = _build_stage_a_variants()
+    shortlist = BacktestJobStageAShortlist(
+        job_id=UUID("00000000-0000-0000-0000-000000000555"),
+        stage_a_indexes=(1, 0),
+        stage_a_variants_total=len(base_variants),
+        risk_total=1,
+        preselect_used=2,
+        updated_at=_utc(2026, 2, 23, 10, 1, 0),
+    )
+    runtime_plan = SimpleNamespace(
+        stage_a_variant_for_index=lambda *, stage_a_index: base_variants[stage_a_index]
+    )
+
+    rows = artifact_runtime_core_module.stage_a_rows_from_persisted_shortlist_v2(
+        runtime_plan=cast(Any, runtime_plan),
+        shortlist=shortlist,
+    )
+
+    assert tuple(row.base_variant.stage_a_index for row in rows) == (1, 0)
+    assert all(row.retained_exact_payload is None for row in rows)
+    assert all(row.no_risk_metrics is None for row in rows)
+    assert tuple(row.total_return_pct for row in rows) == (0.0, 0.0)
+
+
+def test_process_claimed_job_no_risk_reuses_persisted_exact_shortlist_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify worker no-risk finalization reuses the persisted exact shortlist payload directly.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        The additive shortlist contract must be sufficient for background worker finalization, so
+        Stage B should not rescore Stage A when compact exact rows were already persisted.
+    Raises:
+        AssertionError: If worker orchestration drops the exact shortlist payload or falls back to
+            scorer-based no-risk materialization.
+    Side Effects:
+        Monkeypatches generic Stage B runner helpers for the duration of the test.
+    """
+    job = _build_running_job()
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    no_risk_variants = (_build_risk_variants()[0],)
+    job_repository = _FakeJobRepository(default_job=job)
+    lease_repository = _FakeLeaseRepository()
+    results_repository = _FakeResultsRepository()
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_serial_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_parallel_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    use_case = _build_use_case(
+        request=request,
+        job_repository=job_repository,
+        lease_repository=lease_repository,
+        results_repository=results_repository,
+        grid_context=_FakeGridContext(
+            base_variants=base_variants,
+            risk_variants=no_risk_variants,
+        ),
+        scorer=SimpleNamespace(score_variant_metric=_unexpected_no_risk_stage_a_rescore),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 6, 0)),
+        stage_a_shortlist_builder=cast(Any, _ArtifactExactNoRiskStageAShortlistBuilder()),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert results_repository.shortlist_get_calls == [{"job_id": job.job_id}]
+    saved_shortlist = results_repository.shortlist_calls[0]["shortlist"]
+    assert saved_shortlist.no_risk_exact_rows is not None
+    assert tuple(saved_shortlist.stage_a_indexes) == (0, 1)
+    assert tuple(
+        row.total_return_pct for row in saved_shortlist.no_risk_exact_rows
+    ) == (12.0, 9.0)
+    running_rows = results_repository.replace_calls[0]["rows"]
+    assert tuple(row.total_return_pct for row in running_rows) == (12.0, 9.0)
+    assert tuple(row.summary_metrics_json["max_drawdown_pct"] for row in running_rows) == (
+        1.0,
+        2.0,
+    )
+    assert tuple(row.summary_metrics_json["profit_factor"] for row in running_rows) == (
+        2.0,
+        3.0,
+    )
 
 
 def test_process_claimed_job_does_not_claim_additional_jobs() -> None:

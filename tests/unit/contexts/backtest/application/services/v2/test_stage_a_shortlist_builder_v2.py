@@ -868,6 +868,7 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
 
     assert len(shortlist) == 1
     retained_exact_payload = shortlist[0].retained_exact_payload
+    assert shortlist[0].no_risk_metrics is not None
     assert retained_exact_payload is not None
     assert retained_exact_payload.memory_shape_bucket == "compact_trade_arrays"
     assert retained_exact_payload.trade_count > 0

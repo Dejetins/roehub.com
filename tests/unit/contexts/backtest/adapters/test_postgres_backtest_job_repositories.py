@@ -14,6 +14,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobErrorPayload,
+    BacktestJobStageANoRiskExactRow,
     BacktestJobStageAShortlist,
     BacktestJobTopVariant,
 )
@@ -874,11 +875,30 @@ def test_results_repository_save_stage_a_shortlist_uses_lease_guarded_upsert() -
         locked_by="worker-a-1",
         shortlist=BacktestJobStageAShortlist(
             job_id=job_id,
-            stage_a_indexes=(1, 3, 8),
+            stage_a_indexes=(1,),
             stage_a_variants_total=100,
-            risk_total=4,
-            preselect_used=20,
+            risk_total=1,
+            preselect_used=1,
             updated_at=datetime(2026, 2, 22, 19, 3, tzinfo=timezone.utc),
+            no_risk_exact_rows=(
+                BacktestJobStageANoRiskExactRow(
+                    entry_signal_idx=(0,),
+                    entry_exec_idx=(1,),
+                    direction=(1,),
+                    sig_exit_signal_idx=(2,),
+                    sig_exit_exec_idx=(3,),
+                    total_return_pct=12.0,
+                    max_drawdown_pct=1.0,
+                    return_over_max_drawdown=12.0,
+                    profit_factor=2.5,
+                    trade_count=1,
+                    sharpe_trades=1.5,
+                    win_rate_pct=60.0,
+                    avg_trade_ret_pct=2.0,
+                    avg_trade_exec_bars=3.0,
+                    exposure_pct=40.0,
+                ),
+            ),
         ),
     )
 
@@ -886,6 +906,81 @@ def test_results_repository_save_stage_a_shortlist_uses_lease_guarded_upsert() -
     assert "ON CONFLICT (job_id)" in gateway.fetch_one_queries[0]
     assert "lease_expires_at > %(now)s" in gateway.fetch_one_queries[0]
     assert "state = 'running'" in gateway.fetch_one_queries[0]
+    assert "no_risk_exact_rows_json" in gateway.fetch_one_queries[0]
+    assert gateway.fetch_one_parameters[0]["no_risk_exact_rows_json"] is not None
+
+
+def test_results_repository_get_stage_a_shortlist_reads_additive_exact_rows_and_legacy_rows(
+) -> None:
+    """
+    Verify shortlist reads map additive exact rows while keeping legacy rows backward-readable.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        New rows may persist compact exact no-risk payloads, while old rows may omit the additive
+        column entirely or keep it null.
+    Raises:
+        AssertionError: If repository mapping drops exact payloads or fails on legacy rows.
+    Side Effects:
+        None.
+    """
+    exact_row = BacktestJobStageANoRiskExactRow(
+        entry_signal_idx=(0,),
+        entry_exec_idx=(1,),
+        direction=(1,),
+        sig_exit_signal_idx=(2,),
+        sig_exit_exec_idx=(3,),
+        total_return_pct=12.0,
+        max_drawdown_pct=1.0,
+        return_over_max_drawdown=12.0,
+        profit_factor=2.5,
+        trade_count=1,
+        sharpe_trades=1.5,
+        win_rate_pct=60.0,
+        avg_trade_ret_pct=2.0,
+        avg_trade_exec_bars=3.0,
+        exposure_pct=40.0,
+    )
+    gateway = _FakeGateway(
+        fetch_one_results=[
+            {
+                "job_id": "00000000-0000-0000-0000-000000000810",
+                "stage_a_indexes_json": [1],
+                "no_risk_exact_rows_json": [exact_row.to_json_object()],
+                "stage_a_variants_total": 100,
+                "risk_total": 1,
+                "preselect_used": 1,
+                "updated_at": datetime(2026, 2, 22, 19, 4, tzinfo=timezone.utc),
+            },
+            {
+                "job_id": "00000000-0000-0000-0000-000000000811",
+                "stage_a_indexes_json": [3, 8],
+                "stage_a_variants_total": 100,
+                "risk_total": 4,
+                "preselect_used": 2,
+                "updated_at": datetime(2026, 2, 22, 19, 5, tzinfo=timezone.utc),
+            },
+        ]
+    )
+    repository = PostgresBacktestJobResultsRepository(gateway=gateway)
+
+    exact_shortlist = repository.get_stage_a_shortlist(
+        job_id=UUID("00000000-0000-0000-0000-000000000810")
+    )
+    legacy_shortlist = repository.get_stage_a_shortlist(
+        job_id=UUID("00000000-0000-0000-0000-000000000811")
+    )
+
+    assert exact_shortlist is not None
+    assert exact_shortlist.no_risk_exact_rows is not None
+    assert exact_shortlist.no_risk_exact_rows[0].profit_factor == 2.5
+    assert exact_shortlist.no_risk_exact_rows[0].trade_count == 1
+    assert legacy_shortlist is not None
+    assert legacy_shortlist.no_risk_exact_rows is None
+    assert legacy_shortlist.stage_a_indexes == (3, 8)
 
 
 def _build_job_row(*, state: str) -> Mapping[str, Any]:

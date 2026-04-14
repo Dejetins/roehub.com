@@ -8,13 +8,19 @@ from heapq import heappush, heapreplace
 from multiprocessing import get_context
 from numbers import Real
 from types import MappingProxyType
-from typing import Any, Callable, Mapping, cast
+from typing import Any, Callable, Mapping, Sequence, cast
+
+import numpy as np
 
 from trading.contexts.backtest.application.dto import BacktestRankingConfig, RunBacktestTemplate
 from trading.contexts.backtest.application.ports import (
     BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorerWithDetails,
     RankingMetricsV1,
+)
+from trading.contexts.backtest.domain.entities import (
+    BacktestJobStageANoRiskExactRow,
+    BacktestJobStageAShortlist,
 )
 from trading.contexts.backtest.domain.value_objects import (
     BacktestVariantScalar,
@@ -2480,6 +2486,37 @@ def stage_a_rows_from_heap_v2(
     return tuple(entry[2] for entry in sorted(heap, key=lambda item: item[:2], reverse=True))
 
 
+def persisted_stage_a_no_risk_exact_rows_v2(
+    *,
+    shortlist: Sequence[Any],
+) -> tuple[BacktestJobStageANoRiskExactRow, ...] | None:
+    """
+    Convert shortlist rows into additive persisted no-risk exact rows when full exact payloads
+    exist.
+
+    Args:
+        shortlist: Ordered Stage A shortlist rows produced by the shared runtime/builder contract.
+    Returns:
+        tuple[BacktestJobStageANoRiskExactRow, ...] | None:
+            Persistable exact rows aligned to shortlist order, or `None` when legacy rows do not
+            expose the compact exact/no-risk payload pair yet.
+    Assumptions:
+        Worker parity storage should persist exact no-risk rows only when every retained row keeps
+        both `retained_exact_payload` and `no_risk_metrics` in the compact-trade-array shape.
+    Raises:
+        ValueError: If one retained exact payload violates the compact-trade-only invariant.
+    Side Effects:
+        None.
+    """
+    persisted_rows: list[BacktestJobStageANoRiskExactRow] = []
+    for stage_a_row in shortlist:
+        persisted_row = _persisted_stage_a_no_risk_exact_row_v2(stage_a_row=stage_a_row)
+        if persisted_row is None:
+            return None
+        persisted_rows.append(persisted_row)
+    return tuple(persisted_rows)
+
+
 def stage_b_rows_from_heap_v2(
     *,
     heap: list[StageBHeapEntryV2],
@@ -2501,6 +2538,43 @@ def stage_b_rows_from_heap_v2(
     return tuple(entry[2] for entry in sorted_stage_b_heap_entries_v2(heap=heap))
 
 
+def stage_a_rows_from_persisted_shortlist_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+    shortlist: BacktestJobStageAShortlist,
+) -> tuple[BacktestStageAScoredVariantV2, ...]:
+    """
+    Rebuild Stage A shortlist rows from the persisted shortlist contract for worker finalization.
+
+    Args:
+        runtime_plan: Deterministic runtime plan used to rematerialize base variants by index.
+        shortlist: Persisted Stage A shortlist contract carried through worker orchestration.
+    Returns:
+        tuple[BacktestStageAScoredVariantV2, ...]:
+            Stage A rows aligned to persisted shortlist order, reusing exact no-risk payloads when
+            present and falling back to index-only legacy rows otherwise.
+    Assumptions:
+        Backward-readable legacy rows may omit additive exact payloads, in which case Stage B
+        finalization must explicitly fall back to scorer materialization instead of generic replay.
+    Raises:
+        ValueError: Propagates from runtime-plan index materialization or compact payload rebuild.
+    Side Effects:
+        None.
+    """
+    exact_rows = shortlist.no_risk_exact_rows
+    materialized_rows: list[BacktestStageAScoredVariantV2] = []
+    for row_index, stage_a_index in enumerate(shortlist.stage_a_indexes):
+        base_variant = runtime_plan.stage_a_variant_for_index(stage_a_index=stage_a_index)
+        exact_row = None if exact_rows is None else exact_rows[row_index]
+        materialized_rows.append(
+            _stage_a_row_from_persisted_exact_row_v2(
+                base_variant=base_variant,
+                exact_row=exact_row,
+            )
+        )
+    return tuple(materialized_rows)
+
+
 def sorted_stage_b_heap_entries_v2(
     *,
     heap: list[StageBHeapEntryV2],
@@ -2520,6 +2594,114 @@ def sorted_stage_b_heap_entries_v2(
         None.
     """
     return tuple(sorted(heap, key=lambda item: item[:2], reverse=True))
+
+
+def _persisted_stage_a_no_risk_exact_row_v2(
+    *,
+    stage_a_row: Any,
+) -> BacktestJobStageANoRiskExactRow | None:
+    """
+    Convert one in-memory Stage A shortlist row into persisted exact no-risk row payload.
+
+    Args:
+        stage_a_row: One shortlist row that may expose compact exact/no-risk payload attributes.
+    Returns:
+        BacktestJobStageANoRiskExactRow | None:
+            Persistable exact row when both compact exact payload and no-risk metrics exist,
+            otherwise `None` for legacy/fake rows.
+    Assumptions:
+        Some unit tests still use lightweight Stage A row fakes without additive no-risk payloads.
+    Raises:
+        ValueError: If retained exact payload violates the compact-trade-array invariant.
+    Side Effects:
+        None.
+    """
+    retained_exact_payload = _validated_retained_exact_payload_v2(
+        retained_exact_payload=cast(
+            StageACompactExactPayloadV2 | None,
+            getattr(stage_a_row, "retained_exact_payload", None),
+        )
+    )
+    no_risk_metrics = cast(
+        StageANoRiskMetricsV2 | None,
+        getattr(stage_a_row, "no_risk_metrics", None),
+    )
+    if retained_exact_payload is None or no_risk_metrics is None:
+        return None
+    return BacktestJobStageANoRiskExactRow(
+        entry_signal_idx=tuple(int(value) for value in retained_exact_payload.entry_signal_idx),
+        entry_exec_idx=tuple(int(value) for value in retained_exact_payload.entry_exec_idx),
+        direction=tuple(int(value) for value in retained_exact_payload.direction),
+        sig_exit_signal_idx=tuple(
+            int(value) for value in retained_exact_payload.sig_exit_signal_idx
+        ),
+        sig_exit_exec_idx=tuple(int(value) for value in retained_exact_payload.sig_exit_exec_idx),
+        total_return_pct=no_risk_metrics.total_return_pct,
+        max_drawdown_pct=no_risk_metrics.max_drawdown_pct,
+        return_over_max_drawdown=no_risk_metrics.return_over_max_drawdown,
+        profit_factor=no_risk_metrics.profit_factor,
+        trade_count=no_risk_metrics.trade_count,
+        sharpe_trades=no_risk_metrics.sharpe_trades,
+        win_rate_pct=no_risk_metrics.win_rate_pct,
+        avg_trade_ret_pct=no_risk_metrics.avg_trade_ret_pct,
+        avg_trade_exec_bars=no_risk_metrics.avg_trade_exec_bars,
+        exposure_pct=no_risk_metrics.exposure_pct,
+        memory_shape_bucket=retained_exact_payload.memory_shape_bucket,
+    )
+
+
+def _stage_a_row_from_persisted_exact_row_v2(
+    *,
+    base_variant: BacktestStageABaseVariantV2,
+    exact_row: BacktestJobStageANoRiskExactRow | None,
+) -> BacktestStageAScoredVariantV2:
+    """
+    Convert one persisted shortlist row back into the shared Stage A runtime row contract.
+
+    Args:
+        base_variant: Exact Stage A base variant materialized from the runtime plan index.
+        exact_row: Optional additive persisted exact no-risk row aligned to the same shortlist slot.
+    Returns:
+        BacktestStageAScoredVariantV2:
+            Shared runtime row with exact no-risk payloads restored when available, or a legacy
+            index-only fallback row that makes scorer materialization explicit.
+    Assumptions:
+        Legacy shortlist rows may lack additive exact payloads; their placeholder
+        `total_return_pct=0.0` is unused once scorer-based fallback computes final metrics.
+    Raises:
+        ValueError: If persisted compact payload reconstruction violates runtime invariants.
+    Side Effects:
+        None.
+    """
+    if exact_row is None:
+        return BacktestStageAScoredVariantV2(
+            base_variant=base_variant,
+            total_return_pct=0.0,
+        )
+    return BacktestStageAScoredVariantV2(
+        base_variant=base_variant,
+        total_return_pct=exact_row.total_return_pct,
+        retained_exact_payload=StageACompactExactPayloadV2(
+            entry_signal_idx=np.asarray(exact_row.entry_signal_idx, dtype=np.int64),
+            entry_exec_idx=np.asarray(exact_row.entry_exec_idx, dtype=np.int64),
+            direction=np.asarray(exact_row.direction, dtype=np.int8),
+            sig_exit_signal_idx=np.asarray(exact_row.sig_exit_signal_idx, dtype=np.int64),
+            sig_exit_exec_idx=np.asarray(exact_row.sig_exit_exec_idx, dtype=np.int64),
+            memory_shape_bucket=exact_row.memory_shape_bucket,
+        ),
+        no_risk_metrics=StageANoRiskMetricsV2(
+            total_return_pct=exact_row.total_return_pct,
+            max_drawdown_pct=exact_row.max_drawdown_pct,
+            return_over_max_drawdown=exact_row.return_over_max_drawdown,
+            profit_factor=exact_row.profit_factor,
+            trade_count=exact_row.trade_count,
+            sharpe_trades=exact_row.sharpe_trades,
+            win_rate_pct=exact_row.win_rate_pct,
+            avg_trade_ret_pct=exact_row.avg_trade_ret_pct,
+            avg_trade_exec_bars=exact_row.avg_trade_exec_bars,
+            exposure_pct=exact_row.exposure_pct,
+        ),
+    )
 
 
 def stage_b_tasks_from_heap_v2(
@@ -2691,7 +2873,9 @@ __all__ = [
     "risk_pct_from_task_v2",
     "score_stage_b_task_with_metrics_v2",
     "sorted_stage_b_heap_entries_v2",
+    "persisted_stage_a_no_risk_exact_rows_v2",
     "stage_a_heap_entry_v2",
+    "stage_a_rows_from_persisted_shortlist_v2",
     "stage_a_rows_from_heap_v2",
     "stage_b_heap_entry_v2",
     "stage_b_rows_from_heap_v2",
