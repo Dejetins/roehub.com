@@ -35,6 +35,11 @@ type NotebookParityMeasurementFieldLiteralV2 = Literal[
     "exact_replay_count",
 ]
 type NotebookParityMeasurementSourceLiteralV2 = Literal["backend", "notebook"]
+type NotebookParityAuthorityKindLiteralV2 = Literal[
+    "synthetic_contract_validation",
+    "live_host_measurement",
+]
+type NotebookParityLiveHostCaptureStatusLiteralV2 = Literal["missing", "captured"]
 type NotebookParityReferenceSourceKindLiteralV2 = Literal["backend", "notebook", "gate"]
 type NotebookParityRuntimeSurfaceLiteralV2 = Literal["sync", "worker", "notebook"]
 type NotebookParityStageBExecutionModeLiteralV2 = Literal[
@@ -71,6 +76,15 @@ _ALLOWED_NOTEBOOK_PARITY_MEASUREMENT_FIELDS_V2: tuple[
 _ALLOWED_NOTEBOOK_PARITY_MEASUREMENT_SOURCES_V2: tuple[
     NotebookParityMeasurementSourceLiteralV2, ...
 ] = ("backend", "notebook")
+_ALLOWED_NOTEBOOK_PARITY_AUTHORITY_KINDS_V2: tuple[
+    NotebookParityAuthorityKindLiteralV2, ...
+] = (
+    "synthetic_contract_validation",
+    "live_host_measurement",
+)
+_ALLOWED_NOTEBOOK_PARITY_LIVE_HOST_CAPTURE_STATUSES_V2: tuple[
+    NotebookParityLiveHostCaptureStatusLiteralV2, ...
+] = ("missing", "captured")
 _ALLOWED_NOTEBOOK_PARITY_REFERENCE_SOURCE_KINDS_V2: tuple[
     NotebookParityReferenceSourceKindLiteralV2, ...
 ] = ("backend", "notebook", "gate")
@@ -158,6 +172,67 @@ class BacktestNotebookParityMeasurementContractV2:
         if not self.notes.strip():
             raise ValueError(
                 "BacktestNotebookParityMeasurementContractV2.notes must be non-empty"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestNotebookParityAuthorityLayerV2:
+    """
+    Explicit benchmark-authority layer separating synthetic validation from live closure evidence.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/fixtures/
+        backtest_notebook_parity_benchmark_corpus_v1.json
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    """
+
+    authority_kind: NotebookParityAuthorityKindLiteralV2
+    scenario_ids: tuple[str, ...]
+    grants_final_closure: bool
+    notes: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate one explicit benchmark-authority layer.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Synthetic perf-smoke can validate the committed contract, but only explicit live host
+            measurements can grant final closure for canonical corrective scenarios.
+        Raises:
+            ValueError: If the layer is empty, duplicates scenarios, or blurs synthetic-vs-live
+                closure semantics.
+        Side Effects:
+            None.
+        """
+        if len(self.scenario_ids) == 0:
+            raise ValueError(
+                "BacktestNotebookParityAuthorityLayerV2.scenario_ids must be non-empty"
+            )
+        if len(self.scenario_ids) != len(set(self.scenario_ids)):
+            raise ValueError(
+                "BacktestNotebookParityAuthorityLayerV2.scenario_ids must not contain "
+                "duplicates"
+            )
+        if self.authority_kind == "synthetic_contract_validation" and self.grants_final_closure:
+            raise ValueError(
+                "BacktestNotebookParityAuthorityLayerV2.synthetic_contract_validation must "
+                "not grant final closure"
+            )
+        if self.authority_kind == "live_host_measurement" and not self.grants_final_closure:
+            raise ValueError(
+                "BacktestNotebookParityAuthorityLayerV2.live_host_measurement must grant "
+                "final closure"
+            )
+        if not self.notes.strip():
+            raise ValueError(
+                "BacktestNotebookParityAuthorityLayerV2.notes must be non-empty"
             )
 
 
@@ -601,6 +676,119 @@ class BacktestNotebookParityScenarioV2:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestNotebookParityLiveHostCaptureV2:
+    """
+    Blocking live-host benchmark capture requirement for one canonical notebook-parity scenario.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/fixtures/
+        backtest_notebook_parity_benchmark_corpus_v1.json
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    """
+
+    capture_id: str
+    scenario_id: str
+    benchmark_class: NotebookParityBenchmarkClassLiteralV2
+    runtime_surface: NotebookParityRuntimeSurfaceLiteralV2
+    capture_status: NotebookParityLiveHostCaptureStatusLiteralV2
+    blocking_closure: bool
+    captured_measurement: BacktestNotebookParityMeasurementV2 | None
+    notes: str
+
+    def __post_init__(self) -> None:
+        """
+        Validate one canonical live-host capture requirement or recorded measurement.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Live host captures are backend-only benchmark artifacts and must stay separate from
+            synthetic perf-smoke validation until an explicit canonical measurement exists.
+        Raises:
+            ValueError: If capture metadata is blank, the runtime surface is unsupported, or the
+                optional measurement conflicts with the declared scenario metadata.
+        Side Effects:
+            None.
+        """
+        if not self.capture_id.strip():
+            raise ValueError(
+                "BacktestNotebookParityLiveHostCaptureV2.capture_id must be non-empty"
+            )
+        if not self.scenario_id.strip():
+            raise ValueError(
+                "BacktestNotebookParityLiveHostCaptureV2.scenario_id must be non-empty"
+            )
+        if self.runtime_surface == "notebook":
+            raise ValueError(
+                "BacktestNotebookParityLiveHostCaptureV2.runtime_surface must not be "
+                "'notebook'"
+            )
+        if self.capture_status == "captured" and self.captured_measurement is None:
+            raise ValueError(
+                "BacktestNotebookParityLiveHostCaptureV2.captured_measurement must be "
+                "provided when capture_status is 'captured'"
+            )
+        if self.capture_status == "missing" and self.captured_measurement is not None:
+            raise ValueError(
+                "BacktestNotebookParityLiveHostCaptureV2.captured_measurement must be "
+                "absent when capture_status is 'missing'"
+            )
+        if self.captured_measurement is not None:
+            if self.captured_measurement.measurement_source != "backend":
+                raise ValueError(
+                    "BacktestNotebookParityLiveHostCaptureV2.captured_measurement must use "
+                    "'backend' as measurement_source"
+                )
+            if self.captured_measurement.scenario_id != self.scenario_id:
+                raise ValueError(
+                    "BacktestNotebookParityLiveHostCaptureV2.captured_measurement.scenario_id "
+                    "must match scenario_id"
+                )
+            if self.captured_measurement.benchmark_class != self.benchmark_class:
+                raise ValueError(
+                    "BacktestNotebookParityLiveHostCaptureV2.captured_measurement."
+                    "benchmark_class must match benchmark_class"
+                )
+            if self.captured_measurement.runtime_surface != self.runtime_surface:
+                raise ValueError(
+                    "BacktestNotebookParityLiveHostCaptureV2.captured_measurement."
+                    "runtime_surface must match runtime_surface"
+                )
+        if not self.notes.strip():
+            raise ValueError(
+                "BacktestNotebookParityLiveHostCaptureV2.notes must be non-empty"
+            )
+
+    def has_required_capture_evidence(self) -> bool:
+        """
+        Report whether this live-host capture currently satisfies its capture-evidence contract.
+
+        Args:
+            None.
+        Returns:
+            bool: `True` when the capture is either non-blocking or already recorded explicitly.
+        Assumptions:
+            Final closure still depends on scenario gate evaluation; this helper answers only
+            whether explicit live-host evidence has been recorded where required.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if not self.blocking_closure:
+            return True
+        return (
+            self.capture_status == "captured"
+            and self.captured_measurement is not None
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestNotebookParityBenchmarkCorpusV2:
     """
     Versioned notebook-parity benchmark corpus for A1 benchmark authority and perf smoke.
@@ -620,6 +808,8 @@ class BacktestNotebookParityBenchmarkCorpusV2:
     status: str
     reference_docs: tuple[str, ...]
     measurement_contract: BacktestNotebookParityMeasurementContractV2
+    authority_layers: tuple[BacktestNotebookParityAuthorityLayerV2, ...]
+    live_host_captures: tuple[BacktestNotebookParityLiveHostCaptureV2, ...]
     source_fixtures: BacktestNotebookParitySourceFixturesV2
     equal_thread_budget_rule: BacktestNotebookParityEqualThreadBudgetRuleV2
     scenario_order: tuple[str, ...]
@@ -664,6 +854,25 @@ class BacktestNotebookParityBenchmarkCorpusV2:
             raise ValueError(
                 "BacktestNotebookParityBenchmarkCorpusV2.reference_docs must be non-empty"
             )
+        if len(self.authority_layers) == 0:
+            raise ValueError(
+                "BacktestNotebookParityBenchmarkCorpusV2.authority_layers must be non-empty"
+            )
+        authority_kinds = tuple(
+            layer.authority_kind for layer in self.authority_layers
+        )
+        if len(authority_kinds) != len(set(authority_kinds)):
+            raise ValueError(
+                "BacktestNotebookParityBenchmarkCorpusV2.authority_layers must not contain "
+                "duplicate authority kinds"
+            )
+        if tuple(sorted(authority_kinds)) != tuple(
+            sorted(_ALLOWED_NOTEBOOK_PARITY_AUTHORITY_KINDS_V2)
+        ):
+            raise ValueError(
+                "BacktestNotebookParityBenchmarkCorpusV2.authority_layers must define "
+                "synthetic_contract_validation and live_host_measurement"
+            )
         if len(self.scenario_order) == 0:
             raise ValueError(
                 "BacktestNotebookParityBenchmarkCorpusV2.scenario_order must be non-empty"
@@ -678,6 +887,50 @@ class BacktestNotebookParityBenchmarkCorpusV2:
             raise ValueError(
                 "BacktestNotebookParityBenchmarkCorpusV2.scenarios must follow scenario_order"
             )
+        valid_scenario_ids = set(self.scenario_order)
+        for layer in self.authority_layers:
+            if not set(layer.scenario_ids).issubset(valid_scenario_ids):
+                raise ValueError(
+                    "BacktestNotebookParityBenchmarkCorpusV2.authority_layers must reference "
+                    "committed scenarios only"
+                )
+        synthetic_layer = self.authority_layer_for_kind(
+            authority_kind="synthetic_contract_validation"
+        )
+        if synthetic_layer.scenario_ids != self.scenario_order:
+            raise ValueError(
+                "BacktestNotebookParityBenchmarkCorpusV2.synthetic_contract_validation must "
+                "cover every committed scenario"
+            )
+        capture_ids = tuple(capture.capture_id for capture in self.live_host_captures)
+        if len(capture_ids) != len(set(capture_ids)):
+            raise ValueError(
+                "BacktestNotebookParityBenchmarkCorpusV2.live_host_captures must not contain "
+                "duplicate capture ids"
+            )
+        capture_scenario_ids = tuple(
+            capture.scenario_id for capture in self.live_host_captures
+        )
+        if len(capture_scenario_ids) != len(set(capture_scenario_ids)):
+            raise ValueError(
+                "BacktestNotebookParityBenchmarkCorpusV2.live_host_captures must not contain "
+                "duplicate scenario ids"
+            )
+        live_layer = self.authority_layer_for_kind(
+            authority_kind="live_host_measurement"
+        )
+        if live_layer.scenario_ids != capture_scenario_ids:
+            raise ValueError(
+                "BacktestNotebookParityBenchmarkCorpusV2.live_host_measurement scenarios "
+                "must match live_host_captures ordering"
+            )
+        for capture in self.live_host_captures:
+            scenario = self.scenario_for_id(scenario_id=capture.scenario_id)
+            if scenario.benchmark_class != capture.benchmark_class:
+                raise ValueError(
+                    "BacktestNotebookParityBenchmarkCorpusV2.live_host_captures must keep "
+                    "scenario benchmark_class alignment"
+                )
 
     def scenario_for_id(self, *, scenario_id: str) -> BacktestNotebookParityScenarioV2:
         """
@@ -698,6 +951,81 @@ class BacktestNotebookParityBenchmarkCorpusV2:
             if scenario.scenario_id == scenario_id:
                 return scenario
         raise KeyError(f"notebook-parity scenario not found: {scenario_id!r}")
+
+    def authority_layer_for_kind(
+        self,
+        *,
+        authority_kind: NotebookParityAuthorityKindLiteralV2,
+    ) -> BacktestNotebookParityAuthorityLayerV2:
+        """
+        Return one explicit benchmark-authority layer by its stable kind.
+
+        Args:
+            authority_kind: Stable authority-layer literal.
+        Returns:
+            BacktestNotebookParityAuthorityLayerV2: Matching committed authority layer.
+        Assumptions:
+            The corpus always defines both synthetic and live authority layers explicitly.
+        Raises:
+            KeyError: If the requested authority layer is not present in the committed corpus.
+        Side Effects:
+            None.
+        """
+        for layer in self.authority_layers:
+            if layer.authority_kind == authority_kind:
+                return layer
+        raise KeyError(f"notebook-parity authority layer not found: {authority_kind!r}")
+
+    def live_host_capture_for_scenario(
+        self,
+        *,
+        scenario_id: str,
+    ) -> BacktestNotebookParityLiveHostCaptureV2 | None:
+        """
+        Return the explicit live-host capture requirement for one scenario when present.
+
+        Args:
+            scenario_id: Stable notebook-parity scenario identifier.
+        Returns:
+            BacktestNotebookParityLiveHostCaptureV2 | None: Matching live-host capture entry, or
+                `None` when the scenario has no blocking live requirement.
+        Assumptions:
+            Only canonical corrective scenarios require explicit live host measurements.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        for capture in self.live_host_captures:
+            if capture.scenario_id == scenario_id:
+                return capture
+        return None
+
+    def has_required_live_capture_evidence_for_scenario(
+        self,
+        *,
+        scenario_id: str,
+    ) -> bool:
+        """
+        Report whether explicit required live-host evidence exists for one scenario.
+
+        Args:
+            scenario_id: Stable notebook-parity scenario identifier.
+        Returns:
+            bool: `True` when the scenario does not require live host evidence or the blocking
+                live capture has been recorded explicitly.
+        Assumptions:
+            This helper does not evaluate benchmark gates; it answers only whether the required
+            live capture artifact exists for later closure review.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        live_host_capture = self.live_host_capture_for_scenario(scenario_id=scenario_id)
+        if live_host_capture is None:
+            return True
+        return live_host_capture.has_required_capture_evidence()
 
 
 @dataclass(frozen=True, slots=True)
@@ -927,6 +1255,31 @@ def serialize_backtest_notebook_parity_measurements_v2(
     return serialize_backtest_notebook_parity_benchmark_corpus_payload_v2(payload=payload)
 
 
+def serialize_backtest_notebook_parity_live_host_captures_v2(
+    *,
+    captures: tuple[BacktestNotebookParityLiveHostCaptureV2, ...],
+) -> bytes:
+    """
+    Serialize canonical live-host capture payloads deterministically for reviewable benchmark logs.
+
+    Args:
+        captures: Ordered immutable live-host capture payloads to serialize.
+    Returns:
+        bytes: Canonical UTF-8 JSON bytes with stable key ordering and trailing newline.
+    Assumptions:
+        Benchmark-host runs may record missing or captured live authority in a narrow internal
+        payload without exposing these fields through public runtime contracts.
+    Raises:
+        TypeError: If one nested capture field becomes non-JSON-serializable.
+    Side Effects:
+        None.
+    """
+    payload: dict[str, object] = {
+        "live_host_captures": [*_live_host_capture_payloads_v2(captures=captures)],
+    }
+    return serialize_backtest_notebook_parity_benchmark_corpus_payload_v2(payload=payload)
+
+
 def evaluate_backtest_notebook_parity_scenario_v2(
     *,
     scenario: BacktestNotebookParityScenarioV2,
@@ -1066,6 +1419,14 @@ def _parse_backtest_notebook_parity_benchmark_corpus_payload_v2(
     """
     reference_docs = _require_string_tuple(payload=payload, key="reference_docs")
     measurement_contract_map = _require_mapping(payload=payload, key="measurement_contract")
+    authority_layer_payloads = _require_mapping_sequence(
+        payload=payload,
+        key="authority_layers",
+    )
+    live_host_capture_payloads = _require_mapping_sequence(
+        payload=payload,
+        key="live_host_captures",
+    )
     source_fixtures_map = _require_mapping(payload=payload, key="source_fixtures")
     equal_thread_budget_rule_map = _require_mapping(
         payload=payload,
@@ -1082,6 +1443,16 @@ def _parse_backtest_notebook_parity_benchmark_corpus_payload_v2(
         reference_docs=reference_docs,
         measurement_contract=_parse_notebook_parity_measurement_contract_v2(
             raw_contract=measurement_contract_map
+        ),
+        authority_layers=tuple(
+            _parse_notebook_parity_authority_layer_v2(raw_layer=raw_layer)
+            for raw_layer in authority_layer_payloads
+        ),
+        live_host_captures=tuple(
+            _parse_backtest_notebook_parity_live_host_capture_v2(
+                raw_capture=raw_capture
+            )
+            for raw_capture in live_host_capture_payloads
         ),
         source_fixtures=BacktestNotebookParitySourceFixturesV2(
             perf_smoke_harness=_require_str(
@@ -1148,6 +1519,38 @@ def _parse_notebook_parity_measurement_contract_v2(
             ),
         ),
         notes=_require_str(payload=raw_contract, key="notes"),
+    )
+
+
+def _parse_notebook_parity_authority_layer_v2(
+    *,
+    raw_layer: dict[str, object],
+) -> BacktestNotebookParityAuthorityLayerV2:
+    """
+    Parse one raw benchmark-authority layer object.
+
+    Args:
+        raw_layer: Raw JSON object describing one authority layer.
+    Returns:
+        BacktestNotebookParityAuthorityLayerV2: Parsed immutable authority layer.
+    Assumptions:
+        Synthetic contract validation and live host measurement stay explicit instead of inferred
+        from prose or scenario naming.
+    Raises:
+        ValueError: If the layer carries unsupported literals or inconsistent closure semantics.
+    Side Effects:
+        None.
+    """
+    return BacktestNotebookParityAuthorityLayerV2(
+        authority_kind=_parse_notebook_parity_authority_kind_v2(
+            value=_require_str(payload=raw_layer, key="authority_kind")
+        ),
+        scenario_ids=_require_string_tuple(payload=raw_layer, key="scenario_ids"),
+        grants_final_closure=_require_bool(
+            payload=raw_layer,
+            key="grants_final_closure",
+        ),
+        notes=_require_str(payload=raw_layer, key="notes"),
     )
 
 
@@ -1252,6 +1655,53 @@ def _parse_backtest_notebook_parity_scenario_v2(
     )
 
 
+def _parse_backtest_notebook_parity_live_host_capture_v2(
+    *,
+    raw_capture: dict[str, object],
+) -> BacktestNotebookParityLiveHostCaptureV2:
+    """
+    Parse one raw live-host capture object into a typed immutable contract.
+
+    Args:
+        raw_capture: Raw JSON object for one live-host capture entry.
+    Returns:
+        BacktestNotebookParityLiveHostCaptureV2: Parsed typed live-host capture contract.
+    Assumptions:
+        The committed corpus may record either a missing closure blocker or a captured backend
+        measurement, but must always state the status explicitly.
+    Raises:
+        ValueError: If one live-host capture field is unsupported or inconsistent.
+    Side Effects:
+        None.
+    """
+    captured_measurement_map = _require_optional_mapping(
+        payload=raw_capture,
+        key="captured_measurement",
+    )
+    return BacktestNotebookParityLiveHostCaptureV2(
+        capture_id=_require_str(payload=raw_capture, key="capture_id"),
+        scenario_id=_require_str(payload=raw_capture, key="scenario_id"),
+        benchmark_class=_parse_notebook_parity_benchmark_class_v2(
+            value=_require_str(payload=raw_capture, key="benchmark_class")
+        ),
+        runtime_surface=_parse_notebook_parity_runtime_surface_v2(
+            value=_require_str(payload=raw_capture, key="runtime_surface")
+        ),
+        capture_status=_parse_notebook_parity_live_host_capture_status_v2(
+            value=_require_str(payload=raw_capture, key="capture_status")
+        ),
+        blocking_closure=_require_bool(payload=raw_capture, key="blocking_closure"),
+        captured_measurement=(
+            _parse_backtest_notebook_parity_measurement_v2(
+                raw_measurement=captured_measurement_map
+            )
+            if captured_measurement_map is not None
+            else None
+        ),
+        notes=_require_str(payload=raw_capture, key="notes"),
+    )
+
+
 def _parse_notebook_parity_baseline_reference_point_v2(
     *,
     raw_point: dict[str, object],
@@ -1349,6 +1799,61 @@ def _parse_notebook_parity_acceptance_gate_v2(
     )
 
 
+def _parse_backtest_notebook_parity_measurement_v2(
+    *,
+    raw_measurement: dict[str, object],
+) -> BacktestNotebookParityMeasurementV2:
+    """
+    Parse one raw runtime-shape measurement object into a typed immutable benchmark payload.
+
+    Args:
+        raw_measurement: Raw JSON object for one measurement entry.
+    Returns:
+        BacktestNotebookParityMeasurementV2: Parsed typed runtime-shape measurement.
+    Assumptions:
+        Live host capture payloads reuse the same internal measurement contract as perf-smoke
+        samples to avoid parallel benchmark schemas.
+    Raises:
+        ValueError: If one measurement field is unsupported or violates typed invariants.
+    Side Effects:
+        None.
+    """
+    return BacktestNotebookParityMeasurementV2(
+        scenario_id=_require_str(payload=raw_measurement, key="scenario_id"),
+        benchmark_class=_parse_notebook_parity_benchmark_class_v2(
+            value=_require_str(payload=raw_measurement, key="benchmark_class")
+        ),
+        measurement_source=_parse_notebook_parity_measurement_source_v2(
+            value=_require_str(payload=raw_measurement, key="measurement_source")
+        ),
+        runtime_surface=_parse_notebook_parity_runtime_surface_v2(
+            value=_require_str(payload=raw_measurement, key="runtime_surface")
+        ),
+        host_label=_require_str(payload=raw_measurement, key="host_label"),
+        artifact_slot=_require_str(payload=raw_measurement, key="artifact_slot"),
+        wall_clock_seconds=_require_float(payload=raw_measurement, key="wall_clock_seconds"),
+        cpu_time_seconds=_require_float(payload=raw_measurement, key="cpu_time_seconds"),
+        peak_rss_bytes=_require_int(payload=raw_measurement, key="peak_rss_bytes"),
+        numba_threads_used=_require_int(payload=raw_measurement, key="numba_threads_used"),
+        max_python_processes_seen=_require_int(
+            payload=raw_measurement,
+            key="max_python_processes_seen",
+        ),
+        stage_b_execution_mode=_parse_notebook_parity_stage_b_execution_mode_v2(
+            value=_require_str(payload=raw_measurement, key="stage_b_execution_mode")
+        ),
+        stage_b_process_fallback_threshold=(
+            _parse_notebook_parity_stage_b_process_fallback_threshold_v2(
+                value=_require_str(
+                    payload=raw_measurement,
+                    key="stage_b_process_fallback_threshold",
+                )
+            )
+        ),
+        exact_replay_count=_require_int(payload=raw_measurement, key="exact_replay_count"),
+    )
+
+
 def _measurement_payloads_v2(
     *,
     measurements: tuple[BacktestNotebookParityMeasurementV2, ...],
@@ -1368,25 +1873,83 @@ def _measurement_payloads_v2(
         None.
     """
     return tuple(
-        {
-            "scenario_id": measurement.scenario_id,
-            "benchmark_class": measurement.benchmark_class,
-            "measurement_source": measurement.measurement_source,
-            "runtime_surface": measurement.runtime_surface,
-            "host_label": measurement.host_label,
-            "artifact_slot": measurement.artifact_slot,
-            "wall_clock_seconds": measurement.wall_clock_seconds,
-            "cpu_time_seconds": measurement.cpu_time_seconds,
-            "peak_rss_bytes": measurement.peak_rss_bytes,
-            "numba_threads_used": measurement.numba_threads_used,
-            "max_python_processes_seen": measurement.max_python_processes_seen,
-            "stage_b_execution_mode": measurement.stage_b_execution_mode,
-            "stage_b_process_fallback_threshold": (
-                measurement.stage_b_process_fallback_threshold
-            ),
-            "exact_replay_count": measurement.exact_replay_count,
-        }
+        _measurement_payload_v2(measurement=measurement)
         for measurement in measurements
+    )
+
+
+def _measurement_payload_v2(
+    *,
+    measurement: BacktestNotebookParityMeasurementV2,
+) -> dict[str, object]:
+    """
+    Convert one typed runtime-shape measurement into its canonical JSON payload dictionary.
+
+    Args:
+        measurement: Immutable measurement payload to convert.
+    Returns:
+        dict[str, object]: Ordered JSON-compatible measurement mapping.
+    Assumptions:
+        Field ordering mirrors the committed internal benchmark contract exactly.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return {
+        "scenario_id": measurement.scenario_id,
+        "benchmark_class": measurement.benchmark_class,
+        "measurement_source": measurement.measurement_source,
+        "runtime_surface": measurement.runtime_surface,
+        "host_label": measurement.host_label,
+        "artifact_slot": measurement.artifact_slot,
+        "wall_clock_seconds": measurement.wall_clock_seconds,
+        "cpu_time_seconds": measurement.cpu_time_seconds,
+        "peak_rss_bytes": measurement.peak_rss_bytes,
+        "numba_threads_used": measurement.numba_threads_used,
+        "max_python_processes_seen": measurement.max_python_processes_seen,
+        "stage_b_execution_mode": measurement.stage_b_execution_mode,
+        "stage_b_process_fallback_threshold": (
+            measurement.stage_b_process_fallback_threshold
+        ),
+        "exact_replay_count": measurement.exact_replay_count,
+    }
+
+
+def _live_host_capture_payloads_v2(
+    *,
+    captures: tuple[BacktestNotebookParityLiveHostCaptureV2, ...],
+) -> tuple[dict[str, object], ...]:
+    """
+    Convert typed live-host captures into canonical JSON payload dictionaries.
+
+    Args:
+        captures: Ordered immutable live-host capture payloads.
+    Returns:
+        tuple[dict[str, object], ...]: Ordered JSON-compatible payload mappings.
+    Assumptions:
+        Missing-vs-captured status must stay reviewable in deterministic serialization output.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return tuple(
+        {
+            "capture_id": capture.capture_id,
+            "scenario_id": capture.scenario_id,
+            "benchmark_class": capture.benchmark_class,
+            "runtime_surface": capture.runtime_surface,
+            "capture_status": capture.capture_status,
+            "blocking_closure": capture.blocking_closure,
+            "captured_measurement": (
+                _measurement_payload_v2(measurement=capture.captured_measurement)
+                if capture.captured_measurement is not None
+                else None
+            ),
+            "notes": capture.notes,
+        }
+        for capture in captures
     )
 
 
@@ -1457,6 +2020,75 @@ def _parse_notebook_parity_measurement_field_v2(
     if value not in _ALLOWED_NOTEBOOK_PARITY_MEASUREMENT_FIELDS_V2:
         raise ValueError(f"unsupported notebook-parity measurement field: {value!r}")
     return cast(NotebookParityMeasurementFieldLiteralV2, value)
+
+
+def _parse_notebook_parity_measurement_source_v2(
+    *,
+    value: str,
+) -> NotebookParityMeasurementSourceLiteralV2:
+    """
+    Parse one notebook-parity measurement-source literal.
+
+    Args:
+        value: Raw measurement-source literal from JSON.
+    Returns:
+        NotebookParityMeasurementSourceLiteralV2: Supported measurement-source literal.
+    Assumptions:
+        Benchmark measurements remain attributable either to backend or notebook sources.
+    Raises:
+        ValueError: If the literal is unsupported.
+    Side Effects:
+        None.
+    """
+    if value not in _ALLOWED_NOTEBOOK_PARITY_MEASUREMENT_SOURCES_V2:
+        raise ValueError(f"unsupported notebook-parity measurement_source: {value!r}")
+    return cast(NotebookParityMeasurementSourceLiteralV2, value)
+
+
+def _parse_notebook_parity_authority_kind_v2(
+    *,
+    value: str,
+) -> NotebookParityAuthorityKindLiteralV2:
+    """
+    Parse one notebook-parity authority-kind literal.
+
+    Args:
+        value: Raw authority-kind literal from JSON.
+    Returns:
+        NotebookParityAuthorityKindLiteralV2: Supported authority-kind literal.
+    Assumptions:
+        Synthetic validation and live host measurement stay explicit top-level authorities.
+    Raises:
+        ValueError: If the literal is unsupported.
+    Side Effects:
+        None.
+    """
+    if value not in _ALLOWED_NOTEBOOK_PARITY_AUTHORITY_KINDS_V2:
+        raise ValueError(f"unsupported notebook-parity authority_kind: {value!r}")
+    return cast(NotebookParityAuthorityKindLiteralV2, value)
+
+
+def _parse_notebook_parity_live_host_capture_status_v2(
+    *,
+    value: str,
+) -> NotebookParityLiveHostCaptureStatusLiteralV2:
+    """
+    Parse one notebook-parity live-host capture-status literal.
+
+    Args:
+        value: Raw capture-status literal from JSON.
+    Returns:
+        NotebookParityLiveHostCaptureStatusLiteralV2: Supported capture-status literal.
+    Assumptions:
+        The benchmark corpus must distinguish missing live authority from captured host evidence.
+    Raises:
+        ValueError: If the literal is unsupported.
+    Side Effects:
+        None.
+    """
+    if value not in _ALLOWED_NOTEBOOK_PARITY_LIVE_HOST_CAPTURE_STATUSES_V2:
+        raise ValueError(f"unsupported notebook-parity live_host_capture status: {value!r}")
+    return cast(NotebookParityLiveHostCaptureStatusLiteralV2, value)
 
 
 def _parse_notebook_parity_reference_source_kind_v2(
@@ -1578,6 +2210,34 @@ def _require_mapping(
     value = payload.get(key)
     if not isinstance(value, dict):
         raise ValueError(f"{key} must be an object mapping")
+    return cast(dict[str, object], value)
+
+
+def _require_optional_mapping(
+    *,
+    payload: dict[str, object],
+    key: str,
+) -> dict[str, object] | None:
+    """
+    Require one optional mapping child from a raw JSON object payload.
+
+    Args:
+        payload: Raw JSON object payload.
+        key: Optional mapping key.
+    Returns:
+        dict[str, object] | None: Child mapping value when present, otherwise `None`.
+    Assumptions:
+        Optional child objects use explicit `null` when no mapping payload exists yet.
+    Raises:
+        ValueError: If the key is present but the value is not an object mapping.
+    Side Effects:
+        None.
+    """
+    value = payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"{key} must be an object mapping when provided")
     return cast(dict[str, object], value)
 
 
@@ -1801,6 +2461,34 @@ def _require_optional_float(
     return float(value)
 
 
+def _require_float(
+    *,
+    payload: dict[str, object],
+    key: str,
+) -> float:
+    """
+    Require one float-or-int child from a raw JSON object payload.
+
+    Args:
+        payload: Raw JSON object payload.
+        key: Required float key.
+    Returns:
+        float: Floating-point value, converting JSON integers losslessly.
+    Assumptions:
+        JSON numeric runtime-shape fields may be authored as ints or floats.
+    Raises:
+        ValueError: If the key is missing or the value is not numeric.
+    Side Effects:
+        None.
+    """
+    value = payload.get(key)
+    if isinstance(value, bool) or value is None:
+        raise ValueError(f"{key} must be a float")
+    if isinstance(value, int | float):
+        return float(value)
+    raise ValueError(f"{key} must be a float")
+
+
 def _require_bool(
     *,
     payload: dict[str, object],
@@ -1832,18 +2520,22 @@ __all__ = [
     "BACKTEST_NOTEBOOK_PARITY_BENCHMARK_CORPUS_MILESTONE_ID_V2",
     "BACKTEST_NOTEBOOK_PARITY_BENCHMARK_CORPUS_SCHEMA_VERSION_V2",
     "BacktestNotebookParityAcceptanceGateV2",
+    "BacktestNotebookParityAuthorityLayerV2",
     "BacktestNotebookParityBaselineReferencePointV2",
     "BacktestNotebookParityBenchmarkCorpusV2",
     "BacktestNotebookParityComparisonV2",
     "BacktestNotebookParityEqualThreadBudgetRuleV2",
+    "BacktestNotebookParityLiveHostCaptureV2",
     "BacktestNotebookParityMeasurementContractV2",
     "BacktestNotebookParityMeasurementV2",
     "BacktestNotebookParityScenarioV2",
     "BacktestNotebookParitySourceFixturesV2",
+    "NotebookParityAuthorityKindLiteralV2",
     "NotebookParityBenchmarkClassLiteralV2",
     "NotebookParityComparisonModeLiteralV2",
     "NotebookParityMeasurementFieldLiteralV2",
     "NotebookParityMeasurementSourceLiteralV2",
+    "NotebookParityLiveHostCaptureStatusLiteralV2",
     "NotebookParityReferenceSourceKindLiteralV2",
     "NotebookParityRuntimeSurfaceLiteralV2",
     "NotebookParityStageBExecutionModeLiteralV2",
@@ -1852,6 +2544,7 @@ __all__ = [
     "load_backtest_notebook_parity_benchmark_corpus_v2",
     "read_backtest_notebook_parity_benchmark_corpus_payload_v2",
     "serialize_backtest_notebook_parity_benchmark_corpus_payload_v2",
+    "serialize_backtest_notebook_parity_live_host_captures_v2",
     "serialize_backtest_notebook_parity_measurements_v2",
     "validate_backtest_notebook_parity_benchmark_corpus_payload_v2",
 ]

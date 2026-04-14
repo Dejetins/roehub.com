@@ -148,6 +148,41 @@ Required runtime-shape measurement fields:
 The contract is intentionally internal-only. These fields are benchmark-only evidence and MUST NOT
 be exposed through public API routes by this prompt.
 
+### Authority layers
+
+The committed corpus now distinguishes two explicit benchmark-authority layers:
+
+- `synthetic_contract_validation`: local perf-smoke proves deterministic schema, serialization,
+  equal-thread-budget normalization, and gate semantics for `NR2`, `RG-TTR`, and `RG-ALT`
+- `live_host_measurement`: final corrective closure authority for canonical `NR2` and `RG-TTR`
+  stays on explicit benchmark-host captures and cannot be inferred from synthetic perf-smoke alone
+
+This split is intentional: passing local synthetic validation keeps the benchmark contract honest,
+but it does not by itself close the corrective roadmap.
+
+### Blocking live host captures
+
+The committed corpus also records explicit `live_host_captures` entries for canonical closure
+scenarios:
+
+- `nr2_live_host_canonical`
+- `rg_ttr_live_host_canonical`
+
+Each entry keeps one explicit `capture_status` plus an optional nested `captured_measurement`
+payload that reuses the same internal runtime-shape contract:
+
+- `wall_clock_seconds`
+- `cpu_time_seconds`
+- `peak_rss_bytes`
+- `numba_threads_used`
+- `max_python_processes_seen`
+- `stage_b_execution_mode`
+- `stage_b_process_fallback_threshold`
+- `exact_replay_count`
+
+While `capture_status = missing`, final closure for that scenario remains blocked even if the
+synthetic harness passes locally.
+
 ### Equal-thread-budget normalization
 
 All notebook-parity comparisons are valid only under `equal thread budget` rules:
@@ -192,8 +227,10 @@ memory or prose:
 
 Maintainers should treat
 `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
-as the perf-smoke authority for notebook parity closure. Captured live benchmark runs remain
-incomplete if they fail any `NR2`, `RG-TTR`, or `RG-ALT` gate, even when the docs still match.
+as the blocking synthetic authority for the committed notebook parity contract. Final corrective
+closure for canonical `NR2` and `RG-TTR` additionally requires explicit benchmark-host
+`live_host_captures` evidence. Captured live benchmark runs remain incomplete if they fail any
+`NR2`, `RG-TTR`, or `RG-ALT` gate, even when the docs still match.
 
 ## R10-03 closure protocol
 
@@ -335,8 +372,10 @@ uv run pytest -q tests/perf_smoke/contexts/backtest/test_backtest_notebook_parit
 
 Этот harness является blocking perf-smoke authority для committed notebook parity contract.
 Он гарантирует, что benchmark surface, runtime-shape payload, equal-thread-budget rules и
-committed comparison points остаются детерминированы и исполнимы. Captured live measurements
-всё равно должны заполнить эти поля и пройти те же gates на benchmark host.
+committed comparison points остаются детерминированы и исполнимы. Это `synthetic_contract_validation`,
+а не замена benchmark-host closure evidence: canonical `NR2` и `RG-TTR` всё равно должны получить
+explicit `live_host_captures` payload с теми же runtime-shape fields и пройти те же gates на
+benchmark host.
 
 4. Сохранить measurement snapshot в файл:
 

@@ -30,6 +30,49 @@
     ],
     "notes": "Runtime-shape measurements are the internal notebook parity closure payload. They must report wall time, CPU time, peak RSS, Numba thread count, maximum Python process fan-out, stage_b_execution_mode, stage_b_process_fallback_threshold, and exact_replay_count."
   },
+  "authority_layers": [
+    {
+      "authority_kind": "synthetic_contract_validation",
+      "scenario_ids": [
+        "nr2",
+        "rg_ttr",
+        "rg_alt"
+      ],
+      "grants_final_closure": false,
+      "notes": "Synthetic perf-smoke validates the committed benchmark contract, deterministic serialization, and gate semantics, but it does not grant final corrective closure by itself."
+    },
+    {
+      "authority_kind": "live_host_measurement",
+      "scenario_ids": [
+        "nr2",
+        "rg_ttr"
+      ],
+      "grants_final_closure": true,
+      "notes": "Final corrective closure for canonical notebook-parity scenarios requires explicit live benchmark measurement on the benchmark host. Missing live_host_captures keep closure open even when synthetic contract validation passes."
+    }
+  ],
+  "live_host_captures": [
+    {
+      "capture_id": "nr2_live_host_canonical",
+      "scenario_id": "nr2",
+      "benchmark_class": "NR2",
+      "runtime_surface": "sync",
+      "capture_status": "missing",
+      "blocking_closure": true,
+      "captured_measurement": null,
+      "notes": "Canonical NR2 closure remains blocked until a benchmark-host backend capture records wall_clock_seconds, peak_rss_bytes, numba_threads_used, max_python_processes_seen, stage_b_execution_mode, stage_b_process_fallback_threshold, and exact_replay_count under the equal thread budget."
+    },
+    {
+      "capture_id": "rg_ttr_live_host_canonical",
+      "scenario_id": "rg_ttr",
+      "benchmark_class": "RG-TTR",
+      "runtime_surface": "sync",
+      "capture_status": "missing",
+      "blocking_closure": true,
+      "captured_measurement": null,
+      "notes": "Canonical RG-TTR closure remains blocked until a benchmark-host backend capture records wall_clock_seconds, peak_rss_bytes, numba_threads_used, max_python_processes_seen, stage_b_execution_mode, stage_b_process_fallback_threshold, and exact_replay_count under the equal thread budget."
+    }
+  ],
   "source_fixtures": {
     "perf_smoke_harness": "tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py",
     "nr2_notebook_anchor": "tests/notebook_tests/new_engine/02_run_f7d2_btcusdt_15m_no_risk_probe.ipynb",

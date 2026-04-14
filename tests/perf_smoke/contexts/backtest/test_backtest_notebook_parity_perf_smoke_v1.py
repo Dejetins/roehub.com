@@ -27,6 +27,10 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
 )
+from trading.contexts.backtest.application.services.v2.notebook_parity_benchmark_corpus_v2 import (
+    BacktestNotebookParityLiveHostCaptureV2,
+    serialize_backtest_notebook_parity_live_host_captures_v2,
+)
 
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 _CORPUS_FIXTURE_PATH = _FIXTURES_DIR / "backtest_notebook_parity_benchmark_corpus_v1.json"
@@ -87,6 +91,16 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
         "stage_b_process_fallback_threshold",
         "exact_replay_count",
     )
+    synthetic_authority = corpus.authority_layer_for_kind(
+        authority_kind="synthetic_contract_validation"
+    )
+    assert synthetic_authority.scenario_ids == ("nr2", "rg_ttr", "rg_alt")
+    assert synthetic_authority.grants_final_closure is False
+    live_authority = corpus.authority_layer_for_kind(
+        authority_kind="live_host_measurement"
+    )
+    assert live_authority.scenario_ids == ("nr2", "rg_ttr")
+    assert live_authority.grants_final_closure is True
     assert corpus.source_fixtures.perf_smoke_harness == (
         "tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py"
     )
@@ -134,6 +148,14 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert nr2.acceptance_gates[2].max_value == 1.0
     assert nr2.acceptance_gates[3].expected_value == "bypassed_no_risk"
     assert nr2.acceptance_gates[4].expected_value == "none"
+    nr2_live_capture = corpus.live_host_capture_for_scenario(scenario_id="nr2")
+    assert nr2_live_capture is not None
+    assert nr2_live_capture.capture_id == "nr2_live_host_canonical"
+    assert nr2_live_capture.runtime_surface == "sync"
+    assert nr2_live_capture.capture_status == "missing"
+    assert nr2_live_capture.blocking_closure is True
+    assert nr2_live_capture.captured_measurement is None
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is False
 
     rg_ttr = corpus.scenario_for_id(scenario_id="rg_ttr")
     assert rg_ttr.benchmark_class == "RG-TTR"
@@ -153,6 +175,17 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert rg_ttr.acceptance_gates[2].expected_value == "in_process"
     assert rg_ttr.acceptance_gates[3].expected_value == "none"
     assert rg_ttr.acceptance_gates[4].max_value == 64.0
+    rg_ttr_live_capture = corpus.live_host_capture_for_scenario(scenario_id="rg_ttr")
+    assert rg_ttr_live_capture is not None
+    assert rg_ttr_live_capture.capture_id == "rg_ttr_live_host_canonical"
+    assert rg_ttr_live_capture.runtime_surface == "sync"
+    assert rg_ttr_live_capture.capture_status == "missing"
+    assert rg_ttr_live_capture.blocking_closure is True
+    assert rg_ttr_live_capture.captured_measurement is None
+    assert (
+        corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr")
+        is False
+    )
 
     rg_alt = corpus.scenario_for_id(scenario_id="rg_alt")
     assert rg_alt.benchmark_class == "RG-ALT"
@@ -167,6 +200,8 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert rg_alt.baseline_reference_points[0].runtime_regression_ratio_limit == 1.1
     assert rg_alt.acceptance_gates[0].metric == "runtime_regression_ratio"
     assert rg_alt.acceptance_gates[0].max_ratio == 1.1
+    assert corpus.live_host_capture_for_scenario(scenario_id="rg_alt") is None
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_alt") is True
 
 
 def test_notebook_parity_benchmark_corpus_serialization_is_byte_stable() -> None:
@@ -360,6 +395,145 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
         b"  ]\n"
         b"}\n"
     )
+
+
+def test_notebook_parity_live_host_capture_serialization_is_deterministic() -> None:
+    """
+    Verify live-host capture payloads serialize deterministically for canonical closure review.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+      - src/trading/contexts/backtest/application/services/v2/
+        notebook_parity_benchmark_corpus_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Benchmark-host evidence must stay byte-stable and reviewable when a canonical live
+        capture is eventually recorded.
+    Raises:
+        AssertionError: If serialized live-host capture bytes drift from the canonical shape.
+    Side Effects:
+        None.
+    """
+    capture = _build_live_host_capture(
+        scenario_id="nr2",
+        benchmark_class="NR2",
+        runtime_surface="sync",
+        capture_status="captured",
+        captured_measurement=_build_measurement(
+            scenario_id="nr2",
+            benchmark_class="NR2",
+            measurement_source="backend",
+            runtime_surface="sync",
+            wall_clock_seconds=8.11,
+            cpu_time_seconds=7.33,
+            peak_rss_bytes=1200,
+            numba_threads_used=4,
+            max_python_processes_seen=1,
+            stage_b_execution_mode="bypassed_no_risk",
+            stage_b_process_fallback_threshold="none",
+            exact_replay_count=48,
+        ),
+    )
+
+    serialized = serialize_backtest_notebook_parity_live_host_captures_v2(
+        captures=(capture,)
+    )
+
+    assert capture.has_required_capture_evidence() is True
+    assert serialized == (
+        b'{\n'
+        b'  "live_host_captures": [\n'
+        b"    {\n"
+        b'      "capture_id": "nr2_live_host_capture",\n'
+        b'      "scenario_id": "nr2",\n'
+        b'      "benchmark_class": "NR2",\n'
+        b'      "runtime_surface": "sync",\n'
+        b'      "capture_status": "captured",\n'
+        b'      "blocking_closure": true,\n'
+        b'      "captured_measurement": {\n'
+        b'        "scenario_id": "nr2",\n'
+        b'        "benchmark_class": "NR2",\n'
+        b'        "measurement_source": "backend",\n'
+        b'        "runtime_surface": "sync",\n'
+        b'        "host_label": "macstudio-class",\n'
+        b'        "artifact_slot": "slot_a",\n'
+        b'        "wall_clock_seconds": 8.11,\n'
+        b'        "cpu_time_seconds": 7.33,\n'
+        b'        "peak_rss_bytes": 1200,\n'
+        b'        "numba_threads_used": 4,\n'
+        b'        "max_python_processes_seen": 1,\n'
+        b'        "stage_b_execution_mode": "bypassed_no_risk",\n'
+        b'        "stage_b_process_fallback_threshold": "none",\n'
+        b'        "exact_replay_count": 48\n'
+        b"      },\n"
+        b'      "notes": "Canonical live benchmark capture for notebook-parity closure."\n'
+        b"    }\n"
+        b"  ]\n"
+        b"}\n"
+    )
+
+
+def test_notebook_parity_closure_authority_requires_explicit_live_host_capture() -> None:
+    """
+    Verify synthetic perf-smoke cannot substitute for canonical live-host closure evidence.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/fixtures/
+        backtest_notebook_parity_benchmark_corpus_v1.json
+      - src/trading/contexts/backtest/application/services/v2/
+        notebook_parity_benchmark_corpus_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical `NR2` and `RG-TTR` must remain closure-blocked until the benchmark host emits
+        explicit live capture payloads, even if synthetic contract validation passes locally.
+    Raises:
+        AssertionError: If live-host capture status stops gating final closure readiness.
+    Side Effects:
+        None.
+    """
+    corpus = _load_notebook_parity_benchmark_corpus()
+
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is False
+    assert (
+        corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr")
+        is False
+    )
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_alt") is True
+
+    captured_nr2 = _build_live_host_capture(
+        scenario_id="nr2",
+        benchmark_class="NR2",
+        runtime_surface="sync",
+        capture_status="captured",
+        captured_measurement=_build_measurement(
+            scenario_id="nr2",
+            benchmark_class="NR2",
+            measurement_source="backend",
+            runtime_surface="sync",
+            wall_clock_seconds=8.11,
+            cpu_time_seconds=7.33,
+            peak_rss_bytes=1200,
+            numba_threads_used=4,
+            max_python_processes_seen=1,
+            stage_b_execution_mode="bypassed_no_risk",
+            stage_b_process_fallback_threshold="none",
+            exact_replay_count=48,
+        ),
+    )
+
+    assert captured_nr2.has_required_capture_evidence() is True
 
 
 def test_stage_a_retained_frontier_memory_shape_is_observable_for_benchmarks() -> None:
@@ -1164,4 +1338,52 @@ def _build_measurement(
             stage_b_process_fallback_threshold  # type: ignore[arg-type]
         ),
         exact_replay_count=exact_replay_count,
+    )
+
+
+def _build_live_host_capture(
+    *,
+    scenario_id: str,
+    benchmark_class: str,
+    runtime_surface: str,
+    capture_status: str,
+    captured_measurement: BacktestNotebookParityMeasurementV2 | None,
+    blocking_closure: bool = True,
+) -> BacktestNotebookParityLiveHostCaptureV2:
+    """
+    Build one deterministic live-host capture payload for canonical notebook-parity scenarios.
+
+    Docs:
+      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+    Related:
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+      - src/trading/contexts/backtest/application/services/v2/
+        notebook_parity_benchmark_corpus_v2.py
+    Args:
+        scenario_id: Stable benchmark scenario identifier.
+        benchmark_class: Canonical benchmark class literal.
+        runtime_surface: Runtime surface literal for the backend capture.
+        capture_status: Explicit live-host capture status literal.
+        captured_measurement: Optional explicit backend measurement emitted by the benchmark host.
+        blocking_closure: Whether the missing capture blocks final closure.
+    Returns:
+        BacktestNotebookParityLiveHostCaptureV2: Immutable live-host capture payload.
+    Assumptions:
+        Perf-smoke uses deterministic capture ids and review notes so live-host evidence remains
+        serializable even before the benchmark host writes real samples.
+    Raises:
+        ValueError: If the typed live-host capture payload rejects one provided field.
+    Side Effects:
+        None.
+    """
+    return BacktestNotebookParityLiveHostCaptureV2(
+        capture_id=f"{scenario_id}_live_host_capture",
+        scenario_id=scenario_id,
+        benchmark_class=benchmark_class,  # type: ignore[arg-type]
+        runtime_surface=runtime_surface,  # type: ignore[arg-type]
+        capture_status=capture_status,  # type: ignore[arg-type]
+        blocking_closure=blocking_closure,
+        captured_measurement=captured_measurement,
+        notes="Canonical live benchmark capture for notebook-parity closure.",
     )
