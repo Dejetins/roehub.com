@@ -113,6 +113,116 @@ def build_generic_row_signal_features_mapping_v2(
     )
 
 
+def _generic_row_total_scores_for_signal_rows_v2(
+    *,
+    signal_rows: np.ndarray,
+    scoring: ExecutionProfileShortlistScoringConfigV2,
+) -> np.ndarray:
+    """
+    Compute GenericRowScorerV2-compatible total scores for one signal-row matrix.
+
+    Args:
+        signal_rows: Int-like matrix shaped `[row, time]` using canonical `{-1, 0, 1}` values.
+        scoring: Shortlist-scoring weights used by `GenericRowScorerV2`.
+    Returns:
+        np.ndarray: Float64 total score per row matching the no-cache scorer fallback path.
+    Assumptions:
+        Callers already materialized one canonical signal-row matrix and want the same total-score
+        math as `GenericRowScorerV2.score_row(...)` without allocating per-row payload objects or
+        resolving optional cached `signal_features`.
+    Raises:
+        ValueError: If `signal_rows` is not 2D or contains empty timelines.
+    Side Effects:
+        Allocates deterministic temporary NumPy arrays for matrix-first row scoring.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+    normalized_signal_rows = np.asarray(signal_rows, dtype=np.int8)
+    if normalized_signal_rows.ndim != 2:
+        raise ValueError("generic row matrix scoring requires 2D signal_rows")
+    timeline_length = int(normalized_signal_rows.shape[1])
+    if timeline_length <= 0:
+        raise ValueError("generic row matrix scoring requires non-empty signal rows")
+    row_count = int(normalized_signal_rows.shape[0])
+    if row_count == 0:
+        return np.empty(0, dtype=np.float64)
+
+    active_mask = normalized_signal_rows != 0
+    nonzero_count = np.count_nonzero(active_mask, axis=1).astype(np.float64, copy=False)
+    long_count = np.count_nonzero(normalized_signal_rows > 0, axis=1).astype(
+        np.float64,
+        copy=False,
+    )
+    short_count = np.count_nonzero(normalized_signal_rows < 0, axis=1).astype(
+        np.float64,
+        copy=False,
+    )
+    activity_ratio = nonzero_count / float(timeline_length)
+    direction_balance = np.divide(
+        long_count - short_count,
+        nonzero_count,
+        out=np.zeros(row_count, dtype=np.float64),
+        where=nonzero_count > 0.0,
+    )
+
+    if timeline_length < 2:
+        transition_count = np.zeros(row_count, dtype=np.float64)
+        transition_normalized = np.zeros(row_count, dtype=np.float64)
+    else:
+        transition_count = np.count_nonzero(
+            normalized_signal_rows[:, 1:] != normalized_signal_rows[:, :-1],
+            axis=1,
+        ).astype(np.float64, copy=False)
+        transition_normalized = np.clip(
+            transition_count / float(timeline_length - 1),
+            0.0,
+            1.0,
+        )
+
+    active_span_ratio = np.zeros(row_count, dtype=np.float64)
+    active_rows = nonzero_count > 0.0
+    if np.any(active_rows):
+        first_active_indexes = np.argmax(active_mask, axis=1)
+        last_active_indexes = (timeline_length - 1) - np.argmax(
+            active_mask[:, ::-1],
+            axis=1,
+        )
+        active_spans = (last_active_indexes - first_active_indexes + 1).astype(
+            np.float64,
+            copy=False,
+        )
+        active_span_ratio[active_rows] = (
+            active_spans[active_rows] / float(timeline_length)
+        )
+
+    direction_balance_normalized = np.zeros(row_count, dtype=np.float64)
+    direction_balance_normalized[active_rows] = 1.0 - np.minimum(
+        np.abs(direction_balance[active_rows]),
+        1.0,
+    )
+
+    total_weight = (
+        float(scoring.activity_ratio_weight)
+        + float(scoring.direction_balance_weight)
+        + float(scoring.transition_ratio_weight)
+        + float(scoring.active_span_ratio_weight)
+    )
+    if total_weight <= 0.0:
+        return np.zeros(row_count, dtype=np.float64)
+
+    total_scores = (
+        activity_ratio * float(scoring.activity_ratio_weight)
+        + direction_balance_normalized * float(scoring.direction_balance_weight)
+        + transition_normalized * float(scoring.transition_ratio_weight)
+        + active_span_ratio * float(scoring.active_span_ratio_weight)
+    )
+    return np.asarray(total_scores / total_weight, dtype=np.float64)
+
+
 @dataclass(frozen=True, slots=True)
 class GenericRowScoringInputV2:
     """

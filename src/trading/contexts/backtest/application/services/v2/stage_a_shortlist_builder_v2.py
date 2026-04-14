@@ -53,10 +53,10 @@ from .contracts import (
     BacktestSignalMatrixLoaderV2,
     artifact_market_id_from_coordinates_v2,
 )
+from .execution_profile_v2 import ExecutionProfileShortlistScoringConfigV2
 from .generic_row_scorer_v2 import (
     GenericRowScorerV2,
-    GenericRowScoringInputV2,
-    build_generic_row_signal_features_mapping_v2,
+    _generic_row_total_scores_for_signal_rows_v2,
 )
 from .price_arrays_loader import MmapPriceArraysLoaderV2
 from .signal_aggregator_kernel import aggregate_ordered_final_signal_rows_v2
@@ -157,6 +157,43 @@ def _batch_proxy_scores_for_signal_rows_kernel_v2(
             activity_count += 1
         scores[row_index] = proxy_score - (fee_rate * float(activity_count))
     return scores
+
+
+def _stable_identity_ranks_for_indicator_rows_v2(
+    *,
+    indicator_id: str,
+    row_count: int,
+) -> np.ndarray:
+    """
+    Resolve deterministic lexicographic `stable_identity` ranks for one indicator row pool.
+
+    Args:
+        indicator_id: Canonical indicator id shared by every row in the local pool.
+        row_count: Total number of deterministic row indexes in the pool.
+    Returns:
+        np.ndarray: Int64 rank per row index matching `f\"{indicator_id}:{row_index}\"` order.
+    Assumptions:
+        The parity path no longer allocates `GenericRowScoringInputV2` objects, but it must keep
+        the legacy lexicographic `stable_identity` tie-break behavior when proxy and total-score
+        values are equal.
+    Raises:
+        ValueError: If `indicator_id` is blank or `row_count` is negative.
+    Side Effects:
+        Allocates one int64 rank vector and temporary stable-identity strings.
+    """
+    normalized_indicator_id = indicator_id.strip()
+    if not normalized_indicator_id:
+        raise ValueError("Stage A stable identity ranks require non-empty indicator_id")
+    if row_count < 0:
+        raise ValueError("Stage A stable identity ranks require row_count >= 0")
+    stable_identity_order = sorted(
+        range(row_count),
+        key=lambda row_index: f"{normalized_indicator_id}:{row_index}",
+    )
+    stable_identity_ranks = np.empty(row_count, dtype=np.int64)
+    for rank, row_index in enumerate(stable_identity_order):
+        stable_identity_ranks[row_index] = rank
+    return stable_identity_ranks
 
 
 @dataclass(frozen=True, slots=True)
@@ -1173,12 +1210,12 @@ class BacktestStageAShortlistBuilderV2:
             Mapping[str, RetainedIndicatorRowFrontierV2]: Immutable retained frontier keyed by
                 indicator id with explicit ranked row ordering.
         Assumptions:
-            Each indicator family can be ranked independently with cheap row-local scoring before
-            the existing exact Stage A path evaluates retained combinations.
+            Each indicator family can be ranked independently with cheap numeric row-local scoring
+            before the existing exact Stage A path evaluates retained combinations.
         Raises:
             ValueError: If one indicator row pool is empty or artifact row shapes drift.
         Side Effects:
-            Reads deterministic signal-row subsets and optional additive `signal_features` rows.
+            Reads deterministic signal-row subsets from the artifact-backed signal matrices.
         """
         target_compute_variants = self._target_prefilter_compute_variants(
             grid_context=grid_context,
@@ -1190,7 +1227,9 @@ class BacktestStageAShortlistBuilderV2:
             ),
             target_compute_variants=target_compute_variants,
         )
-        scorer = self._row_scorer_for_grid_context(grid_context=grid_context)
+        scoring = self._row_prefilter_scoring_for_grid_context(
+            grid_context=grid_context
+        )
         retained_frontier: dict[str, RetainedIndicatorRowFrontierV2] = {}
         for row_plan, retained_rows_limit in zip(
             row_plans,
@@ -1209,7 +1248,7 @@ class BacktestStageAShortlistBuilderV2:
                     local_signal_close=local_signal_close,
                     execution_params=execution_params,
                     retained_rows_limit=retained_rows_limit,
-                    scorer=scorer,
+                    scoring=scoring,
                 ),
             )
         return MappingProxyType(retained_frontier)
@@ -1570,73 +1609,107 @@ class BacktestStageAShortlistBuilderV2:
         local_signal_close: np.ndarray,
         execution_params: ExecutionParamsV1,
         retained_rows_limit: int,
-        scorer: GenericRowScorerV2,
+        scoring: ExecutionProfileShortlistScoringConfigV2,
     ) -> tuple[int, ...]:
         """
-        Rank one indicator family's rows and retain the deterministic frontier for exact work.
+        Rank one indicator family's rows through the numeric parity prefilter path.
 
         Args:
             row_plan: Prepared row-addressing metadata for one indicator family.
-            grid_context: Stage A runtime plan owning timeframe and optional feature access.
+            grid_context: Stage A runtime plan owning timeframe metadata for signal-row loading.
             artifact_context: Slot-pinned runtime context for strict artifact reads.
             signal_target_slice: Target request slice in the signal timeline.
             local_signal_close: Request-timeframe close prices aligned to `signal_target_slice`.
             execution_params: Immutable execution settings used for fee-aware proxy scoring.
             retained_rows_limit: Maximum retained row count for this indicator family.
-            scorer: Rehydrated generic row scorer used for structural row-local ranking.
+            scoring: Resolved shortlist-scoring weights used for numeric tie-break scoring.
         Returns:
             tuple[int, ...]: Deterministic retained row indexes in ranked frontier order.
         Assumptions:
-            The retained frontier uses a cheap price-aware proxy with the generic row scorer as an
-            explicit deterministic tie-break.
+            The canonical parity hot path must keep proxy scoring matrix-first, avoid universal row
+            payload allocation, and preserve deterministic tie-break semantics.
         Raises:
-            ValueError: If the indicator pool is empty or one loaded row payload is malformed.
+            ValueError: If the indicator pool is empty or one loaded signal-row matrix is invalid.
         Side Effects:
-            Reads one indicator's selected signal rows and optional additive feature rows.
+            Reads one indicator's selected signal rows from the artifact-backed signal matrix.
         """
         total_rows = int(math.prod(row_plan.axis_radices))
-        row_indexes = np.arange(total_rows, dtype=np.int64)
         signal_rows = _load_chunk_signal_rows_v2(
             signal_matrix_loader=self.signal_matrix_loader,
             artifact_context=artifact_context,
             timeframe=grid_context.timeframe_code,
             indicator_id=row_plan.indicator_id,
-            indicator_row_indexes=row_indexes,
+            indicator_row_indexes=np.arange(total_rows, dtype=np.int64),
             signal_target_slice=signal_target_slice,
         )
-        signal_feature_rows = self._load_prefilter_signal_feature_rows(
-            grid_context=grid_context,
-            artifact_context=artifact_context,
+        ranked_row_indexes = self._rank_prefilter_row_indexes_numeric(
             indicator_id=row_plan.indicator_id,
-            row_indexes=tuple(int(value) for value in row_indexes.tolist()),
+            signal_rows=signal_rows,
+            local_signal_close=local_signal_close,
+            execution_params=execution_params,
+            scoring=scoring,
         )
-        scored_rows = scorer.score_rows(
-            rows=self._row_scoring_inputs_for_prefilter(
-                indicator_id=row_plan.indicator_id,
-                signal_rows=signal_rows,
-                signal_feature_rows=signal_feature_rows,
+        retained_count = min(retained_rows_limit, total_rows)
+        if retained_count <= 0:
+            raise ValueError(
+                f"Stage A row prefilter retained no rows for {row_plan.indicator_id!r}"
             )
-        )
+        retained_row_indexes = ranked_row_indexes[:retained_count]
+        return tuple(int(row_index) for row_index in retained_row_indexes.tolist())
+
+    def _rank_prefilter_row_indexes_numeric(
+        self,
+        *,
+        indicator_id: str,
+        signal_rows: np.ndarray,
+        local_signal_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        scoring: ExecutionProfileShortlistScoringConfigV2,
+    ) -> np.ndarray:
+        """
+        Rank one indicator family's row indexes without GenericRowScorerV2 payload objects.
+
+        Args:
+            indicator_id: Indicator id shared by every row in `signal_rows`.
+            signal_rows: Target-sliced signal rows in artifact row order.
+            local_signal_close: Request-timeframe close prices aligned to `signal_rows`.
+            execution_params: Immutable execution settings supplying the fee penalty.
+            scoring: Resolved shortlist-scoring weights used for numeric tie-break scoring.
+        Returns:
+            np.ndarray: Int64 row indexes sorted by proxy score, numeric total score, and the
+                legacy lexicographic `stable_identity` tie-break.
+        Assumptions:
+            Canonical parity ranking stays proxy-first, while equal proxy rows keep the same
+            deterministic tie semantics as the former `GenericRowScorerV2` object path.
+        Raises:
+            ValueError: If the signal-row matrix is malformed or the computed ranking keys drift.
+        Side Effects:
+            May trigger Numba compilation for the batched proxy-score kernel.
+        """
         proxy_scores = self._prefilter_proxy_scores_for_rows(
             signal_rows=signal_rows,
             local_signal_close=local_signal_close,
             execution_params=execution_params,
         )
-        scorer_sorted_row_indexes = np.asarray(
-            [payload.row_index for payload in scored_rows],
-            dtype=np.int64,
+        total_scores = _generic_row_total_scores_for_signal_rows_v2(
+            signal_rows=signal_rows,
+            scoring=scoring,
         )
-        stable_proxy_order = np.argsort(
-            -proxy_scores[scorer_sorted_row_indexes],
-            kind="mergesort",
-        )
-        retained_count = min(retained_rows_limit, len(scored_rows))
-        if retained_count <= 0:
+        if proxy_scores.shape != total_scores.shape:
             raise ValueError(
-                f"Stage A row prefilter retained no rows for {row_plan.indicator_id!r}"
+                "Stage A row prefilter requires proxy and total-score vectors to align"
             )
-        retained_row_indexes = scorer_sorted_row_indexes[stable_proxy_order[:retained_count]]
-        return tuple(int(row_index) for row_index in retained_row_indexes.tolist())
+        stable_identity_ranks = _stable_identity_ranks_for_indicator_rows_v2(
+            indicator_id=indicator_id,
+            row_count=int(signal_rows.shape[0]),
+        )
+        return np.lexsort(
+            (
+                stable_identity_ranks,
+                -total_scores,
+                -proxy_scores,
+            )
+        ).astype(np.int64, copy=False)
 
     def _select_combo_proxy_retained_chunk_row_indexes(
         self,
@@ -1701,107 +1774,6 @@ class BacktestStageAShortlistBuilderV2:
             kind="mergesort",
         )
         return tuple(int(row_index) for row_index in selected_row_indexes.tolist())
-
-    def _row_scoring_inputs_for_prefilter(
-        self,
-        *,
-        indicator_id: str,
-        signal_rows: np.ndarray,
-        signal_feature_rows: ArtifactSignalFeaturesRowsV2 | None,
-    ) -> tuple[GenericRowScoringInputV2, ...]:
-        """
-        Build deterministic row-scoring inputs for one indicator family's prefilter pool.
-
-        Args:
-            indicator_id: Indicator id whose artifact rows are being ranked.
-            signal_rows: Target-sliced signal rows in artifact row order.
-            signal_feature_rows: Optional additive cached feature rows in the same order.
-        Returns:
-            tuple[GenericRowScoringInputV2, ...]: Deterministic row-local scoring inputs.
-        Assumptions:
-            Optional feature rows stay strictly 1:1 aligned with `signal_rows` when available.
-        Raises:
-            ValueError: If the signal rows are not 2D or feature-row alignment drifts.
-        Side Effects:
-            None.
-        """
-        if signal_rows.ndim != 2:
-            raise ValueError("Stage A row prefilter requires 2D signal_rows")
-        if (
-            signal_feature_rows is not None
-            and signal_feature_rows.rows.shape[0] != signal_rows.shape[0]
-        ):
-            raise ValueError(
-                "Stage A row prefilter requires signal_features rows to align with signal_rows"
-            )
-        return tuple(
-            GenericRowScoringInputV2(
-                indicator_id=indicator_id,
-                row_index=row_index,
-                stable_identity=f"{indicator_id}:{row_index}",
-                signal_row=np.asarray(signal_rows[row_index, :], dtype=np.int8),
-                signal_features=(
-                    build_generic_row_signal_features_mapping_v2(
-                        feature_names=signal_feature_rows.feature_names,
-                        feature_values=tuple(
-                            float(value)
-                            for value in signal_feature_rows.rows[row_index, :].tolist()
-                        ),
-                    )
-                    if signal_feature_rows is not None
-                    else None
-                ),
-            )
-            for row_index in range(int(signal_rows.shape[0]))
-        )
-
-    def _load_prefilter_signal_feature_rows(
-        self,
-        *,
-        grid_context: BacktestArtifactRuntimePlanV2,
-        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
-        indicator_id: str,
-        row_indexes: tuple[int, ...],
-    ) -> ArtifactSignalFeaturesRowsV2 | None:
-        """
-        Load optional cached feature rows for one indicator family's retained frontier scoring.
-
-        Args:
-            grid_context: Stage A runtime plan owning optional feature-access metadata.
-            artifact_context: Slot-pinned runtime context for strict artifact reads.
-            indicator_id: Indicator id whose feature rows are requested.
-            row_indexes: Deterministic row indexes aligned to the prefilter signal-row pool.
-        Returns:
-            ArtifactSignalFeaturesRowsV2 | None: Selected feature rows or `None` when optional
-                warm-cache access is unavailable.
-        Assumptions:
-            `signal_features` remain non-mandatory for this milestone and must fall back to
-            runtime row-local derivation when absent.
-        Raises:
-            FileNotFoundError: If a declared strict feature family is missing on disk.
-            ValueError: If feature-row selection metadata is invalid.
-        Side Effects:
-            May memory-map one additive `signal_features` matrix on first explicit access.
-        """
-        signal_features_access = _signal_features_access_plan_for_indicator_v2(
-            grid_context=grid_context,
-            indicator_id=indicator_id,
-        )
-        if signal_features_access is None or self.signal_features_loader is None:
-            return None
-        if signal_features_access.optional:
-            return self.signal_features_loader.try_load_signal_feature_rows(
-                context=artifact_context,
-                timeframe=signal_features_access.timeframe,
-                indicator_id=indicator_id,
-                row_selection=row_indexes,
-            )
-        return self.signal_features_loader.load_signal_feature_rows(
-            context=artifact_context,
-            timeframe=signal_features_access.timeframe,
-            indicator_id=indicator_id,
-            row_selection=row_indexes,
-        )
 
     def _prefilter_proxy_score_for_row(
         self,
@@ -2084,21 +2056,22 @@ class BacktestStageAShortlistBuilderV2:
                 return False
         return True
 
-    def _row_scorer_for_grid_context(
+    def _row_prefilter_scoring_for_grid_context(
         self,
         *,
         grid_context: BacktestArtifactRuntimePlanV2,
-    ) -> GenericRowScorerV2:
+    ) -> ExecutionProfileShortlistScoringConfigV2:
         """
-        Rehydrate the generic row scorer with runtime-plan shortlist weights when available.
+        Resolve numeric row-prefilter scoring weights from the runtime-plan surface.
 
         Args:
             grid_context: Stage A runtime plan that may expose execution-profile shortlist weights.
         Returns:
-            GenericRowScorerV2: Deterministic row scorer used by row-local prefiltering.
+            ExecutionProfileShortlistScoringConfigV2: Deterministic weights used for matrix-first
+                row tie-break scoring.
         Assumptions:
-            Threshold literals remain owned by the builder, while runtime profiles may override
-            additive shortlist-scoring weights.
+            Canonical parity ranking should honor runtime-profile shortlist weights when present
+            without routing back through `GenericRowScorerV2.score_rows(...)`.
         Raises:
             None.
         Side Effects:
@@ -2109,16 +2082,9 @@ class BacktestStageAShortlistBuilderV2:
         scoring = (
             shortlist_config.scoring
             if shortlist_config is not None
-            else self.row_scorer.scoring
+            else ExecutionProfileShortlistScoringConfigV2()
         )
-        return GenericRowScorerV2(
-            scoring=scoring,
-            low_activity_threshold=self.row_scorer.low_activity_threshold,
-            high_activity_threshold=self.row_scorer.high_activity_threshold,
-            direction_balance_threshold=self.row_scorer.direction_balance_threshold,
-            low_transition_ratio_threshold=self.row_scorer.low_transition_ratio_threshold,
-            high_transition_ratio_threshold=self.row_scorer.high_transition_ratio_threshold,
-        )
+        return scoring
 
     def load_chunk_runtime_inputs(
         self,

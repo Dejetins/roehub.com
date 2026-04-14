@@ -27,6 +27,9 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
 )
+from trading.contexts.backtest.application.services.v2.generic_row_scorer_v2 import (
+    GenericRowScorerV2,
+)
 from trading.contexts.backtest.application.services.v2.notebook_parity_benchmark_corpus_v2 import (
     BacktestNotebookParityLiveHostCaptureV2,
     serialize_backtest_notebook_parity_live_host_captures_v2,
@@ -774,6 +777,82 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
     assert runtime_shape.frontier_compute_mode == "kernel-driven"
     assert runtime_shape.stage_a_workers == 2
     assert runtime_shape.numba_threads_used == 2
+
+
+def test_stage_a_streaming_exact_runtime_shape_bypasses_generic_row_scorer_hot_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify perf-smoke fails fast if Stage A regresses to GenericRowScorerV2 object scoring.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+    Args:
+        monkeypatch: pytest fixture used to fail fast on the deprecated generic hot path.
+    Returns:
+        None.
+    Assumptions:
+        The canonical `NR2`-style parity path should stay numeric and matrix-first, so perf-smoke
+        must fail if `GenericRowScorerV2.score_rows(...)` reappears on the live Stage A route.
+    Raises:
+        AssertionError: If the live Stage A path re-enters GenericRowScorerV2 object scoring.
+    Side Effects:
+        Monkeypatches the deprecated generic row-scorer method during one in-memory Stage A run.
+    """
+
+    def _raise_generic_row_scorer_call(*args: Any, **kwargs: Any) -> Any:
+        """
+        Fail fast if the live Stage A path calls GenericRowScorerV2.
+
+        Args:
+            *args: Ignored positional arguments from the patched method call.
+            **kwargs: Ignored keyword arguments from the patched method call.
+        Returns:
+            Any: This helper never returns successfully.
+        Assumptions:
+            Perf-smoke should guard the numeric row-prefilter runtime shape directly.
+        Raises:
+            AssertionError: Always, because the generic scorer must stay off the hot path.
+        Side Effects:
+            None.
+        """
+        raise AssertionError("Stage A parity hot path should bypass GenericRowScorerV2")
+
+    monkeypatch.setattr(
+        GenericRowScorerV2,
+        "score_rows",
+        _raise_generic_row_scorer_call,
+    )
+
+    shortlist = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=stage_a_shortlist_builder_testkit._ComboProxyPriceLoader(),
+        signal_matrix_loader=stage_a_shortlist_builder_testkit._combo_proxy_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, stage_a_shortlist_builder_testkit._combo_proxy_grid_context()),
+        artifact_context=cast(
+            Any,
+            stage_a_shortlist_builder_testkit._combo_proxy_artifact_context(),
+        ),
+        target_time_range=stage_a_shortlist_builder_testkit._combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=6,
+    )
+
+    runtime_shape = (
+        stage_a_shortlist_builder_module.describe_stage_a_streaming_exact_runtime_shape_v2(
+            retained_chunk_sizes=(4, 2),
+            stage_a_variants_total=8,
+            narrowed_stage_a_variants_total=8,
+        )
+    )
+
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
+    assert runtime_shape.frontier_compute_mode == "kernel-driven"
+    assert runtime_shape.deferred_replay_count == 0
 
 
 def test_stage_a_streaming_exact_runtime_shape_tracks_narrowed_frontier_cardinality(

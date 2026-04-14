@@ -39,6 +39,10 @@ from trading.contexts.backtest.application.services.v2 import (
 from trading.contexts.backtest.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
 )
+from trading.contexts.backtest.application.services.v2.generic_row_scorer_v2 import (
+    GenericRowScorerV2,
+    GenericRowScoringInputV2,
+)
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
@@ -1082,12 +1086,94 @@ def test_stage_a_shortlist_builder_v2_batch_prefilter_proxy_scores_match_scalar_
     np.testing.assert_allclose(batch_scores, scalar_scores)
 
 
+def test_stage_a_shortlist_builder_v2_numeric_prefilter_ranking_matches_generic_reference(
+) -> None:
+    """
+    Verify numeric Stage A row ranking preserves the former generic tie-break semantics.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The canonical parity path should avoid `GenericRowScorerV2` row objects while keeping the
+        same proxy-first ordering and lexicographic `stable_identity` tie-breaks as the replaced
+        generic reference path.
+    Raises:
+        AssertionError: If the numeric ranking drifts from the former generic reference order.
+    Side Effects:
+        May trigger Numba compilation on first use.
+    """
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=cast(Any, object()),
+        signal_matrix_loader=cast(Any, object()),
+    )
+    signal_rows = np.zeros((12, 5), dtype=np.int8)
+    local_signal_close = np.asarray(
+        (100.0, 100.0, 100.0, 100.0, 100.0),
+        dtype=np.float64,
+    )
+    execution_params = ExecutionParamsV1(
+        direction_mode="long-short",
+        sizing_mode="all_in",
+        init_cash_quote=10000.0,
+        fixed_quote=100.0,
+        safe_profit_percent=30.0,
+        fee_pct=0.075,
+        slippage_pct=0.01,
+    )
+
+    ranked_row_indexes = builder._rank_prefilter_row_indexes_numeric(
+        indicator_id="ma.ema",
+        signal_rows=signal_rows,
+        local_signal_close=local_signal_close,
+        execution_params=execution_params,
+        scoring=builder.row_scorer.scoring,
+    )
+    generic_reference = GenericRowScorerV2()
+    scored_rows = generic_reference.score_rows(
+        rows=tuple(
+            GenericRowScoringInputV2(
+                indicator_id="ma.ema",
+                row_index=row_index,
+                stable_identity=f"ma.ema:{row_index}",
+                signal_row=np.asarray(signal_rows[row_index, :], dtype=np.int8),
+            )
+            for row_index in range(int(signal_rows.shape[0]))
+        )
+    )
+    proxy_scores = builder._prefilter_proxy_scores_for_rows(
+        signal_rows=signal_rows,
+        local_signal_close=local_signal_close,
+        execution_params=execution_params,
+    )
+    scorer_sorted_row_indexes = np.asarray(
+        [payload.row_index for payload in scored_rows],
+        dtype=np.int64,
+    )
+    generic_ranked_row_indexes = scorer_sorted_row_indexes[
+        np.argsort(-proxy_scores[scorer_sorted_row_indexes], kind="mergesort")
+    ]
+
+    assert tuple(int(value) for value in ranked_row_indexes.tolist()) == tuple(
+        int(value) for value in generic_ranked_row_indexes.tolist()
+    )
+    assert tuple(int(value) for value in ranked_row_indexes[:6].tolist()) == (
+        0,
+        1,
+        10,
+        11,
+        2,
+        3,
+    )
+
+
 def test_stage_a_shortlist_builder_v2_row_prefilter_uses_batch_proxy_scores(
     synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    Verify Stage A row prefilter avoids the scalar per-row proxy helper in the hot path.
+    Verify Stage A row prefilter avoids both scalar proxy helpers and GenericRowScorerV2 objects.
 
     Args:
         synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
@@ -1096,9 +1182,10 @@ def test_stage_a_shortlist_builder_v2_row_prefilter_uses_batch_proxy_scores(
         None.
     Assumptions:
         Stage A row prefilter should rank rows through the batch-friendly proxy-score path while
-        preserving the same deterministic retained order.
+        preserving the same deterministic retained order without calling `GenericRowScorerV2`.
     Raises:
-        AssertionError: If the row-prefilter path falls back to scalar proxy scoring.
+        AssertionError: If the row-prefilter path falls back to scalar proxy scoring or the
+            universal generic row-scorer object path.
     Side Effects:
         Memory-maps strict artifact arrays from the synthetic store.
     """
@@ -1140,10 +1227,179 @@ def test_stage_a_shortlist_builder_v2_row_prefilter_uses_batch_proxy_scores(
         """
         raise AssertionError("Stage A row prefilter should use batch proxy scores")
 
+    def _raise_generic_row_scorer_call(*args: Any, **kwargs: Any) -> Any:
+        """
+        Fail fast if Stage A re-enters the deprecated GenericRowScorerV2 hot path.
+
+        Args:
+            *args: Ignored positional arguments from the patched method call.
+            **kwargs: Ignored keyword arguments from the patched method call.
+        Returns:
+            Any: This helper never returns successfully.
+        Assumptions:
+            The canonical parity row prefilter should stay numeric and matrix-first.
+        Raises:
+            AssertionError: Always, because GenericRowScorerV2 must be bypassed here.
+        Side Effects:
+            None.
+        """
+        raise AssertionError("Stage A row prefilter should bypass GenericRowScorerV2")
+
     monkeypatch.setattr(
         stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2,
         "_prefilter_proxy_score_for_row",
         _raise_scalar_proxy_call,
+    )
+    monkeypatch.setattr(
+        GenericRowScorerV2,
+        "score_rows",
+        _raise_generic_row_scorer_call,
+    )
+
+    retained_frontier = builder._build_row_prefilter_frontier(
+        row_plans=row_plans,
+        grid_context=cast(Any, grid_context),
+        artifact_context=context,
+        signal_target_slice=signal_target_slice,
+        local_signal_close=np.asarray(
+            signal_prices.ohlcv[signal_target_slice, 3],
+            dtype=np.float64,
+        ),
+        execution_params=builder._resolve_execution_params(
+            grid_context=cast(Any, grid_context),
+            market_id=artifact_market_id_from_coordinates_v2(context.coordinates),
+        ),
+        shortlist_limit=2,
+        cancel_checker=None,
+    )
+
+    assert retained_frontier["ma.ema"].retained_row_indexes == (1, 0)
+
+
+def test_stage_a_shortlist_builder_v2_row_prefilter_keeps_signal_features_out_of_hot_path(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify canonical Stage A row prefilter does not require optional cached `signal_features`.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with strict signal and signal-feature artifacts.
+    Returns:
+        None.
+    Assumptions:
+        The numeric parity hot path should rank retained rows from signal matrices alone while
+        leaving warm-cache `signal_features` access lazy and opt-in.
+    Raises:
+        AssertionError: If the row prefilter eagerly reads cached feature rows.
+    Side Effects:
+        Memory-maps strict signal rows from the synthetic store.
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    grid_context = _grid_context_for_windows(windows=(10, 20))
+    _attach_signal_features_access(grid_context=grid_context)
+    price_loader = MmapPriceArraysLoaderV2(artifact_loader=store.loader)
+    signal_prices = price_loader.load_price_arrays(context=context, timeframe="15m")
+    signal_target_slice = compute_target_slice_by_close_time_v2(
+        close_time=signal_prices.close_time,
+        target_time_range=_synthetic_target_time_range(),
+    )
+    recording_feature_loader = _RecordingSignalFeaturesLoader(
+        wrapped=MmapSignalFeaturesLoaderV2(artifact_loader=store.loader)
+    )
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=price_loader,
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+        signal_features_loader=recording_feature_loader,
+    )
+    row_plans = tuple(
+        PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
+        for plan in cast(Any, grid_context).indicator_plans
+    )
+
+    retained_frontier = builder._build_row_prefilter_frontier(
+        row_plans=row_plans,
+        grid_context=cast(Any, grid_context),
+        artifact_context=context,
+        signal_target_slice=signal_target_slice,
+        local_signal_close=np.asarray(
+            signal_prices.ohlcv[signal_target_slice, 3],
+            dtype=np.float64,
+        ),
+        execution_params=builder._resolve_execution_params(
+            grid_context=cast(Any, grid_context),
+            market_id=artifact_market_id_from_coordinates_v2(context.coordinates),
+        ),
+        shortlist_limit=2,
+        cancel_checker=None,
+    )
+
+    assert retained_frontier["ma.ema"].retained_row_indexes == (1, 0)
+    assert recording_feature_loader.row_calls == []
+
+
+def test_stage_a_shortlist_builder_v2_row_prefilter_does_not_read_generic_row_scorer_config(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify the numeric parity prefilter does not depend on GenericRowScorerV2 config fallback.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+    Returns:
+        None.
+    Assumptions:
+        `C3` requires the canonical row-prefilter hot path to bypass `GenericRowScorerV2`
+        entirely, including fallback shortlist-weight access when no execution profile is present.
+    Raises:
+        AssertionError: If the row-prefilter path still reads `builder.row_scorer.scoring`.
+    Side Effects:
+        Memory-maps strict signal rows from the synthetic store.
+    """
+
+    class _ExplodingRowScorer:
+        """
+        Minimal sentinel scorer that fails if Stage A reads generic scorer config.
+        """
+
+        @property
+        def scoring(self) -> Any:
+            """
+            Fail fast if the numeric parity path still reads GenericRowScorerV2 weights.
+
+            Args:
+                None.
+            Returns:
+                Any: This property never returns successfully.
+            Assumptions:
+                The parity hot path should source default numeric weights without consulting the
+                generic scorer object.
+            Raises:
+                AssertionError: Always, because the generic scorer config must stay unused here.
+            Side Effects:
+                None.
+            """
+            raise AssertionError(
+                "Stage A row prefilter should not read GenericRowScorerV2 config"
+            )
+
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    grid_context = _grid_context_for_windows(windows=(10, 20))
+    price_loader = MmapPriceArraysLoaderV2(artifact_loader=store.loader)
+    signal_prices = price_loader.load_price_arrays(context=context, timeframe="15m")
+    signal_target_slice = compute_target_slice_by_close_time_v2(
+        close_time=signal_prices.close_time,
+        target_time_range=_synthetic_target_time_range(),
+    )
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=price_loader,
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=store.loader),
+    )
+    object.__setattr__(builder, "row_scorer", cast(Any, _ExplodingRowScorer()))
+    row_plans = tuple(
+        PreparedIndicatorRowPlanV2.from_indicator_plan(plan=plan)
+        for plan in cast(Any, grid_context).indicator_plans
     )
 
     retained_frontier = builder._build_row_prefilter_frontier(
