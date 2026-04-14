@@ -11,11 +11,16 @@ from trading.contexts.backtest.application.services.v2 import (
     StageBHitTimesFixtureV2,
     StageBHitTimesSliceV2,
     StageBLevelFactorsV2,
+    StageBReplayPayloadV2,
+    StageBTradeExitV2,
     build_execution_outcome_from_replay_v2,
     compute_stage_b_metrics_v2,
     load_stage_b_golden_fixture_catalog_v2,
     replay_risk_cell_exact_v2,
     stage_b_metrics_to_ranking_payload_v2,
+)
+from trading.contexts.backtest.application.services.v2.metrics_kernel import (
+    normalize_persisted_summary_metrics_v2,
 )
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
@@ -150,6 +155,71 @@ def test_stage_b_metrics_to_ranking_payload_v2_exposes_stable_aliases() -> None:
     assert payload["Max. Drawdown [%]"] == pytest.approx(metrics.max_drawdown_pct)
     assert payload["return_over_max_drawdown"] == pytest.approx(metrics.return_over_max_drawdown)
     assert payload["profit_factor"] == pytest.approx(metrics.profit_factor)
+
+
+def test_normalize_persisted_summary_metrics_v2_drops_non_finite_values_only() -> None:
+    """
+    Verify persisted summary metrics drop `Infinity`/`NaN` while raw ranking semantics stay intact.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Stage B ranking may legitimately use non-finite raw metrics, but persisted summary JSON
+        must keep only finite numeric values.
+    Raises:
+        AssertionError: If raw ranking aliases are rewritten or persisted summary sanitization
+            keeps non-finite values.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+    """
+    replay = StageBReplayPayloadV2(
+        tp_index=0,
+        sl_index=0,
+        sentinel_index=4,
+        close_on_end=True,
+        trade_exits=(
+            StageBTradeExitV2(
+                trade_index=0,
+                entry_exec_idx=0,
+                direction=1,
+                sig_exit_exec_idx=1,
+                exit_exec_idx=1,
+                exit_reason="tp",
+                gross_factor=1.10,
+                closed=True,
+            ),
+        ),
+    )
+
+    metrics = compute_stage_b_metrics_v2(
+        replay=replay,
+        fee_rate=0.0,
+        bars_per_year_exec=365.0,
+    )
+    payload = stage_b_metrics_to_ranking_payload_v2(metrics=metrics)
+    summary = normalize_persisted_summary_metrics_v2(
+        metrics={
+            "profit_factor": payload["profit_factor"],
+            "return_over_max_drawdown": payload["return_over_max_drawdown"],
+            "sharpe_trades": float("nan"),
+            "total_return_pct": payload["total_return_pct"],
+        }
+    )
+
+    assert np.isinf(payload["profit_factor"])
+    assert np.isinf(payload["return_over_max_drawdown"])
+    assert "profit_factor" not in summary
+    assert "return_over_max_drawdown" not in summary
+    assert "sharpe_trades" not in summary
+    assert summary["total_return_pct"] == pytest.approx(payload["total_return_pct"])
 
 
 def test_build_execution_outcome_from_replay_v2_materializes_closed_stage_b_trades() -> None:

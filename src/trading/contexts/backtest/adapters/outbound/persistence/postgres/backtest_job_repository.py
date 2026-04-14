@@ -13,6 +13,9 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListQuery,
     BacktestJobRepository,
 )
+from trading.contexts.backtest.application.services.v2.metrics_kernel import (
+    normalize_persisted_summary_metrics_v2,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestArtifactSlotLiteral,
     BacktestJob,
@@ -1026,6 +1029,8 @@ def _serialize_top_rows(
                 "PostgresBacktestJobRepository.create_with_top_variants "
                 "received mismatched top row job_id"
             )
+        summary_metrics_payload = dict(row.summary_metrics_json)
+        summary_metrics_payload["total_return_pct"] = row.total_return_pct
         serialized_rows.append(
             {
                 "rank": row.rank,
@@ -1034,7 +1039,9 @@ def _serialize_top_rows(
                 "variant_index": row.variant_index,
                 "total_return_pct": row.total_return_pct,
                 "payload_json": dict(row.payload_json),
-                "summary_metrics_json": dict(row.summary_metrics_json),
+                "summary_metrics_json": dict(
+                    normalize_persisted_summary_metrics_v2(metrics=summary_metrics_payload)
+                ),
                 "best_tp_pct": row.best_tp_pct,
                 "best_sl_pct": row.best_sl_pct,
             }

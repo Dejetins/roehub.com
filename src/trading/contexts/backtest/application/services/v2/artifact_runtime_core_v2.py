@@ -40,6 +40,7 @@ from .execution_profile_v2 import (
     execution_profile_stage_b_process_fallback_threshold_v2,
     execution_profile_uses_process_pool_stage_b_v2,
 )
+from .metrics_kernel import normalize_persisted_summary_metrics_v2
 from .trade_compactor_kernel import (
     StageACompactExactPayloadV2,
     no_risk_metrics_to_ranking_payload_v2,
@@ -2143,14 +2144,15 @@ def summary_metrics_from_ranking_metrics_v2(
     metrics: RankingMetricsV1,
 ) -> Mapping[str, float]:
     """
-    Normalize raw scorer metrics into deterministic summary metrics payload.
+    Normalize raw scorer metrics into deterministic persisted-summary metrics payload.
 
     Args:
         metrics: Raw scorer metrics payload for one Stage B variant.
     Returns:
-        Mapping[str, float]: Immutable mapping with deterministic summary metric keys.
+        Mapping[str, float]: Immutable mapping with deterministic finite summary metric keys.
     Assumptions:
-        Only approved numeric summary metrics participate in persisted summary rows.
+        Only approved numeric summary metrics participate in persisted summary rows, and non-finite
+        values are dropped before they can reach JSON persistence.
     Raises:
         ValueError: If one kept metric value is non-numeric.
     Side Effects:
@@ -2212,7 +2214,7 @@ def summary_metrics_from_ranking_metrics_v2(
     if isinstance(total_return_pct, bool) or not isinstance(total_return_pct, Real):
         raise ValueError("summary metric 'total_return_pct' must be numeric")
     normalized["total_return_pct"] = float(total_return_pct)
-    return MappingProxyType(normalized)
+    return normalize_persisted_summary_metrics_v2(metrics=normalized)
 
 
 def risk_pct_from_task_v2(

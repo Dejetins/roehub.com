@@ -9,6 +9,9 @@ from trading.contexts.backtest.adapters.outbound.persistence.postgres.gateway im
     BacktestPostgresGateway,
 )
 from trading.contexts.backtest.application.ports import BacktestJobResultsRepository
+from trading.contexts.backtest.application.services.v2.metrics_kernel import (
+    normalize_persisted_summary_metrics_v2,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestJobStageANoRiskExactRow,
     BacktestJobStageAShortlist,
@@ -418,6 +421,8 @@ def _serialize_top_rows(
                 "PostgresBacktestJobResultsRepository.replace_top_variants_snapshot"
                 " row.job_id must match method job_id"
             )
+        summary_metrics_payload = dict(row.summary_metrics_json)
+        summary_metrics_payload["total_return_pct"] = row.total_return_pct
         serialized.append(
             {
                 "rank": row.rank,
@@ -426,7 +431,9 @@ def _serialize_top_rows(
                 "variant_index": row.variant_index,
                 "total_return_pct": row.total_return_pct,
                 "payload_json": dict(row.payload_json),
-                "summary_metrics_json": dict(row.summary_metrics_json),
+                "summary_metrics_json": dict(
+                    normalize_persisted_summary_metrics_v2(metrics=summary_metrics_payload)
+                ),
                 "best_tp_pct": row.best_tp_pct,
                 "best_sl_pct": row.best_sl_pct,
             }

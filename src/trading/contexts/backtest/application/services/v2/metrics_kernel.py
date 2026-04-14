@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import math
+from numbers import Real
 from types import MappingProxyType
+from typing import Any, Mapping
 
 import numpy as np
 
@@ -18,6 +21,41 @@ from .trade_compactor_kernel import (
 )
 
 _BARS_PER_YEAR_EXEC_1M_V2 = 365.0 * 24.0 * 60.0
+
+
+def normalize_persisted_summary_metrics_v2(
+    *,
+    metrics: Mapping[str, Any],
+) -> Mapping[str, float]:
+    """
+    Keep only finite numeric summary metrics in persisted JSON-facing payloads.
+
+    Args:
+        metrics: Candidate summary metrics mapping destined for persisted summary JSON.
+    Returns:
+        Mapping[str, float]: Immutable mapping containing only finite numeric values.
+    Assumptions:
+        Persistence keeps already-finite values unchanged and drops `Infinity`, `-Infinity`, and
+        `NaN` instead of rewriting them to misleading numeric sentinels.
+    Raises:
+        ValueError: If one metric key is blank or one metric value is non-numeric.
+    Side Effects:
+        None.
+    """
+    normalized: dict[str, float] = {}
+    for raw_key, raw_value in metrics.items():
+        key = str(raw_key).strip()
+        if not key:
+            raise ValueError("persisted summary metric keys must be non-empty")
+        if raw_value is None:
+            continue
+        if isinstance(raw_value, bool) or not isinstance(raw_value, Real):
+            raise ValueError(f"persisted summary metric {key!r} must be numeric")
+        value = float(raw_value)
+        if not math.isfinite(value):
+            continue
+        normalized[key] = value
+    return MappingProxyType(normalized)
 
 
 def compute_stage_b_metrics_v2(
@@ -406,5 +444,6 @@ def _resolve_exit_mark_price_v2(
 __all__ = [
     "build_execution_outcome_from_replay_v2",
     "compute_stage_b_metrics_v2",
+    "normalize_persisted_summary_metrics_v2",
     "stage_b_metrics_to_ranking_payload_v2",
 ]

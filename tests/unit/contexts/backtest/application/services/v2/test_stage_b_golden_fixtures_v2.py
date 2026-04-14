@@ -1,14 +1,23 @@
 from __future__ import annotations
 
+import json
 from copy import deepcopy
+from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
+from uuid import UUID
 
 import numpy as np
 import pytest
 
+from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
+    backtest_job_repository as job_repository_module,
+)
+from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
+    backtest_job_results_repository as job_results_repository_module,
+)
 from trading.contexts.backtest.application.services.v2 import (
     BacktestArtifactBackedStageBScorerV2,
     StageBBestCellReplayCaseV2,
@@ -38,6 +47,7 @@ from trading.contexts.backtest.application.services.v2.stage_b_golden_fixtures_v
 from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
     StageACompactExactPayloadV2,
 )
+from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
 _FIXTURE_PATH = Path(__file__).with_name("fixtures") / "stage_b_golden_fixtures_v2.json"
@@ -199,6 +209,77 @@ class _FinalistOnlyStageBScorerStubV2:
             raise AssertionError("finalist-only scorer stub expects Stage B details scoring only")
         self.exact_calls.append(variant_key)
         return SimpleNamespace(metrics=self._exact_metrics_by_variant_key[variant_key])
+
+
+def test_top_row_serializers_drop_non_finite_summary_metrics_before_json_persistence() -> None:
+    """
+    Verify both top-row persistence adapters sanitize non-finite summary metrics identically.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Persisted top rows keep `total_return_pct` separately and may drop non-finite summary-only
+        metrics without changing ranking semantics already decided upstream.
+    Raises:
+        AssertionError: If either repository keeps `Infinity`/`NaN` inside persisted summary JSON.
+    Side Effects:
+        Serializes one in-memory top-row payload through both repository helper paths.
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_repository.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+    """
+    job_id = UUID("00000000-0000-0000-0000-0000000000c5")
+    row = BacktestJobTopVariant(
+        job_id=job_id,
+        rank=1,
+        variant_key="a" * 64,
+        indicator_variant_key="b" * 64,
+        variant_index=0,
+        total_return_pct=12.5,
+        payload_json={
+            "direction_mode": "long-only",
+            "execution_params": {"fee_pct": 0.0},
+            "risk_params": {
+                "tp_enabled": True,
+                "tp_pct": 1.5,
+                "sl_enabled": True,
+                "sl_pct": 0.5,
+            },
+            "signal_params": {},
+            "sizing_mode": "all_in",
+        },
+        updated_at=datetime(2026, 4, 14, tzinfo=timezone.utc),
+        summary_metrics_json={
+            "profit_factor": float("inf"),
+            "return_over_max_drawdown": float("inf"),
+            "sharpe_trades": float("nan"),
+            "win_rate_pct": 50.0,
+        },
+        best_tp_pct=1.5,
+        best_sl_pct=0.5,
+    )
+
+    job_snapshot_rows = job_repository_module._serialize_top_rows(job_id=job_id, rows=(row,))
+    result_snapshot_rows = job_results_repository_module._serialize_top_rows(
+        job_id=job_id,
+        rows=(row,),
+    )
+
+    for serialized_rows in (job_snapshot_rows, result_snapshot_rows):
+        summary_metrics = serialized_rows[0]["summary_metrics_json"]
+        assert summary_metrics["total_return_pct"] == pytest.approx(12.5)
+        assert summary_metrics["win_rate_pct"] == pytest.approx(50.0)
+        assert "profit_factor" not in summary_metrics
+        assert "return_over_max_drawdown" not in summary_metrics
+        assert "sharpe_trades" not in summary_metrics
+        json.dumps(serialized_rows, allow_nan=False)
 
 
 def test_stage_b_fast_path_stays_enabled_with_retained_exact_payload_for_total_return_pct() -> None:
