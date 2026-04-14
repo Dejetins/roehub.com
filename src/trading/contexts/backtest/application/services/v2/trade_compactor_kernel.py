@@ -229,7 +229,7 @@ class StageACompactExactPayloadV2:
 @dataclass(frozen=True, slots=True)
 class _CompactTradeBatchV2:
     """
-    Dense internal trade-list-first batch state for retained exact-candidate evaluation.
+    Bounded dense internal trade-list-first batch state for retained exact-candidate evaluation.
 
     Args:
         entry_signal_idx: Dense `[V, max_trades]` entry-signal indexes with `-1` padding.
@@ -255,6 +255,27 @@ class _CompactTradeBatchV2:
     sig_exit_signal_idx: np.ndarray
     sig_exit_exec_idx: np.ndarray
     trade_count: np.ndarray
+
+    @property
+    def max_trade_count(self) -> int:
+        """
+        Return the bounded trade-width allocated for this retained exact batch.
+
+        Args:
+            None.
+        Returns:
+            int: Internal batch width equal to the maximum retained `trade_count`.
+        Assumptions:
+            Compact-trade storage should stay bounded by actual retained trades rather than the
+            full `signal_count` once per-row trade counts are known.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self.entry_signal_idx.ndim != 2:
+            return 0
+        return int(self.entry_signal_idx.shape[1])
 
     def trade_row_at(self, *, row_index: int) -> tuple[StageACompactTradeV2, ...]:
         """
@@ -455,16 +476,68 @@ def _trade_sharpe_kernel_v2(
     return (mean_trade_return / math.sqrt(variance)) * math.sqrt(trades_per_year)
 
 
+@nb.njit(cache=True)
+def _count_compact_trades_for_signal_row_v2(
+    signal_row_i8: np.ndarray,
+    entry_exec_idx_i64: np.ndarray,
+    sentinel_index: int,
+    direction_mode_code: int,
+) -> int:
+    """
+    Count one retained signal row's compact trades without allocating batch-width buffers.
+
+    Args:
+        signal_row_i8: One retained candidate signal row aligned to the signal timeline.
+        entry_exec_idx_i64: Entry execution indexes aligned to the same signal timeline.
+        sentinel_index: Local execution timeline length.
+        direction_mode_code: Encoded direction-mode literal.
+    Returns:
+        int: Deterministic compact-trade count for the requested retained row.
+    Assumptions:
+        Counting must preserve the same exit-only and sentinel-carry semantics as the fill pass so
+        `max_trade_count` stays bounded by real retained trades.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    current_direction = 0
+    row_trade_count = 0
+    signal_count = int(signal_row_i8.shape[0])
+
+    for signal_bar_idx in range(signal_count):
+        raw_direction = int(signal_row_i8[signal_bar_idx])
+        if raw_direction == SIGNAL_CODE_NEUTRAL_V2:
+            continue
+        mapped_entry_exec_idx = int(entry_exec_idx_i64[signal_bar_idx])
+        if mapped_entry_exec_idx >= sentinel_index:
+            break
+        if current_direction == 0:
+            if _direction_allowed_code_v2(raw_direction, direction_mode_code):
+                current_direction = raw_direction
+            continue
+        if raw_direction == current_direction:
+            continue
+        row_trade_count += 1
+        if _direction_allowed_code_v2(raw_direction, direction_mode_code):
+            current_direction = raw_direction
+        else:
+            current_direction = 0
+    if current_direction != 0:
+        row_trade_count += 1
+    return row_trade_count
+
+
 @nb.njit(parallel=True, cache=True)
-def _build_compact_trade_batch_kernel_v2(
+def _count_compact_trade_batch_rows_kernel_v2(
     *,
     final_signal_i8: np.ndarray,
     entry_exec_idx_i64: np.ndarray,
     sentinel_index: int,
     direction_mode_code: int,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> np.ndarray:
     """
-    Build dense trade-list-first rows for one retained exact-candidate matrix in parallel.
+    Count compact trades per retained row before allocating bounded trade-field storage.
 
     Args:
         final_signal_i8: Canonical `int8` retained `final_signal[V, T_signal]` matrix.
@@ -472,64 +545,150 @@ def _build_compact_trade_batch_kernel_v2(
         sentinel_index: Local execution timeline length.
         direction_mode_code: Encoded direction-mode literal.
     Returns:
-        tuple[np.ndarray, ...]: Dense trade fields plus per-row trade counts.
+        np.ndarray: Int64 per-row compact-trade counts aligned to retained row order.
     Assumptions:
-        Each retained row is independent, so dense trade extraction can parallelize across rows
-        while preserving the authored signal timeline order inside each row.
+        The retained rows are independent, so counting can parallelize across rows and later drive
+        one bounded `max_trade_count` allocation.
     Raises:
         None.
     Side Effects:
-        Allocates dense trade-field arrays for the retained batch.
+        Allocates one per-row count vector.
     """
     row_count = int(final_signal_i8.shape[0])
-    signal_count = int(final_signal_i8.shape[1])
-    entry_signal_idx = np.full((row_count, signal_count), -1, dtype=np.int64)
-    entry_exec_idx = np.zeros((row_count, signal_count), dtype=np.int64)
-    direction = np.zeros((row_count, signal_count), dtype=np.int8)
-    sig_exit_signal_idx = np.full((row_count, signal_count), -1, dtype=np.int64)
-    sig_exit_exec_idx = np.zeros((row_count, signal_count), dtype=np.int64)
     trade_count = np.zeros(row_count, dtype=np.int64)
-
     for row_index in nb.prange(row_count):
-        current_direction = 0
-        current_entry_signal_idx = 0
-        current_entry_exec_idx = 0
-        row_trade_count = 0
-        for signal_bar_idx in range(signal_count):
-            raw_direction = int(final_signal_i8[row_index, signal_bar_idx])
-            if raw_direction == SIGNAL_CODE_NEUTRAL_V2:
-                continue
-            mapped_entry_exec_idx = int(entry_exec_idx_i64[signal_bar_idx])
-            if mapped_entry_exec_idx >= sentinel_index:
-                break
-            if current_direction == 0:
-                if _direction_allowed_code_v2(raw_direction, direction_mode_code):
-                    current_direction = raw_direction
-                    current_entry_signal_idx = signal_bar_idx
-                    current_entry_exec_idx = mapped_entry_exec_idx
-                continue
-            if raw_direction == current_direction:
-                continue
-            entry_signal_idx[row_index, row_trade_count] = current_entry_signal_idx
-            entry_exec_idx[row_index, row_trade_count] = current_entry_exec_idx
-            direction[row_index, row_trade_count] = current_direction
-            sig_exit_signal_idx[row_index, row_trade_count] = signal_bar_idx
-            sig_exit_exec_idx[row_index, row_trade_count] = mapped_entry_exec_idx
-            row_trade_count += 1
+        trade_count[row_index] = _count_compact_trades_for_signal_row_v2(
+            final_signal_i8[row_index],
+            entry_exec_idx_i64,
+            sentinel_index,
+            direction_mode_code,
+        )
+    return trade_count
+
+
+@nb.njit(cache=True)
+def _fill_compact_trade_row_v2(
+    signal_row_i8: np.ndarray,
+    entry_exec_idx_i64: np.ndarray,
+    sentinel_index: int,
+    direction_mode_code: int,
+    entry_signal_idx_i64: np.ndarray,
+    entry_exec_idx_by_trade_i64: np.ndarray,
+    direction_i8: np.ndarray,
+    sig_exit_signal_idx_i64: np.ndarray,
+    sig_exit_exec_idx_i64: np.ndarray,
+) -> None:
+    """
+    Fill one retained row's bounded compact-trade arrays in authored timeline order.
+
+    Args:
+        signal_row_i8: One retained candidate signal row aligned to the signal timeline.
+        entry_exec_idx_i64: Entry execution indexes aligned to the same signal timeline.
+        sentinel_index: Local execution timeline length.
+        direction_mode_code: Encoded direction-mode literal.
+        entry_signal_idx_i64: Preallocated row buffer for entry signal indexes.
+        entry_exec_idx_by_trade_i64: Preallocated row buffer for entry execution indexes.
+        direction_i8: Preallocated row buffer for trade directions.
+        sig_exit_signal_idx_i64: Preallocated row buffer for signal-exit indexes.
+        sig_exit_exec_idx_i64: Preallocated row buffer for exit execution indexes.
+    Returns:
+        None.
+    Assumptions:
+        Row buffers are already sized to the exact retained trade count for this row or to a
+        larger batch-local `max_trade_count` with padding beyond the written prefix.
+    Raises:
+        None.
+    Side Effects:
+        Mutates the provided row buffers in place.
+    """
+    current_direction = 0
+    current_entry_signal_idx = 0
+    current_entry_exec_idx = 0
+    row_trade_index = 0
+    signal_count = int(signal_row_i8.shape[0])
+
+    for signal_bar_idx in range(signal_count):
+        raw_direction = int(signal_row_i8[signal_bar_idx])
+        if raw_direction == SIGNAL_CODE_NEUTRAL_V2:
+            continue
+        mapped_entry_exec_idx = int(entry_exec_idx_i64[signal_bar_idx])
+        if mapped_entry_exec_idx >= sentinel_index:
+            break
+        if current_direction == 0:
             if _direction_allowed_code_v2(raw_direction, direction_mode_code):
                 current_direction = raw_direction
                 current_entry_signal_idx = signal_bar_idx
                 current_entry_exec_idx = mapped_entry_exec_idx
-            else:
-                current_direction = 0
-        if current_direction != 0:
-            entry_signal_idx[row_index, row_trade_count] = current_entry_signal_idx
-            entry_exec_idx[row_index, row_trade_count] = current_entry_exec_idx
-            direction[row_index, row_trade_count] = current_direction
-            sig_exit_signal_idx[row_index, row_trade_count] = -1
-            sig_exit_exec_idx[row_index, row_trade_count] = sentinel_index
-            row_trade_count += 1
-        trade_count[row_index] = row_trade_count
+            continue
+        if raw_direction == current_direction:
+            continue
+        entry_signal_idx_i64[row_trade_index] = current_entry_signal_idx
+        entry_exec_idx_by_trade_i64[row_trade_index] = current_entry_exec_idx
+        direction_i8[row_trade_index] = current_direction
+        sig_exit_signal_idx_i64[row_trade_index] = signal_bar_idx
+        sig_exit_exec_idx_i64[row_trade_index] = mapped_entry_exec_idx
+        row_trade_index += 1
+        if _direction_allowed_code_v2(raw_direction, direction_mode_code):
+            current_direction = raw_direction
+            current_entry_signal_idx = signal_bar_idx
+            current_entry_exec_idx = mapped_entry_exec_idx
+        else:
+            current_direction = 0
+    if current_direction != 0:
+        entry_signal_idx_i64[row_trade_index] = current_entry_signal_idx
+        entry_exec_idx_by_trade_i64[row_trade_index] = current_entry_exec_idx
+        direction_i8[row_trade_index] = current_direction
+        sig_exit_signal_idx_i64[row_trade_index] = -1
+        sig_exit_exec_idx_i64[row_trade_index] = sentinel_index
+
+
+@nb.njit(parallel=True, cache=True)
+def _build_compact_trade_batch_kernel_v2(
+    *,
+    final_signal_i8: np.ndarray,
+    entry_exec_idx_i64: np.ndarray,
+    sentinel_index: int,
+    direction_mode_code: int,
+    max_trade_count: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Build bounded trade-list-first rows for one retained exact-candidate matrix in parallel.
+
+    Args:
+        final_signal_i8: Canonical `int8` retained `final_signal[V, T_signal]` matrix.
+        entry_exec_idx_i64: Canonical local entry indexes aligned to `T_signal`.
+        sentinel_index: Local execution timeline length.
+        direction_mode_code: Encoded direction-mode literal.
+        max_trade_count: Batch-local maximum compact-trade count across retained rows.
+    Returns:
+        tuple[np.ndarray, ...]: Bounded dense trade fields sized `[V, max_trade_count]`.
+    Assumptions:
+        Each retained row is independent, so the second pass can fill preallocated bounded arrays
+        in parallel while preserving the authored signal timeline order inside each row.
+    Raises:
+        None.
+    Side Effects:
+        Allocates bounded trade-field arrays for the retained batch.
+    """
+    row_count = int(final_signal_i8.shape[0])
+    entry_signal_idx = np.full((row_count, max_trade_count), -1, dtype=np.int64)
+    entry_exec_idx = np.zeros((row_count, max_trade_count), dtype=np.int64)
+    direction = np.zeros((row_count, max_trade_count), dtype=np.int8)
+    sig_exit_signal_idx = np.full((row_count, max_trade_count), -1, dtype=np.int64)
+    sig_exit_exec_idx = np.zeros((row_count, max_trade_count), dtype=np.int64)
+
+    for row_index in nb.prange(row_count):
+        _fill_compact_trade_row_v2(
+            final_signal_i8[row_index],
+            entry_exec_idx_i64,
+            sentinel_index,
+            direction_mode_code,
+            entry_signal_idx[row_index],
+            entry_exec_idx[row_index],
+            direction[row_index],
+            sig_exit_signal_idx[row_index],
+            sig_exit_exec_idx[row_index],
+        )
 
     return (
         entry_signal_idx,
@@ -537,7 +696,6 @@ def _build_compact_trade_batch_kernel_v2(
         direction,
         sig_exit_signal_idx,
         sig_exit_exec_idx,
-        trade_count,
     )
 
 
@@ -792,7 +950,7 @@ def build_compact_trade_batch_v2(
     direction_mode: str = "long-short",
 ) -> _CompactTradeBatchV2:
     """
-    Build dense internal trade-list-first batch state for retained exact candidates.
+    Build bounded dense internal trade-list-first batch state for retained exact candidates.
 
     Args:
         final_signal: Aggregated retained-candidate signal matrix shaped `[V, T_signal]`.
@@ -821,18 +979,27 @@ def build_compact_trade_batch_v2(
         np.int64,
         copy=False,
     )
+    normalized_signal_i8 = np.ascontiguousarray(normalized_signal, dtype=np.int8)
+    entry_exec_idx_i64 = np.ascontiguousarray(entry_exec_idx, dtype=np.int64)
+    trade_count = _count_compact_trade_batch_rows_kernel_v2(
+        final_signal_i8=normalized_signal_i8,
+        entry_exec_idx_i64=entry_exec_idx_i64,
+        sentinel_index=sentinel_index,
+        direction_mode_code=direction_mode_code,
+    )
+    max_trade_count = 0 if trade_count.size == 0 else int(np.max(trade_count))
     (
         entry_signal_idx,
         entry_exec_idx_by_trade,
         direction,
         sig_exit_signal_idx,
         sig_exit_exec_idx,
-        trade_count,
     ) = _build_compact_trade_batch_kernel_v2(
-        final_signal_i8=np.ascontiguousarray(normalized_signal, dtype=np.int8),
-        entry_exec_idx_i64=np.ascontiguousarray(entry_exec_idx, dtype=np.int64),
+        final_signal_i8=normalized_signal_i8,
+        entry_exec_idx_i64=entry_exec_idx_i64,
         sentinel_index=sentinel_index,
         direction_mode_code=direction_mode_code,
+        max_trade_count=max_trade_count,
     )
     return _CompactTradeBatchV2(
         entry_signal_idx=entry_signal_idx,

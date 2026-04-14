@@ -1942,7 +1942,7 @@ def test_stage_a_shortlist_builder_v2_materializes_exact_payloads_only_for_short
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
-    Verify dense retained exact chunk work only materializes payload objects for shortlisted rows.
+    Verify bounded retained exact chunk work only materializes payload objects for shortlisted rows.
 
     Args:
         monkeypatch: pytest fixture used to record retained exact batch and payload calls.
@@ -1960,12 +1960,14 @@ def test_stage_a_shortlist_builder_v2_materializes_exact_payloads_only_for_short
     """
     grid_context = _combo_proxy_grid_context()
     retained_batch_row_counts: list[int] = []
+    retained_batch_signal_counts: list[int] = []
+    retained_batch_max_trade_counts: list[int] = []
     materialized_payload_row_indexes: list[int] = []
     original_builder = stage_a_shortlist_builder_module.build_compact_trade_batch_v2
 
     def _recording_builder(**kwargs: Any) -> Any:
         """
-        Record retained exact batch size and selective payload materialization.
+        Record retained exact batch size, bounded width, and selective payload materialization.
 
         Args:
             **kwargs: Dense retained-batch builder keyword arguments including `final_signal`.
@@ -1976,10 +1978,13 @@ def test_stage_a_shortlist_builder_v2_materializes_exact_payloads_only_for_short
         Raises:
             None.
         Side Effects:
-            Appends the retained batch row count and later payload row indexes to in-memory logs.
+            Appends retained batch shape data and later payload row indexes to in-memory logs.
         """
-        retained_batch_row_counts.append(int(np.asarray(kwargs["final_signal"]).shape[0]))
+        retained_final_signal = np.asarray(kwargs["final_signal"])
+        retained_batch_row_counts.append(int(retained_final_signal.shape[0]))
+        retained_batch_signal_counts.append(int(retained_final_signal.shape[1]))
         wrapped_batch = original_builder(**kwargs)
+        retained_batch_max_trade_counts.append(int(wrapped_batch.max_trade_count))
 
         class _RecordingBatch:
             """
@@ -2062,6 +2067,8 @@ def test_stage_a_shortlist_builder_v2_materializes_exact_payloads_only_for_short
     assert sum(retained_batch_row_counts) == 4
     assert grid_context.stage_a_variants_total == 8
     assert sum(retained_batch_row_counts) < grid_context.stage_a_variants_total
+    assert retained_batch_max_trade_counts == [1]
+    assert retained_batch_max_trade_counts[0] < retained_batch_signal_counts[0]
     assert materialized_payload_row_indexes == [0, 1]
     assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
 

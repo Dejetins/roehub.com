@@ -148,6 +148,43 @@ def test_build_compact_exact_payloads_v2_wraps_internal_compact_trade_representa
     assert payload.compact_trades == compact_trades[0]
 
 
+def test_build_compact_trade_batch_v2_bounds_internal_width_by_actual_trade_count() -> None:
+    """
+    Verify retained compact-trade batch storage width follows `max_trade_count`, not `signal_count`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Repeated same-direction confirmations should collapse into one open trade, so retained
+        batch storage can stay narrower than the full signal timeline.
+    Raises:
+        AssertionError: If bounded allocation regresses back to dense `[V, T_signal]` storage.
+    Side Effects:
+        None.
+    """
+    final_signal = np.array(
+        [[1, 1, 1, -1, -1, 0, 0], [0, 1, 1, 1, 1, 1, 0]],
+        dtype=np.int8,
+    )
+    batch = build_compact_trade_batch_v2(
+        final_signal=final_signal,
+        bar_close_1m_idx=np.arange(final_signal.shape[1], dtype=np.int64),
+        sentinel_index=8,
+    )
+
+    assert tuple(int(value) for value in batch.trade_count) == (2, 1)
+    assert batch.max_trade_count == 2
+    assert batch.max_trade_count < int(final_signal.shape[1])
+    assert batch.entry_signal_idx.shape == (2, 2)
+    assert batch.entry_exec_idx.shape == (2, 2)
+    assert batch.direction.shape == (2, 2)
+    assert batch.sig_exit_signal_idx.shape == (2, 2)
+    assert batch.sig_exit_exec_idx.shape == (2, 2)
+    assert batch.exact_payload_at(row_index=1).trade_count == 1
+
+
 def test_compute_no_risk_metrics_v2_is_deterministic_and_shortlist_ready() -> None:
     """
     Verify no-risk Stage A metrics are deterministic and expose stable shortlist ranking fields.
