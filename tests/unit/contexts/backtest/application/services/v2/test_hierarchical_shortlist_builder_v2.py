@@ -302,6 +302,59 @@ class _RecordingSignalLoader:
         return np.asarray(matrix[normalized_row_selection, :], dtype=np.int8)
 
 
+class _StaticDefaultsProvider:
+    """
+    Minimal runtime-defaults fake exposing deterministic per-indicator source catalogs.
+
+    Docs:
+      - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+    """
+
+    def __init__(self, *, source_values_by_indicator: dict[str, tuple[str, ...]]) -> None:
+        """
+        Store one deterministic source-catalog mapping for hybrid-builder tests.
+
+        Args:
+            source_values_by_indicator: Ordered source literals keyed by indicator id.
+        Returns:
+            None.
+        Assumptions:
+            Tests in this module need only the `allowed_source_values(...)` runtime-defaults
+            surface.
+        Raises:
+            None.
+        Side Effects:
+            Stores the mapping in memory.
+        """
+        self._source_values_by_indicator = {
+            str(indicator_id): tuple(str(value) for value in values)
+            for indicator_id, values in source_values_by_indicator.items()
+        }
+
+    def allowed_source_values(self, *, indicator_id: str) -> tuple[str, ...]:
+        """
+        Return the ordered source catalog for one indicator id.
+
+        Args:
+            indicator_id: Indicator identifier requested by the builder.
+        Returns:
+            tuple[str, ...]: Deterministic ordered source literals for the indicator.
+        Assumptions:
+            Lookup remains exact for the fixture ids used in these tests.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self._source_values_by_indicator.get(str(indicator_id), ())
+
+
 class _RecordingFamilyPlugin:
     """
     Minimal proposal-only family plugin test double with optional sleep/error behavior.
@@ -480,6 +533,204 @@ def test_hierarchical_shortlist_builder_v2_reduces_runtime_plan_and_preserves_ex
     ) == (0, 1)
     assert signal_loader.matrix_calls == ["alpha", "beta"]
     assert price_loader.calls == 1
+
+
+def test_hierarchical_shortlist_builder_v2_remaps_source_subset_rows_to_full_catalog() -> None:
+    """
+    Verify source-subset plans score planner-local rows against the full artifact source catalog.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - configs/prod/indicators.yaml
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Artifact matrices widen only the `source` axis while preserving the planner axis order and
+        last-axis-fastest mixed-radix flattening.
+    Raises:
+        AssertionError: If planner-local rows are not remapped onto the correct artifact rows.
+    Side Effects:
+        None.
+    """
+    plan = BacktestIndicatorPlanV2(
+        indicator_id="ma.dema",
+        axes=(
+            BacktestIndicatorAxisPlanV2(name="source", values=("close", "high", "hlc3")),
+            BacktestIndicatorAxisPlanV2(name="window", values=(5, 10)),
+        ),
+        variants=6,
+    )
+    signal_matrix = np.asarray(
+        [
+            [
+                ((row_index // 9) % 3) - 1,
+                ((row_index // 3) % 3) - 1,
+                (row_index % 3) - 1,
+            ]
+            for row_index in range(12)
+        ],
+        dtype=np.int8,
+    )
+    builder = BacktestHierarchicalShortlistBuilderV2(
+        price_arrays_loader=_RecordingPriceLoader(
+            close_time=np.array([2_599, 4_599, 6_599], dtype=np.int64)
+        ),
+        signal_matrix_loader=_RecordingSignalLoader(
+            matrices_by_indicator={"ma.dema": signal_matrix}
+        ),
+        defaults_provider=_StaticDefaultsProvider(
+            source_values_by_indicator={
+                "ma.dema": ("close", "hlc3", "ohlc4", "low", "high", "open")
+            }
+        ),
+    )
+
+    row_inputs = builder._row_inputs_for_indicator_plan(
+        plan=plan,
+        signal_matrix=signal_matrix,
+        signal_target_slice=slice(0, 3),
+    )
+
+    assert tuple(row_input.row_index for row_input in row_inputs) == (0, 1, 2, 3, 4, 5)
+    assert tuple(
+        tuple(int(value) for value in row_input.signal_row)
+        for row_input in row_inputs
+    ) == tuple(
+        tuple(int(value) for value in signal_matrix[row_index, :])
+        for row_index in (0, 1, 8, 9, 2, 3)
+    )
+
+
+def test_hierarchical_shortlist_builder_v2_requires_defaults_provider_for_source_subset_artifacts(
+) -> None:
+    """
+    Verify source-aware artifact remapping fails fast without runtime defaults ordering.
+
+    Docs:
+      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - configs/prod/indicators.yaml
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Builder wiring must provide runtime defaults whenever the artifact source catalog is wider
+        than the request-local plan.
+    Raises:
+        AssertionError: If the builder silently scores widened artifact matrices without runtime
+            defaults.
+    Side Effects:
+        None.
+    """
+    plan = BacktestIndicatorPlanV2(
+        indicator_id="ma.dema",
+        axes=(
+            BacktestIndicatorAxisPlanV2(name="source", values=("close", "high", "hlc3")),
+            BacktestIndicatorAxisPlanV2(name="window", values=(5, 10)),
+        ),
+        variants=6,
+    )
+    signal_matrix = np.asarray(
+        [[row_index, row_index, row_index] for row_index in range(12)],
+        dtype=np.int8,
+    )
+    builder = BacktestHierarchicalShortlistBuilderV2(
+        price_arrays_loader=_RecordingPriceLoader(
+            close_time=np.array([2_599, 4_599, 6_599], dtype=np.int64)
+        ),
+        signal_matrix_loader=_RecordingSignalLoader(
+            matrices_by_indicator={"ma.dema": signal_matrix}
+        ),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="requires defaults_provider to remap source-aware signal rows",
+    ):
+        builder._row_inputs_for_indicator_plan(
+            plan=plan,
+            signal_matrix=signal_matrix,
+            signal_target_slice=slice(0, 3),
+        )
+
+
+def test_hierarchical_shortlist_runtime_plan_v2_resolves_sparse_stage_a_indexes() -> None:
+    """
+    Verify reduced hybrid plans resolve retained Stage A variants by original sparse indexes.
+
+    Docs:
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/
+        hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Reduced hybrid plans keep original exact `stage_a_index` values even when the retained
+        set is sparse.
+    Raises:
+        AssertionError: If sparse retained indexes cannot be resolved back to Stage A variants.
+    Side Effects:
+        None.
+    """
+    exact_plan = _runtime_plan_fixture(
+        max_candidates=6,
+        indicator_plans=(
+            BacktestIndicatorPlanV2(
+                indicator_id="alpha",
+                axes=(BacktestIndicatorAxisPlanV2(name="window", values=(10, 20, 30)),),
+                variants=3,
+            ),
+        ),
+        signal_axes=(
+            BacktestSignalAxisPlanV2(
+                indicator_id="signals.v1",
+                param_name="mode",
+                values=("strict", "relaxed"),
+            ),
+        ),
+        stage_b_variants_total=6,
+    )
+    reduced_plan = HierarchicalShortlistRuntimePlanV2.from_source_runtime_plan(
+        source_runtime_plan=exact_plan,
+        retained_stage_a_variants=(
+            exact_plan.stage_a_variant_for_index(stage_a_index=2),
+            exact_plan.stage_a_variant_for_index(stage_a_index=5),
+        ),
+        block_results=(),
+        retained_compute_variants_total=1,
+    )
+
+    assert reduced_plan.stage_a_variant_for_index(stage_a_index=2).stage_a_index == 2
+    assert reduced_plan.stage_a_variant_for_index(stage_a_index=5).stage_a_index == 5
+    with pytest.raises(
+        ValueError,
+        match="HierarchicalShortlistRuntimePlanV2.stage_a_variant_for_index requires retained",
+    ):
+        reduced_plan.stage_a_variant_for_index(stage_a_index=0)
 
 
 def test_hierarchical_shortlist_builder_v2_rejects_non_opt_in_profile_flags() -> None:

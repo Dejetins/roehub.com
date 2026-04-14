@@ -309,7 +309,8 @@ class RunBacktestUseCase:
         resolved_hierarchical_shortlist_builder = (
             hierarchical_shortlist_builder
             or build_default_hierarchical_shortlist_builder_v2(
-                artifact_slot_resolver=artifact_slot_resolver
+                artifact_slot_resolver=artifact_slot_resolver,
+                defaults_provider=defaults_provider,
             )
         )
         resolved_timeline_builder = artifact_timeline_builder or BacktestArtifactTimelineBuilderV2(

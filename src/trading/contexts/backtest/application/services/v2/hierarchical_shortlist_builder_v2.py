@@ -15,6 +15,7 @@ from typing import Callable, Iterator, Literal, Sequence, cast
 
 import numpy as np
 
+from trading.contexts.backtest.application.ports import BacktestGridDefaultsProvider
 from trading.contexts.backtest.domain.value_objects import build_backtest_variant_key_v1
 from trading.contexts.indicators.application.dto import (
     IndicatorVariantSelection,
@@ -267,6 +268,34 @@ class HierarchicalShortlistRuntimePlanV2(BacktestArtifactRuntimePlanV2):
                 )
             previous_stage_a_index = variant.stage_a_index
 
+    def stage_a_variant_for_index(
+        self,
+        *,
+        stage_a_index: int,
+    ) -> BacktestStageABaseVariantV2:
+        """
+        Resolve one retained Stage A variant by its original exact-runtime index.
+
+        Args:
+            stage_a_index: Original exact Stage A index preserved on the retained variant payload.
+        Returns:
+            BacktestStageABaseVariantV2: Matching retained Stage A base variant.
+        Assumptions:
+            Reduced hybrid plans keep the exact Stage A index space sparse, so lookup must target
+            retained original indexes rather than `[0, retained_count)`.
+        Raises:
+            ValueError: If the requested exact Stage A index is not present in the retained set.
+        Side Effects:
+            None.
+        """
+        for retained_variant in self.retained_stage_a_variants:
+            if retained_variant.stage_a_index == stage_a_index:
+                return retained_variant
+        raise ValueError(
+            "HierarchicalShortlistRuntimePlanV2.stage_a_variant_for_index requires retained "
+            f"stage_a_index, got {stage_a_index}"
+        )
+
     @classmethod
     def from_source_runtime_plan(
         cls,
@@ -424,6 +453,7 @@ class BacktestHierarchicalShortlistBuilderV2:
 
     price_arrays_loader: BacktestPriceArraysLoaderV2
     signal_matrix_loader: BacktestSignalMatrixLoaderV2
+    defaults_provider: BacktestGridDefaultsProvider | None = None
     row_scorer: GenericRowScorerV2 = field(default_factory=GenericRowScorerV2)
     diversified_retention: DiversifiedRetentionV2 = field(
         default_factory=DiversifiedRetentionV2
@@ -445,7 +475,8 @@ class BacktestHierarchicalShortlistBuilderV2:
         Returns:
             None.
         Assumptions:
-            Constructor wires collaborators only and performs no artifact IO.
+            Constructor wires collaborators only, keeps runtime defaults optional, and performs no
+            artifact IO.
         Raises:
             ValueError: If dependencies are missing or multiplier is invalid.
         Side Effects:
@@ -1010,10 +1041,11 @@ class BacktestHierarchicalShortlistBuilderV2:
         Returns:
             HierarchicalShortlistBlockResultV2: Retained rows plus full retention audit trail.
         Assumptions:
-            Indicator-row indexes in artifact matrices match the planner's indicator-local
-            mixed-radix variant indexes.
+            When signal artifacts materialize a fuller source catalog than the request selected,
+            planner-local indexes are remapped onto artifact rows before scoring.
         Raises:
-            ValueError: If signal row counts drift from planner invariants.
+            ValueError: If signal row counts drift from planner invariants and cannot be
+                reconciled through source-aware remapping.
         Side Effects:
             Reads one strict signal matrix from the pinned artifact slot.
         """
@@ -1022,13 +1054,6 @@ class BacktestHierarchicalShortlistBuilderV2:
             timeframe=timeframe_code,
             indicator_id=plan.indicator_id,
         )
-        if signal_matrix.manifest.rows_count != plan.variants:
-            raise ValueError(
-                "Hierarchical shortlist requires signal rows_count to match indicator plan "
-                f"variants for {plan.indicator_id!r}; got "
-                f"{signal_matrix.manifest.rows_count}, expected {plan.variants}"
-            )
-
         scored_rows = self._scorer_for_profile(profile=profile).score_rows(
             rows=self._row_inputs_for_indicator_plan(
                 plan=plan,
@@ -1113,33 +1138,160 @@ class BacktestHierarchicalShortlistBuilderV2:
         Returns:
             tuple[GenericRowScoringInputV2, ...]: Deterministic row-scoring inputs for the block.
         Assumptions:
-            Row indexes in the signal matrix align exactly with the planner's indicator-local
-            mixed-radix variant indexes.
+            Returned `row_index` values stay planner-local even when the source artifact keeps a
+            fuller source catalog than the request.
         Raises:
-            ValueError: If the target slice is empty or signal matrix shape drifts.
+            ValueError: If the target slice is empty or signal matrix shape cannot be reconciled
+                with the planner plus runtime defaults.
         Side Effects:
             None.
         """
         if signal_matrix.ndim != 2:
             raise ValueError("Hierarchical shortlist requires 2D signal matrices")
-        if signal_matrix.shape[0] != plan.variants:
-            raise ValueError(
-                "Hierarchical shortlist requires signal matrix rows to match plan variants for "
-                f"{plan.indicator_id!r}; got {signal_matrix.shape[0]}, expected {plan.variants}"
-            )
         if (signal_target_slice.stop or 0) <= (signal_target_slice.start or 0):
             raise ValueError(
                 "Hierarchical shortlist requires non-empty request-timeframe signal_target_slice"
             )
-        sliced_signal_matrix = signal_matrix[:, signal_target_slice]
+        artifact_row_indexes = self._artifact_row_indexes_for_indicator_plan(
+            plan=plan,
+            artifact_row_count=int(signal_matrix.shape[0]),
+        )
         return tuple(
             GenericRowScoringInputV2(
                 indicator_id=plan.indicator_id,
-                row_index=row_index,
-                signal_row=np.asarray(sliced_signal_matrix[row_index, :], dtype=np.int8),
-                stable_identity=f"{plan.indicator_id}:{row_index}",
+                row_index=planner_row_index,
+                signal_row=np.asarray(
+                    signal_matrix[artifact_row_index, signal_target_slice],
+                    dtype=np.int8,
+                ),
+                stable_identity=f"{plan.indicator_id}:{planner_row_index}",
             )
-            for row_index in range(plan.variants)
+            for planner_row_index, artifact_row_index in enumerate(artifact_row_indexes)
+        )
+
+    def _artifact_row_indexes_for_indicator_plan(
+        self,
+        *,
+        plan: BacktestIndicatorPlanV2,
+        artifact_row_count: int,
+    ) -> tuple[int, ...]:
+        """
+        Resolve planner-local row indexes onto the artifact matrix row order.
+
+        Args:
+            plan: One indicator plan from the original exact runtime plan.
+            artifact_row_count: Row count published by the loaded signal artifact.
+        Returns:
+            tuple[int, ...]: Artifact row indexes aligned with planner-local variant indexes.
+        Assumptions:
+            Non-source axes in the runtime plan already match the artifact grid exactly, while the
+            source axis may expand to the full runtime-defaults catalog in artifact storage.
+        Raises:
+            ValueError: If artifact rows cannot be reconciled with the plan and runtime defaults.
+        Side Effects:
+            May consult in-memory runtime defaults for source catalog ordering.
+        """
+        if artifact_row_count == plan.variants:
+            return tuple(range(plan.variants))
+        source_axis = next((axis for axis in plan.axes if axis.name == "source"), None)
+        if source_axis is None:
+            raise ValueError(
+                "Hierarchical shortlist requires signal rows_count to match indicator plan "
+                f"variants for {plan.indicator_id!r}; got {artifact_row_count}, expected "
+                f"{plan.variants}"
+            )
+        if self.defaults_provider is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "Hierarchical shortlist requires defaults_provider to remap source-aware signal "
+                f"rows for {plan.indicator_id!r}; got artifact rows_count {artifact_row_count} "
+                f"for plan variants {plan.variants}"
+            )
+        artifact_source_values = tuple(
+            self.defaults_provider.allowed_source_values(indicator_id=plan.indicator_id)
+        )
+        if len(artifact_source_values) == 0:
+            raise ValueError(
+                "Hierarchical shortlist requires non-empty defaults_provider source catalog for "
+                f"{plan.indicator_id!r}"
+            )
+        artifact_radices = tuple(
+            len(artifact_source_values) if axis.name == "source" else len(axis.values)
+            for axis in plan.axes
+        )
+        expected_artifact_row_count = _product_v2(values=artifact_radices)
+        if expected_artifact_row_count != artifact_row_count:
+            raise ValueError(
+                "Hierarchical shortlist source-aware remap requires artifact rows_count to "
+                "match the runtime-defaults source catalog for "
+                f"{plan.indicator_id!r}; got {artifact_row_count}, expected "
+                f"{expected_artifact_row_count}"
+            )
+        return tuple(
+            self._artifact_row_index_for_selection(
+                plan=plan,
+                selection=build_indicator_selection_for_variant_index_v2(
+                    plan=plan,
+                    variant_index=planner_row_index,
+                ),
+                artifact_source_values=artifact_source_values,
+            )
+            for planner_row_index in range(plan.variants)
+        )
+
+    def _artifact_row_index_for_selection(
+        self,
+        *,
+        plan: BacktestIndicatorPlanV2,
+        selection: IndicatorVariantSelection,
+        artifact_source_values: tuple[str, ...],
+    ) -> int:
+        """
+        Encode one explicit planner selection into the artifact matrix row order.
+
+        Args:
+            plan: One indicator plan from the original exact runtime plan.
+            selection: Explicit planner-local indicator selection.
+            artifact_source_values: Ordered full source catalog published for the artifact.
+        Returns:
+            int: Zero-based artifact row index matching the explicit selection.
+        Assumptions:
+            Artifact row order preserves the planner axis order while widening only the `source`
+            axis to the full runtime-defaults catalog.
+        Raises:
+            ValueError: If one selected value is absent from the artifact axis catalog.
+        Side Effects:
+            None.
+        """
+        coordinates: list[int] = []
+        radices: list[int] = []
+        for axis in plan.axes:
+            if axis.name in selection.inputs:
+                selected_value = selection.inputs[axis.name]
+            elif axis.name in selection.params:
+                selected_value = selection.params[axis.name]
+            else:
+                raise ValueError(
+                    "Hierarchical shortlist could not resolve selection value for axis "
+                    f"{axis.name!r} in {plan.indicator_id!r}"
+                )
+            axis_values = (
+                artifact_source_values
+                if axis.name == "source"
+                else tuple(axis.values)
+            )
+            try:
+                coordinate = axis_values.index(selected_value)
+            except ValueError as exc:
+                raise ValueError(
+                    "Hierarchical shortlist selection value is missing from the artifact axis "
+                    f"catalog for {plan.indicator_id!r}:{axis.name!r}; got "
+                    f"{selected_value!r} not in {axis_values!r}"
+                ) from exc
+            coordinates.append(coordinate)
+            radices.append(len(axis_values))
+        return _encode_mixed_radix_v2(
+            coordinates=coordinates,
+            radices=radices,
         )
 
     def _beam_candidates(
@@ -1282,6 +1434,7 @@ class BacktestHierarchicalShortlistBuilderV2:
 def build_default_hierarchical_shortlist_builder_v2(
     *,
     artifact_slot_resolver: BacktestArtifactSlotResolverV2 | None,
+    defaults_provider: BacktestGridDefaultsProvider | None = None,
 ) -> BacktestHierarchicalShortlistBuilderV2 | None:
     """
     Build the default hierarchical shortlist builder from shared artifact runtime wiring.
@@ -1297,6 +1450,7 @@ def build_default_hierarchical_shortlist_builder_v2(
 
     Args:
         artifact_slot_resolver: Optional slot resolver already wired by runtime startup.
+        defaults_provider: Optional runtime defaults provider exposing per-indicator source order.
     Returns:
         BacktestHierarchicalShortlistBuilderV2 | None: Default builder when the resolver exposes
             a shared artifact loader, otherwise `None`.
@@ -1319,6 +1473,7 @@ def build_default_hierarchical_shortlist_builder_v2(
         signal_matrix_loader=MmapSignalMatrixLoaderV2(
             artifact_loader=typed_artifact_loader
         ),
+        defaults_provider=defaults_provider,
     )
 
 

@@ -1736,6 +1736,69 @@ def test_stage_a_shortlist_builder_v2_checkpoints_report_narrowed_frontier_cardi
     assert tuple(row.base_variant.stage_a_index for row in shortlist) == (1,)
 
 
+def test_stage_a_shortlist_builder_v2_uses_explicit_retained_variants_when_present() -> None:
+    """
+    Verify narrowed runtime plans stream their explicit retained Stage A variants directly.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Hierarchical shortlist plans already preserve sparse exact `stage_a_index` ordering, so
+        Stage A must not rebuild a wider cartesian frontier from per-indicator row pools.
+    Raises:
+        AssertionError: If explicit retained variants are ignored or batch bucketing drifts.
+    Side Effects:
+        None.
+    """
+    retained_variants = (
+        _combo_proxy_base_variant(
+            stage_a_index=3,
+            alpha_window=10,
+            beta_window=10,
+            gamma_window=10,
+        ),
+        _combo_proxy_base_variant(
+            stage_a_index=4,
+            alpha_window=10,
+            beta_window=10,
+            gamma_window=20,
+        ),
+        _combo_proxy_base_variant(
+            stage_a_index=7,
+            alpha_window=20,
+            beta_window=20,
+            gamma_window=20,
+        ),
+    )
+    grid_context = SimpleNamespace(retained_stage_a_variants=retained_variants)
+    builder = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=_combo_proxy_signal_loader(),
+    )
+
+    chunks = tuple(
+        tuple(variant.stage_a_index for variant in chunk)
+        for chunk in builder._iter_retained_stage_a_variant_chunks(
+            row_plans=(),
+            grid_context=cast(Any, grid_context),
+            row_prefilter_frontier={},
+            batch_size=3,
+        )
+    )
+
+    assert chunks == ((3, 4), (7,))
+    assert (
+        builder._retained_stage_a_variants_total(
+            row_plans=(),
+            grid_context=cast(Any, grid_context),
+            row_prefilter_frontier={},
+        )
+        == 3
+    )
+
+
 def test_stage_a_shortlist_builder_v2_streaming_exact_shortlist_is_batch_invariant() -> None:
     """
     Verify streaming exact scoring keeps the deterministic Stage A shortlist stable across batches.

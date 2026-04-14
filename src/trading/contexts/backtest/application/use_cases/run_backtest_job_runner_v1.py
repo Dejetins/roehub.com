@@ -388,7 +388,8 @@ class RunBacktestJobRunnerV1:
         resolved_hierarchical_shortlist_builder = (
             hierarchical_shortlist_builder
             or build_default_hierarchical_shortlist_builder_v2(
-                artifact_slot_resolver=artifact_slot_resolver
+                artifact_slot_resolver=artifact_slot_resolver,
+                defaults_provider=defaults_provider,
             )
         )
         resolved_price_arrays_loader = price_arrays_loader or _build_price_arrays_loader(

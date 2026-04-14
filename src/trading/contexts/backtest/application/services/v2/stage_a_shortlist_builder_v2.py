@@ -1410,6 +1410,24 @@ class BacktestStageAShortlistBuilderV2:
         """
         if batch_size <= 0:
             raise ValueError("Stage A retained-frontier chunk enumeration requires batch_size > 0")
+        explicit_retained_variants = self._explicit_retained_stage_a_variants_for_grid_context(
+            grid_context=grid_context
+        )
+        if explicit_retained_variants is not None:
+            current_batch_bucket: int | None = None
+            current_chunk: list[BacktestStageABaseVariantV2] = []
+            for retained_variant in explicit_retained_variants:
+                batch_bucket = retained_variant.stage_a_index // batch_size
+                if current_batch_bucket is None:
+                    current_batch_bucket = batch_bucket
+                elif batch_bucket != current_batch_bucket:
+                    yield tuple(current_chunk)
+                    current_chunk = []
+                    current_batch_bucket = batch_bucket
+                current_chunk.append(retained_variant)
+            if current_chunk:
+                yield tuple(current_chunk)
+            return
         signal_variants_total = self._signal_variants_total_for_grid_context(
             grid_context=grid_context
         )
@@ -1473,6 +1491,11 @@ class BacktestStageAShortlistBuilderV2:
         Side Effects:
             None.
         """
+        explicit_retained_variants = self._explicit_retained_stage_a_variants_for_grid_context(
+            grid_context=grid_context
+        )
+        if explicit_retained_variants is not None:
+            return len(explicit_retained_variants)
         retained_stage_a_variants_total = self._signal_variants_total_for_grid_context(
             grid_context=grid_context
         )
@@ -1486,6 +1509,41 @@ class BacktestStageAShortlistBuilderV2:
         if retained_stage_a_variants_total <= 0:
             raise ValueError("Stage A retained frontier total must be > 0")
         return retained_stage_a_variants_total
+
+    def _explicit_retained_stage_a_variants_for_grid_context(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+    ) -> tuple[BacktestStageABaseVariantV2, ...] | None:
+        """
+        Resolve precomputed retained Stage A variants when the runtime plan already exposes them.
+
+        Args:
+            grid_context: Stage A runtime plan or compatible test fixture.
+        Returns:
+            tuple[BacktestStageABaseVariantV2, ...] | None: Explicit retained variants when the
+                runtime plan already narrowed Stage A directly, otherwise `None`.
+        Assumptions:
+            Hybrid shortlist plans may publish sparse retained Stage A survivors explicitly, in
+            which case Stage A must iterate that list directly instead of rebuilding a cartesian
+            product from retained row pools.
+        Raises:
+            ValueError: If the runtime plan exposes an empty explicit retained-variant surface.
+        Side Effects:
+            None.
+        """
+        retained_variants = getattr(grid_context, "retained_stage_a_variants", None)
+        if retained_variants is None:
+            return None
+        normalized_variants = tuple(
+            cast(BacktestStageABaseVariantV2, variant) for variant in retained_variants
+        )
+        if len(normalized_variants) == 0:
+            raise ValueError(
+                "Stage A retained-frontier enumeration requires non-empty "
+                "retained_stage_a_variants when the runtime plan exposes them"
+            )
+        return normalized_variants
 
     def _retained_row_pool_for_stage_order(
         self,

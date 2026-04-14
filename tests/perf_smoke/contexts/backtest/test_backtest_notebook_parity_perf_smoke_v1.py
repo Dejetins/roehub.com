@@ -155,10 +155,13 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert nr2_live_capture is not None
     assert nr2_live_capture.capture_id == "nr2_live_host_canonical"
     assert nr2_live_capture.runtime_surface == "sync"
-    assert nr2_live_capture.capture_status == "missing"
+    assert nr2_live_capture.capture_status == "captured"
     assert nr2_live_capture.blocking_closure is True
-    assert nr2_live_capture.captured_measurement is None
-    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is False
+    assert nr2_live_capture.captured_measurement is not None
+    assert nr2_live_capture.captured_measurement.wall_clock_seconds == 18.052954375000354
+    assert nr2_live_capture.captured_measurement.peak_rss_bytes == 17462542336
+    assert nr2_live_capture.captured_measurement.stage_b_execution_mode == "bypassed_no_risk"
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is True
 
     rg_ttr = corpus.scenario_for_id(scenario_id="rg_ttr")
     assert rg_ttr.benchmark_class == "RG-TTR"
@@ -182,12 +185,15 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert rg_ttr_live_capture is not None
     assert rg_ttr_live_capture.capture_id == "rg_ttr_live_host_canonical"
     assert rg_ttr_live_capture.runtime_surface == "sync"
-    assert rg_ttr_live_capture.capture_status == "missing"
+    assert rg_ttr_live_capture.capture_status == "captured"
     assert rg_ttr_live_capture.blocking_closure is True
-    assert rg_ttr_live_capture.captured_measurement is None
+    assert rg_ttr_live_capture.captured_measurement is not None
+    assert rg_ttr_live_capture.captured_measurement.wall_clock_seconds == 9.896754750000127
+    assert rg_ttr_live_capture.captured_measurement.peak_rss_bytes == 23074209792
+    assert rg_ttr_live_capture.captured_measurement.stage_b_execution_mode == "bypassed_no_risk"
     assert (
         corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr")
-        is False
+        is True
     )
 
     rg_alt = corpus.scenario_for_id(scenario_id="rg_alt")
@@ -482,9 +488,9 @@ def test_notebook_parity_live_host_capture_serialization_is_deterministic() -> N
     )
 
 
-def test_notebook_parity_closure_authority_requires_explicit_live_host_capture() -> None:
+def test_notebook_parity_closure_authority_tracks_explicit_live_host_capture() -> None:
     """
-    Verify synthetic perf-smoke cannot substitute for canonical live-host closure evidence.
+    Verify canonical live-host evidence flips the capture-authority readiness bits explicitly.
 
     Docs:
       - docs/architecture/backtest/backtest-v2-benchmarks.md
@@ -499,19 +505,19 @@ def test_notebook_parity_closure_authority_requires_explicit_live_host_capture()
     Returns:
         None.
     Assumptions:
-        Canonical `NR2` and `RG-TTR` must remain closure-blocked until the benchmark host emits
-        explicit live capture payloads, even if synthetic contract validation passes locally.
+        Canonical `NR2` and `RG-TTR` now carry benchmark-host backend captures, while final
+        closure still depends on scenario gate evaluation rather than mere capture presence.
     Raises:
-        AssertionError: If live-host capture status stops gating final closure readiness.
+        AssertionError: If recorded live-host capture status stops driving readiness explicitly.
     Side Effects:
         None.
     """
     corpus = _load_notebook_parity_benchmark_corpus()
 
-    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is False
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is True
     assert (
         corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr")
-        is False
+        is True
     )
     assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_alt") is True
 
