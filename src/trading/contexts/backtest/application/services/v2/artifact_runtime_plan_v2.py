@@ -36,6 +36,7 @@ from .adaptive_selector_v2 import (
     default_adaptive_selector_policy_v2,
 )
 from .execution_profile_v2 import (
+    ExecutionProfileLaunchBudgetEvidenceV2,
     ExecutionProfileModeLiteralV2,
     ExecutionProfilesCatalogV2,
     ExecutionProfileV2,
@@ -276,6 +277,7 @@ class BacktestRuntimeStageCostModelV2:
     """
 
     row_prefilter_rows_total: int
+    retained_row_variants_total: int
     combo_prefilter_variants_total: int
     retained_exact_candidates_total: int
     stage_a_cost_units: int
@@ -290,7 +292,8 @@ class BacktestRuntimeStageCostModelV2:
             None.
         Assumptions:
             Public `stage_a` remains stable while planner math separately tracks row prefilter,
-            combo prefilter, and retained-candidate exact work as positive deterministic counts.
+            retained-row tensor envelope, combo prefilter, and retained-candidate exact work as
+            positive deterministic counts.
         Raises:
             ValueError: If one internal stage total is non-positive.
         Side Effects:
@@ -298,6 +301,7 @@ class BacktestRuntimeStageCostModelV2:
         """
         for field_name in (
             "row_prefilter_rows_total",
+            "retained_row_variants_total",
             "combo_prefilter_variants_total",
             "retained_exact_candidates_total",
             "stage_a_cost_units",
@@ -340,6 +344,7 @@ class BacktestArtifactRuntimePlanV2:
     )
     adaptive_selector_decision: AdaptiveSelectorDecisionV2 | None = None
     stage_cost_model: BacktestRuntimeStageCostModelV2 | None = None
+    launch_budget_evidence: ExecutionProfileLaunchBudgetEvidenceV2 | None = None
 
     def __post_init__(self) -> None:
         """
@@ -359,7 +364,9 @@ class BacktestArtifactRuntimePlanV2:
             None.
         Assumptions:
             Stage totals and memory totals were guard-validated by the planner; when selector
-            debug metadata is attached, it must agree with the effective execution profile.
+            debug metadata is attached, it must agree with the effective execution profile. When
+            launch-budget evidence is attached, its workload class must stay aligned with the
+            prepared risk shape.
         Raises:
             ValueError: If one scalar invariant is invalid or selector debug metadata drifts from
                 the effective execution profile.
@@ -407,6 +414,24 @@ class BacktestArtifactRuntimePlanV2:
             raise ValueError(
                 "BacktestArtifactRuntimePlanV2.stage_cost_model retained frontier cannot "
                 "exceed stage_a_variants_total"
+            )
+        if (
+            self.launch_budget_evidence is not None
+            and self.uses_no_risk_terminal_path()
+            and self.launch_budget_evidence.workload_class != "no_risk_terminal"
+        ):
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.launch_budget_evidence must classify "
+                "no-risk plans as no_risk_terminal"
+            )
+        if (
+            self.launch_budget_evidence is not None
+            and not self.uses_no_risk_terminal_path()
+            and self.launch_budget_evidence.workload_class == "no_risk_terminal"
+        ):
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.launch_budget_evidence cannot classify "
+                "risk-grid plans as no_risk_terminal"
             )
         object.__setattr__(
             self,
@@ -569,8 +594,8 @@ class BacktestArtifactRuntimePlanV2:
         Side Effects:
             None.
         """
-        return len(self.risk_variants) == 1 and _risk_variant_is_no_risk_v2(
-            risk_variant=self.risk_variants[0]
+        return _risk_variants_use_no_risk_terminal_path_v2(
+            risk_variants=self.risk_variants
         )
 
     def stage_b_execution_mode(self) -> str:
@@ -794,6 +819,7 @@ class BacktestArtifactRuntimePlannerV2:
         stage_a_cost_units: int | None = None,
         requested_execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
         indicator_ids: tuple[str, ...] | None = None,
+        launch_budget_evidence: ExecutionProfileLaunchBudgetEvidenceV2 | None = None,
     ) -> ExecutionProfileV2:
         """
         Resolve the effective execution profile from deterministic planner cost evidence.
@@ -824,6 +850,10 @@ class BacktestArtifactRuntimePlannerV2:
             indicator_ids:
                 Optional deterministic indicator ids from the prepared plan. These stay internal
                 and are used only to validate `hybrid_family` plugin availability.
+            launch_budget_evidence:
+                Optional explicit sync-launch workload evidence prepared by the planner. Canonical
+                no-risk requests may narrow Stage A and memory evidence here without changing
+                public request/response contracts or full-budget guard enforcement.
         Returns:
             ExecutionProfileV2: Selected execution profile for the prepared request.
         Assumptions:
@@ -840,6 +870,12 @@ class BacktestArtifactRuntimePlannerV2:
         if requested_execution_profile_mode is not None:
             requested_profile = self._execution_profiles.profile_for_mode(
                 mode=requested_execution_profile_mode
+            )
+            requested_launch_budget_evidence = _resolved_launch_budget_evidence_v2(
+                stage_a_variants_total=stage_a_variants_total,
+                stage_b_variants_total=stage_b_variants_total,
+                estimated_memory_bytes=estimated_memory_bytes,
+                launch_budget_evidence=launch_budget_evidence,
             )
             if (
                 execution_profile_uses_hierarchical_shortlist_runtime_v2(
@@ -862,20 +898,22 @@ class BacktestArtifactRuntimePlannerV2:
                 )
             if (
                 self._launch_budget_mode == "sync_inline"
-                and stage_a_variants_total is not None
-                and stage_b_variants_total is not None
-                and estimated_memory_bytes is not None
-                and not requested_profile.launch_budget.allows(
-                    stage_a_variants_total=stage_a_variants_total,
-                    stage_b_variants_total=stage_b_variants_total,
-                    estimated_memory_bytes=estimated_memory_bytes,
+                and requested_launch_budget_evidence is not None
+                and not requested_profile.launch_budget.allows_evidence(
+                    evidence=requested_launch_budget_evidence,
                 )
             ):
                 raise _background_auto_required_error_v2(
                     execution_profile_mode=requested_profile.mode,
-                    stage_a_variants_total=stage_a_variants_total,
-                    stage_b_variants_total=stage_b_variants_total,
-                    estimated_memory_bytes=estimated_memory_bytes,
+                    stage_a_variants_total=(
+                        requested_launch_budget_evidence.stage_a_variants_total
+                    ),
+                    stage_b_variants_total=(
+                        requested_launch_budget_evidence.stage_b_variants_total
+                    ),
+                    estimated_memory_bytes=(
+                        requested_launch_budget_evidence.estimated_memory_bytes
+                    ),
                 )
             return requested_profile
 
@@ -1057,6 +1095,14 @@ class BacktestArtifactRuntimePlannerV2:
             shortlist_len=shortlist_len,
         )
         stage_b_variants_total = shortlist_len * len(risk_variants)
+        launch_budget_evidence = _build_launch_budget_evidence_v2(
+            bars=len(candles.ts_open),
+            stage_a_variants_total=stage_a_variants_total,
+            stage_b_variants_total=stage_b_variants_total,
+            estimated_memory_bytes=estimated_memory_bytes,
+            stage_cost_model=stage_cost_model,
+            risk_variants=risk_variants,
+        )
         if stage_b_variants_total > max_variants_per_compute:
             raise _variants_guard_error_v2(
                 stage=STAGE_B_LITERAL_V2,
@@ -1082,6 +1128,7 @@ class BacktestArtifactRuntimePlannerV2:
                 estimated_memory_bytes=estimated_memory_bytes,
                 requested_execution_profile_mode=requested_execution_profile_mode,
                 indicator_ids=tuple(plan.indicator_id for plan in indicator_plans),
+                launch_budget_evidence=launch_budget_evidence,
             )
 
         return BacktestArtifactRuntimePlanV2(
@@ -1108,6 +1155,7 @@ class BacktestArtifactRuntimePlannerV2:
             indicator_estimate_calls=len(indicator_plans),
             adaptive_selector_decision=adaptive_selector_decision,
             stage_cost_model=stage_cost_model,
+            launch_budget_evidence=launch_budget_evidence,
         )
 
     def build(
@@ -1592,6 +1640,30 @@ def _risk_variant_is_no_risk_v2(
     )
 
 
+def _risk_variants_use_no_risk_terminal_path_v2(
+    *,
+    risk_variants: tuple[BacktestRiskVariantV2, ...],
+) -> bool:
+    """
+    Classify whether one prepared risk-variant set belongs to the canonical no-risk class.
+
+    Args:
+        risk_variants: Prepared Stage B risk variants for one runtime plan.
+    Returns:
+        bool: `True` when the runtime stays on the canonical single-cell no-risk terminal path.
+    Assumptions:
+        The no-risk class remains a single disabled-risk cell, which keeps sync launch budgeting
+        and runtime-shape classification deterministic for `NR2`-style requests.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return len(risk_variants) == 1 and _risk_variant_is_no_risk_v2(
+        risk_variant=risk_variants[0]
+    )
+
+
 def _bool_scalar_v2(*, value: BacktestVariantScalar, field_name: str) -> bool:
     """
     Validate one boolean scalar value from risk payload mappings.
@@ -1674,14 +1746,41 @@ def _estimate_memory_bytes_v2(
     Side Effects:
         None.
     """
+    return _estimate_memory_bytes_from_variant_counts_v2(
+        bars=bars,
+        indicator_variants_total=sum(plan.variants for plan in indicator_plans),
+    )
+
+
+def _estimate_memory_bytes_from_variant_counts_v2(
+    *,
+    bars: int,
+    indicator_variants_total: int,
+) -> int:
+    """
+    Estimate total runtime memory bytes from aggregate indicator-variant cardinality.
+
+    Args:
+        bars: Number of warmup-inclusive request-timeframe bars.
+        indicator_variants_total: Aggregate indicator-variant rows contributing float32 tensors.
+    Returns:
+        int: Estimated total memory bytes with reserve.
+    Assumptions:
+        Planner memory budgeting stays explicit and deterministic, so both raw-grid and no-risk
+        launch evidence share the same reserve policy while varying only the aggregate retained
+        indicator cardinality.
+    Raises:
+        ValueError: If bars is non-positive or aggregate variant count is negative.
+    Side Effects:
+        None.
+    """
     if bars <= 0:
         raise ValueError("bars must be > 0 for memory estimate")
+    if indicator_variants_total < 0:
+        raise ValueError("indicator_variants_total must be >= 0 for memory estimate")
 
     bytes_candles = bars * _CANDLES_BYTES_PER_STEP
-    bytes_indicators = 0
-    for plan in indicator_plans:
-        bytes_indicators += bars * plan.variants * _FLOAT32_BYTES
-
+    bytes_indicators = bars * indicator_variants_total * _FLOAT32_BYTES
     reserve_base = bytes_candles + bytes_indicators
     reserve = max(_RESERVE_FIXED_BYTES, int(math.ceil(reserve_base * _RESERVE_FACTOR)))
     return reserve_base + reserve
@@ -1764,7 +1863,8 @@ def _build_stage_cost_model_v2(
         BacktestRuntimeStageCostModelV2: Internal cost model for planner-only classification.
     Assumptions:
         Public `stage_a` still maps to the full outward stage while internal cost evidence tracks
-        row prefilter, combo prefilter, and retained-candidate exact work separately.
+        row prefilter, retained-row tensor envelope, combo prefilter, and retained-candidate
+        exact work separately.
     Raises:
         ValueError: If one derived retained-frontier total is non-positive.
     Side Effects:
@@ -1796,9 +1896,100 @@ def _build_stage_cost_model_v2(
     )
     return BacktestRuntimeStageCostModelV2(
         row_prefilter_rows_total=row_prefilter_rows_total,
+        retained_row_variants_total=sum(retained_row_limits),
         combo_prefilter_variants_total=combo_prefilter_variants_total,
         retained_exact_candidates_total=retained_exact_candidates_total,
         stage_a_cost_units=stage_a_cost_units,
+    )
+
+
+def _build_launch_budget_evidence_v2(
+    *,
+    bars: int,
+    stage_a_variants_total: int,
+    stage_b_variants_total: int,
+    estimated_memory_bytes: int,
+    stage_cost_model: BacktestRuntimeStageCostModelV2,
+    risk_variants: tuple[BacktestRiskVariantV2, ...],
+) -> ExecutionProfileLaunchBudgetEvidenceV2:
+    """
+    Build explicit sync-launch workload evidence aligned to the prepared terminal runtime shape.
+
+    Args:
+        bars: Warmup-inclusive request-timeframe bars count.
+        stage_a_variants_total: Raw prepared Stage A cartesian total.
+        stage_b_variants_total: Prepared Stage B variants total before runtime execution.
+        estimated_memory_bytes: Raw deterministic planner memory estimate.
+        stage_cost_model: Internal retained-frontier stage-cost model for the same plan.
+        risk_variants: Prepared Stage B risk variants for the same plan.
+    Returns:
+        ExecutionProfileLaunchBudgetEvidenceV2: Explicit sync-launch evidence for requested
+            profile gating.
+    Assumptions:
+        Canonical no-risk requests may use narrowed retained-frontier Stage A evidence and a
+        no-risk-aligned memory estimate while the full-budget compute guards stay unchanged.
+    Raises:
+        ValueError: If one derived evidence field is invalid.
+    Side Effects:
+        None.
+    """
+    if _risk_variants_use_no_risk_terminal_path_v2(risk_variants=risk_variants):
+        return ExecutionProfileLaunchBudgetEvidenceV2(
+            stage_a_variants_total=stage_cost_model.combo_prefilter_variants_total,
+            stage_b_variants_total=stage_b_variants_total,
+            estimated_memory_bytes=_estimate_memory_bytes_from_variant_counts_v2(
+                bars=bars,
+                indicator_variants_total=stage_cost_model.retained_row_variants_total,
+            ),
+            workload_class="no_risk_terminal",
+        )
+    return ExecutionProfileLaunchBudgetEvidenceV2(
+        stage_a_variants_total=stage_a_variants_total,
+        stage_b_variants_total=stage_b_variants_total,
+        estimated_memory_bytes=estimated_memory_bytes,
+        workload_class="raw_grid",
+    )
+
+
+def _resolved_launch_budget_evidence_v2(
+    *,
+    stage_a_variants_total: int | None,
+    stage_b_variants_total: int | None,
+    estimated_memory_bytes: int | None,
+    launch_budget_evidence: ExecutionProfileLaunchBudgetEvidenceV2 | None,
+) -> ExecutionProfileLaunchBudgetEvidenceV2 | None:
+    """
+    Resolve the explicit launch-budget evidence used by requested sync profile gating.
+
+    Args:
+        stage_a_variants_total: Raw prepared Stage A cartesian total, if available.
+        stage_b_variants_total: Raw prepared Stage B variants total, if available.
+        estimated_memory_bytes: Raw deterministic planner memory estimate, if available.
+        launch_budget_evidence: Optional explicit planner-prepared launch-budget evidence.
+    Returns:
+        ExecutionProfileLaunchBudgetEvidenceV2 | None:
+            Explicit evidence when enough inputs exist, otherwise `None`.
+    Assumptions:
+        Requested sync launch gating should prefer explicit planner evidence and fall back to raw
+        request-shape totals only when no narrower runtime-shape evidence exists.
+    Raises:
+        ValueError: If fallback raw evidence is materially incomplete.
+    Side Effects:
+        None.
+    """
+    if launch_budget_evidence is not None:
+        return launch_budget_evidence
+    if (
+        stage_a_variants_total is None
+        or stage_b_variants_total is None
+        or estimated_memory_bytes is None
+    ):
+        return None
+    return ExecutionProfileLaunchBudgetEvidenceV2(
+        stage_a_variants_total=stage_a_variants_total,
+        stage_b_variants_total=stage_b_variants_total,
+        estimated_memory_bytes=estimated_memory_bytes,
+        workload_class="raw_grid",
     )
 
 

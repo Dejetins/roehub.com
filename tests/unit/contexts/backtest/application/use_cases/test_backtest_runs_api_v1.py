@@ -616,6 +616,56 @@ def test_launch_backtest_with_auto_fallback_returns_sync_inline_when_sync_budget
     assert create_use_case.calls == 0
 
 
+def test_launch_backtest_with_auto_fallback_keeps_canonical_nr2_sync_inline_response() -> None:
+    """
+    Verify canonical `NR2` no-risk sync launch stays on `sync_inline` and keeps the internal
+    `hybrid_conservative` execution profile instead of drifting into `background_auto`.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The sync wrapper should preserve the corrected planner decision end to end once the
+        canonical no-risk request is admitted by sync launch budgeting.
+    Raises:
+        AssertionError: If the launch wrapper mutates the sync response or touches fallback paths.
+    Side Effects:
+        None.
+    """
+    sync_response = replace(
+        _template_run_response(),
+        run_id=UUID("00000000-0000-0000-0000-000000000912"),
+        state="succeeded",
+        execution_mode="sync_inline",
+        execution_profile_mode="hybrid_conservative",
+        engine_version="signal_tf + 1m_risk",
+        engine_params_hash="f" * 64,
+    )
+    preflight_use_case = _FakePreflightUseCase()
+    create_use_case = _FakeBackgroundCreateUseCase()
+    use_case = LaunchBacktestRunWithAutoFallbackUseCase(
+        sync_inline_use_case=_FakeRunUseCase(response=sync_response),
+        background_preflight_use_case=preflight_use_case,
+        background_create_use_case=create_use_case,
+        engine_version="signal_tf + 1m_risk",
+    )
+
+    launched = use_case.execute(
+        request=_template_request(),
+        current_user=CurrentUser(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+        ),
+        request_payload=_template_request_payload(),
+    )
+
+    assert launched.execution_mode == "sync_inline"
+    assert launched.execution_profile_mode == "hybrid_conservative"
+    assert launched.run_id == UUID("00000000-0000-0000-0000-000000000912")
+    assert preflight_use_case.calls == 0
+    assert create_use_case.calls == 0
+
+
 def test_launch_backtest_with_auto_fallback_routes_heavy_valid_request_to_background_auto(
 ) -> None:
     """

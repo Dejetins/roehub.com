@@ -24,6 +24,10 @@ type ExecutionProfileStageBProcessFallbackThresholdLiteralV2 = Literal[
     "none",
     "stage_b_variants_total",
 ]
+type ExecutionProfileLaunchBudgetWorkloadClassLiteralV2 = Literal[
+    "raw_grid",
+    "no_risk_terminal",
+]
 type ExecutionProfileShortlistDiversityBucketLiteralV2 = Literal[
     "activity_band",
     "direction_band",
@@ -40,6 +44,12 @@ DEFAULT_EXECUTION_PROFILE_MODE_V2: ExecutionProfileModeLiteralV2 = "exact_small"
 _EXACT_EXECUTION_PROFILE_MODES_V2: tuple[ExecutionProfileModeLiteralV2, ...] = (
     "exact_small",
     "exact_parallel",
+)
+ALLOWED_EXECUTION_PROFILE_LAUNCH_BUDGET_WORKLOAD_CLASSES_V2: tuple[
+    ExecutionProfileLaunchBudgetWorkloadClassLiteralV2, ...
+] = (
+    "raw_grid",
+    "no_risk_terminal",
 )
 ALLOWED_EXECUTION_PROFILE_SHORTLIST_DIVERSITY_BUCKETS_V2: tuple[
     ExecutionProfileShortlistDiversityBucketLiteralV2, ...
@@ -233,6 +243,61 @@ class ExecutionProfileShortlistRetentionConfigV2:
 
 
 @dataclass(frozen=True, slots=True)
+class ExecutionProfileLaunchBudgetEvidenceV2:
+    """
+    Explicit sync-launch workload evidence used for exact requested-profile budget gating.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_adaptive_selector_v2.py
+    """
+
+    stage_a_variants_total: int
+    stage_b_variants_total: int
+    estimated_memory_bytes: int
+    workload_class: ExecutionProfileLaunchBudgetWorkloadClassLiteralV2 = "raw_grid"
+
+    def __post_init__(self) -> None:
+        """
+        Validate deterministic workload evidence used for requested sync launch decisions.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Evidence values come from planner math only and must remain explicit, positive, and
+            reviewable so `sync_inline` routing decisions can be debugged without inspecting
+            runtime side effects.
+        Raises:
+            ValueError: If one numeric field is non-positive or workload class is unsupported.
+        Side Effects:
+            None.
+        """
+        for field_name, field_value in (
+            ("stage_a_variants_total", self.stage_a_variants_total),
+            ("stage_b_variants_total", self.stage_b_variants_total),
+            ("estimated_memory_bytes", self.estimated_memory_bytes),
+        ):
+            if field_value <= 0:
+                raise ValueError(
+                    f"ExecutionProfileLaunchBudgetEvidenceV2.{field_name} must be > 0"
+                )
+        if (
+            self.workload_class
+            not in ALLOWED_EXECUTION_PROFILE_LAUNCH_BUDGET_WORKLOAD_CLASSES_V2
+        ):
+            raise ValueError(
+                "ExecutionProfileLaunchBudgetEvidenceV2.workload_class must be one of "
+                f"{ALLOWED_EXECUTION_PROFILE_LAUNCH_BUDGET_WORKLOAD_CLASSES_V2}"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionProfileLaunchBudgetV2:
     """
     Deterministic request-shape budget used for exact profile selection and sync launch routing.
@@ -319,6 +384,32 @@ class ExecutionProfileLaunchBudgetV2:
             stage_a_variants_total <= self.max_stage_a_variants_total
             and stage_b_variants_total <= self.max_stage_b_variants_total
             and estimated_memory_bytes <= self.max_estimated_memory_bytes
+        )
+
+    def allows_evidence(
+        self,
+        *,
+        evidence: ExecutionProfileLaunchBudgetEvidenceV2,
+    ) -> bool:
+        """
+        Return whether one explicit workload-evidence payload fits this launch budget.
+
+        Args:
+            evidence: Deterministic sync-launch workload evidence prepared by the planner.
+        Returns:
+            bool: `True` when the evidence fits all configured thresholds.
+        Assumptions:
+            The evidence payload already reflects the intended runtime shape, including the
+            narrowed no-risk terminal path when applicable.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self.allows(
+            stage_a_variants_total=evidence.stage_a_variants_total,
+            stage_b_variants_total=evidence.stage_b_variants_total,
+            estimated_memory_bytes=evidence.estimated_memory_bytes,
         )
 
 
@@ -1492,6 +1583,7 @@ __all__ = [
     "ALLOWED_EXECUTION_PROFILE_MODES_V2",
     "DEFAULT_EXECUTION_PROFILE_MODE_V2",
     "ExecutionProfileFeatureFlagsV2",
+    "ExecutionProfileLaunchBudgetEvidenceV2",
     "ExecutionProfileLaunchBudgetV2",
     "ExecutionProfileModeLiteralV2",
     "ExecutionProfileParallelismConfigV2",

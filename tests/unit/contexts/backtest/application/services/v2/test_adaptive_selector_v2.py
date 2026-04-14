@@ -13,9 +13,13 @@ from trading.contexts.backtest.application.services.v2.adaptive_selector_v2 impo
 )
 from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlannerV2,
+    BacktestRiskVariantV2,
+    BacktestRuntimeStageCostModelV2,
+    _build_launch_budget_evidence_v2,
 )
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
+    ExecutionProfileLaunchBudgetEvidenceV2,
     ExecutionProfilesCatalogV2,
     default_execution_profiles_catalog_v2,
 )
@@ -541,3 +545,111 @@ def test_requested_hybrid_profile_override_is_allowed_in_opt_in_phase() -> None:
     )
 
     assert profile.mode == "hybrid_conservative"
+
+
+def test_requested_nr2_no_risk_hybrid_profile_uses_narrowed_launch_budget_evidence() -> None:
+    """
+    Verify canonical `NR2` `hybrid_conservative` sync launch stays `sync_inline` once the
+    planner uses explicit no-risk evidence aligned with the `bypassed_no_risk` terminal path.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Without explicit no-risk launch evidence the same request would still fall into
+        `background_auto` because raw-grid Stage A and legacy memory math exceed the requested
+        sync launch budget.
+    Raises:
+        AssertionError: If raw-grid rejection disappears or narrowed no-risk evidence fails to
+            preserve the requested sync launch.
+    Side Effects:
+        None.
+    """
+    planner = BacktestArtifactRuntimePlannerV2(
+        execution_profiles=_catalog_with_live_hybrid_profiles(),
+        adaptive_selector_policy=_policy(mode="active"),
+        launch_budget_mode="sync_inline",
+    )
+
+    with pytest.raises(RoehubError) as error_info:
+        planner.resolve_execution_profile(
+            stage_a_variants_total=345744,
+            stage_b_variants_total=20000,
+            estimated_memory_bytes=2300000000,
+            requested_execution_profile_mode="hybrid_conservative",
+            indicator_ids=("ma.fast", "ma.slow"),
+        )
+
+    details = error_info.value.details
+    assert details is not None
+    assert details["error"] == "background_auto_required"
+    assert details["execution_mode"] == "background_auto"
+    assert details["stage_a_variants_total"] == 345744
+
+    profile = planner.resolve_execution_profile(
+        stage_a_variants_total=345744,
+        stage_b_variants_total=20000,
+        estimated_memory_bytes=2300000000,
+        requested_execution_profile_mode="hybrid_conservative",
+        indicator_ids=("ma.fast", "ma.slow"),
+        launch_budget_evidence=ExecutionProfileLaunchBudgetEvidenceV2(
+            stage_a_variants_total=20164,
+            stage_b_variants_total=20000,
+            estimated_memory_bytes=1400000000,
+            workload_class="no_risk_terminal",
+        ),
+    )
+
+    assert profile.mode == "hybrid_conservative"
+
+
+def test_nr2_no_risk_launch_budget_evidence_uses_planner_narrowed_workload_shape() -> None:
+    """
+    Verify planner-produced `NR2` launch-budget evidence narrows Stage A and memory inputs for
+    the `bypassed_no_risk` terminal path instead of reusing raw-grid math.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical no-risk sync launch budgeting should stay explicit and inspectable, so the
+        planner emits a typed evidence object rather than hiding this narrowing behind profile
+        threshold changes.
+    Raises:
+        AssertionError: If the planner stops classifying the canonical no-risk shape as
+            `no_risk_terminal` or reverts to raw-grid totals.
+    Side Effects:
+        None.
+    """
+    evidence = _build_launch_budget_evidence_v2(
+        bars=2_500,
+        stage_a_variants_total=345_744,
+        stage_b_variants_total=20_000,
+        estimated_memory_bytes=2_300_000_000,
+        stage_cost_model=BacktestRuntimeStageCostModelV2(
+            row_prefilter_rows_total=284,
+            retained_row_variants_total=284,
+            combo_prefilter_variants_total=20_164,
+            retained_exact_candidates_total=40_000,
+            stage_a_cost_units=180_448,
+        ),
+        risk_variants=(
+            BacktestRiskVariantV2(
+                risk_index=0,
+                risk_params={
+                    "sl_enabled": False,
+                    "sl_pct": None,
+                    "tp_enabled": False,
+                    "tp_pct": None,
+                },
+            ),
+        ),
+    )
+
+    assert evidence.workload_class == "no_risk_terminal"
+    assert evidence.stage_a_variants_total == 20_164
+    assert evidence.stage_b_variants_total == 20_000
+    assert evidence.estimated_memory_bytes > 0
+    assert evidence.estimated_memory_bytes < 2_300_000_000
