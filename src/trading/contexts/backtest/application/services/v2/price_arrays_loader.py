@@ -61,6 +61,25 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
         ArtifactHitTimesArraysV2,
     ] = field(default_factory=dict, init=False, repr=False, compare=False)
 
+    def run_scoped(self) -> MmapPriceArraysLoaderV2:
+        """
+        Build one `run-scoped` price loader that owns fresh mmap caches for a single caller.
+
+        Args:
+            None.
+        Returns:
+            MmapPriceArraysLoaderV2: Fresh loader sharing the same strict `artifact_loader`
+                wiring and starting with empty price, mapping, and hit-times caches.
+        Assumptions:
+            Caller defines the returned loader lifetime and discards it after the owning runtime
+            scope finishes.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return MmapPriceArraysLoaderV2(artifact_loader=self.artifact_loader)
+
     def load_price_arrays(
         self,
         *,

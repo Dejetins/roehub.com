@@ -41,6 +41,25 @@ class MmapSignalMatrixLoaderV2(BacktestSignalMatrixLoaderV2):
         ArtifactSignalMatrixV2,
     ] = field(default_factory=dict, init=False, repr=False, compare=False)
 
+    def run_scoped(self) -> MmapSignalMatrixLoaderV2:
+        """
+        Build one `run-scoped` signal loader that owns fresh mmap caches for a single caller.
+
+        Args:
+            None.
+        Returns:
+            MmapSignalMatrixLoaderV2: Fresh loader sharing the same strict `artifact_loader`
+                wiring and starting with an empty signal-matrix cache.
+        Assumptions:
+            Caller defines the returned loader lifetime and discards it after the owning runtime
+            scope finishes.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return MmapSignalMatrixLoaderV2(artifact_loader=self.artifact_loader)
+
     def load_signal_matrix(
         self,
         *,

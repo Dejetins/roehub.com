@@ -354,6 +354,89 @@ class RunBacktestUseCase:
         )
         self._artifact_slot_resolver = artifact_slot_resolver
 
+    def _run_scoped_artifact_timeline_builder(self) -> BacktestArtifactTimelineBuilderV2:
+        """
+        Resolve one timeline builder whose `artifact_loader` caches belong to the current run.
+
+        Args:
+            None.
+        Returns:
+            BacktestArtifactTimelineBuilderV2: Fresh run-owned timeline builder when the stored
+                prototype exposes explicit `run_scoped` semantics, otherwise the original builder
+                for compatibility with custom injections and test doubles.
+        Assumptions:
+            The default live API path wires `BacktestArtifactTimelineBuilderV2`, so returning a
+            fresh builder removes process-lifetime mmap retention without changing public
+            contracts.
+        Raises:
+            TypeError: If an injected builder exposes a non-callable `run_scoped` attribute.
+        Side Effects:
+            None.
+        """
+        run_scoped_builder = getattr(self._artifact_timeline_builder, "run_scoped", None)
+        if run_scoped_builder is None:
+            return self._artifact_timeline_builder
+        if not callable(run_scoped_builder):
+            raise TypeError("artifact_timeline_builder run_scoped attribute must be callable")
+        return cast(BacktestArtifactTimelineBuilderV2, run_scoped_builder())
+
+    def _run_scoped_stage_a_shortlist_builder(self) -> BacktestStageAShortlistBuilderV2:
+        """
+        Resolve one Stage A builder whose large artifact caches belong to the current run.
+
+        Args:
+            None.
+        Returns:
+            BacktestStageAShortlistBuilderV2: Fresh run-owned Stage A builder when the stored
+                prototype exposes explicit `run_scoped` semantics, otherwise the original builder
+                for compatibility with custom injections and test doubles.
+        Assumptions:
+            The default live API path wires `BacktestStageAShortlistBuilderV2`, so returning a
+            fresh builder removes process-lifetime mmap retention while preserving same-run
+            reuse.
+        Raises:
+            TypeError: If an injected builder exposes a non-callable `run_scoped` attribute.
+        Side Effects:
+            None.
+        """
+        run_scoped_builder = getattr(self._stage_a_shortlist_builder, "run_scoped", None)
+        if run_scoped_builder is None:
+            return self._stage_a_shortlist_builder
+        if not callable(run_scoped_builder):
+            raise TypeError("stage_a_shortlist_builder run_scoped attribute must be callable")
+        return cast(BacktestStageAShortlistBuilderV2, run_scoped_builder())
+
+    def _run_scoped_hierarchical_shortlist_builder(
+        self,
+    ) -> BacktestHierarchicalShortlistBuilderV2 | None:
+        """
+        Resolve one hierarchical builder whose large artifact caches belong to the current run.
+
+        Args:
+            None.
+        Returns:
+            BacktestHierarchicalShortlistBuilderV2 | None: Fresh run-owned hybrid shortlist
+                builder when the stored prototype exposes explicit `run_scoped` semantics,
+                otherwise the original builder, or `None` when hierarchical runtime is
+                unavailable.
+        Assumptions:
+            The live API path may enter `hybrid_conservative` or `hybrid_family`, so hybrid
+            shortlist artifact loaders must not stay attached to the long-lived use-case
+            singleton.
+        Raises:
+            TypeError: If an injected builder exposes a non-callable `run_scoped` attribute.
+        Side Effects:
+            None.
+        """
+        if self._hierarchical_shortlist_builder is None:
+            return None
+        run_scoped_builder = getattr(self._hierarchical_shortlist_builder, "run_scoped", None)
+        if run_scoped_builder is None:
+            return self._hierarchical_shortlist_builder
+        if not callable(run_scoped_builder):
+            raise TypeError("hierarchical_shortlist_builder run_scoped attribute must be callable")
+        return cast(BacktestHierarchicalShortlistBuilderV2, run_scoped_builder())
+
     def execute(
         self,
         *,
@@ -411,7 +494,9 @@ class RunBacktestUseCase:
             if run_control is not None:
                 run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
             resolved = self._resolve_run_context(request=request, current_user=current_user)
-            timeline = self._artifact_timeline_builder.build(
+            artifact_timeline_builder = self._run_scoped_artifact_timeline_builder()
+            stage_a_shortlist_builder = self._run_scoped_stage_a_shortlist_builder()
+            timeline = artifact_timeline_builder.build(
                 artifact_context=resolved.artifact_context,
                 market_id=resolved.template.instrument_id.market_id,
                 symbol=resolved.template.instrument_id.symbol,
@@ -433,13 +518,16 @@ class RunBacktestUseCase:
             if execution_profile_uses_hierarchical_shortlist_runtime_v2(
                 profile=runtime_plan.execution_profile
             ):
-                if self._hierarchical_shortlist_builder is None:
+                hierarchical_shortlist_builder = (
+                    self._run_scoped_hierarchical_shortlist_builder()
+                )
+                if hierarchical_shortlist_builder is None:
                     raise ValueError(
                         "RunBacktestUseCase requires hierarchical_shortlist_builder for "
                         "hybrid shortlist runtime"
                     )
                 effective_runtime_plan = (
-                    self._hierarchical_shortlist_builder.build_runtime_plan(
+                    hierarchical_shortlist_builder.build_runtime_plan(
                         runtime_plan=runtime_plan,
                         artifact_context=resolved.artifact_context,
                         target_time_range=request.time_range,
@@ -463,7 +551,7 @@ class RunBacktestUseCase:
                 execution_profile=effective_runtime_plan.execution_profile,
                 max_numba_threads=self._max_numba_threads,
             )
-            shortlist = self._stage_a_shortlist_builder.build_shortlist(
+            shortlist = stage_a_shortlist_builder.build_shortlist(
                 grid_context=effective_runtime_plan,
                 artifact_context=resolved.artifact_context,
                 target_time_range=request.time_range,
@@ -559,7 +647,8 @@ class RunBacktestUseCase:
             if run_control is not None:
                 run_control.raise_if_cancelled(stage=STAGE_B_LITERAL_V2)
             resolved = self._resolve_run_context(request=request, current_user=current_user)
-            timeline = self._artifact_timeline_builder.build(
+            artifact_timeline_builder = self._run_scoped_artifact_timeline_builder()
+            timeline = artifact_timeline_builder.build(
                 artifact_context=resolved.artifact_context,
                 market_id=resolved.template.instrument_id.market_id,
                 symbol=resolved.template.instrument_id.symbol,
@@ -735,7 +824,8 @@ class RunBacktestUseCase:
                 if artifact_context is not None
                 else self._bootstrap_artifact_context(template=template)
             )
-            timeline = self._artifact_timeline_builder.build(
+            artifact_timeline_builder = self._run_scoped_artifact_timeline_builder()
+            timeline = artifact_timeline_builder.build(
                 artifact_context=resolved_artifact_context,
                 market_id=template.instrument_id.market_id,
                 symbol=template.instrument_id.symbol,

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Mapping, cast
+from unittest.mock import Mock
 from uuid import UUID
 
 import numpy as np
@@ -343,6 +344,62 @@ class _ArtifactOnlyStageAShortlistBuilder:
         if on_checkpoint is not None:
             on_checkpoint(len(rows), len(tuple(grid_context.iter_stage_a_variants())))
         return rows
+
+
+class _RecordingHierarchicalShortlistBuilder:
+    """
+    Hybrid shortlist builder fake recording sync use-case hybrid runtime inputs.
+    """
+
+    def __init__(self, *, runtime_plan: Any) -> None:
+        """
+        Initialize fake builder with one deterministic reduced runtime plan.
+
+        Args:
+            runtime_plan: Runtime plan returned for every hybrid shortlist build.
+        Returns:
+            None.
+        Assumptions:
+            Sync tests only verify hybrid builder wiring and not shortlist internals here.
+        Raises:
+            None.
+        Side Effects:
+            Stores mutable in-memory call log.
+        """
+        self.runtime_plan = runtime_plan
+        self.calls: list[dict[str, Any]] = []
+
+    def build_runtime_plan(
+        self,
+        *,
+        runtime_plan: Any,
+        artifact_context: Any,
+        target_time_range: TimeRange,
+    ) -> Any:
+        """
+        Record one hybrid shortlist build call and return the predefined reduced plan.
+
+        Args:
+            runtime_plan: Original exact runtime plan.
+            artifact_context: Slot-pinned runtime context.
+            target_time_range: Requested trading window.
+        Returns:
+            Any: Prebuilt reduced runtime plan fixture.
+        Assumptions:
+            Test coverage here is limited to ownership/wiring, not hybrid shortlist math.
+        Raises:
+            None.
+        Side Effects:
+            Appends one call payload to the in-memory log.
+        """
+        self.calls.append(
+            {
+                "runtime_plan": runtime_plan,
+                "artifact_context": artifact_context,
+                "target_time_range": target_time_range,
+            }
+        )
+        return self.runtime_plan
 
 
 class _StaticRuntimePlanner:
@@ -1096,6 +1153,203 @@ def test_run_backtest_use_case_routes_sync_path_through_artifact_timeline_builde
     )
     assert normalized_range.end == UtcTimestamp(datetime(2026, 2, 16, 12, 11, tzinfo=timezone.utc))
     assert response.total_indicator_compute_calls == 1
+    assert len(response.variants) == 1
+
+
+def test_run_backtest_use_case_uses_run_scoped_artifact_builders_per_public_call() -> None:
+    """
+    Verify sync use-case routes `preflight` and `execute` through fresh `run-scoped` builders.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Long-lived API-owned use-case instances should keep only prototype builders while each
+        public call owns fresh artifact loader caches.
+    Raises:
+        AssertionError: If `preflight` or `execute` uses prototype builders directly.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+    prototype_timeline_builder = _RecordingArtifactTimelineBuilder()
+    run_scoped_timeline_builder_one = _RecordingArtifactTimelineBuilder()
+    run_scoped_timeline_builder_two = _RecordingArtifactTimelineBuilder()
+    prototype_timeline_builder.run_scoped = Mock(  # type: ignore[attr-defined]
+        side_effect=(
+            run_scoped_timeline_builder_one,
+            run_scoped_timeline_builder_two,
+        )
+    )
+    stage_a_row = BacktestStageAScoredVariantV2(
+        base_variant=BacktestStageABaseVariantV2(
+            stage_a_index=0,
+            indicator_selections=(
+                IndicatorVariantSelection(
+                    indicator_id="ema",
+                    inputs={"source": "close"},
+                    params={"window": 20},
+                ),
+            ),
+            signal_params={},
+            indicator_variant_key="1" * 64,
+            base_variant_key="2" * 64,
+        ),
+        total_return_pct=20.0,
+    )
+    prototype_stage_a_builder = _RecordingStageAShortlistBuilder(rows=(stage_a_row,))
+    run_scoped_stage_a_builder = _RecordingStageAShortlistBuilder(rows=(stage_a_row,))
+    prototype_stage_a_builder.run_scoped = Mock(  # type: ignore[attr-defined]
+        return_value=run_scoped_stage_a_builder
+    )
+    use_case = _build_use_case(
+        staged_scorer=_DeterministicScorer(),
+        artifact_timeline_builder=prototype_timeline_builder,
+        stage_a_shortlist_builder=prototype_stage_a_builder,
+    )
+    request = RunBacktestRequest(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+        ),
+        template=_build_template(windows=(20,)),
+        warmup_bars=2,
+        top_k=1,
+        preselect=1,
+    )
+    current_user = CurrentUser(
+        user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))
+    )
+
+    use_case.preflight(request=request, current_user=current_user)
+    response = use_case.execute(request=request, current_user=current_user)
+
+    assert prototype_timeline_builder.run_scoped.call_count == 2  # type: ignore[attr-defined]
+    assert prototype_stage_a_builder.run_scoped.call_count == 1  # type: ignore[attr-defined]
+    assert len(prototype_timeline_builder.calls) == 0
+    assert len(prototype_stage_a_builder.calls) == 0
+    assert len(run_scoped_timeline_builder_one.calls) == 1
+    assert len(run_scoped_timeline_builder_two.calls) == 1
+    assert len(run_scoped_stage_a_builder.calls) == 1
+    assert len(response.variants) == 1
+
+
+def test_run_backtest_use_case_uses_run_scoped_hierarchical_builder_for_hybrid_runtime() -> None:
+    """
+    Verify sync use-case routes hybrid shortlist runtime through a fresh `run-scoped` builder.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `hybrid_conservative` is a live API path, so its loader-owning builder must not retain
+        mmap caches on the long-lived use-case singleton.
+    Raises:
+        AssertionError: If hybrid runtime uses the prototype builder directly.
+    Side Effects:
+        None.
+    Docs:
+      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+    """
+    stage_a_row = BacktestStageAScoredVariantV2(
+        base_variant=BacktestStageABaseVariantV2(
+            stage_a_index=0,
+            indicator_selections=(
+                IndicatorVariantSelection(
+                    indicator_id="ema",
+                    inputs={"source": "close"},
+                    params={"window": 20},
+                ),
+            ),
+            signal_params={},
+            indicator_variant_key="1" * 64,
+            base_variant_key="2" * 64,
+        ),
+        total_return_pct=20.0,
+    )
+    hybrid_runtime_plan = SimpleNamespace(
+        indicator_estimate_calls=0,
+        execution_profile=SimpleNamespace(
+            mode="hybrid_conservative",
+            parallelism=SimpleNamespace(stage_a_workers=2),
+            shortlist_config=SimpleNamespace(enabled=True),
+            feature_flags=SimpleNamespace(
+                runtime_enabled=True,
+                heuristic_shortlist_enabled=True,
+                family_plugin_enabled=False,
+            ),
+        ),
+        iter_stage_a_variants=lambda: (stage_a_row.base_variant,),
+    )
+    prototype_hierarchical_builder = _RecordingHierarchicalShortlistBuilder(
+        runtime_plan=hybrid_runtime_plan
+    )
+    run_scoped_hierarchical_builder = _RecordingHierarchicalShortlistBuilder(
+        runtime_plan=hybrid_runtime_plan
+    )
+    prototype_hierarchical_builder.run_scoped = Mock(  # type: ignore[attr-defined]
+        return_value=run_scoped_hierarchical_builder
+    )
+    shortlist_builder = _RecordingStageAShortlistBuilder(rows=(stage_a_row,))
+    runtime_runner = _StaticRuntimeRunner(
+        ranked_rows=(
+            SimpleNamespace(
+                variant_index=stage_a_row.base_variant.stage_a_index,
+                variant_key=stage_a_row.base_variant.base_variant_key,
+                indicator_variant_key=stage_a_row.base_variant.indicator_variant_key,
+                total_return_pct=stage_a_row.total_return_pct,
+                summary_metrics_json={"Total Return [%]": stage_a_row.total_return_pct},
+                best_tp_pct=None,
+                best_sl_pct=None,
+            ),
+        ),
+        ranked_tasks={
+            stage_a_row.base_variant.base_variant_key: SimpleNamespace(
+                indicator_selections=stage_a_row.base_variant.indicator_selections,
+                signal_params=stage_a_row.base_variant.signal_params,
+                risk_params={},
+            )
+        },
+    )
+    request = RunBacktestRequest(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+        ),
+        template=_build_template(windows=(20,)),
+        warmup_bars=2,
+        top_k=1,
+        preselect=1,
+    )
+    use_case = _build_use_case(
+        staged_scorer=_DeterministicScorer(),
+        stage_a_shortlist_builder=cast(Any, shortlist_builder),
+        hierarchical_shortlist_builder=cast(Any, prototype_hierarchical_builder),
+        runtime_planner=cast(Any, _StaticRuntimePlanner(runtime_plan=hybrid_runtime_plan)),
+        runtime_runner=cast(Any, runtime_runner),
+    )
+
+    response = use_case.execute(
+        request=request,
+        current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
+    )
+
+    assert prototype_hierarchical_builder.run_scoped.call_count == 1  # type: ignore[attr-defined]
+    assert len(prototype_hierarchical_builder.calls) == 0
+    assert len(run_scoped_hierarchical_builder.calls) == 1
+    assert run_scoped_hierarchical_builder.calls[0]["target_time_range"] == request.time_range
+    assert len(shortlist_builder.calls) == 1
     assert len(response.variants) == 1
 
 

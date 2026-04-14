@@ -20,6 +20,35 @@ from .contracts import ArtifactSlotPinnedRuntimeContextV2, BacktestPriceArraysLo
 from .stage_a_shortlist_builder_v2 import compute_target_slice_by_close_time_v2
 
 
+def _run_scoped_price_arrays_loader_v2(
+    *,
+    price_arrays_loader: BacktestPriceArraysLoaderV2,
+) -> BacktestPriceArraysLoaderV2:
+    """
+    Clone one price loader when it exposes explicit `run_scoped` ownership semantics.
+
+    Args:
+        price_arrays_loader: Price loader or test double used by the long-lived timeline
+            builder prototype.
+    Returns:
+        BacktestPriceArraysLoaderV2: Fresh run-owned loader when `run_scoped()` is available,
+            otherwise the original loader for compatibility with custom wiring.
+    Assumptions:
+        Loaders without explicit `run_scoped` semantics already own an acceptable lifecycle for
+        the current caller.
+    Raises:
+        TypeError: If `run_scoped()` exists but is not callable.
+    Side Effects:
+        None.
+    """
+    run_scoped_loader = getattr(price_arrays_loader, "run_scoped", None)
+    if run_scoped_loader is None:
+        return price_arrays_loader
+    if not callable(run_scoped_loader):
+        raise TypeError("price_arrays_loader run_scoped attribute must be callable")
+    return run_scoped_loader()
+
+
 @dataclass(frozen=True, slots=True)
 class BacktestArtifactRuntimeTimelineV2:
     """
@@ -74,6 +103,30 @@ class BacktestArtifactTimelineBuilderV2:
                 "BacktestArtifactTimelineBuilderV2 requires price_arrays_loader"
             )
         self._price_arrays_loader = price_arrays_loader
+
+    def run_scoped(self) -> BacktestArtifactTimelineBuilderV2:
+        """
+        Build one `run-scoped` timeline builder whose large artifact caches belong to one run.
+
+        Args:
+            None.
+        Returns:
+            BacktestArtifactTimelineBuilderV2: Fresh builder cloning the injected price loader
+                when it exposes explicit `run_scoped` ownership semantics.
+        Assumptions:
+            The returned builder is used only within one runtime request/report scope.
+        Raises:
+            TypeError: If the injected price loader exposes a non-callable `run_scoped`
+                attribute.
+            ValueError: Propagated from constructor validation when the cloned loader is invalid.
+        Side Effects:
+            None.
+        """
+        return BacktestArtifactTimelineBuilderV2(
+            price_arrays_loader=_run_scoped_price_arrays_loader_v2(
+                price_arrays_loader=self._price_arrays_loader
+            )
+        )
 
     def build(
         self,

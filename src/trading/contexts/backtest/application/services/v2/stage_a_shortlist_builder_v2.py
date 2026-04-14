@@ -83,6 +83,31 @@ StageACancelCheckerV2 = Callable[[str], None]
 StageACheckpointCallbackV2 = Callable[[int, int], None]
 
 
+def _run_scoped_loader_v2(*, loader: object) -> object:
+    """
+    Clone one artifact loader when it exposes explicit `run_scoped` ownership semantics.
+
+    Args:
+        loader: Artifact loader or test double used by the long-lived Stage A builder prototype.
+    Returns:
+        object: Fresh run-owned loader when `loader.run_scoped()` is available, otherwise the
+            original loader for compatibility with test doubles and custom wiring.
+    Assumptions:
+        Loaders without explicit `run_scoped` semantics already own an acceptable lifecycle for
+        the current caller.
+    Raises:
+        TypeError: If `run_scoped()` exists but is not callable.
+    Side Effects:
+        None.
+    """
+    run_scoped_loader = getattr(loader, "run_scoped", None)
+    if run_scoped_loader is None:
+        return loader
+    if not callable(run_scoped_loader):
+        raise TypeError("artifact loader run_scoped attribute must be callable")
+    return run_scoped_loader()
+
+
 def _close_returns_for_proxy_score_v2(
     *,
     local_signal_close: np.ndarray,
@@ -1035,6 +1060,52 @@ class BacktestStageAShortlistBuilderV2:
             self,
             "fee_pct_default_by_market_id",
             MappingProxyType(normalized_fee_defaults),
+        )
+
+    def run_scoped(self) -> BacktestStageAShortlistBuilderV2:
+        """
+        Build one `run-scoped` Stage A builder whose large artifact caches belong to one run.
+
+        Args:
+            None.
+        Returns:
+            BacktestStageAShortlistBuilderV2: Fresh builder reusing the same ranking/runtime
+                configuration while cloning cache-owning artifact loaders when available.
+        Assumptions:
+            Pure collaborators such as `row_scorer` are safe to share across runs because they do
+            not own mmap artifact caches.
+        Raises:
+            TypeError: If one injected loader exposes a non-callable `run_scoped` attribute.
+            ValueError: Propagated from constructor validation when cloned configuration drifts.
+        Side Effects:
+            None.
+        """
+        run_scoped_signal_features_loader = (
+            cast(
+                BacktestSignalFeaturesLoaderV2,
+                _run_scoped_loader_v2(loader=self.signal_features_loader),
+            )
+            if self.signal_features_loader is not None
+            else None
+        )
+        return BacktestStageAShortlistBuilderV2(
+            price_arrays_loader=cast(
+                BacktestPriceArraysLoaderV2,
+                _run_scoped_loader_v2(loader=self.price_arrays_loader),
+            ),
+            signal_matrix_loader=cast(
+                BacktestSignalMatrixLoaderV2,
+                _run_scoped_loader_v2(loader=self.signal_matrix_loader),
+            ),
+            signal_features_loader=run_scoped_signal_features_loader,
+            row_scorer=self.row_scorer,
+            configurable_ranking_enabled=self.configurable_ranking_enabled,
+            chunk_size_default=self.chunk_size_default,
+            init_cash_quote_default=self.init_cash_quote_default,
+            fixed_quote_default=self.fixed_quote_default,
+            safe_profit_percent_default=self.safe_profit_percent_default,
+            slippage_pct_default=self.slippage_pct_default,
+            fee_pct_default_by_market_id=self.fee_pct_default_by_market_id,
         )
 
     def build_shortlist(

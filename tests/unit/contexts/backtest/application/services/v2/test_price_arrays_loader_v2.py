@@ -130,6 +130,66 @@ def test_price_arrays_loader_v2_rejects_price_manifest_path_drift(
         loader.load_price_arrays(context=context, timeframe="1m")
 
 
+def test_price_arrays_loader_v2_run_scoped_loader_keeps_cache_ownership_per_run(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify `run-scoped` price loaders isolate large family caches from long-lived prototypes.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+    Returns:
+        None.
+    Assumptions:
+        API-owned prototypes may be reused across requests only when every request gets a fresh
+        cache-owning clone.
+    Raises:
+        AssertionError: If `run_scoped()` reuses prototype cache entries for prices, mappings, or
+            hit-times.
+    Side Effects:
+        Memory-maps deterministic `.npy` files from the synthetic store.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    prototype_loader = MmapPriceArraysLoaderV2(artifact_loader=store.loader)
+
+    prototype_prices = prototype_loader.load_price_arrays(context=context, timeframe="1m")
+    prototype_mappings = prototype_loader.load_mapping_arrays(
+        context=context,
+        timeframe="15m",
+    )
+    prototype_hit_times = prototype_loader.load_hit_times_arrays(context=context)
+    run_scoped_loader = prototype_loader.run_scoped()
+    run_scoped_prices = run_scoped_loader.load_price_arrays(context=context, timeframe="1m")
+    run_scoped_mappings = run_scoped_loader.load_mapping_arrays(
+        context=context,
+        timeframe="15m",
+    )
+    run_scoped_hit_times = run_scoped_loader.load_hit_times_arrays(context=context)
+
+    assert run_scoped_loader is not prototype_loader
+    assert prototype_loader.load_price_arrays(context=context, timeframe="1m") is prototype_prices
+    assert prototype_loader.load_mapping_arrays(
+        context=context,
+        timeframe="15m",
+    ) is prototype_mappings
+    assert prototype_loader.load_hit_times_arrays(context=context) is prototype_hit_times
+    assert run_scoped_prices is not prototype_prices
+    assert run_scoped_mappings is not prototype_mappings
+    assert run_scoped_hit_times is not prototype_hit_times
+    assert run_scoped_loader.load_price_arrays(context=context, timeframe="1m") is run_scoped_prices
+    assert run_scoped_loader.load_mapping_arrays(
+        context=context,
+        timeframe="15m",
+    ) is run_scoped_mappings
+    assert run_scoped_loader.load_hit_times_arrays(context=context) is run_scoped_hit_times
+
+
 def test_price_arrays_loader_v2_rejects_mapping_bounds_drift(tmp_path: Path) -> None:
     """
     Verify mapping loading fails fast when `bar_close_1m_idx` escapes `prices/1m` bounds.

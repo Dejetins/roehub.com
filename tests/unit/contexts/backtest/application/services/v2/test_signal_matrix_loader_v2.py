@@ -144,6 +144,60 @@ def test_signal_matrix_loader_v2_rejects_catalog_path_drift(
         loader.load_signal_matrix(context=context, timeframe="15m", indicator_id="ma.ema")
 
 
+def test_signal_matrix_loader_v2_run_scoped_loader_keeps_cache_ownership_per_run(
+    synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
+) -> None:
+    """
+    Verify `run-scoped` signal loaders keep reuse inside one run without sharing mmap cache state.
+
+    Args:
+        synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
+    Returns:
+        None.
+    Assumptions:
+        Long-lived API wiring should keep only a prototype loader while each request gets its own
+        cache-owning clone.
+    Raises:
+        AssertionError: If `run_scoped()` reuses prototype cache entries across runs.
+    Side Effects:
+        Memory-maps deterministic `.npy` files from the synthetic store.
+    Docs:
+      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/signal_matrix_loader.py
+    """
+    store = synthetic_artifact_store_v2
+    context = _inactive_context(store)
+    prototype_loader = MmapSignalMatrixLoaderV2(artifact_loader=store.loader)
+
+    prototype_matrix = prototype_loader.load_signal_matrix(
+        context=context,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+    run_scoped_loader = prototype_loader.run_scoped()
+    run_scoped_matrix = run_scoped_loader.load_signal_matrix(
+        context=context,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+    repeated_run_scoped_matrix = run_scoped_loader.load_signal_matrix(
+        context=context,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    )
+
+    assert run_scoped_loader is not prototype_loader
+    assert prototype_loader.load_signal_matrix(
+        context=context,
+        timeframe="15m",
+        indicator_id="ma.ema",
+    ) is prototype_matrix
+    assert run_scoped_matrix is not prototype_matrix
+    assert repeated_run_scoped_matrix is run_scoped_matrix
+
+
 def test_signal_matrix_loader_v2_rejects_timeline_drift(
     synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
 ) -> None:

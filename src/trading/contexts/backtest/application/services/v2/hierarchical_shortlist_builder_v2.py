@@ -66,6 +66,31 @@ from .stage_a_shortlist_builder_v2 import compute_target_slice_by_close_time_v2
 type HierarchicalProposalLayerSourceLiteralV2 = Literal["universal", "family_plugin"]
 
 
+def _run_scoped_loader_v2(*, loader: object) -> object:
+    """
+    Clone one artifact loader when it exposes explicit `run_scoped` ownership semantics.
+
+    Args:
+        loader: Artifact loader or test double used by the long-lived hybrid builder prototype.
+    Returns:
+        object: Fresh run-owned loader when `loader.run_scoped()` is available, otherwise the
+            original loader for compatibility with test doubles and custom wiring.
+    Assumptions:
+        Loaders without explicit `run_scoped` semantics already own an acceptable lifecycle for
+        the current caller.
+    Raises:
+        TypeError: If `run_scoped()` exists but is not callable.
+    Side Effects:
+        None.
+    """
+    run_scoped_loader = getattr(loader, "run_scoped", None)
+    if run_scoped_loader is None:
+        return loader
+    if not callable(run_scoped_loader):
+        raise TypeError("artifact loader run_scoped attribute must be callable")
+    return run_scoped_loader()
+
+
 @dataclass(frozen=True, slots=True)
 class HierarchicalShortlistRetainedRowV2:
     """
@@ -503,6 +528,42 @@ class BacktestHierarchicalShortlistBuilderV2:
             raise ValueError(
                 "BacktestHierarchicalShortlistBuilderV2.block_survivor_multiplier must be > 0"
             )
+
+    def run_scoped(self) -> BacktestHierarchicalShortlistBuilderV2:
+        """
+        Build one `run-scoped` hierarchical builder whose large artifact caches belong to one run.
+
+        Args:
+            None.
+        Returns:
+            BacktestHierarchicalShortlistBuilderV2: Fresh builder reusing the same hybrid
+                shortlist collaborators while cloning cache-owning artifact loaders when
+                available.
+        Assumptions:
+            Pure collaborators such as scorers, retention, and family-plugin registry are safe to
+            share across runs because they do not own mmap artifact caches.
+        Raises:
+            TypeError: If one injected loader exposes a non-callable `run_scoped` attribute.
+            ValueError: Propagated from constructor validation when cloned configuration drifts.
+        Side Effects:
+            None.
+        """
+        return BacktestHierarchicalShortlistBuilderV2(
+            price_arrays_loader=cast(
+                BacktestPriceArraysLoaderV2,
+                _run_scoped_loader_v2(loader=self.price_arrays_loader),
+            ),
+            signal_matrix_loader=cast(
+                BacktestSignalMatrixLoaderV2,
+                _run_scoped_loader_v2(loader=self.signal_matrix_loader),
+            ),
+            defaults_provider=self.defaults_provider,
+            row_scorer=self.row_scorer,
+            diversified_retention=self.diversified_retention,
+            family_plugin_registry=self.family_plugin_registry,
+            family_plugin_circuit_breaker_factory=self.family_plugin_circuit_breaker_factory,
+            block_survivor_multiplier=self.block_survivor_multiplier,
+        )
 
     def build_runtime_plan(
         self,
