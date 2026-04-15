@@ -158,8 +158,8 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert nr2_live_capture.capture_status == "captured"
     assert nr2_live_capture.blocking_closure is True
     assert nr2_live_capture.captured_measurement is not None
-    assert nr2_live_capture.captured_measurement.wall_clock_seconds == 18.052954375000354
-    assert nr2_live_capture.captured_measurement.peak_rss_bytes == 17462542336
+    assert nr2_live_capture.captured_measurement.wall_clock_seconds == 18.887235915999554
+    assert nr2_live_capture.captured_measurement.peak_rss_bytes == 16409231360
     assert nr2_live_capture.captured_measurement.stage_b_execution_mode == "bypassed_no_risk"
     assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is True
 

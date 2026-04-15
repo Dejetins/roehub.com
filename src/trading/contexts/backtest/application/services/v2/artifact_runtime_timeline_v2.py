@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import cast
 
 import numpy as np
 
@@ -46,7 +47,7 @@ def _run_scoped_price_arrays_loader_v2(
         return price_arrays_loader
     if not callable(run_scoped_loader):
         raise TypeError("price_arrays_loader run_scoped attribute must be callable")
-    return run_scoped_loader()
+    return cast(BacktestPriceArraysLoaderV2, run_scoped_loader())
 
 
 @dataclass(frozen=True, slots=True)

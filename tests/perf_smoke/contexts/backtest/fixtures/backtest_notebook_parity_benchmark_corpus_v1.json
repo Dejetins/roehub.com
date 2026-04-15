@@ -66,16 +66,16 @@
         "runtime_surface": "sync",
         "host_label": "macstudio-class",
         "artifact_slot": "slot_a",
-        "wall_clock_seconds": 18.052954375000354,
-        "cpu_time_seconds": 25.58547928,
-        "peak_rss_bytes": 17462542336,
+        "wall_clock_seconds": 18.887235915999554,
+        "cpu_time_seconds": 25.814602943999997,
+        "peak_rss_bytes": 16409231360,
         "numba_threads_used": 4,
         "max_python_processes_seen": 1,
         "stage_b_execution_mode": "bypassed_no_risk",
         "stage_b_process_fallback_threshold": "none",
         "exact_replay_count": 0
       },
-      "notes": "Canonical NR2 benchmark-host backend capture recorded on 2026-04-14. Closure remains open because wall_clock_ratio and peak_rss_ratio fail the accepted gates."
+      "notes": "Canonical NR2 benchmark-host backend capture recorded on 2026-04-15. Runtime shape stayed sync_inline with execution_profile_mode=hybrid_conservative. Closure remains open because wall_clock_ratio and peak_rss_ratio fail the accepted gates and top-result parity remains divergent versus the canonical notebook anchor."
     },
     {
       "capture_id": "rg_ttr_live_host_canonical",

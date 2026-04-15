@@ -354,6 +354,59 @@ class _StaticDefaultsProvider:
         """
         return self._source_values_by_indicator.get(str(indicator_id), ())
 
+    def compute_defaults(self, *, indicator_id: str) -> Any:
+        """
+        Return no compute-grid defaults for this deterministic test double.
+
+        Args:
+            indicator_id: Indicator identifier requested by the runtime.
+        Returns:
+            Any: `None`, meaning these tests do not rely on compute-grid defaults.
+        Assumptions:
+            Source-subset remapping coverage in this module depends only on source ordering.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = indicator_id
+        return None
+
+    def signal_param_defaults(self, *, indicator_id: str) -> dict[str, Any]:
+        """
+        Return no signal-parameter defaults for this deterministic test double.
+
+        Args:
+            indicator_id: Indicator identifier requested by the runtime.
+        Returns:
+            dict[str, Any]: Empty mapping because these tests do not exercise signal defaults.
+        Assumptions:
+            The builder path under test needs only the source catalog.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        _ = indicator_id
+        return {}
+
+    def supported_indicator_ids(self) -> tuple[str, ...]:
+        """
+        Return the deterministic indicator-id catalog owned by this test double.
+
+        Args:
+            None.
+        Returns:
+            tuple[str, ...]: Stable ordered indicator ids present in the source-catalog mapping.
+        Assumptions:
+            Sorting is sufficient for deterministic fixture behavior in this module.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return tuple(sorted(self._source_values_by_indicator))
+
 
 class _RecordingFamilyPlugin:
     """

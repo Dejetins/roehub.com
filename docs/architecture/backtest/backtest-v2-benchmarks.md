@@ -183,6 +183,18 @@ payload that reuses the same internal runtime-shape contract:
 While `capture_status = missing`, final closure for that scenario remains blocked even if the
 synthetic harness passes locally.
 
+Fresh `NR2` rerun authority on `2026-04-15` still keeps closure open:
+
+- service (`sync_inline`, `execution_profile_mode = hybrid_conservative`):
+  `18.887s` wall, `25.815s` backend CPU, `16.41 GB` peak RSS, `1` Python process
+- notebook (`NUMBA_NUM_THREADS=4` on the same host / slot):
+  `7.808s` wall, `18.776s` CPU, `1.37 GB` peak RSS, `1` Python process
+- current `NR2` ratios remain outside the accepted gates:
+  `wall_clock_ratio = 2.42x`, `peak_rss_ratio = 11.94x`
+- memory symptoms improved versus the `2026-04-15` earlier diagnostic capture
+  (`22.32 GB -> 16.41 GB` peak RSS, cold API baseline about `0.20 GB` after restart),
+  but top-result parity is still divergent (`-92.36%` service vs `1621.73%` notebook)
+
 ### Equal-thread-budget normalization
 
 All notebook-parity comparisons are valid only under `equal thread budget` rules:
