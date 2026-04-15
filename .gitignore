@@ -1,4 +1,3 @@
-```
 # Compiled Python files
 *.pyc
 __pycache__/
@@ -17,6 +16,10 @@ node_modules/
 .env
 .env.local
 *.env.*
+!.env.example
+deploy/.env
+deploy/.env.*
+!deploy/.env.example
 
 # Editors
 .vscode/
@@ -30,9 +33,25 @@ htmlcov/
 # Python cache
 .mypy_cache/
 .pytest_cache/
+.ruff_cache/
 
 # Build artifacts
 dist/
 build/
 target/
-```
+.dist/
+.build/
+
+# Local workspace artifacts
+.DS_Store
+.codex/
+.codex/*
+.data_load/*
+/data_load/
+/data_load/*
+/data_load/promts/
+tests/notebook_tests/.cache/
+
+# Notebooks / experiments
+#test/
+#jup_tests/
