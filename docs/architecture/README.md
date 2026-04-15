@@ -17,6 +17,7 @@
 - [Backtest Jobs v1 -- Job-Runner Worker (historical / compatibility-only; claim/lease + streaming batches + cancel) (BKT-EPIC-10)](docs/architecture/backtest/backtest-job-runner-worker-v1.md)
 - [План внедрения backtest-job-runner v2](docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md)
 - [План доработки и ускорения backtest runtime v1](docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md)
+- [Корректирующий план достижения notebook-parity для backtest engine vNext (v2)](docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md)
 - [Алгоритм расчета из `tests/notebook_tests/06_backtest_compute.ipynb` (v2, historical reference semantics)](docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md)
 - [Backtest v1 — Signals-from-indicators (v1) + AND aggregation (BKT-EPIC-03)](docs/architecture/backtest/backtest-signals-from-indicators-v1.md)
 - [Market Data — Application Ports (Walking Skeleton v1)](docs/architecture/market_data/market-data-application-ports.md)
@@ -107,6 +108,7 @@
 - [План переустройства backtest engine vNext](docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md) — `docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md` — Статус: proposed implementation roadmap for notebook-derived engine redesign
 - [План достижения notebook-parity производительности для backtest engine vNext](docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md) — `docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md` — Статус: proposed benchmark-gated implementation roadmap
 - [Корректирующий план достижения notebook-parity для backtest engine vNext](docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md) — `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md` — Статус: proposed corrective roadmap after live `NR2` benchmark verification
+- [Корректирующий план достижения notebook-parity для backtest engine vNext (v2)](docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md) — `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md` — Статус: proposed corrective roadmap after live `NR2` rerun verification
 - [План внедрения backtest-job-runner v2](docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md) — `docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md` — Статус: proposed implementation roadmap for canonical claimed background worker
 - [Final Backtest Refactor Plan v2](docs/architecture/roadmap/backtest-refactor-final-plan-v2.md) — `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md` — Статус: approved architecture baseline
 - [План доработки и ускорения backtest runtime v1](docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md) — `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md` — Статус: proposed follow-up roadmap after R10-03
