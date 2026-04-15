@@ -1,25 +1,38 @@
-.venv/
+```
+# Compiled Python files
+*.pyc
 __pycache__/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.dist/
-.build/
-.data_load/*
-.codex/*
-.codex/
-# Secrets / env files
-/data_load/*
-/data_load/promts/
+
+# Dependencies
+.venv/
+venv/
+node_modules/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Environment files
 .env
-.env.*
-!.env.example
-deploy/.env
-deploy/.env.*
-!deploy/.env.example
-tests/notebook_tests/.cache/
-.DS_Store
-tests/notebook_tests/.cache/
-# notebooks / experiments
-#test/
-#jup_tests/
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Coverage reports
+.coverage
+coverage/
+htmlcov/
+
+# Python cache
+.mypy_cache/
+.pytest_cache/
+
+# Build artifacts
+dist/
+build/
+target/
+```

@@ -17,6 +17,7 @@ from trading.contexts.backtest.domain.entities import BacktestJobStageWeights
 type ExecutionProfileModeLiteralV2 = Literal[
     "exact_small",
     "exact_parallel",
+    "exact_no_risk_parity",
     "hybrid_conservative",
     "hybrid_family",
 ]
@@ -37,6 +38,7 @@ type ExecutionProfileShortlistDiversityBucketLiteralV2 = Literal[
 ALLOWED_EXECUTION_PROFILE_MODES_V2: tuple[ExecutionProfileModeLiteralV2, ...] = (
     "exact_small",
     "exact_parallel",
+    "exact_no_risk_parity",
     "hybrid_conservative",
     "hybrid_family",
 )
@@ -44,6 +46,7 @@ DEFAULT_EXECUTION_PROFILE_MODE_V2: ExecutionProfileModeLiteralV2 = "exact_small"
 _EXACT_EXECUTION_PROFILE_MODES_V2: tuple[ExecutionProfileModeLiteralV2, ...] = (
     "exact_small",
     "exact_parallel",
+    "exact_no_risk_parity",
 )
 ALLOWED_EXECUTION_PROFILE_LAUNCH_BUDGET_WORKLOAD_CLASSES_V2: tuple[
     ExecutionProfileLaunchBudgetWorkloadClassLiteralV2, ...
