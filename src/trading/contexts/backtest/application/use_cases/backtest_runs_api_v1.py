@@ -45,7 +45,7 @@ _AUTO_FALLBACK_ELIGIBLE_ERRORS = frozenset(
         "background_auto_required",
     }
 )
-_SYNC_INLINE_REDESIGNED_EXECUTION_PROFILE_MODE = "hybrid_conservative"
+_SYNC_INLINE_REDESIGNED_EXECUTION_PROFILE_MODE = "exact_no_risk_parity"
 
 
 class BacktestRunsApiUseCase(Protocol):
@@ -688,10 +688,10 @@ def _with_sync_inline_redesigned_engine_request_payload(
     request_payload: Mapping[str, Any],
 ) -> Mapping[str, Any]:
     """
-    Force persisted sync-inline launches onto the redesigned prefilter-first engine profile.
+    Force persisted sync-inline launches onto the parity-first no-risk exact engine profile.
 
     Docs:
-      - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
       - docs/architecture/backtest/backtest-api-post-backtests-v1.md
       - docs/architecture/backtest/backtest-engine-vnext.md
     Related:
@@ -702,10 +702,10 @@ def _with_sync_inline_redesigned_engine_request_payload(
         request_payload: Strict API request snapshot captured before sync launch orchestration.
     Returns:
         Mapping[str, Any]: Canonical payload copy with internal
-            `execution_profile_mode=hybrid_conservative`.
+            `execution_profile_mode=exact_no_risk_parity`.
     Assumptions:
-        `POST /backtests` keeps the same public request/response shape; the Milestone F1 sync
-        cutover is represented only by additive internal metadata that stays excluded from
+        `POST /backtests` keeps the same public request/response shape; the D0 corrective split
+        is represented only by additive internal metadata that stays excluded from
         canonical request-hash semantics.
     Raises:
         ValueError: Propagated if the configured internal execution-profile literal is invalid.

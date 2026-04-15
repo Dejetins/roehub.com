@@ -403,14 +403,14 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert persisted.run_id == UUID("00000000-0000-0000-0000-000000000910")
     assert persisted.state == "succeeded"
     assert persisted.execution_mode == "sync_inline"
-    assert persisted.execution_profile_mode == "hybrid_conservative"
+    assert persisted.execution_profile_mode == "exact_no_risk_parity"
     assert persisted.engine_version == "signal_tf + 1m_risk"
     assert persisted.artifact_slot == "slot_b"
     assert persisted.artifact_slot_generation == 11
     assert persisted.artifact_asof_date == "2026-03-28"
     assert persisted.artifact_manifest_hash == "c" * 64
     assert run_use_case.last_request_payload is not None
-    assert run_use_case.last_request_payload["execution_profile_mode"] == "hybrid_conservative"
+    assert run_use_case.last_request_payload["execution_profile_mode"] == "exact_no_risk_parity"
     assert repo.created_job is not None
     assert repo.created_job.execution_mode == "sync_inline"
     assert repo.created_job.state == "succeeded"
@@ -428,8 +428,8 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_job.request_json["template"]["execution"]["fee_pct"] == 0.075
     assert repo.created_job.request_json["template"]["direction_mode"] == "long-short"
     assert "execution_profile_mode" not in repo.created_job.request_json
-    assert repo.created_job.execution_profile_mode_hint == "hybrid_conservative"
-    assert repo.created_job.effective_execution_profile_mode == "hybrid_conservative"
+    assert repo.created_job.execution_profile_mode_hint == "exact_no_risk_parity"
+    assert repo.created_job.effective_execution_profile_mode == "exact_no_risk_parity"
     assert repo.created_job.request_hash == _build_sha256_from_payload(
         payload=repo.created_job.request_json
     )
@@ -445,18 +445,18 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
 
 def test_create_and_run_backtest_sync_inline_forces_redesigned_internal_profile() -> None:
     """
-    Verify persisted `POST /backtests` sync launch forces the redesigned internal profile.
+    Verify persisted `POST /backtests` sync launch forces the parity-first no-risk exact profile.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Public launch payload stays unchanged, so the sync cutover must happen via additive
+        Public launch payload stays unchanged, so the D0 corrective split must happen via additive
         internal metadata only.
     Raises:
-        AssertionError: If sync-inline launch forwards or persists an old exact profile instead of
-            the redesigned `hybrid_conservative` mode.
+        AssertionError: If sync-inline launch forwards or persists hybrid_conservative instead of
+            the new parity-first `exact_no_risk_parity` mode.
     Side Effects:
         None.
     """
@@ -483,11 +483,11 @@ def test_create_and_run_backtest_sync_inline_forces_redesigned_internal_profile(
     )
 
     assert run_use_case.last_request_payload is not None
-    assert run_use_case.last_request_payload["execution_profile_mode"] == "hybrid_conservative"
+    assert run_use_case.last_request_payload["execution_profile_mode"] == "exact_no_risk_parity"
     assert repo.created_job is not None
     assert "execution_profile_mode" not in repo.created_job.request_json
-    assert repo.created_job.execution_profile_mode_hint == "hybrid_conservative"
-    assert repo.created_job.effective_execution_profile_mode == "hybrid_conservative"
+    assert repo.created_job.execution_profile_mode_hint == "exact_no_risk_parity"
+    assert repo.created_job.effective_execution_profile_mode == "exact_no_risk_parity"
 
 
 def test_request_hash_ignores_internal_execution_profile_mode_across_exact_and_hybrid_modes(
