@@ -21,6 +21,9 @@ type ExecutionProfileModeLiteralV2 = Literal[
     "hybrid_conservative",
     "hybrid_family",
 ]
+type ExecutionProfileParityClassLiteralV2 = Literal[
+    "parity_first_no_risk_exact",
+]
 type ExecutionProfileStageBProcessFallbackThresholdLiteralV2 = Literal[
     "none",
     "stage_b_variants_total",
@@ -54,6 +57,113 @@ ALLOWED_EXECUTION_PROFILE_LAUNCH_BUDGET_WORKLOAD_CLASSES_V2: tuple[
     "raw_grid",
     "no_risk_terminal",
 )
+ALLOWED_EXECUTION_PROFILE_PARITY_CLASSES_V2: tuple[
+    ExecutionProfileParityClassLiteralV2, ...
+] = (
+    "parity_first_no_risk_exact",
+)
+
+
+def validate_execution_profile_parity_class_v2(
+    *,
+    value: str,
+) -> ExecutionProfileParityClassLiteralV2:
+    """
+    Validate one parity-first classification literal against the D1 parity-corrective contract.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_adaptive_selector_v2.py
+
+    Args:
+        value: Raw parity-class literal from planner or config.
+    Returns:
+        ExecutionProfileParityClassLiteralV2: Canonical approved parity-class literal.
+    Assumptions:
+        Parity-first classification remains internal and additive, so it does not affect public
+        API transport but provides explicit deterministic evidence for canonical NR2 routing.
+    Raises:
+        ValueError: If the literal is blank or outside the approved parity-class set.
+    Side Effects:
+        None.
+    """
+    normalized_value = value.strip().lower()
+    if not normalized_value:
+        raise ValueError(
+            "ExecutionProfile parity-class literal must be non-empty"
+        )
+    if normalized_value not in ALLOWED_EXECUTION_PROFILE_PARITY_CLASSES_V2:
+        raise ValueError(
+            "ExecutionProfile parity-class must be one of "
+            f"{ALLOWED_EXECUTION_PROFILE_PARITY_CLASSES_V2}, got {value!r}"
+        )
+    return cast(ExecutionProfileParityClassLiteralV2, normalized_value)
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionProfileParityClassificationV2:
+    """
+    Deterministic parity-first classification evidence for canonical no-risk exact workloads.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_adaptive_selector_v2.py
+    """
+
+    parity_class: ExecutionProfileParityClassLiteralV2 = "parity_first_no_risk_exact"
+    disabled_risk_single_cell: bool = True
+    low_indicator_block_cardinality: bool = True
+    narrowed_retained_row_evidence: bool = True
+    notebook_shaped_cost_units: bool = True
+    nr2_classification_reason: str = ""
+
+    def __post_init__(self) -> None:
+        """
+        Validate deterministic parity-classification evidence for canonical no-risk workloads.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Parity classification evidence remains explicit and debuggable so canonical NR2
+            routing decisions can be verified without inspecting runtime side effects.
+        Raises:
+            ValueError: If one boolean flag is invalid or parity class is unsupported.
+        Side Effects:
+            None.
+        """
+        for field_name in (
+            "disabled_risk_single_cell",
+            "low_indicator_block_cardinality",
+            "narrowed_retained_row_evidence",
+            "notebook_shaped_cost_units",
+        ):
+            if not isinstance(getattr(self, field_name), bool):
+                raise ValueError(
+                    f"ExecutionProfileParityClassificationV2.{field_name} must be bool"
+                )
+        if self.parity_class not in ALLOWED_EXECUTION_PROFILE_PARITY_CLASSES_V2:
+            raise ValueError(
+                "ExecutionProfileParityClassificationV2.parity_class must be one of "
+                f"{ALLOWED_EXECUTION_PROFILE_PARITY_CLASSES_V2}"
+            )
+        if not self.nr2_classification_reason.strip():
+            object.__setattr__(
+                self,
+                "nr2_classification_reason",
+                "canonical NR2 no-risk single-cell parity class",
+            )
+
+
 ALLOWED_EXECUTION_PROFILE_SHORTLIST_DIVERSITY_BUCKETS_V2: tuple[
     ExecutionProfileShortlistDiversityBucketLiteralV2, ...
 ] = (
@@ -1582,6 +1692,7 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
 
 
 __all__ = [
+    "ALLOWED_EXECUTION_PROFILE_PARITY_CLASSES_V2",
     "ALLOWED_EXECUTION_PROFILE_SHORTLIST_DIVERSITY_BUCKETS_V2",
     "ALLOWED_EXECUTION_PROFILE_MODES_V2",
     "DEFAULT_EXECUTION_PROFILE_MODE_V2",
@@ -1589,6 +1700,8 @@ __all__ = [
     "ExecutionProfileLaunchBudgetEvidenceV2",
     "ExecutionProfileLaunchBudgetV2",
     "ExecutionProfileModeLiteralV2",
+    "ExecutionProfileParityClassificationV2",
+    "ExecutionProfileParityClassLiteralV2",
     "ExecutionProfileParallelismConfigV2",
     "ExecutionProfileStageBProcessFallbackConfigV2",
     "ExecutionProfileStageBProcessFallbackThresholdLiteralV2",
@@ -1605,4 +1718,5 @@ __all__ = [
     "execution_profile_uses_process_pool_stage_b_v2",
     "validate_execution_profile_shortlist_diversity_bucket_v2",
     "validate_execution_profile_mode_v2",
+    "validate_execution_profile_parity_class_v2",
 ]

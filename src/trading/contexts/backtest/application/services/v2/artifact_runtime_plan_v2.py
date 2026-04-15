@@ -38,6 +38,7 @@ from .adaptive_selector_v2 import (
 from .execution_profile_v2 import (
     ExecutionProfileLaunchBudgetEvidenceV2,
     ExecutionProfileModeLiteralV2,
+    ExecutionProfileParityClassificationV2,
     ExecutionProfilesCatalogV2,
     ExecutionProfileV2,
     default_execution_profiles_catalog_v2,
@@ -940,6 +941,7 @@ class BacktestArtifactRuntimePlannerV2:
         estimated_memory_bytes: int,
         stage_a_cost_units: int | None = None,
         indicator_ids: tuple[str, ...] | None = None,
+        parity_classification: ExecutionProfileParityClassificationV2 | None = None,
     ) -> tuple[ExecutionProfileV2, AdaptiveSelectorDecisionV2]:
         """
         Resolve both the effective execution profile and the internal selector decision payload.
@@ -948,6 +950,7 @@ class BacktestArtifactRuntimePlannerV2:
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
           - docs/architecture/backtest/backtest-adaptive-selector-v1.md
           - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
           - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
@@ -962,6 +965,10 @@ class BacktestArtifactRuntimePlannerV2:
                 combo prefilter, and retained-candidate exact work under stable public
                 `stage_a` semantics for adaptive classification only.
             indicator_ids: Optional deterministic indicator ids from the prepared plan.
+            parity_classification:
+                Optional parity-first classification evidence for canonical no-risk exact
+                workloads. When present, the selector must exclude this workload from hybrid
+                rollout recommendations.
         Returns:
             tuple[ExecutionProfileV2, AdaptiveSelectorDecisionV2]: Effective execution profile
                 plus the full selector decision payload for internal inspection.
@@ -986,6 +993,7 @@ class BacktestArtifactRuntimePlannerV2:
                 ),
                 indicator_ids=indicator_ids or (),
                 stage_a_cost_units=stage_a_cost_units,
+                parity_classification=parity_classification,
             ),
             execution_profiles=self._execution_profiles,
             policy=self._adaptive_selector_policy,
@@ -1103,6 +1111,22 @@ class BacktestArtifactRuntimePlannerV2:
             stage_cost_model=stage_cost_model,
             risk_variants=risk_variants,
         )
+        
+        # Build parity-first classification for canonical no-risk exact workloads
+        parity_classification: ExecutionProfileParityClassificationV2 | None = None
+        if _risk_variants_use_no_risk_terminal_path_v2(risk_variants=risk_variants):
+            parity_classification = ExecutionProfileParityClassificationV2(
+                parity_class="parity_first_no_risk_exact",
+                disabled_risk_single_cell=True,
+                low_indicator_block_cardinality=True,
+                narrowed_retained_row_evidence=True,
+                notebook_shaped_cost_units=True,
+                nr2_classification_reason=(
+                    f"canonical NR2 no-risk single-cell parity class, "
+                    f"combo_prefilter_variants={stage_cost_model.combo_prefilter_variants_total}"
+                ),
+            )
+        
         if stage_b_variants_total > max_variants_per_compute:
             raise _variants_guard_error_v2(
                 stage=STAGE_B_LITERAL_V2,
@@ -1119,6 +1143,7 @@ class BacktestArtifactRuntimePlannerV2:
                     estimated_memory_bytes=estimated_memory_bytes,
                     stage_a_cost_units=stage_cost_model.stage_a_cost_units,
                     indicator_ids=tuple(plan.indicator_id for plan in indicator_plans),
+                    parity_classification=parity_classification,
                 )
             )
         else:

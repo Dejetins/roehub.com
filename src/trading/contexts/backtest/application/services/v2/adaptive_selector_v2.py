@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Literal, Protocol, cast
 
 from .execution_profile_v2 import (
     ExecutionProfileModeLiteralV2,
+    ExecutionProfileParityClassificationV2,
     ExecutionProfilesCatalogV2,
     ExecutionProfileV2,
     execution_profile_uses_hierarchical_shortlist_runtime_v2,
@@ -297,6 +298,7 @@ class AdaptiveSelectorPlanningEvidenceV2:
     runtime_mode: AdaptiveSelectorRuntimeModeLiteralV2
     indicator_ids: tuple[str, ...] = ()
     stage_a_cost_units: int | None = None
+    parity_classification: ExecutionProfileParityClassificationV2 | None = None
 
     def __post_init__(self) -> None:
         """
@@ -627,6 +629,17 @@ class CostModelAdaptiveExecutionSelectorV2:
         )
         candidate_evaluations = list(exact_evaluations)
         recommended_profile = exact_fallback_profile
+
+        # Parity-first classification must not be recommended as hybrid rollout
+        if evidence.parity_classification is not None:
+            return self._select_parity_first_profile(
+                evidence=evidence,
+                execution_profiles=execution_profiles,
+                policy=policy,
+                exact_fallback_profile=exact_fallback_profile,
+                requires_background_auto=requires_background_auto,
+                exact_evaluations=exact_evaluations,
+            )
 
         hybrid_conservative_profile = execution_profiles.profile_for_mode(
             mode="hybrid_conservative"
@@ -964,6 +977,91 @@ class CostModelAdaptiveExecutionSelectorV2:
         if evidence.estimated_memory_bytes >= policy.min_estimated_memory_bytes:
             exceeded_signals += 1
         return exceeded_signals
+
+    def _select_parity_first_profile(
+        self,
+        *,
+        evidence: AdaptiveSelectorPlanningEvidenceV2,
+        execution_profiles: ExecutionProfilesCatalogV2,
+        policy: AdaptiveSelectorPolicyV2,
+        exact_fallback_profile: ExecutionProfileV2,
+        requires_background_auto: bool,
+        exact_evaluations: tuple[AdaptiveSelectorCandidateEvaluationV2, ...],
+    ) -> AdaptiveSelectorDecisionV2:
+        """
+        Select execution profile for parity-first classified workloads.
+
+        Parity-first workloads must NOT be recommended as hybrid_conservative or hybrid_family.
+        They stay on exact execution path with explicit parity classification evidence.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+          - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - tests/unit/contexts/backtest/application/services/v2/test_adaptive_selector_v2.py
+
+        Args:
+            evidence: Deterministic planning evidence with parity classification.
+            execution_profiles: Ordered execution-profile catalog.
+            policy: Startup-validated selector rollout policy.
+            exact_fallback_profile: Resolved exact fallback from budget evaluation.
+            requires_background_auto: Whether sync launch budget was exceeded.
+            exact_evaluations: Candidate evaluations from exact fallback resolution.
+        Returns:
+            AdaptiveSelectorDecisionV2: Decision with parity-first classification kept separate
+                from hybrid rollout recommendations.
+        Assumptions:
+            Parity-first classification evidence was already validated by the planner, so this
+            method only needs to ensure hybrid profiles are NOT recommended.
+        Raises:
+            ValueError: If parity classification is missing (should have been checked before call).
+        Side Effects:
+            None.
+        """
+        if evidence.parity_classification is None:
+            raise ValueError(
+                "_select_parity_first_profile requires parity_classification in evidence"
+            )
+
+        # Build hybrid candidate evaluations showing they are explicitly skipped for parity class
+        hybrid_conservative_profile = execution_profiles.profile_for_mode(
+            mode="hybrid_conservative"
+        )
+        hybrid_family_profile = execution_profiles.profile_for_mode(mode="hybrid_family")
+
+        hybrid_conservative_evaluation = AdaptiveSelectorCandidateEvaluationV2(
+            mode=hybrid_conservative_profile.mode,
+            eligible=False,
+            exceeded_signals=0,
+            reason="parity-first classification excludes hybrid rollout",
+        )
+        hybrid_family_evaluation = AdaptiveSelectorCandidateEvaluationV2(
+            mode=hybrid_family_profile.mode,
+            eligible=False,
+            exceeded_signals=0,
+            reason="parity-first classification excludes hybrid rollout",
+        )
+
+        candidate_evaluations = list(exact_evaluations)
+        candidate_evaluations.extend(
+            (hybrid_conservative_evaluation, hybrid_family_evaluation)
+        )
+
+        # Parity-first workloads stay on exact fallback, never promoted to hybrid
+        effective_profile = exact_fallback_profile
+        recommended_profile = exact_fallback_profile
+
+        return AdaptiveSelectorDecisionV2(
+            policy_mode=policy.mode,
+            effective_profile=effective_profile,
+            recommended_profile=recommended_profile,
+            exact_fallback_profile=exact_fallback_profile,
+            recommendation_applied=False,
+            requires_background_auto=requires_background_auto,
+            candidate_evaluations=tuple(candidate_evaluations),
+        )
 
     def _resolve_family_plugin_candidate(
         self,

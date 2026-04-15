@@ -20,6 +20,7 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
     ExecutionProfileLaunchBudgetEvidenceV2,
+    ExecutionProfileParityClassificationV2,
     ExecutionProfilesCatalogV2,
     default_execution_profiles_catalog_v2,
 )
@@ -653,3 +654,107 @@ def test_nr2_no_risk_launch_budget_evidence_uses_planner_narrowed_workload_shape
     assert evidence.stage_b_variants_total == 20_000
     assert evidence.estimated_memory_bytes > 0
     assert evidence.estimated_memory_bytes < 2_300_000_000
+
+
+def test_parity_first_classification_excludes_hybrid_conservative_recommendation() -> None:
+    """
+    Verify canonical NR2 with parity-first classification is NOT recommended as hybrid_conservative.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Parity-first classification must keep canonical NR2 separate from hybrid rollout policy,
+        even when the workload would otherwise qualify for hybrid_conservative.
+    Raises:
+        AssertionError: If parity-classified workload is recommended as hybrid_conservative.
+    Side Effects:
+        None.
+    """
+    selector = CostModelAdaptiveExecutionSelectorV2()
+    decision = selector.select(
+        evidence=AdaptiveSelectorPlanningEvidenceV2(
+            grid_cardinality=345744,
+            stage_a_variants_total=345744,
+            stage_b_variants_total=20000,
+            estimated_memory_bytes=1400000000,
+            runtime_mode="sync_inline",
+            indicator_ids=("ma.fast", "ma.slow"),
+            parity_classification=ExecutionProfileParityClassificationV2(
+                parity_class="parity_first_no_risk_exact",
+                disabled_risk_single_cell=True,
+                low_indicator_block_cardinality=True,
+                narrowed_retained_row_evidence=True,
+                notebook_shaped_cost_units=True,
+                nr2_classification_reason="canonical NR2 no-risk single-cell parity class",
+            ),
+        ),
+        execution_profiles=_catalog_with_live_hybrid_profiles(),
+        policy=_policy(mode="active"),
+    )
+
+    # Parity-first classification must stay on exact profile, not hybrid
+    assert decision.effective_profile.mode in ("exact_small", "exact_parallel")
+    assert decision.recommended_profile.mode in ("exact_small", "exact_parallel")
+    assert decision.recommendation_applied is False
+
+    # Hybrid evaluations must explicitly show they are excluded
+    hybrid_conservative_eval = _evaluation_for_mode(
+        evaluations=decision.candidate_evaluations,
+        mode="hybrid_conservative",
+    )
+    assert "parity-first classification excludes hybrid rollout" in hybrid_conservative_eval.reason
+    assert hybrid_conservative_eval.eligible is False
+
+
+def test_parity_first_classification_excludes_hybrid_family_recommendation() -> None:
+    """
+    Verify canonical NR2 with parity-first classification is NOT recommended as hybrid_family.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Parity-first classification must keep canonical NR2 separate from ALL hybrid rollout
+        profiles, including hybrid_family.
+    Raises:
+        AssertionError: If parity-classified workload is recommended as hybrid_family.
+    Side Effects:
+        None.
+    """
+    selector = CostModelAdaptiveExecutionSelectorV2()
+    decision = selector.select(
+        evidence=AdaptiveSelectorPlanningEvidenceV2(
+            grid_cardinality=345744,
+            stage_a_variants_total=345744,
+            stage_b_variants_total=20000,
+            estimated_memory_bytes=1400000000,
+            runtime_mode="sync_inline",
+            indicator_ids=("ma.fast", "ma.slow"),
+            parity_classification=ExecutionProfileParityClassificationV2(
+                parity_class="parity_first_no_risk_exact",
+                disabled_risk_single_cell=True,
+                low_indicator_block_cardinality=True,
+                narrowed_retained_row_evidence=True,
+                notebook_shaped_cost_units=True,
+                nr2_classification_reason="canonical NR2 no-risk single-cell parity class",
+            ),
+        ),
+        execution_profiles=_catalog_with_live_hybrid_profiles(),
+        policy=_policy(mode="active"),
+    )
+
+    # Parity-first classification must stay on exact profile
+    assert decision.effective_profile.mode in ("exact_small", "exact_parallel")
+    assert decision.recommended_profile.mode in ("exact_small", "exact_parallel")
+
+    # Hybrid family must also be explicitly excluded
+    hybrid_family_eval = _evaluation_for_mode(
+        evaluations=decision.candidate_evaluations,
+        mode="hybrid_family",
+    )
+    assert "parity-first classification excludes hybrid rollout" in hybrid_family_eval.reason
+    assert hybrid_family_eval.eligible is False
+
