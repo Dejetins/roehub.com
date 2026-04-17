@@ -619,7 +619,7 @@ def test_launch_backtest_with_auto_fallback_returns_sync_inline_when_sync_budget
 def test_launch_backtest_with_auto_fallback_keeps_canonical_nr2_sync_inline_response() -> None:
     """
     Verify canonical `NR2` no-risk sync launch stays on `sync_inline` and keeps the internal
-    `hybrid_conservative` execution profile instead of drifting into `background_auto`.
+    `exact_no_risk_parity` execution profile instead of drifting into `background_auto`.
 
     Args:
         None.
@@ -638,7 +638,7 @@ def test_launch_backtest_with_auto_fallback_keeps_canonical_nr2_sync_inline_resp
         run_id=UUID("00000000-0000-0000-0000-000000000912"),
         state="succeeded",
         execution_mode="sync_inline",
-        execution_profile_mode="hybrid_conservative",
+        execution_profile_mode="exact_no_risk_parity",
         engine_version="signal_tf + 1m_risk",
         engine_params_hash="f" * 64,
     )
@@ -660,7 +660,7 @@ def test_launch_backtest_with_auto_fallback_keeps_canonical_nr2_sync_inline_resp
     )
 
     assert launched.execution_mode == "sync_inline"
-    assert launched.execution_profile_mode == "hybrid_conservative"
+    assert launched.execution_profile_mode == "exact_no_risk_parity"
     assert launched.run_id == UUID("00000000-0000-0000-0000-000000000912")
     assert preflight_use_case.calls == 0
     assert create_use_case.calls == 0
@@ -1140,7 +1140,7 @@ def _template_run_response() -> RunBacktestResponse:
         artifact_slot_generation=11,
         artifact_asof_date="2026-03-28",
         artifact_manifest_hash="c" * 64,
-        execution_profile_mode="hybrid_conservative",
+        execution_profile_mode="exact_no_risk_parity",
     )
 
 

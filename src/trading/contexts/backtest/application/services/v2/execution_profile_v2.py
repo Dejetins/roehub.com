@@ -48,8 +48,8 @@ ALLOWED_EXECUTION_PROFILE_MODES_V2: tuple[ExecutionProfileModeLiteralV2, ...] = 
 DEFAULT_EXECUTION_PROFILE_MODE_V2: ExecutionProfileModeLiteralV2 = "exact_small"
 _EXACT_EXECUTION_PROFILE_MODES_V2: tuple[ExecutionProfileModeLiteralV2, ...] = (
     "exact_small",
-    "exact_parallel",
     "exact_no_risk_parity",
+    "exact_parallel",
 )
 ALLOWED_EXECUTION_PROFILE_LAUNCH_BUDGET_WORKLOAD_CLASSES_V2: tuple[
     ExecutionProfileLaunchBudgetWorkloadClassLiteralV2, ...
@@ -1251,6 +1251,43 @@ class ExecutionProfilesCatalogV2:
             )
         return exact_profiles
 
+    def runtime_enabled_non_parity_exact_profiles(self) -> tuple[ExecutionProfileV2, ...]:
+        """
+        Return runtime-enabled exact profiles excluding the parity-first exact internal mode.
+
+        Docs:
+          - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+          - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+
+        Args:
+            None.
+        Returns:
+            tuple[ExecutionProfileV2, ...]:
+                Ordered runtime-enabled exact profiles reserved for generic non-parity fallback.
+        Assumptions:
+            `exact_no_risk_parity` is an internal parity-only exact route and must not silently
+            become the default fallback for unrelated exact workloads.
+        Raises:
+            ValueError: If no non-parity runtime-enabled exact profiles remain in the catalog.
+        Side Effects:
+            None.
+        """
+        non_parity_exact_profiles = tuple(
+            profile
+            for profile in self.runtime_enabled_exact_profiles()
+            if profile.mode != "exact_no_risk_parity"
+        )
+        if len(non_parity_exact_profiles) == 0:
+            raise ValueError(
+                "ExecutionProfilesCatalogV2 must include at least one runtime-enabled non-parity "
+                "exact profile"
+            )
+        return non_parity_exact_profiles
+
     def background_exact_profile(self) -> ExecutionProfileV2:
         """
         Return the heaviest runtime-enabled exact profile used for heavy background execution.
@@ -1310,6 +1347,11 @@ def _default_launch_budget_for_mode_v2(
             max_stage_b_variants_total=12000,
             max_estimated_memory_bytes=268435456,
         ),
+        "exact_no_risk_parity": ExecutionProfileLaunchBudgetV2(
+            max_stage_a_variants_total=25000,
+            max_stage_b_variants_total=50000,
+            max_estimated_memory_bytes=1610612736,
+        ),
         "exact_parallel": ExecutionProfileLaunchBudgetV2(
             max_stage_a_variants_total=25000,
             max_stage_b_variants_total=180000,
@@ -1364,6 +1406,11 @@ def _default_progress_weights_for_mode_v2(
     """
     weights_by_mode: dict[ExecutionProfileModeLiteralV2, BacktestJobStageWeights] = {
         "exact_small": BacktestJobStageWeights(stage_a=40, stage_b=55, finalizing=5),
+        "exact_no_risk_parity": BacktestJobStageWeights(
+            stage_a=45,
+            stage_b=50,
+            finalizing=5,
+        ),
         "exact_parallel": BacktestJobStageWeights(stage_a=45, stage_b=50, finalizing=5),
         "hybrid_conservative": BacktestJobStageWeights(
             stage_a=55,
@@ -1414,6 +1461,9 @@ def _default_stage_b_process_fallback_for_mode_v2(
     ] = {
         "exact_small": ExecutionProfileStageBProcessFallbackConfigV2(
             min_stage_b_variants_total=12000
+        ),
+        "exact_no_risk_parity": ExecutionProfileStageBProcessFallbackConfigV2(
+            min_stage_b_variants_total=50000
         ),
         "exact_parallel": ExecutionProfileStageBProcessFallbackConfigV2(
             min_stage_b_variants_total=150000
@@ -1471,6 +1521,10 @@ def _default_parallelism_for_mode_v2(
             stage_a_workers=1,
             stage_b_workers=1,
         ),
+        "exact_no_risk_parity": ExecutionProfileParallelismConfigV2(
+            stage_a_workers=4,
+            stage_b_workers=1,
+        ),
         "exact_parallel": ExecutionProfileParallelismConfigV2(
             stage_a_workers=4,
             stage_b_workers=1,
@@ -1522,6 +1576,7 @@ def _default_family_plugin_budget_ms_for_mode_v2(
     """
     budgets_by_mode: dict[ExecutionProfileModeLiteralV2, int] = {
         "exact_small": 10,
+        "exact_no_risk_parity": 20,
         "exact_parallel": 20,
         "hybrid_conservative": 30,
         "hybrid_family": 40,
@@ -1587,6 +1642,35 @@ def default_execution_profiles_catalog_v2() -> ExecutionProfilesCatalogV2:
                     mode="exact_small"
                 ),
                 planning_budget_ms=25,
+            ),
+            ExecutionProfileV2(
+                mode="exact_no_risk_parity",
+                shortlist_config=ExecutionProfileShortlistConfigV2(
+                    enabled=False,
+                    max_candidates=None,
+                    scoring=ExecutionProfileShortlistScoringConfigV2(),
+                    retention=ExecutionProfileShortlistRetentionConfigV2(),
+                ),
+                parallelism=_default_parallelism_for_mode_v2(mode="exact_no_risk_parity"),
+                feature_flags=ExecutionProfileFeatureFlagsV2(
+                    runtime_enabled=True,
+                    heuristic_shortlist_enabled=False,
+                    parallel_stage_b_enabled=False,
+                    family_plugin_enabled=False,
+                ),
+                stage_b_process_fallback=_default_stage_b_process_fallback_for_mode_v2(
+                    mode="exact_no_risk_parity"
+                ),
+                launch_budget=_default_launch_budget_for_mode_v2(
+                    mode="exact_no_risk_parity"
+                ),
+                progress_weights=_default_progress_weights_for_mode_v2(
+                    mode="exact_no_risk_parity"
+                ),
+                family_plugin_budget_ms=_default_family_plugin_budget_ms_for_mode_v2(
+                    mode="exact_no_risk_parity"
+                ),
+                planning_budget_ms=50,
             ),
             ExecutionProfileV2(
                 mode="exact_parallel",

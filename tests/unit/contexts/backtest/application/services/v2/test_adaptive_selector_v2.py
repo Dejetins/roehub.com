@@ -16,6 +16,7 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 
     BacktestRiskVariantV2,
     BacktestRuntimeStageCostModelV2,
     _build_launch_budget_evidence_v2,
+    _build_parity_classification_v2,
 )
 from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
@@ -656,6 +657,53 @@ def test_nr2_no_risk_launch_budget_evidence_uses_planner_narrowed_workload_shape
     assert evidence.estimated_memory_bytes < 2_300_000_000
 
 
+def test_nr2_no_risk_planner_builds_parity_first_classification_evidence() -> None:
+    """
+    Verify planner parity-classification evidence stays explicit and reviewable for canonical NR2.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        D1 keeps parity evidence internal-only, so a compact typed helper is sufficient for unit
+        coverage as long as the planner reuses the same helper while building runtime plans.
+    Raises:
+        AssertionError: If canonical no-risk shape stops producing deterministic parity evidence.
+    Side Effects:
+        None.
+    """
+    classification = _build_parity_classification_v2(
+        stage_cost_model=BacktestRuntimeStageCostModelV2(
+            row_prefilter_rows_total=284,
+            retained_row_variants_total=284,
+            combo_prefilter_variants_total=20_164,
+            retained_exact_candidates_total=40_000,
+            stage_a_cost_units=180_448,
+        ),
+        risk_variants=(
+            BacktestRiskVariantV2(
+                risk_index=0,
+                risk_params={
+                    "sl_enabled": False,
+                    "sl_pct": None,
+                    "tp_enabled": False,
+                    "tp_pct": None,
+                },
+            ),
+        ),
+    )
+
+    assert classification is not None
+    assert classification.parity_class == "parity_first_no_risk_exact"
+    assert classification.disabled_risk_single_cell is True
+    assert classification.low_indicator_block_cardinality is True
+    assert classification.narrowed_retained_row_evidence is True
+    assert classification.notebook_shaped_cost_units is True
+    assert "canonical NR2" in classification.nr2_classification_reason
+    assert "combo_prefilter_variants=20164" in classification.nr2_classification_reason
+
+
 def test_parity_first_classification_excludes_hybrid_conservative_recommendation() -> None:
     """
     Verify canonical NR2 with parity-first classification is NOT recommended as hybrid_conservative.
@@ -694,10 +742,17 @@ def test_parity_first_classification_excludes_hybrid_conservative_recommendation
         policy=_policy(mode="active"),
     )
 
-    # Parity-first classification must stay on exact profile, not hybrid
-    assert decision.effective_profile.mode in ("exact_small", "exact_parallel")
-    assert decision.recommended_profile.mode in ("exact_small", "exact_parallel")
+    # Parity-first classification must stay on the dedicated exact profile, not hybrid
+    assert decision.effective_profile.mode == "exact_no_risk_parity"
+    assert decision.recommended_profile.mode == "exact_no_risk_parity"
     assert decision.recommendation_applied is False
+
+    parity_eval = _evaluation_for_mode(
+        evaluations=decision.candidate_evaluations,
+        mode="exact_no_risk_parity",
+    )
+    assert "parity-first classification selects exact no-risk profile" in parity_eval.reason
+    assert parity_eval.eligible is True
 
     # Hybrid evaluations must explicitly show they are excluded
     hybrid_conservative_eval = _evaluation_for_mode(
@@ -746,9 +801,9 @@ def test_parity_first_classification_excludes_hybrid_family_recommendation() -> 
         policy=_policy(mode="active"),
     )
 
-    # Parity-first classification must stay on exact profile
-    assert decision.effective_profile.mode in ("exact_small", "exact_parallel")
-    assert decision.recommended_profile.mode in ("exact_small", "exact_parallel")
+    # Parity-first classification must stay on the dedicated exact profile
+    assert decision.effective_profile.mode == "exact_no_risk_parity"
+    assert decision.recommended_profile.mode == "exact_no_risk_parity"
 
     # Hybrid family must also be explicitly excluded
     hybrid_family_eval = _evaluation_for_mode(
@@ -757,4 +812,3 @@ def test_parity_first_classification_excludes_hybrid_family_recommendation() -> 
     )
     assert "parity-first classification excludes hybrid rollout" in hybrid_family_eval.reason
     assert hybrid_family_eval.eligible is False
-

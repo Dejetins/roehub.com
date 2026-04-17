@@ -346,6 +346,7 @@ class BacktestArtifactRuntimePlanV2:
     adaptive_selector_decision: AdaptiveSelectorDecisionV2 | None = None
     stage_cost_model: BacktestRuntimeStageCostModelV2 | None = None
     launch_budget_evidence: ExecutionProfileLaunchBudgetEvidenceV2 | None = None
+    parity_classification: ExecutionProfileParityClassificationV2 | None = None
 
     def __post_init__(self) -> None:
         """
@@ -366,8 +367,8 @@ class BacktestArtifactRuntimePlanV2:
         Assumptions:
             Stage totals and memory totals were guard-validated by the planner; when selector
             debug metadata is attached, it must agree with the effective execution profile. When
-            launch-budget evidence is attached, its workload class must stay aligned with the
-            prepared risk shape.
+            launch-budget evidence or parity classification is attached, each internal additive
+            marker must stay aligned with the prepared no-risk or risk-grid shape.
         Raises:
             ValueError: If one scalar invariant is invalid or selector debug metadata drifts from
                 the effective execution profile.
@@ -433,6 +434,20 @@ class BacktestArtifactRuntimePlanV2:
             raise ValueError(
                 "BacktestArtifactRuntimePlanV2.launch_budget_evidence cannot classify "
                 "risk-grid plans as no_risk_terminal"
+            )
+        if self.parity_classification is not None and not self.uses_no_risk_terminal_path():
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.parity_classification requires no-risk terminal "
+                "path"
+            )
+        if (
+            self.parity_classification is not None
+            and self.adaptive_selector_decision is not None
+            and self.execution_profile.mode != "exact_no_risk_parity"
+        ):
+            raise ValueError(
+                "BacktestArtifactRuntimePlanV2.parity_classification requires "
+                "exact_no_risk_parity execution profile"
             )
         object.__setattr__(
             self,
@@ -941,6 +956,7 @@ class BacktestArtifactRuntimePlannerV2:
         estimated_memory_bytes: int,
         stage_a_cost_units: int | None = None,
         indicator_ids: tuple[str, ...] | None = None,
+        launch_budget_evidence: ExecutionProfileLaunchBudgetEvidenceV2 | None = None,
         parity_classification: ExecutionProfileParityClassificationV2 | None = None,
     ) -> tuple[ExecutionProfileV2, AdaptiveSelectorDecisionV2]:
         """
@@ -965,6 +981,10 @@ class BacktestArtifactRuntimePlannerV2:
                 combo prefilter, and retained-candidate exact work under stable public
                 `stage_a` semantics for adaptive classification only.
             indicator_ids: Optional deterministic indicator ids from the prepared plan.
+            launch_budget_evidence:
+                Optional explicit sync-launch workload evidence. Parity-first classified requests
+                rely on this narrowed evidence instead of raw grid totals when validating
+                `sync_inline` admission against the dedicated parity exact profile budget.
             parity_classification:
                 Optional parity-first classification evidence for canonical no-risk exact
                 workloads. When present, the selector must exclude this workload from hybrid
@@ -977,9 +997,29 @@ class BacktestArtifactRuntimePlannerV2:
             deterministic and free of runtime IO.
         Raises:
             RoehubError: If sync launch budgets are exceeded and background routing is required.
+            ValueError: If parity-classified sync admission is attempted without launch evidence.
         Side Effects:
             None.
         """
+        if parity_classification is not None:
+            parity_profile = self._execution_profiles.profile_for_mode(
+                mode="exact_no_risk_parity"
+            )
+            if self._launch_budget_mode == "sync_inline":
+                if launch_budget_evidence is None:
+                    raise ValueError(
+                        "Parity-classified execution profile selection requires "
+                        "launch_budget_evidence"
+                    )
+                if not parity_profile.launch_budget.allows_evidence(
+                    evidence=launch_budget_evidence,
+                ):
+                    raise _background_auto_required_error_v2(
+                        execution_profile_mode=parity_profile.mode,
+                        stage_a_variants_total=launch_budget_evidence.stage_a_variants_total,
+                        stage_b_variants_total=launch_budget_evidence.stage_b_variants_total,
+                        estimated_memory_bytes=launch_budget_evidence.estimated_memory_bytes,
+                    )
         selector_decision = self._adaptive_selector.select(
             evidence=AdaptiveSelectorPlanningEvidenceV2(
                 grid_cardinality=stage_a_variants_total,
@@ -1111,22 +1151,11 @@ class BacktestArtifactRuntimePlannerV2:
             stage_cost_model=stage_cost_model,
             risk_variants=risk_variants,
         )
-        
-        # Build parity-first classification for canonical no-risk exact workloads
-        parity_classification: ExecutionProfileParityClassificationV2 | None = None
-        if _risk_variants_use_no_risk_terminal_path_v2(risk_variants=risk_variants):
-            parity_classification = ExecutionProfileParityClassificationV2(
-                parity_class="parity_first_no_risk_exact",
-                disabled_risk_single_cell=True,
-                low_indicator_block_cardinality=True,
-                narrowed_retained_row_evidence=True,
-                notebook_shaped_cost_units=True,
-                nr2_classification_reason=(
-                    f"canonical NR2 no-risk single-cell parity class, "
-                    f"combo_prefilter_variants={stage_cost_model.combo_prefilter_variants_total}"
-                ),
-            )
-        
+        parity_classification = _build_parity_classification_v2(
+            stage_cost_model=stage_cost_model,
+            risk_variants=risk_variants,
+        )
+
         if stage_b_variants_total > max_variants_per_compute:
             raise _variants_guard_error_v2(
                 stage=STAGE_B_LITERAL_V2,
@@ -1143,6 +1172,7 @@ class BacktestArtifactRuntimePlannerV2:
                     estimated_memory_bytes=estimated_memory_bytes,
                     stage_a_cost_units=stage_cost_model.stage_a_cost_units,
                     indicator_ids=tuple(plan.indicator_id for plan in indicator_plans),
+                    launch_budget_evidence=launch_budget_evidence,
                     parity_classification=parity_classification,
                 )
             )
@@ -1181,6 +1211,7 @@ class BacktestArtifactRuntimePlannerV2:
             adaptive_selector_decision=adaptive_selector_decision,
             stage_cost_model=stage_cost_model,
             launch_budget_evidence=launch_budget_evidence,
+            parity_classification=parity_classification,
         )
 
     def build(
@@ -1973,6 +2004,45 @@ def _build_launch_budget_evidence_v2(
         stage_b_variants_total=stage_b_variants_total,
         estimated_memory_bytes=estimated_memory_bytes,
         workload_class="raw_grid",
+    )
+
+
+def _build_parity_classification_v2(
+    *,
+    stage_cost_model: BacktestRuntimeStageCostModelV2,
+    risk_variants: tuple[BacktestRiskVariantV2, ...],
+) -> ExecutionProfileParityClassificationV2 | None:
+    """
+    Build deterministic parity-first classification evidence for canonical no-risk workloads.
+
+    Args:
+        stage_cost_model: Internal retained-frontier cost model for the prepared planner path.
+        risk_variants: Prepared Stage B risk variants for the same request.
+    Returns:
+        ExecutionProfileParityClassificationV2 | None:
+            Explicit parity-first classification evidence for canonical no-risk exact workloads,
+            otherwise `None`.
+    Assumptions:
+        Only the single disabled-risk terminal path should carry parity-first classification, and
+        its debug reason should remain compact but deterministic for planner/selector review.
+    Raises:
+        ValueError: Propagated if the derived parity-classification payload is invalid.
+    Side Effects:
+        None.
+    """
+    if not _risk_variants_use_no_risk_terminal_path_v2(risk_variants=risk_variants):
+        return None
+    return ExecutionProfileParityClassificationV2(
+        parity_class="parity_first_no_risk_exact",
+        disabled_risk_single_cell=True,
+        low_indicator_block_cardinality=True,
+        narrowed_retained_row_evidence=True,
+        notebook_shaped_cost_units=True,
+        nr2_classification_reason=(
+            "canonical NR2 no-risk single-cell parity class; "
+            f"retained_rows={stage_cost_model.retained_row_variants_total}; "
+            f"combo_prefilter_variants={stage_cost_model.combo_prefilter_variants_total}"
+        ),
     )
 
 

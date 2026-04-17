@@ -803,13 +803,14 @@ class CostModelAdaptiveExecutionSelectorV2:
                 Selected exact fallback, sync background-routing flag, and candidate evaluations.
         Assumptions:
             Existing exact launch budgets remain authoritative for conservative fallback and keep
-            the exact Stage B scorer canonical.
+            the exact Stage B scorer canonical, while the dedicated parity-only exact mode is
+            excluded here and resolved only through explicit parity classification.
         Raises:
             ValueError: If the exact catalog is empty.
         Side Effects:
             None.
         """
-        exact_profiles = execution_profiles.runtime_enabled_exact_profiles()
+        exact_profiles = execution_profiles.runtime_enabled_non_parity_exact_profiles()
         selected_profile: ExecutionProfileV2 | None = None
         evaluations: list[AdaptiveSelectorCandidateEvaluationV2] = []
         for profile in exact_profiles:
@@ -992,7 +993,8 @@ class CostModelAdaptiveExecutionSelectorV2:
         Select execution profile for parity-first classified workloads.
 
         Parity-first workloads must NOT be recommended as hybrid_conservative or hybrid_family.
-        They stay on exact execution path with explicit parity classification evidence.
+        They stay on the dedicated parity-first exact profile with explicit parity classification
+        evidence.
 
         Docs:
           - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
@@ -1011,10 +1013,11 @@ class CostModelAdaptiveExecutionSelectorV2:
             exact_evaluations: Candidate evaluations from exact fallback resolution.
         Returns:
             AdaptiveSelectorDecisionV2: Decision with parity-first classification kept separate
-                from hybrid rollout recommendations.
+                from hybrid rollout recommendations and generic exact fallback.
         Assumptions:
             Parity-first classification evidence was already validated by the planner, so this
-            method only needs to ensure hybrid profiles are NOT recommended.
+            method only needs to ensure hybrid profiles are NOT recommended and the dedicated
+            parity exact profile remains the effective selection.
         Raises:
             ValueError: If parity classification is missing (should have been checked before call).
         Side Effects:
@@ -1024,6 +1027,18 @@ class CostModelAdaptiveExecutionSelectorV2:
             raise ValueError(
                 "_select_parity_first_profile requires parity_classification in evidence"
             )
+
+        parity_profile = execution_profiles.profile_for_mode(mode="exact_no_risk_parity")
+        parity_reason = (
+            "parity-first classification selects exact no-risk profile: "
+            f"{evidence.parity_classification.nr2_classification_reason}"
+        )
+        parity_evaluation = AdaptiveSelectorCandidateEvaluationV2(
+            mode=parity_profile.mode,
+            eligible=True,
+            exceeded_signals=0,
+            reason=parity_reason,
+        )
 
         # Build hybrid candidate evaluations showing they are explicitly skipped for parity class
         hybrid_conservative_profile = execution_profiles.profile_for_mode(
@@ -1045,21 +1060,22 @@ class CostModelAdaptiveExecutionSelectorV2:
         )
 
         candidate_evaluations = list(exact_evaluations)
+        candidate_evaluations.append(parity_evaluation)
         candidate_evaluations.extend(
             (hybrid_conservative_evaluation, hybrid_family_evaluation)
         )
 
-        # Parity-first workloads stay on exact fallback, never promoted to hybrid
-        effective_profile = exact_fallback_profile
-        recommended_profile = exact_fallback_profile
+        # Parity-first workloads stay on the dedicated exact profile, never promoted to hybrid
+        effective_profile = parity_profile
+        recommended_profile = parity_profile
 
         return AdaptiveSelectorDecisionV2(
             policy_mode=policy.mode,
             effective_profile=effective_profile,
             recommended_profile=recommended_profile,
-            exact_fallback_profile=exact_fallback_profile,
+            exact_fallback_profile=parity_profile,
             recommendation_applied=False,
-            requires_background_auto=requires_background_auto,
+            requires_background_auto=False,
             candidate_evaluations=tuple(candidate_evaluations),
         )
 

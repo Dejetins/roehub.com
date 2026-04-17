@@ -488,9 +488,9 @@ class CreateAndRunBacktestSyncInlineUseCase:
             request_payload:
                 Strict API payload snapshot used to persist canonical `request_json` after
                 storage-only metadata is stripped. The sync-inline wrapper also injects the
-                server-owned internal `execution_profile_mode=hybrid_conservative` marker into
-                the runtime payload so `POST /backtests` runs through the redesigned
-                prefilter-first sync engine without changing the public transport contract.
+                server-owned internal `execution_profile_mode=exact_no_risk_parity` marker into
+                the runtime payload so canonical `NR2` `POST /backtests` launches keep their
+                parity-first exact routing truth without changing the public transport contract.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             RunBacktestResponse: Sync response enriched with persisted run identity metadata.

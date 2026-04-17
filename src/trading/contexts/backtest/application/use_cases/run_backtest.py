@@ -465,8 +465,8 @@ class RunBacktestUseCase:
                 `execution_profile_mode` override when present; this field is not part of the
                 public `/backtests` request contract and must stay excluded from request hashes.
                 After Milestone F / EPIC F1 the persisted sync-inline launch wrapper uses this
-                additive metadata to pin `POST /backtests` onto the redesigned
-                `hybrid_conservative` prefilter-first engine path.
+                additive metadata to pin canonical `NR2` `POST /backtests` launches onto the
+                dedicated `exact_no_risk_parity` internal engine path.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
             RunBacktestResponse: Deterministic staged response with ranked top-k variants.

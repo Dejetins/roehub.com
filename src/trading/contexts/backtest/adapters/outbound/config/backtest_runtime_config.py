@@ -1655,7 +1655,9 @@ def _parse_execution_profiles_catalog(
         ExecutionProfilesCatalogV2: Parsed ordered catalog ready for planner/DTO reuse.
     Assumptions:
         Missing section falls back to the additive A1 default catalog with all approved modes,
-        including typed family-plugin budgets for future `hybrid_family` proposal work.
+        including typed family-plugin budgets for future `hybrid_family` proposal work. When
+        env YAML overrides only a subset of profiles, omitted internal profiles are backfilled
+        from the default catalog to preserve additive contract growth.
     Raises:
         ValueError: If one profile mapping violates typed contract or ordering invariants.
     Side Effects:
@@ -1676,7 +1678,7 @@ def _parse_execution_profiles_catalog(
     if len(profiles_payload) == 0:
         raise ValueError("backtest.execution_profiles.profiles must be non-empty")
 
-    available_profiles: list[ExecutionProfileV2] = []
+    configured_profiles_by_mode: dict[ExecutionProfileModeLiteralV2, ExecutionProfileV2] = {}
     for index, profile_map in enumerate(profiles_payload):
         mode = validate_execution_profile_mode_v2(
             value=_get_str(profile_map, "mode", required=True)
@@ -1694,155 +1696,154 @@ def _parse_execution_profiles_catalog(
         )
         launch_budget_map = _get_mapping(profile_map, "launch_budget", required=False)
         progress_map = _get_mapping(profile_map, "progress", required=False)
-        available_profiles.append(
-            ExecutionProfileV2(
-                mode=mode,
-                shortlist_config=ExecutionProfileShortlistConfigV2(
-                    enabled=_get_bool_with_default(
-                        shortlist_map,
-                        "enabled",
-                        default=default_profile.shortlist_config.enabled,
-                    ),
-                    max_candidates=_get_optional_int_with_default(
-                        shortlist_map,
-                        "max_candidates",
-                        default=default_profile.shortlist_config.max_candidates,
-                    ),
-                    scoring=ExecutionProfileShortlistScoringConfigV2(
-                        activity_ratio_weight=_get_float_with_default(
-                            shortlist_scoring_map,
-                            "activity_ratio_weight",
-                            default=(
-                                default_profile.shortlist_config.scoring.activity_ratio_weight
-                            ),
-                        ),
-                        direction_balance_weight=_get_float_with_default(
-                            shortlist_scoring_map,
-                            "direction_balance_weight",
-                            default=(
-                                default_profile.shortlist_config.scoring.direction_balance_weight
-                            ),
-                        ),
-                        transition_ratio_weight=_get_float_with_default(
-                            shortlist_scoring_map,
-                            "transition_ratio_weight",
-                            default=(
-                                default_profile.shortlist_config.scoring.transition_ratio_weight
-                            ),
-                        ),
-                        active_span_ratio_weight=_get_float_with_default(
-                            shortlist_scoring_map,
-                            "active_span_ratio_weight",
-                            default=(
-                                default_profile.shortlist_config.scoring.active_span_ratio_weight
-                            ),
-                        ),
-                    ),
-                    retention=ExecutionProfileShortlistRetentionConfigV2(
-                        diversity_buckets=tuple(
-                            validate_execution_profile_shortlist_diversity_bucket_v2(
-                                value=bucket_name
-                            )
-                            for bucket_name in _get_str_sequence_with_default(
-                                shortlist_retention_map,
-                                "diversity_buckets",
-                                default=(
-                                    default_profile.shortlist_config.retention.diversity_buckets
-                                ),
-                            )
-                        ),
-                        max_per_bucket=_get_optional_int_with_default(
-                            shortlist_retention_map,
-                            "max_per_bucket",
-                            default=default_profile.shortlist_config.retention.max_per_bucket,
-                        ),
-                    ),
+        configured_profiles_by_mode[mode] = ExecutionProfileV2(
+            mode=mode,
+            shortlist_config=ExecutionProfileShortlistConfigV2(
+                enabled=_get_bool_with_default(
+                    shortlist_map,
+                    "enabled",
+                    default=default_profile.shortlist_config.enabled,
                 ),
-                parallelism=ExecutionProfileParallelismConfigV2(
-                    stage_a_workers=_get_int_with_default(
-                        parallelism_map,
-                        "stage_a_workers",
-                        default=1,
-                    ),
-                    stage_b_workers=_get_int_with_default(
-                        parallelism_map,
-                        "stage_b_workers",
-                        default=1,
-                    ),
+                max_candidates=_get_optional_int_with_default(
+                    shortlist_map,
+                    "max_candidates",
+                    default=default_profile.shortlist_config.max_candidates,
                 ),
-                feature_flags=ExecutionProfileFeatureFlagsV2(
-                    runtime_enabled=_get_bool_with_default(
-                        feature_flags_map,
-                        "runtime_enabled",
-                        default=index == 0,
-                    ),
-                    heuristic_shortlist_enabled=_get_bool_with_default(
-                        feature_flags_map,
-                        "heuristic_shortlist_enabled",
-                        default=False,
-                    ),
-                    parallel_stage_b_enabled=_get_bool_with_default(
-                        feature_flags_map,
-                        "parallel_stage_b_enabled",
-                        default=False,
-                    ),
-                    family_plugin_enabled=_get_bool_with_default(
-                        feature_flags_map,
-                        "family_plugin_enabled",
-                        default=False,
-                    ),
-                ),
-                stage_b_process_fallback=ExecutionProfileStageBProcessFallbackConfigV2(
-                    min_stage_b_variants_total=_get_int_with_default(
-                        stage_b_process_fallback_map,
-                        "min_stage_b_variants_total",
+                scoring=ExecutionProfileShortlistScoringConfigV2(
+                    activity_ratio_weight=_get_float_with_default(
+                        shortlist_scoring_map,
+                        "activity_ratio_weight",
                         default=(
-                            default_profile.stage_b_process_fallback.min_stage_b_variants_total
+                            default_profile.shortlist_config.scoring.activity_ratio_weight
+                        ),
+                    ),
+                    direction_balance_weight=_get_float_with_default(
+                        shortlist_scoring_map,
+                        "direction_balance_weight",
+                        default=(
+                            default_profile.shortlist_config.scoring.direction_balance_weight
+                        ),
+                    ),
+                    transition_ratio_weight=_get_float_with_default(
+                        shortlist_scoring_map,
+                        "transition_ratio_weight",
+                        default=(
+                            default_profile.shortlist_config.scoring.transition_ratio_weight
+                        ),
+                    ),
+                    active_span_ratio_weight=_get_float_with_default(
+                        shortlist_scoring_map,
+                        "active_span_ratio_weight",
+                        default=(
+                            default_profile.shortlist_config.scoring.active_span_ratio_weight
                         ),
                     ),
                 ),
-                launch_budget=ExecutionProfileLaunchBudgetV2(
-                    max_stage_a_variants_total=_get_int_with_default(
-                        launch_budget_map,
-                        "max_stage_a_variants_total",
-                        default=default_profile.launch_budget.max_stage_a_variants_total,
+                retention=ExecutionProfileShortlistRetentionConfigV2(
+                    diversity_buckets=tuple(
+                        validate_execution_profile_shortlist_diversity_bucket_v2(
+                            value=bucket_name
+                        )
+                        for bucket_name in _get_str_sequence_with_default(
+                            shortlist_retention_map,
+                            "diversity_buckets",
+                            default=default_profile.shortlist_config.retention.diversity_buckets,
+                        )
                     ),
-                    max_stage_b_variants_total=_get_int_with_default(
-                        launch_budget_map,
-                        "max_stage_b_variants_total",
-                        default=default_profile.launch_budget.max_stage_b_variants_total,
-                    ),
-                    max_estimated_memory_bytes=_get_int_with_default(
-                        launch_budget_map,
-                        "max_estimated_memory_bytes",
-                        default=default_profile.launch_budget.max_estimated_memory_bytes,
-                    ),
-                ),
-                progress_weights=BacktestJobStageWeights(
-                    stage_a=_get_int_with_default(
-                        progress_map,
-                        "stage_a",
-                        default=default_profile.progress_weights.stage_a,
-                    ),
-                    stage_b=_get_int_with_default(
-                        progress_map,
-                        "stage_b",
-                        default=default_profile.progress_weights.stage_b,
-                    ),
-                    finalizing=_get_int_with_default(
-                        progress_map,
-                        "finalizing",
-                        default=default_profile.progress_weights.finalizing,
+                    max_per_bucket=_get_optional_int_with_default(
+                        shortlist_retention_map,
+                        "max_per_bucket",
+                        default=default_profile.shortlist_config.retention.max_per_bucket,
                     ),
                 ),
-                family_plugin_budget_ms=_get_int_with_default(
-                    profile_map,
-                    "family_plugin_budget_ms",
-                    default=default_profile.family_plugin_budget_ms,
+            ),
+            parallelism=ExecutionProfileParallelismConfigV2(
+                stage_a_workers=_get_int_with_default(
+                    parallelism_map,
+                    "stage_a_workers",
+                    default=1,
                 ),
-                planning_budget_ms=_get_int(profile_map, "planning_budget_ms", required=True),
-            )
+                stage_b_workers=_get_int_with_default(
+                    parallelism_map,
+                    "stage_b_workers",
+                    default=1,
+                ),
+            ),
+            feature_flags=ExecutionProfileFeatureFlagsV2(
+                runtime_enabled=_get_bool_with_default(
+                    feature_flags_map,
+                    "runtime_enabled",
+                    default=index == 0,
+                ),
+                heuristic_shortlist_enabled=_get_bool_with_default(
+                    feature_flags_map,
+                    "heuristic_shortlist_enabled",
+                    default=False,
+                ),
+                parallel_stage_b_enabled=_get_bool_with_default(
+                    feature_flags_map,
+                    "parallel_stage_b_enabled",
+                    default=False,
+                ),
+                family_plugin_enabled=_get_bool_with_default(
+                    feature_flags_map,
+                    "family_plugin_enabled",
+                    default=False,
+                ),
+            ),
+            stage_b_process_fallback=ExecutionProfileStageBProcessFallbackConfigV2(
+                min_stage_b_variants_total=_get_int_with_default(
+                    stage_b_process_fallback_map,
+                    "min_stage_b_variants_total",
+                    default=default_profile.stage_b_process_fallback.min_stage_b_variants_total,
+                ),
+            ),
+            launch_budget=ExecutionProfileLaunchBudgetV2(
+                max_stage_a_variants_total=_get_int_with_default(
+                    launch_budget_map,
+                    "max_stage_a_variants_total",
+                    default=default_profile.launch_budget.max_stage_a_variants_total,
+                ),
+                max_stage_b_variants_total=_get_int_with_default(
+                    launch_budget_map,
+                    "max_stage_b_variants_total",
+                    default=default_profile.launch_budget.max_stage_b_variants_total,
+                ),
+                max_estimated_memory_bytes=_get_int_with_default(
+                    launch_budget_map,
+                    "max_estimated_memory_bytes",
+                    default=default_profile.launch_budget.max_estimated_memory_bytes,
+                ),
+            ),
+            progress_weights=BacktestJobStageWeights(
+                stage_a=_get_int_with_default(
+                    progress_map,
+                    "stage_a",
+                    default=default_profile.progress_weights.stage_a,
+                ),
+                stage_b=_get_int_with_default(
+                    progress_map,
+                    "stage_b",
+                    default=default_profile.progress_weights.stage_b,
+                ),
+                finalizing=_get_int_with_default(
+                    progress_map,
+                    "finalizing",
+                    default=default_profile.progress_weights.finalizing,
+                ),
+            ),
+            family_plugin_budget_ms=_get_int_with_default(
+                profile_map,
+                "family_plugin_budget_ms",
+                default=default_profile.family_plugin_budget_ms,
+            ),
+            planning_budget_ms=_get_int(profile_map, "planning_budget_ms", required=True),
         )
+
+    available_profiles = [
+        configured_profiles_by_mode.get(default_profile.mode, default_profile)
+        for default_profile in default_catalog.available_profiles
+    ]
 
     return ExecutionProfilesCatalogV2(
         default_mode=default_mode,
