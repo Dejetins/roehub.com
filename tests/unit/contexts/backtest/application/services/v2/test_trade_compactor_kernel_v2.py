@@ -11,8 +11,12 @@ from trading.contexts.backtest.application.services import (
     no_risk_metrics_to_ranking_payload_v2,
 )
 from trading.contexts.backtest.application.services.v2.contracts import StageACompactTradeV2
+from trading.contexts.backtest.application.services.v2.signal_aggregator_kernel import (
+    aggregate_signal_pairs_v2,
+)
 from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
     build_compact_exact_payloads_v2,
+    build_compact_trade_batch_for_signal_pairs_v2,
     build_compact_trade_batch_v2,
     compute_no_risk_metrics_for_trade_batch_v2,
 )
@@ -331,6 +335,64 @@ def test_compute_no_risk_metrics_for_trade_batch_v2_matches_scalar_rows() -> Non
         assert batched.avg_trade_ret_pct == pytest.approx(scalar.avg_trade_ret_pct)
         assert batched.avg_trade_exec_bars == pytest.approx(scalar.avg_trade_exec_bars)
         assert batched.exposure_pct == pytest.approx(scalar.exposure_pct)
+
+
+def test_build_compact_trade_batch_for_signal_pairs_v2_matches_generic_batch_shape() -> None:
+    """
+    Verify pair-first compact batching matches generic batching for two-indicator consensus rows.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        D4 pair-first compaction must preserve exact trade ordering and payload semantics while
+        skipping the broad retained `final_signal[V, T_signal]` batch on the parity path.
+    Raises:
+        AssertionError: If pair-first batching drifts from the generic compact-trade contract.
+    Side Effects:
+        None.
+    """
+    left_signal_rows = np.array([[1, 1, -1, 0], [1, 0, -1, 1]], dtype=np.int8)
+    right_signal_rows = np.array([[1, 1, -1, 0], [1, -1, -1, 1]], dtype=np.int8)
+    final_signal = aggregate_signal_pairs_v2(
+        left_signal_rows=left_signal_rows,
+        right_signal_rows=right_signal_rows,
+        indicator_ids=("ma.dema", "ma.hma"),
+    )
+
+    generic_batch = build_compact_trade_batch_v2(
+        final_signal=final_signal,
+        bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+        sentinel_index=5,
+    )
+    pair_batch = build_compact_trade_batch_for_signal_pairs_v2(
+        left_signal_rows=left_signal_rows,
+        right_signal_rows=right_signal_rows,
+        bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+        sentinel_index=5,
+    )
+
+    np.testing.assert_array_equal(pair_batch.trade_count, generic_batch.trade_count)
+    np.testing.assert_array_equal(pair_batch.entry_signal_idx, generic_batch.entry_signal_idx)
+    np.testing.assert_array_equal(pair_batch.entry_exec_idx, generic_batch.entry_exec_idx)
+    np.testing.assert_array_equal(pair_batch.direction, generic_batch.direction)
+    np.testing.assert_array_equal(
+        pair_batch.sig_exit_signal_idx,
+        generic_batch.sig_exit_signal_idx,
+    )
+    np.testing.assert_array_equal(
+        pair_batch.sig_exit_exec_idx,
+        generic_batch.sig_exit_exec_idx,
+    )
+    assert pair_batch.max_trade_count == generic_batch.max_trade_count
+    assert tuple(
+        pair_batch.exact_payload_at(row_index=row_index).compact_trades
+        for row_index in range(int(pair_batch.trade_count.shape[0]))
+    ) == tuple(
+        generic_batch.exact_payload_at(row_index=row_index).compact_trades
+        for row_index in range(int(generic_batch.trade_count.shape[0]))
+    )
 
 
 def test_build_compact_trade_list_v2_rejects_out_of_range_mapping_indexes() -> None:

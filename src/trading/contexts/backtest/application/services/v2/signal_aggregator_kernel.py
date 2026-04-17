@@ -10,6 +10,73 @@ import numpy as np
 from .contracts import SIGNAL_CODE_LONG_V2, SIGNAL_CODE_NEUTRAL_V2, SIGNAL_CODE_SHORT_V2
 
 
+@nb.njit(cache=True)
+def _resolve_pair_consensus_signal_v2(
+    left_signal_value: int,
+    right_signal_value: int,
+) -> int:
+    """
+    Resolve one two-indicator consensus signal without building a dense indicator cube.
+
+    Args:
+        left_signal_value: Left indicator signal value inside `{-1, 0, 1}`.
+        right_signal_value: Right indicator signal value inside `{-1, 0, 1}`.
+    Returns:
+        int: Consensus signal code preserving the Stage A long/short/neutral contract.
+    Assumptions:
+        The pair-first parity path evaluates exactly two indicators, so consensus reduces to
+        checking whether both rows confirm the same non-neutral direction.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if left_signal_value == right_signal_value:
+        if left_signal_value == SIGNAL_CODE_LONG_V2:
+            return SIGNAL_CODE_LONG_V2
+        if left_signal_value == SIGNAL_CODE_SHORT_V2:
+            return SIGNAL_CODE_SHORT_V2
+    return SIGNAL_CODE_NEUTRAL_V2
+
+
+@nb.njit(parallel=True, cache=True)
+def _aggregate_signal_pair_rows_kernel_v2(
+    *,
+    left_signal_rows_i8: np.ndarray,
+    right_signal_rows_i8: np.ndarray,
+) -> np.ndarray:
+    """
+    Aggregate one two-indicator Stage A signal pair directly in pair-first row order.
+
+    Args:
+        left_signal_rows_i8: Left indicator rows shaped `[variant, time]`.
+        right_signal_rows_i8: Right indicator rows shaped `[variant, time]`.
+    Returns:
+        np.ndarray: Aggregated `final_signal[V, T_signal]` matrix for the same variant order.
+    Assumptions:
+        The parity-only pair path must avoid dense `[indicator, variant, time]` cube allocation,
+        so every `[variant, time]` cell is resolved directly from the aligned row pair.
+    Raises:
+        None.
+    Side Effects:
+        Allocates one aggregated `np.int8` matrix.
+    """
+    variant_count = int(left_signal_rows_i8.shape[0])
+    timeline_length = int(left_signal_rows_i8.shape[1])
+    aggregated = np.full(
+        (variant_count, timeline_length),
+        SIGNAL_CODE_NEUTRAL_V2,
+        dtype=np.int8,
+    )
+    for row_index in nb.prange(variant_count):
+        for time_index in range(timeline_length):
+            aggregated[row_index, time_index] = _resolve_pair_consensus_signal_v2(
+                int(left_signal_rows_i8[row_index, time_index]),
+                int(right_signal_rows_i8[row_index, time_index]),
+            )
+    return aggregated
+
+
 @nb.njit(parallel=True, cache=True)
 def _aggregate_final_signal_row_cube_kernel_v2(
     *,
@@ -126,6 +193,51 @@ def aggregate_ordered_final_signal_rows_v2(
     return _aggregate_normalized_signal_rows_v2(normalized_rows=normalized_rows)
 
 
+def aggregate_signal_pairs_v2(
+    *,
+    left_signal_rows: np.ndarray,
+    right_signal_rows: np.ndarray,
+    indicator_ids: tuple[str, str] | None = None,
+) -> np.ndarray:
+    """
+    Aggregate exactly two ordered indicator signal matrices through the pair-first kernel path.
+
+    Args:
+        left_signal_rows: Left indicator signal rows shaped `[V, T_signal]`.
+        right_signal_rows: Right indicator signal rows shaped `[V, T_signal]`.
+        indicator_ids: Optional `(left_id, right_id)` pair used in fail-fast diagnostics.
+    Returns:
+        np.ndarray: Aggregated `final_signal[V, T_signal]` matrix with value set `{-1, 0, 1}`.
+    Assumptions:
+        Canonical no-risk parity currently narrows to a two-indicator class, so the exact path can
+        stay pair-first and avoid the broader dense indicator cube used by generic kernels.
+    Raises:
+        ValueError: If indicator-id alignment drifts, shapes drift, or one matrix is invalid.
+    Side Effects:
+        Allocates one aggregated `np.int8` matrix and may trigger Numba compilation on first use.
+    """
+    resolved_indicator_ids = (
+        ("indicator[0]", "indicator[1]")
+        if indicator_ids is None
+        else tuple(str(indicator_id) for indicator_id in indicator_ids)
+    )
+    if len(resolved_indicator_ids) != 2:
+        raise ValueError(
+            "indicator_ids must provide exactly two ids for pair aggregation; got "
+            f"{len(resolved_indicator_ids)}"
+        )
+    left_normalized, right_normalized = _normalize_signal_pair_matrices_v2(
+        left_indicator_id=resolved_indicator_ids[0],
+        left_signal_rows=left_signal_rows,
+        right_indicator_id=resolved_indicator_ids[1],
+        right_signal_rows=right_signal_rows,
+    )
+    return _aggregate_signal_pair_rows_kernel_v2(
+        left_signal_rows_i8=left_normalized,
+        right_signal_rows_i8=right_normalized,
+    )
+
+
 def _aggregate_normalized_signal_rows_v2(
     *,
     normalized_rows: Sequence[np.ndarray],
@@ -197,6 +309,48 @@ def _normalize_signal_row_matrices_v2(
                 f"{(variant_count, timeline_length)!r}"
             )
     return normalized_rows
+
+
+def _normalize_signal_pair_matrices_v2(
+    *,
+    left_indicator_id: str,
+    left_signal_rows: np.ndarray,
+    right_indicator_id: str,
+    right_signal_rows: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Normalize and shape-check one ordered two-indicator Stage A signal-row pair.
+
+    Args:
+        left_indicator_id: Left indicator id used in diagnostics.
+        left_signal_rows: Left indicator rows shaped `[V, T_signal]`.
+        right_indicator_id: Right indicator id used in diagnostics.
+        right_signal_rows: Right indicator rows shaped `[V, T_signal]`.
+    Returns:
+        tuple[np.ndarray, np.ndarray]: Canonical `np.int8` matrices aligned by pair row order.
+    Assumptions:
+        Pair-first parity scoring keeps row order explicit and must fail fast if either side
+        drifts from the shared deterministic `[variant, time]` contract.
+    Raises:
+        ValueError: If either matrix is invalid or their shapes drift.
+    Side Effects:
+        None.
+    """
+    left_normalized = _normalize_signal_row_matrix_v2(
+        indicator_id=left_indicator_id,
+        values=left_signal_rows,
+    )
+    right_normalized = _normalize_signal_row_matrix_v2(
+        indicator_id=right_indicator_id,
+        values=right_signal_rows,
+    )
+    if left_normalized.shape != right_normalized.shape:
+        raise ValueError(
+            "pair signal rows must share one deterministic shape; "
+            f"{left_indicator_id!r} has {left_normalized.shape!r}, "
+            f"{right_indicator_id!r} has {right_normalized.shape!r}"
+        )
+    return left_normalized, right_normalized
 
 
 def _resolve_indicator_ids_v2(
@@ -302,4 +456,4 @@ def _normalize_signal_row_matrix_v2(*, indicator_id: str, values: np.ndarray) ->
     return normalized
 
 
-__all__ = ["aggregate_final_signal_rows_v2"]
+__all__ = ["aggregate_final_signal_rows_v2", "aggregate_signal_pairs_v2"]

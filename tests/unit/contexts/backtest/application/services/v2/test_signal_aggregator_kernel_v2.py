@@ -119,3 +119,42 @@ def test_aggregate_final_signal_rows_v2_uses_parallel_kernel_driven_stage_a_path
         ]
         is True
     )
+
+
+def test_aggregate_signal_pairs_v2_matches_generic_consensus_without_dense_cube() -> None:
+    """
+    Verify the pair-first kernel preserves consensus semantics for the two-indicator parity case.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        D4 pair-first aggregation must stay semantically identical to the generic consensus path
+        while avoiding dense `[indicator, variant, time]` cube materialization.
+    Raises:
+        AssertionError: If pair aggregation drifts from the generic consensus contract.
+    Side Effects:
+        None.
+    """
+    left_signal_rows = np.array([[1, 1, 0, -1], [1, -1, -1, 1]], dtype=np.int8)
+    right_signal_rows = np.array([[1, 0, 0, -1], [1, -1, 1, 1]], dtype=np.int8)
+
+    pair_aggregated = signal_aggregator_kernel_module.aggregate_signal_pairs_v2(
+        left_signal_rows=left_signal_rows,
+        right_signal_rows=right_signal_rows,
+        indicator_ids=("ma.dema", "ma.hma"),
+    )
+    generic_aggregated = aggregate_final_signal_rows_v2(
+        selected_signal_rows={
+            "ma.hma": right_signal_rows,
+            "ma.dema": left_signal_rows,
+        }
+    )
+
+    np.testing.assert_array_equal(pair_aggregated, generic_aggregated)
+    assert (
+        cast(Any, signal_aggregator_kernel_module._aggregate_signal_pair_rows_kernel_v2)
+        .targetoptions["parallel"]
+        is True
+    )

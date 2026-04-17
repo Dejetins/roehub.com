@@ -1923,6 +1923,150 @@ def test_stage_a_shortlist_builder_v2_no_risk_parity_rejects_narrowed_combo_coun
         )
 
 
+def test_stage_a_shortlist_builder_v2_no_risk_parity_uses_bounded_pair_first_blocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify D4 parity scoring bypasses generic dense kernels and uses bounded pair blocks.
+
+    Args:
+        monkeypatch: pytest fixture used to record pair-block sizes and fail fast on generic paths.
+    Returns:
+        None.
+    Assumptions:
+        The canonical two-indicator `exact_no_risk_parity` path should exact-score through the new
+        pair-first kernel route only, while broad dense aggregation and generic retained batching
+        remain available for non-parity paths.
+    Raises:
+        AssertionError: If parity re-enters the generic dense kernels or stops using bounded pair
+            blocks.
+    Side Effects:
+        Monkeypatches the pair-first block size and pair-batch builder during one in-memory Stage
+        A run.
+    """
+    recorded_pair_block_sizes: list[int] = []
+    recorded_runtime_input_block_sizes: list[int] = []
+    original_pair_batch_builder = (
+        stage_a_shortlist_builder_module.build_compact_trade_batch_for_signal_pairs_v2
+    )
+    original_load_chunk_runtime_inputs = (
+        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2.load_chunk_runtime_inputs
+    )
+
+    def _raise_generic_dense_kernel(*args: Any, **kwargs: Any) -> Any:
+        """
+        Fail fast if the two-indicator no-risk parity path re-enters generic dense kernels.
+
+        Args:
+            *args: Ignored positional arguments.
+            **kwargs: Ignored keyword arguments.
+        Returns:
+            Any: This helper never returns.
+        Assumptions:
+            D4 should keep generic dense aggregation and compaction unavailable on this parity
+            route while leaving them untouched for other paths.
+        Raises:
+            AssertionError: Always.
+        Side Effects:
+            None.
+        """
+        raise AssertionError("two-indicator exact_no_risk_parity must bypass generic dense kernels")
+
+    def _record_pair_batch_builder(**kwargs: Any) -> Any:
+        """
+        Record one parity pair-block cardinality before delegating to the live pair builder.
+
+        Args:
+            **kwargs: Pair-first batch-builder keyword arguments including `left_signal_rows`.
+        Returns:
+            Any: Live pair-first compact-trade batch.
+        Assumptions:
+            Each call corresponds to one bounded pair block emitted by the D4 parity path.
+        Raises:
+            None.
+        Side Effects:
+            Appends one observed pair-block size to the in-memory log.
+        """
+        recorded_pair_block_sizes.append(int(kwargs["left_signal_rows"].shape[0]))
+        return original_pair_batch_builder(**kwargs)
+
+    def _record_load_chunk_runtime_inputs(self: Any, **kwargs: Any) -> Any:
+        """
+        Record one exact-stage runtime-input block size before delegating to the live loader.
+
+        Args:
+            self: Stage A shortlist builder under test.
+            **kwargs: Runtime-input loader keyword arguments including `chunk_variants`.
+        Returns:
+            Any: Live prepared chunk inputs for the requested exact-stage block.
+        Assumptions:
+            D4 should reload signal rows for parity exact work per bounded pair block instead of
+            materializing runtime inputs for the whole retained raw chunk first.
+        Raises:
+            None.
+        Side Effects:
+            Appends one observed exact-stage chunk size to the in-memory log.
+        """
+        recorded_runtime_input_block_sizes.append(len(kwargs["chunk_variants"]))
+        return original_load_chunk_runtime_inputs(self, **kwargs)
+
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "_PAIR_FIRST_NO_RISK_EXACT_BLOCK_SIZE_V2",
+        2,
+    )
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "aggregate_ordered_final_signal_rows_v2",
+        _raise_generic_dense_kernel,
+    )
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "build_compact_trade_batch_v2",
+        _raise_generic_dense_kernel,
+    )
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "build_compact_trade_batch_for_signal_pairs_v2",
+        _record_pair_batch_builder,
+    )
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2,
+        "load_chunk_runtime_inputs",
+        _record_load_chunk_runtime_inputs,
+    )
+
+    grid_context = _pair_first_no_risk_grid_context()
+    setattr(grid_context, "execution_profile", SimpleNamespace(mode="exact_no_risk_parity"))
+
+    signal_loader = _pair_first_no_risk_signal_loader()
+
+    shortlist = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=signal_loader,
+    ).build_shortlist(
+        grid_context=cast(Any, grid_context),
+        artifact_context=cast(Any, _combo_proxy_artifact_context()),
+        target_time_range=_combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=8,
+        parallelism=numba_runtime_module.BacktestStageAParallelismConfigV1(
+            stage_a_workers=1,
+            numba_threads=1,
+        ),
+    )
+
+    assert recorded_pair_block_sizes == [2, 2]
+    assert recorded_runtime_input_block_sizes == [2, 2]
+    assert len(shortlist) == 2
+    assert all(row.retained_exact_payload is not None for row in shortlist)
+    assert all(
+        row.retained_exact_payload is not None
+        and row.retained_exact_payload.memory_shape_bucket == "compact_trade_arrays"
+        for row in shortlist
+    )
+
+
 def test_stage_a_shortlist_builder_v2_streaming_exact_shortlist_is_batch_invariant() -> None:
     """
     Verify streaming exact scoring keeps the deterministic Stage A shortlist stable across batches.
@@ -2482,6 +2626,115 @@ def _combo_proxy_signal_loader() -> _InMemorySignalRowsLoader:
             "alpha": np.vstack((strong_then_hold, weak_open_only)),
             "beta": np.vstack((strong_then_hold, weak_open_only)),
             "gamma": np.vstack((strong_then_hold, weak_open_only)),
+        }
+    )
+
+
+def _pair_first_no_risk_grid_context() -> _FakeGridContext:
+    """
+    Build a two-indicator Stage A grid context for the bounded pair-first parity path.
+
+    Args:
+        None.
+    Returns:
+        _FakeGridContext: Deterministic two-indicator cartesian Stage A fixture.
+    Assumptions:
+        D4 targets the canonical two-indicator no-risk parity class, so tests model that exact
+        shape and let row prefilter retain the full 2x2 narrowed frontier.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    indicator_rows = (
+        ("ma.dema", (12, 24)),
+        ("ma.hma", (16, 32)),
+    )
+    base_variants = tuple(
+        _pair_first_no_risk_base_variant(
+            stage_a_index=stage_a_index,
+            dema_window=dema_window,
+            hma_window=hma_window,
+        )
+        for stage_a_index, (dema_window, hma_window) in enumerate(
+            product(*(rows for _, rows in indicator_rows))
+        )
+    )
+    return _FakeGridContext(
+        base_variants=base_variants,
+        indicator_plans=tuple(
+            _FakeIndicatorPlan(
+                indicator_id=indicator_id,
+                axes=(_FakeAxis(name="window", values=windows),),
+            )
+            for indicator_id, windows in indicator_rows
+        ),
+    )
+
+
+def _pair_first_no_risk_base_variant(
+    *,
+    stage_a_index: int,
+    dema_window: int,
+    hma_window: int,
+) -> BacktestStageABaseVariant:
+    """
+    Build one deterministic two-indicator Stage A base variant for pair-first parity tests.
+
+    Args:
+        stage_a_index: Stage A flat index.
+        dema_window: `ma.dema.window` parameter value.
+        hma_window: `ma.hma.window` parameter value.
+    Returns:
+        BacktestStageABaseVariant: Minimal two-indicator Stage A base variant fixture.
+    Assumptions:
+        Indicator ordering must stay explicit so the pair-first path preserves deterministic row
+        pairing and shortlist tie semantics.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return BacktestStageABaseVariant(
+        stage_a_index=stage_a_index,
+        indicator_selections=(
+            IndicatorVariantSelection(
+                indicator_id="ma.dema",
+                inputs={"source": "close"},
+                params={"window": dema_window},
+            ),
+            IndicatorVariantSelection(
+                indicator_id="ma.hma",
+                inputs={"source": "close"},
+                params={"window": hma_window},
+            ),
+        ),
+        signal_params={},
+        indicator_variant_key=f"{stage_a_index + 1:x}" * 64,
+        base_variant_key=f"{stage_a_index + 9:x}" * 64,
+    )
+
+
+def _pair_first_no_risk_signal_loader() -> _InMemorySignalRowsLoader:
+    """
+    Build deterministic two-indicator signal rows for the bounded pair-first parity tests.
+
+    Args:
+        None.
+    Returns:
+        _InMemorySignalRowsLoader: In-memory signal loader aligned to the two-indicator fixture.
+    Assumptions:
+        Rising execution prices should make the fully confirming first pair outperform the other
+        narrowed combos while still leaving four variants so D4 block splitting is observable.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _InMemorySignalRowsLoader(
+        matrices_by_indicator={
+            "ma.dema": np.array([[1, 1, -1], [1, 0, -1]], dtype=np.int8),
+            "ma.hma": np.array([[1, 1, -1], [1, -1, -1]], dtype=np.int8),
         }
     )
 

@@ -64,6 +64,7 @@ from .signal_features_loader_v2 import MmapSignalFeaturesLoaderV2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .trade_compactor_kernel import (
     _CompactTradeBatchV2,
+    build_compact_trade_batch_for_signal_pairs_v2,
     build_compact_trade_batch_v2,
     compute_no_risk_metrics_for_trade_batch_v2,
     no_risk_metrics_to_ranking_payload_v2,
@@ -78,6 +79,7 @@ _DEFAULT_FEE_PCT_BY_MARKET_ID_V2: Mapping[int, float] = MappingProxyType(
     }
 )
 _COMBO_PROXY_PREFILTER_SURVIVOR_MULTIPLIER_V2 = 2
+_PAIR_FIRST_NO_RISK_EXACT_BLOCK_SIZE_V2 = 128
 
 StageACancelCheckerV2 = Callable[[str], None]
 StageACheckpointCallbackV2 = Callable[[int, int], None]
@@ -1342,7 +1344,8 @@ class BacktestStageAShortlistBuilderV2:
             batch bucket boundaries so exact chunk order and final shortlist tie semantics stay
             stable while breadth shrinks to the narrowed frontier. Legacy/hybrid paths still use
             combo proxy retention per chunk; parity-first no-risk paths exact-score every narrowed
-            chunk variant directly.
+            chunk variant directly and may split two-indicator parity work into smaller bounded
+            pair blocks inside each raw Stage A chunk.
         Raises:
             ValueError: If the retained chunk limit is non-positive.
         Side Effects:
@@ -1367,6 +1370,14 @@ class BacktestStageAShortlistBuilderV2:
         )
         processed = 0
 
+        use_pair_first_no_risk_exact_path = (
+            not use_combo_proxy_prefilter
+            and self._uses_pair_first_no_risk_exact_path_for_indicator_count(
+                grid_context=grid_context,
+                indicator_count=len(row_plans),
+            )
+        )
+
         for chunk_variants in self._iter_retained_stage_a_variant_chunks(
             row_plans=row_plans,
             grid_context=grid_context,
@@ -1375,38 +1386,86 @@ class BacktestStageAShortlistBuilderV2:
         ):
             if cancel_checker is not None:
                 cancel_checker(STAGE_A_LITERAL_V2)
-            chunk_inputs = self.load_chunk_runtime_inputs(
-                row_plans=row_plans,
-                chunk_variants=chunk_variants,
-                grid_context=grid_context,
-                artifact_context=artifact_context,
-                signal_target_slice=signal_target_slice,
-            )
-            final_signal = aggregate_ordered_final_signal_rows_v2(
-                ordered_signal_rows=tuple(
-                    prepared_input.signal_rows for prepared_input in chunk_inputs
-                ),
-                indicator_ids=tuple(prepared_input.indicator_id for prepared_input in chunk_inputs),
-            )
-            if use_combo_proxy_prefilter:
-                retained_row_indexes = self._select_combo_proxy_retained_chunk_row_indexes(
-                    chunk_variants=chunk_variants,
-                    final_signal=final_signal,
-                    local_signal_close=local_signal_close,
-                    execution_params=execution_params,
-                    retained_chunk_limit=retained_chunk_limit,
+            if use_pair_first_no_risk_exact_path:
+                pair_block_size = self._pair_first_no_risk_exact_block_size(
+                    chunk_row_count=len(chunk_variants)
                 )
-                if retained_row_indexes:
-                    retained_row_selection = np.asarray(
-                        retained_row_indexes,
-                        dtype=np.int64,
+                for block_start in range(0, len(chunk_variants), pair_block_size):
+                    block_variants = tuple(
+                        chunk_variants[block_start : block_start + pair_block_size]
                     )
+                    block_inputs = self.load_chunk_runtime_inputs(
+                        row_plans=row_plans,
+                        chunk_variants=block_variants,
+                        grid_context=grid_context,
+                        artifact_context=artifact_context,
+                        signal_target_slice=signal_target_slice,
+                    )
+                    self._merge_pair_first_retained_exact_payload_chunk_into_heap(
+                        chunk_variants=block_variants,
+                        chunk_inputs=block_inputs,
+                        grid_context=grid_context,
+                        local_bar_close_1m_idx=local_bar_close_1m_idx,
+                        sentinel_index=sentinel_index,
+                        local_exec_open=local_exec_open,
+                        local_exec_close=local_exec_close,
+                        execution_params=execution_params,
+                        ranking_plan=ranking_plan,
+                        shortlist_limit=shortlist_limit,
+                        shortlist_heap=shortlist_heap,
+                    )
+            else:
+                chunk_inputs = self.load_chunk_runtime_inputs(
+                    row_plans=row_plans,
+                    chunk_variants=chunk_variants,
+                    grid_context=grid_context,
+                    artifact_context=artifact_context,
+                    signal_target_slice=signal_target_slice,
+                )
+                final_signal = aggregate_ordered_final_signal_rows_v2(
+                    ordered_signal_rows=tuple(
+                        prepared_input.signal_rows for prepared_input in chunk_inputs
+                    ),
+                    indicator_ids=tuple(
+                        prepared_input.indicator_id for prepared_input in chunk_inputs
+                    ),
+                )
+                if use_combo_proxy_prefilter:
+                    retained_row_indexes = self._select_combo_proxy_retained_chunk_row_indexes(
+                        chunk_variants=chunk_variants,
+                        final_signal=final_signal,
+                        local_signal_close=local_signal_close,
+                        execution_params=execution_params,
+                        retained_chunk_limit=retained_chunk_limit,
+                    )
+                    if retained_row_indexes:
+                        retained_row_selection = np.asarray(
+                            retained_row_indexes,
+                            dtype=np.int64,
+                        )
+                        self._merge_retained_exact_payload_chunk_into_heap(
+                            chunk_variants=tuple(
+                                chunk_variants[row_index] for row_index in retained_row_indexes
+                            ),
+                            final_signal=np.ascontiguousarray(
+                                final_signal[retained_row_selection, :],
+                                dtype=np.int8,
+                            ),
+                            grid_context=grid_context,
+                            local_bar_close_1m_idx=local_bar_close_1m_idx,
+                            sentinel_index=sentinel_index,
+                            local_exec_open=local_exec_open,
+                            local_exec_close=local_exec_close,
+                            execution_params=execution_params,
+                            ranking_plan=ranking_plan,
+                            shortlist_limit=shortlist_limit,
+                            shortlist_heap=shortlist_heap,
+                        )
+                else:
                     self._merge_retained_exact_payload_chunk_into_heap(
-                        chunk_variants=tuple(
-                            chunk_variants[row_index] for row_index in retained_row_indexes
-                        ),
+                        chunk_variants=chunk_variants,
                         final_signal=np.ascontiguousarray(
-                            final_signal[retained_row_selection, :],
+                            final_signal,
                             dtype=np.int8,
                         ),
                         grid_context=grid_context,
@@ -1419,23 +1478,6 @@ class BacktestStageAShortlistBuilderV2:
                         shortlist_limit=shortlist_limit,
                         shortlist_heap=shortlist_heap,
                     )
-            else:
-                self._merge_retained_exact_payload_chunk_into_heap(
-                    chunk_variants=chunk_variants,
-                    final_signal=np.ascontiguousarray(
-                        final_signal,
-                        dtype=np.int8,
-                    ),
-                    grid_context=grid_context,
-                    local_bar_close_1m_idx=local_bar_close_1m_idx,
-                    sentinel_index=sentinel_index,
-                    local_exec_open=local_exec_open,
-                    local_exec_close=local_exec_close,
-                    execution_params=execution_params,
-                    ranking_plan=ranking_plan,
-                    shortlist_limit=shortlist_limit,
-                    shortlist_heap=shortlist_heap,
-                )
             processed += len(chunk_variants)
             if on_checkpoint is not None:
                 on_checkpoint(processed, total)
@@ -2367,6 +2409,59 @@ class BacktestStageAShortlistBuilderV2:
             )
         return tuple(prepared_inputs)
 
+    def _uses_pair_first_no_risk_exact_path_for_indicator_count(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+        indicator_count: int,
+    ) -> bool:
+        """
+        Resolve whether one Stage A chunk may use the pair-first bounded exact kernel path.
+
+        Args:
+            grid_context: Stage A runtime plan or compatible fixture exposing execution profile.
+            indicator_count: Number of indicator row families participating in the current chunk.
+        Returns:
+            bool: `True` only for two-indicator `exact_no_risk_parity` chunks.
+        Assumptions:
+            D4 keeps the pair-first exact path opt-in for the parity-only two-indicator class,
+            while every other exact or hybrid path continues through the generic dense kernels.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        execution_profile = getattr(grid_context, "execution_profile", None)
+        profile_mode = getattr(execution_profile, "mode", None)
+        return (
+            str(profile_mode).strip().lower() == "exact_no_risk_parity"
+            and indicator_count == 2
+        )
+
+    def _pair_first_no_risk_exact_block_size(
+        self,
+        *,
+        chunk_row_count: int,
+    ) -> int:
+        """
+        Resolve the bounded pair-block size used by the parity-only exact kernel path.
+
+        Args:
+            chunk_row_count: Total retained pair rows aligned to the current Stage A chunk.
+        Returns:
+            int: Positive pair-block size bounded by the internal parity block cap.
+        Assumptions:
+            D4 collapses request-local memory shape by processing retained pair rows in smaller
+            bounded blocks instead of one broad dense exact batch for the whole raw Stage A chunk.
+        Raises:
+            ValueError: If `chunk_row_count` is non-positive.
+        Side Effects:
+            None.
+        """
+        if chunk_row_count <= 0:
+            raise ValueError("Stage A pair-first exact blocks require chunk_row_count > 0")
+        return min(chunk_row_count, _PAIR_FIRST_NO_RISK_EXACT_BLOCK_SIZE_V2)
+
     def _resolve_batch_size(
         self,
         *,
@@ -2551,6 +2646,123 @@ class BacktestStageAShortlistBuilderV2:
             chunk_variants=chunk_variants,
             final_signal=final_signal,
             local_bar_close_1m_idx=local_bar_close_1m_idx,
+            sentinel_index=sentinel_index,
+            direction_mode=grid_context.direction_mode,
+        )
+        exact_metrics = compute_no_risk_metrics_for_trade_batch_v2(
+            compact_trade_batch=exact_batch,
+            exec_open=local_exec_open,
+            exec_close=local_exec_close,
+            sentinel_index=sentinel_index,
+            execution_params=execution_params,
+        )
+        for row_index, (base_variant, metrics) in enumerate(
+            zip(chunk_variants, exact_metrics, strict=True)
+        ):
+            row = BacktestStageAScoredVariantV2(
+                base_variant=base_variant,
+                total_return_pct=metrics.total_return_pct,
+                retained_exact_payload=None,
+                no_risk_metrics=metrics,
+            )
+            ranking_payload = no_risk_metrics_to_ranking_payload_v2(metrics=metrics)
+            heap_entry = stage_a_heap_entry_v2(
+                row=row,
+                metrics=ranking_payload,
+                ranking_plan=ranking_plan,
+            )
+            if len(shortlist_heap) < shortlist_limit:
+                heappush(
+                    shortlist_heap,
+                    stage_a_heap_entry_v2(
+                        row=BacktestStageAScoredVariantV2(
+                            base_variant=base_variant,
+                            total_return_pct=metrics.total_return_pct,
+                            retained_exact_payload=exact_batch.exact_payload_at(
+                                row_index=row_index
+                            ),
+                            no_risk_metrics=metrics,
+                        ),
+                        metrics=ranking_payload,
+                        ranking_plan=ranking_plan,
+                    ),
+                )
+                continue
+            if heap_entry_outranks_v2(candidate=heap_entry, baseline=shortlist_heap[0]):
+                heapreplace(
+                    shortlist_heap,
+                    stage_a_heap_entry_v2(
+                        row=BacktestStageAScoredVariantV2(
+                            base_variant=base_variant,
+                            total_return_pct=metrics.total_return_pct,
+                            retained_exact_payload=exact_batch.exact_payload_at(
+                                row_index=row_index
+                            ),
+                            no_risk_metrics=metrics,
+                        ),
+                        metrics=ranking_payload,
+                            ranking_plan=ranking_plan,
+                        ),
+                    )
+
+    def _merge_pair_first_retained_exact_payload_chunk_into_heap(
+        self,
+        *,
+        chunk_variants: Sequence[BacktestStageABaseVariantV2],
+        chunk_inputs: Sequence[PreparedIndicatorChunkInputsV2],
+        grid_context: BacktestArtifactRuntimePlanV2,
+        local_bar_close_1m_idx: np.ndarray,
+        sentinel_index: int,
+        local_exec_open: np.ndarray,
+        local_exec_close: np.ndarray,
+        execution_params: ExecutionParamsV1,
+        ranking_plan: ResolvedRankingPlanV2,
+        shortlist_limit: int,
+        shortlist_heap: list[StageAHeapEntryV2],
+    ) -> None:
+        """
+        Exact-score one two-indicator parity chunk through bounded pair-first workspaces.
+
+        Args:
+            chunk_variants: Deterministic Stage A base variants aligned to `chunk_inputs`.
+            chunk_inputs: Two ordered indicator chunks aligned to the same variant order.
+            grid_context: Stage A grid context with direction-mode metadata.
+            local_bar_close_1m_idx: Rebases `bar_close_1m_idx` for the local execution window.
+            sentinel_index: Local execution sentinel index.
+            local_exec_open: Local execution-bar open prices.
+            local_exec_close: Local execution-bar close prices.
+            execution_params: Immutable no-risk execution settings.
+            ranking_plan: Pre-resolved staged ranking plan from shared Stage A machinery.
+            shortlist_limit: Maximum retained shortlist size.
+            shortlist_heap: Mutable bounded shortlist heap updated in place.
+        Returns:
+            None.
+        Assumptions:
+            Canonical D4 parity scoring handles exactly two indicators, resolves their consensus
+            directly into bounded pair blocks, and leaves generic dense kernels available for all
+            non-parity paths.
+        Raises:
+            ValueError: If the chunk is not a two-indicator aligned pair block.
+        Side Effects:
+            Mutates `shortlist_heap` in place while exact-scoring each bounded pair block.
+        """
+        if len(chunk_inputs) != 2:
+            raise ValueError("Stage A pair-first exact path requires exactly two chunk inputs")
+        chunk_row_count = len(chunk_variants)
+        if chunk_row_count <= 0:
+            raise ValueError("Stage A pair-first exact path requires non-empty chunk_variants")
+        for chunk_input in chunk_inputs:
+            if int(chunk_input.signal_rows.shape[0]) != chunk_row_count:
+                raise ValueError(
+                    "Stage A pair-first exact path requires chunk input rows to match "
+                    "chunk_variants"
+                )
+        left_signal_rows = np.asarray(chunk_inputs[0].signal_rows, dtype=np.int8)
+        right_signal_rows = np.asarray(chunk_inputs[1].signal_rows, dtype=np.int8)
+        exact_batch = build_compact_trade_batch_for_signal_pairs_v2(
+            left_signal_rows=np.ascontiguousarray(left_signal_rows, dtype=np.int8),
+            right_signal_rows=np.ascontiguousarray(right_signal_rows, dtype=np.int8),
+            bar_close_1m_idx=local_bar_close_1m_idx,
             sentinel_index=sentinel_index,
             direction_mode=grid_context.direction_mode,
         )
