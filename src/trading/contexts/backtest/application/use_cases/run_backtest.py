@@ -40,7 +40,6 @@ from trading.contexts.backtest.application.services import (
     build_default_artifact_backed_stage_b_scorer_v2,
     build_default_hierarchical_shortlist_builder_v2,
     build_default_stage_a_shortlist_builder_v2,
-    execution_profile_uses_hierarchical_shortlist_runtime_v2,
     validate_execution_profile_mode_v2,
 )
 from trading.contexts.backtest.application.services.numba_runtime_v1 import (
@@ -57,6 +56,7 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_core_v2 
 from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlannerV2,
     BacktestArtifactRuntimePlanV2,
+    runtime_plan_requires_hierarchical_shortlist_runtime_v2,
 )
 from trading.contexts.backtest.application.services.v2.artifact_runtime_timeline_v2 import (
     BacktestArtifactRuntimeTimelineV2,
@@ -515,8 +515,8 @@ class RunBacktestUseCase:
                 max_compute_bytes_total=self._max_compute_bytes_total,
             )
             effective_runtime_plan = runtime_plan
-            if execution_profile_uses_hierarchical_shortlist_runtime_v2(
-                profile=runtime_plan.execution_profile
+            if runtime_plan_requires_hierarchical_shortlist_runtime_v2(
+                runtime_plan=runtime_plan
             ):
                 hierarchical_shortlist_builder = (
                     self._run_scoped_hierarchical_shortlist_builder()

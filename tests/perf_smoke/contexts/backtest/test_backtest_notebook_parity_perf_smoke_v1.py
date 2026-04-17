@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, Mapping, cast
 
 import pytest
 import yaml
@@ -26,6 +26,20 @@ from trading.contexts.backtest.application.services.v2 import (
 )
 from trading.contexts.backtest.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
+)
+from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
+    BacktestIndicatorAxisPlanV2,
+    BacktestIndicatorPlanV2,
+    BacktestNoRiskExactParityRuntimeCountersV2,
+    BacktestNoRiskExactParityRuntimePlanV2,
+    BacktestParityRetainedRowsCounterV2,
+    BacktestRiskVariantV2,
+    BacktestRuntimeStageCostModelV2,
+    BacktestSignalAxisPlanV2,
+    runtime_plan_requires_hierarchical_shortlist_runtime_v2,
+)
+from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+    ExecutionProfileParityClassificationV2,
 )
 from trading.contexts.backtest.application.services.v2.generic_row_scorer_v2 import (
     GenericRowScorerV2,
@@ -648,6 +662,126 @@ def test_stage_a_streaming_exact_runtime_shape_is_observable_for_benchmarks() ->
     assert runtime_shape.frontier_compute_mode == "kernel-driven"
     assert runtime_shape.stage_a_workers is None
     assert runtime_shape.numba_threads_used is None
+
+
+def test_no_risk_parity_runtime_plan_is_first_class_and_exposes_additive_counters(
+) -> None:
+    """
+    Verify canonical no-risk parity plan is first-class and exposes D2 benchmark-facing counters.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical `NR2` keeps `sync_inline` launch shape and `bypassed_no_risk` Stage B mode,
+        while additive counters must expose retained rows, narrowed combos, and
+        `exact_replay_count`.
+    Raises:
+        AssertionError: If parity plan drifts back to hybrid reduced-plan semantics or drops D2
+            counter observability.
+    Side Effects:
+        None.
+    """
+    execution_profile = default_execution_profiles_catalog_v2().profile_for_mode(
+        mode="exact_no_risk_parity"
+    )
+    parity_plan = BacktestNoRiskExactParityRuntimePlanV2(
+        indicator_plans=(
+            BacktestIndicatorPlanV2(
+                indicator_id="ema",
+                axes=(BacktestIndicatorAxisPlanV2(name="window", values=(8, 13)),),
+                variants=2,
+            ),
+            BacktestIndicatorPlanV2(
+                indicator_id="rsi",
+                axes=(BacktestIndicatorAxisPlanV2(name="length", values=(14, 21)),),
+                variants=2,
+            ),
+        ),
+        signal_axes=(
+            BacktestSignalAxisPlanV2(
+                indicator_id="ema",
+                param_name="signal_threshold",
+                values=(0.4, 0.6),
+            ),
+        ),
+        risk_variants=(
+            BacktestRiskVariantV2(
+                risk_index=0,
+                risk_params={
+                    "sl_enabled": False,
+                    "sl_pct": None,
+                    "tp_enabled": False,
+                    "tp_pct": None,
+                },
+            ),
+        ),
+        execution_profile=execution_profile,
+        instrument_id_literal="binance:spot:btcusdt",
+        timeframe_code="15m",
+        direction_mode="both",
+        sizing_mode="fixed_fraction",
+        execution_params={},
+        stage_a_variants_total=8,
+        stage_b_variants_total=4,
+        estimated_memory_bytes=256_000,
+        indicator_estimate_calls=2,
+        stage_cost_model=BacktestRuntimeStageCostModelV2(
+            row_prefilter_rows_total=10,
+            retained_row_variants_total=5,
+            combo_prefilter_variants_total=6,
+            retained_exact_candidates_total=4,
+            stage_a_cost_units=32,
+            retained_rows_per_indicator=(3, 2),
+            narrowed_compute_variants_total=6,
+        ),
+        parity_classification=ExecutionProfileParityClassificationV2(),
+        no_risk_parity_counters=BacktestNoRiskExactParityRuntimeCountersV2(
+            retained_rows_per_indicator=(
+                BacktestParityRetainedRowsCounterV2(
+                    indicator_id="ema",
+                    retained_rows=3,
+                ),
+                BacktestParityRetainedRowsCounterV2(
+                    indicator_id="rsi",
+                    retained_rows=2,
+                ),
+            ),
+            retained_rows_total=5,
+            narrowed_combo_total=6,
+            narrowed_compute_combo_total=6,
+            no_risk_finalization_count=4,
+            exact_replay_count=0,
+            deterministic_combo_ordering="stage_a_index",
+            stage_b_execution_mode="bypassed_no_risk",
+        ),
+    )
+
+    counters = parity_plan.parity_runtime_counters()
+
+    assert parity_plan.uses_hybrid_reduced_plan_contract() is False
+    assert (
+        runtime_plan_requires_hierarchical_shortlist_runtime_v2(runtime_plan=parity_plan)
+        is False
+    )
+    assert counters["retained_rows_total"] == 5
+    assert counters["narrowed_combo_total"] == 6
+    assert counters["narrowed_compute_combo_total"] == 6
+    assert counters["no_risk_finalization_count"] == 4
+    assert counters["exact_replay_count"] == 0
+    assert counters["stage_b_execution_mode"] == "bypassed_no_risk"
+    retained_rows_per_indicator = cast(
+        Mapping[str, int],
+        counters["retained_rows_per_indicator"],
+    )
+    assert retained_rows_per_indicator == {"ema": 3, "rsi": 2}
 
 
 def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(

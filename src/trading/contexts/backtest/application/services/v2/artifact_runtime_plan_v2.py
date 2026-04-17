@@ -282,6 +282,8 @@ class BacktestRuntimeStageCostModelV2:
     combo_prefilter_variants_total: int
     retained_exact_candidates_total: int
     stage_a_cost_units: int
+    retained_rows_per_indicator: tuple[int, ...] = ()
+    narrowed_compute_variants_total: int | None = None
 
     def __post_init__(self) -> None:
         """
@@ -294,7 +296,7 @@ class BacktestRuntimeStageCostModelV2:
         Assumptions:
             Public `stage_a` remains stable while planner math separately tracks row prefilter,
             retained-row tensor envelope, combo prefilter, and retained-candidate exact work as
-            positive deterministic counts.
+            positive deterministic counts. Additive parity-facing counters stay internal-only.
         Raises:
             ValueError: If one internal stage total is non-positive.
         Side Effects:
@@ -311,6 +313,201 @@ class BacktestRuntimeStageCostModelV2:
                 raise ValueError(
                     f"BacktestRuntimeStageCostModelV2.{field_name} must be > 0"
                 )
+        if self.retained_rows_per_indicator:
+            if any(value <= 0 for value in self.retained_rows_per_indicator):
+                raise ValueError(
+                    "BacktestRuntimeStageCostModelV2.retained_rows_per_indicator must be > 0 "
+                    "when provided"
+                )
+            if sum(self.retained_rows_per_indicator) != self.retained_row_variants_total:
+                raise ValueError(
+                    "BacktestRuntimeStageCostModelV2.retained_rows_per_indicator must sum to "
+                    "retained_row_variants_total"
+                )
+        if self.narrowed_compute_variants_total is not None:
+            if self.narrowed_compute_variants_total <= 0:
+                raise ValueError(
+                    "BacktestRuntimeStageCostModelV2.narrowed_compute_variants_total must be > "
+                    "0 when provided"
+                )
+            if (
+                self.narrowed_compute_variants_total
+                > self.combo_prefilter_variants_total
+            ):
+                raise ValueError(
+                    "BacktestRuntimeStageCostModelV2.narrowed_compute_variants_total cannot "
+                    "exceed combo_prefilter_variants_total"
+                )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestParityRetainedRowsCounterV2:
+    """
+    Deterministic retained-row counter for one indicator inside the parity runtime plan.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    """
+
+    indicator_id: str
+    retained_rows: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one per-indicator retained-row counter payload.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Parity retained-row counters are additive benchmark-facing metadata only.
+        Raises:
+            ValueError: If the indicator id is blank or retained rows are non-positive.
+        Side Effects:
+            None.
+        """
+        if not self.indicator_id.strip():
+            raise ValueError(
+                "BacktestParityRetainedRowsCounterV2.indicator_id must be non-empty"
+            )
+        if self.retained_rows <= 0:
+            raise ValueError(
+                "BacktestParityRetainedRowsCounterV2.retained_rows must be > 0"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestNoRiskExactParityRuntimeCountersV2:
+    """
+    Additive benchmark-facing counters for the first-class no-risk exact parity runtime plan.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    """
+
+    retained_rows_per_indicator: tuple[BacktestParityRetainedRowsCounterV2, ...]
+    retained_rows_total: int
+    narrowed_combo_total: int
+    narrowed_compute_combo_total: int
+    no_risk_finalization_count: int
+    exact_replay_count: int = 0
+    deterministic_combo_ordering: str = "stage_a_index"
+    stage_b_execution_mode: str = STAGE_B_EXECUTION_MODE_BYPASSED_NO_RISK_LITERAL_V2
+
+    def __post_init__(self) -> None:
+        """
+        Validate additive no-risk parity runtime counters.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Counters are internal benchmark-facing evidence and must stay deterministic across
+            sync and worker flows for the same artifact slot.
+        Raises:
+            ValueError: If one additive counter is invalid.
+        Side Effects:
+            None.
+        """
+        if len(self.retained_rows_per_indicator) == 0:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2.retained_rows_per_indicator "
+                "must be non-empty"
+            )
+        if self.retained_rows_total <= 0:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2.retained_rows_total must be > 0"
+            )
+        if self.narrowed_combo_total <= 0:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2.narrowed_combo_total must be > 0"
+            )
+        if self.narrowed_compute_combo_total <= 0:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2."
+                "narrowed_compute_combo_total must be > 0"
+            )
+        if self.no_risk_finalization_count <= 0:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2.no_risk_finalization_count "
+                "must be > 0"
+            )
+        if self.exact_replay_count < 0:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2.exact_replay_count must be >= 0"
+            )
+        if not self.deterministic_combo_ordering.strip():
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2."
+                "deterministic_combo_ordering must be non-empty"
+            )
+        if (
+            self.stage_b_execution_mode
+            != STAGE_B_EXECUTION_MODE_BYPASSED_NO_RISK_LITERAL_V2
+        ):
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2.stage_b_execution_mode must be "
+                "'bypassed_no_risk'"
+            )
+        if (
+            sum(item.retained_rows for item in self.retained_rows_per_indicator)
+            != self.retained_rows_total
+        ):
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2.retained_rows_total must equal the "
+                "sum of retained_rows_per_indicator"
+            )
+        indicator_ids = tuple(
+            item.indicator_id for item in self.retained_rows_per_indicator
+        )
+        if len(indicator_ids) != len(set(indicator_ids)):
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimeCountersV2.retained_rows_per_indicator must "
+                "not duplicate indicator ids"
+            )
+
+    def as_mapping(self) -> Mapping[str, object]:
+        """
+        Export immutable additive parity counters for benchmark-facing runtime scans.
+
+        Args:
+            None.
+        Returns:
+            Mapping[str, object]: Immutable benchmark-facing counter payload.
+        Assumptions:
+            Counter export remains internal-only and deterministic.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return MappingProxyType(
+            {
+                "retained_rows_total": self.retained_rows_total,
+                "narrowed_combo_total": self.narrowed_combo_total,
+                "narrowed_compute_combo_total": self.narrowed_compute_combo_total,
+                "no_risk_finalization_count": self.no_risk_finalization_count,
+                "exact_replay_count": self.exact_replay_count,
+                "deterministic_combo_ordering": self.deterministic_combo_ordering,
+                "stage_b_execution_mode": self.stage_b_execution_mode,
+                "retained_rows_per_indicator": MappingProxyType(
+                    {
+                        item.indicator_id: item.retained_rows
+                        for item in self.retained_rows_per_indicator
+                    }
+                ),
+            }
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -663,6 +860,42 @@ class BacktestArtifactRuntimePlanV2:
             stage_b_variants_total=self.stage_b_variants_total,
         )
 
+    def uses_hybrid_reduced_plan_contract(self) -> bool:
+        """
+        Report whether this runtime plan depends on hybrid reduced-plan semantics.
+
+        Args:
+            None.
+        Returns:
+            bool: `False` for the base exact runtime plan contract.
+        Assumptions:
+            Hybrid reduced-plan wrappers override this method to expose dependency on retained
+            shortlist surfaces, while first-class parity plans must stay `False`.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return False
+
+    def parity_runtime_counters(self) -> Mapping[str, object] | None:
+        """
+        Return additive parity runtime counters when the plan owns a parity-first contract.
+
+        Args:
+            None.
+        Returns:
+            Mapping[str, object] | None: Immutable parity counters for benchmark scans, or
+                `None` for non-parity plans.
+        Assumptions:
+            Counter exposure remains internal benchmark-facing metadata and is not a public API.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return None
+
     def stage_a_variant_for_index(
         self,
         *,
@@ -747,6 +980,193 @@ class BacktestArtifactRuntimePlanV2:
                 execution_params=self.execution_params,
             ),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestNoRiskExactParityRuntimePlanV2(BacktestArtifactRuntimePlanV2):
+    """
+    First-class runtime-plan contract for canonical no-risk exact parity workloads.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
+    """
+
+    no_risk_parity_counters: BacktestNoRiskExactParityRuntimeCountersV2 | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate first-class parity runtime-plan invariants.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Canonical parity plan must remain sync/worker-equivalent, no-risk exact, and detached
+            from hybrid reduced-plan semantics.
+        Raises:
+            ValueError: If no-risk or parity profile invariants drift.
+        Side Effects:
+            Reuses base-plan normalization from `BacktestArtifactRuntimePlanV2.__post_init__`.
+        """
+        BacktestArtifactRuntimePlanV2.__post_init__(self)
+        if not self.uses_no_risk_terminal_path():
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimePlanV2 requires no-risk terminal path"
+            )
+        if self.execution_profile.mode != "exact_no_risk_parity":
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimePlanV2 requires "
+                "execution_profile.mode='exact_no_risk_parity'"
+            )
+        if self.parity_classification is None:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimePlanV2 requires parity_classification"
+            )
+        if self.no_risk_parity_counters is None:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimePlanV2 requires no_risk_parity_counters"
+            )
+        if (
+            self.no_risk_parity_counters.stage_b_execution_mode
+            != self.stage_b_execution_mode()
+        ):
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimePlanV2 counters must report the same "
+                "stage_b_execution_mode as the runtime plan"
+            )
+
+    @classmethod
+    def from_runtime_plan(
+        cls,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        no_risk_parity_counters: BacktestNoRiskExactParityRuntimeCountersV2,
+    ) -> "BacktestNoRiskExactParityRuntimePlanV2":
+        """
+        Build one first-class parity runtime plan from the shared planner base output.
+
+        Args:
+            runtime_plan: Base planner output to promote into first-class parity plan.
+            no_risk_parity_counters: Additive parity counters attached to the promoted plan.
+        Returns:
+            BacktestNoRiskExactParityRuntimePlanV2: Promoted parity-first runtime plan.
+        Assumptions:
+            Promotion keeps deterministic enumeration/state contracts unchanged and only adds
+            parity-specific runtime metadata.
+        Raises:
+            ValueError: Propagated if promoted payload violates parity invariants.
+        Side Effects:
+            None.
+        """
+        return cls(
+            indicator_plans=runtime_plan.indicator_plans,
+            signal_axes=runtime_plan.signal_axes,
+            risk_variants=runtime_plan.risk_variants,
+            execution_profile=runtime_plan.execution_profile,
+            instrument_id_literal=runtime_plan.instrument_id_literal,
+            timeframe_code=runtime_plan.timeframe_code,
+            direction_mode=runtime_plan.direction_mode,
+            sizing_mode=runtime_plan.sizing_mode,
+            execution_params=runtime_plan.execution_params,
+            stage_a_variants_total=runtime_plan.stage_a_variants_total,
+            stage_b_variants_total=runtime_plan.stage_b_variants_total,
+            estimated_memory_bytes=runtime_plan.estimated_memory_bytes,
+            indicator_estimate_calls=runtime_plan.indicator_estimate_calls,
+            signal_features_access=runtime_plan.signal_features_access,
+            adaptive_selector_decision=runtime_plan.adaptive_selector_decision,
+            stage_cost_model=runtime_plan.stage_cost_model,
+            launch_budget_evidence=runtime_plan.launch_budget_evidence,
+            parity_classification=runtime_plan.parity_classification,
+            no_risk_parity_counters=no_risk_parity_counters,
+        )
+
+    def uses_hybrid_reduced_plan_contract(self) -> bool:
+        """
+        Assert that first-class parity runtime plans are independent from hybrid reduced plans.
+
+        Args:
+            None.
+        Returns:
+            bool: Always `False` for first-class parity plans.
+        Assumptions:
+            D2 requires parity runtime plans to stop depending on reduced shortlist wrappers.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return False
+
+    def parity_runtime_counters(self) -> Mapping[str, object]:
+        """
+        Export additive parity runtime counters attached to this first-class parity plan.
+
+        Args:
+            None.
+        Returns:
+            Mapping[str, object]: Immutable additive parity counters.
+        Assumptions:
+            Counters remain internal benchmark-facing metadata.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self.no_risk_parity_counters is None:
+            raise ValueError(
+                "BacktestNoRiskExactParityRuntimePlanV2 requires no_risk_parity_counters"
+            )
+        return self.no_risk_parity_counters.as_mapping()
+
+
+def runtime_plan_requires_hierarchical_shortlist_runtime_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+) -> bool:
+    """
+    Resolve whether one runtime plan should enter hierarchical reduced-plan handoff.
+
+    Args:
+        runtime_plan: Prepared runtime plan candidate for sync/worker orchestration.
+    Returns:
+        bool: `True` only when hybrid shortlist runtime is enabled and the plan still depends on
+            reduced-plan semantics.
+    Assumptions:
+        First-class parity plans must bypass hierarchical reduction even if historical branches
+        previously used profile-level checks only. Test doubles may provide a duck-typed runtime
+        plan exposing only `execution_profile`.
+    Raises:
+        TypeError: If a duck-typed plan exposes non-callable
+            `uses_hybrid_reduced_plan_contract`.
+    Side Effects:
+        None.
+    """
+    uses_hybrid_reduced_contract = getattr(
+        runtime_plan,
+        "uses_hybrid_reduced_plan_contract",
+        None,
+    )
+    if uses_hybrid_reduced_contract is not None:
+        if not callable(uses_hybrid_reduced_contract):
+            raise TypeError(
+                "runtime_plan uses_hybrid_reduced_plan_contract attribute must be callable"
+            )
+        if bool(uses_hybrid_reduced_contract()):
+            return True
+    if isinstance(runtime_plan, BacktestNoRiskExactParityRuntimePlanV2):
+        return False
+    profile = getattr(runtime_plan, "execution_profile", None)
+    if profile is None:
+        return False
+    return execution_profile_uses_hierarchical_shortlist_runtime_v2(
+        profile=profile,
+    )
 
 
 class BacktestArtifactRuntimePlannerV2:
@@ -1186,7 +1606,7 @@ class BacktestArtifactRuntimePlannerV2:
                 launch_budget_evidence=launch_budget_evidence,
             )
 
-        return BacktestArtifactRuntimePlanV2(
+        runtime_plan = BacktestArtifactRuntimePlanV2(
             indicator_plans=indicator_plans,
             signal_axes=signal_axes,
             risk_variants=risk_variants,
@@ -1212,6 +1632,9 @@ class BacktestArtifactRuntimePlannerV2:
             stage_cost_model=stage_cost_model,
             launch_budget_evidence=launch_budget_evidence,
             parity_classification=parity_classification,
+        )
+        return _build_first_class_parity_runtime_plan_v2(
+            runtime_plan=runtime_plan,
         )
 
     def build(
@@ -1260,6 +1683,58 @@ class BacktestArtifactRuntimePlannerV2:
             Calls `plan(...)`, which may call `indicator_compute.estimate(...)` once per
             indicator block.
         """
+        return self.plan(
+            template=template,
+            candles=candles,
+            indicator_compute=indicator_compute,
+            preselect=preselect,
+            requested_execution_profile_mode=requested_execution_profile_mode,
+            defaults_provider=defaults_provider,
+            max_variants_per_compute=max_variants_per_compute,
+            max_compute_bytes_total=max_compute_bytes_total,
+        )
+
+    def build_sync_inline_plan(
+        self,
+        *,
+        template: RunBacktestTemplate,
+        candles: CandleArrays,
+        indicator_compute: IndicatorCompute,
+        preselect: int,
+        requested_execution_profile_mode: ExecutionProfileModeLiteralV2 | None = None,
+        defaults_provider: BacktestGridDefaultsProvider | None = None,
+        max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
+        max_compute_bytes_total: int = MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
+    ) -> BacktestArtifactRuntimePlanV2:
+        """
+        Build one sync-inline plan while preserving first-class parity runtime-plan promotion.
+
+        Args:
+            template: Resolved backtest template payload.
+            candles: Warmup-inclusive request-timeframe candles from pinned artifacts.
+            indicator_compute: Indicator estimate port used for compute-axis materialization.
+            preselect: Stage A shortlist size before Stage B expansion.
+            requested_execution_profile_mode:
+                Optional internal execution profile override for sync launch validation.
+            defaults_provider: Optional provider for compute/signal fallback defaults.
+            max_variants_per_compute: Variants guard budget.
+            max_compute_bytes_total: Memory guard budget.
+        Returns:
+            BacktestArtifactRuntimePlanV2: Prepared sync-inline runtime plan.
+        Assumptions:
+            This helper is valid only for planners configured with
+            `launch_budget_mode='sync_inline'`.
+        Raises:
+            ValueError: If planner launch budget mode is not `sync_inline`.
+            RoehubError: If guard limits are exceeded.
+        Side Effects:
+            Delegates to `plan(...)`, which may call `indicator_compute.estimate(...)`.
+        """
+        if self._launch_budget_mode != "sync_inline":
+            raise ValueError(
+                "BacktestArtifactRuntimePlannerV2.build_sync_inline_plan requires "
+                "launch_budget_mode='sync_inline'"
+            )
         return self.plan(
             template=template,
             candles=candles,
@@ -1933,9 +2408,10 @@ def _build_stage_cost_model_v2(
         row_variants=row_variants,
         target_compute_variants=target_compute_variants,
     )
+    narrowed_compute_variants_total = int(math.prod(retained_row_limits))
     combo_prefilter_variants_total = min(
         stage_a_variants_total,
-        int(math.prod(retained_row_limits)) * signal_variants_total,
+        narrowed_compute_variants_total * signal_variants_total,
     )
     retained_exact_candidates_total = min(
         stage_a_variants_total,
@@ -1956,6 +2432,8 @@ def _build_stage_cost_model_v2(
         combo_prefilter_variants_total=combo_prefilter_variants_total,
         retained_exact_candidates_total=retained_exact_candidates_total,
         stage_a_cost_units=stage_a_cost_units,
+        retained_rows_per_indicator=retained_row_limits,
+        narrowed_compute_variants_total=narrowed_compute_variants_total,
     )
 
 
@@ -2043,6 +2521,99 @@ def _build_parity_classification_v2(
             f"retained_rows={stage_cost_model.retained_row_variants_total}; "
             f"combo_prefilter_variants={stage_cost_model.combo_prefilter_variants_total}"
         ),
+    )
+
+
+def _build_first_class_parity_runtime_plan_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+) -> BacktestArtifactRuntimePlanV2:
+    """
+    Promote canonical no-risk parity workloads into a first-class runtime-plan contract.
+
+    Args:
+        runtime_plan: Shared planner output before parity-specific promotion.
+    Returns:
+        BacktestArtifactRuntimePlanV2: First-class parity plan for canonical no-risk workloads,
+            otherwise the input runtime plan unchanged.
+    Assumptions:
+        D2 keeps Stage A semantics unchanged and only reifies parity runtime-shape ownership as a
+        dedicated contract.
+    Raises:
+        ValueError: If parity profile invariants drift and required stage-cost evidence is absent.
+    Side Effects:
+        None.
+    """
+    if runtime_plan.execution_profile.mode != "exact_no_risk_parity":
+        return runtime_plan
+    if not runtime_plan.uses_no_risk_terminal_path():
+        return runtime_plan
+    if runtime_plan.parity_classification is None:
+        return runtime_plan
+    if runtime_plan.stage_cost_model is None:
+        raise ValueError(
+            "First-class parity runtime plan promotion requires stage_cost_model"
+        )
+    return BacktestNoRiskExactParityRuntimePlanV2.from_runtime_plan(
+        runtime_plan=runtime_plan,
+        no_risk_parity_counters=_build_no_risk_exact_parity_runtime_counters_v2(
+            runtime_plan=runtime_plan,
+            stage_cost_model=runtime_plan.stage_cost_model,
+        ),
+    )
+
+
+def _build_no_risk_exact_parity_runtime_counters_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+    stage_cost_model: BacktestRuntimeStageCostModelV2,
+) -> BacktestNoRiskExactParityRuntimeCountersV2:
+    """
+    Build deterministic additive counters for first-class no-risk exact parity runtime plans.
+
+    Args:
+        runtime_plan: Prepared runtime plan eligible for parity promotion.
+        stage_cost_model: Internal retained-frontier stage-cost model for the same plan.
+    Returns:
+        BacktestNoRiskExactParityRuntimeCountersV2: Additive deterministic parity counters.
+    Assumptions:
+        Counters remain benchmark-facing internal metadata and do not modify public API payloads.
+    Raises:
+        ValueError: If per-indicator retained-row evidence drifts from plan indicator ordering.
+    Side Effects:
+        None.
+    """
+    retained_rows_per_indicator = stage_cost_model.retained_rows_per_indicator
+    if len(retained_rows_per_indicator) != len(runtime_plan.indicator_plans):
+        raise ValueError(
+            "Parity runtime counters require retained rows for every indicator plan"
+        )
+    if len(retained_rows_per_indicator) == 0:
+        raise ValueError(
+            "Parity runtime counters require at least one retained-row counter"
+        )
+    narrowed_compute_combo_total = stage_cost_model.narrowed_compute_variants_total
+    if narrowed_compute_combo_total is None:
+        signal_total = max(1, runtime_plan.signal_variants_total())
+        narrowed_compute_combo_total = max(
+            1,
+            int(stage_cost_model.combo_prefilter_variants_total // signal_total),
+        )
+    return BacktestNoRiskExactParityRuntimeCountersV2(
+        retained_rows_per_indicator=tuple(
+            BacktestParityRetainedRowsCounterV2(
+                indicator_id=plan.indicator_id,
+                retained_rows=retained_rows_per_indicator[position],
+            )
+            for position, plan in enumerate(runtime_plan.indicator_plans)
+        ),
+        retained_rows_total=stage_cost_model.retained_row_variants_total,
+        narrowed_combo_total=stage_cost_model.combo_prefilter_variants_total,
+        narrowed_compute_combo_total=narrowed_compute_combo_total,
+        no_risk_finalization_count=runtime_plan.stage_b_variants_total,
+        exact_replay_count=0,
+        deterministic_combo_ordering="stage_a_index",
+        stage_b_execution_mode=runtime_plan.stage_b_execution_mode(),
     )
 
 
@@ -2455,6 +3026,9 @@ def _requested_execution_profile_not_enabled_error_v2(
 __all__ = [
     "BacktestArtifactRuntimePlanV2",
     "BacktestArtifactRuntimePlannerV2",
+    "BacktestNoRiskExactParityRuntimeCountersV2",
+    "BacktestNoRiskExactParityRuntimePlanV2",
+    "BacktestParityRetainedRowsCounterV2",
     "build_indicator_selection_for_variant_index_v2",
     "build_signal_params_for_variant_index_v2",
     "BacktestIndicatorAxisPlanV2",
@@ -2465,4 +3039,5 @@ __all__ = [
     "BacktestStageABaseVariantV2",
     "STAGE_A_LITERAL_V2",
     "STAGE_B_LITERAL_V2",
+    "runtime_plan_requires_hierarchical_shortlist_runtime_v2",
 ]
