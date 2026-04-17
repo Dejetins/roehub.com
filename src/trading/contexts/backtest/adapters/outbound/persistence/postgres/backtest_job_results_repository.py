@@ -17,6 +17,9 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobStageAShortlist,
     BacktestJobTopVariant,
 )
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityRuntimeState,
+)
 from trading.contexts.backtest.domain.errors import BacktestStorageError
 
 
@@ -291,6 +294,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                 " shortlist.job_id must match method job_id"
             )
         no_risk_exact_rows_json = shortlist.to_no_risk_exact_rows_json_array()
+        parity_runtime_state_json = shortlist.to_parity_runtime_state_json_object()
 
         query = f"""
         WITH lease_owner AS (
@@ -307,6 +311,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
             job_id,
             stage_a_indexes_json,
             no_risk_exact_rows_json,
+            parity_runtime_state_json,
             stage_a_variants_total,
             risk_total,
             preselect_used,
@@ -316,6 +321,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
             %(job_id)s::uuid,
             %(stage_a_indexes_json)s::jsonb,
             %(no_risk_exact_rows_json)s::jsonb,
+            %(parity_runtime_state_json)s::jsonb,
             %(stage_a_variants_total)s,
             %(risk_total)s,
             %(preselect_used)s,
@@ -325,6 +331,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         DO UPDATE SET
             stage_a_indexes_json = EXCLUDED.stage_a_indexes_json,
             no_risk_exact_rows_json = EXCLUDED.no_risk_exact_rows_json,
+            parity_runtime_state_json = EXCLUDED.parity_runtime_state_json,
             stage_a_variants_total = EXCLUDED.stage_a_variants_total,
             risk_total = EXCLUDED.risk_total,
             preselect_used = EXCLUDED.preselect_used,
@@ -348,6 +355,16 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                     if no_risk_exact_rows_json is None
                     else json.dumps(
                         no_risk_exact_rows_json,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=True,
+                    )
+                ),
+                "parity_runtime_state_json": (
+                    None
+                    if parity_runtime_state_json is None
+                    else json.dumps(
+                        parity_runtime_state_json,
                         sort_keys=True,
                         separators=(",", ":"),
                         ensure_ascii=True,
@@ -380,6 +397,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
             job_id,
             stage_a_indexes_json,
             no_risk_exact_rows_json,
+            parity_runtime_state_json,
             stage_a_variants_total,
             risk_total,
             preselect_used,
@@ -615,6 +633,11 @@ def _map_stage_a_shortlist_row(*, row: Mapping[str, Any]) -> BacktestJobStageASh
             value=row.get("no_risk_exact_rows_json"),
             field_name="no_risk_exact_rows_json",
         )
+        raw_parity_runtime_state = _parse_json_object(
+            value=row.get("parity_runtime_state_json"),
+            field_name="parity_runtime_state_json",
+            required=False,
+        )
         no_risk_exact_rows: tuple[BacktestJobStageANoRiskExactRow, ...] | None = None
         if raw_no_risk_exact_rows is not None:
             mapped_rows: list[BacktestJobStageANoRiskExactRow] = []
@@ -628,6 +651,11 @@ def _map_stage_a_shortlist_row(*, row: Mapping[str, Any]) -> BacktestJobStageASh
                     BacktestJobStageANoRiskExactRow.from_json_object(value=dict(raw_item))
                 )
             no_risk_exact_rows = tuple(mapped_rows)
+        parity_runtime_state: BacktestJobParityRuntimeState | None = None
+        if raw_parity_runtime_state is not None:
+            parity_runtime_state = BacktestJobParityRuntimeState.from_json_object(
+                value=dict(raw_parity_runtime_state)
+            )
 
         return BacktestJobStageAShortlist(
             job_id=UUID(str(row["job_id"])),
@@ -637,6 +665,7 @@ def _map_stage_a_shortlist_row(*, row: Mapping[str, Any]) -> BacktestJobStageASh
             preselect_used=int(row["preselect_used"]),
             updated_at=row["updated_at"],
             no_risk_exact_rows=no_risk_exact_rows,
+            parity_runtime_state=parity_runtime_state,
         )
     except Exception as error:  # noqa: BLE001
         if isinstance(error, BacktestStorageError):

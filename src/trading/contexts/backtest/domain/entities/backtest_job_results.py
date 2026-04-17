@@ -118,6 +118,507 @@ class BacktestJobTopVariant:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestJobParityRetainedRowsCounter:
+    """
+    Persisted retained-row counter for one indicator inside the compact parity runtime state.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+    """
+
+    indicator_id: str
+    retained_rows: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one persisted parity retained-row counter.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Parity retained-row counters remain compact additive metadata only and must stay
+            deterministic for mixed-version reads.
+        Raises:
+            BacktestJobTransitionError: If indicator id is blank or retained rows are non-positive.
+        Side Effects:
+            Normalizes `indicator_id` to stripped builtin `str`.
+        """
+        normalized_indicator_id = self.indicator_id.strip()
+        if not normalized_indicator_id:
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRetainedRowsCounter.indicator_id must be non-empty"
+            )
+        if isinstance(self.retained_rows, bool) or not isinstance(self.retained_rows, int):
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRetainedRowsCounter.retained_rows must be integer"
+            )
+        if self.retained_rows <= 0:
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRetainedRowsCounter.retained_rows must be > 0"
+            )
+        object.__setattr__(self, "indicator_id", normalized_indicator_id)
+
+    def to_json_object(self) -> dict[str, Any]:
+        """
+        Convert one retained-row counter into deterministic JSON payload.
+
+        Args:
+            None.
+        Returns:
+            dict[str, Any]: JSON-safe counter payload.
+        Assumptions:
+            Indicator order is preserved by the enclosing parity runtime state tuple.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return {
+            "indicator_id": self.indicator_id,
+            "retained_rows": self.retained_rows,
+        }
+
+    @classmethod
+    def from_json_object(
+        cls,
+        *,
+        value: Mapping[str, Any],
+    ) -> "BacktestJobParityRetainedRowsCounter":
+        """
+        Build one retained-row counter from persisted JSON object payload.
+
+        Args:
+            value: Raw persisted JSON object.
+        Returns:
+            BacktestJobParityRetainedRowsCounter: Normalized immutable counter payload.
+        Assumptions:
+            Repository mapping validates the top-level object boundary before calling this helper.
+        Raises:
+            BacktestJobTransitionError: If one required field is missing or malformed.
+        Side Effects:
+            None.
+        """
+        return cls(
+            indicator_id=_required_non_empty_str_from_json(
+                name="BacktestJobParityRetainedRowsCounter.indicator_id",
+                value=value.get("indicator_id"),
+            ),
+            retained_rows=_required_positive_int_from_json(
+                name="BacktestJobParityRetainedRowsCounter.retained_rows",
+                value=value.get("retained_rows"),
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestJobParityClassification:
+    """
+    Persisted parity-first classification evidence for the canonical no-risk exact runtime class.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+    """
+
+    parity_class: str = "parity_first_no_risk_exact"
+    disabled_risk_single_cell: bool = True
+    low_indicator_block_cardinality: bool = True
+    narrowed_retained_row_evidence: bool = True
+    notebook_shaped_cost_units: bool = True
+    nr2_classification_reason: str = ""
+
+    def __post_init__(self) -> None:
+        """
+        Validate persisted parity-classification evidence.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            D5 persists only the compact classification required to prove the parity-first
+            no-risk exact class and keep worker resume deterministic.
+        Raises:
+            BacktestJobTransitionError: If one field violates the persisted parity contract.
+        Side Effects:
+            Normalizes string fields to stripped builtin `str`.
+        """
+        normalized_parity_class = self.parity_class.strip().lower()
+        if normalized_parity_class != "parity_first_no_risk_exact":
+            raise BacktestJobTransitionError(
+                "BacktestJobParityClassification.parity_class must be "
+                "'parity_first_no_risk_exact'"
+            )
+        for field_name in (
+            "disabled_risk_single_cell",
+            "low_indicator_block_cardinality",
+            "narrowed_retained_row_evidence",
+            "notebook_shaped_cost_units",
+        ):
+            if not isinstance(getattr(self, field_name), bool):
+                raise BacktestJobTransitionError(
+                    f"BacktestJobParityClassification.{field_name} must be bool"
+                )
+        normalized_reason = self.nr2_classification_reason.strip()
+        if not normalized_reason:
+            raise BacktestJobTransitionError(
+                "BacktestJobParityClassification.nr2_classification_reason must be non-empty"
+            )
+        object.__setattr__(self, "parity_class", normalized_parity_class)
+        object.__setattr__(self, "nr2_classification_reason", normalized_reason)
+
+    def to_json_object(self) -> dict[str, Any]:
+        """
+        Convert persisted parity-classification evidence into deterministic JSON payload.
+
+        Args:
+            None.
+        Returns:
+            dict[str, Any]: JSON-safe classification payload.
+        Assumptions:
+            Boolean evidence fields stay explicit to avoid mixed-version inference.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return {
+            "disabled_risk_single_cell": self.disabled_risk_single_cell,
+            "low_indicator_block_cardinality": self.low_indicator_block_cardinality,
+            "narrowed_retained_row_evidence": self.narrowed_retained_row_evidence,
+            "notebook_shaped_cost_units": self.notebook_shaped_cost_units,
+            "nr2_classification_reason": self.nr2_classification_reason,
+            "parity_class": self.parity_class,
+        }
+
+    @classmethod
+    def from_json_object(
+        cls,
+        *,
+        value: Mapping[str, Any],
+    ) -> "BacktestJobParityClassification":
+        """
+        Build persisted parity-classification evidence from JSON object payload.
+
+        Args:
+            value: Raw persisted JSON object.
+        Returns:
+            BacktestJobParityClassification: Normalized immutable classification payload.
+        Assumptions:
+            Repository mapping validates the top-level object boundary before calling this helper.
+        Raises:
+            BacktestJobTransitionError: If one required field is missing or malformed.
+        Side Effects:
+            None.
+        """
+        return cls(
+            parity_class=_required_non_empty_str_from_json(
+                name="BacktestJobParityClassification.parity_class",
+                value=value.get("parity_class"),
+            ),
+            disabled_risk_single_cell=_required_bool_from_json(
+                name="BacktestJobParityClassification.disabled_risk_single_cell",
+                value=value.get("disabled_risk_single_cell"),
+            ),
+            low_indicator_block_cardinality=_required_bool_from_json(
+                name="BacktestJobParityClassification.low_indicator_block_cardinality",
+                value=value.get("low_indicator_block_cardinality"),
+            ),
+            narrowed_retained_row_evidence=_required_bool_from_json(
+                name="BacktestJobParityClassification.narrowed_retained_row_evidence",
+                value=value.get("narrowed_retained_row_evidence"),
+            ),
+            notebook_shaped_cost_units=_required_bool_from_json(
+                name="BacktestJobParityClassification.notebook_shaped_cost_units",
+                value=value.get("notebook_shaped_cost_units"),
+            ),
+            nr2_classification_reason=_required_non_empty_str_from_json(
+                name="BacktestJobParityClassification.nr2_classification_reason",
+                value=value.get("nr2_classification_reason"),
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestJobParityRuntimeState:
+    """
+    Compact persisted parity runtime state reused by worker resume for the no-risk parity class.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-job-runner-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
+        backtest_job_results_repository.py
+    """
+
+    execution_profile_mode: str
+    parity_classification: BacktestJobParityClassification
+    retained_rows_per_indicator: tuple[BacktestJobParityRetainedRowsCounter, ...]
+    retained_rows_total: int
+    narrowed_combo_total: int
+    narrowed_compute_combo_total: int
+    no_risk_finalization_count: int
+    exact_replay_count: int = 0
+    deterministic_combo_ordering: str = "stage_a_index"
+    stage_b_execution_mode: str = "bypassed_no_risk"
+    stage_b_process_fallback_threshold: str = "none"
+
+    def __post_init__(self) -> None:
+        """
+        Validate compact persisted parity runtime state invariants.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            D5 persists enough runtime-shape evidence to let the worker resume the canonical
+            no-risk exact class without silently re-entering hybrid-era reduced-plan semantics.
+        Raises:
+            BacktestJobTransitionError: If one field violates the persisted parity-state contract.
+        Side Effects:
+            Normalizes literal strings and retained-row counters into immutable tuples.
+        """
+        normalized_execution_profile_mode = self.execution_profile_mode.strip().lower()
+        if normalized_execution_profile_mode != "exact_no_risk_parity":
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRuntimeState.execution_profile_mode must be "
+                "'exact_no_risk_parity'"
+            )
+        if not isinstance(self.parity_classification, BacktestJobParityClassification):
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRuntimeState.parity_classification must be "
+                "BacktestJobParityClassification"
+            )
+        if len(self.retained_rows_per_indicator) == 0:
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRuntimeState.retained_rows_per_indicator must be non-empty"
+            )
+        normalized_retained_rows: list[BacktestJobParityRetainedRowsCounter] = []
+        for raw_counter in self.retained_rows_per_indicator:
+            if not isinstance(raw_counter, BacktestJobParityRetainedRowsCounter):
+                raise BacktestJobTransitionError(
+                    "BacktestJobParityRuntimeState.retained_rows_per_indicator items must be "
+                    "BacktestJobParityRetainedRowsCounter"
+                )
+            normalized_retained_rows.append(raw_counter)
+        indicator_ids = tuple(item.indicator_id for item in normalized_retained_rows)
+        if len(indicator_ids) != len(set(indicator_ids)):
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRuntimeState.retained_rows_per_indicator must not duplicate "
+                "indicator ids"
+            )
+        retained_rows_total = _required_positive_int_from_json(
+            name="BacktestJobParityRuntimeState.retained_rows_total",
+            value=self.retained_rows_total,
+        )
+        if sum(item.retained_rows for item in normalized_retained_rows) != retained_rows_total:
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRuntimeState.retained_rows_total must equal the sum of "
+                "retained_rows_per_indicator"
+            )
+        normalized_narrowed_combo_total = _required_positive_int_from_json(
+            name="BacktestJobParityRuntimeState.narrowed_combo_total",
+            value=self.narrowed_combo_total,
+        )
+        normalized_narrowed_compute_combo_total = _required_positive_int_from_json(
+            name="BacktestJobParityRuntimeState.narrowed_compute_combo_total",
+            value=self.narrowed_compute_combo_total,
+        )
+        normalized_no_risk_finalization_count = _required_positive_int_from_json(
+            name="BacktestJobParityRuntimeState.no_risk_finalization_count",
+            value=self.no_risk_finalization_count,
+        )
+        normalized_exact_replay_count = _required_non_negative_int_from_json(
+            name="BacktestJobParityRuntimeState.exact_replay_count",
+            value=self.exact_replay_count,
+        )
+        normalized_combo_ordering = self.deterministic_combo_ordering.strip()
+        if not normalized_combo_ordering:
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRuntimeState.deterministic_combo_ordering must be non-empty"
+            )
+        normalized_stage_b_execution_mode = self.stage_b_execution_mode.strip().lower()
+        if normalized_stage_b_execution_mode != "bypassed_no_risk":
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRuntimeState.stage_b_execution_mode must be "
+                "'bypassed_no_risk'"
+            )
+        normalized_stage_b_process_fallback_threshold = (
+            self.stage_b_process_fallback_threshold.strip().lower()
+        )
+        if normalized_stage_b_process_fallback_threshold != "none":
+            raise BacktestJobTransitionError(
+                "BacktestJobParityRuntimeState.stage_b_process_fallback_threshold must be 'none'"
+            )
+        object.__setattr__(self, "execution_profile_mode", normalized_execution_profile_mode)
+        object.__setattr__(
+            self,
+            "retained_rows_per_indicator",
+            tuple(normalized_retained_rows),
+        )
+        object.__setattr__(self, "retained_rows_total", retained_rows_total)
+        object.__setattr__(self, "narrowed_combo_total", normalized_narrowed_combo_total)
+        object.__setattr__(
+            self,
+            "narrowed_compute_combo_total",
+            normalized_narrowed_compute_combo_total,
+        )
+        object.__setattr__(
+            self,
+            "no_risk_finalization_count",
+            normalized_no_risk_finalization_count,
+        )
+        object.__setattr__(self, "exact_replay_count", normalized_exact_replay_count)
+        object.__setattr__(
+            self,
+            "deterministic_combo_ordering",
+            normalized_combo_ordering,
+        )
+        object.__setattr__(
+            self,
+            "stage_b_execution_mode",
+            normalized_stage_b_execution_mode,
+        )
+        object.__setattr__(
+            self,
+            "stage_b_process_fallback_threshold",
+            normalized_stage_b_process_fallback_threshold,
+        )
+
+    def to_json_object(self) -> dict[str, Any]:
+        """
+        Convert compact parity runtime state into deterministic JSON-safe payload.
+
+        Args:
+            None.
+        Returns:
+            dict[str, Any]: JSON-safe parity runtime-state payload.
+        Assumptions:
+            Persisted parity runtime state remains internal-only and additive.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return {
+            "deterministic_combo_ordering": self.deterministic_combo_ordering,
+            "exact_replay_count": self.exact_replay_count,
+            "execution_profile_mode": self.execution_profile_mode,
+            "narrowed_combo_total": self.narrowed_combo_total,
+            "narrowed_compute_combo_total": self.narrowed_compute_combo_total,
+            "no_risk_finalization_count": self.no_risk_finalization_count,
+            "parity_classification": self.parity_classification.to_json_object(),
+            "retained_rows_per_indicator": [
+                item.to_json_object() for item in self.retained_rows_per_indicator
+            ],
+            "retained_rows_total": self.retained_rows_total,
+            "stage_b_execution_mode": self.stage_b_execution_mode,
+            "stage_b_process_fallback_threshold": self.stage_b_process_fallback_threshold,
+        }
+
+    @classmethod
+    def from_json_object(
+        cls,
+        *,
+        value: Mapping[str, Any],
+    ) -> "BacktestJobParityRuntimeState":
+        """
+        Build compact parity runtime state from persisted JSON object payload.
+
+        Args:
+            value: Raw persisted JSON object.
+        Returns:
+            BacktestJobParityRuntimeState: Normalized immutable parity runtime state.
+        Assumptions:
+            Repository mapping validates the top-level object boundary before calling this helper.
+        Raises:
+            BacktestJobTransitionError: If one required field is missing or malformed.
+        Side Effects:
+            None.
+        """
+        raw_retained_rows = _required_json_sequence(
+            value=value,
+            field_name="retained_rows_per_indicator",
+        )
+        retained_rows: list[BacktestJobParityRetainedRowsCounter] = []
+        for raw_item in raw_retained_rows:
+            if not isinstance(raw_item, Mapping):
+                raise BacktestJobTransitionError(
+                    "BacktestJobParityRuntimeState.retained_rows_per_indicator must contain "
+                    "JSON objects"
+                )
+            retained_rows.append(
+                BacktestJobParityRetainedRowsCounter.from_json_object(
+                    value=dict(raw_item)
+                )
+            )
+        raw_parity_classification = _required_json_object(
+            value=value,
+            field_name="parity_classification",
+            entity_name="BacktestJobParityRuntimeState",
+        )
+        return cls(
+            execution_profile_mode=_required_non_empty_str_from_json(
+                name="BacktestJobParityRuntimeState.execution_profile_mode",
+                value=value.get("execution_profile_mode"),
+            ),
+            parity_classification=BacktestJobParityClassification.from_json_object(
+                value=raw_parity_classification
+            ),
+            retained_rows_per_indicator=tuple(retained_rows),
+            retained_rows_total=_required_positive_int_from_json(
+                name="BacktestJobParityRuntimeState.retained_rows_total",
+                value=value.get("retained_rows_total"),
+            ),
+            narrowed_combo_total=_required_positive_int_from_json(
+                name="BacktestJobParityRuntimeState.narrowed_combo_total",
+                value=value.get("narrowed_combo_total"),
+            ),
+            narrowed_compute_combo_total=_required_positive_int_from_json(
+                name="BacktestJobParityRuntimeState.narrowed_compute_combo_total",
+                value=value.get("narrowed_compute_combo_total"),
+            ),
+            no_risk_finalization_count=_required_positive_int_from_json(
+                name="BacktestJobParityRuntimeState.no_risk_finalization_count",
+                value=value.get("no_risk_finalization_count"),
+            ),
+            exact_replay_count=_required_non_negative_int_from_json(
+                name="BacktestJobParityRuntimeState.exact_replay_count",
+                value=value.get("exact_replay_count"),
+            ),
+            deterministic_combo_ordering=_required_non_empty_str_from_json(
+                name="BacktestJobParityRuntimeState.deterministic_combo_ordering",
+                value=value.get("deterministic_combo_ordering"),
+            ),
+            stage_b_execution_mode=_required_non_empty_str_from_json(
+                name="BacktestJobParityRuntimeState.stage_b_execution_mode",
+                value=value.get("stage_b_execution_mode"),
+            ),
+            stage_b_process_fallback_threshold=_required_non_empty_str_from_json(
+                name="BacktestJobParityRuntimeState.stage_b_process_fallback_threshold",
+                value=value.get("stage_b_process_fallback_threshold"),
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestJobStageAShortlist:
     """
     Persisted Stage-A shortlist projection used for deterministic restart/resume in worker.
@@ -139,6 +640,7 @@ class BacktestJobStageAShortlist:
     preselect_used: int
     updated_at: datetime
     no_risk_exact_rows: tuple["BacktestJobStageANoRiskExactRow", ...] | None = None
+    parity_runtime_state: BacktestJobParityRuntimeState | None = None
 
     def __post_init__(self) -> None:
         """
@@ -203,9 +705,36 @@ class BacktestJobStageAShortlist:
                 )
             normalized_no_risk_exact_rows = tuple(normalized_rows)
 
+        normalized_parity_runtime_state: BacktestJobParityRuntimeState | None = None
+        if self.parity_runtime_state is not None:
+            if not isinstance(self.parity_runtime_state, BacktestJobParityRuntimeState):
+                raise BacktestJobTransitionError(
+                    "BacktestJobStageAShortlist.parity_runtime_state must be "
+                    "BacktestJobParityRuntimeState"
+                )
+            if self.risk_total != 1:
+                raise BacktestJobTransitionError(
+                    "BacktestJobStageAShortlist.parity_runtime_state requires risk_total == 1"
+                )
+            if normalized_no_risk_exact_rows is None:
+                raise BacktestJobTransitionError(
+                    "BacktestJobStageAShortlist.parity_runtime_state requires "
+                    "no_risk_exact_rows"
+                )
+            if (
+                self.parity_runtime_state.no_risk_finalization_count
+                != len(normalized_indexes)
+            ):
+                raise BacktestJobTransitionError(
+                    "BacktestJobStageAShortlist.parity_runtime_state."
+                    "no_risk_finalization_count must align with stage_a_indexes"
+                )
+            normalized_parity_runtime_state = self.parity_runtime_state
+
         _ensure_utc_datetime(name="updated_at", value=self.updated_at)
         object.__setattr__(self, "stage_a_indexes", tuple(normalized_indexes))
         object.__setattr__(self, "no_risk_exact_rows", normalized_no_risk_exact_rows)
+        object.__setattr__(self, "parity_runtime_state", normalized_parity_runtime_state)
 
     def to_json_array(self) -> list[int]:
         """
@@ -242,6 +771,25 @@ class BacktestJobStageAShortlist:
         if self.no_risk_exact_rows is None:
             return None
         return [row.to_json_object() for row in self.no_risk_exact_rows]
+
+    def to_parity_runtime_state_json_object(self) -> dict[str, Any] | None:
+        """
+        Convert optional parity runtime state into JSON object payload for SQL adapter writes.
+
+        Args:
+            None.
+        Returns:
+            dict[str, Any] | None: Compact parity runtime-state payload, or `None` for legacy rows.
+        Assumptions:
+            Missing payload means explicit fallback to live Stage A recomputation on resume.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if self.parity_runtime_state is None:
+            return None
+        return self.parity_runtime_state.to_json_object()
 
 
 @dataclass(frozen=True, slots=True)
@@ -779,8 +1327,38 @@ def _required_json_sequence(
     if field_name not in value:
         raise BacktestJobTransitionError(
             f"BacktestJobStageANoRiskExactRow.{field_name} is required"
-        )
+    )
     return cast(Sequence[Any], value[field_name])
+
+
+def _required_json_object(
+    *,
+    value: Mapping[str, Any],
+    field_name: str,
+    entity_name: str,
+) -> dict[str, Any]:
+    """
+    Resolve one required nested JSON object field from persisted payload.
+
+    Args:
+        value: Raw persisted JSON object.
+        field_name: Required nested field name.
+        entity_name: Entity name used in deterministic error messages.
+    Returns:
+        dict[str, Any]: Nested JSON object payload.
+    Assumptions:
+        Repository mapping validates the top-level object boundary before calling this helper.
+    Raises:
+        BacktestJobTransitionError: If the field is missing or is not a JSON object.
+    Side Effects:
+        None.
+    """
+    if field_name not in value:
+        raise BacktestJobTransitionError(f"{entity_name}.{field_name} is required")
+    nested_value = value[field_name]
+    if not isinstance(nested_value, Mapping):
+        raise BacktestJobTransitionError(f"{entity_name}.{field_name} must be JSON object")
+    return dict(nested_value)
 
 
 def _required_non_negative_int_from_json(*, name: str, value: Any) -> int:
@@ -808,6 +1386,74 @@ def _required_non_negative_int_from_json(*, name: str, value: Any) -> int:
             f"BacktestJobStageANoRiskExactRow.{name} must be >= 0"
         )
     return int(value)
+
+
+def _required_positive_int_from_json(*, name: str, value: Any) -> int:
+    """
+    Parse one required positive integer from persisted JSON payload.
+
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Raw JSON scalar.
+    Returns:
+        int: Normalized positive integer.
+    Assumptions:
+        Compact parity counters use explicit integer fields rather than inferred defaults.
+    Raises:
+        BacktestJobTransitionError: If value is missing, boolean, non-integer, or non-positive.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise BacktestJobTransitionError(f"{name} must be integer")
+    if value <= 0:
+        raise BacktestJobTransitionError(f"{name} must be > 0")
+    return int(value)
+
+
+def _required_bool_from_json(*, name: str, value: Any) -> bool:
+    """
+    Parse one required boolean from persisted JSON payload.
+
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Raw JSON scalar.
+    Returns:
+        bool: Normalized boolean value.
+    Assumptions:
+        Persisted parity evidence keeps boolean flags explicit for backward-readable resume.
+    Raises:
+        BacktestJobTransitionError: If value is not boolean.
+    Side Effects:
+        None.
+    """
+    if not isinstance(value, bool):
+        raise BacktestJobTransitionError(f"{name} must be bool")
+    return value
+
+
+def _required_non_empty_str_from_json(*, name: str, value: Any) -> str:
+    """
+    Parse one required non-empty string from persisted JSON payload.
+
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Raw JSON scalar.
+    Returns:
+        str: Normalized stripped string.
+    Assumptions:
+        Persisted parity literals remain explicit and do not rely on implicit defaults.
+    Raises:
+        BacktestJobTransitionError: If value is missing, non-string, or blank.
+    Side Effects:
+        None.
+    """
+    if not isinstance(value, str):
+        raise BacktestJobTransitionError(f"{name} must be string")
+    normalized_value = value.strip()
+    if not normalized_value:
+        raise BacktestJobTransitionError(f"{name} must be non-empty")
+    return normalized_value
 
 
 def _json_metric_scalar(*, value: float) -> float | str:
@@ -896,6 +1542,9 @@ def _normalize_json_value(*, value: Any) -> Any:
 
 
 __all__ = [
+    "BacktestJobParityClassification",
+    "BacktestJobParityRetainedRowsCounter",
+    "BacktestJobParityRuntimeState",
     "BacktestJobStageANoRiskExactRow",
     "BacktestJobStageAShortlist",
     "BacktestJobTopVariant",

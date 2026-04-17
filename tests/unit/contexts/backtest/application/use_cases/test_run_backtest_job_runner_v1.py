@@ -34,8 +34,14 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobExecutionMode,
+    BacktestJobStageANoRiskExactRow,
     BacktestJobStageAShortlist,
     TradeV1,
+)
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityClassification,
+    BacktestJobParityRetainedRowsCounter,
+    BacktestJobParityRuntimeState,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
@@ -357,6 +363,8 @@ class _FakeGridContext:
         base_variants: tuple[BacktestStageABaseVariant, ...],
         risk_variants: tuple[BacktestRiskVariantV1, ...],
         execution_profile: Any | None = None,
+        parity_classification: Any | None = None,
+        parity_runtime_counters: Mapping[str, Any] | None = None,
     ) -> None:
         """
         Initialize deterministic staged grid context payload.
@@ -390,6 +398,10 @@ class _FakeGridContext:
                 stage_b_workers=1,
                 parallel_stage_b_enabled=False,
             )
+        )
+        self.parity_classification = parity_classification
+        self._parity_runtime_counters = (
+            dict(parity_runtime_counters) if parity_runtime_counters is not None else None
         )
 
     def iter_stage_a_variants(self) -> tuple[BacktestStageABaseVariant, ...]:
@@ -435,6 +447,131 @@ class _FakeGridContext:
             )
         return self._base_variants[stage_a_index]
 
+    def stage_b_execution_mode(self) -> str:
+        """
+        Resolve deterministic Stage-B execution mode for the fake runtime plan.
+
+        Args:
+            None.
+        Returns:
+            str: Canonical execution-mode literal matching the fake risk/profile shape.
+        Assumptions:
+            No-risk single-cell fixtures always bypass generic Stage B in these worker tests.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if _is_no_risk_terminal_fixture(risk_variants=self.risk_variants):
+            return "bypassed_no_risk"
+        threshold_name_for = getattr(
+            getattr(self.execution_profile, "stage_b_process_fallback", None),
+            "threshold_name_for",
+            None,
+        )
+        if callable(threshold_name_for):
+            return (
+                "process_pool"
+                if threshold_name_for(stage_b_variants_total=self.stage_b_variants_total)
+                == "stage_b_variants_total"
+                else "in_process"
+            )
+        return "in_process"
+
+    def stage_b_process_fallback_threshold(self) -> str:
+        """
+        Resolve deterministic Stage-B fallback threshold for the fake runtime plan.
+
+        Args:
+            None.
+        Returns:
+            str: Canonical threshold literal for the fake runtime plan.
+        Assumptions:
+            No-risk fixtures always report `none`, while risk-grid fixtures may opt into the
+            explicit `stage_b_variants_total` threshold through the fake execution profile.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if _is_no_risk_terminal_fixture(risk_variants=self.risk_variants):
+            return "none"
+        threshold_name_for = getattr(
+            getattr(self.execution_profile, "stage_b_process_fallback", None),
+            "threshold_name_for",
+            None,
+        )
+        if callable(threshold_name_for):
+            return str(
+                threshold_name_for(stage_b_variants_total=self.stage_b_variants_total)
+            )
+        return "none"
+
+    def uses_hybrid_reduced_plan_contract(self) -> bool:
+        """
+        Report whether the fake runtime plan depends on hybrid reduced-plan semantics.
+
+        Args:
+            None.
+        Returns:
+            bool: `True` only for hybrid fake execution-profile modes.
+        Assumptions:
+            Tests use this hook to mirror the shared planner contract without importing the full
+            runtime-plan implementation.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        shortlist_config = getattr(self.execution_profile, "shortlist_config", None)
+        return bool(getattr(shortlist_config, "enabled", False))
+
+    def parity_runtime_counters(self) -> Mapping[str, Any] | None:
+        """
+        Return compact parity runtime counters exposed by the fake runtime plan.
+
+        Args:
+            None.
+        Returns:
+            Mapping[str, Any] | None: Parity counters fixture, or `None` for non-parity plans.
+        Assumptions:
+            D5 worker tests keep parity counters small and deterministic.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return self._parity_runtime_counters
+
+
+def _is_no_risk_terminal_fixture(
+    *,
+    risk_variants: tuple[BacktestRiskVariantV1, ...],
+) -> bool:
+    """
+    Detect the no-risk single-cell fixture shape used by worker parity tests.
+
+    Args:
+        risk_variants: Risk variants fixture.
+    Returns:
+        bool: `True` only for the disabled-risk single-cell no-risk fixture.
+    Assumptions:
+        Test fixtures use the canonical `sl_enabled/sl_pct/tp_enabled/tp_pct` keys.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if len(risk_variants) != 1:
+        return False
+    risk_params = risk_variants[0].risk_params
+    return (
+        risk_params.get("sl_enabled") is False
+        and risk_params.get("sl_pct") is None
+        and risk_params.get("tp_enabled") is False
+        and risk_params.get("tp_pct") is None
+    )
+
 
 def _unexpected_generic_stage_b_path(*args: Any, **kwargs: Any) -> Any:
     """
@@ -475,6 +612,27 @@ def _unexpected_no_risk_stage_a_rescore(*args: Any, **kwargs: Any) -> Any:
     """
     _ = args, kwargs
     raise AssertionError("no-risk finalization must reuse Stage-A metrics without rescoring")
+
+
+def _unexpected_stage_a_shortlist_build(*args: Any, **kwargs: Any) -> Any:
+    """
+    Fail the test when parity resume unexpectedly recomputes Stage A instead of reusing storage.
+
+    Args:
+        *args: Ignored positional arguments forwarded from the Stage A builder hook.
+        **kwargs: Ignored keyword arguments forwarded from the Stage A builder hook.
+    Returns:
+        Any: Never returns because the helper always raises.
+    Assumptions:
+        D5 parity resume must reuse the persisted shortlist contract when parity runtime state is
+        present and matches the live runtime plan.
+    Raises:
+        AssertionError: Always, to signal that Stage A recomputation regressed.
+    Side Effects:
+        None.
+    """
+    _ = args, kwargs
+    raise AssertionError("parity resume must reuse persisted Stage-A shortlist")
 
 
 def _build_fake_execution_profile(
@@ -525,7 +683,8 @@ def _build_fake_execution_profile(
             min_stage_b_variants_total=min_stage_b_variants_total,
             threshold_name_for=lambda *, stage_b_variants_total: (
                 "stage_b_variants_total"
-                if stage_b_variants_total >= min_stage_b_variants_total
+                if parallel_stage_b_enabled
+                and stage_b_variants_total >= min_stage_b_variants_total
                 else "none"
             ),
         ),
@@ -1860,12 +2019,19 @@ class _FakeResultsRepository:
     Results repository fake with optional lease-loss simulation on snapshot writes.
     """
 
-    def __init__(self, *, fail_replace_call_numbers: tuple[int, ...] = ()) -> None:
+    def __init__(
+        self,
+        *,
+        fail_replace_call_numbers: tuple[int, ...] = (),
+        preloaded_shortlists: Mapping[UUID, Any] | None = None,
+    ) -> None:
         """
         Initialize results repository fake.
 
         Args:
             fail_replace_call_numbers: 1-based replace call numbers returning lease lost.
+            preloaded_shortlists:
+                Optional persisted shortlist snapshots keyed by job id for resume-path tests.
         Returns:
             None.
         Assumptions:
@@ -1876,6 +2042,7 @@ class _FakeResultsRepository:
             None.
         """
         self._fail_replace_call_numbers = set(fail_replace_call_numbers)
+        self._preloaded_shortlists = dict(preloaded_shortlists or {})
         self.replace_calls: list[dict[str, Any]] = []
         self.shortlist_calls: list[dict[str, Any]] = []
         self.shortlist_get_calls: list[dict[str, Any]] = []
@@ -1961,7 +2128,8 @@ class _FakeResultsRepository:
             Any: Latest recorded shortlist payload for the requested job, or `None`.
         Assumptions:
             Worker C4 review requires the no-risk path to read back the persisted shortlist before
-            finalization rather than relying only on the in-memory save input.
+            finalization rather than relying only on the in-memory save input; D5 resume tests may
+            also preload one persisted shortlist snapshot before the attempt starts.
         Raises:
             None.
         Side Effects:
@@ -1971,7 +2139,7 @@ class _FakeResultsRepository:
         for call in reversed(self.shortlist_calls):
             if call["job_id"] == job_id:
                 return call["shortlist"]
-        return None
+        return self._preloaded_shortlists.get(job_id)
 
 
 @dataclass
@@ -2422,6 +2590,213 @@ def test_process_claimed_job_no_risk_reuses_persisted_exact_shortlist_payload(
         2.0,
         3.0,
     )
+
+
+def test_process_claimed_job_reuses_persisted_parity_shortlist_on_stage_b_resume(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify parity-stage resume reuses the persisted shortlist without recomputing Stage A.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        D5 resume must consume the additive persisted parity runtime state so stage-b resumes do
+        not re-enter Stage A or hidden hybrid-era reduction semantics.
+    Raises:
+        AssertionError: If the worker recomputes Stage A or drops the persisted parity shortlist.
+    Side Effects:
+        Monkeypatches generic Stage B runner helpers for the duration of the test.
+    """
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    no_risk_variants = (_build_risk_variants()[0],)
+    runtime_plan = _build_parity_grid_context(
+        base_variants=base_variants,
+        risk_variants=no_risk_variants,
+    )
+    job = _build_running_job_with_artifact_pin().update_progress(
+        changed_at=_utc(2026, 2, 23, 9, 1, 0),
+        stage="stage_b",
+        processed_units=0,
+        total_units=2,
+    )
+    persisted_shortlist = BacktestJobStageAShortlist(
+        job_id=job.job_id,
+        stage_a_indexes=(0, 1),
+        stage_a_variants_total=len(base_variants),
+        risk_total=1,
+        preselect_used=2,
+        updated_at=_utc(2026, 2, 23, 9, 0, 45),
+        no_risk_exact_rows=(
+            BacktestJobStageANoRiskExactRow(
+                entry_signal_idx=(0,),
+                entry_exec_idx=(1,),
+                direction=(1,),
+                sig_exit_signal_idx=(2,),
+                sig_exit_exec_idx=(3,),
+                total_return_pct=12.0,
+                max_drawdown_pct=1.0,
+                return_over_max_drawdown=12.0,
+                profit_factor=2.0,
+                trade_count=1,
+                sharpe_trades=1.5,
+                win_rate_pct=60.0,
+                avg_trade_ret_pct=2.0,
+                avg_trade_exec_bars=3.0,
+                exposure_pct=40.0,
+            ),
+            BacktestJobStageANoRiskExactRow(
+                entry_signal_idx=(1,),
+                entry_exec_idx=(2,),
+                direction=(1,),
+                sig_exit_signal_idx=(3,),
+                sig_exit_exec_idx=(4,),
+                total_return_pct=9.0,
+                max_drawdown_pct=2.0,
+                return_over_max_drawdown=4.5,
+                profit_factor=3.0,
+                trade_count=1,
+                sharpe_trades=2.5,
+                win_rate_pct=61.0,
+                avg_trade_ret_pct=1.75,
+                avg_trade_exec_bars=4.0,
+                exposure_pct=41.0,
+            ),
+        ),
+        parity_runtime_state=_build_parity_runtime_state(
+            retained_rows_total=len(base_variants),
+            no_risk_finalization_count=2,
+        ),
+    )
+    results_repository = _FakeResultsRepository(
+        preloaded_shortlists={job.job_id: persisted_shortlist}
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_serial_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_parallel_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=results_repository,
+        grid_context=runtime_plan,
+        scorer=SimpleNamespace(score_variant_metric=_unexpected_no_risk_stage_a_rescore),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 7, 0)),
+        stage_a_shortlist_builder=cast(
+            Any,
+            SimpleNamespace(build_shortlist=_unexpected_stage_a_shortlist_build),
+        ),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert results_repository.shortlist_get_calls == [{"job_id": job.job_id}]
+    assert results_repository.shortlist_calls == []
+    running_rows = results_repository.replace_calls[0]["rows"]
+    assert tuple(row.total_return_pct for row in running_rows) == (12.0, 9.0)
+    assert tuple(row.summary_metrics_json["max_drawdown_pct"] for row in running_rows) == (
+        1.0,
+        2.0,
+    )
+
+
+def test_process_claimed_job_recomputes_stage_a_when_legacy_resume_lacks_parity_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify resumed parity jobs fall back explicitly to live Stage A when legacy rows lack D5 state.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        Legacy shortlist rows stay backward-readable, but only rows carrying D5 parity runtime
+        state may be reused directly for resumed parity execution.
+    Raises:
+        AssertionError: If the worker silently reuses a legacy shortlist without recomputing
+            Stage A under the live parity runtime plan.
+    Side Effects:
+        Monkeypatches generic Stage B runner helpers for the duration of the test.
+    """
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    no_risk_variants = (_build_risk_variants()[0],)
+    runtime_plan = _build_parity_grid_context(
+        base_variants=base_variants,
+        risk_variants=no_risk_variants,
+    )
+    job = _build_running_job_with_artifact_pin().update_progress(
+        changed_at=_utc(2026, 2, 23, 9, 1, 30),
+        stage="stage_b",
+        processed_units=0,
+        total_units=2,
+    )
+    legacy_shortlist = BacktestJobStageAShortlist(
+        job_id=job.job_id,
+        stage_a_indexes=(1, 0),
+        stage_a_variants_total=len(base_variants),
+        risk_total=1,
+        preselect_used=2,
+        updated_at=_utc(2026, 2, 23, 9, 1, 0),
+        no_risk_exact_rows=None,
+    )
+    results_repository = _FakeResultsRepository(
+        preloaded_shortlists={job.job_id: legacy_shortlist}
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_serial_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_parallel_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=results_repository,
+        grid_context=runtime_plan,
+        scorer=SimpleNamespace(score_variant_metric=_unexpected_no_risk_stage_a_rescore),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 7, 30)),
+        stage_a_shortlist_builder=cast(Any, _ArtifactExactNoRiskStageAShortlistBuilder()),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert results_repository.shortlist_get_calls == [
+        {"job_id": job.job_id},
+        {"job_id": job.job_id},
+    ]
+    assert len(results_repository.shortlist_calls) == 1
+    saved_shortlist = results_repository.shortlist_calls[0]["shortlist"]
+    assert saved_shortlist.parity_runtime_state is not None
+    assert saved_shortlist.parity_runtime_state.execution_profile_mode == "exact_no_risk_parity"
 
 
 def test_process_claimed_job_does_not_claim_additional_jobs() -> None:
@@ -4161,6 +4536,128 @@ def _build_risk_variants() -> tuple[BacktestRiskVariantV1, ...]:
                 "tp_pct": 2.0,
             },
         ),
+    )
+
+
+def _build_parity_runtime_state(
+    *,
+    retained_rows_total: int,
+    no_risk_finalization_count: int,
+) -> BacktestJobParityRuntimeState:
+    """
+    Build compact persisted parity runtime state fixture for D5 worker-resume tests.
+
+    Args:
+        retained_rows_total: Deterministic retained-row total for the parity fixture.
+        no_risk_finalization_count: Deterministic no-risk finalization count for the fixture.
+    Returns:
+        BacktestJobParityRuntimeState: Compact parity runtime-state fixture.
+    Assumptions:
+        Worker parity tests use a single-indicator `ema` fixture with compact deterministic
+        counters that remain contract-equivalent across sync and worker flows.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return BacktestJobParityRuntimeState(
+        execution_profile_mode="exact_no_risk_parity",
+        parity_classification=BacktestJobParityClassification(
+            parity_class="parity_first_no_risk_exact",
+            disabled_risk_single_cell=True,
+            low_indicator_block_cardinality=True,
+            narrowed_retained_row_evidence=True,
+            notebook_shaped_cost_units=True,
+            nr2_classification_reason=(
+                "canonical NR2 f7d2 no-risk single-cell parity class; "
+                "retained_rows="
+                f"{retained_rows_total}; combo_prefilter_variants={retained_rows_total}"
+            ),
+        ),
+        retained_rows_per_indicator=(
+            BacktestJobParityRetainedRowsCounter(
+                indicator_id="ema",
+                retained_rows=retained_rows_total,
+            ),
+        ),
+        retained_rows_total=retained_rows_total,
+        narrowed_combo_total=retained_rows_total,
+        narrowed_compute_combo_total=retained_rows_total,
+        no_risk_finalization_count=no_risk_finalization_count,
+        exact_replay_count=0,
+        deterministic_combo_ordering="stage_a_index",
+        stage_b_execution_mode="bypassed_no_risk",
+        stage_b_process_fallback_threshold="none",
+    )
+
+
+def _build_parity_grid_context(
+    *,
+    base_variants: tuple[BacktestStageABaseVariant, ...],
+    risk_variants: tuple[BacktestRiskVariantV1, ...],
+) -> _FakeGridContext:
+    """
+    Build fake runtime plan fixture for the first-class no-risk parity execution profile.
+
+    Args:
+        base_variants: Stage-A base variants fixture.
+        risk_variants: No-risk single-cell Stage-B variants fixture.
+    Returns:
+        _FakeGridContext: Fake parity runtime plan carrying compact parity metadata.
+    Assumptions:
+        D5 tests focus on the parity-only no-risk class and therefore always use
+        `execution_profile_mode='exact_no_risk_parity'`.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    parity_runtime_state = _build_parity_runtime_state(
+        retained_rows_total=len(base_variants),
+        no_risk_finalization_count=len(base_variants) * len(risk_variants),
+    )
+    parity_classification = SimpleNamespace(
+        parity_class=parity_runtime_state.parity_classification.parity_class,
+        disabled_risk_single_cell=(
+            parity_runtime_state.parity_classification.disabled_risk_single_cell
+        ),
+        low_indicator_block_cardinality=(
+            parity_runtime_state.parity_classification.low_indicator_block_cardinality
+        ),
+        narrowed_retained_row_evidence=(
+            parity_runtime_state.parity_classification.narrowed_retained_row_evidence
+        ),
+        notebook_shaped_cost_units=(
+            parity_runtime_state.parity_classification.notebook_shaped_cost_units
+        ),
+        nr2_classification_reason=(
+            parity_runtime_state.parity_classification.nr2_classification_reason
+        ),
+    )
+    parity_runtime_counters = {
+        "retained_rows_total": parity_runtime_state.retained_rows_total,
+        "narrowed_combo_total": parity_runtime_state.narrowed_combo_total,
+        "narrowed_compute_combo_total": parity_runtime_state.narrowed_compute_combo_total,
+        "no_risk_finalization_count": parity_runtime_state.no_risk_finalization_count,
+        "exact_replay_count": parity_runtime_state.exact_replay_count,
+        "deterministic_combo_ordering": parity_runtime_state.deterministic_combo_ordering,
+        "stage_b_execution_mode": parity_runtime_state.stage_b_execution_mode,
+        "retained_rows_per_indicator": {
+            item.indicator_id: item.retained_rows
+            for item in parity_runtime_state.retained_rows_per_indicator
+        },
+    }
+    return _FakeGridContext(
+        base_variants=base_variants,
+        risk_variants=risk_variants,
+        execution_profile=_build_fake_execution_profile(
+            mode="exact_no_risk_parity",
+            stage_a_workers=1,
+            stage_b_workers=1,
+            parallel_stage_b_enabled=False,
+        ),
+        parity_classification=parity_classification,
+        parity_runtime_counters=parity_runtime_counters,
     )
 
 

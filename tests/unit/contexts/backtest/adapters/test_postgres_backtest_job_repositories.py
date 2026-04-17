@@ -18,6 +18,11 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobStageAShortlist,
     BacktestJobTopVariant,
 )
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityClassification,
+    BacktestJobParityRetainedRowsCounter,
+    BacktestJobParityRuntimeState,
+)
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 from trading.shared_kernel.primitives import UserId
 
@@ -899,6 +904,34 @@ def test_results_repository_save_stage_a_shortlist_uses_lease_guarded_upsert() -
                     exposure_pct=40.0,
                 ),
             ),
+            parity_runtime_state=BacktestJobParityRuntimeState(
+                execution_profile_mode="exact_no_risk_parity",
+                parity_classification=BacktestJobParityClassification(
+                    parity_class="parity_first_no_risk_exact",
+                    disabled_risk_single_cell=True,
+                    low_indicator_block_cardinality=True,
+                    narrowed_retained_row_evidence=True,
+                    notebook_shaped_cost_units=True,
+                    nr2_classification_reason=(
+                        "canonical NR2 f7d2 no-risk single-cell parity class; "
+                        "retained_rows=1; combo_prefilter_variants=1"
+                    ),
+                ),
+                retained_rows_per_indicator=(
+                    BacktestJobParityRetainedRowsCounter(
+                        indicator_id="ema",
+                        retained_rows=1,
+                    ),
+                ),
+                retained_rows_total=1,
+                narrowed_combo_total=1,
+                narrowed_compute_combo_total=1,
+                no_risk_finalization_count=1,
+                exact_replay_count=0,
+                deterministic_combo_ordering="stage_a_index",
+                stage_b_execution_mode="bypassed_no_risk",
+                stage_b_process_fallback_threshold="none",
+            ),
         ),
     )
 
@@ -907,7 +940,9 @@ def test_results_repository_save_stage_a_shortlist_uses_lease_guarded_upsert() -
     assert "lease_expires_at > %(now)s" in gateway.fetch_one_queries[0]
     assert "state = 'running'" in gateway.fetch_one_queries[0]
     assert "no_risk_exact_rows_json" in gateway.fetch_one_queries[0]
+    assert "parity_runtime_state_json" in gateway.fetch_one_queries[0]
     assert gateway.fetch_one_parameters[0]["no_risk_exact_rows_json"] is not None
+    assert gateway.fetch_one_parameters[0]["parity_runtime_state_json"] is not None
 
 
 def test_results_repository_get_stage_a_shortlist_reads_additive_exact_rows_and_legacy_rows(
@@ -944,12 +979,41 @@ def test_results_repository_get_stage_a_shortlist_reads_additive_exact_rows_and_
         avg_trade_exec_bars=3.0,
         exposure_pct=40.0,
     )
+    parity_runtime_state = BacktestJobParityRuntimeState(
+        execution_profile_mode="exact_no_risk_parity",
+        parity_classification=BacktestJobParityClassification(
+            parity_class="parity_first_no_risk_exact",
+            disabled_risk_single_cell=True,
+            low_indicator_block_cardinality=True,
+            narrowed_retained_row_evidence=True,
+            notebook_shaped_cost_units=True,
+            nr2_classification_reason=(
+                "canonical NR2 f7d2 no-risk single-cell parity class; "
+                "retained_rows=1; combo_prefilter_variants=1"
+            ),
+        ),
+        retained_rows_per_indicator=(
+            BacktestJobParityRetainedRowsCounter(
+                indicator_id="ema",
+                retained_rows=1,
+            ),
+        ),
+        retained_rows_total=1,
+        narrowed_combo_total=1,
+        narrowed_compute_combo_total=1,
+        no_risk_finalization_count=1,
+        exact_replay_count=0,
+        deterministic_combo_ordering="stage_a_index",
+        stage_b_execution_mode="bypassed_no_risk",
+        stage_b_process_fallback_threshold="none",
+    )
     gateway = _FakeGateway(
         fetch_one_results=[
             {
                 "job_id": "00000000-0000-0000-0000-000000000810",
                 "stage_a_indexes_json": [1],
                 "no_risk_exact_rows_json": [exact_row.to_json_object()],
+                "parity_runtime_state_json": parity_runtime_state.to_json_object(),
                 "stage_a_variants_total": 100,
                 "risk_total": 1,
                 "preselect_used": 1,
@@ -976,10 +1040,13 @@ def test_results_repository_get_stage_a_shortlist_reads_additive_exact_rows_and_
 
     assert exact_shortlist is not None
     assert exact_shortlist.no_risk_exact_rows is not None
+    assert exact_shortlist.parity_runtime_state is not None
+    assert exact_shortlist.parity_runtime_state.execution_profile_mode == "exact_no_risk_parity"
     assert exact_shortlist.no_risk_exact_rows[0].profit_factor == 2.5
     assert exact_shortlist.no_risk_exact_rows[0].trade_count == 1
     assert legacy_shortlist is not None
     assert legacy_shortlist.no_risk_exact_rows is None
+    assert legacy_shortlist.parity_runtime_state is None
     assert legacy_shortlist.stage_a_indexes == (3, 8)
 
 

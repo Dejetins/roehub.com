@@ -82,6 +82,11 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobErrorPayload,
     BacktestJobStageAShortlist,
 )
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityClassification,
+    BacktestJobParityRetainedRowsCounter,
+    BacktestJobParityRuntimeState,
+)
 from trading.contexts.backtest.domain.value_objects import BacktestVariantScalar
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
@@ -527,7 +532,7 @@ class RunBacktestJobRunnerV1:
                 candles=timeline.candles,
             )
 
-            shortlist, heartbeat_at = self._run_stage_a(
+            shortlist, heartbeat_at = self._resume_or_run_stage_a(
                 job=job,
                 locked_by=normalized_locked_by,
                 context=context,
@@ -1003,6 +1008,18 @@ class RunBacktestJobRunnerV1:
         )
         now = self._now()
         self._ensure_not_cancelled(job=job, locked_by=locked_by, stage=STAGE_A_LITERAL_V2)
+        persisted_no_risk_exact_rows = (
+            persisted_stage_a_no_risk_exact_rows_v2(shortlist=shortlist_rows)
+            if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan)
+            else None
+        )
+        parity_runtime_state = self._parity_runtime_state_from_runtime_plan(
+            runtime_plan=runtime_plan
+        )
+        if parity_runtime_state is not None and persisted_no_risk_exact_rows is None:
+            raise ValueError(
+                "exact_no_risk_parity Stage-A shortlist must persist compact no-risk exact rows"
+            )
         stage_a_shortlist = BacktestJobStageAShortlist(
             job_id=job.job_id,
             stage_a_indexes=tuple(row.base_variant.stage_a_index for row in shortlist_rows),
@@ -1010,11 +1027,8 @@ class RunBacktestJobRunnerV1:
             risk_total=len(runtime_plan.risk_variants),
             preselect_used=len(shortlist_rows),
             updated_at=now,
-            no_risk_exact_rows=(
-                persisted_stage_a_no_risk_exact_rows_v2(shortlist=shortlist_rows)
-                if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan)
-                else None
-            ),
+            no_risk_exact_rows=persisted_no_risk_exact_rows,
+            parity_runtime_state=parity_runtime_state,
         )
         saved = self._results_repository.save_stage_a_shortlist(
             job_id=job.job_id,
@@ -1037,6 +1051,255 @@ class RunBacktestJobRunnerV1:
             reloaded_stage_a_shortlist = persisted_shortlist
 
         return (reloaded_stage_a_shortlist, heartbeat_at)
+
+    def _resume_or_run_stage_a(
+        self,
+        *,
+        job: BacktestJob,
+        locked_by: str,
+        context: _ResolvedJobRequestContext,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+    ) -> tuple[BacktestJobStageAShortlist, datetime]:
+        """
+        Reuse persisted parity shortlist on Stage-B/finalizing resume or execute Stage A anew.
+
+        Args:
+            job: Claimed running job snapshot.
+            locked_by: Active lease owner.
+            context: Resolved deterministic job request context.
+            runtime_plan: Prepared artifact-backed runtime plan.
+        Returns:
+            tuple[BacktestJobStageAShortlist, datetime]:
+                Reused or freshly persisted shortlist plus the latest heartbeat timestamp.
+        Assumptions:
+            D5 resume reuse is scoped only to the parity-first no-risk class; all legacy or
+            mixed-version rows fall back explicitly to live Stage A recomputation.
+        Raises:
+            ValueError: If persisted parity runtime state drifts from the live runtime plan.
+            _BacktestJobCancelled: Propagated from Stage A execution when cancellation is requested.
+            _BacktestJobLeaseLost: Propagated from persistence/heartbeat writes.
+        Side Effects:
+            May load persisted shortlist metadata or execute/persist a fresh Stage A shortlist.
+        """
+        reused_shortlist = self._reusable_persisted_parity_stage_a_shortlist(
+            job=job,
+            runtime_plan=runtime_plan,
+        )
+        if reused_shortlist is not None:
+            reused_parity_runtime_state = reused_shortlist.parity_runtime_state
+            if reused_parity_runtime_state is None:
+                raise ValueError(
+                    "reused parity shortlist must expose parity_runtime_state"
+                )
+            resumed_heartbeat_at = job.heartbeat_at if job.heartbeat_at is not None else self._now()
+            _LOG.info(
+                "event=job_stage_a_resume_reuse job_id=%s attempt=%s stage=%s "
+                "execution_profile_mode=%s",
+                job.job_id,
+                job.attempt,
+                job.stage,
+                reused_parity_runtime_state.execution_profile_mode,
+            )
+            return (reused_shortlist, resumed_heartbeat_at)
+        return self._run_stage_a(
+            job=job,
+            locked_by=locked_by,
+            context=context,
+            runtime_plan=runtime_plan,
+        )
+
+    def _reusable_persisted_parity_stage_a_shortlist(
+        self,
+        *,
+        job: BacktestJob,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+    ) -> BacktestJobStageAShortlist | None:
+        """
+        Load and validate persisted parity shortlist reuse for Stage-B/finalizing resumes.
+
+        Args:
+            job: Claimed running job snapshot.
+            runtime_plan: Prepared artifact-backed runtime plan.
+        Returns:
+            BacktestJobStageAShortlist | None:
+                Persisted shortlist when parity resume state matches the live runtime plan, or
+                `None` when the worker must recompute Stage A explicitly.
+        Assumptions:
+            Only resumed `stage_b` / `finalizing` attempts may reuse persisted parity shortlist
+            state, while stage-a or legacy rows must keep their fallback explicit.
+        Raises:
+            ValueError: If persisted parity runtime state exists but no longer matches the live
+                runtime plan shape.
+        Side Effects:
+            Reads persisted shortlist storage for resumed attempts.
+        """
+        if job.stage not in {STAGE_B_LITERAL_V2, "finalizing"}:
+            return None
+
+        persisted_shortlist = self._results_repository.get_stage_a_shortlist(job_id=job.job_id)
+        if persisted_shortlist is None:
+            _LOG.info(
+                "event=job_stage_a_resume_fallback job_id=%s attempt=%s stage=%s "
+                "reason=missing_shortlist",
+                job.job_id,
+                job.attempt,
+                job.stage,
+            )
+            return None
+
+        persisted_parity_runtime_state = persisted_shortlist.parity_runtime_state
+        if persisted_parity_runtime_state is None:
+            _LOG.info(
+                "event=job_stage_a_resume_fallback job_id=%s attempt=%s stage=%s "
+                "reason=missing_parity_runtime_state",
+                job.job_id,
+                job.attempt,
+                job.stage,
+            )
+            return None
+
+        live_parity_runtime_state = self._parity_runtime_state_from_runtime_plan(
+            runtime_plan=runtime_plan
+        )
+        if live_parity_runtime_state is None:
+            raise ValueError(
+                "persisted parity runtime state requires exact_no_risk_parity live runtime plan"
+            )
+        if persisted_shortlist.stage_a_variants_total != runtime_plan.stage_a_variants_total:
+            raise ValueError(
+                "persisted parity shortlist stage_a_variants_total drifted from live runtime plan"
+            )
+        if persisted_shortlist.risk_total != len(runtime_plan.risk_variants):
+            raise ValueError(
+                "persisted parity shortlist risk_total drifted from live runtime plan"
+            )
+        if persisted_parity_runtime_state != live_parity_runtime_state:
+            raise ValueError(
+                "persisted parity runtime state drifted from live runtime plan"
+            )
+        return persisted_shortlist
+
+    def _parity_runtime_state_from_runtime_plan(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+    ) -> BacktestJobParityRuntimeState | None:
+        """
+        Project compact persisted parity runtime state from the live runtime plan when available.
+
+        Args:
+            runtime_plan: Prepared artifact-backed runtime plan.
+        Returns:
+            BacktestJobParityRuntimeState | None:
+                Compact persisted parity runtime state for `exact_no_risk_parity`, or `None` for
+                all non-parity runtime plans.
+        Assumptions:
+            D5 reuses the shared parity-classification and parity-counter structures rather than
+            inventing a worker-only reduced-plan schema.
+        Raises:
+            ValueError: If a parity runtime plan omits required classification/counter metadata.
+        Side Effects:
+            None.
+        """
+        execution_profile_mode = str(runtime_plan.execution_profile.mode).strip().lower()
+        if execution_profile_mode != "exact_no_risk_parity":
+            return None
+
+        raw_parity_classification = getattr(runtime_plan, "parity_classification", None)
+        if raw_parity_classification is None:
+            raise ValueError(
+                "exact_no_risk_parity runtime plan must expose parity_classification"
+            )
+        raw_parity_runtime_counters_method = getattr(runtime_plan, "parity_runtime_counters", None)
+        if raw_parity_runtime_counters_method is None or not callable(
+            raw_parity_runtime_counters_method
+        ):
+            raise ValueError(
+                "exact_no_risk_parity runtime plan must expose callable parity_runtime_counters"
+            )
+        raw_parity_runtime_counters = raw_parity_runtime_counters_method()
+        if raw_parity_runtime_counters is None:
+            raise ValueError(
+                "exact_no_risk_parity runtime plan must expose parity_runtime_counters payload"
+            )
+        if not isinstance(raw_parity_runtime_counters, Mapping):
+            raise ValueError(
+                "exact_no_risk_parity runtime plan parity_runtime_counters must be mapping"
+            )
+        parity_runtime_counters = cast(
+            Mapping[str, object],
+            raw_parity_runtime_counters,
+        )
+        raw_retained_rows = parity_runtime_counters.get("retained_rows_per_indicator")
+        if not isinstance(raw_retained_rows, Mapping) or len(raw_retained_rows) == 0:
+            raise ValueError(
+                "exact_no_risk_parity runtime plan must expose retained_rows_per_indicator"
+            )
+        stage_b_execution_mode = runtime_plan.stage_b_execution_mode()
+        stage_b_process_fallback_threshold = runtime_plan.stage_b_process_fallback_threshold()
+        return BacktestJobParityRuntimeState(
+            execution_profile_mode=execution_profile_mode,
+            parity_classification=BacktestJobParityClassification(
+                parity_class=str(raw_parity_classification.parity_class),
+                disabled_risk_single_cell=bool(
+                    raw_parity_classification.disabled_risk_single_cell
+                ),
+                low_indicator_block_cardinality=bool(
+                    raw_parity_classification.low_indicator_block_cardinality
+                ),
+                narrowed_retained_row_evidence=bool(
+                    raw_parity_classification.narrowed_retained_row_evidence
+                ),
+                notebook_shaped_cost_units=bool(
+                    raw_parity_classification.notebook_shaped_cost_units
+                ),
+                nr2_classification_reason=str(
+                    raw_parity_classification.nr2_classification_reason
+                ),
+            ),
+            retained_rows_per_indicator=tuple(
+                BacktestJobParityRetainedRowsCounter(
+                    indicator_id=str(indicator_id),
+                    retained_rows=_coerce_positive_int(
+                        name="retained_rows_per_indicator",
+                        value=retained_rows,
+                    ),
+                )
+                for indicator_id, retained_rows in raw_retained_rows.items()
+            ),
+            retained_rows_total=_coerce_positive_int(
+                name="retained_rows_total",
+                value=parity_runtime_counters.get("retained_rows_total"),
+            ),
+            narrowed_combo_total=_coerce_positive_int(
+                name="narrowed_combo_total",
+                value=parity_runtime_counters.get("narrowed_combo_total"),
+            ),
+            narrowed_compute_combo_total=_coerce_positive_int(
+                name="narrowed_compute_combo_total",
+                value=parity_runtime_counters.get("narrowed_compute_combo_total"),
+            ),
+            no_risk_finalization_count=_coerce_positive_int(
+                name="no_risk_finalization_count",
+                value=parity_runtime_counters.get("no_risk_finalization_count"),
+            ),
+            exact_replay_count=_coerce_non_negative_int(
+                name="exact_replay_count",
+                value=parity_runtime_counters.get("exact_replay_count"),
+            ),
+            deterministic_combo_ordering=_coerce_non_empty_str(
+                name="deterministic_combo_ordering",
+                value=parity_runtime_counters.get("deterministic_combo_ordering"),
+            ),
+            stage_b_execution_mode=_coerce_non_empty_str(
+                name="stage_b_execution_mode",
+                value=stage_b_execution_mode,
+            ),
+            stage_b_process_fallback_threshold=_coerce_non_empty_str(
+                name="stage_b_process_fallback_threshold",
+                value=stage_b_process_fallback_threshold,
+            ),
+        )
 
     def _run_stage_b(
         self,
@@ -2492,6 +2755,78 @@ def _optional_mode(*, payload: Mapping[str, Any], key: str, default: str) -> str
     if not normalized:
         return default
     return normalized
+
+
+def _coerce_positive_int(*, name: str, value: Any) -> int:
+    """
+    Coerce one required positive integer from parity runtime metadata.
+
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Raw runtime metadata value.
+    Returns:
+        int: Normalized positive integer.
+    Assumptions:
+        Parity runtime counters must remain explicit integers in persisted state.
+    Raises:
+        ValueError: If value is boolean, non-integer, or non-positive.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be integer")
+    if value <= 0:
+        raise ValueError(f"{name} must be > 0")
+    return int(value)
+
+
+def _coerce_non_negative_int(*, name: str, value: Any) -> int:
+    """
+    Coerce one required non-negative integer from parity runtime metadata.
+
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Raw runtime metadata value.
+    Returns:
+        int: Normalized non-negative integer.
+    Assumptions:
+        Exact replay count remains additive metadata and may legitimately be zero.
+    Raises:
+        ValueError: If value is boolean, non-integer, or negative.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{name} must be integer")
+    if value < 0:
+        raise ValueError(f"{name} must be >= 0")
+    return int(value)
+
+
+def _coerce_non_empty_str(*, name: str, value: Any) -> str:
+    """
+    Coerce one required non-empty string from parity runtime metadata.
+
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Raw runtime metadata value.
+    Returns:
+        str: Normalized stripped string.
+    Assumptions:
+        Persisted parity runtime literals stay explicit and reviewable.
+    Raises:
+        ValueError: If value is missing, non-string, or blank.
+    Side Effects:
+        None.
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"{name} must be string")
+    normalized_value = value.strip()
+    if not normalized_value:
+        raise ValueError(f"{name} must be non-empty")
+    return normalized_value
+
+
 __all__ = [
     "BacktestJobRunReportV1",
     "BacktestJobRunStatus",

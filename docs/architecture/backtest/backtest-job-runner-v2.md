@@ -287,6 +287,22 @@ Claimed execution uses one shared stage model.
 The worker builds a deterministic shortlist of base variants through artifact-backed Stage A
 services and persists Stage A shortlist metadata for observability and diagnostics.
 
+For first-class no-risk parity workloads, the persisted Stage A shortlist also carries additive
+compact exact rows plus compact `parity_runtime_state_json` metadata. That metadata must record
+the effective `execution_profile_mode=exact_no_risk_parity`, `stage_b_execution_mode=
+bypassed_no_risk`, and the deterministic parity counters/classification needed to prove that a
+resumed worker attempt is still executing the same parity contract rather than drifting back to
+`hybrid_conservative` or another reduced-plan explanation.
+
+Resume rules for this parity class are strict:
+
+- resumed `stage_b` / `finalizing` attempts may reuse the persisted shortlist only when the stored
+  parity runtime state still matches the live runtime plan exactly;
+- legacy rows that do not carry the additive parity runtime state remain readable, but they must
+  fall back explicitly to live Stage A recomputation before continuing;
+- the worker must not silently reinterpret missing or drifted parity state as permission to resume
+  through hybrid-era shortlist semantics.
+
 ### Stage B
 
 The worker expands retained candidates across risk dimensions and scores them through the shared
