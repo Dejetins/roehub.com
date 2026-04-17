@@ -398,9 +398,7 @@ class PreparedIndicatorChunkInputsV2:
                 "PreparedIndicatorChunkInputsV2.signal_row_selection must be non-empty"
             )
         if any(value < 0 for value in normalized_row_selection):
-            raise ValueError(
-                "PreparedIndicatorChunkInputsV2.signal_row_selection must be >= 0"
-            )
+            raise ValueError("PreparedIndicatorChunkInputsV2.signal_row_selection must be >= 0")
         if len(normalized_row_selection) != int(normalized_signal_rows.shape[0]):
             raise ValueError(
                 "PreparedIndicatorChunkInputsV2.signal_row_selection must align with signal_rows"
@@ -509,13 +507,9 @@ class RetainedIndicatorRowFrontierV2:
                 "RetainedIndicatorRowFrontierV2.retained_row_indexes must be non-empty"
             )
         if any(value < 0 for value in normalized_row_indexes):
-            raise ValueError(
-                "RetainedIndicatorRowFrontierV2.retained_row_indexes must be >= 0"
-            )
+            raise ValueError("RetainedIndicatorRowFrontierV2.retained_row_indexes must be >= 0")
         if len(set(normalized_row_indexes)) != len(normalized_row_indexes):
-            raise ValueError(
-                "RetainedIndicatorRowFrontierV2.retained_row_indexes must be unique"
-            )
+            raise ValueError("RetainedIndicatorRowFrontierV2.retained_row_indexes must be unique")
         object.__setattr__(self, "retained_row_indexes", normalized_row_indexes)
         object.__setattr__(
             self,
@@ -583,9 +577,7 @@ class _RetainedExactCandidateAddressV2:
                 "_RetainedExactCandidateAddressV2.indicator_row_indexes must be non-empty"
             )
         if any(value < 0 for value in normalized_row_indexes):
-            raise ValueError(
-                "_RetainedExactCandidateAddressV2.indicator_row_indexes must be >= 0"
-            )
+            raise ValueError("_RetainedExactCandidateAddressV2.indicator_row_indexes must be >= 0")
         object.__setattr__(self, "indicator_row_indexes", normalized_row_indexes)
 
 
@@ -698,9 +690,7 @@ class StageARetainedFrontierMemoryShapeV2:
                 "StageARetainedFrontierMemoryShapeV2.retained_address_value_count must be >= 0"
             )
         if self.signal_bar_count < 0:
-            raise ValueError(
-                "StageARetainedFrontierMemoryShapeV2.signal_bar_count must be >= 0"
-            )
+            raise ValueError("StageARetainedFrontierMemoryShapeV2.signal_bar_count must be >= 0")
         if self.legacy_final_signal_value_count < 0:
             raise ValueError(
                 "StageARetainedFrontierMemoryShapeV2.legacy_final_signal_value_count must be >= 0"
@@ -754,13 +744,8 @@ def describe_stage_a_retained_frontier_memory_shape_v2(
         retained_exact_candidates[0].retained_address.indicator_row_indexes
     )
     for candidate in retained_exact_candidates[1:]:
-        if (
-            len(candidate.retained_address.indicator_row_indexes)
-            != indicator_count_per_candidate
-        ):
-            raise ValueError(
-                "Stage A retained frontier requires uniform retained address width"
-            )
+        if len(candidate.retained_address.indicator_row_indexes) != indicator_count_per_candidate:
+            raise ValueError("Stage A retained frontier requires uniform retained address width")
     retained_address_value_count = candidate_count * indicator_count_per_candidate
     legacy_final_signal_value_count = candidate_count * int(signal_bar_count)
     legacy_to_address_value_ratio = (
@@ -825,9 +810,7 @@ class StageAStreamingExactRuntimeShapeV2:
                 "StageAStreamingExactRuntimeShapeV2.exact_scoring_mode must be non-empty"
             )
         if self.retained_chunk_count < 0:
-            raise ValueError(
-                "StageAStreamingExactRuntimeShapeV2.retained_chunk_count must be >= 0"
-            )
+            raise ValueError("StageAStreamingExactRuntimeShapeV2.retained_chunk_count must be >= 0")
         if self.retained_candidate_count < 0:
             raise ValueError(
                 "StageAStreamingExactRuntimeShapeV2.retained_candidate_count must be >= 0"
@@ -863,9 +846,7 @@ class StageAStreamingExactRuntimeShapeV2:
                 "exceed stage_a_variants_total"
             )
         if not self.execution_shape:
-            raise ValueError(
-                "StageAStreamingExactRuntimeShapeV2.execution_shape must be non-empty"
-            )
+            raise ValueError("StageAStreamingExactRuntimeShapeV2.execution_shape must be non-empty")
         if not self.frontier_compute_mode:
             raise ValueError(
                 "StageAStreamingExactRuntimeShapeV2.frontier_compute_mode must be non-empty"
@@ -876,8 +857,7 @@ class StageAStreamingExactRuntimeShapeV2:
             )
         if self.numba_threads_used is not None and self.numba_threads_used <= 0:
             raise ValueError(
-                "StageAStreamingExactRuntimeShapeV2.numba_threads_used must be > 0 when "
-                "provided"
+                "StageAStreamingExactRuntimeShapeV2.numba_threads_used must be > 0 when provided"
             )
 
 
@@ -915,9 +895,7 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
     """
     normalized_chunk_sizes = tuple(int(value) for value in retained_chunk_sizes)
     if any(value < 0 for value in normalized_chunk_sizes):
-        raise ValueError(
-            "Stage A streaming exact scoring retained_chunk_sizes must be >= 0"
-        )
+        raise ValueError("Stage A streaming exact scoring retained_chunk_sizes must be >= 0")
     return StageAStreamingExactRuntimeShapeV2(
         exact_scoring_mode="streaming exact scoring",
         retained_chunk_count=len(normalized_chunk_sizes),
@@ -1037,9 +1015,7 @@ class BacktestStageAShortlistBuilderV2:
         if self.chunk_size_default <= 0:
             raise ValueError("BacktestStageAShortlistBuilderV2.chunk_size_default must be > 0")
         if self.init_cash_quote_default <= 0.0:
-            raise ValueError(
-                "BacktestStageAShortlistBuilderV2.init_cash_quote_default must be > 0"
-            )
+            raise ValueError("BacktestStageAShortlistBuilderV2.init_cash_quote_default must be > 0")
         if self.fixed_quote_default <= 0.0:
             raise ValueError("BacktestStageAShortlistBuilderV2.fixed_quote_default must be > 0")
         if self.safe_profit_percent_default < 0.0 or self.safe_profit_percent_default > 100.0:
@@ -1047,9 +1023,7 @@ class BacktestStageAShortlistBuilderV2:
                 "BacktestStageAShortlistBuilderV2.safe_profit_percent_default must be in [0, 100]"
             )
         if self.slippage_pct_default < 0.0:
-            raise ValueError(
-                "BacktestStageAShortlistBuilderV2.slippage_pct_default must be >= 0"
-            )
+            raise ValueError("BacktestStageAShortlistBuilderV2.slippage_pct_default must be >= 0")
         normalized_fee_defaults: dict[int, float] = {}
         for market_id in sorted(self.fee_pct_default_by_market_id.keys()):
             fee_pct = self.fee_pct_default_by_market_id[market_id]
@@ -1155,11 +1129,8 @@ class BacktestStageAShortlistBuilderV2:
         if shortlist_limit <= 0:
             raise ValueError("BacktestStageAShortlistBuilderV2.shortlist_limit must be > 0")
         effective_batch_size = self._resolve_batch_size(batch_size=batch_size)
-        effective_parallelism = (
-            parallelism
-            or resolve_backtest_stage_a_parallelism_v1(
-                execution_profile=getattr(grid_context, "execution_profile", None)
-            )
+        effective_parallelism = parallelism or resolve_backtest_stage_a_parallelism_v1(
+            execution_profile=getattr(grid_context, "execution_profile", None)
         )
         ranking_plan = resolve_ranking_plan_v2(
             ranking=effective_ranking_config_v2(
@@ -1293,14 +1264,10 @@ class BacktestStageAShortlistBuilderV2:
             shortlist_limit=shortlist_limit,
         )
         retained_row_limits = _retained_row_limits_v2(
-            row_variants=tuple(
-                int(math.prod(row_plan.axis_radices)) for row_plan in row_plans
-            ),
+            row_variants=tuple(int(math.prod(row_plan.axis_radices)) for row_plan in row_plans),
             target_compute_variants=target_compute_variants,
         )
-        scoring = self._row_prefilter_scoring_for_grid_context(
-            grid_context=grid_context
-        )
+        scoring = self._row_prefilter_scoring_for_grid_context(grid_context=grid_context)
         retained_frontier: dict[str, RetainedIndicatorRowFrontierV2] = {}
         for row_plan, retained_rows_limit in zip(
             row_plans,
@@ -1371,10 +1338,11 @@ class BacktestStageAShortlistBuilderV2:
         Returns:
             None.
         Assumptions:
-            Stage A enumerates only retained-frontier variants, but it preserves the legacy raw
-            Stage A batch bucket boundaries so combo proxy retention, exact chunk order, and final
-            shortlist tie semantics stay stable while the runtime breadth shrinks to the narrowed
-            frontier.
+            Stage A enumerates only retained-frontier variants and preserves legacy raw Stage A
+            batch bucket boundaries so exact chunk order and final shortlist tie semantics stay
+            stable while breadth shrinks to the narrowed frontier. Legacy/hybrid paths still use
+            combo proxy retention per chunk; parity-first no-risk paths exact-score every narrowed
+            chunk variant directly.
         Raises:
             ValueError: If the retained chunk limit is non-positive.
         Side Effects:
@@ -1382,14 +1350,20 @@ class BacktestStageAShortlistBuilderV2:
             reports retained-frontier progress through `on_checkpoint`, and mutates
             `shortlist_heap` in place.
         """
-        if retained_chunk_limit <= 0:
-            raise ValueError(
-                "Stage A combo proxy prefilter requires retained_chunk_limit > 0"
-            )
+        use_combo_proxy_prefilter = self._uses_combo_proxy_prefilter_for_grid_context(
+            grid_context=grid_context
+        )
+        if use_combo_proxy_prefilter and retained_chunk_limit <= 0:
+            raise ValueError("Stage A combo proxy prefilter requires retained_chunk_limit > 0")
         total = self._retained_stage_a_variants_total(
             row_plans=row_plans,
             grid_context=grid_context,
             row_prefilter_frontier=row_prefilter_frontier,
+        )
+        self._assert_parity_narrowed_combo_cardinality_for_grid_context(
+            grid_context=grid_context,
+            use_combo_proxy_prefilter=use_combo_proxy_prefilter,
+            narrowed_combo_total=total,
         )
         processed = 0
 
@@ -1412,29 +1386,44 @@ class BacktestStageAShortlistBuilderV2:
                 ordered_signal_rows=tuple(
                     prepared_input.signal_rows for prepared_input in chunk_inputs
                 ),
-                indicator_ids=tuple(
-                    prepared_input.indicator_id for prepared_input in chunk_inputs
-                ),
+                indicator_ids=tuple(prepared_input.indicator_id for prepared_input in chunk_inputs),
             )
-            retained_row_indexes = self._select_combo_proxy_retained_chunk_row_indexes(
-                chunk_variants=chunk_variants,
-                final_signal=final_signal,
-                local_signal_close=local_signal_close,
-                execution_params=execution_params,
-                retained_chunk_limit=retained_chunk_limit,
-            )
-            if retained_row_indexes:
-                retained_row_selection = np.asarray(
-                    retained_row_indexes,
-                    dtype=np.int64,
+            if use_combo_proxy_prefilter:
+                retained_row_indexes = self._select_combo_proxy_retained_chunk_row_indexes(
+                    chunk_variants=chunk_variants,
+                    final_signal=final_signal,
+                    local_signal_close=local_signal_close,
+                    execution_params=execution_params,
+                    retained_chunk_limit=retained_chunk_limit,
                 )
+                if retained_row_indexes:
+                    retained_row_selection = np.asarray(
+                        retained_row_indexes,
+                        dtype=np.int64,
+                    )
+                    self._merge_retained_exact_payload_chunk_into_heap(
+                        chunk_variants=tuple(
+                            chunk_variants[row_index] for row_index in retained_row_indexes
+                        ),
+                        final_signal=np.ascontiguousarray(
+                            final_signal[retained_row_selection, :],
+                            dtype=np.int8,
+                        ),
+                        grid_context=grid_context,
+                        local_bar_close_1m_idx=local_bar_close_1m_idx,
+                        sentinel_index=sentinel_index,
+                        local_exec_open=local_exec_open,
+                        local_exec_close=local_exec_close,
+                        execution_params=execution_params,
+                        ranking_plan=ranking_plan,
+                        shortlist_limit=shortlist_limit,
+                        shortlist_heap=shortlist_heap,
+                    )
+            else:
                 self._merge_retained_exact_payload_chunk_into_heap(
-                    chunk_variants=tuple(
-                        chunk_variants[row_index]
-                        for row_index in retained_row_indexes
-                    ),
+                    chunk_variants=chunk_variants,
                     final_signal=np.ascontiguousarray(
-                        final_signal[retained_row_selection, :],
+                        final_signal,
                         dtype=np.int8,
                     ),
                     grid_context=grid_context,
@@ -1502,9 +1491,7 @@ class BacktestStageAShortlistBuilderV2:
         signal_variants_total = self._signal_variants_total_for_grid_context(
             grid_context=grid_context
         )
-        compute_row_radices = tuple(
-            int(math.prod(row_plan.axis_radices)) for row_plan in row_plans
-        )
+        compute_row_radices = tuple(int(math.prod(row_plan.axis_radices)) for row_plan in row_plans)
         retained_row_pools = tuple(
             self._retained_row_pool_for_stage_order(
                 indicator_id=row_plan.indicator_id,
@@ -1596,13 +1583,16 @@ class BacktestStageAShortlistBuilderV2:
                 runtime plan already narrowed Stage A directly, otherwise `None`.
         Assumptions:
             Hybrid shortlist plans may publish sparse retained Stage A survivors explicitly, in
-            which case Stage A must iterate that list directly instead of rebuilding a cartesian
-            product from retained row pools.
+            which case Stage A iterates that list directly. Parity-first no-risk plans must bypass
+            this reduced-plan surface and rebuild deterministic narrowed combos from retained row
+            pools.
         Raises:
             ValueError: If the runtime plan exposes an empty explicit retained-variant surface.
         Side Effects:
             None.
         """
+        if not self._uses_combo_proxy_prefilter_for_grid_context(grid_context=grid_context):
+            return None
         retained_variants = getattr(grid_context, "retained_stage_a_variants", None)
         if retained_variants is None:
             return None
@@ -1615,6 +1605,77 @@ class BacktestStageAShortlistBuilderV2:
                 "retained_stage_a_variants when the runtime plan exposes them"
             )
         return normalized_variants
+
+    def _uses_combo_proxy_prefilter_for_grid_context(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+    ) -> bool:
+        """
+        Resolve whether Stage A should keep combo proxy prefiltering for this runtime plan.
+
+        Args:
+            grid_context: Stage A runtime plan or compatible fixture exposing execution profile.
+        Returns:
+            bool: `False` only for parity-first `exact_no_risk_parity`; `True` otherwise.
+        Assumptions:
+            D3 keeps combo proxy prefilter for legacy/hybrid paths, while canonical no-risk parity
+            must exact-score every narrowed combo directly from retained row pools.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        execution_profile = getattr(grid_context, "execution_profile", None)
+        profile_mode = getattr(execution_profile, "mode", None)
+        if profile_mode is None:
+            return True
+        return str(profile_mode).strip().lower() != "exact_no_risk_parity"
+
+    def _assert_parity_narrowed_combo_cardinality_for_grid_context(
+        self,
+        *,
+        grid_context: BacktestArtifactRuntimePlanV2,
+        use_combo_proxy_prefilter: bool,
+        narrowed_combo_total: int,
+    ) -> None:
+        """
+        Assert additive parity narrowed-combo counters when the runtime plan exposes them.
+
+        Args:
+            grid_context: Stage A runtime plan or compatible fixture.
+            use_combo_proxy_prefilter:
+                Whether this run still uses combo proxy prefiltering (non-parity paths).
+            narrowed_combo_total: Live narrowed Stage A variant total derived from retained rows.
+        Returns:
+            None.
+        Assumptions:
+            D3 parity runs should enumerate every narrowed combo directly, so runtime-plan counters
+            must stay aligned with the live narrowed cardinality when additive counters exist.
+        Raises:
+            ValueError: If parity runtime counters report a narrowed combo total that drifts from
+                live retained-row enumeration.
+        Side Effects:
+            None.
+        """
+        if use_combo_proxy_prefilter:
+            return
+        no_risk_parity_counters = getattr(grid_context, "no_risk_parity_counters", None)
+        if no_risk_parity_counters is None:
+            return
+        expected_narrowed_combo_total = getattr(
+            no_risk_parity_counters,
+            "narrowed_combo_total",
+            None,
+        )
+        if expected_narrowed_combo_total is None:
+            return
+        if int(expected_narrowed_combo_total) != int(narrowed_combo_total):
+            raise ValueError(
+                "Stage A exact_no_risk_parity narrowed_combo_total counter drifted from live "
+                f"retained-row enumeration: expected {int(expected_narrowed_combo_total)}, "
+                f"got {int(narrowed_combo_total)}"
+            )
 
     def _retained_row_pool_for_stage_order(
         self,
@@ -1871,13 +1932,10 @@ class BacktestStageAShortlistBuilderV2:
             None.
         """
         if retained_chunk_limit <= 0:
-            raise ValueError(
-                "Stage A combo proxy prefilter requires retained_chunk_limit > 0"
-            )
+            raise ValueError("Stage A combo proxy prefilter requires retained_chunk_limit > 0")
         if int(final_signal.shape[0]) != len(chunk_variants):
             raise ValueError(
-                "Stage A combo proxy prefilter requires final_signal rows to match "
-                "chunk_variants"
+                "Stage A combo proxy prefilter requires final_signal rows to match chunk_variants"
             )
         proxy_scores = self._prefilter_proxy_scores_for_rows(
             signal_rows=final_signal,
@@ -1891,9 +1949,7 @@ class BacktestStageAShortlistBuilderV2:
             count=len(chunk_variants),
         )
         stage_order = np.argsort(stage_a_indexes, kind="mergesort")
-        ranked_row_indexes = stage_order[
-            np.argsort(-proxy_scores[stage_order], kind="mergesort")
-        ]
+        ranked_row_indexes = stage_order[np.argsort(-proxy_scores[stage_order], kind="mergesort")]
         retained_row_count = min(len(chunk_variants), retained_chunk_limit)
         selected_row_indexes = np.sort(
             np.asarray(
@@ -2059,9 +2115,7 @@ class BacktestStageAShortlistBuilderV2:
         for signal_axis in signal_axes:
             signal_variants_total *= len(signal_axis.values)
         if signal_variants_total <= 0:
-            raise ValueError(
-                "Stage A row prefilter requires positive signal-axis cardinality"
-            )
+            raise ValueError("Stage A row prefilter requires positive signal-axis cardinality")
         stage_a_variants_total = int(
             getattr(grid_context, "stage_a_variants_total", shortlist_limit)
         )
@@ -2092,9 +2146,7 @@ class BacktestStageAShortlistBuilderV2:
             None.
         """
         if shortlist_limit <= 0:
-            raise ValueError(
-                "Stage A combo proxy prefilter requires shortlist_limit > 0"
-            )
+            raise ValueError("Stage A combo proxy prefilter requires shortlist_limit > 0")
         stage_a_variants_total = int(
             getattr(grid_context, "stage_a_variants_total", shortlist_limit)
         )
@@ -2103,8 +2155,7 @@ class BacktestStageAShortlistBuilderV2:
             stage_a_variants_total,
             max(
                 effective_shortlist_limit,
-                effective_shortlist_limit
-                * _COMBO_PROXY_PREFILTER_SURVIVOR_MULTIPLIER_V2,
+                effective_shortlist_limit * _COMBO_PROXY_PREFILTER_SURVIVOR_MULTIPLIER_V2,
             ),
         )
 
@@ -2171,8 +2222,7 @@ class BacktestStageAShortlistBuilderV2:
             retained_frontier = row_prefilter_frontier.get(row_plan.indicator_id)
             if retained_frontier is None:
                 raise ValueError(
-                    "Stage A row prefilter is missing retained rows for "
-                    f"{row_plan.indicator_id!r}"
+                    f"Stage A row prefilter is missing retained rows for {row_plan.indicator_id!r}"
                 )
             row_index = row_plan.row_index_for_selection(
                 selection=_indicator_selection_for_plan_v2(
@@ -2487,10 +2537,10 @@ class BacktestStageAShortlistBuilderV2:
         Returns:
             None.
         Assumptions:
-            The combo proxy prefilter narrows candidates first, and only the retained chunk
-            receives internal compact exact payload construction before Stage A no-risk ranking,
-            with shortlisted rows carrying the same exact no-risk metric payload into the direct
-            no-risk finalization path.
+            Legacy/hybrid paths may narrow with combo proxy prefilter first, while parity-first
+            no-risk paths feed every narrowed chunk variant directly into exact scoring. In both
+            cases shortlisted rows carry the same exact no-risk metric payload into direct no-risk
+            finalization.
         Raises:
             ValueError: If `final_signal` row count drifts from `chunk_variants`.
         Side Effects:
@@ -2593,9 +2643,7 @@ def _retained_row_limits_v2(
         1,
         int(math.ceil(target_compute_variants ** (1.0 / len(normalized_variants)))),
     )
-    retained_limits = [
-        min(variants, base_limit) for variants in normalized_variants
-    ]
+    retained_limits = [min(variants, base_limit) for variants in normalized_variants]
     retained_product = math.prod(retained_limits)
     while retained_product < target_compute_variants:
         grew = False
@@ -2659,9 +2707,7 @@ def build_default_stage_a_shortlist_builder_v2(
     return BacktestStageAShortlistBuilderV2(
         price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=typed_artifact_loader),
         signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=typed_artifact_loader),
-        signal_features_loader=MmapSignalFeaturesLoaderV2(
-            artifact_loader=typed_artifact_loader
-        ),
+        signal_features_loader=MmapSignalFeaturesLoaderV2(artifact_loader=typed_artifact_loader),
         configurable_ranking_enabled=configurable_ranking_enabled,
         init_cash_quote_default=init_cash_quote_default,
         fixed_quote_default=fixed_quote_default,
@@ -2714,8 +2760,7 @@ def build_prepared_indicator_row_plan_from_grid_spec_v2(
     if grid_spec.source is not None:
         axis_names.append("source")
         axis_values_by_name["source"] = tuple(
-            _normalize_indicator_scalar_v2(value=value)
-            for value in grid_spec.source.materialize()
+            _normalize_indicator_scalar_v2(value=value) for value in grid_spec.source.materialize()
         )
     for param_name in sorted(grid_spec.params.keys()):
         axis_names.append(param_name)
@@ -3068,9 +3113,7 @@ def _resolve_number_v2(
     if candidate is None:
         return float(default)
     if isinstance(candidate, bool) or not isinstance(candidate, int | float):
-        raise ValueError(
-            f"execution field '{primary_key}' must be numeric when provided"
-        )
+        raise ValueError(f"execution field '{primary_key}' must be numeric when provided")
     return float(candidate)
 
 

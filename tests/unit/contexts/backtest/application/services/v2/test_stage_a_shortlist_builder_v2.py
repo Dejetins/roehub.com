@@ -949,9 +949,7 @@ def test_stage_a_shortlist_builder_v2_hands_retained_exact_payload_into_stage_b(
     assert scored_row.best_sl_pct == sl_pct
     assert metrics["total_return_pct"] == scored_row.total_return_pct
     assert "trade_count" not in metrics
-    assert scored_row.summary_metrics_json == {
-        "total_return_pct": scored_row.total_return_pct
-    }
+    assert scored_row.summary_metrics_json == {"total_return_pct": scored_row.total_return_pct}
 
     details = scorer.score_variant_with_details(
         stage="stage_b",
@@ -1087,8 +1085,7 @@ def test_stage_a_shortlist_builder_v2_batch_prefilter_proxy_scores_match_scalar_
     np.testing.assert_allclose(batch_scores, scalar_scores)
 
 
-def test_stage_a_shortlist_builder_v2_numeric_prefilter_ranking_matches_generic_reference(
-) -> None:
+def test_stage_a_shortlist_builder_v2_numeric_prefilter_ranking_matches_generic_reference() -> None:
     """
     Verify numeric Stage A row ranking preserves the former generic tie-break semantics.
 
@@ -1380,9 +1377,7 @@ def test_stage_a_shortlist_builder_v2_row_prefilter_does_not_read_generic_row_sc
             Side Effects:
                 None.
             """
-            raise AssertionError(
-                "Stage A row prefilter should not read GenericRowScorerV2 config"
-            )
+            raise AssertionError("Stage A row prefilter should not read GenericRowScorerV2 config")
 
     store = synthetic_artifact_store_v2
     context = _inactive_context(store)
@@ -1647,9 +1642,14 @@ def test_stage_a_shortlist_builder_v2_breaks_metric_ties_by_base_variant_key() -
 
     shortlist = builder.build_shortlist(
         grid_context=cast(Any, grid_context),
-        artifact_context=cast(ArtifactSlotPinnedRuntimeContextV2, SimpleNamespace(
-            coordinates=SimpleNamespace(exchange="binance", market_type="spot", symbol="BTCUSDT")
-        )),
+        artifact_context=cast(
+            ArtifactSlotPinnedRuntimeContextV2,
+            SimpleNamespace(
+                coordinates=SimpleNamespace(
+                    exchange="binance", market_type="spot", symbol="BTCUSDT"
+                )
+            ),
+        ),
         target_time_range=_synthetic_target_time_range(),
         shortlist_limit=2,
         ranking=BacktestRankingConfig(primary_metric="total_return_pct"),
@@ -1799,6 +1799,130 @@ def test_stage_a_shortlist_builder_v2_uses_explicit_retained_variants_when_prese
     )
 
 
+def test_stage_a_shortlist_builder_v2_no_risk_parity_bypasses_hybrid_reduction(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify no-risk parity bypasses reduced-plan survivors and exact-scores narrowed combos direct.
+
+    Args:
+        monkeypatch: Pytest fixture used to fail fast if combo proxy prefilter is called.
+    Returns:
+        None.
+    Assumptions:
+        D3 requires canonical parity Stage A to ignore `retained_stage_a_variants` inherited from
+        hybrid reduced-plan semantics and enumerate notebook-shaped narrowed combos directly from
+        retained row pools in deterministic order.
+    Raises:
+        AssertionError: If parity Stage A still depends on reduced-plan survivors or combo proxy
+            chunk prefiltering.
+    Side Effects:
+        Monkeypatches one combo-proxy helper during one in-memory Stage A run.
+    """
+
+    def _raise_combo_proxy_call(*args: Any, **kwargs: Any) -> Any:
+        """
+        Fail fast if no-risk parity Stage A still calls combo proxy prefiltering.
+
+        Args:
+            *args: Ignored positional arguments from the patched method call.
+            **kwargs: Ignored keyword arguments from the patched method call.
+        Returns:
+            Any: This helper never returns successfully.
+        Assumptions:
+            D3 parity path must exact-score every narrowed combo directly.
+        Raises:
+            AssertionError: Always, because combo proxy prefilter is forbidden for parity runs.
+        Side Effects:
+            None.
+        """
+        raise AssertionError("Stage A exact_no_risk_parity path must bypass combo proxy prefilter")
+
+    monkeypatch.setattr(
+        BacktestStageAShortlistBuilderV2,
+        "_select_combo_proxy_retained_chunk_row_indexes",
+        _raise_combo_proxy_call,
+    )
+
+    grid_context = _combo_proxy_grid_context()
+    setattr(grid_context, "execution_profile", SimpleNamespace(mode="exact_no_risk_parity"))
+    setattr(
+        grid_context,
+        "retained_stage_a_variants",
+        (
+            _combo_proxy_base_variant(
+                stage_a_index=6,
+                alpha_window=20,
+                beta_window=15,
+                gamma_window=1,
+            ),
+            _combo_proxy_base_variant(
+                stage_a_index=7,
+                alpha_window=20,
+                beta_window=15,
+                gamma_window=2,
+            ),
+        ),
+    )
+
+    shortlist = BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=_ComboProxyPriceLoader(),
+        signal_matrix_loader=_combo_proxy_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, grid_context),
+        artifact_context=cast(Any, _combo_proxy_artifact_context()),
+        target_time_range=_combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=8,
+        parallelism=numba_runtime_module.BacktestStageAParallelismConfigV1(
+            stage_a_workers=1,
+            numba_threads=1,
+        ),
+    )
+
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
+
+
+def test_stage_a_shortlist_builder_v2_no_risk_parity_rejects_narrowed_combo_counter_drift() -> None:
+    """
+    Verify no-risk parity fails fast when runtime counters drift from live narrowed combos.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        D3 parity runs should expose narrowed combo cardinality as additive runtime evidence, and
+        Stage A should reject stale/misaligned parity counters before scoring.
+    Raises:
+        AssertionError: If parity counter drift is not surfaced as deterministic validation.
+    Side Effects:
+        None.
+    """
+    grid_context = _combo_proxy_grid_context()
+    setattr(grid_context, "execution_profile", SimpleNamespace(mode="exact_no_risk_parity"))
+    setattr(grid_context, "no_risk_parity_counters", SimpleNamespace(narrowed_combo_total=7))
+
+    with pytest.raises(
+        ValueError,
+        match="narrowed_combo_total counter drifted",
+    ):
+        BacktestStageAShortlistBuilderV2(
+            price_arrays_loader=_ComboProxyPriceLoader(),
+            signal_matrix_loader=_combo_proxy_signal_loader(),
+        ).build_shortlist(
+            grid_context=cast(Any, grid_context),
+            artifact_context=cast(Any, _combo_proxy_artifact_context()),
+            target_time_range=_combo_proxy_target_time_range(),
+            shortlist_limit=2,
+            batch_size=8,
+            parallelism=numba_runtime_module.BacktestStageAParallelismConfigV1(
+                stage_a_workers=1,
+                numba_threads=1,
+            ),
+        )
+
+
 def test_stage_a_shortlist_builder_v2_streaming_exact_shortlist_is_batch_invariant() -> None:
     """
     Verify streaming exact scoring keeps the deterministic Stage A shortlist stable across batches.
@@ -1836,9 +1960,9 @@ def test_stage_a_shortlist_builder_v2_streaming_exact_shortlist_is_batch_invaria
         batch_size=8,
     )
 
-    assert tuple(
-        row.base_variant.base_variant_key for row in small_batch_shortlist
-    ) == tuple(row.base_variant.base_variant_key for row in large_batch_shortlist)
+    assert tuple(row.base_variant.base_variant_key for row in small_batch_shortlist) == tuple(
+        row.base_variant.base_variant_key for row in large_batch_shortlist
+    )
 
 
 def test_stage_a_shortlist_builder_v2_applies_stage_a_workers_to_live_kernel_path(
@@ -1860,9 +1984,7 @@ def test_stage_a_shortlist_builder_v2_applies_stage_a_workers_to_live_kernel_pat
         Monkeypatches the ordered aggregation helper during one in-memory Stage A run.
     """
     observed_numba_threads: list[int] = []
-    original_aggregate = (
-        stage_a_shortlist_builder_module.aggregate_ordered_final_signal_rows_v2
-    )
+    original_aggregate = stage_a_shortlist_builder_module.aggregate_ordered_final_signal_rows_v2
 
     def _recording_aggregate(**kwargs: Any) -> np.ndarray:
         """
@@ -1880,9 +2002,7 @@ def test_stage_a_shortlist_builder_v2_applies_stage_a_workers_to_live_kernel_pat
         Side Effects:
             Appends one observed Numba thread count to the in-memory log.
         """
-        observed_numba_threads.append(
-            numba_runtime_module.current_backtest_numba_threads_v1()
-        )
+        observed_numba_threads.append(numba_runtime_module.current_backtest_numba_threads_v1())
         return original_aggregate(**kwargs)
 
     monkeypatch.setattr(
@@ -1911,8 +2031,9 @@ def test_stage_a_shortlist_builder_v2_applies_stage_a_workers_to_live_kernel_pat
     assert max(observed_numba_threads) == 2
 
 
-def test_stage_a_shortlist_builder_v2_streaming_exact_scoring_removes_deferred_replay_helpers(
-) -> None:
+def test_stage_a_shortlist_builder_v2_streaming_exact_scoring_removes_deferred_replay_helpers() -> (
+    None
+):
     """
     Verify Stage A no longer exposes deferred retained replay helpers on the active builder.
 
@@ -2120,9 +2241,7 @@ def _record_streaming_exact_chunks(
         `BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap`.
     """
     streaming_exact_chunks: list[tuple[int, ...]] = []
-    original_method = (
-        BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap
-    )
+    original_method = BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap
 
     def _recording_method(self: Any, **kwargs: Any) -> None:
         """
@@ -2142,9 +2261,7 @@ def _record_streaming_exact_chunks(
             Appends exact-scored Stage A indexes to the in-memory log.
         """
         streaming_exact_chunks.append(
-            tuple(
-                variant.stage_a_index for variant in kwargs["chunk_variants"]
-            )
+            tuple(variant.stage_a_index for variant in kwargs["chunk_variants"])
         )
         original_method(self, **kwargs)
 

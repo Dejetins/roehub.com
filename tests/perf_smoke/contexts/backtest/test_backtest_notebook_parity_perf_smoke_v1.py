@@ -113,9 +113,7 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     )
     assert synthetic_authority.scenario_ids == ("nr2", "rg_ttr", "rg_alt")
     assert synthetic_authority.grants_final_closure is False
-    live_authority = corpus.authority_layer_for_kind(
-        authority_kind="live_host_measurement"
-    )
+    live_authority = corpus.authority_layer_for_kind(authority_kind="live_host_measurement")
     assert live_authority.scenario_ids == ("nr2", "rg_ttr")
     assert live_authority.grants_final_closure is True
     assert corpus.source_fixtures.perf_smoke_harness == (
@@ -205,10 +203,7 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert rg_ttr_live_capture.captured_measurement.wall_clock_seconds == 9.896754750000127
     assert rg_ttr_live_capture.captured_measurement.peak_rss_bytes == 23074209792
     assert rg_ttr_live_capture.captured_measurement.stage_b_execution_mode == "bypassed_no_risk"
-    assert (
-        corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr")
-        is True
-    )
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr") is True
 
     rg_alt = corpus.scenario_for_id(scenario_id="rg_alt")
     assert rg_alt.benchmark_class == "RG-ALT"
@@ -295,14 +290,13 @@ def test_notebook_parity_thread_budget_contract_is_aligned_with_exact_parallel_d
     assert exact_parallel_profile.parallelism.stage_a_workers == accepted_thread_budget
     assert exact_parallel_profile.parallelism.stage_b_workers == 1
     assert (
-        corpus.scenario_for_id(scenario_id="nr2").baseline_reference_points[
-            1
-        ].numba_threads_used
+        corpus.scenario_for_id(scenario_id="nr2").baseline_reference_points[1].numba_threads_used
         == accepted_thread_budget
     )
-    assert corpus.scenario_for_id(
-        scenario_id="rg_ttr"
-    ).baseline_reference_points[0].numba_threads_used == accepted_thread_budget
+    assert (
+        corpus.scenario_for_id(scenario_id="rg_ttr").baseline_reference_points[0].numba_threads_used
+        == accepted_thread_budget
+    )
 
     repo_root = Path(__file__).resolve().parents[4]
     for env_name in ("dev", "test", "prod"):
@@ -315,9 +309,10 @@ def test_notebook_parity_thread_budget_contract_is_aligned_with_exact_parallel_d
         }
 
         assert int(payload["backtest"]["cpu"]["max_numba_threads"]) == accepted_thread_budget
-        assert int(
-            profiles_by_mode["exact_parallel"]["parallelism"]["stage_a_workers"]
-        ) == accepted_thread_budget
+        assert (
+            int(profiles_by_mode["exact_parallel"]["parallelism"]["stage_a_workers"])
+            == accepted_thread_budget
+        )
         assert int(profiles_by_mode["exact_parallel"]["parallelism"]["stage_b_workers"]) == 1
 
 
@@ -376,12 +371,10 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
         ),
     )
 
-    serialized = serialize_backtest_notebook_parity_measurements_v2(
-        measurements=measurements
-    )
+    serialized = serialize_backtest_notebook_parity_measurements_v2(measurements=measurements)
 
     assert serialized == (
-        b'{\n'
+        b"{\n"
         b'  "measurements": [\n'
         b"    {\n"
         b'      "scenario_id": "nr2",\n'
@@ -464,13 +457,11 @@ def test_notebook_parity_live_host_capture_serialization_is_deterministic() -> N
         ),
     )
 
-    serialized = serialize_backtest_notebook_parity_live_host_captures_v2(
-        captures=(capture,)
-    )
+    serialized = serialize_backtest_notebook_parity_live_host_captures_v2(captures=(capture,))
 
     assert capture.has_required_capture_evidence() is True
     assert serialized == (
-        b'{\n'
+        b"{\n"
         b'  "live_host_captures": [\n'
         b"    {\n"
         b'      "capture_id": "nr2_live_host_capture",\n'
@@ -529,10 +520,7 @@ def test_notebook_parity_closure_authority_tracks_explicit_live_host_capture() -
     corpus = _load_notebook_parity_benchmark_corpus()
 
     assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is True
-    assert (
-        corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr")
-        is True
-    )
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr") is True
     assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_alt") is True
 
     captured_nr2 = _build_live_host_capture(
@@ -664,8 +652,7 @@ def test_stage_a_streaming_exact_runtime_shape_is_observable_for_benchmarks() ->
     assert runtime_shape.numba_threads_used is None
 
 
-def test_no_risk_parity_runtime_plan_is_first_class_and_exposes_additive_counters(
-) -> None:
+def test_no_risk_parity_runtime_plan_is_first_class_and_exposes_additive_counters() -> None:
     """
     Verify canonical no-risk parity plan is first-class and exposes D2 benchmark-facing counters.
 
@@ -768,8 +755,7 @@ def test_no_risk_parity_runtime_plan_is_first_class_and_exposes_additive_counter
 
     assert parity_plan.uses_hybrid_reduced_plan_contract() is False
     assert (
-        runtime_plan_requires_hierarchical_shortlist_runtime_v2(runtime_plan=parity_plan)
-        is False
+        runtime_plan_requires_hierarchical_shortlist_runtime_v2(runtime_plan=parity_plan) is False
     )
     assert counters["retained_rows_total"] == 5
     assert counters["narrowed_combo_total"] == 6
@@ -810,9 +796,8 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
     """
     retained_chunk_sizes: list[int] = []
     observed_numba_threads: list[int] = []
-    original_method = (
-        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap
-    )
+    stage_a_builder_cls = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2
+    original_method = stage_a_builder_cls._merge_retained_exact_payload_chunk_into_heap
     original_aggregate = stage_a_shortlist_builder_module.aggregate_ordered_final_signal_rows_v2
 
     def _recording_method(self: Any, **kwargs: Any) -> None:
@@ -850,9 +835,7 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
         Side Effects:
             Appends one observed thread count to the in-memory log.
         """
-        observed_numba_threads.append(
-            numba_runtime_module.current_backtest_numba_threads_v1()
-        )
+        observed_numba_threads.append(numba_runtime_module.current_backtest_numba_threads_v1())
         return original_aggregate(**kwargs)
 
     monkeypatch.setattr(
@@ -1023,9 +1006,8 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_narrowed_frontier_cardinal
     """
     retained_chunk_sizes: list[int] = []
     checkpoints: list[tuple[int, int]] = []
-    original_method = (
-        stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2._merge_retained_exact_payload_chunk_into_heap
-    )
+    stage_a_builder_cls = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2
+    original_method = stage_a_builder_cls._merge_retained_exact_payload_chunk_into_heap
 
     def _recording_method(self: Any, **kwargs: Any) -> None:
         """
@@ -1052,12 +1034,8 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_narrowed_frontier_cardinal
         _recording_method,
     )
 
-    store = stage_a_shortlist_builder_testkit.build_synthetic_artifact_store_v2(
-        tmp_path=tmp_path
-    )
-    grid_context = stage_a_shortlist_builder_testkit._grid_context_for_windows(
-        windows=(10, 20)
-    )
+    store = stage_a_shortlist_builder_testkit.build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    grid_context = stage_a_shortlist_builder_testkit._grid_context_for_windows(windows=(10, 20))
 
     shortlist = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2(
         price_arrays_loader=stage_a_shortlist_builder_testkit.MmapPriceArraysLoaderV2(
@@ -1092,6 +1070,114 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_narrowed_frontier_cardinal
     assert runtime_shape.narrowed_stage_a_variants_total == 1
     assert runtime_shape.stage_a_variants_total == 2
     assert runtime_shape.narrowed_stage_a_variants_total < runtime_shape.stage_a_variants_total
+
+
+def test_nr2_f7d2_top_result_parity_is_blocking_for_no_risk_stage_a_pipeline() -> None:
+    """
+    Verify canonical no-risk parity treats notebook top-result identity as a blocking contract.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        D3 requires canonical `NR2` (`f7d2`) parity runs to keep `sync_inline` +
+        `bypassed_no_risk` runtime shape while bypassing inherited `hybrid_conservative`
+        reduced-survivor semantics before Stage A top-result selection.
+    Raises:
+        AssertionError: If parity Stage A top-1 identity diverges from notebook-shaped narrowed
+            combo enumeration or collapses back to hybrid reduced survivors.
+    Side Effects:
+        None.
+    """
+    scenario_id = "NR2"
+    notebook_anchor_id = "f7d2"
+    execution_mode_literal = "sync_inline"
+    stage_b_mode_literal = "bypassed_no_risk"
+    hybrid_mode_literal = "hybrid_conservative"
+
+    parity_grid_context = stage_a_shortlist_builder_testkit._combo_proxy_grid_context()
+    setattr(
+        parity_grid_context,
+        "execution_profile",
+        SimpleNamespace(mode="exact_no_risk_parity"),
+    )
+    setattr(
+        parity_grid_context,
+        "retained_stage_a_variants",
+        (
+            stage_a_shortlist_builder_testkit._combo_proxy_base_variant(
+                stage_a_index=6,
+                alpha_window=20,
+                beta_window=15,
+                gamma_window=1,
+            ),
+            stage_a_shortlist_builder_testkit._combo_proxy_base_variant(
+                stage_a_index=7,
+                alpha_window=20,
+                beta_window=15,
+                gamma_window=2,
+            ),
+        ),
+    )
+    hybrid_grid_context = stage_a_shortlist_builder_testkit._combo_proxy_grid_context()
+    setattr(
+        hybrid_grid_context,
+        "execution_profile",
+        SimpleNamespace(mode=hybrid_mode_literal),
+    )
+    setattr(
+        hybrid_grid_context,
+        "retained_stage_a_variants",
+        cast(Any, parity_grid_context).retained_stage_a_variants,
+    )
+
+    builder = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=stage_a_shortlist_builder_testkit._ComboProxyPriceLoader(),
+        signal_matrix_loader=stage_a_shortlist_builder_testkit._combo_proxy_signal_loader(),
+    )
+    parallelism = numba_runtime_module.BacktestStageAParallelismConfigV1(
+        stage_a_workers=1,
+        numba_threads=1,
+    )
+    parity_shortlist = builder.build_shortlist(
+        grid_context=cast(Any, parity_grid_context),
+        artifact_context=cast(
+            Any,
+            stage_a_shortlist_builder_testkit._combo_proxy_artifact_context(),
+        ),
+        target_time_range=stage_a_shortlist_builder_testkit._combo_proxy_target_time_range(),
+        shortlist_limit=1,
+        batch_size=8,
+        parallelism=parallelism,
+    )
+    hybrid_shortlist = builder.build_shortlist(
+        grid_context=cast(Any, hybrid_grid_context),
+        artifact_context=cast(
+            Any,
+            stage_a_shortlist_builder_testkit._combo_proxy_artifact_context(),
+        ),
+        target_time_range=stage_a_shortlist_builder_testkit._combo_proxy_target_time_range(),
+        shortlist_limit=1,
+        batch_size=8,
+        parallelism=parallelism,
+    )
+
+    notebook_top_stage_a_index = 0
+    assert parity_shortlist[0].base_variant.stage_a_index == notebook_top_stage_a_index, (
+        f"{scenario_id}/{notebook_anchor_id} {execution_mode_literal} "
+        f"{stage_b_mode_literal} parity top-1 must match notebook-shaped narrowed combos"
+    )
+    assert hybrid_shortlist[0].base_variant.stage_a_index != notebook_top_stage_a_index, (
+        f"{scenario_id}/{notebook_anchor_id} parity check must fail when "
+        f"{hybrid_mode_literal} reduced survivors are reused"
+    )
 
 
 def test_stage_a_parallelism_resolution_clamps_requested_workers_to_thread_budget() -> None:

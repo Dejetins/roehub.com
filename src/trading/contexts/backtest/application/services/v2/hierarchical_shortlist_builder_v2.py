@@ -245,25 +245,20 @@ class HierarchicalShortlistRuntimePlanV2(BacktestArtifactRuntimePlanV2):
                 "HierarchicalShortlistRuntimePlanV2.proposal_layer_source must be "
                 "'universal' or 'family_plugin'"
             )
-        if (
-            self.proposal_layer_source == "family_plugin"
-            and self.family_plugin_proposal is None
-        ):
+        if self.proposal_layer_source == "family_plugin" and self.family_plugin_proposal is None:
             raise ValueError(
                 "HierarchicalShortlistRuntimePlanV2.family_plugin_proposal is required when "
                 "proposal_layer_source='family_plugin'"
             )
-        if (
-            self.proposal_layer_source == "universal"
-            and self.family_plugin_proposal is not None
-        ):
+        if self.proposal_layer_source == "universal" and self.family_plugin_proposal is not None:
             raise ValueError(
                 "HierarchicalShortlistRuntimePlanV2.family_plugin_proposal must be None when "
                 "proposal_layer_source='universal'"
             )
         if (
             self.family_plugin_registry_status is not None
-            and self.family_plugin_registry_status not in {
+            and self.family_plugin_registry_status
+            not in {
                 "resolved",
                 "disabled",
                 "not_applicable",
@@ -480,15 +475,13 @@ class BacktestHierarchicalShortlistBuilderV2:
     signal_matrix_loader: BacktestSignalMatrixLoaderV2
     defaults_provider: BacktestGridDefaultsProvider | None = None
     row_scorer: GenericRowScorerV2 = field(default_factory=GenericRowScorerV2)
-    diversified_retention: DiversifiedRetentionV2 = field(
-        default_factory=DiversifiedRetentionV2
-    )
+    diversified_retention: DiversifiedRetentionV2 = field(default_factory=DiversifiedRetentionV2)
     family_plugin_registry: FamilyPluginRegistryV2 = field(
         default_factory=build_default_family_plugin_registry_v2
     )
-    family_plugin_circuit_breaker_factory: Callable[
-        [], FamilyPluginCircuitBreakerV2
-    ] = FamilyPluginCircuitBreakerV2
+    family_plugin_circuit_breaker_factory: Callable[[], FamilyPluginCircuitBreakerV2] = (
+        FamilyPluginCircuitBreakerV2
+    )
     block_survivor_multiplier: int = 2
 
     def __post_init__(self) -> None:
@@ -508,13 +501,9 @@ class BacktestHierarchicalShortlistBuilderV2:
             None.
         """
         if self.price_arrays_loader is None:  # type: ignore[truthy-bool]
-            raise ValueError(
-                "BacktestHierarchicalShortlistBuilderV2 requires price_arrays_loader"
-            )
+            raise ValueError("BacktestHierarchicalShortlistBuilderV2 requires price_arrays_loader")
         if self.signal_matrix_loader is None:  # type: ignore[truthy-bool]
-            raise ValueError(
-                "BacktestHierarchicalShortlistBuilderV2 requires signal_matrix_loader"
-            )
+            raise ValueError("BacktestHierarchicalShortlistBuilderV2 requires signal_matrix_loader")
         if self.family_plugin_registry is None:  # type: ignore[truthy-bool]
             raise ValueError(
                 "BacktestHierarchicalShortlistBuilderV2 requires family_plugin_registry"
@@ -603,6 +592,12 @@ class BacktestHierarchicalShortlistBuilderV2:
             may execute one proposal-only family plugin for `hybrid_family`.
         """
         profile = runtime_plan.execution_profile
+        if profile.mode == "exact_no_risk_parity":
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires explicit hybrid shortlist "
+                "runtime-enabled profile; exact_no_risk_parity must bypass hierarchical "
+                "shortlist reduction"
+            )
         if not execution_profile_uses_hierarchical_shortlist_runtime_v2(profile=profile):
             raise ValueError(
                 "BacktestHierarchicalShortlistBuilderV2 requires explicit "
@@ -869,9 +864,7 @@ class BacktestHierarchicalShortlistBuilderV2:
             None.
         """
         if len(proposal.row_shortlist) == 0:
-            raise ValueError(
-                "family plugin proposal layer must emit a non-empty row_shortlist"
-            )
+            raise ValueError("family plugin proposal layer must emit a non-empty row_shortlist")
         retained_stage_a_variants = tuple(
             runtime_plan.stage_a_variant_for_index(stage_a_index=stage_a_index)
             for stage_a_index in proposal.row_shortlist
@@ -938,9 +931,7 @@ class BacktestHierarchicalShortlistBuilderV2:
             source_runtime_plan=runtime_plan,
             retained_stage_a_variants=tuple(runtime_plan.iter_stage_a_variants()),
             block_results=(),
-            retained_compute_variants_total=_compute_variants_total_v2(
-                runtime_plan=runtime_plan
-            ),
+            retained_compute_variants_total=_compute_variants_total_v2(runtime_plan=runtime_plan),
             proposal_layer_source=proposal_layer_source,
             family_plugin_registry_status=family_plugin_registry_status,
             family_plugin_warning=family_plugin_warning,
@@ -1174,12 +1165,8 @@ class BacktestHierarchicalShortlistBuilderV2:
             low_activity_threshold=self.row_scorer.low_activity_threshold,
             high_activity_threshold=self.row_scorer.high_activity_threshold,
             direction_balance_threshold=self.row_scorer.direction_balance_threshold,
-            low_transition_ratio_threshold=(
-                self.row_scorer.low_transition_ratio_threshold
-            ),
-            high_transition_ratio_threshold=(
-                self.row_scorer.high_transition_ratio_threshold
-            ),
+            low_transition_ratio_threshold=(self.row_scorer.low_transition_ratio_threshold),
+            high_transition_ratio_threshold=(self.row_scorer.high_transition_ratio_threshold),
         )
 
     def _row_inputs_for_indicator_plan(
@@ -1335,11 +1322,7 @@ class BacktestHierarchicalShortlistBuilderV2:
                     "Hierarchical shortlist could not resolve selection value for axis "
                     f"{axis.name!r} in {plan.indicator_id!r}"
                 )
-            axis_values = (
-                artifact_source_values
-                if axis.name == "source"
-                else tuple(axis.values)
-            )
+            axis_values = artifact_source_values if axis.name == "source" else tuple(axis.values)
             try:
                 coordinate = axis_values.index(selected_value)
             except ValueError as exc:
@@ -1396,8 +1379,7 @@ class BacktestHierarchicalShortlistBuilderV2:
                 for retained_row in block_result.retained_rows:
                     expanded.append(
                         _HierarchicalBeamCandidateV2(
-                            row_indexes=partial_candidate.row_indexes
-                            + (retained_row.row_index,),
+                            row_indexes=partial_candidate.row_indexes + (retained_row.row_index,),
                             indicator_selections=partial_candidate.indicator_selections
                             + (retained_row.selection,),
                             score_total=partial_candidate.score_total
@@ -1487,9 +1469,7 @@ class BacktestHierarchicalShortlistBuilderV2:
                         base_variant_key=base_variant_key,
                     )
                 )
-        return tuple(
-            sorted(retained_variants, key=lambda variant: variant.stage_a_index)
-        )
+        return tuple(sorted(retained_variants, key=lambda variant: variant.stage_a_index))
 
 
 def build_default_hierarchical_shortlist_builder_v2(
@@ -1531,9 +1511,7 @@ def build_default_hierarchical_shortlist_builder_v2(
     typed_artifact_loader = cast(BacktestArtifactLoaderV2, artifact_loader)
     return BacktestHierarchicalShortlistBuilderV2(
         price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=typed_artifact_loader),
-        signal_matrix_loader=MmapSignalMatrixLoaderV2(
-            artifact_loader=typed_artifact_loader
-        ),
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=typed_artifact_loader),
         defaults_provider=defaults_provider,
     )
 
