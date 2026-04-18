@@ -12,6 +12,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestVariantPreview,
     RunBacktestRequest,
     RunBacktestResponse,
+    RunBacktestSyncPersistenceArtifact,
     RunBacktestTemplate,
 )
 from trading.contexts.backtest.application.ports import (
@@ -30,7 +31,14 @@ from trading.contexts.backtest.application.use_cases.backtest_runs_api_v1 import
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
+    BacktestJobStageANoRiskExactRow,
+    BacktestJobStageAShortlist,
     BacktestJobTopVariant,
+)
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityClassification,
+    BacktestJobParityRetainedRowsCounter,
+    BacktestJobParityRuntimeState,
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
@@ -129,6 +137,7 @@ class _FakeJobRepository:
 
     created_job: BacktestJob | None = None
     created_rows: tuple[BacktestJobTopVariant, ...] = tuple()
+    created_stage_a_shortlist: BacktestJobStageAShortlist | None = None
 
     def create(self, *, job: BacktestJob) -> BacktestJob:
         """
@@ -153,6 +162,7 @@ class _FakeJobRepository:
         *,
         job: BacktestJob,
         top_variants: tuple[BacktestJobTopVariant, ...],
+        stage_a_shortlist: BacktestJobStageAShortlist | None = None,
     ) -> BacktestJob:
         """
         Record atomic persisted sync-inline snapshot payload and echo the terminal job row.
@@ -160,6 +170,7 @@ class _FakeJobRepository:
         Args:
             job: Terminal job snapshot.
             top_variants: Summary-only persisted top rows.
+            stage_a_shortlist: Optional internal Stage A shortlist snapshot.
         Returns:
             BacktestJob: Echoed terminal job snapshot.
         Assumptions:
@@ -167,10 +178,11 @@ class _FakeJobRepository:
         Raises:
             None.
         Side Effects:
-            Stores last persisted job row and top rows tuple.
+            Stores last persisted job row, top rows tuple, and optional shortlist snapshot.
         """
         self.created_job = job
         self.created_rows = top_variants
+        self.created_stage_a_shortlist = stage_a_shortlist
         return job
 
     def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
@@ -361,7 +373,8 @@ class _FakeBackgroundCreateUseCase:
 
 def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> None:
     """
-    Verify orchestrator persists terminal sync-inline run row and summary-only top rows.
+    Verify orchestrator persists terminal sync-inline run row, summary-only top rows, and the
+    live parity shortlist snapshot atomically.
 
     Args:
         None.
@@ -441,6 +454,73 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
     assert repo.created_rows[0].summary_metrics_json["win_rate_pct"] == 60.0
     assert repo.created_rows[0].best_tp_pct == 4.0
     assert repo.created_rows[0].best_sl_pct == 2.0
+    assert repo.created_stage_a_shortlist is not None
+    assert repo.created_stage_a_shortlist.job_id == persisted.run_id
+    assert repo.created_stage_a_shortlist.stage_a_indexes == (0,)
+    assert repo.created_stage_a_shortlist.stage_a_variants_total == 100
+    assert repo.created_stage_a_shortlist.preselect_used == 1
+    assert repo.created_stage_a_shortlist.risk_total == 1
+    assert repo.created_stage_a_shortlist.no_risk_exact_rows is not None
+    assert len(repo.created_stage_a_shortlist.no_risk_exact_rows) == 1
+    assert repo.created_stage_a_shortlist.parity_runtime_state is not None
+    assert (
+        repo.created_stage_a_shortlist.parity_runtime_state.execution_profile_mode
+        == "exact_no_risk_parity"
+    )
+    assert (
+        repo.created_stage_a_shortlist.parity_runtime_state.to_json_object()[
+            "stage_b_execution_mode"
+        ]
+        == "bypassed_no_risk"
+    )
+
+
+def test_create_and_run_backtest_sync_inline_rejects_missing_live_parity_shortlist_artifact(
+) -> None:
+    """
+    Verify parity `sync_inline` persistence fails fast when the live Stage A artifact is absent.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical `exact_no_risk_parity` sync runs must carry a live shortlist snapshot into the
+        atomic terminal write instead of recomputing Stage A posthoc.
+    Raises:
+        AssertionError: If sync persistence proceeds without the required internal artifact.
+    Side Effects:
+        None.
+    """
+    repo = _FakeJobRepository()
+    response = replace(_template_run_response(), sync_persistence_artifact=None)
+    now_values = iter(
+        (
+            datetime(2026, 3, 28, 12, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 3, 28, 12, 0, 3, tzinfo=timezone.utc),
+        )
+    )
+    use_case = CreateAndRunBacktestSyncInlineUseCase(
+        run_use_case=_FakeRunUseCase(response=response),
+        job_repository=repo,
+        backtest_runtime_config_hash="f" * 64,
+        engine_version="signal_tf + 1m_risk",
+        now_provider=lambda: next(now_values),
+        run_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000910"),
+    )
+
+    with pytest.raises(BacktestValidationError) as error:
+        use_case.execute(
+            request=_template_request(),
+            current_user=CurrentUser(
+                user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+            ),
+            request_payload=_template_request_payload(),
+        )
+
+    assert "live Stage A artifact" in str(error.value)
+    assert repo.created_job is None
+    assert repo.created_stage_a_shortlist is None
 
 
 def test_create_and_run_backtest_sync_inline_forces_redesigned_internal_profile() -> None:
@@ -1141,6 +1221,78 @@ def _template_run_response() -> RunBacktestResponse:
         artifact_asof_date="2026-03-28",
         artifact_manifest_hash="c" * 64,
         execution_profile_mode="exact_no_risk_parity",
+        sync_persistence_artifact=_template_sync_persistence_artifact(),
+    )
+
+
+def _template_sync_persistence_artifact() -> RunBacktestSyncPersistenceArtifact:
+    """
+    Build deterministic internal sync persistence artifact fixture for parity runs.
+
+    Args:
+        None.
+    Returns:
+        RunBacktestSyncPersistenceArtifact: Live Stage A persistence artifact fixture.
+    Assumptions:
+        Fixture mirrors the shared worker-side shortlist and `parity_runtime_state_json`
+        contract for one retained no-risk row.
+    Raises:
+        ValueError: If the fixture violates internal persistence invariants.
+    Side Effects:
+        None.
+    """
+    return RunBacktestSyncPersistenceArtifact(
+        stage_a_indexes=(0,),
+        stage_a_variants_total=100,
+        risk_total=1,
+        preselect_used=1,
+        no_risk_exact_rows=(
+            BacktestJobStageANoRiskExactRow(
+                entry_signal_idx=(0,),
+                entry_exec_idx=(1,),
+                direction=(1,),
+                sig_exit_signal_idx=(2,),
+                sig_exit_exec_idx=(3,),
+                total_return_pct=12.34,
+                max_drawdown_pct=1.0,
+                return_over_max_drawdown=12.34,
+                profit_factor=1.23,
+                trade_count=1,
+                sharpe_trades=1.5,
+                win_rate_pct=60.0,
+                avg_trade_ret_pct=2.0,
+                avg_trade_exec_bars=3.0,
+                exposure_pct=40.0,
+            ),
+        ),
+        parity_runtime_state=BacktestJobParityRuntimeState(
+            execution_profile_mode="exact_no_risk_parity",
+            parity_classification=BacktestJobParityClassification(
+                parity_class="parity_first_no_risk_exact",
+                disabled_risk_single_cell=True,
+                low_indicator_block_cardinality=True,
+                narrowed_retained_row_evidence=True,
+                notebook_shaped_cost_units=True,
+                nr2_classification_reason=(
+                    "canonical NR2 f7d2 no-risk single-cell parity class; "
+                    "retained_rows=1; combo_prefilter_variants=1"
+                ),
+            ),
+            retained_rows_per_indicator=(
+                BacktestJobParityRetainedRowsCounter(
+                    indicator_id="ma.sma",
+                    retained_rows=1,
+                ),
+            ),
+            retained_rows_total=1,
+            narrowed_combo_total=1,
+            narrowed_compute_combo_total=1,
+            no_risk_finalization_count=1,
+            exact_replay_count=0,
+            deterministic_combo_ordering="stage_a_index",
+            stage_b_execution_mode="bypassed_no_risk",
+            stage_b_process_fallback_threshold="none",
+        ),
     )
 
 

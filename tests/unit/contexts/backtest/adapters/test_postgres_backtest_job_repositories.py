@@ -439,8 +439,67 @@ def test_job_repository_create_with_top_variants_persists_terminal_sync_inline_r
             updated_at=finished_at,
         ),
     )
+    stage_a_shortlist = BacktestJobStageAShortlist(
+        job_id=job_id,
+        stage_a_indexes=(0,),
+        stage_a_variants_total=100,
+        risk_total=1,
+        preselect_used=1,
+        updated_at=finished_at,
+        no_risk_exact_rows=(
+            BacktestJobStageANoRiskExactRow(
+                entry_signal_idx=(0,),
+                entry_exec_idx=(1,),
+                direction=(1,),
+                sig_exit_signal_idx=(2,),
+                sig_exit_exec_idx=(3,),
+                total_return_pct=12.34,
+                max_drawdown_pct=1.0,
+                return_over_max_drawdown=12.34,
+                profit_factor=1.23,
+                trade_count=1,
+                sharpe_trades=1.5,
+                win_rate_pct=60.0,
+                avg_trade_ret_pct=2.0,
+                avg_trade_exec_bars=3.0,
+                exposure_pct=40.0,
+            ),
+        ),
+        parity_runtime_state=BacktestJobParityRuntimeState(
+            execution_profile_mode="exact_no_risk_parity",
+            parity_classification=BacktestJobParityClassification(
+                parity_class="parity_first_no_risk_exact",
+                disabled_risk_single_cell=True,
+                low_indicator_block_cardinality=True,
+                narrowed_retained_row_evidence=True,
+                notebook_shaped_cost_units=True,
+                nr2_classification_reason=(
+                    "canonical NR2 f7d2 no-risk single-cell parity class; "
+                    "retained_rows=1; combo_prefilter_variants=1"
+                ),
+            ),
+            retained_rows_per_indicator=(
+                BacktestJobParityRetainedRowsCounter(
+                    indicator_id="ema",
+                    retained_rows=1,
+                ),
+            ),
+            retained_rows_total=1,
+            narrowed_combo_total=1,
+            narrowed_compute_combo_total=1,
+            no_risk_finalization_count=1,
+            exact_replay_count=0,
+            deterministic_combo_ordering="stage_a_index",
+            stage_b_execution_mode="bypassed_no_risk",
+            stage_b_process_fallback_threshold="none",
+        ),
+    )
 
-    persisted = repository.create_with_top_variants(job=job, top_variants=top_rows)
+    persisted = repository.create_with_top_variants(
+        job=job,
+        top_variants=top_rows,
+        stage_a_shortlist=stage_a_shortlist,
+    )
 
     assert persisted.state == "succeeded"
     assert gateway.fetch_one_parameters[0]["execution_mode"] == "sync_inline"
@@ -452,8 +511,13 @@ def test_job_repository_create_with_top_variants_persists_terminal_sync_inline_r
     assert persisted.execution_profile_mode_hint == "exact_no_risk_parity"
     assert persisted.effective_execution_profile_mode == "exact_no_risk_parity"
     assert isinstance(gateway.fetch_one_parameters[0]["rows_json"], str)
+    assert gateway.fetch_one_parameters[0]["stage_a_indexes_json"] is not None
+    assert gateway.fetch_one_parameters[0]["no_risk_exact_rows_json"] is not None
+    assert gateway.fetch_one_parameters[0]["parity_runtime_state_json"] is not None
     assert "INSERT INTO backtest_jobs" in gateway.fetch_one_queries[0]
+    assert "INSERT INTO backtest_job_stage_a_shortlist" in gateway.fetch_one_queries[0]
     assert "INSERT INTO backtest_job_top_variants" in gateway.fetch_one_queries[0]
+    assert "parity_runtime_state_json" in gateway.fetch_one_queries[0]
     assert "item -> 'summary_metrics_json' AS summary_metrics_json" in gateway.fetch_one_queries[0]
     assert "NULL::TEXT AS report_table_md" in gateway.fetch_one_queries[0]
     assert "NULL::JSONB AS trades_json" in gateway.fetch_one_queries[0]

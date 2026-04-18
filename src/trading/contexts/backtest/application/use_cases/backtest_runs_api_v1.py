@@ -22,6 +22,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobMode,
+    BacktestJobStageAShortlist,
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
@@ -553,9 +554,15 @@ class CreateAndRunBacktestSyncInlineUseCase:
             persisted_at=finished_at,
             response=base_response,
         )
+        persisted_shortlist = _build_terminal_sync_inline_stage_a_shortlist(
+            job_id=run.job_id,
+            persisted_at=finished_at,
+            response=base_response,
+        )
         persisted_run = self._job_repository.create_with_top_variants(
             job=run,
             top_variants=persisted_rows,
+            stage_a_shortlist=persisted_shortlist,
         )
 
         return replace(
@@ -1298,6 +1305,52 @@ def _build_persisted_top_rows(
         execution_params=_sorted_execution_payload(response=response),
         reports_by_variant_key={},
         trades_by_variant_key={},
+    )
+
+
+def _build_terminal_sync_inline_stage_a_shortlist(
+    *,
+    job_id: UUID,
+    persisted_at: datetime,
+    response: RunBacktestResponse,
+) -> BacktestJobStageAShortlist | None:
+    """
+    Materialize one optional internal Stage A shortlist snapshot for atomic sync persistence.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/dto/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+    Args:
+        job_id: Persisted terminal sync run identifier.
+        persisted_at: Terminal sync persistence timestamp in UTC.
+        response: Completed sync response carrying optional internal persistence artifact.
+    Returns:
+        BacktestJobStageAShortlist | None:
+            Shared shortlist entity for atomic SQL write, or `None` for non-parity sync runs.
+    Assumptions:
+        Public `POST /backtests` transport stays summary-only even when internal shortlist data is
+        carried through this response DTO.
+    Raises:
+        BacktestValidationError: If canonical `exact_no_risk_parity` sync response reaches
+            persistence without the required live Stage A artifact.
+    Side Effects:
+        None.
+    """
+    sync_persistence_artifact = response.sync_persistence_artifact
+    if sync_persistence_artifact is None:
+        if response.execution_profile_mode == "exact_no_risk_parity":
+            raise BacktestValidationError(
+                "exact_no_risk_parity sync_inline persistence requires live Stage A artifact"
+            )
+        return None
+    return sync_persistence_artifact.to_stage_a_shortlist(
+        job_id=job_id,
+        updated_at=persisted_at,
     )
 
 

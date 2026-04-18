@@ -12,6 +12,7 @@ from .run_backtest import (
     RunBacktestRequest,
     RunBacktestResponse,
     RunBacktestSavedOverrides,
+    RunBacktestSyncPersistenceArtifact,
     RunBacktestTemplate,
     normalize_backtest_ranking_metric_literal,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "RunBacktestRequest",
     "RunBacktestResponse",
     "RunBacktestSavedOverrides",
+    "RunBacktestSyncPersistenceArtifact",
     "RunBacktestTemplate",
     "normalize_backtest_ranking_metric_literal",
 ]

@@ -24,7 +24,8 @@
   - `POST /backtests` now persists successful inline executions into the same storage family
     with `execution_mode=sync_inline`,
   - sync-inline path writes one terminal `backtest_jobs` row plus summary-only top rows
-    atomically,
+    atomically, and canonical `exact_no_risk_parity` runs also carry one internal
+    `backtest_job_stage_a_shortlist` snapshot with `parity_runtime_state_json`,
   - canonical preflight/validation `422` failures remain non-persisted and do not create rows.
 - R7-03 public history update:
   - public `/backtests/runs*` reads this same storage family without introducing a second

@@ -185,28 +185,35 @@ synthetic harness passes locally.
 
 Fresh post-D0-D5 `NR2` rerun authority on `2026-04-18` still keeps closure open:
 
-- service persisted `run_id = a6628e23-f662-43b7-8e44-65e9f39c52cf` after the storage migration
-  allowed `effective_execution_profile_mode = exact_no_risk_parity`; direct DB row confirms
-  `execution_mode = sync_inline`, `artifact_slot = slot_a`, `artifact_asof_date = 2026-04-14`
+- service persisted `run_id = 0deed418-27a1-4a6a-9633-d9960c1a1d0a` after a cold restart on clean
+  `origin/main`; the isolated benchmark run required `ROEHUB_ENV = prod` so the service resolved
+  the same published `slot_a` artifacts as the notebook anchor. Direct DB row confirms
+  `execution_mode = sync_inline`, `effective_execution_profile_mode = exact_no_risk_parity`,
+  `artifact_slot = slot_a`, `artifact_asof_date = 2026-04-14`
 - service absolute metrics:
-  `49.57770170799631s` wall, `62.753774272s` backend CPU,
-  `19898761216` peak RSS bytes, `174.03021177528495%` peak CPU,
-  cold baseline `202850304` RSS bytes, `1` Python process, top-1 `975.5496672803515%`
+  `46.29263141600018s` wall, `59.251817656s` backend CPU,
+  `19904364544` peak RSS bytes, `186.8%` peak CPU,
+  cold baseline `201670656` RSS bytes, `1` Python process, top-1 `975.5496672803515%`
 - notebook (`NUMBA_NUM_THREADS=4` on the same host / slot, clean `HEAD` anchor):
-  `7.644975749994046s` wall, `18.86455s` CPU,
-  `1368621056` peak RSS bytes, `397.84701921722376%` peak CPU,
+  `7.155866625000044s` wall, `18.814051s` CPU,
+  `1372848128` peak RSS bytes, `397.1%` peak CPU,
   `1` Python process, top-1 `1621.7322019157828%`
-- current `NR2` ratios remain far outside the accepted gates:
-  `wall_clock_ratio = 6.49x`, `cpu_time_ratio = 3.33x`, `peak_rss_ratio = 14.54x`
-- symptoms did not close:
-  memory worsened versus the `2026-04-15` live rerun (`16.41 GB -> 18.53 GiB` peak RSS),
-  peak CPU saturation improved slightly (`185.5% -> 174.03%`),
-  top-result parity improved (`-92.36% -> 975.55%`) but still loses to notebook
-  (`1621.73%`)
+- current `NR2` ratios remain far outside both primary and near-target closure gates:
+  `wall_clock_ratio = 6.469185892072142x`,
+  `cpu_time_ratio = 3.1493386329185564x`,
+  `peak_rss_ratio = 14.498591751002483x`,
+  `peak_cpu_ratio = 0.47041047595064217x`
+- versus the prior post-D0-D5 authority rerun `a6628e23-f662-43b7-8e44-65e9f39c52cf`:
+  wall ratio improved slightly (`6.485004443347636x -> 6.469185892072142x`),
+  CPU ratio improved slightly (`3.3265449889872802x -> 3.1493386329185564x`),
+  peak RSS ratio improved marginally (`14.539277419972706x -> 14.498591751002483x`),
+  peak CPU ratio improved slightly (`0.4374299752645998x -> 0.47041047595064217x`),
+  but winner parity did not improve because service top-1 remained `975.5496672803515%`
 - closure blocker:
-  the persisted sync-inline run wrote no `backtest_job_stage_a_shortlist.parity_runtime_state_json`,
-  so direct `stage_b_execution_mode` and `exact_replay_count` are still missing; the canonical
-  `NR2` authority capture therefore stays `missing` even though the run now persists under
+  the persisted sync-inline run still wrote no
+  `backtest_job_stage_a_shortlist.parity_runtime_state_json`,
+  so direct `stage_b_execution_mode` and `exact_replay_count` remain missing; the canonical
+  `NR2` authority capture therefore stays `missing` even though the run persists under
   `exact_no_risk_parity`
 
 ### Equal-thread-budget normalization

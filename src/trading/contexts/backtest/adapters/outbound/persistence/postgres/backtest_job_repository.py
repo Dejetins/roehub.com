@@ -24,6 +24,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobExecutionMode,
     BacktestJobMode,
     BacktestJobStage,
+    BacktestJobStageAShortlist,
     BacktestJobState,
     BacktestJobTopVariant,
 )
@@ -93,6 +94,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         gateway: BacktestPostgresGateway,
         jobs_table: str = "backtest_jobs",
         top_variants_table: str = "backtest_job_top_variants",
+        stage_a_shortlist_table: str = "backtest_job_stage_a_shortlist",
     ) -> None:
         """
         Initialize repository with SQL gateway and target table name.
@@ -101,6 +103,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             gateway: SQL gateway abstraction.
             jobs_table: Backtest jobs table name.
             top_variants_table: Backtest job top-variants table name.
+            stage_a_shortlist_table: Backtest Stage A shortlist table name.
         Returns:
             None.
         Assumptions:
@@ -114,15 +117,21 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             raise ValueError("PostgresBacktestJobRepository requires gateway")
         normalized_table = jobs_table.strip()
         normalized_top_variants_table = top_variants_table.strip()
+        normalized_stage_a_shortlist_table = stage_a_shortlist_table.strip()
         if not normalized_table:
             raise ValueError("PostgresBacktestJobRepository requires non-empty jobs_table")
         if not normalized_top_variants_table:
             raise ValueError(
                 "PostgresBacktestJobRepository requires non-empty top_variants_table"
             )
+        if not normalized_stage_a_shortlist_table:
+            raise ValueError(
+                "PostgresBacktestJobRepository requires non-empty stage_a_shortlist_table"
+            )
         self._gateway = gateway
         self._jobs_table = normalized_table
         self._top_variants_table = normalized_top_variants_table
+        self._stage_a_shortlist_table = normalized_stage_a_shortlist_table
 
     def create(self, *, job: BacktestJob) -> BacktestJob:
         """
@@ -249,9 +258,10 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         *,
         job: BacktestJob,
         top_variants: tuple[BacktestJobTopVariant, ...],
+        stage_a_shortlist: BacktestJobStageAShortlist | None = None,
     ) -> BacktestJob:
         """
-        Persist one terminal run row and summary-only top rows in one atomic SQL statement.
+        Persist one terminal run row, summary-only top rows, and optional shortlist atomically.
 
         Docs:
           - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -264,16 +274,20 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Args:
             job: Prepared terminal persisted-run aggregate.
             top_variants: Summary-only top rows ordered by `rank ASC, variant_key ASC`.
+            stage_a_shortlist:
+                Optional internal shortlist snapshot for `exact_no_risk_parity` sync runs.
         Returns:
             BacktestJob: Persisted immutable job snapshot.
         Assumptions:
             Sync-inline cutover persists only final succeeded rows and does not store detail
-            payloads in `report_table_md/trades_json`.
+            payloads in `report_table_md/trades_json`; internal shortlist persistence remains
+            additive and summary-only transport stays unchanged.
         Raises:
             BacktestStorageError: If SQL execution fails or row mapping breaks.
         Side Effects:
             Writes one row in `backtest_jobs` and zero or more rows in
-            `backtest_job_top_variants`.
+            `backtest_job_top_variants`, plus at most one row in
+            `backtest_job_stage_a_shortlist`.
         """
         insert_parameters = _build_job_insert_parameters(job=job)
         insert_parameters["rows_json"] = json.dumps(
@@ -281,6 +295,9 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=True,
+        )
+        insert_parameters.update(
+            _build_stage_a_shortlist_insert_parameters(shortlist=stage_a_shortlist)
         )
         query = f"""
         WITH inserted_job AS (
@@ -374,6 +391,30 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         source_rows AS (
             SELECT item
             FROM jsonb_array_elements(%(rows_json)s::jsonb) AS item
+        ),
+        inserted_shortlist AS (
+            INSERT INTO {self._stage_a_shortlist_table}
+            (
+                job_id,
+                stage_a_indexes_json,
+                stage_a_variants_total,
+                risk_total,
+                preselect_used,
+                no_risk_exact_rows_json,
+                parity_runtime_state_json,
+                updated_at
+            )
+            SELECT
+                %(job_id)s::uuid AS job_id,
+                %(stage_a_indexes_json)s::jsonb AS stage_a_indexes_json,
+                %(stage_a_variants_total)s AS stage_a_variants_total,
+                %(risk_total)s AS risk_total,
+                %(preselect_used)s AS preselect_used,
+                %(no_risk_exact_rows_json)s::jsonb AS no_risk_exact_rows_json,
+                %(parity_runtime_state_json)s::jsonb AS parity_runtime_state_json,
+                %(updated_at)s AS updated_at
+            FROM inserted_job
+            WHERE %(stage_a_indexes_json)s::jsonb IS NOT NULL
         ),
         inserted_rows AS (
             INSERT INTO {self._top_variants_table}
@@ -936,6 +977,52 @@ def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
     }
 
 
+def _build_stage_a_shortlist_insert_parameters(
+    *,
+    shortlist: BacktestJobStageAShortlist | None,
+) -> dict[str, Any]:
+    """
+    Build canonical SQL parameters for the optional sync-inline shortlist insert branch.
+
+    Args:
+        shortlist: Optional internal Stage A shortlist snapshot carried from live sync execution.
+    Returns:
+        dict[str, Any]: SQL parameters mapping consumed by the optional shortlist CTE.
+    Assumptions:
+        When shortlist is absent the terminal sync write must remain backward-compatible and skip
+        the `backtest_job_stage_a_shortlist` insert branch.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if shortlist is None:
+        return {
+            "stage_a_indexes_json": None,
+            "stage_a_variants_total": None,
+            "risk_total": None,
+            "preselect_used": None,
+            "no_risk_exact_rows_json": None,
+            "parity_runtime_state_json": None,
+        }
+    return {
+        "stage_a_indexes_json": _json_dumps(payload=shortlist.to_json_array()),
+        "stage_a_variants_total": shortlist.stage_a_variants_total,
+        "risk_total": shortlist.risk_total,
+        "preselect_used": shortlist.preselect_used,
+        "no_risk_exact_rows_json": _json_dumps(
+            payload=shortlist.to_no_risk_exact_rows_json_array()
+        )
+        if shortlist.no_risk_exact_rows is not None
+        else None,
+        "parity_runtime_state_json": _json_dumps(
+            payload=shortlist.to_parity_runtime_state_json_object()
+        )
+        if shortlist.parity_runtime_state is not None
+        else None,
+    }
+
+
 def _normalize_optional_execution_profile_mode_metadata(
     *,
     value: Any,
@@ -1268,12 +1355,12 @@ def _parse_execution_mode(*, value: Any) -> BacktestJobExecutionMode | None:
     return cast(BacktestJobExecutionMode, normalized)
 
 
-def _json_dumps(*, payload: Mapping[str, Any] | None) -> str | None:
+def _json_dumps(*, payload: Any) -> str | None:
     """
-    Serialize optional mapping payload into canonical JSON string.
+    Serialize optional JSON-compatible payload into canonical JSON string.
 
     Args:
-        payload: Optional mapping payload.
+        payload: Optional JSON-compatible payload.
     Returns:
         str | None: Canonical JSON text or `None`.
     Assumptions:
@@ -1285,9 +1372,37 @@ def _json_dumps(*, payload: Mapping[str, Any] | None) -> str | None:
     """
     if payload is None:
         return None
-    # json.dumps does not support MappingProxyType directly.
-    # Domain aggregates intentionally store JSON payloads as immutable mappings.
-    return json.dumps(dict(payload), sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return json.dumps(
+        _normalize_json_payload_for_dumps(value=payload),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+
+
+def _normalize_json_payload_for_dumps(*, value: Any) -> Any:
+    """
+    Normalize immutable mapping/sequence wrappers into `json.dumps`-compatible builtins.
+
+    Args:
+        value: Raw JSON-compatible payload possibly containing mapping proxies or tuples.
+    Returns:
+        Any: Builtin dict/list/scalar tree accepted by `json.dumps`.
+    Assumptions:
+        Repository payloads are already JSON-safe; this helper only unwraps immutable containers.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, Mapping):
+        return {
+            str(key): _normalize_json_payload_for_dumps(value=item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (tuple, list)):
+        return [_normalize_json_payload_for_dumps(value=item) for item in value]
+    return value
 
 
 __all__ = ["PostgresBacktestJobRepository"]

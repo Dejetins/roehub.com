@@ -171,7 +171,7 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert nr2_live_capture.blocking_closure is True
     assert nr2_live_capture.captured_measurement is None
     assert "2026-04-18" in nr2_live_capture.notes
-    assert "a6628e23-f662-43b7-8e44-65e9f39c52cf" in nr2_live_capture.notes
+    assert "0deed418-27a1-4a6a-9633-d9960c1a1d0a" in nr2_live_capture.notes
     assert "effective_execution_profile_mode=exact_no_risk_parity" in nr2_live_capture.notes
     assert "stage_b_execution_mode and exact_replay_count are still missing" in (
         nr2_live_capture.notes

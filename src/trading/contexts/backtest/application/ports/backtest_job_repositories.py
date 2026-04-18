@@ -113,6 +113,7 @@ class BacktestJobRepository(Protocol):
         *,
         job: BacktestJob,
         top_variants: tuple[BacktestJobTopVariant, ...],
+        stage_a_shortlist: BacktestJobStageAShortlist | None = None,
     ) -> BacktestJob:
         """
         Persist one terminal run row plus deterministic summary-only top rows atomically.
@@ -129,15 +130,20 @@ class BacktestJobRepository(Protocol):
         Args:
             job: Prepared terminal persisted-run aggregate.
             top_variants: Summary-only top rows ordered by `rank ASC, variant_key ASC`.
+            stage_a_shortlist:
+                Optional internal Stage A shortlist snapshot reused for
+                `exact_no_risk_parity` sync persistence.
         Returns:
             BacktestJob: Persisted immutable job row projection.
         Assumptions:
-            Sync-inline cutover writes final state and top rows via the existing jobs table family.
+            Sync-inline cutover writes final state, summary-only top rows, and optional internal
+            shortlist state via the existing jobs table family.
         Raises:
             ValueError: If storage write fails or row mapping breaks.
         Side Effects:
             Writes one row in `backtest_jobs` and zero or more rows in
-            `backtest_job_top_variants`.
+            `backtest_job_top_variants`, plus at most one internal
+            `backtest_job_stage_a_shortlist` row.
         """
         ...
 

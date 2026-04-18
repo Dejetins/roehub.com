@@ -18,6 +18,7 @@ from trading.contexts.backtest.application.dto import (
     RunBacktestRequest,
     RunBacktestResponse,
     RunBacktestSavedOverrides,
+    RunBacktestSyncPersistenceArtifact,
     RunBacktestTemplate,
 )
 from trading.contexts.backtest.application.ports import (
@@ -52,6 +53,8 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_core_v2 
     BacktestArtifactRuntimeRunnerV2,
     BacktestStageBScoredVariantV2,
     BacktestStageBTaskV2,
+    _runtime_plan_uses_no_risk_terminal_path_v2,
+    persisted_stage_a_no_risk_exact_rows_v2,
 )
 from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlannerV2,
@@ -72,6 +75,11 @@ from trading.contexts.backtest.application.use_cases.errors import map_backtest_
 from trading.contexts.backtest.application.use_cases.request_runtime_contract_v1 import (
     validate_signal_overrides_default_only,
     validate_template_runtime_contract,
+)
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityClassification,
+    BacktestJobParityRetainedRowsCounter,
+    BacktestJobParityRuntimeState,
 )
 from trading.contexts.backtest.domain.errors import (
     BacktestForbiddenError,
@@ -575,6 +583,10 @@ class RunBacktestUseCase:
                 ranked_rows=ranked_rows,
                 ranked_tasks=ranked_tasks,
             )
+            sync_persistence_artifact = _build_sync_persistence_artifact(
+                runtime_plan=effective_runtime_plan,
+                shortlist=shortlist,
+            )
 
             return RunBacktestResponse(
                 mode=resolved.mode,
@@ -595,6 +607,7 @@ class RunBacktestUseCase:
                 spec_hash=resolved.spec_hash,
                 spec_payload_json=resolved.spec_payload_json,
                 execution_profile_mode=effective_runtime_plan.execution_profile.mode,
+                sync_persistence_artifact=sync_persistence_artifact,
             )
         except RoehubError:
             raise
@@ -1635,6 +1648,232 @@ def _build_price_arrays_loader_v2(
     if artifact_loader is None:
         raise ValueError("artifact_slot_resolver must expose artifact_loader")
     return MmapPriceArraysLoaderV2(artifact_loader=artifact_loader)
+
+
+def _build_sync_persistence_artifact(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+    shortlist: tuple[Any, ...],
+) -> RunBacktestSyncPersistenceArtifact | None:
+    """
+    Build one internal sync persistence artifact from the already computed live Stage A state.
+
+    Args:
+        runtime_plan: Effective artifact-backed runtime plan used during the sync run.
+        shortlist: Ordered live Stage A shortlist rows produced during the same sync execution.
+    Returns:
+        RunBacktestSyncPersistenceArtifact | None:
+            Internal artifact for atomic terminal persistence, or `None` for non-parity runs.
+    Assumptions:
+        Only canonical `exact_no_risk_parity` sync runs persist `backtest_job_stage_a_shortlist`
+        during terminal `sync_inline` writes.
+    Raises:
+        ValueError: If parity runtime state exists without the compact no-risk exact rows needed
+            for backward-readable worker reuse.
+    Side Effects:
+        None.
+    """
+    parity_runtime_state = _parity_runtime_state_from_runtime_plan(runtime_plan=runtime_plan)
+    if parity_runtime_state is None:
+        return None
+    if not _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
+        raise ValueError(
+            "exact_no_risk_parity sync_inline persistence requires no-risk terminal runtime"
+        )
+    no_risk_exact_rows = persisted_stage_a_no_risk_exact_rows_v2(shortlist=shortlist)
+    if no_risk_exact_rows is None:
+        raise ValueError(
+            "exact_no_risk_parity sync_inline persistence requires compact no-risk exact rows"
+        )
+    return RunBacktestSyncPersistenceArtifact(
+        stage_a_indexes=tuple(row.base_variant.stage_a_index for row in shortlist),
+        stage_a_variants_total=int(runtime_plan.stage_a_variants_total),
+        risk_total=len(runtime_plan.risk_variants),
+        preselect_used=len(shortlist),
+        no_risk_exact_rows=no_risk_exact_rows,
+        parity_runtime_state=parity_runtime_state,
+    )
+
+
+def _parity_runtime_state_from_runtime_plan(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+) -> BacktestJobParityRuntimeState | None:
+    """
+    Project compact parity runtime state from the live sync runtime plan when available.
+
+    Args:
+        runtime_plan: Prepared artifact-backed runtime plan for the current sync execution.
+    Returns:
+        BacktestJobParityRuntimeState | None:
+            Compact parity runtime state for `exact_no_risk_parity`, or `None` for other plans.
+    Assumptions:
+        Sync persistence must reuse the same worker-side parity contract rather than introducing
+        one sync-only schema.
+    Raises:
+        ValueError: If a parity runtime plan omits required classification or counter metadata.
+    Side Effects:
+        None.
+    """
+    execution_profile_mode = str(runtime_plan.execution_profile.mode).strip().lower()
+    if execution_profile_mode != "exact_no_risk_parity":
+        return None
+
+    raw_parity_classification = getattr(runtime_plan, "parity_classification", None)
+    if raw_parity_classification is None:
+        raise ValueError("exact_no_risk_parity runtime plan must expose parity_classification")
+    raw_parity_runtime_counters_method = getattr(runtime_plan, "parity_runtime_counters", None)
+    if raw_parity_runtime_counters_method is None or not callable(
+        raw_parity_runtime_counters_method
+    ):
+        raise ValueError(
+            "exact_no_risk_parity runtime plan must expose callable parity_runtime_counters"
+        )
+    raw_parity_runtime_counters = raw_parity_runtime_counters_method()
+    if raw_parity_runtime_counters is None:
+        raise ValueError(
+            "exact_no_risk_parity runtime plan must expose parity_runtime_counters payload"
+        )
+    if not isinstance(raw_parity_runtime_counters, Mapping):
+        raise ValueError(
+            "exact_no_risk_parity runtime plan parity_runtime_counters must be mapping"
+        )
+    parity_runtime_counters = cast(
+        Mapping[str, object],
+        raw_parity_runtime_counters,
+    )
+    raw_retained_rows = parity_runtime_counters.get("retained_rows_per_indicator")
+    if not isinstance(raw_retained_rows, Mapping) or len(raw_retained_rows) == 0:
+        raise ValueError(
+            "exact_no_risk_parity runtime plan must expose retained_rows_per_indicator"
+        )
+    stage_b_execution_mode = runtime_plan.stage_b_execution_mode()
+    stage_b_process_fallback_threshold = runtime_plan.stage_b_process_fallback_threshold()
+    return BacktestJobParityRuntimeState(
+        execution_profile_mode=execution_profile_mode,
+        parity_classification=BacktestJobParityClassification(
+            parity_class=str(raw_parity_classification.parity_class),
+            disabled_risk_single_cell=bool(raw_parity_classification.disabled_risk_single_cell),
+            low_indicator_block_cardinality=bool(
+                raw_parity_classification.low_indicator_block_cardinality
+            ),
+            narrowed_retained_row_evidence=bool(
+                raw_parity_classification.narrowed_retained_row_evidence
+            ),
+            notebook_shaped_cost_units=bool(raw_parity_classification.notebook_shaped_cost_units),
+            nr2_classification_reason=str(raw_parity_classification.nr2_classification_reason),
+        ),
+        retained_rows_per_indicator=tuple(
+            BacktestJobParityRetainedRowsCounter(
+                indicator_id=str(indicator_id),
+                retained_rows=_coerce_positive_int(
+                    name="retained_rows_per_indicator",
+                    value=retained_rows,
+                ),
+            )
+            for indicator_id, retained_rows in raw_retained_rows.items()
+        ),
+        retained_rows_total=_coerce_positive_int(
+            name="retained_rows_total",
+            value=parity_runtime_counters.get("retained_rows_total"),
+        ),
+        narrowed_combo_total=_coerce_positive_int(
+            name="narrowed_combo_total",
+            value=parity_runtime_counters.get("narrowed_combo_total"),
+        ),
+        narrowed_compute_combo_total=_coerce_positive_int(
+            name="narrowed_compute_combo_total",
+            value=parity_runtime_counters.get("narrowed_compute_combo_total"),
+        ),
+        no_risk_finalization_count=_coerce_positive_int(
+            name="no_risk_finalization_count",
+            value=parity_runtime_counters.get("no_risk_finalization_count"),
+        ),
+        exact_replay_count=_coerce_non_negative_int(
+            name="exact_replay_count",
+            value=parity_runtime_counters.get("exact_replay_count"),
+        ),
+        deterministic_combo_ordering=_coerce_non_empty_str(
+            name="deterministic_combo_ordering",
+            value=parity_runtime_counters.get("deterministic_combo_ordering"),
+        ),
+        stage_b_execution_mode=_coerce_non_empty_str(
+            name="stage_b_execution_mode",
+            value=stage_b_execution_mode,
+        ),
+        stage_b_process_fallback_threshold=_coerce_non_empty_str(
+            name="stage_b_process_fallback_threshold",
+            value=stage_b_process_fallback_threshold,
+        ),
+    )
+
+
+def _coerce_positive_int(*, name: str, value: object) -> int:
+    """
+    Coerce one persisted parity counter into a positive integer.
+
+    Args:
+        name: Counter name used in deterministic error messages.
+        value: Raw counter payload from runtime-plan metadata.
+    Returns:
+        int: Positive integer value.
+    Assumptions:
+        Parity runtime counters are scalar numeric values produced by the live runtime plan.
+    Raises:
+        ValueError: If value is not an integer greater than zero.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise ValueError(f"exact_no_risk_parity runtime plan {name} must be positive integer")
+    return value
+
+
+def _coerce_non_negative_int(*, name: str, value: object) -> int:
+    """
+    Coerce one persisted parity counter into a non-negative integer.
+
+    Args:
+        name: Counter name used in deterministic error messages.
+        value: Raw counter payload from runtime-plan metadata.
+    Returns:
+        int: Non-negative integer value.
+    Assumptions:
+        `exact_replay_count` is additive metadata and may legitimately be zero.
+    Raises:
+        ValueError: If value is not an integer greater than or equal to zero.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(
+            f"exact_no_risk_parity runtime plan {name} must be non-negative integer"
+        )
+    return value
+
+
+def _coerce_non_empty_str(*, name: str, value: object) -> str:
+    """
+    Coerce one persisted parity metadata literal into a non-empty string.
+
+    Args:
+        name: Field name used in deterministic error messages.
+        value: Raw runtime-plan metadata value.
+    Returns:
+        str: Stripped non-empty string.
+    Assumptions:
+        Runtime-plan metadata already uses stable string literals for persisted parity evidence.
+    Raises:
+        ValueError: If value is not a non-empty string literal.
+    Side Effects:
+        None.
+    """
+    if not isinstance(value, str):
+        raise ValueError(f"exact_no_risk_parity runtime plan {name} must be string")
+    normalized_value = value.strip()
+    if not normalized_value:
+        raise ValueError(f"exact_no_risk_parity runtime plan {name} must be non-empty")
+    return normalized_value
 
 
 def _cancel_checker_from_run_control(

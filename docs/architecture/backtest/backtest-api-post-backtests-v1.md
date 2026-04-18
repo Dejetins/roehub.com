@@ -61,7 +61,9 @@ deterministic `422` ошибками.
 - R7-02 storage note:
   - sync and background executions share one persisted-run storage family in Postgres,
   - successful `POST /backtests` now performs internal preflight, executes inline, and persists
-    one terminal run row plus summary-only top rows in the same table family,
+    one terminal run row plus summary-only top rows in the same table family; canonical
+    `exact_no_risk_parity` sync runs also persist one internal `backtest_job_stage_a_shortlist`
+    snapshot in the same atomic write,
   - successful sync response now includes persisted run metadata:
     `run_id`, `state`, `execution_mode=sync_inline`, `engine_version`,
     `artifact_slot`, `artifact_slot_generation`, `artifact_asof_date`,
@@ -301,6 +303,8 @@ R9-01 launch UX note:
 - После успешного inline execution backend сохраняет:
   - terminal row в `backtest_jobs`,
   - summary-only top rows в `backtest_job_top_variants`,
+  - для canonical `exact_no_risk_parity` runs: internal-only shortlist snapshot в
+    `backtest_job_stage_a_shortlist`,
   - denormalized run metadata и artifact pin identity для будущих history/filter endpoints.
 - Persisted top rows сохраняют только:
   - `payload_json`,
@@ -309,6 +313,8 @@ R9-01 launch UX note:
   - `best_sl_pct`,
   - `report_table_md=NULL`,
   - `trades_json=NULL`.
+- Публичный `POST /backtests` response при этом остаётся `summary-only` и не раскрывает
+  parity internals.
 
 ### 6A) `POST /backtests` теперь имеет три deterministic launch branch
 

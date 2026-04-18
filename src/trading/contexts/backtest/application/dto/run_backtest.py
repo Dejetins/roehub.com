@@ -8,8 +8,13 @@ from uuid import UUID
 from trading.contexts.backtest.domain.entities import (
     BacktestArtifactSlotLiteral,
     BacktestJobExecutionMode,
+    BacktestJobStageANoRiskExactRow,
     BacktestJobState,
     TradeV1,
+)
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityRuntimeState,
+    BacktestJobStageAShortlist,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
@@ -668,6 +673,60 @@ class BacktestVariantPreview:
 
 
 @dataclass(frozen=True, slots=True)
+class RunBacktestSyncPersistenceArtifact:
+    """
+    Internal-only sync persistence payload carrying live Stage A artifacts across `/backtests`.
+
+    Docs:
+      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
+    """
+
+    stage_a_indexes: tuple[int, ...]
+    stage_a_variants_total: int
+    risk_total: int
+    preselect_used: int
+    no_risk_exact_rows: tuple[BacktestJobStageANoRiskExactRow, ...] | None = None
+    parity_runtime_state: BacktestJobParityRuntimeState | None = None
+
+    def to_stage_a_shortlist(
+        self,
+        *,
+        job_id: UUID,
+        updated_at: Any,
+    ) -> BacktestJobStageAShortlist:
+        """
+        Materialize the shared Stage A shortlist entity for atomic sync persistence.
+
+        Args:
+            job_id: Persisted terminal sync run identifier.
+            updated_at: Terminal sync persistence timestamp in UTC.
+        Returns:
+            BacktestJobStageAShortlist: Shared worker-compatible shortlist snapshot entity.
+        Assumptions:
+            The live artifact is internal-only and must remain excluded from public API transport.
+        Raises:
+            ValueError: Propagated from `BacktestJobStageAShortlist` invariant validation.
+        Side Effects:
+            None.
+        """
+        return BacktestJobStageAShortlist(
+            job_id=job_id,
+            stage_a_indexes=self.stage_a_indexes,
+            stage_a_variants_total=self.stage_a_variants_total,
+            risk_total=self.risk_total,
+            preselect_used=self.preselect_used,
+            updated_at=updated_at,
+            no_risk_exact_rows=self.no_risk_exact_rows,
+            parity_runtime_state=self.parity_runtime_state,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RunBacktestResponse:
     """
     Backtest use-case response skeleton for BKT-EPIC-01.
@@ -704,6 +763,11 @@ class RunBacktestResponse:
     spec_hash: str | None = None
     spec_payload_json: Mapping[str, Any] | None = None
     engine_params_hash: str | None = None
+    sync_persistence_artifact: RunBacktestSyncPersistenceArtifact | None = field(
+        default=None,
+        compare=False,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         """
@@ -853,6 +917,14 @@ class RunBacktestResponse:
                 self,
                 "spec_payload_json",
                 MappingProxyType(_normalize_json_payload_mapping(values=self.spec_payload_json)),
+            )
+        if self.sync_persistence_artifact is not None and not isinstance(
+            self.sync_persistence_artifact,
+            RunBacktestSyncPersistenceArtifact,
+        ):
+            raise ValueError(
+                "RunBacktestResponse.sync_persistence_artifact must be "
+                "RunBacktestSyncPersistenceArtifact"
             )
 
 
