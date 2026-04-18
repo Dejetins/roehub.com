@@ -427,8 +427,8 @@ def test_get_backtest_runs_prefers_additive_execution_profile_metadata() -> None
             items=(
                 replace(
                     _queued_run(run_id=UUID("00000000-0000-0000-0000-000000000934")),
-                    execution_profile_mode_hint="exact_parallel",
-                    effective_execution_profile_mode="exact_parallel",
+                    execution_profile_mode_hint="exact_no_risk_parity",
+                    effective_execution_profile_mode="exact_no_risk_parity",
                 ),
             ),
             next_cursor=None,
@@ -444,7 +444,7 @@ def test_get_backtest_runs_prefers_additive_execution_profile_metadata() -> None
     assert response.status_code == 200
     body = response.json()
     assert body["items"][0]["run_id"] == "00000000-0000-0000-0000-000000000934"
-    assert body["items"][0]["execution_profile_mode"] == "exact_parallel"
+    assert body["items"][0]["execution_profile_mode"] == "exact_no_risk_parity"
     assert body["items"][0]["progress_percent"] == 0
     assert body["items"][0]["eta_seconds"] is None
 
@@ -553,7 +553,9 @@ def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_field
     Returns:
         None.
     Assumptions:
-        Public runs status remains backward-compatible while adding UI-facing progress metadata.
+        Public runs status remains backward-compatible while adding UI-facing progress metadata,
+        including the parity-first internal `exact_no_risk_parity` execution profile when that is
+        the persisted runtime truth.
     Raises:
         AssertionError: If additive fields or their deterministic values drift.
     Side Effects:
@@ -587,8 +589,8 @@ def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_field
             artifact_asof_date="2026-03-29",
         ),
         execution_mode="sync_inline",
-        execution_profile_mode_hint="exact_parallel",
-        effective_execution_profile_mode="exact_parallel",
+        execution_profile_mode_hint="exact_no_risk_parity",
+        effective_execution_profile_mode="exact_no_risk_parity",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -619,7 +621,7 @@ def test_get_backtest_run_status_returns_additive_progress_eta_and_profile_field
     assert body["stage"] == "stage_b"
     assert body["processed_units"] == 10
     assert body["total_units"] == 20
-    assert body["execution_profile_mode"] == "exact_parallel"
+    assert body["execution_profile_mode"] == "exact_no_risk_parity"
     assert body["progress_percent"] == 70
     assert body["eta_seconds"] == 26
     assert "ranking_secondary_metric" not in body

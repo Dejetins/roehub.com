@@ -354,14 +354,16 @@ def test_job_repository_get_uses_legacy_request_json_execution_profile_fallback(
 def test_job_repository_create_with_top_variants_persists_terminal_sync_inline_rows_atomically(
 ) -> None:
     """
-    Verify atomic sync-inline create path inserts job row and summary-only top rows together.
+    Verify atomic sync-inline create path inserts job row, parity metadata, and top rows together.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        R7-02 persists final sync-inline run metadata and top rows via the existing jobs family.
+        R7-02 persists final sync-inline run metadata and top rows via the existing jobs family,
+        while the parity-first corrective path keeps
+        `execution_profile_mode_hint/effective_execution_profile_mode=exact_no_risk_parity`.
     Raises:
         AssertionError: If SQL or serialized parameters miss required summary-only clauses.
     Side Effects:
@@ -373,6 +375,8 @@ def test_job_repository_create_with_top_variants_persists_terminal_sync_inline_r
     persisted_row["execution_mode"] = "sync_inline"
     persisted_row["artifact_slot_generation"] = 11
     persisted_row["artifact_asof_date"] = "2026-03-28"
+    persisted_row["execution_profile_mode_hint"] = "exact_no_risk_parity"
+    persisted_row["effective_execution_profile_mode"] = "exact_no_risk_parity"
     gateway = _FakeGateway(fetch_one_results=[persisted_row])
     repository = PostgresBacktestJobRepository(gateway=gateway)
     created_at = datetime(2026, 3, 28, 18, 0, tzinfo=timezone.utc)
@@ -400,6 +404,8 @@ def test_job_repository_create_with_top_variants_persists_terminal_sync_inline_r
             artifact_asof_date="2026-03-28",
         ),
         execution_mode="sync_inline",
+        execution_profile_mode_hint="exact_no_risk_parity",
+        effective_execution_profile_mode="exact_no_risk_parity",
         market_id=1,
         symbol="BTCUSDT",
         timeframe="1h",
@@ -438,6 +444,13 @@ def test_job_repository_create_with_top_variants_persists_terminal_sync_inline_r
 
     assert persisted.state == "succeeded"
     assert gateway.fetch_one_parameters[0]["execution_mode"] == "sync_inline"
+    assert gateway.fetch_one_parameters[0]["execution_profile_mode_hint"] == "exact_no_risk_parity"
+    assert (
+        gateway.fetch_one_parameters[0]["effective_execution_profile_mode"]
+        == "exact_no_risk_parity"
+    )
+    assert persisted.execution_profile_mode_hint == "exact_no_risk_parity"
+    assert persisted.effective_execution_profile_mode == "exact_no_risk_parity"
     assert isinstance(gateway.fetch_one_parameters[0]["rows_json"], str)
     assert "INSERT INTO backtest_jobs" in gateway.fetch_one_queries[0]
     assert "INSERT INTO backtest_job_top_variants" in gateway.fetch_one_queries[0]

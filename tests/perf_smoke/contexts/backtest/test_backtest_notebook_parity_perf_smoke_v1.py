@@ -167,13 +167,16 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert nr2_live_capture is not None
     assert nr2_live_capture.capture_id == "nr2_live_host_canonical"
     assert nr2_live_capture.runtime_surface == "sync"
-    assert nr2_live_capture.capture_status == "captured"
+    assert nr2_live_capture.capture_status == "missing"
     assert nr2_live_capture.blocking_closure is True
-    assert nr2_live_capture.captured_measurement is not None
-    assert nr2_live_capture.captured_measurement.wall_clock_seconds == 18.887235915999554
-    assert nr2_live_capture.captured_measurement.peak_rss_bytes == 16409231360
-    assert nr2_live_capture.captured_measurement.stage_b_execution_mode == "bypassed_no_risk"
-    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is True
+    assert nr2_live_capture.captured_measurement is None
+    assert "2026-04-18" in nr2_live_capture.notes
+    assert "a6628e23-f662-43b7-8e44-65e9f39c52cf" in nr2_live_capture.notes
+    assert "effective_execution_profile_mode=exact_no_risk_parity" in nr2_live_capture.notes
+    assert "stage_b_execution_mode and exact_replay_count are still missing" in (
+        nr2_live_capture.notes
+    )
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is False
 
     rg_ttr = corpus.scenario_for_id(scenario_id="rg_ttr")
     assert rg_ttr.benchmark_class == "RG-TTR"
@@ -239,7 +242,9 @@ def test_notebook_parity_benchmark_corpus_serialization_is_byte_stable() -> None
     Returns:
         None.
     Assumptions:
-        Canonical formatting is part of the reviewable benchmark-corpus contract.
+        Canonical formatting is part of the reviewable benchmark-corpus contract, including
+        explicit `capture_status=missing` when a fresh rerun cannot publish all required
+        runtime-shape fields honestly.
     Raises:
         AssertionError: If canonical serialization drifts from the committed fixture bytes.
     Side Effects:
@@ -510,8 +515,9 @@ def test_notebook_parity_closure_authority_tracks_explicit_live_host_capture() -
     Returns:
         None.
     Assumptions:
-        Canonical `NR2` and `RG-TTR` now carry benchmark-host backend captures, while final
-        closure still depends on scenario gate evaluation rather than mere capture presence.
+        Canonical `RG-TTR` still carries benchmark-host backend capture evidence, while `NR2`
+        explicitly remains missing until the sync-inline path exposes direct persisted
+        `stage_b_execution_mode/exact_replay_count` runtime-shape evidence.
     Raises:
         AssertionError: If recorded live-host capture status stops driving readiness explicitly.
     Side Effects:
@@ -519,7 +525,7 @@ def test_notebook_parity_closure_authority_tracks_explicit_live_host_capture() -
     """
     corpus = _load_notebook_parity_benchmark_corpus()
 
-    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is True
+    assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="nr2") is False
     assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_ttr") is True
     assert corpus.has_required_live_capture_evidence_for_scenario(scenario_id="rg_alt") is True
 

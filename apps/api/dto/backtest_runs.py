@@ -38,6 +38,7 @@ BacktestRunsStageLiteral = Literal["stage_a", "stage_b", "finalizing"]
 BacktestRunExecutionProfileModeLiteral = Literal[
     "exact_small",
     "exact_parallel",
+    "exact_no_risk_parity",
     "hybrid_conservative",
     "hybrid_family",
 ]

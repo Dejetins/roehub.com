@@ -183,17 +183,31 @@ payload that reuses the same internal runtime-shape contract:
 While `capture_status = missing`, final closure for that scenario remains blocked even if the
 synthetic harness passes locally.
 
-Fresh `NR2` rerun authority on `2026-04-15` still keeps closure open:
+Fresh post-D0-D5 `NR2` rerun authority on `2026-04-18` still keeps closure open:
 
-- service (`sync_inline`, `execution_profile_mode = hybrid_conservative`):
-  `18.887s` wall, `25.815s` backend CPU, `16.41 GB` peak RSS, `1` Python process
-- notebook (`NUMBA_NUM_THREADS=4` on the same host / slot):
-  `7.808s` wall, `18.776s` CPU, `1.37 GB` peak RSS, `1` Python process
-- current `NR2` ratios remain outside the accepted gates:
-  `wall_clock_ratio = 2.42x`, `peak_rss_ratio = 11.94x`
-- memory symptoms improved versus the `2026-04-15` earlier diagnostic capture
-  (`22.32 GB -> 16.41 GB` peak RSS, cold API baseline about `0.20 GB` after restart),
-  but top-result parity is still divergent (`-92.36%` service vs `1621.73%` notebook)
+- service persisted `run_id = a6628e23-f662-43b7-8e44-65e9f39c52cf` after the storage migration
+  allowed `effective_execution_profile_mode = exact_no_risk_parity`; direct DB row confirms
+  `execution_mode = sync_inline`, `artifact_slot = slot_a`, `artifact_asof_date = 2026-04-14`
+- service absolute metrics:
+  `49.57770170799631s` wall, `62.753774272s` backend CPU,
+  `19898761216` peak RSS bytes, `174.03021177528495%` peak CPU,
+  cold baseline `202850304` RSS bytes, `1` Python process, top-1 `975.5496672803515%`
+- notebook (`NUMBA_NUM_THREADS=4` on the same host / slot, clean `HEAD` anchor):
+  `7.644975749994046s` wall, `18.86455s` CPU,
+  `1368621056` peak RSS bytes, `397.84701921722376%` peak CPU,
+  `1` Python process, top-1 `1621.7322019157828%`
+- current `NR2` ratios remain far outside the accepted gates:
+  `wall_clock_ratio = 6.49x`, `cpu_time_ratio = 3.33x`, `peak_rss_ratio = 14.54x`
+- symptoms did not close:
+  memory worsened versus the `2026-04-15` live rerun (`16.41 GB -> 18.53 GiB` peak RSS),
+  peak CPU saturation improved slightly (`185.5% -> 174.03%`),
+  top-result parity improved (`-92.36% -> 975.55%`) but still loses to notebook
+  (`1621.73%`)
+- closure blocker:
+  the persisted sync-inline run wrote no `backtest_job_stage_a_shortlist.parity_runtime_state_json`,
+  so direct `stage_b_execution_mode` and `exact_replay_count` are still missing; the canonical
+  `NR2` authority capture therefore stays `missing` even though the run now persists under
+  `exact_no_risk_parity`
 
 ### Equal-thread-budget normalization
 
