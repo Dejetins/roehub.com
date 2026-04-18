@@ -473,7 +473,7 @@ class CreateAndRunBacktestSyncInlineUseCase:
         run_control: BacktestRunControlV1 | None = None,
     ) -> RunBacktestResponse:
         """
-        Execute sync run inline, then persist final run row and summary-only top rows atomically.
+        Execute sync run inline, then persist the terminal snapshot atomically.
 
         Docs:
           - docs/architecture/backtest/backtest-api-post-backtests-v1.md
@@ -505,7 +505,8 @@ class CreateAndRunBacktestSyncInlineUseCase:
                 from the inner sync use-case.
         Side Effects:
             Executes sync backtest compute and writes one terminal run row plus summary-only top
-            rows into the unified Postgres storage family.
+            rows, and for canonical `exact_no_risk_parity` runs one internal
+            `backtest_job_stage_a_shortlist` snapshot, into the unified Postgres storage family.
         """
         if request is None:  # type: ignore[truthy-bool]
             raise ValueError("CreateAndRunBacktestSyncInlineUseCase.execute requires request")
@@ -1341,13 +1342,14 @@ def _build_terminal_sync_inline_stage_a_shortlist(
     Side Effects:
         None.
     """
+    execution_profile_mode = _require_response_execution_profile_mode(response=response)
+    if execution_profile_mode != "exact_no_risk_parity":
+        return None
     sync_persistence_artifact = response.sync_persistence_artifact
     if sync_persistence_artifact is None:
-        if response.execution_profile_mode == "exact_no_risk_parity":
-            raise BacktestValidationError(
-                "exact_no_risk_parity sync_inline persistence requires live Stage A artifact"
-            )
-        return None
+        raise BacktestValidationError(
+            "exact_no_risk_parity sync_inline persistence requires live Stage A artifact"
+        )
     return sync_persistence_artifact.to_stage_a_shortlist(
         job_id=job_id,
         updated_at=persisted_at,

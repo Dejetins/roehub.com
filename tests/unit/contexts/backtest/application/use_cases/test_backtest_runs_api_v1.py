@@ -523,6 +523,53 @@ def test_create_and_run_backtest_sync_inline_rejects_missing_live_parity_shortli
     assert repo.created_stage_a_shortlist is None
 
 
+def test_create_and_run_backtest_sync_inline_skips_shortlist_for_non_parity_response() -> None:
+    """
+    Verify sync persistence keeps non-parity runs backward-compatible even with stray internals.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Only canonical `exact_no_risk_parity` runs may persist
+        `backtest_job_stage_a_shortlist`; other sync profiles must remain jobs-plus-top-rows.
+    Raises:
+        AssertionError: If a non-parity sync response persists the internal shortlist snapshot.
+    Side Effects:
+        None.
+    """
+    repo = _FakeJobRepository()
+    response = replace(_template_run_response(), execution_profile_mode="exact_small")
+    now_values = iter(
+        (
+            datetime(2026, 3, 28, 12, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 3, 28, 12, 0, 3, tzinfo=timezone.utc),
+        )
+    )
+    use_case = CreateAndRunBacktestSyncInlineUseCase(
+        run_use_case=_FakeRunUseCase(response=response),
+        job_repository=repo,
+        backtest_runtime_config_hash="f" * 64,
+        engine_version="signal_tf + 1m_risk",
+        now_provider=lambda: next(now_values),
+        run_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000910"),
+    )
+
+    persisted = use_case.execute(
+        request=_template_request(),
+        current_user=CurrentUser(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+        ),
+        request_payload=_template_request_payload(),
+    )
+
+    assert persisted.execution_profile_mode == "exact_small"
+    assert repo.created_job is not None
+    assert repo.created_job.execution_profile_mode_hint == "exact_small"
+    assert repo.created_stage_a_shortlist is None
+
+
 def test_create_and_run_backtest_sync_inline_forces_redesigned_internal_profile() -> None:
     """
     Verify persisted `POST /backtests` sync launch forces the parity-first no-risk exact profile.
