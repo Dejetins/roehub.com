@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from typing import Any, Mapping, cast
+from unittest.mock import Mock
 from uuid import UUID
 
 import numpy as np
@@ -2799,6 +2800,78 @@ def test_process_claimed_job_recomputes_stage_a_when_legacy_resume_lacks_parity_
     assert saved_shortlist.parity_runtime_state.execution_profile_mode == "exact_no_risk_parity"
 
 
+def test_process_claimed_job_bypasses_hierarchical_builder_for_first_class_parity_runtime(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify canonical parity worker runs keep the first-class runtime plan and skip hybrid reduction.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        D2 requires worker orchestration to mirror sync behavior and never rebuild the active
+        `exact_no_risk_parity` runtime through `BacktestHierarchicalShortlistBuilderV2`.
+    Raises:
+        AssertionError: If worker orchestration re-enters hierarchical reduced-plan semantics.
+    Side Effects:
+        Monkeypatches generic Stage B runner helpers for the duration of the test.
+    """
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    no_risk_variants = (_build_risk_variants()[0],)
+    runtime_plan = _build_parity_grid_context(
+        base_variants=base_variants,
+        risk_variants=no_risk_variants,
+    )
+    job = _build_running_job_with_artifact_pin()
+    results_repository = _FakeResultsRepository()
+    hierarchical_shortlist_builder = SimpleNamespace(
+        build_runtime_plan=Mock(
+            side_effect=AssertionError(
+                "first-class parity worker runtime must not call hierarchical shortlist builder"
+            )
+        )
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_serial_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_parallel_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=_FakeLeaseRepository(),
+        results_repository=results_repository,
+        grid_context=runtime_plan,
+        scorer=SimpleNamespace(score_variant_metric=_unexpected_no_risk_stage_a_rescore),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 8, 0)),
+        stage_a_shortlist_builder=cast(Any, _ArtifactExactNoRiskStageAShortlistBuilder()),
+        hierarchical_shortlist_builder=cast(Any, hierarchical_shortlist_builder),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "succeeded"
+    assert hierarchical_shortlist_builder.build_runtime_plan.call_count == 0
+    assert len(results_repository.shortlist_calls) == 1
+    saved_shortlist = results_repository.shortlist_calls[0]["shortlist"]
+    assert saved_shortlist.parity_runtime_state is not None
+    assert saved_shortlist.parity_runtime_state.execution_profile_mode == "exact_no_risk_parity"
+    assert saved_shortlist.parity_runtime_state.narrowed_combo_total == len(base_variants)
+
+
 def test_process_claimed_job_does_not_claim_additional_jobs() -> None:
     """
     Verify the use case handles only the provided claimed job and never calls `claim_next(...)`.
@@ -4202,6 +4275,7 @@ def _build_use_case(
     runtime_planner: Any | None = None,
     artifact_slot_resolver: Any | None = None,
     stage_a_shortlist_builder: Any | None = None,
+    hierarchical_shortlist_builder: Any | None = None,
     price_arrays_loader: Any | None = None,
 ) -> RunBacktestJobRunnerV1:
     """
@@ -4223,6 +4297,9 @@ def _build_use_case(
         runtime_planner: Optional shared runtime planner test double.
         artifact_slot_resolver: Optional shared slot-pinned context resolver test double.
         stage_a_shortlist_builder: Optional artifact-backed Stage A builder test double.
+        hierarchical_shortlist_builder:
+            Optional hybrid shortlist builder test double used only for explicit hybrid runtime
+            regression assertions.
         price_arrays_loader: Optional artifact price loader test double.
     Returns:
         RunBacktestJobRunnerV1: Prepared use-case instance.
@@ -4272,6 +4349,7 @@ def _build_use_case(
         now_provider=now_provider,
         artifact_slot_resolver=cast(Any, resolved_artifact_slot_resolver),
         stage_a_shortlist_builder=cast(Any, resolved_stage_a_shortlist_builder),
+        hierarchical_shortlist_builder=cast(Any, hierarchical_shortlist_builder),
         price_arrays_loader=cast(Any, resolved_price_arrays_loader),
     )
 
