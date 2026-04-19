@@ -68,5 +68,7 @@ jobs:
           file: infra/docker/Dockerfile.market_data
           platforms: linux/amd64,linux/arm64
           push: true
+          cache-from: type=gha,scope=publish-app-image-${{ github.ref_name }}
+          cache-to: type=gha,mode=max,scope=publish-app-image-${{ github.ref_name }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
