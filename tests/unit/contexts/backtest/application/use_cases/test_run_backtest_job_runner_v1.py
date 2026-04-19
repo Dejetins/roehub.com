@@ -2800,6 +2800,125 @@ def test_process_claimed_job_recomputes_stage_a_when_legacy_resume_lacks_parity_
     assert saved_shortlist.parity_runtime_state.execution_profile_mode == "exact_no_risk_parity"
 
 
+def test_process_claimed_job_fails_loudly_when_parity_resume_plan_drifts_to_hybrid(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify resumed parity rows fail loudly when live worker planning drifts to hybrid semantics.
+
+    Args:
+        monkeypatch: Pytest monkeypatch fixture.
+    Returns:
+        None.
+    Assumptions:
+        D5 requires resumed parity rows to avoid silent fallback into `hybrid_conservative`; drift
+        must surface as a deterministic failed run.
+    Raises:
+        AssertionError: If worker silently recomputes Stage A or completes with drifted hybrid plan.
+    Side Effects:
+        Monkeypatches generic Stage B runner helpers for the duration of the test.
+    """
+    request = _build_request(top_k=5, preselect=2, top_trades_n=1)
+    base_variants = _build_stage_a_variants()
+    no_risk_variants = (_build_risk_variants()[0],)
+    runtime_plan = _FakeGridContext(
+        base_variants=base_variants,
+        risk_variants=no_risk_variants,
+        execution_profile=_build_fake_execution_profile(
+            mode="hybrid_conservative",
+            stage_a_workers=1,
+            stage_b_workers=1,
+            parallel_stage_b_enabled=False,
+        ),
+    )
+    job = _build_running_job_with_artifact_pin().update_progress(
+        changed_at=_utc(2026, 2, 23, 9, 1, 45),
+        stage="stage_b",
+        processed_units=0,
+        total_units=2,
+    )
+    persisted_shortlist = BacktestJobStageAShortlist(
+        job_id=job.job_id,
+        stage_a_indexes=(0,),
+        stage_a_variants_total=len(base_variants),
+        risk_total=1,
+        preselect_used=1,
+        updated_at=_utc(2026, 2, 23, 9, 1, 15),
+        no_risk_exact_rows=(
+            BacktestJobStageANoRiskExactRow(
+                entry_signal_idx=(0,),
+                entry_exec_idx=(1,),
+                direction=(1,),
+                sig_exit_signal_idx=(2,),
+                sig_exit_exec_idx=(3,),
+                total_return_pct=12.0,
+                max_drawdown_pct=1.0,
+                return_over_max_drawdown=12.0,
+                profit_factor=2.0,
+                trade_count=1,
+                sharpe_trades=1.5,
+                win_rate_pct=60.0,
+                avg_trade_ret_pct=2.0,
+                avg_trade_exec_bars=3.0,
+                exposure_pct=40.0,
+            ),
+        ),
+        parity_runtime_state=_build_parity_runtime_state(
+            retained_rows_total=len(base_variants),
+            no_risk_finalization_count=1,
+        ),
+    )
+    results_repository = _FakeResultsRepository(
+        preloaded_shortlists={job.job_id: persisted_shortlist}
+    )
+    hierarchical_shortlist_builder = SimpleNamespace(
+        build_runtime_plan=Mock(return_value=runtime_plan)
+    )
+    lease_repository = _FakeLeaseRepository()
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_serial_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    monkeypatch.setattr(
+        artifact_runtime_core_module.BacktestArtifactRuntimeRunnerV2,
+        "_run_stage_b_parallel_v2",
+        _unexpected_generic_stage_b_path,
+    )
+    use_case = _build_use_case(
+        request=request,
+        job_repository=_FakeJobRepository(default_job=job),
+        lease_repository=lease_repository,
+        results_repository=results_repository,
+        grid_context=runtime_plan,
+        scorer=SimpleNamespace(score_variant_metric=_unexpected_no_risk_stage_a_rescore),
+        reporting_service=_FakeReportingService(),
+        top_k_persisted_default=2,
+        snapshot_seconds=None,
+        snapshot_variants_step=None,
+        stage_batch_size=1,
+        now_provider=_NowProvider(current=_utc(2026, 2, 23, 10, 7, 45)),
+        stage_a_shortlist_builder=cast(
+            Any,
+            SimpleNamespace(build_shortlist=_unexpected_stage_a_shortlist_build),
+        ),
+        hierarchical_shortlist_builder=cast(Any, hierarchical_shortlist_builder),
+    )
+
+    report = use_case.process_claimed_job(job=job, locked_by="worker-test-1")
+
+    assert report.status == "failed"
+    assert results_repository.shortlist_get_calls == [{"job_id": job.job_id}]
+    assert results_repository.shortlist_calls == []
+    assert len(lease_repository.finish_calls) == 1
+    assert lease_repository.finish_calls[0]["next_state"] == "failed"
+    assert (
+        lease_repository.finish_calls[0]["last_error"]
+        == "persisted parity runtime state requires exact_no_risk_parity live runtime plan"
+    )
+    assert hierarchical_shortlist_builder.build_runtime_plan.call_count == 1
+
+
 def test_process_claimed_job_bypasses_hierarchical_builder_for_first_class_parity_runtime(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -2825,6 +2944,7 @@ def test_process_claimed_job_bypasses_hierarchical_builder_for_first_class_parit
         base_variants=base_variants,
         risk_variants=no_risk_variants,
     )
+    runtime_plan.uses_hybrid_reduced_plan_contract = lambda: True
     job = _build_running_job_with_artifact_pin()
     results_repository = _FakeResultsRepository()
     hierarchical_shortlist_builder = SimpleNamespace(

@@ -511,8 +511,11 @@ class RunBacktestJobRunnerV1:
                 candles=timeline.candles,
             )
             effective_runtime_plan = runtime_plan
-            if runtime_plan_requires_hierarchical_shortlist_runtime_v2(
-                runtime_plan=runtime_plan
+            if (
+                not _runtime_plan_is_exact_no_risk_parity_v2(runtime_plan=runtime_plan)
+                and runtime_plan_requires_hierarchical_shortlist_runtime_v2(
+                    runtime_plan=runtime_plan
+                )
             ):
                 if self._hierarchical_shortlist_builder is None:
                     raise ValueError(
@@ -2028,6 +2031,34 @@ def _normalize_timeframe_literals(
         seen.add(value)
         normalized.append(value)
     return tuple(normalized)
+
+
+def _runtime_plan_is_exact_no_risk_parity_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+) -> bool:
+    """
+    Resolve whether the runtime plan belongs to the first-class no-risk parity profile.
+
+    Args:
+        runtime_plan: Prepared artifact-backed runtime plan used by the worker attempt.
+    Returns:
+        bool: `True` only when `execution_profile.mode` is `exact_no_risk_parity`.
+    Assumptions:
+        D5 requires worker and sync orchestrators to share the same parity-first bypass guard and
+        never route parity plans through the hybrid shortlist reducer.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    execution_profile = getattr(runtime_plan, "execution_profile", None)
+    if execution_profile is None:
+        return False
+    profile_mode = getattr(execution_profile, "mode", None)
+    if profile_mode is None:
+        return False
+    return str(profile_mode).strip().lower() == "exact_no_risk_parity"
 
 
 def _utc_now() -> datetime:
