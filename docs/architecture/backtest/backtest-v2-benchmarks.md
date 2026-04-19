@@ -225,11 +225,13 @@ Fresh post-D0-D5 `NR2` rerun authority on `2026-04-18` still keeps closure open:
   peak CPU ratio improved slightly (`0.4374299752645998x -> 0.47041047595064217x`),
   but winner parity did not improve because service top-1 remained `975.5496672803515%`
 - closure blocker:
-  the persisted sync-inline run still wrote no
-  `backtest_job_stage_a_shortlist.parity_runtime_state_json`,
-  so direct `stage_b_execution_mode` and `exact_replay_count` remain missing; the canonical
-  `NR2` authority capture therefore stays `missing` even though the run persists under
-  `exact_no_risk_parity`
+  this specific historical rerun still has no
+  `backtest_job_stage_a_shortlist.parity_runtime_state_json`, so it remains `capture_status =
+  missing`;
+  D6 now requires canonical sync persistence to fail fast without
+  **DB-backed runtime-shape literals** (`stage_b_execution_mode`,
+  `stage_b_process_fallback_threshold`, `exact_replay_count`) before a new `NR2` live capture can
+  move to `captured`.
 
 ### Equal-thread-budget normalization
 

@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Mapping
 from uuid import UUID
 
+import pytest
+
 from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
     PostgresBacktestJobLeaseRepository,
     PostgresBacktestJobRepository,
@@ -23,6 +25,7 @@ from trading.contexts.backtest.domain.entities.backtest_job_results import (
     BacktestJobParityRetainedRowsCounter,
     BacktestJobParityRuntimeState,
 )
+from trading.contexts.backtest.domain.errors import BacktestStorageError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 from trading.shared_kernel.primitives import UserId
 
@@ -565,6 +568,125 @@ def test_job_repository_count_active_for_artifact_manifest_uses_pin_and_instrume
     assert "symbol = %(symbol)s" in gateway.fetch_one_queries[0]
     assert "request_json -> 'template' -> 'instrument_id'" in gateway.fetch_one_queries[0]
     assert "spec_payload_json -> 'instrument_id'" in gateway.fetch_one_queries[0]
+
+
+def test_job_repository_create_with_top_variants_rejects_shortlist_without_runtime_literals(
+) -> None:
+    """
+    Verify no-risk shortlist payloads require DB-backed runtime-shape literals.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        If `no_risk_exact_rows_json` is present, persistence must also store
+        `parity_runtime_state_json` so benchmark authority does not rely on inference.
+    Raises:
+        AssertionError: If repository accepts no-risk shortlist payload without runtime literals.
+    Side Effects:
+        None.
+    """
+    job_id = UUID("00000000-0000-0000-0000-000000000920")
+    gateway = _FakeGateway()
+    repository = PostgresBacktestJobRepository(gateway=gateway)
+    created_at = datetime(2026, 4, 18, 10, 0, tzinfo=timezone.utc)
+    finished_at = datetime(2026, 4, 18, 10, 0, 5, tzinfo=timezone.utc)
+    job = BacktestJob(
+        job_id=job_id,
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000111"),
+        mode="template",
+        state="succeeded",
+        created_at=created_at,
+        updated_at=finished_at,
+        started_at=created_at,
+        finished_at=finished_at,
+        request_json={"mode": "template", "warmup_bars": 200},
+        request_hash="a" * 64,
+        spec_hash=None,
+        spec_payload_json=None,
+        engine_params_hash="b" * 64,
+        backtest_runtime_config_hash="c" * 64,
+        artifact_pin=BacktestJobArtifactPin(
+            artifact_slot="slot_b",
+            artifact_slot_generation=11,
+            artifact_manifest_hash="d" * 64,
+            artifact_asof_date="2026-03-28",
+        ),
+        execution_mode="sync_inline",
+        execution_profile_mode_hint="exact_no_risk_parity",
+        effective_execution_profile_mode="exact_no_risk_parity",
+        market_id=1,
+        symbol="BTCUSDT",
+        timeframe="1h",
+        requested_top_n=25,
+        ranking_primary_metric="profit_factor",
+        ranking_secondary_metric="win_rate_pct",
+        stage="finalizing",
+        processed_units=100,
+        total_units=100,
+        progress_updated_at=finished_at,
+        locked_by=None,
+        locked_at=None,
+        lease_expires_at=None,
+        heartbeat_at=None,
+        attempt=1,
+    )
+    top_rows = (
+        BacktestJobTopVariant(
+            job_id=job_id,
+            rank=1,
+            variant_key="a" * 64,
+            indicator_variant_key="b" * 64,
+            variant_index=0,
+            total_return_pct=12.34,
+            payload_json={"schema_version": 1},
+            summary_metrics_json={"total_return_pct": 12.34, "profit_factor": 1.23},
+            best_tp_pct=4.0,
+            best_sl_pct=2.0,
+            report_table_md=None,
+            trades_json=None,
+            updated_at=finished_at,
+        ),
+    )
+    shortlist_without_runtime_literals = BacktestJobStageAShortlist(
+        job_id=job_id,
+        stage_a_indexes=(0,),
+        stage_a_variants_total=100,
+        risk_total=1,
+        preselect_used=1,
+        updated_at=finished_at,
+        no_risk_exact_rows=(
+            BacktestJobStageANoRiskExactRow(
+                entry_signal_idx=(0,),
+                entry_exec_idx=(1,),
+                direction=(1,),
+                sig_exit_signal_idx=(2,),
+                sig_exit_exec_idx=(3,),
+                total_return_pct=12.34,
+                max_drawdown_pct=1.0,
+                return_over_max_drawdown=12.34,
+                profit_factor=1.23,
+                trade_count=1,
+                sharpe_trades=1.5,
+                win_rate_pct=60.0,
+                avg_trade_ret_pct=2.0,
+                avg_trade_exec_bars=3.0,
+                exposure_pct=40.0,
+            ),
+        ),
+        parity_runtime_state=None,
+    )
+
+    with pytest.raises(BacktestStorageError) as error:
+        repository.create_with_top_variants(
+            job=job,
+            top_variants=top_rows,
+            stage_a_shortlist=shortlist_without_runtime_literals,
+        )
+
+    assert "DB-backed runtime-shape literals" in str(error.value)
+    assert gateway.fetch_one_queries == []
 
 
 def test_job_repository_cancel_preserves_existing_running_cancel_marker() -> None:

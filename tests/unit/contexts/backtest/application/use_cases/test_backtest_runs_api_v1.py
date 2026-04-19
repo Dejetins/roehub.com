@@ -473,6 +473,18 @@ def test_create_and_run_backtest_sync_inline_persists_run_and_summary_rows() -> 
         ]
         == "bypassed_no_risk"
     )
+    assert (
+        repo.created_stage_a_shortlist.parity_runtime_state.to_json_object()[
+            "stage_b_process_fallback_threshold"
+        ]
+        == "none"
+    )
+    assert (
+        repo.created_stage_a_shortlist.parity_runtime_state.to_json_object()[
+            "exact_replay_count"
+        ]
+        == 0
+    )
 
 
 def test_create_and_run_backtest_sync_inline_rejects_missing_live_parity_shortlist_artifact(
@@ -519,6 +531,61 @@ def test_create_and_run_backtest_sync_inline_rejects_missing_live_parity_shortli
         )
 
     assert "live Stage A artifact" in str(error.value)
+    assert repo.created_job is None
+    assert repo.created_stage_a_shortlist is None
+
+
+def test_create_and_run_backtest_sync_inline_rejects_missing_db_backed_runtime_shape_literals(
+) -> None:
+    """
+    Verify canonical parity sync persistence fails when shortlist evidence omits runtime literals.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `stage_b_execution_mode`, `stage_b_process_fallback_threshold`, and `exact_replay_count`
+        must come from persisted shortlist runtime state rather than code-level inference.
+    Raises:
+        AssertionError: If sync persistence accepts shortlist snapshots with missing runtime-state
+            authority.
+    Side Effects:
+        None.
+    """
+    repo = _FakeJobRepository()
+    response = replace(
+        _template_run_response(),
+        sync_persistence_artifact=replace(
+            _template_sync_persistence_artifact(),
+            parity_runtime_state=None,
+        ),
+    )
+    now_values = iter(
+        (
+            datetime(2026, 3, 28, 12, 0, 0, tzinfo=timezone.utc),
+            datetime(2026, 3, 28, 12, 0, 3, tzinfo=timezone.utc),
+        )
+    )
+    use_case = CreateAndRunBacktestSyncInlineUseCase(
+        run_use_case=_FakeRunUseCase(response=response),
+        job_repository=repo,
+        backtest_runtime_config_hash="f" * 64,
+        engine_version="signal_tf + 1m_risk",
+        now_provider=lambda: next(now_values),
+        run_id_factory=lambda: UUID("00000000-0000-0000-0000-000000000910"),
+    )
+
+    with pytest.raises(BacktestValidationError) as error:
+        use_case.execute(
+            request=_template_request(),
+            current_user=CurrentUser(
+                user_id=UserId.from_string("00000000-0000-0000-0000-000000000777")
+            ),
+            request_payload=_template_request_payload(),
+        )
+
+    assert "DB-backed runtime-shape literals" in str(error.value)
     assert repo.created_job is None
     assert repo.created_stage_a_shortlist is None
 

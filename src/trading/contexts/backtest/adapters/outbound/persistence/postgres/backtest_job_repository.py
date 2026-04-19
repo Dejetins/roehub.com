@@ -990,9 +990,11 @@ def _build_stage_a_shortlist_insert_parameters(
         dict[str, Any]: SQL parameters mapping consumed by the optional shortlist CTE.
     Assumptions:
         When shortlist is absent the terminal sync write must remain backward-compatible and skip
-        the `backtest_job_stage_a_shortlist` insert branch.
+        the `backtest_job_stage_a_shortlist` insert branch, while no-risk shortlist payloads must
+        carry persisted parity runtime-state literals.
     Raises:
-        None.
+        BacktestStorageError: If no-risk shortlist rows are provided without
+            `parity_runtime_state` evidence.
     Side Effects:
         None.
     """
@@ -1005,6 +1007,11 @@ def _build_stage_a_shortlist_insert_parameters(
             "no_risk_exact_rows_json": None,
             "parity_runtime_state_json": None,
         }
+    if shortlist.no_risk_exact_rows is not None and shortlist.parity_runtime_state is None:
+        raise BacktestStorageError(
+            "backtest_job_stage_a_shortlist requires DB-backed runtime-shape literals when "
+            "no_risk_exact_rows_json is populated"
+        )
     return {
         "stage_a_indexes_json": _json_dumps(payload=shortlist.to_json_array()),
         "stage_a_variants_total": shortlist.stage_a_variants_total,

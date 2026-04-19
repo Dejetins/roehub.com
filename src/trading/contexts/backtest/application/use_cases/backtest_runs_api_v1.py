@@ -1350,10 +1350,52 @@ def _build_terminal_sync_inline_stage_a_shortlist(
         raise BacktestValidationError(
             "exact_no_risk_parity sync_inline persistence requires live Stage A artifact"
         )
-    return sync_persistence_artifact.to_stage_a_shortlist(
+    shortlist = sync_persistence_artifact.to_stage_a_shortlist(
         job_id=job_id,
         updated_at=persisted_at,
     )
+    _require_db_backed_runtime_shape_literals(shortlist=shortlist)
+    return shortlist
+
+
+def _require_db_backed_runtime_shape_literals(
+    *,
+    shortlist: BacktestJobStageAShortlist,
+) -> None:
+    """
+    Require canonical no-risk shortlist evidence to include DB-backed runtime-shape literals.
+
+    Args:
+        shortlist: Internal Stage A shortlist snapshot materialized from live sync execution.
+    Returns:
+        None.
+    Assumptions:
+        Canonical `NR2` closure evidence must be read from persisted shortlist runtime state
+        rather than posthoc inference from code defaults.
+    Raises:
+        BacktestValidationError: If runtime-state evidence or one required runtime-shape literal
+            is missing from the shortlist snapshot.
+    Side Effects:
+        None.
+    """
+    runtime_state = shortlist.parity_runtime_state
+    if runtime_state is None:
+        raise BacktestValidationError(
+            "exact_no_risk_parity sync_inline persistence requires DB-backed runtime-shape "
+            "literals in parity_runtime_state"
+        )
+    runtime_shape_literals = runtime_state.to_json_object()
+    required_literal_keys = (
+        "stage_b_execution_mode",
+        "stage_b_process_fallback_threshold",
+        "exact_replay_count",
+    )
+    for key in required_literal_keys:
+        if key not in runtime_shape_literals:
+            raise BacktestValidationError(
+                "exact_no_risk_parity sync_inline persistence requires DB-backed "
+                f"runtime-shape literals: missing {key!r}"
+            )
 
 
 def _require_direction_mode(*, response: RunBacktestResponse) -> str:

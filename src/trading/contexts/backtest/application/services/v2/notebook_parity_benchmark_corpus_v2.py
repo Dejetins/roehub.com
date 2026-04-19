@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
+from trading.contexts.backtest.domain.entities import BacktestJobStageAShortlist
+
 BACKTEST_NOTEBOOK_PARITY_BENCHMARK_CORPUS_SCHEMA_VERSION_V2 = 1
 BACKTEST_NOTEBOOK_PARITY_BENCHMARK_CORPUS_KIND_V2 = (
     "backtest_notebook_parity_benchmark_corpus_v1"
@@ -1280,6 +1282,84 @@ def serialize_backtest_notebook_parity_live_host_captures_v2(
     return serialize_backtest_notebook_parity_benchmark_corpus_payload_v2(payload=payload)
 
 
+def build_backtest_notebook_parity_measurement_from_sync_evidence_v2(
+    *,
+    scenario_id: str,
+    benchmark_class: NotebookParityBenchmarkClassLiteralV2,
+    host_label: str,
+    artifact_slot: str,
+    wall_clock_seconds: float,
+    cpu_time_seconds: float,
+    peak_rss_bytes: int,
+    numba_threads_used: int,
+    max_python_processes_seen: int,
+    stage_a_shortlist: BacktestJobStageAShortlist,
+    runtime_surface: NotebookParityRuntimeSurfaceLiteralV2 = "sync",
+) -> BacktestNotebookParityMeasurementV2:
+    """
+    Build one benchmark measurement from persisted sync shortlist evidence without inference.
+
+    Args:
+        scenario_id: Stable benchmark scenario identifier.
+        benchmark_class: Canonical benchmark class literal.
+        host_label: Benchmark host label.
+        artifact_slot: Artifact slot literal used by the captured run.
+        wall_clock_seconds: End-to-end backend wall time in seconds.
+        cpu_time_seconds: Backend process CPU time in seconds.
+        peak_rss_bytes: Peak resident set size captured during the run.
+        numba_threads_used: Effective Numba thread budget used during the run.
+        max_python_processes_seen: Maximum Python process fan-out observed during the run.
+        stage_a_shortlist: Persisted internal shortlist evidence from sync terminal persistence.
+        runtime_surface: Backend runtime surface literal (`sync` or `worker`).
+    Returns:
+        BacktestNotebookParityMeasurementV2: Canonical benchmark measurement payload populated
+            from direct DB-backed runtime-shape literals.
+    Assumptions:
+        Canonical `NR2` authority for sync reruns must read
+        `stage_b_execution_mode/stage_b_process_fallback_threshold/exact_replay_count`
+        directly from persisted shortlist runtime-state evidence.
+    Raises:
+        ValueError: If shortlist evidence is missing parity runtime state or the runtime surface
+            is unsupported for backend measurements.
+    Side Effects:
+        None.
+    """
+    resolved_runtime_surface = _parse_notebook_parity_runtime_surface_v2(value=runtime_surface)
+    if resolved_runtime_surface == "notebook":
+        raise ValueError(
+            "build_backtest_notebook_parity_measurement_from_sync_evidence_v2 requires "
+            "backend runtime surface"
+        )
+    runtime_state = stage_a_shortlist.parity_runtime_state
+    if runtime_state is None:
+        raise ValueError(
+            "build_backtest_notebook_parity_measurement_from_sync_evidence_v2 requires "
+            "DB-backed runtime-shape literals in shortlist parity_runtime_state"
+        )
+    return BacktestNotebookParityMeasurementV2(
+        scenario_id=scenario_id,
+        benchmark_class=benchmark_class,
+        measurement_source="backend",
+        runtime_surface=resolved_runtime_surface,
+        host_label=host_label,
+        artifact_slot=artifact_slot,
+        wall_clock_seconds=wall_clock_seconds,
+        cpu_time_seconds=cpu_time_seconds,
+        peak_rss_bytes=peak_rss_bytes,
+        numba_threads_used=numba_threads_used,
+        max_python_processes_seen=max_python_processes_seen,
+        stage_b_execution_mode=cast(
+            NotebookParityStageBExecutionModeLiteralV2,
+            runtime_state.stage_b_execution_mode,
+        ),
+        stage_b_process_fallback_threshold=cast(
+            NotebookParityStageBProcessFallbackThresholdLiteralV2,
+            runtime_state.stage_b_process_fallback_threshold,
+        ),
+        exact_replay_count=runtime_state.exact_replay_count,
+    )
+
+
 def evaluate_backtest_notebook_parity_scenario_v2(
     *,
     scenario: BacktestNotebookParityScenarioV2,
@@ -2540,6 +2620,7 @@ __all__ = [
     "NotebookParityRuntimeSurfaceLiteralV2",
     "NotebookParityStageBExecutionModeLiteralV2",
     "NotebookParityStageBProcessFallbackThresholdLiteralV2",
+    "build_backtest_notebook_parity_measurement_from_sync_evidence_v2",
     "evaluate_backtest_notebook_parity_scenario_v2",
     "load_backtest_notebook_parity_benchmark_corpus_v2",
     "read_backtest_notebook_parity_benchmark_corpus_payload_v2",

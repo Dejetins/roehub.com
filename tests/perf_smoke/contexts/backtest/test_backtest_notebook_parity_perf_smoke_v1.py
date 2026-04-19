@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Mapping, cast
+from uuid import UUID
 
 import pytest
 import yaml
@@ -46,7 +48,17 @@ from trading.contexts.backtest.application.services.v2.generic_row_scorer_v2 imp
 )
 from trading.contexts.backtest.application.services.v2.notebook_parity_benchmark_corpus_v2 import (
     BacktestNotebookParityLiveHostCaptureV2,
+    build_backtest_notebook_parity_measurement_from_sync_evidence_v2,
     serialize_backtest_notebook_parity_live_host_captures_v2,
+)
+from trading.contexts.backtest.domain.entities import (
+    BacktestJobStageANoRiskExactRow,
+    BacktestJobStageAShortlist,
+)
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityClassification,
+    BacktestJobParityRetainedRowsCounter,
+    BacktestJobParityRuntimeState,
 )
 
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -551,6 +563,84 @@ def test_notebook_parity_closure_authority_tracks_explicit_live_host_capture() -
     )
 
     assert captured_nr2.has_required_capture_evidence() is True
+
+
+def test_notebook_parity_sync_evidence_builds_measurement_from_db_backed_runtime_literals(
+) -> None:
+    """
+    Verify benchmark measurement builder reads runtime-shape literals from persisted sync evidence.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical sync authority must source `stage_b_execution_mode`,
+        `stage_b_process_fallback_threshold`, and `exact_replay_count` from
+        `backtest_job_stage_a_shortlist.parity_runtime_state_json`.
+    Raises:
+        AssertionError: If measurement builder starts inferring runtime-shape fields indirectly.
+    Side Effects:
+        None.
+    """
+    shortlist = _build_sync_stage_a_shortlist_evidence(exact_replay_count=48)
+
+    measurement = build_backtest_notebook_parity_measurement_from_sync_evidence_v2(
+        scenario_id="nr2",
+        benchmark_class="NR2",
+        host_label="macstudio-class",
+        artifact_slot="slot_a",
+        wall_clock_seconds=8.11,
+        cpu_time_seconds=7.33,
+        peak_rss_bytes=1200,
+        numba_threads_used=4,
+        max_python_processes_seen=1,
+        stage_a_shortlist=shortlist,
+    )
+
+    assert measurement.measurement_source == "backend"
+    assert measurement.runtime_surface == "sync"
+    assert measurement.stage_b_execution_mode == "bypassed_no_risk"
+    assert measurement.stage_b_process_fallback_threshold == "none"
+    assert measurement.exact_replay_count == 48
+
+
+def test_notebook_parity_sync_evidence_rejects_missing_db_backed_runtime_literals() -> None:
+    """
+    Verify benchmark measurement builder fails loudly when sync runtime literals are missing.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical benchmark authority must not fallback to code-level defaults when persisted
+        runtime-state literals are absent.
+    Raises:
+        AssertionError: If missing runtime-state evidence does not raise deterministic failure.
+    Side Effects:
+        None.
+    """
+    shortlist_without_runtime_literals = _build_sync_stage_a_shortlist_evidence(
+        exact_replay_count=0,
+        include_runtime_state=False,
+    )
+
+    with pytest.raises(ValueError) as error:
+        build_backtest_notebook_parity_measurement_from_sync_evidence_v2(
+            scenario_id="nr2",
+            benchmark_class="NR2",
+            host_label="macstudio-class",
+            artifact_slot="slot_a",
+            wall_clock_seconds=8.11,
+            cpu_time_seconds=7.33,
+            peak_rss_bytes=1200,
+            numba_threads_used=4,
+            max_python_processes_seen=1,
+            stage_a_shortlist=shortlist_without_runtime_literals,
+        )
+
+    assert "DB-backed runtime-shape literals" in str(error.value)
 
 
 def test_stage_a_retained_frontier_memory_shape_is_observable_for_benchmarks() -> None:
@@ -1839,6 +1929,87 @@ def _load_notebook_parity_benchmark_corpus():
         Reads one committed JSON fixture from the repository.
     """
     return load_backtest_notebook_parity_benchmark_corpus_v2(path=_CORPUS_FIXTURE_PATH)
+
+
+def _build_sync_stage_a_shortlist_evidence(
+    *,
+    exact_replay_count: int,
+    include_runtime_state: bool = True,
+) -> BacktestJobStageAShortlist:
+    """
+    Build deterministic persisted sync shortlist evidence for benchmark authority tests.
+
+    Args:
+        exact_replay_count: Explicit exact replay counter literal stored in runtime-state evidence.
+        include_runtime_state: Include or omit parity runtime-state payload.
+    Returns:
+        BacktestJobStageAShortlist: Internal shortlist snapshot mirroring persisted sync evidence.
+    Assumptions:
+        Canonical no-risk sync persistence stores one compact exact row and additive runtime-state
+        literals in the same shortlist snapshot.
+    Raises:
+        ValueError: If the constructed shortlist violates persisted-entity invariants.
+    Side Effects:
+        None.
+    """
+    parity_runtime_state = None
+    if include_runtime_state:
+        parity_runtime_state = BacktestJobParityRuntimeState(
+            execution_profile_mode="exact_no_risk_parity",
+            parity_classification=BacktestJobParityClassification(
+                parity_class="parity_first_no_risk_exact",
+                disabled_risk_single_cell=True,
+                low_indicator_block_cardinality=True,
+                narrowed_retained_row_evidence=True,
+                notebook_shaped_cost_units=True,
+                nr2_classification_reason=(
+                    "canonical NR2 f7d2 no-risk single-cell parity class; "
+                    "retained_rows=1; combo_prefilter_variants=1"
+                ),
+            ),
+            retained_rows_per_indicator=(
+                BacktestJobParityRetainedRowsCounter(
+                    indicator_id="ma.sma",
+                    retained_rows=1,
+                ),
+            ),
+            retained_rows_total=1,
+            narrowed_combo_total=1,
+            narrowed_compute_combo_total=1,
+            no_risk_finalization_count=1,
+            exact_replay_count=exact_replay_count,
+            deterministic_combo_ordering="stage_a_index",
+            stage_b_execution_mode="bypassed_no_risk",
+            stage_b_process_fallback_threshold="none",
+        )
+    return BacktestJobStageAShortlist(
+        job_id=UUID("00000000-0000-0000-0000-000000000930"),
+        stage_a_indexes=(0,),
+        stage_a_variants_total=100,
+        risk_total=1,
+        preselect_used=1,
+        updated_at=datetime(2026, 4, 18, 10, 0, 5, tzinfo=timezone.utc),
+        no_risk_exact_rows=(
+            BacktestJobStageANoRiskExactRow(
+                entry_signal_idx=(0,),
+                entry_exec_idx=(1,),
+                direction=(1,),
+                sig_exit_signal_idx=(2,),
+                sig_exit_exec_idx=(3,),
+                total_return_pct=12.34,
+                max_drawdown_pct=1.0,
+                return_over_max_drawdown=12.34,
+                profit_factor=1.23,
+                trade_count=1,
+                sharpe_trades=1.5,
+                win_rate_pct=60.0,
+                avg_trade_ret_pct=2.0,
+                avg_trade_exec_bars=3.0,
+                exposure_pct=40.0,
+            ),
+        ),
+        parity_runtime_state=parity_runtime_state,
+    )
 
 
 def _build_measurement(
