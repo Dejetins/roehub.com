@@ -130,6 +130,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.adaptive_selector_policy.hybrid_family.min_stage_b_variants_total == 80000
     assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
         "exact_small",
+        "exact_no_risk_parity",
         "exact_parallel",
         "hybrid_conservative",
         "hybrid_family",
@@ -137,7 +138,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
     assert config.execution_profiles.default_profile().feature_flags.runtime_enabled is True
     assert config.execution_profiles.available_profiles[1].feature_flags.runtime_enabled is True
     assert (
-        config.execution_profiles.available_profiles[1].feature_flags.parallel_stage_b_enabled
+        config.execution_profiles.available_profiles[2].feature_flags.parallel_stage_b_enabled
         is True
     )
     assert (
@@ -145,7 +146,7 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         == 1500
     )
     assert (
-        config.execution_profiles.available_profiles[1].launch_budget.max_stage_b_variants_total
+        config.execution_profiles.available_profiles[2].launch_budget.max_stage_b_variants_total
         == 180000
     )
     assert config.execution_profiles.available_profiles[1].progress_weights.stage_a == 45
@@ -163,19 +164,8 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         == ("activity_band", "direction_band")
     )
     assert (
-        config.execution_profiles.available_profiles[2].shortlist_config.retention.max_per_bucket
+        config.execution_profiles.available_profiles[3].shortlist_config.retention.max_per_bucket
         == 750
-    )
-    assert config.execution_profiles.available_profiles[2].feature_flags.runtime_enabled is True
-    assert (
-        config.execution_profiles.available_profiles[2].feature_flags
-        .heuristic_shortlist_enabled
-        is True
-    )
-    assert (
-        config.execution_profiles.available_profiles[3].shortlist_config.scoring
-        .transition_ratio_weight
-        == 0.3
     )
     assert config.execution_profiles.available_profiles[3].feature_flags.runtime_enabled is True
     assert (
@@ -184,7 +174,18 @@ def test_load_backtest_runtime_config_reads_yaml_values() -> None:
         is True
     )
     assert (
-        config.execution_profiles.available_profiles[3].feature_flags
+        config.execution_profiles.available_profiles[4].shortlist_config.scoring
+        .transition_ratio_weight
+        == 0.3
+    )
+    assert config.execution_profiles.available_profiles[4].feature_flags.runtime_enabled is True
+    assert (
+        config.execution_profiles.available_profiles[4].feature_flags
+        .heuristic_shortlist_enabled
+        is True
+    )
+    assert (
+        config.execution_profiles.available_profiles[4].feature_flags
         .family_plugin_enabled
         is True
     )
@@ -374,6 +375,7 @@ backtest:
     assert config.adaptive_selector_policy.hybrid_family.rollout_mode == "active"
     assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
         "exact_small",
+        "exact_no_risk_parity",
         "exact_parallel",
         "hybrid_conservative",
         "hybrid_family",
@@ -389,7 +391,7 @@ backtest:
         == 0.1
     )
     assert (
-        config.execution_profiles.available_profiles[2].shortlist_config.retention.max_per_bucket
+        config.execution_profiles.available_profiles[3].shortlist_config.retention.max_per_bucket
         == 750
     )
     assert config.guards.max_variants_per_compute == 600000
@@ -817,14 +819,15 @@ backtest:
     assert config.adaptive_selector_policy.hybrid_family.minimum_exceeded_signals == 4
     assert tuple(profile.mode for profile in config.execution_profiles.available_profiles) == (
         "exact_small",
+        "exact_no_risk_parity",
         "exact_parallel",
         "hybrid_conservative",
         "hybrid_family",
     )
-    assert config.execution_profiles.available_profiles[1].parallelism.stage_b_workers == 3
-    assert config.execution_profiles.available_profiles[1].feature_flags.runtime_enabled is False
+    assert config.execution_profiles.available_profiles[2].parallelism.stage_b_workers == 3
+    assert config.execution_profiles.available_profiles[2].feature_flags.runtime_enabled is False
     assert (
-        config.execution_profiles.available_profiles[1].feature_flags.parallel_stage_b_enabled
+        config.execution_profiles.available_profiles[2].feature_flags.parallel_stage_b_enabled
         is False
     )
     assert (
@@ -833,12 +836,12 @@ backtest:
     )
     assert config.execution_profiles.available_profiles[0].progress_weights.stage_b == 75
     assert (
-        config.execution_profiles.available_profiles[1].launch_budget.max_stage_b_variants_total
+        config.execution_profiles.available_profiles[2].launch_budget.max_stage_b_variants_total
         == 24000
     )
-    assert config.execution_profiles.available_profiles[1].progress_weights.stage_a == 30
+    assert config.execution_profiles.available_profiles[2].progress_weights.stage_a == 30
     assert (
-        config.execution_profiles.available_profiles[2].shortlist_config.max_candidates
+        config.execution_profiles.available_profiles[3].shortlist_config.max_candidates
         == 1500
     )
     assert (
@@ -851,19 +854,19 @@ backtest:
         .diversity_buckets
         == ("activity_band", "transition_band")
     )
-    assert config.execution_profiles.available_profiles[2].progress_weights.stage_b == 50
+    assert config.execution_profiles.available_profiles[3].progress_weights.stage_b == 50
     assert (
-        config.execution_profiles.available_profiles[2].shortlist_config.retention
+        config.execution_profiles.available_profiles[3].shortlist_config.retention
         .max_per_bucket
         == 200
     )
     assert (
-        config.execution_profiles.available_profiles[3].shortlist_config.scoring
+        config.execution_profiles.available_profiles[4].shortlist_config.scoring
         .active_span_ratio_weight
         == 0.25
     )
-    assert config.execution_profiles.available_profiles[3].family_plugin_budget_ms == 37
-    assert config.execution_profiles.available_profiles[3].planning_budget_ms == 65
+    assert config.execution_profiles.available_profiles[4].family_plugin_budget_ms == 37
+    assert config.execution_profiles.available_profiles[4].planning_budget_ms == 65
     assert config.guards.max_variants_per_compute == 1200
     assert config.guards.max_compute_bytes_total == 1234567
     assert config.cpu.max_numba_threads == 6

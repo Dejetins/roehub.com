@@ -642,6 +642,7 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         ).contracts.execution.available_execution_profiles
     ] == [
         "exact_small",
+        "exact_no_risk_parity",
         "exact_parallel",
         "hybrid_conservative",
         "hybrid_family",
@@ -662,6 +663,11 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     )
     assert (
         runtime_defaults_response.contracts.execution.available_execution_profiles[3]
+        .family_plugin_budget_ms
+        == 30
+    )
+    assert (
+        runtime_defaults_response.contracts.execution.available_execution_profiles[4]
         .family_plugin_budget_ms
         == 40
     )

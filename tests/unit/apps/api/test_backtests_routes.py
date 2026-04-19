@@ -567,6 +567,48 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
                         "planning_budget_ms": 25,
                     },
                     {
+                        "mode": "exact_no_risk_parity",
+                        "shortlist_config": {
+                            "enabled": False,
+                            "max_candidates": None,
+                            "scoring": {
+                                "activity_ratio_weight": 0.4,
+                                "direction_balance_weight": 0.25,
+                                "transition_ratio_weight": 0.25,
+                                "active_span_ratio_weight": 0.1,
+                            },
+                            "retention": {
+                                "diversity_buckets": [
+                                    "activity_band",
+                                    "direction_band",
+                                ],
+                                "max_per_bucket": None,
+                            },
+                        },
+                        "parallelism": {
+                            "stage_a_workers": 4,
+                            "stage_b_workers": 1,
+                        },
+                        "feature_flags": {
+                            "runtime_enabled": True,
+                            "heuristic_shortlist_enabled": False,
+                            "parallel_stage_b_enabled": False,
+                            "family_plugin_enabled": False,
+                        },
+                        "launch_budget": {
+                            "max_stage_a_variants_total": 25000,
+                            "max_stage_b_variants_total": 50000,
+                            "max_estimated_memory_bytes": 1610612736,
+                        },
+                        "progress_weights": {
+                            "stage_a": 45,
+                            "stage_b": 50,
+                            "finalizing": 5,
+                        },
+                        "family_plugin_budget_ms": 20,
+                        "planning_budget_ms": 50,
+                    },
+                    {
                         "mode": "exact_parallel",
                         "shortlist_config": {
                             "enabled": False,
@@ -737,6 +779,7 @@ def test_get_backtests_runtime_defaults_returns_deterministic_payload() -> None:
         ]
     ] == [
         "exact_small",
+        "exact_no_risk_parity",
         "exact_parallel",
         "hybrid_conservative",
         "hybrid_family",

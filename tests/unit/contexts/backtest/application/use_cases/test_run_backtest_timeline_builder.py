@@ -24,6 +24,12 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_core_v2 
 from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestStageABaseVariantV2,
 )
+from trading.contexts.backtest.application.services.v2.contracts import (
+    StageANoRiskMetricsV2,
+)
+from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
+    StageACompactExactPayloadV2,
+)
 from trading.contexts.backtest.application.use_cases import RunBacktestUseCase
 from trading.contexts.backtest.application.use_cases import run_backtest as run_backtest_module
 from trading.contexts.backtest.domain.entities import ExecutionOutcomeV1, TradeV1
@@ -49,6 +55,88 @@ from trading.shared_kernel.primitives import (
 
 _EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _ONE_MINUTE = timedelta(minutes=1)
+
+
+def _stage_a_compact_exact_payload() -> StageACompactExactPayloadV2:
+    """
+    Build one deterministic compact exact payload for sync-persistence-compatible test rows.
+
+    Args:
+        None.
+    Returns:
+        StageACompactExactPayloadV2: Minimal compact-trade payload accepted by parity persistence.
+    Assumptions:
+        Timeline/use-case tests verify orchestration only and therefore need just one valid
+        compact trade retained row.
+    Raises:
+        ValueError: Propagated if compact payload invariants drift.
+    Side Effects:
+        Allocates readonly NumPy arrays for the returned payload.
+    """
+    return StageACompactExactPayloadV2(
+        entry_signal_idx=np.asarray((0,), dtype=np.int64),
+        entry_exec_idx=np.asarray((1,), dtype=np.int64),
+        direction=np.asarray((1,), dtype=np.int8),
+        sig_exit_signal_idx=np.asarray((1,), dtype=np.int64),
+        sig_exit_exec_idx=np.asarray((1,), dtype=np.int64),
+    )
+
+
+def _stage_a_no_risk_metrics(*, total_return_pct: float) -> StageANoRiskMetricsV2:
+    """
+    Build deterministic no-risk metrics aligned to one scored Stage A row.
+
+    Args:
+        total_return_pct: Deterministic total-return payload used by the test row.
+    Returns:
+        StageANoRiskMetricsV2: Minimal no-risk metrics payload accepted by parity persistence.
+    Assumptions:
+        Tests assert ranking/order semantics only, so additive metrics may stay lightweight.
+    Raises:
+        ValueError: Propagated if metric invariants drift.
+    Side Effects:
+        None.
+    """
+    return StageANoRiskMetricsV2(
+        total_return_pct=total_return_pct,
+        max_drawdown_pct=1.0,
+        return_over_max_drawdown=total_return_pct,
+        profit_factor=total_return_pct + 1.0,
+        trade_count=1,
+        sharpe_trades=1.0,
+        win_rate_pct=100.0,
+        avg_trade_ret_pct=total_return_pct,
+        avg_trade_exec_bars=1.0,
+        exposure_pct=50.0,
+    )
+
+
+def _stage_a_scored_variant(
+    *,
+    base_variant: BacktestStageABaseVariantV2,
+    total_return_pct: float,
+) -> BacktestStageAScoredVariantV2:
+    """
+    Build one parity-persistence-compatible Stage A row for sync orchestration tests.
+
+    Args:
+        base_variant: Deterministic Stage A base variant fixture.
+        total_return_pct: Deterministic ranking metric used by the row.
+    Returns:
+        BacktestStageAScoredVariantV2: Stage A row carrying compact exact and no-risk payloads.
+    Assumptions:
+        Sync tests should not fail only because lightweight rows omit additive persistence fields.
+    Raises:
+        ValueError: Propagated if compact payload or metric fixtures violate invariants.
+    Side Effects:
+        None.
+    """
+    return BacktestStageAScoredVariantV2(
+        base_variant=base_variant,
+        total_return_pct=total_return_pct,
+        retained_exact_payload=_stage_a_compact_exact_payload(),
+        no_risk_metrics=_stage_a_no_risk_metrics(total_return_pct=total_return_pct),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,7 +417,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
             cancel_checker("stage_a")
         base_variants = tuple(grid_context.iter_stage_a_variants())[:shortlist_limit]
         rows = tuple(
-            BacktestStageAScoredVariantV2(
+            _stage_a_scored_variant(
                 base_variant=cast(Any, base_variant),
                 total_return_pct=float(base_variant.indicator_selections[0].params["window"]),
             )
@@ -1187,7 +1275,7 @@ def test_run_backtest_use_case_uses_run_scoped_artifact_builders_per_public_call
             run_scoped_timeline_builder_two,
         )
     )
-    stage_a_row = BacktestStageAScoredVariantV2(
+    stage_a_row = _stage_a_scored_variant(
         base_variant=BacktestStageABaseVariantV2(
             stage_a_index=0,
             indicator_selections=(
@@ -1262,7 +1350,7 @@ def test_run_backtest_use_case_uses_run_scoped_hierarchical_builder_for_hybrid_r
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
     """
-    stage_a_row = BacktestStageAScoredVariantV2(
+    stage_a_row = _stage_a_scored_variant(
         base_variant=BacktestStageABaseVariantV2(
             stage_a_index=0,
             indicator_selections=(
@@ -1528,7 +1616,7 @@ def test_run_backtest_use_case_uses_artifact_stage_a_shortlist_builder_when_avai
         artifact_asof_date="2026-03-29",
         artifact_manifest_hash="a" * 64,
     )
-    stage_a_row = BacktestStageAScoredVariantV2(
+    stage_a_row = _stage_a_scored_variant(
         base_variant=BacktestStageABaseVariantV2(
             stage_a_index=0,
             indicator_selections=(
