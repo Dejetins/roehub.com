@@ -1254,6 +1254,88 @@ def build_compact_trade_batch_v2(
     )
 
 
+def _build_compact_trade_batch_for_normalized_signal_pairs_v2(
+    *,
+    left_signal_rows_i8: np.ndarray,
+    right_signal_rows_i8: np.ndarray,
+    bar_close_1m_idx: np.ndarray,
+    sentinel_index: int,
+    direction_mode: str = "long-short",
+) -> _CompactTradeBatchV2:
+    """
+    Build pair-first compact trade batches from pre-normalized two-indicator signal rows.
+
+    Args:
+        left_signal_rows_i8: Left indicator rows shaped `[V, T_signal]` in `{-1, 0, 1}`.
+        right_signal_rows_i8: Right indicator rows shaped `[V, T_signal]` in `{-1, 0, 1}`.
+        bar_close_1m_idx: Local execution-timeline close mapping for the same `T_signal` bars.
+        sentinel_index: Local execution timeline length used as the sentinel fallback.
+        direction_mode: Strategy direction policy (`long-only`, `short-only`, `long-short`).
+    Returns:
+        _CompactTradeBatchV2: Dense internal batch state aligned to retained pair-row order.
+    Assumptions:
+        Stage A parity hot path can supply already normalized pair rows, so this helper avoids
+        repeating broad matrix validation while preserving the exact compact-trade contract.
+    Raises:
+        ValueError: If pair-row matrices are not two-dimensional or their shapes drift.
+    Side Effects:
+        May trigger Numba compilation on first use.
+    """
+    if left_signal_rows_i8.ndim != 2:
+        raise ValueError("left_signal_rows_i8 must be a 2D matrix")
+    if right_signal_rows_i8.ndim != 2:
+        raise ValueError("right_signal_rows_i8 must be a 2D matrix")
+    if left_signal_rows_i8.shape != right_signal_rows_i8.shape:
+        raise ValueError(
+            "pair signal rows must share one deterministic shape; got "
+            f"{left_signal_rows_i8.shape!r} and {right_signal_rows_i8.shape!r}"
+        )
+    normalized_mapping = _normalize_bar_close_1m_idx_v2(
+        values=bar_close_1m_idx,
+        expected_length=left_signal_rows_i8.shape[1],
+        sentinel_index=sentinel_index,
+    )
+    resolved_direction_mode = _validate_direction_mode_v2(direction_mode=direction_mode)
+    direction_mode_code = _direction_mode_code_v2(direction_mode=resolved_direction_mode)
+    entry_exec_idx = np.minimum(normalized_mapping + 1, sentinel_index).astype(
+        np.int64,
+        copy=False,
+    )
+    left_signal_rows_i8 = np.ascontiguousarray(left_signal_rows_i8, dtype=np.int8)
+    right_signal_rows_i8 = np.ascontiguousarray(right_signal_rows_i8, dtype=np.int8)
+    entry_exec_idx_i64 = np.ascontiguousarray(entry_exec_idx, dtype=np.int64)
+    trade_count = _count_compact_trade_pair_batch_rows_kernel_v2(
+        left_signal_rows_i8=left_signal_rows_i8,
+        right_signal_rows_i8=right_signal_rows_i8,
+        entry_exec_idx_i64=entry_exec_idx_i64,
+        sentinel_index=sentinel_index,
+        direction_mode_code=direction_mode_code,
+    )
+    max_trade_count = 0 if trade_count.size == 0 else int(np.max(trade_count))
+    (
+        entry_signal_idx,
+        entry_exec_idx_by_trade,
+        direction,
+        sig_exit_signal_idx,
+        sig_exit_exec_idx,
+    ) = _build_compact_trade_pair_batch_kernel_v2(
+        left_signal_rows_i8=left_signal_rows_i8,
+        right_signal_rows_i8=right_signal_rows_i8,
+        entry_exec_idx_i64=entry_exec_idx_i64,
+        sentinel_index=sentinel_index,
+        direction_mode_code=direction_mode_code,
+        max_trade_count=max_trade_count,
+    )
+    return _CompactTradeBatchV2(
+        entry_signal_idx=entry_signal_idx,
+        entry_exec_idx=entry_exec_idx_by_trade,
+        direction=direction,
+        sig_exit_signal_idx=sig_exit_signal_idx,
+        sig_exit_exec_idx=sig_exit_exec_idx,
+        trade_count=trade_count,
+    )
+
+
 def build_compact_trade_batch_for_signal_pairs_v2(
     *,
     left_signal_rows: np.ndarray,
@@ -1288,49 +1370,12 @@ def build_compact_trade_batch_for_signal_pairs_v2(
         right_indicator_id="indicator[1]",
         right_signal_rows=right_signal_rows,
     )
-    normalized_mapping = _normalize_bar_close_1m_idx_v2(
-        values=bar_close_1m_idx,
-        expected_length=left_normalized.shape[1],
+    return _build_compact_trade_batch_for_normalized_signal_pairs_v2(
+        left_signal_rows_i8=left_normalized,
+        right_signal_rows_i8=right_normalized,
+        bar_close_1m_idx=bar_close_1m_idx,
         sentinel_index=sentinel_index,
-    )
-    resolved_direction_mode = _validate_direction_mode_v2(direction_mode=direction_mode)
-    direction_mode_code = _direction_mode_code_v2(direction_mode=resolved_direction_mode)
-    entry_exec_idx = np.minimum(normalized_mapping + 1, sentinel_index).astype(
-        np.int64,
-        copy=False,
-    )
-    left_signal_rows_i8 = np.ascontiguousarray(left_normalized, dtype=np.int8)
-    right_signal_rows_i8 = np.ascontiguousarray(right_normalized, dtype=np.int8)
-    entry_exec_idx_i64 = np.ascontiguousarray(entry_exec_idx, dtype=np.int64)
-    trade_count = _count_compact_trade_pair_batch_rows_kernel_v2(
-        left_signal_rows_i8=left_signal_rows_i8,
-        right_signal_rows_i8=right_signal_rows_i8,
-        entry_exec_idx_i64=entry_exec_idx_i64,
-        sentinel_index=sentinel_index,
-        direction_mode_code=direction_mode_code,
-    )
-    max_trade_count = 0 if trade_count.size == 0 else int(np.max(trade_count))
-    (
-        entry_signal_idx,
-        entry_exec_idx_by_trade,
-        direction,
-        sig_exit_signal_idx,
-        sig_exit_exec_idx,
-    ) = _build_compact_trade_pair_batch_kernel_v2(
-        left_signal_rows_i8=left_signal_rows_i8,
-        right_signal_rows_i8=right_signal_rows_i8,
-        entry_exec_idx_i64=entry_exec_idx_i64,
-        sentinel_index=sentinel_index,
-        direction_mode_code=direction_mode_code,
-        max_trade_count=max_trade_count,
-    )
-    return _CompactTradeBatchV2(
-        entry_signal_idx=entry_signal_idx,
-        entry_exec_idx=entry_exec_idx_by_trade,
-        direction=direction,
-        sig_exit_signal_idx=sig_exit_signal_idx,
-        sig_exit_exec_idx=sig_exit_exec_idx,
-        trade_count=trade_count,
+        direction_mode=direction_mode,
     )
 
 

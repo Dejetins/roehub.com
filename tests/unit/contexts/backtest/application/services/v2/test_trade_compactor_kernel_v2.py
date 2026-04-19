@@ -10,6 +10,9 @@ from trading.contexts.backtest.application.services import (
     compute_no_risk_metrics_v2,
     no_risk_metrics_to_ranking_payload_v2,
 )
+from trading.contexts.backtest.application.services.v2 import (
+    trade_compactor_kernel as trade_compactor_kernel_module,
+)
 from trading.contexts.backtest.application.services.v2.contracts import StageACompactTradeV2
 from trading.contexts.backtest.application.services.v2.signal_aggregator_kernel import (
     aggregate_signal_pairs_v2,
@@ -392,6 +395,69 @@ def test_build_compact_trade_batch_for_signal_pairs_v2_matches_generic_batch_sha
     ) == tuple(
         generic_batch.exact_payload_at(row_index=row_index).compact_trades
         for row_index in range(int(generic_batch.trade_count.shape[0]))
+    )
+
+
+def test_normalized_pair_first_trade_batch_helper_v2_matches_default_pair_builder() -> None:
+    """
+    Verify the normalized pair-first helper stays equivalent to the default pair builder.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Stage A parity blockwise workspaces can pass normalized `np.int8` pair rows to the
+        internal helper while preserving the compact-trade payload contract.
+    Raises:
+        AssertionError: If normalized pair-first helper drifts from default pair batching.
+    Side Effects:
+        None.
+    """
+    left_signal_rows = np.ascontiguousarray(
+        np.array([[1, 1, -1, 0], [1, 0, -1, 1]], dtype=np.int8),
+        dtype=np.int8,
+    )
+    right_signal_rows = np.ascontiguousarray(
+        np.array([[1, 1, -1, 0], [1, -1, -1, 1]], dtype=np.int8),
+        dtype=np.int8,
+    )
+
+    default_pair_batch = build_compact_trade_batch_for_signal_pairs_v2(
+        left_signal_rows=left_signal_rows,
+        right_signal_rows=right_signal_rows,
+        bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+        sentinel_index=5,
+    )
+    normalized_helper_batch = (
+        trade_compactor_kernel_module._build_compact_trade_batch_for_normalized_signal_pairs_v2(
+            left_signal_rows_i8=left_signal_rows,
+            right_signal_rows_i8=right_signal_rows,
+            bar_close_1m_idx=np.array([0, 1, 2, 3], dtype=np.int64),
+            sentinel_index=5,
+        )
+    )
+
+    np.testing.assert_array_equal(
+        normalized_helper_batch.trade_count,
+        default_pair_batch.trade_count,
+    )
+    np.testing.assert_array_equal(
+        normalized_helper_batch.entry_signal_idx,
+        default_pair_batch.entry_signal_idx,
+    )
+    np.testing.assert_array_equal(
+        normalized_helper_batch.entry_exec_idx,
+        default_pair_batch.entry_exec_idx,
+    )
+    np.testing.assert_array_equal(normalized_helper_batch.direction, default_pair_batch.direction)
+    np.testing.assert_array_equal(
+        normalized_helper_batch.sig_exit_signal_idx,
+        default_pair_batch.sig_exit_signal_idx,
+    )
+    np.testing.assert_array_equal(
+        normalized_helper_batch.sig_exit_exec_idx,
+        default_pair_batch.sig_exit_exec_idx,
     )
 
 

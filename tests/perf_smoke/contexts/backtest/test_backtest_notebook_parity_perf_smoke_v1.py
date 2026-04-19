@@ -908,6 +908,161 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
     assert runtime_shape.numba_threads_used == 2
 
 
+def test_stage_a_streaming_exact_runtime_shape_tracks_pair_first_bounded_blockwise_workspaces(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Verify perf-smoke can observe pair-first bounded blockwise workspaces on the parity hot path.
+
+    Docs:
+      - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
+      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
+    Args:
+        monkeypatch: pytest fixture used to record pair-first merge sizes and fail generic merges.
+    Returns:
+        None.
+    Assumptions:
+        Canonical two-indicator `exact_no_risk_parity` should exact-score through pair-first
+        blocks only, and runtime-shape evidence should expose bounded blockwise workspaces.
+    Raises:
+        AssertionError: If parity Stage A re-enters generic dense merge or loses pair blocks.
+    Side Effects:
+        Monkeypatches one parity block-size constant and exact-merge helpers in-memory.
+    """
+    pair_block_sizes: list[int] = []
+    observed_normalized_helper_calls = 0
+    stage_a_builder_cls = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2
+    original_pair_merge = (
+        stage_a_builder_cls._merge_pair_first_retained_exact_payload_chunk_into_heap
+    )
+    original_normalized_pair_batch_builder = (
+        stage_a_shortlist_builder_module._build_compact_trade_batch_for_normalized_signal_pairs_v2
+    )
+
+    def _recording_pair_merge(self: Any, **kwargs: Any) -> None:
+        """
+        Record one parity pair-block size before delegating to the live pair-first merge helper.
+
+        Args:
+            self: Stage A shortlist builder under test.
+            **kwargs: Pair-first merge keyword arguments including `chunk_variants`.
+        Returns:
+            None.
+        Assumptions:
+            Each pair-first merge call corresponds to one bounded parity block.
+        Raises:
+            None.
+        Side Effects:
+            Appends one observed parity block size to the in-memory log.
+        """
+        pair_block_sizes.append(len(kwargs["chunk_variants"]))
+        original_pair_merge(self, **kwargs)
+
+    def _raise_generic_dense_merge(self: Any, **kwargs: Any) -> None:
+        """
+        Fail fast if parity Stage A falls back to generic dense exact merges.
+
+        Args:
+            self: Stage A shortlist builder under test.
+            **kwargs: Generic merge keyword arguments.
+        Returns:
+            None.
+        Assumptions:
+            D4 pair-first parity should bypass generic dense exact merges entirely.
+        Raises:
+            AssertionError: Always.
+        Side Effects:
+            None.
+        """
+        raise AssertionError("exact_no_risk_parity must bypass generic dense exact merge path")
+
+    def _recording_normalized_pair_batch_builder(**kwargs: Any) -> Any:
+        """
+        Record calls to the normalized pair-first helper used by parity blockwise workspaces.
+
+        Args:
+            **kwargs: Pair batch-builder keyword arguments.
+        Returns:
+            Any: Live pair-first compact-trade batch from the normalized helper.
+        Assumptions:
+            Stage A parity blocks should invoke the normalized helper exactly once per pair block.
+        Raises:
+            None.
+        Side Effects:
+            Increments one in-memory call counter.
+        """
+        nonlocal observed_normalized_helper_calls
+        observed_normalized_helper_calls += 1
+        return original_normalized_pair_batch_builder(**kwargs)
+
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "_PAIR_FIRST_NO_RISK_EXACT_BLOCK_SIZE_V2",
+        2,
+    )
+    monkeypatch.setattr(
+        stage_a_builder_cls,
+        "_merge_pair_first_retained_exact_payload_chunk_into_heap",
+        _recording_pair_merge,
+    )
+    monkeypatch.setattr(
+        stage_a_builder_cls,
+        "_merge_retained_exact_payload_chunk_into_heap",
+        _raise_generic_dense_merge,
+    )
+    monkeypatch.setattr(
+        stage_a_shortlist_builder_module,
+        "_build_compact_trade_batch_for_normalized_signal_pairs_v2",
+        _recording_normalized_pair_batch_builder,
+    )
+
+    grid_context = stage_a_shortlist_builder_testkit._pair_first_no_risk_grid_context()
+    setattr(grid_context, "execution_profile", SimpleNamespace(mode="exact_no_risk_parity"))
+    parallelism = numba_runtime_module.BacktestStageAParallelismConfigV1(
+        stage_a_workers=1,
+        numba_threads=1,
+    )
+
+    shortlist = stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2(
+        price_arrays_loader=stage_a_shortlist_builder_testkit._ComboProxyPriceLoader(),
+        signal_matrix_loader=stage_a_shortlist_builder_testkit._pair_first_no_risk_signal_loader(),
+    ).build_shortlist(
+        grid_context=cast(Any, grid_context),
+        artifact_context=cast(
+            Any,
+            stage_a_shortlist_builder_testkit._combo_proxy_artifact_context(),
+        ),
+        target_time_range=stage_a_shortlist_builder_testkit._combo_proxy_target_time_range(),
+        shortlist_limit=2,
+        batch_size=8,
+        parallelism=parallelism,
+    )
+    runtime_shape = (
+        stage_a_shortlist_builder_module.describe_stage_a_streaming_exact_runtime_shape_v2(
+            retained_chunk_sizes=tuple(pair_block_sizes),
+            pair_first_block_sizes=tuple(pair_block_sizes),
+            stage_a_workers=parallelism.stage_a_workers,
+            numba_threads_used=parallelism.numba_threads,
+        )
+    )
+
+    assert tuple(row.base_variant.stage_a_index for row in shortlist) == (0, 1)
+    assert pair_block_sizes == [2, 2]
+    assert observed_normalized_helper_calls == 2
+    assert runtime_shape.retained_chunk_count == 2
+    assert runtime_shape.retained_candidate_count == 4
+    assert runtime_shape.max_retained_chunk_size == 2
+    assert runtime_shape.pair_first_block_count == 2
+    assert runtime_shape.max_pair_first_block_size == 2
+    assert (
+        runtime_shape.frontier_compute_mode
+        == "kernel-driven pair-first bounded blockwise workspaces"
+    )
+
+
 def test_stage_a_streaming_exact_runtime_shape_bypasses_generic_row_scorer_hot_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

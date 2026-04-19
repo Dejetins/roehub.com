@@ -63,8 +63,8 @@ from .signal_aggregator_kernel import aggregate_ordered_final_signal_rows_v2
 from .signal_features_loader_v2 import MmapSignalFeaturesLoaderV2
 from .signal_matrix_loader import MmapSignalMatrixLoaderV2
 from .trade_compactor_kernel import (
+    _build_compact_trade_batch_for_normalized_signal_pairs_v2,
     _CompactTradeBatchV2,
-    build_compact_trade_batch_for_signal_pairs_v2,
     build_compact_trade_batch_v2,
     compute_no_risk_metrics_for_trade_batch_v2,
     no_risk_metrics_to_ranking_payload_v2,
@@ -786,6 +786,8 @@ class StageAStreamingExactRuntimeShapeV2:
     deferred_replay_count: int
     narrowed_stage_a_variants_total: int | None = None
     stage_a_variants_total: int | None = None
+    pair_first_block_count: int | None = None
+    max_pair_first_block_size: int | None = None
     execution_shape: str = "single-process parallel Stage A"
     frontier_compute_mode: str = "kernel-driven"
     stage_a_workers: int | None = None
@@ -838,6 +840,26 @@ class StageAStreamingExactRuntimeShapeV2:
                 "StageAStreamingExactRuntimeShapeV2.stage_a_variants_total must be > 0 when "
                 "provided"
             )
+        if self.pair_first_block_count is not None and self.pair_first_block_count < 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.pair_first_block_count must be >= 0 when "
+                "provided"
+            )
+        if self.max_pair_first_block_size is not None and self.max_pair_first_block_size < 0:
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.max_pair_first_block_size must be >= 0 when "
+                "provided"
+            )
+        if (
+            self.pair_first_block_count is not None
+            and self.max_pair_first_block_size is not None
+            and self.pair_first_block_count == 0
+            and self.max_pair_first_block_size > 0
+        ):
+            raise ValueError(
+                "StageAStreamingExactRuntimeShapeV2.max_pair_first_block_size requires "
+                "pair_first_block_count > 0"
+            )
         if (
             self.narrowed_stage_a_variants_total is not None
             and self.stage_a_variants_total is not None
@@ -868,6 +890,7 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
     retained_chunk_sizes: Sequence[int],
     narrowed_stage_a_variants_total: int | None = None,
     stage_a_variants_total: int | None = None,
+    pair_first_block_sizes: Sequence[int] | None = None,
     stage_a_workers: int | None = None,
     numba_threads_used: int | None = None,
 ) -> StageAStreamingExactRuntimeShapeV2:
@@ -880,6 +903,9 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
         narrowed_stage_a_variants_total: Optional total Stage A breadth actually enumerated after
             retained-frontier narrowing.
         stage_a_variants_total: Optional raw public Stage A cartesian total for the same request.
+        pair_first_block_sizes:
+            Optional pair-first block sizes observed while parity exact scoring uses bounded
+            blockwise workspaces.
         stage_a_workers: Optional configured Stage A worker budget for the measured run.
         numba_threads_used: Optional effective in-process Numba thread count observed live.
     Returns:
@@ -888,16 +914,28 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
     Assumptions:
         The active Stage A path exact-scores each retained chunk immediately, keeps deferred
         replay count at zero, can report narrowed-vs-raw Stage A breadth additively, and remains
-        a single-process kernel-driven frontier when `stage_a_workers` and `numba_threads_used`
-        are supplied.
+        a single-process kernel-driven frontier. Pair-first parity runs may also report bounded
+        blockwise workspaces when `pair_first_block_sizes` are supplied.
     Raises:
-        ValueError: If one retained chunk size is negative.
+        ValueError: If one retained chunk size or pair-first block size is negative.
     Side Effects:
         None.
     """
     normalized_chunk_sizes = tuple(int(value) for value in retained_chunk_sizes)
     if any(value < 0 for value in normalized_chunk_sizes):
         raise ValueError("Stage A streaming exact scoring retained_chunk_sizes must be >= 0")
+    pair_first_block_count: int | None = None
+    max_pair_first_block_size: int | None = None
+    frontier_compute_mode = "kernel-driven"
+    if pair_first_block_sizes is not None:
+        normalized_pair_block_sizes = tuple(int(value) for value in pair_first_block_sizes)
+        if any(value < 0 for value in normalized_pair_block_sizes):
+            raise ValueError(
+                "Stage A streaming exact scoring pair_first_block_sizes must be >= 0"
+            )
+        pair_first_block_count = len(normalized_pair_block_sizes)
+        max_pair_first_block_size = max(normalized_pair_block_sizes, default=0)
+        frontier_compute_mode = "kernel-driven pair-first bounded blockwise workspaces"
     return StageAStreamingExactRuntimeShapeV2(
         exact_scoring_mode="streaming exact scoring",
         retained_chunk_count=len(normalized_chunk_sizes),
@@ -912,6 +950,9 @@ def describe_stage_a_streaming_exact_runtime_shape_v2(
         stage_a_variants_total=(
             None if stage_a_variants_total is None else int(stage_a_variants_total)
         ),
+        pair_first_block_count=pair_first_block_count,
+        max_pair_first_block_size=max_pair_first_block_size,
+        frontier_compute_mode=frontier_compute_mode,
         stage_a_workers=stage_a_workers,
         numba_threads_used=numba_threads_used,
     )
@@ -2757,11 +2798,17 @@ class BacktestStageAShortlistBuilderV2:
                     "Stage A pair-first exact path requires chunk input rows to match "
                     "chunk_variants"
                 )
-        left_signal_rows = np.asarray(chunk_inputs[0].signal_rows, dtype=np.int8)
-        right_signal_rows = np.asarray(chunk_inputs[1].signal_rows, dtype=np.int8)
-        exact_batch = build_compact_trade_batch_for_signal_pairs_v2(
-            left_signal_rows=np.ascontiguousarray(left_signal_rows, dtype=np.int8),
-            right_signal_rows=np.ascontiguousarray(right_signal_rows, dtype=np.int8),
+        left_signal_rows_i8 = np.ascontiguousarray(
+            np.asarray(chunk_inputs[0].signal_rows, dtype=np.int8),
+            dtype=np.int8,
+        )
+        right_signal_rows_i8 = np.ascontiguousarray(
+            np.asarray(chunk_inputs[1].signal_rows, dtype=np.int8),
+            dtype=np.int8,
+        )
+        exact_batch = _build_compact_trade_batch_for_normalized_signal_pairs_v2(
+            left_signal_rows_i8=left_signal_rows_i8,
+            right_signal_rows_i8=right_signal_rows_i8,
             bar_close_1m_idx=local_bar_close_1m_idx,
             sentinel_index=sentinel_index,
             direction_mode=grid_context.direction_mode,
