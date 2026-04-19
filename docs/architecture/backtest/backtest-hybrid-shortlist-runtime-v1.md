@@ -7,6 +7,10 @@
 ## Status
 
 - Status: active `Milestone D / EPIC D2+D3` architecture contract.
+- Master-plan note:
+  - `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md` now treats
+    `hybrid_conservative` as rollout-only approximate surface for unresolved closure work;
+  - canonical `NR2` / `RG-TTR` parity closure must not be explained as “hybrid by default”.
 - Scope:
   - `hybrid_conservative` only;
   - universal row scoring + diversified retention + hierarchical shortlist;
@@ -55,7 +59,10 @@ Hybrid runtime может исполняться только когда одн�
 
 - public `POST /backtests` contract не получает нового поля;
 - browser не выбирает profile самостоятельно;
-- default server routing остаётся exact-first;
+- if current shipped service routing pins `hybrid_conservative`, persisted metadata must record
+  that truthfully as server-owned internal behavior;
+- `v2` master-plan D0-D2 treats such server-owned pinning as temporary shipped divergence and
+  requires canonical parity closure to move it back out of the canonical path;
 - hybrid path разрешён только через internal-only `execution_profile_mode` override,
   который не входит в request-hash semantics и нужен для tests/manual wiring/persisted internal
   metadata.
@@ -133,7 +140,9 @@ Exact runtime остаётся главным контрактом:
 
 Практически это означает:
 
-- ordinary `POST /backtests` launches продолжают идти по exact routing;
+- public `POST /backtests` не получает user-facing profile selector, а any shipped internal
+  hybrid routing must stay explicitly documented as server-owned behavior rather than hidden
+  “default exact” assumption;
 - benchmark corpus сравнивает hybrid against exact baseline, а не наоборот;
 - любые rollout decisions для hybrid должны приниматься только по benchmark evidence.
 

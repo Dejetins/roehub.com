@@ -5,6 +5,15 @@
 ## Status
 
 - Status: active canonical precompute/publish contract after R10-02 docs synchronization.
+- D10 prerequisite note:
+  - widened canonical `hit_times/1m` TP/SL grids are treated as delivered prerequisite for
+    `backtest-engine-vnext-parity-corrective-plan-v2.md`;
+  - this document is part of the confirming evidence set for that prerequisite together with
+    `backtest-runtime-kernels-v2.md`,
+    `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py`,
+    and `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py`;
+  - if live `RG-TTR` closure later contradicts this prerequisite, that contradiction must reopen
+    a blocking defect explicitly rather than silently drifting the roadmap.
 - Canonical runtime relationship:
   - precompute produces only artifact inputs for the active `signal_tf + 1m_risk` runtime;
   - sync launch, claimed worker, and run-scoped lazy detail consume the same published slot
@@ -35,6 +44,7 @@
 - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
+- `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`
 
 ## Config Inputs (R2-04)
 

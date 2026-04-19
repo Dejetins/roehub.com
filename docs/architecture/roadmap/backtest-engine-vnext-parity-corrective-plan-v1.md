@@ -7,9 +7,16 @@ owner: backtest
 
 # Корректирующий план достижения notebook-parity для backtest engine vNext
 
-Статус: proposed corrective roadmap after live `NR2` benchmark verification  
+Статус: proposed corrective roadmap after live `NR2` benchmark verification; historical first corrective roadmap superseded by `v2` umbrella master-plan
 Дата фиксации: 2026-04-12  
 Область: `backtest`, `apps/api`, `apps/worker`, planner/runtime kernels, persisted shortlist, benchmark/perf-smoke
+
+Исполнительный статус:
+
+- этот документ сохраняется как historical first corrective program reference;
+- unresolved corrective scope, execution order, and closure authority перенесены в
+  `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`;
+- если этот документ конфликтует с `v2`, authority всегда остаётся за `v2`.
 
 ## 1. Зачем нужен этот документ
 

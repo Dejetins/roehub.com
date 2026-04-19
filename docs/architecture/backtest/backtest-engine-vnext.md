@@ -1,8 +1,10 @@
 # Backtest Engine vNext
 
-Canonical redesign document for the `backtest-engine-vnext` shape after Milestone G / H closure aligned the active launch, detail, and worker contracts.
+Canonical redesign document for the `backtest-engine-vnext` shape after Milestone G / H closure
+aligned the active launch, detail, and worker contracts; remaining closure execution is governed
+by the umbrella roadmap in `backtest-engine-vnext-parity-corrective-plan-v2.md`.
 
-Status: canonical redesign baseline after Milestone G / H closure  
+Status: canonical redesign baseline after Milestone G / H closure; not the remaining execution roadmap
 Implementation state: active `summary-only` launch, `on-demand` variant detail, and shared sync/worker runtime are aligned with the shipped v2 runtime/API/worker contracts  
 Canonical experimental anchor: `tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb`
 
@@ -16,6 +18,11 @@ It exists to:
 - describe the staged engine shape in implementation-ready terms for future follow-up work;
 - freeze the agreed vocabulary for launch shape, internal exact payloads, and shared runtime boundaries;
 - prevent later implementation prompts from mixing current production behavior with target redesign intent.
+
+Remaining execution and closure authority for unresolved parity/product/compatibility work now
+belongs to:
+
+- `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`
 
 This document does not replace the shipped runtime/API/worker contracts as the source of active behavior.
 

@@ -6,6 +6,12 @@
 ## Status
 
 - Status: active v1 endpoint contract with additive R0 freeze fields.
+- Master-plan note:
+  - this endpoint remains the shipped discovery/defaults contract for browser clients;
+  - `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md` remains the
+    only execution master-plan for unresolved parity/product closure;
+  - publishing a profile in this catalog does not by itself mean canonical sync launch should use
+    that profile.
 - Superseded by target-v2 source-of-truth:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
@@ -51,8 +57,11 @@
     `feature_flags.runtime_enabled=true` and
     `feature_flags.heuristic_shortlist_enabled=true`;
   - this remains discovery/debug surface only for browser clients;
-  - browser still does not choose `execution_profile_mode`, and public launch remains server-owned
-    exact-first routing unless an internal-only override is used outside the public API contract.
+  - browser still does not choose `execution_profile_mode`, and launch classification remains
+    server-owned even when the current shipped service snapshot uses internal hybrid routing for an
+    approximate path;
+  - this catalog therefore must not be read as proof that canonical sync launch should or should
+    not use one concrete profile without checking the active runtime/API contract docs.
 - E1/E2 additive contract:
   - each execution profile now also publishes `family_plugin_budget_ms` next to
     `planning_budget_ms`;

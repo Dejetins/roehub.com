@@ -11,11 +11,22 @@
 ## Status
 
 - Status: active benchmark/protocol reference for the delivered v2 runtime and summary-only UX.
+- Umbrella authority note:
+  - `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md` is the only
+    remaining execution master-plan for parity/program closure;
+  - this document remains benchmark/protocol/evidence authority only and does not reopen a second
+    parallel roadmap.
 - Compatibility note:
   - R10-02 synchronized docs around the shipped runtime and left R10-03 for perf/runbook
     closure only;
   - R10-03 uses this document as the canonical benchmark protocol for legacy R0 reference,
     artifact-backed v2 perf gates, and rollout evidence.
+- D10 prerequisite note:
+  - wider `hit_times/1m` TP/SL artifact grids plus grid-agnostic Stage B loader consumption are
+    treated here as delivered prerequisites for master-plan closure;
+  - this document validates and measures that prerequisite together with
+    `backtest-precompute-runner-v2.md`, `backtest-runtime-kernels-v2.md`, and the cited unit
+    tests rather than reopening it as a new implementation milestone.
 - Milestone A / EPIC A3 adds one additive rollout corpus on top of this baseline:
   - `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`
   - `tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json`
@@ -26,7 +37,8 @@
   - `small_grid_overhead` remains the lightweight small-run overhead check;
   - neither slice changes active default profile selection or implies rollout of `exact_parallel`
     launch policy by itself.
-- Milestones A-G notebook parity closure keep one frozen benchmark surface:
+- Historical Milestones A-G naming is kept only for traceability; the active umbrella master-plan
+  now reuses one frozen benchmark surface:
   - `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
   - `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
   - internal measurement helpers under
@@ -64,12 +76,15 @@ R6-04 фиксирует полный runtime ranking contract и summary-only t
   same finalists, ranking order, and `variant_key` semantics as the approved exact baseline.
 - summary-only runtime rows: ranking payload определяет inclusion в `top_n`, а report/trades тела
   не materialize'ятся в sync/jobs summary paths.
-- Milestone C artifact dependency expands the canonical `hit_times/1m` surface to:
+- Milestone C artifact dependency expanded the canonical `hit_times/1m` surface to:
   - `tp_values = [0.5, 1.0, ..., 50.0]` (`100` levels);
   - `sl_values = [0.5, 1.0, ..., 25.0]` (`50` levels);
   - raw table footprint is therefore `300` `uint32` cells per `1m` bar, which keeps the default
     `20_000`-bar incremental tail under `50_000_000` cells while moving bootstrap/full rebuilds
     into a documented multi-gibibyte memory range.
+
+Для umbrella master-plan `v2` этот widened artifact contract читается как delivered prerequisite,
+а не как ещё не начатая dependency branch.
 
 ## Артефакты R0
 
@@ -114,8 +129,8 @@ R0 intentionally не фиксирует machine-specific SLA. Проверяе�
 ## Notebook parity benchmark contract (A1 artifact, G1/G2 closure authority)
 
 Этот contract не заменяет R0. Он сохраняет A1 fixture names, но на этапе closure фиксирует
-active benchmark authority для performance program из
-`backtest-engine-vnext-notebook-parity-plan-v1.md`.
+active benchmark authority для umbrella master-plan из
+`backtest-engine-vnext-parity-corrective-plan-v2.md`.
 
 ### Canonical classes
 
@@ -158,7 +173,7 @@ The committed corpus now distinguishes two explicit benchmark-authority layers:
   stays on explicit benchmark-host captures and cannot be inferred from synthetic perf-smoke alone
 
 This split is intentional: passing local synthetic validation keeps the benchmark contract honest,
-but it does not by itself close the corrective roadmap.
+but it does not by itself close the umbrella execution master-plan.
 
 ### Blocking live host captures
 

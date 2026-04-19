@@ -7,6 +7,11 @@ artifact-backed backtest v2 runtime.
 
 - Status: canonical architecture document for the active `backtest-job-runner` runtime.
 - This file is the source of truth for the claimed background execution path for persisted runs.
+- Master-plan note:
+  - remaining parity/product closure authority belongs to
+    `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`;
+  - this document stays focused on the active worker contract and must remain truthful about
+    shipped behavior while that closure is still open.
 - [`docs/architecture/backtest/backtest-job-runner-worker-v1.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
   is historical / compatibility-only and is kept for migration context.
 - Public lifecycle vocabulary and persisted run storage remain compatible with runs/history

@@ -7,9 +7,17 @@ owner: backtest
 
 # План достижения notebook-parity производительности для backtest engine vNext
 
-Статус: proposed benchmark-gated implementation roadmap  
+Статус: proposed benchmark-gated implementation roadmap; historical performance roadmap after `v2` umbrella cutover
 Дата фиксации: 2026-04-12  
 Область: `backtest`, `apps/api`, `apps/worker`, runtime kernels, artifact-backed scoring, benchmark/perf-smoke
+
+Исполнительный статус:
+
+- этот документ сохраняется как historical performance-rationale and benchmark-shape reference;
+- remaining execution scope и closure authority перенесены в
+  `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`;
+- benchmark gates, если они остаются актуальными, должны читаться через `v2`, а не как
+  самостоятельная параллельная программа работ.
 
 ## 1. Зачем нужен этот документ
 

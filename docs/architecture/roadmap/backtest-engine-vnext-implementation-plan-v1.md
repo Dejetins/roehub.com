@@ -7,9 +7,17 @@ owner: backtest
 
 # План переустройства backtest engine vNext
 
-Статус: proposed implementation roadmap for notebook-derived engine redesign  
+Статус: proposed implementation roadmap for notebook-derived engine redesign; historical design roadmap after `v2` umbrella cutover
 Дата фиксации: 2026-04-10  
 Область: `backtest`, `apps/api`, `apps/web`, `apps/worker`, artifact precompute/runtime, persisted runs UX
+
+Исполнительный статус:
+
+- этот документ сохраняется как historical design/source-vocabulary reference;
+- remaining execution scope по этой теме перенесён в
+  `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`;
+- если формулировки этого документа расходятся с active shipped contracts или с umbrella
+  master-plan `v2`, authority остаётся за active contract docs и `v2`.
 
 ## 1. Зачем нужен этот документ
 
@@ -983,4 +991,3 @@ Roadmap считается успешно реализованным, когда
 8. perf smoke подтверждает заметный разрыв в лучшую сторону относительно current Stage A hot path;
 9. новый roadmap можно безопасно разложить на последовательные prompts без конфликтующих
    трактовок.
-

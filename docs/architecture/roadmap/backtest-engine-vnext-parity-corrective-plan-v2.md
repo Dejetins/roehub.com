@@ -7,10 +7,11 @@ owner: backtest
 
 # Корректирующий план достижения notebook-parity для backtest engine vNext (v2)
 
-Статус: proposed corrective roadmap after live `NR2` rerun verification  
+Статус: proposed corrective roadmap after live `NR2` rerun verification; execution master-plan  
 Дата фиксации: 2026-04-15  
 Область: `backtest`, `apps/api`, `apps/worker`, execution-profile topology, parity runtime
-contract, Stage A exact kernels, persisted parity state, benchmark/perf-smoke
+contract, Stage A exact kernels, risk-grid parity closure, public API/UI contract, persisted parity
+state, compatibility invariants, artifact dependency status, benchmark/perf-smoke
 
 ## 1. Зачем нужен этот документ
 
@@ -37,6 +38,17 @@ contract, Stage A exact kernels, persisted parity state, benchmark/perf-smoke
 Документ intentionally не открывает новый product redesign. Он описывает только тот набор
 доработок, который теперь нужен, чтобы backend service пришёл либо к target parity, либо к
 максимально близкому состоянию, подтверждённому live benchmark на benchmark host.
+
+Начиная с этой редакции документ также становится единственным исполняемым master-plan для
+remaining scope по:
+
+- `docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md`
+- `docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md`
+- `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md`
+
+То есть unresolved scope из этих документов больше не должен исполняться “рядом” как отдельная
+программа. Если обязательство остаётся актуальным, оно должно быть либо перенесено сюда как
+explicit epic/gate, либо зафиксировано здесь как completed prerequisite с подтверждающей ссылкой.
 
 ## 2. Зафиксированные факты по живому benchmark
 
@@ -301,9 +313,12 @@ approximate:
 Это важно, чтобы новая corrective program не ушла снова в локальные hot-spot patches вместо
 service-topology split.
 
-## 5. Что считаем достаточным scope новой corrective program
+## 5. Что считаем достаточным scope этого master-plan
 
-Эта corrective program intentionally ограничена семью рабочими направлениями:
+Начиная с этой редакции документ intentionally фиксирует полный remaining scope всей программы
+`backtest engine vNext`, который ещё нужен для честного closure.
+
+Эта master-program intentionally ограничена одиннадцатью рабочими направлениями:
 
 1. `canonical service-topology split away from hybrid_conservative`
 2. `planner / execution-profile / adaptive-selector topology split`
@@ -311,12 +326,17 @@ service-topology split.
 4. `notebook-shaped Stage A parity pipeline`
 5. `pair-first no-risk exact kernel and memory-shape collapse`
 6. `sync / worker parity contract and persisted parity state`
-7. `final live benchmark closure`
+7. `benchmark observability foundation`
+8. `public contract and UX closure`
+9. `risk-grid parity closure`
+10. `compatibility and correctness invariants`
+11. `artifact dependency status`
 
-Если эти семь направлений не будут закрыты, backend service либо останется approximate by design,
-либо будет “быстрее”, но не parity-correct по winners/results.
+Если хотя бы одно из этих направлений не будет закрыто, то master-plan не считается завершённым:
+backend service либо останется approximate by design, либо будет “быстрее”, но не parity-correct,
+либо сохранит незакрытые продуктовые/контрактные хвосты из старых roadmap’ов.
 
-## 6. Целевое runtime состояние после corrective program
+## 6. Целевое runtime состояние после master-plan closure
 
 ### 6.1 Для canonical `NR2`
 
@@ -345,9 +365,38 @@ Canonical `NR2` run должен иметь такую форму:
   approximate universal shortlist logic;
 - sync and worker outputs stay contract-equivalent.
 
-### 6.3 Целевые benchmark gates
+### 6.3 Для canonical `RG-TTR`
 
-Primary target:
+Canonical risk-grid total-return run должен иметь такую форму:
+
+- Stage A retains compact, deterministic survivors instead of broad signal-row replay payloads;
+- retained payload for the risk path is compact-trade-first and does not carry full dense
+  `final_signal_row` state;
+- Stage B keeps cheap total-return grid ranking enabled even when retained payload exists;
+- exact replay is bounded by finalist scope only;
+- benchmark-sized workloads stay `in_process` and `single-process` by default;
+- process fan-out exists only as explicit fallback above documented workload thresholds;
+- top-level metrics and ranking stay comparable to the notebook anchor on equal thread budget.
+
+### 6.4 Public contract and compatibility invariants
+
+После closure master-plan должен одновременно сохранять следующие инварианты:
+
+- public launch surface keeps only `ranking.primary_metric` as the ranking selector;
+- `secondary_metric`, `warmup_bars`, and `top_trades_n` are removed from active
+  request/defaults/UI/history contracts;
+- launch path remains `summary-only`;
+- trades, report rows, and report tables are materialized only on explicit on-demand
+  `variant-report` flow;
+- public progress vocabulary remains `stage_a`, `stage_b`, `finalizing` even if internal
+  sub-stages change;
+- supported alternative `primary_metric` values remain functionally correct for both no-risk and
+  risk-grid paths;
+- persisted summary/job payloads remain finite and JSON-safe.
+
+### 6.5 Целевые benchmark gates
+
+Primary target for canonical `NR2`:
 
 - top-1 winner identical to notebook anchor on equal thread budget;
 - `wall_clock_ratio <= 1.18x`;
@@ -356,12 +405,29 @@ Primary target:
 - `execution_mode = sync_inline`;
 - `stage_b_execution_mode = bypassed_no_risk`.
 
-Near-target fallback, acceptable only as explicit interim milestone and not as final closure:
+Near-target fallback for `NR2`, acceptable only as explicit interim milestone and not as final
+closure:
 
 - top-1 winner identical to notebook anchor;
 - `wall_clock_ratio <= 1.30x`;
 - `peak_rss_ratio <= 2.00x`;
 - same single-process no-risk runtime shape.
+
+Primary target for canonical `RG-TTR`:
+
+- notebook-equivalent top result and top-level metrics on equal thread budget;
+- `wall_clock_ratio <= 1.18x`;
+- Stage B stays `in_process` and `single-process` by default;
+- retained payload remains compact-trade-first;
+- exact replay count is bounded by finalist scope and observable in benchmark output.
+
+Functional target for `RG-ALT`:
+
+- correctness remains intact for shipped alternative `primary_metric` values;
+- runtime does not regress by more than `10%` versus the accepted pre-cutover live baseline on the
+  benchmark host;
+- alternative metrics do not accidentally force a heavier runtime class when the ranking semantics
+  do not require it.
 
 ## 7. Пошаговый план реализации
 
@@ -592,12 +658,12 @@ Current worker reuse of the same reduced-plan branch and incomplete persisted pa
   metrics as sync execution;
 - worker must not re-enter hybrid shortlist reduction for the parity-first no-risk class.
 
-## EPIC D6. Benchmark observability and closure
+## EPIC D6. Benchmark observability foundation
 
 ### Цель
 
-Закрыть corrective program measured truth, not inference, and make future regressions immediately
-observable.
+Сделать future regressions immediately observable и подготовить measured-truth surface, на которой
+потом можно честно закрывать весь master-plan.
 
 ### Что делаем
 
@@ -609,8 +675,9 @@ observable.
   - narrowed combo count,
   - exact replay count;
 - rerun canonical `NR2` service vs notebook on equal thread budget;
+- rerun canonical `RG-TTR` service vs notebook on equal thread budget;
 - rerun worker parity validation for the same class if background path stays supported;
-- sync docs/fixtures only after fresh live capture is available.
+- keep docs/fixtures blocked on fresh live capture until all remaining epics are closed.
 
 ### Основные файлы
 
@@ -627,9 +694,211 @@ observable.
 
 ### Acceptance gate
 
-- canonical `NR2` service path must either pass the primary target gates or explicitly land in
-  the documented near-target fallback state;
-- benchmark report must not rely on code-level inference for active runtime shape fields.
+- benchmark surfaces must expose live runtime-shape fields for `NR2` and `RG-TTR` without relying
+  on code-level inference;
+- repository must have repeatable equal-thread-budget capture flow ready before contract-closure
+  epics are declared complete.
+
+## EPIC D7. Public contract and UX closure
+
+### Цель
+
+Вернуть в master-plan обязательный public-contract closure from implementation roadmap, чтобы
+parity fix не оставил рядом несинхронизированные API/UI/defaults/history surfaces.
+
+### Что заменяем
+
+Current leftover public-contract ambiguity around:
+
+- `secondary_metric`
+- `warmup_bars`
+- `top_trades_n`
+- mixed launch-vs-detail trade materialization assumptions
+
+### Что делаем
+
+- remove `secondary_metric` from active request DTOs, runtime defaults, UI, and persisted history
+  vocabulary;
+- remove `warmup_bars` from public input and keep it as internal derived/debug-only value;
+- remove `top_trades_n` from active request/defaults/UI/normalization surfaces;
+- keep launch payloads and persisted top rows `summary-only`;
+- keep trades/report bodies only on explicit run-scoped `variant-report` path;
+- sync API, web defaults, history/detail docs, and browser behavior so they all describe the same
+  public contract.
+
+### Основные файлы
+
+- `apps/api/dto/backtests.py`
+- `apps/api/dto/backtest_runtime_defaults.py`
+- `apps/api/dto/backtest_runs.py`
+- `apps/api/dto/backtest_jobs.py`
+- `apps/api/routes/backtests.py`
+- `src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py`
+- `src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py`
+- `src/trading/contexts/backtest/application/use_cases/run_backtest.py`
+- `src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py`
+- `apps/web/templates/backtests.html`
+- `apps/web/templates/backtest_run_summary.html`
+- `apps/web/dist/backtest_ui.js`
+- `apps/web/dist/backtest_runs_ui.js`
+- `apps/web/dist/backtest_jobs_ui.js`
+- `apps/api/wiring/modules/backtest.py`
+- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
+- `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+
+### Acceptance gate
+
+- active public launch contract accepts only `ranking.primary_metric` as ranking selector;
+- `secondary_metric`, `warmup_bars`, and `top_trades_n` disappear from active API/UI/defaults and
+  persisted run-history vocabulary;
+- launch path stays `summary-only`, and full trades/report bodies stay on explicit `variant-report`
+  flow only.
+
+## EPIC D8. Risk-grid parity closure
+
+### Цель
+
+Вернуть в master-plan обязательный `RG-TTR` scope, чтобы notebook-parity closure не ограничивался
+только canonical no-risk path.
+
+### Что заменяем
+
+Current partially closed risk-grid runtime contract spread across:
+
+- `src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py`
+- `src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py`
+- `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py`
+- `src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py`
+
+### Что делаем
+
+- keep retained payload for the risk path compact-trade-first only;
+- retained payload must not disable cheap Stage B total-return grid ranking;
+- exact replay must become finalist-only and observable in runtime counters/tests;
+- single-process `in_process` Stage B becomes the default for benchmark-sized `RG-TTR` workloads;
+- process fan-out remains fallback-only above explicit documented workload thresholds;
+- rerun canonical `RG-TTR` live benchmark on equal thread budget and keep it as blocking closure
+  gate.
+
+### Основные файлы
+
+- `src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py`
+- `src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py`
+- `src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py`
+- `src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py`
+- `configs/prod/backtest.yaml`
+- `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
+- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+
+### Acceptance gate
+
+- canonical `RG-TTR` benchmark reaches its accepted parity gate on equal thread budget;
+- retained payload for the risk path stays compact-trade-first and does not carry full signal-row
+  state;
+- exact replay count is bounded by finalist scope;
+- default benchmark-sized risk-grid runtime no longer relies on process fan-out.
+
+## EPIC D9. Compatibility and correctness invariants
+
+### Цель
+
+Явно зафиксировать те correctness and compatibility obligations, которые нельзя считать
+“вторичными” относительно parity, потому что без них closure будет недостоверным.
+
+### Что заменяем
+
+Current partial handling of:
+
+- `RG-ALT` functional guardrails
+- alternative `primary_metric` support
+- finite-metric JSON persistence
+- progress vocabulary stability
+
+### Что делаем
+
+- keep shipped alternative `primary_metric` values functionally supported for both no-risk and
+  risk-grid classes;
+- keep `RG-ALT` as correctness-first class with explicit non-regression gate;
+- define one explicit finite-metric normalization rule for persisted summary rows, job snapshots,
+  and benchmark output surfaces;
+- sanitize `Infinity`, `-Infinity`, and `NaN` before JSON serialization where persistence/export
+  contracts require finite values;
+- preserve public progress vocabulary `stage_a`, `stage_b`, `finalizing` even if internal
+  sub-stages and counters become more detailed.
+
+### Основные файлы
+
+- `src/trading/contexts/backtest/application/services/v2/metrics_kernel.py`
+- `src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py`
+- `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py`
+- `src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_results_repository.py`
+- `src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py`
+- `apps/api/dto/backtest_runs.py`
+- `tests/unit/contexts/backtest/application/services/v2/test_metrics_kernel_v2.py`
+- `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py`
+- `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/backtest-job-runner-v2.md`
+- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+
+### Acceptance gate
+
+- `RG-ALT` remains functionally correct and does not regress runtime by more than `10%` versus the
+  accepted live baseline on the benchmark host;
+- persisted rows, job snapshots, and exported benchmark/report surfaces remain finite and
+  JSON-safe;
+- public progress semantics stay stable even after internal runtime-stage refactoring.
+
+## EPIC D10. Artifact dependency status
+
+### Цель
+
+Убрать ambiguity вокруг wider TP/SL artifact dependency, чтобы master-plan не оставлял открытым
+вопрос, должен ли он ещё внедряться или уже является completed prerequisite.
+
+### Что заменяем
+
+Current ambiguity inherited from the older implementation roadmap about whether:
+
+- wider canonical `hit_times/1m` TP/SL grids are already delivered;
+- Stage B loaders/kernels are already grid-agnostic;
+- parity closure must still include this rollout or only validate its presence.
+
+### Что делаем
+
+- explicitly fix in this master-plan that wider TP/SL artifact grids and grid-agnostic Stage B
+  loaders are treated as `completed prerequisite`, not as a new unresolved epic;
+- cite the confirming authority for that prerequisite in active docs/tests:
+  - `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py`
+  - `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py`
+- require any contradiction discovered during `RG-TTR` closure to reopen this dependency as a
+  blocker before final acceptance.
+
+### Основные файлы
+
+- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py`
+- `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py`
+
+### Acceptance gate
+
+- this roadmap explicitly states that wider TP/SL artifact grids and grid-agnostic runtime loaders
+  are already delivered prerequisites;
+- repository docs/tests cited above remain sufficient to confirm that status for master-plan
+  readers and reviewers;
+- if live `RG-TTR` closure contradicts that prerequisite, the contradiction is treated as a
+  blocking defect, not as silent roadmap drift.
 
 ## 8. Что intentionally не входит в scope
 
@@ -637,6 +906,7 @@ observable.
 - не возвращаем `hybrid_conservative` как default explanation for canonical no-risk service runs;
 - не считаем thread tuning главным решением;
 - не расширяем public `POST /backtests` transport новыми user-facing profile knobs;
+- не возвращаем `secondary_metric`, `warmup_bars`, или `top_trades_n` как active public knobs;
 - не переписываем family-plugin / `hybrid_family` rollout beyond what is necessary to stop it
   interfering with parity classification;
 - не делаем broad docs rewrite outside directly touched runtime contracts.
@@ -651,7 +921,11 @@ observable.
 4. `D3` notebook-shaped Stage A parity pipeline
 5. `D4` pair-first no-risk exact kernel and memory-shape collapse
 6. `D5` sync / worker parity contract
-7. `D6` benchmark observability and closure
+7. `D6` benchmark observability foundation
+8. `D7` public contract and UX closure
+9. `D8` risk-grid parity closure
+10. `D9` compatibility and correctness invariants
+11. `D10` artifact dependency status validation
 
 Причина:
 
@@ -661,12 +935,19 @@ observable.
 - без `D3` top-result parity не может стать blocking contract;
 - без `D4` memory and CPU symptoms останутся слишком далеки от notebook;
 - без `D5` worker path останется отдельной divergence surface;
-- только после этого имеет смысл обновлять closure docs and claims.
+- без `D6` нельзя честно измерять closure для `NR2` и `RG-TTR`;
+- без `D7` останутся несинхронизированные API/UI/defaults/history contracts из старого redesign
+  scope;
+- без `D8` master-plan будет закрывать только no-risk path, но не canonical risk-grid parity
+  target;
+- без `D9` останутся correctness/compatibility holes, которые сломают доверие к closure;
+- без `D10` останется ambiguity, delivered ли wider TP/SL prerequisite или он был silently skipped.
 
 ## 10. Документы, которые должны быть синхронизированы
 
 - `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md`
 - `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`
+- `docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md`
 - `docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md`
 - `docs/architecture/backtest/backtest-v2-benchmarks.md`
 - `docs/architecture/backtest/backtest-engine-vnext.md`
@@ -675,16 +956,31 @@ observable.
 - `docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md`
 - `docs/architecture/backtest/backtest-adaptive-selector-v1.md`
 - `docs/architecture/backtest/backtest-job-runner-v2.md`
+- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
+- `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 
 ## 11. Итоговое правило этого документа
 
-Эта corrective program считается завершённой только тогда, когда одновременно выполнены все
+Этот master-plan считается завершённым только тогда, когда одновременно выполнены все
 условия:
 
 - canonical service `NR2` path больше не живёт на `hybrid_conservative`;
-- top-1 winner совпадает с notebook anchor при equal thread budget;
+- canonical `NR2` top-1 winner совпадает с notebook anchor при equal thread budget;
+- canonical `RG-TTR` path keeps notebook-equivalent top result on equal thread budget while
+  staying `in_process`, `single-process` by default, and finalist-only for exact replay;
 - runtime shape остаётся `sync_inline`, `single-process`, `bypassed_no_risk`;
-- wall time and RSS либо реально проходят target gates, либо документированно входят в near-target
-  fallback window как explicit interim state;
+- `NR2` and `RG-TTR` либо реально проходят свои target gates, либо для `NR2` документированно
+  зафиксирован near-target interim state, который не выдаётся за final closure;
 - sync and worker no-risk outputs больше не расходятся контрактно;
+- active public launch contract keeps only `ranking.primary_metric`; `secondary_metric`,
+  `warmup_bars`, and `top_trades_n` удалены из active API/UI/defaults/history surfaces;
+- launch path остаётся `summary-only`, а trades/report bodies materialize-ятся только on-demand
+  через explicit `variant-report`;
+- `RG-ALT` remains functionally correct and within its non-regression runtime envelope;
+- persisted summary/job/benchmark payloads remain finite and JSON-safe;
+- public progress semantics remain `stage_a`, `stage_b`, `finalizing`;
+- wider TP/SL artifact dependency explicitly recorded here as completed prerequisite and not
+  contradicted by live `RG-TTR` closure evidence;
 - docs описывают именно live-delivered service truth, а не intended architecture.

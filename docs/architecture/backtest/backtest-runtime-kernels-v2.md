@@ -16,6 +16,17 @@ Closure authority: `tests/perf_smoke/contexts/backtest/test_backtest_notebook_pa
 ## Status
 
 - Status: active canonical production runtime contract after R10-01 and R10-02.
+- Umbrella roadmap note:
+  - `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md` is now the
+    only remaining execution master-plan for unresolved parity/product closure;
+  - this document remains the current shipped runtime contract and kernel-boundary source of truth.
+- D10 prerequisite note:
+  - wider `hit_times/1m` TP/SL grids and grid-agnostic Stage B loaders are treated here as
+    delivered prerequisites, not as open implementation scope;
+  - the confirming evidence surface is this document together with
+    `backtest-precompute-runner-v2.md`,
+    `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py`,
+    and `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py`.
 - Supersedes as hot-path description:
   - `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
   - `docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md`
@@ -55,6 +66,9 @@ Historical notebook references only:
   `06_backtest_compute.ipynb`.
 - R5-01 остаётся immutable input boundary: runtime читает только shipped `1m hit-times`,
   `prices/<tf>`, `prices/1m`, `mappings/<tf>` и `signals/<tf>/<indicator_id>`.
+- Для `v2` master-plan это shipped `hit_times/1m` boundary уже считается delivered prerequisite:
+  closure может только подтвердить его benchmark evidence или поднять blocking defect, но не
+  “заново открывать” сам dependency branch без явного reopen decision.
 - R6-01 уже реализует runtime-side artifact loading primitives:
   `artifact_slot_resolver.py`, `price_arrays_loader.py`, `signal_matrix_loader.py`.
 - R6-02 уже реализует Stage A artifact-backed kernels и additive shortlist bridge:
@@ -231,7 +245,9 @@ Milestone D добавляет первый approximate runtime path, но не 
   orchestration с `stage_a_shortlist_builder_v2.py`;
 - hybrid path разрешён только для explicitly opted-in
   `execution_profile.mode = hybrid_conservative`;
-- public launch routing не получает новый selector и по-прежнему остаётся exact-first;
+- public launch routing не получает новый selector; any current shipped hybrid routing must stay
+  explicitly documented as server-owned internal behavior rather than assumed away as
+  “exact-first by definition”;
 - final scoring authority остаётся за existing exact Stage B scorer.
 
 Практическая граница:

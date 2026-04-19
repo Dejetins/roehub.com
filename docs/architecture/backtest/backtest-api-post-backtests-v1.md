@@ -7,6 +7,10 @@ deterministic `422` ошибками.
 ## Status
 
 - Status: active v1 launch contract after R8-02 explicit auto-fallback cutover.
+- Master-plan note:
+  - this document records the current shipped public launch contract;
+  - remaining parity/product closure authority belongs to
+    `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`.
 - Compatibility note:
   - `POST /backtests` remains the active public launch route;
   - `background_auto` is the canonical background path for new queued runs created by
@@ -125,16 +129,21 @@ deterministic `422` ошибками.
   - effective `execution_profile_mode` is persisted into additive unified-run metadata for later
     `/backtests/runs*` progress/history rendering.
 - D2 hybrid rollout note:
-  - `hybrid_conservative` remains an internal-only runtime profile, but sync `POST /backtests`
-    now server-pins that profile for the redesigned prefilter-first launch path;
+  - `hybrid_conservative` remains an internal-only approximate runtime profile;
+  - current shipped sync wrapper may still server-pin that profile for the approximate shortlist
+    path in the pre-master-plan snapshot;
+  - `v2` master-plan treats this as current-state truth to be removed by the parity-first cutover,
+    not as the target closure condition;
   - public `POST /backtests` still does not expose a profile selector;
   - internal-only execution-profile metadata must live in additive persisted fields outside
     `request_json`, while legacy `request_json.execution_profile_mode` remains compatibility-only
     for already stored rows and stays out of request-hash semantics.
 - F1 sync cutover note:
-  - sync `POST /backtests` launch now executes through the redesigned prefilter-first exact
-    pipeline by forcing internal `execution_profile_mode=hybrid_conservative` inside the
-    persisted sync-inline wrapper;
+  - current shipped sync `POST /backtests` path still records the hybrid-era approximate wrapper
+    behavior where internal `execution_profile_mode=hybrid_conservative` may be forced for that
+    snapshot of the cutover;
+  - `v2` master-plan D0-D2 explicitly requires canonical no-risk parity closure to move away from
+    that server-owned hybrid pinning;
   - public request/response transport remains unchanged:
     no new public launch fields, launch stays `summary-only`, and persisted top rows stay
     `summary-only`;
@@ -168,9 +177,9 @@ deterministic `422` ошибками.
 - Current exact runtime-enabled launch profiles are:
   - `exact_small`
   - `exact_parallel`
-- `hybrid_conservative` is now the server-owned internal sync-launch profile for
-  `POST /backtests`; it still does not add a public request field or a user-selectable profile
-  knob.
+- current shipped sync wrapper may still use `hybrid_conservative` as a server-owned internal
+  launch profile for the approximate shortlist path; `v2` master-plan treats this as temporary
+  current-state truth rather than the accepted parity closure target.
 - `hybrid_family` remains future rollout surface only.
 - Варианты детерминированы, guards применяются в sync режиме:
   - `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md`
@@ -194,7 +203,7 @@ deterministic `422` ошибками.
 - Output policy v1:
   - для grid запуска возвращаем только top-K summary rows (default `top_k_default=300`,
     override из request),
-  - ranking выбирается по 1-2 approved runtime metrics:
+  - ranking выбирается по одному approved runtime metric с deterministic tie-break:
     `total_return_pct`, `max_drawdown_pct`, `return_over_max_drawdown`,
     `profit_factor`, `sharpe_trades`, `win_rate_pct`,
   - direction map фиксирован:

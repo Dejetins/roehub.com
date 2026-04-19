@@ -6,6 +6,7 @@ Related documents:
 - `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
 - `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`
 - `docs/architecture/backtest/backtest-family-accelerators-v1.md`
+- `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`
 
 ## Purpose
 
@@ -21,6 +22,10 @@ It exists to keep automatic selection:
 
 This document does not add a new public `POST /backtests` field.
 The browser still does not choose `execution_profile_mode`.
+
+Remaining parity closure authority does not live in this selector document.
+`v2` umbrella master-plan requires planner/selector topology split so canonical no-risk parity
+classification must not be silently reduced to hybrid rollout semantics.
 
 ## Policy modes
 
