@@ -523,8 +523,11 @@ class RunBacktestUseCase:
                 max_compute_bytes_total=self._max_compute_bytes_total,
             )
             effective_runtime_plan = runtime_plan
-            if runtime_plan_requires_hierarchical_shortlist_runtime_v2(
-                runtime_plan=runtime_plan
+            if (
+                not _runtime_plan_is_exact_no_risk_parity_v2(runtime_plan=runtime_plan)
+                and runtime_plan_requires_hierarchical_shortlist_runtime_v2(
+                    runtime_plan=runtime_plan
+                )
             ):
                 hierarchical_shortlist_builder = (
                     self._run_scoped_hierarchical_shortlist_builder()
@@ -1648,6 +1651,34 @@ def _build_price_arrays_loader_v2(
     if artifact_loader is None:
         raise ValueError("artifact_slot_resolver must expose artifact_loader")
     return MmapPriceArraysLoaderV2(artifact_loader=artifact_loader)
+
+
+def _runtime_plan_is_exact_no_risk_parity_v2(
+    *,
+    runtime_plan: BacktestArtifactRuntimePlanV2,
+) -> bool:
+    """
+    Resolve whether the live runtime plan belongs to the first-class no-risk parity profile.
+
+    Args:
+        runtime_plan: Prepared artifact-backed runtime plan for the current sync execution.
+    Returns:
+        bool: `True` only when `execution_profile.mode` is `exact_no_risk_parity`.
+    Assumptions:
+        D3 canonical `NR2` orchestration must bypass `BacktestHierarchicalShortlistBuilderV2`
+        entirely and keep reduced-plan semantics disabled before Stage A exact scoring.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    execution_profile = getattr(runtime_plan, "execution_profile", None)
+    if execution_profile is None:
+        return False
+    profile_mode = getattr(execution_profile, "mode", None)
+    if profile_mode is None:
+        return False
+    return str(profile_mode).strip().lower() == "exact_no_risk_parity"
 
 
 def _build_sync_persistence_artifact(

@@ -1441,6 +1441,147 @@ def test_run_backtest_use_case_uses_run_scoped_hierarchical_builder_for_hybrid_r
     assert len(response.variants) == 1
 
 
+def test_run_backtest_use_case_bypasses_hierarchical_builder_for_exact_no_risk_parity_runtime(
+) -> None:
+    """
+    Verify canonical parity sync orchestration bypasses hierarchical reduced-plan runtime wiring.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        D3 canonical `NR2` runs must keep the planner-owned `exact_no_risk_parity` runtime plan
+        active and never call `BacktestHierarchicalShortlistBuilderV2`.
+    Raises:
+        AssertionError: If sync orchestration re-enters hierarchical shortlist reduction.
+    Side Effects:
+        None.
+    """
+    stage_a_row = _stage_a_scored_variant(
+        base_variant=BacktestStageABaseVariantV2(
+            stage_a_index=0,
+            indicator_selections=(
+                IndicatorVariantSelection(
+                    indicator_id="ema",
+                    inputs={"source": "close"},
+                    params={"window": 20},
+                ),
+            ),
+            signal_params={},
+            indicator_variant_key="1" * 64,
+            base_variant_key="2" * 64,
+        ),
+        total_return_pct=20.0,
+    )
+    parity_runtime_plan = SimpleNamespace(
+        indicator_estimate_calls=0,
+        stage_a_variants_total=1,
+        risk_variants=(
+            SimpleNamespace(
+                risk_params={
+                    "sl_enabled": False,
+                    "sl_pct": None,
+                    "tp_enabled": False,
+                    "tp_pct": None,
+                }
+            ),
+        ),
+        execution_profile=SimpleNamespace(
+            mode="exact_no_risk_parity",
+            parallelism=SimpleNamespace(stage_a_workers=1),
+            shortlist_config=SimpleNamespace(enabled=True),
+            feature_flags=SimpleNamespace(
+                runtime_enabled=True,
+                heuristic_shortlist_enabled=False,
+                family_plugin_enabled=False,
+            ),
+        ),
+        parity_classification=SimpleNamespace(
+            parity_class="parity_first_no_risk_exact",
+            disabled_risk_single_cell=True,
+            low_indicator_block_cardinality=True,
+            narrowed_retained_row_evidence=True,
+            notebook_shaped_cost_units=True,
+            nr2_classification_reason="canonical NR2 parity no-risk class",
+        ),
+        parity_runtime_counters=lambda: {
+            "retained_rows_per_indicator": {"ma.ema": 1},
+            "retained_rows_total": 1,
+            "narrowed_combo_total": 1,
+            "narrowed_compute_combo_total": 1,
+            "no_risk_finalization_count": 1,
+            "exact_replay_count": 0,
+            "deterministic_combo_ordering": "stage_a_index",
+        },
+        uses_no_risk_terminal_path=lambda: True,
+        stage_b_execution_mode=lambda: "bypassed_no_risk",
+        stage_b_process_fallback_threshold=lambda: "none",
+        iter_stage_a_variants=lambda: (stage_a_row.base_variant,),
+    )
+    hierarchical_shortlist_builder = _RecordingHierarchicalShortlistBuilder(
+        runtime_plan=parity_runtime_plan
+    )
+    hierarchical_shortlist_builder.run_scoped = Mock(  # type: ignore[attr-defined]
+        side_effect=AssertionError(
+            "exact_no_risk_parity sync runtime must bypass hierarchical shortlist builder"
+        )
+    )
+    shortlist_builder = _RecordingStageAShortlistBuilder(rows=(stage_a_row,))
+    runtime_runner = _StaticRuntimeRunner(
+        ranked_rows=(
+            SimpleNamespace(
+                variant_index=stage_a_row.base_variant.stage_a_index,
+                variant_key=stage_a_row.base_variant.base_variant_key,
+                indicator_variant_key=stage_a_row.base_variant.indicator_variant_key,
+                total_return_pct=stage_a_row.total_return_pct,
+                summary_metrics_json={"Total Return [%]": stage_a_row.total_return_pct},
+                best_tp_pct=None,
+                best_sl_pct=None,
+            ),
+        ),
+        ranked_tasks={
+            stage_a_row.base_variant.base_variant_key: SimpleNamespace(
+                indicator_selections=stage_a_row.base_variant.indicator_selections,
+                signal_params=stage_a_row.base_variant.signal_params,
+                risk_params={},
+            )
+        },
+    )
+    request = RunBacktestRequest(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 16, 12, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 2, 16, 12, 5, tzinfo=timezone.utc)),
+        ),
+        template=_build_template(windows=(20,)),
+        warmup_bars=2,
+        top_k=1,
+        preselect=1,
+    )
+    use_case = _build_use_case(
+        staged_scorer=_DeterministicScorer(),
+        stage_a_shortlist_builder=cast(Any, shortlist_builder),
+        hierarchical_shortlist_builder=cast(Any, hierarchical_shortlist_builder),
+        runtime_planner=cast(Any, _StaticRuntimePlanner(runtime_plan=parity_runtime_plan)),
+        runtime_runner=cast(Any, runtime_runner),
+    )
+
+    response = use_case.execute(
+        request=request,
+        current_user=CurrentUser(user_id=UserId(UUID("00000000-0000-0000-0000-000000000111"))),
+    )
+
+    assert getattr(hierarchical_shortlist_builder, "run_scoped").call_count == 0
+    assert len(hierarchical_shortlist_builder.calls) == 0
+    assert len(shortlist_builder.calls) == 1
+    assert response.execution_profile_mode == "exact_no_risk_parity"
+    assert response.sync_persistence_artifact is not None
+    assert (
+        response.sync_persistence_artifact.parity_runtime_state.deterministic_combo_ordering
+        == "stage_a_index"
+    )
+
+
 def test_run_backtest_use_case_applies_staged_top_k_limit() -> None:
     """
     Verify use-case forwards top-k settings to staged pipeline and returns ranked variants.
