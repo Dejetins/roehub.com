@@ -606,6 +606,99 @@ def test_requested_nr2_no_risk_hybrid_profile_uses_narrowed_launch_budget_eviden
     assert profile.mode == "hybrid_conservative"
 
 
+def test_requested_nr2_no_risk_parity_profile_requires_explicit_narrowed_launch_budget_evidence(
+) -> None:
+    """
+    Verify the parity-only requested profile rejects raw-grid sync admission inputs.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        `exact_no_risk_parity` is reserved for canonical no-risk parity routing, so calling it
+        without planner-produced `no_risk_terminal` evidence should fail fast instead of falling
+        back to raw-grid launch-budget math.
+    Raises:
+        AssertionError: If the parity-only requested profile accepts missing or raw-grid evidence.
+    Side Effects:
+        None.
+    """
+    planner = BacktestArtifactRuntimePlannerV2(
+        execution_profiles=_catalog_with_live_hybrid_profiles(),
+        adaptive_selector_policy=_policy(mode="active"),
+        launch_budget_mode="sync_inline",
+    )
+
+    with pytest.raises(ValueError) as missing_evidence_error:
+        planner.resolve_execution_profile(
+            stage_a_variants_total=345744,
+            stage_b_variants_total=20000,
+            estimated_memory_bytes=2300000000,
+            requested_execution_profile_mode="exact_no_risk_parity",
+            indicator_ids=("ma.fast", "ma.slow"),
+        )
+
+    assert "requires launch_budget_evidence" in str(missing_evidence_error.value)
+
+    with pytest.raises(ValueError) as raw_grid_error:
+        planner.resolve_execution_profile(
+            stage_a_variants_total=345744,
+            stage_b_variants_total=20000,
+            estimated_memory_bytes=2300000000,
+            requested_execution_profile_mode="exact_no_risk_parity",
+            indicator_ids=("ma.fast", "ma.slow"),
+            launch_budget_evidence=ExecutionProfileLaunchBudgetEvidenceV2(
+                stage_a_variants_total=345744,
+                stage_b_variants_total=20000,
+                estimated_memory_bytes=2300000000,
+                workload_class="raw_grid",
+            ),
+        )
+
+    assert "requires no_risk_terminal launch_budget_evidence" in str(raw_grid_error.value)
+
+
+def test_requested_nr2_no_risk_parity_profile_uses_narrowed_launch_budget_evidence() -> None:
+    """
+    Verify canonical `NR2` parity sync launch is admitted from narrowed exact workload evidence.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        The dedicated `exact_no_risk_parity` route should stay separate from hybrid rollout and
+        should rely on planner-produced `no_risk_terminal` evidence for sync launch admission.
+    Raises:
+        AssertionError: If narrowed no-risk evidence fails to preserve the requested parity sync
+            launch.
+    Side Effects:
+        None.
+    """
+    planner = BacktestArtifactRuntimePlannerV2(
+        execution_profiles=_catalog_with_live_hybrid_profiles(),
+        adaptive_selector_policy=_policy(mode="active"),
+        launch_budget_mode="sync_inline",
+    )
+
+    profile = planner.resolve_execution_profile(
+        stage_a_variants_total=345744,
+        stage_b_variants_total=20000,
+        estimated_memory_bytes=2300000000,
+        requested_execution_profile_mode="exact_no_risk_parity",
+        indicator_ids=("ma.fast", "ma.slow"),
+        launch_budget_evidence=ExecutionProfileLaunchBudgetEvidenceV2(
+            stage_a_variants_total=20164,
+            stage_b_variants_total=20000,
+            estimated_memory_bytes=1400000000,
+            workload_class="no_risk_terminal",
+        ),
+    )
+
+    assert profile.mode == "exact_no_risk_parity"
+
+
 def test_nr2_no_risk_launch_budget_evidence_uses_planner_narrowed_workload_shape() -> None:
     """
     Verify planner-produced `NR2` launch-budget evidence narrows Stage A and memory inputs for
@@ -680,6 +773,8 @@ def test_nr2_no_risk_planner_builds_parity_first_classification_evidence() -> No
             combo_prefilter_variants_total=20_164,
             retained_exact_candidates_total=40_000,
             stage_a_cost_units=180_448,
+            retained_rows_per_indicator=(142, 142),
+            narrowed_compute_variants_total=10_082,
         ),
         risk_variants=(
             BacktestRiskVariantV2(
@@ -702,6 +797,48 @@ def test_nr2_no_risk_planner_builds_parity_first_classification_evidence() -> No
     assert classification.notebook_shaped_cost_units is True
     assert "canonical NR2" in classification.nr2_classification_reason
     assert "combo_prefilter_variants=20164" in classification.nr2_classification_reason
+
+
+def test_noncanonical_no_risk_shape_does_not_build_parity_first_classification() -> None:
+    """
+    Verify parity-first evidence stays bounded to the canonical two-indicator `NR2` shape.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        D1 must not classify every no-risk terminal request as canonical parity, otherwise hybrid
+        rollout ownership could silently leak back into unrelated no-risk workloads.
+    Raises:
+        AssertionError: If a broader no-risk shape still produces parity-first classification.
+    Side Effects:
+        None.
+    """
+    classification = _build_parity_classification_v2(
+        stage_cost_model=BacktestRuntimeStageCostModelV2(
+            row_prefilter_rows_total=360,
+            retained_row_variants_total=360,
+            combo_prefilter_variants_total=48_000,
+            retained_exact_candidates_total=48_000,
+            stage_a_cost_units=210_000,
+            retained_rows_per_indicator=(120, 120, 120),
+            narrowed_compute_variants_total=16_000,
+        ),
+        risk_variants=(
+            BacktestRiskVariantV2(
+                risk_index=0,
+                risk_params={
+                    "sl_enabled": False,
+                    "sl_pct": None,
+                    "tp_enabled": False,
+                    "tp_pct": None,
+                },
+            ),
+        ),
+    )
+
+    assert classification is None
 
 
 def test_parity_first_classification_excludes_hybrid_conservative_recommendation() -> None:

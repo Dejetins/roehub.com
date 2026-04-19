@@ -1295,8 +1295,11 @@ class BacktestArtifactRuntimePlannerV2:
         Assumptions:
             Requested exact-profile overrides keep precedence, while requested hybrid overrides are
             allowed only when selector rollout has reached explicit `opt_in` or `active`
-            semantics. Persisted read-model metadata is not a requested override input; automatic
-            selection uses the typed adaptive selector only when planning evidence is available.
+            semantics. The parity-only `exact_no_risk_parity` override additionally requires
+            explicit planner-provided `no_risk_terminal` launch evidence so sync admission stays
+            tied to narrowed exact workload math instead of raw-grid fallback totals. Persisted
+            read-model metadata is not a requested override input; automatic selection uses the
+            typed adaptive selector only when planning evidence is available.
         Raises:
             RoehubError: If sync launch budgets are exceeded and background routing is required.
             ValueError: If configured profiles cannot be resolved from the catalog.
@@ -1306,6 +1309,10 @@ class BacktestArtifactRuntimePlannerV2:
         if requested_execution_profile_mode is not None:
             requested_profile = self._execution_profiles.profile_for_mode(
                 mode=requested_execution_profile_mode
+            )
+            _validate_requested_parity_launch_evidence_v2(
+                requested_profile=requested_profile,
+                launch_budget_evidence=launch_budget_evidence,
             )
             requested_launch_budget_evidence = _resolved_launch_budget_evidence_v2(
                 stage_a_variants_total=stage_a_variants_total,
@@ -2501,8 +2508,9 @@ def _build_parity_classification_v2(
             Explicit parity-first classification evidence for canonical no-risk exact workloads,
             otherwise `None`.
     Assumptions:
-        Only the single disabled-risk terminal path should carry parity-first classification, and
-        its debug reason should remain compact but deterministic for planner/selector review.
+        Only the single disabled-risk terminal path with canonical two-indicator retained-row
+        evidence should carry parity-first classification, and its debug reason should remain
+        compact but deterministic for planner/selector review.
     Raises:
         ValueError: Propagated if the derived parity-classification payload is invalid.
     Side Effects:
@@ -2510,12 +2518,25 @@ def _build_parity_classification_v2(
     """
     if not _risk_variants_use_no_risk_terminal_path_v2(risk_variants=risk_variants):
         return None
+    low_indicator_block_cardinality = (
+        len(stage_cost_model.retained_rows_per_indicator) == 2
+    )
+    narrowed_retained_row_evidence = bool(stage_cost_model.retained_rows_per_indicator)
+    notebook_shaped_cost_units = (
+        stage_cost_model.narrowed_compute_variants_total is not None
+    )
+    if not (
+        low_indicator_block_cardinality
+        and narrowed_retained_row_evidence
+        and notebook_shaped_cost_units
+    ):
+        return None
     return ExecutionProfileParityClassificationV2(
         parity_class="parity_first_no_risk_exact",
         disabled_risk_single_cell=True,
-        low_indicator_block_cardinality=True,
-        narrowed_retained_row_evidence=True,
-        notebook_shaped_cost_units=True,
+        low_indicator_block_cardinality=low_indicator_block_cardinality,
+        narrowed_retained_row_evidence=narrowed_retained_row_evidence,
+        notebook_shaped_cost_units=notebook_shaped_cost_units,
         nr2_classification_reason=(
             "canonical NR2 no-risk single-cell parity class; "
             f"retained_rows={stage_cost_model.retained_row_variants_total}; "
@@ -2657,6 +2678,42 @@ def _resolved_launch_budget_evidence_v2(
         estimated_memory_bytes=estimated_memory_bytes,
         workload_class="raw_grid",
     )
+
+
+def _validate_requested_parity_launch_evidence_v2(
+    *,
+    requested_profile: ExecutionProfileV2,
+    launch_budget_evidence: ExecutionProfileLaunchBudgetEvidenceV2 | None,
+) -> None:
+    """
+    Validate that the parity-only requested profile uses explicit narrowed no-risk evidence.
+
+    Args:
+        requested_profile: Resolved explicit requested execution profile.
+        launch_budget_evidence: Optional planner-produced sync launch-budget evidence.
+    Returns:
+        None.
+    Assumptions:
+        `exact_no_risk_parity` is reserved for the canonical no-risk parity class and therefore
+        must never derive sync admission from raw-grid fallback totals.
+    Raises:
+        ValueError: If the parity-only requested profile is used without explicit
+            `no_risk_terminal` launch evidence.
+    Side Effects:
+        None.
+    """
+    if requested_profile.mode != "exact_no_risk_parity":
+        return
+    if launch_budget_evidence is None:
+        raise ValueError(
+            "Requested exact_no_risk_parity execution profile requires "
+            "launch_budget_evidence"
+        )
+    if launch_budget_evidence.workload_class != "no_risk_terminal":
+        raise ValueError(
+            "Requested exact_no_risk_parity execution profile requires "
+            "no_risk_terminal launch_budget_evidence"
+        )
 
 
 def _signal_variants_total_for_axes_v2(
