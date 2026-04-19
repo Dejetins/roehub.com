@@ -31,6 +31,7 @@ from trading.contexts.backtest.application.services.v2.execution_profile_v2 impo
     DEFAULT_EXECUTION_PROFILE_MODE_V2,
     ExecutionProfileFeatureFlagsV2,
     ExecutionProfileLaunchBudgetV2,
+    ExecutionProfileModeLiteralV2,
     ExecutionProfileParallelismConfigV2,
     ExecutionProfilesCatalogV2,
     ExecutionProfileShortlistConfigV2,
