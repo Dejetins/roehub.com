@@ -39,6 +39,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
     BacktestJobExecutionMode,
+    BacktestJobStageAShortlist,
     BacktestJobStageWeights,
     BacktestJobTopVariant,
 )
@@ -121,6 +122,7 @@ class _FakeJobRepository:
         *,
         job: BacktestJob,
         top_variants: tuple[BacktestJobTopVariant, ...],
+        stage_a_shortlist: BacktestJobStageAShortlist | None = None,
     ) -> BacktestJob:
         """
         Reject unexpected sync-inline persistence calls in public runs history unit tests.
@@ -128,6 +130,7 @@ class _FakeJobRepository:
         Args:
             job: Terminal job snapshot.
             top_variants: Summary-only top rows.
+            stage_a_shortlist: Optional Stage A shortlist snapshot from sync persistence.
         Returns:
             BacktestJob: Never returns because this path is out of scope.
         Assumptions:
@@ -137,7 +140,7 @@ class _FakeJobRepository:
         Side Effects:
             None.
         """
-        _ = job, top_variants
+        _ = job, top_variants, stage_a_shortlist
         raise AssertionError("create_with_top_variants is not expected in these tests")
 
     def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
