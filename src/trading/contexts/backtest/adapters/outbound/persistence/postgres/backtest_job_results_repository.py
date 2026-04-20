@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime, timezone
+from numbers import Real
 from typing import Any, Mapping
 from uuid import UUID
 
@@ -184,12 +186,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                 "job_id": str(job_id),
                 "now": now,
                 "locked_by": normalized_owner,
-                "rows_json": json.dumps(
-                    serialized_rows,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=True,
-                ),
+                "rows_json": _json_dumps(payload=serialized_rows),
             },
         )
         if row is None:
@@ -344,31 +341,16 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
                 "job_id": str(job_id),
                 "locked_by": normalized_owner,
                 "now": now,
-                "stage_a_indexes_json": json.dumps(
-                    shortlist.to_json_array(),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                    ensure_ascii=True,
-                ),
+                "stage_a_indexes_json": _json_dumps(payload=shortlist.to_json_array()),
                 "no_risk_exact_rows_json": (
                     None
                     if no_risk_exact_rows_json is None
-                    else json.dumps(
-                        no_risk_exact_rows_json,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                        ensure_ascii=True,
-                    )
+                    else _json_dumps(payload=no_risk_exact_rows_json)
                 ),
                 "parity_runtime_state_json": (
                     None
                     if parity_runtime_state_json is None
-                    else json.dumps(
-                        parity_runtime_state_json,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                        ensure_ascii=True,
-                    )
+                    else _json_dumps(payload=parity_runtime_state_json)
                 ),
                 "stage_a_variants_total": shortlist.stage_a_variants_total,
                 "risk_total": shortlist.risk_total,
@@ -410,6 +392,67 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
             return None
         return _map_stage_a_shortlist_row(row=row)
 
+
+def _json_dumps(*, payload: Any) -> str | None:
+    """
+    Serialize optional JSON-compatible payload into canonical strict JSON text.
+
+    Args:
+        payload: Optional JSON-compatible payload.
+    Returns:
+        str | None: Canonical JSON text or `None`.
+    Assumptions:
+        Serialization keeps payloads deterministic and normalizes non-finite numeric values to
+        `null` so persisted rows remain JSON-safe.
+    Raises:
+        TypeError: If payload cannot be represented as canonical JSON.
+    Side Effects:
+        None.
+    """
+    if payload is None:
+        return None
+    return json.dumps(
+        _normalize_json_payload_for_dumps(value=payload),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    )
+
+
+def _normalize_json_payload_for_dumps(*, value: Any) -> Any:
+    """
+    Normalize immutable wrappers and scalars into strict-JSON compatible builtins.
+
+    Args:
+        value: Raw JSON-compatible payload value.
+    Returns:
+        Any: Builtin dict/list/scalar tree accepted by strict `json.dumps`.
+    Assumptions:
+        Non-finite numeric values must not leak as `Infinity`, `-Infinity`, or `NaN`; they are
+        normalized to `null` instead of misleading finite sentinels.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    if isinstance(value, Mapping):
+        return {
+            str(key): _normalize_json_payload_for_dumps(value=item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (tuple, list)):
+        return [_normalize_json_payload_for_dumps(value=item) for item in value]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, Real):
+        normalized_numeric = float(value)
+        if not math.isfinite(normalized_numeric):
+            return None
+        return normalized_numeric
+    return value
 
 
 def _serialize_top_rows(

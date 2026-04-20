@@ -224,7 +224,8 @@ def test_top_row_serializers_drop_non_finite_summary_metrics_before_json_persist
         Persisted top rows keep `total_return_pct` separately and may drop non-finite summary-only
         metrics without changing ranking semantics already decided upstream.
     Raises:
-        AssertionError: If either repository keeps `Infinity`/`NaN` inside persisted summary JSON.
+        AssertionError: If either repository keeps `Infinity`/`-Infinity`/`NaN` inside persisted
+            summary metrics or payload JSON.
     Side Effects:
         Serializes one in-memory top-row payload through both repository helper paths.
     Docs:
@@ -247,6 +248,11 @@ def test_top_row_serializers_drop_non_finite_summary_metrics_before_json_persist
         payload_json={
             "direction_mode": "long-only",
             "execution_params": {"fee_pct": 0.0},
+            "diagnostics": {
+                "runtime_regression_ratio": float("inf"),
+                "runtime_regression_floor": float("-inf"),
+                "nan_probe": float("nan"),
+            },
             "risk_params": {
                 "tp_enabled": True,
                 "tp_pct": 1.5,
@@ -273,14 +279,24 @@ def test_top_row_serializers_drop_non_finite_summary_metrics_before_json_persist
         rows=(row,),
     )
 
-    for serialized_rows in (job_snapshot_rows, result_snapshot_rows):
+    for repository_module, serialized_rows in (
+        (job_repository_module, job_snapshot_rows),
+        (job_results_repository_module, result_snapshot_rows),
+    ):
         summary_metrics = serialized_rows[0]["summary_metrics_json"]
         assert summary_metrics["total_return_pct"] == pytest.approx(12.5)
         assert summary_metrics["win_rate_pct"] == pytest.approx(50.0)
         assert "profit_factor" not in summary_metrics
         assert "return_over_max_drawdown" not in summary_metrics
         assert "sharpe_trades" not in summary_metrics
-        json.dumps(serialized_rows, allow_nan=False)
+        payload_json_text = repository_module._json_dumps(payload=serialized_rows)
+        assert payload_json_text is not None
+        normalized_payload_rows = json.loads(payload_json_text)
+        diagnostics = normalized_payload_rows[0]["payload_json"]["diagnostics"]
+        assert diagnostics["runtime_regression_ratio"] is None
+        assert diagnostics["runtime_regression_floor"] is None
+        assert diagnostics["nan_probe"] is None
+        json.dumps(normalized_payload_rows, allow_nan=False)
 
 
 def test_stage_b_fast_path_stays_enabled_with_retained_exact_payload_for_total_return_pct() -> None:

@@ -35,6 +35,9 @@ from trading.contexts.backtest.application.use_cases import (
     GetBacktestRunTopUseCase,
     ListBacktestRunsUseCase,
 )
+from trading.contexts.backtest.application.use_cases import (
+    backtest_runs_history_api_v1 as backtest_runs_history_module,
+)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
@@ -1018,6 +1021,38 @@ def test_run_progress_snapshot_builder_keeps_progress_bounded_and_monotonic_acro
     stage_b_mid_progress = builder.build(run=running_stage_b_mid).progress_percent
 
     assert 0 <= stage_a_progress < stage_b_start_progress < stage_b_mid_progress <= 100
+
+
+def test_later_backtest_job_stages_keeps_public_stage_vocabulary_stable() -> None:
+    """
+    Verify later-stage projection keeps public `stage_a/stage_b/finalizing` vocabulary stable.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Internal runtime sub-stage details may evolve, but public history ETA/progress projection
+        must remain fixed to the stable stage literals.
+    Raises:
+        AssertionError: If later-stage projection leaks non-public stage literals.
+    Side Effects:
+        None.
+    """
+    assert backtest_runs_history_module._later_backtest_job_stages(stage="stage_a") == (
+        "stage_b",
+        "finalizing",
+    )
+    assert backtest_runs_history_module._later_backtest_job_stages(stage="stage_b") == (
+        "finalizing",
+    )
+    assert (
+        backtest_runs_history_module._later_backtest_job_stages(stage="finalizing") == tuple()
+    )
+    assert (
+        backtest_runs_history_module._later_backtest_job_stages(stage="stage_a_prefilter")
+        == tuple()
+    )
 
 
 def test_run_progress_snapshot_builder_reads_weights_from_execution_profile_catalog() -> None:

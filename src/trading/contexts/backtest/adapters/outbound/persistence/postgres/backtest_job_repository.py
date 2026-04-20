@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime, timezone
+from numbers import Real
 from typing import Any, Mapping, cast
 from uuid import UUID
 
@@ -1384,6 +1386,7 @@ def _json_dumps(*, payload: Any) -> str | None:
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=True,
+        allow_nan=False,
     )
 
 
@@ -1396,7 +1399,8 @@ def _normalize_json_payload_for_dumps(*, value: Any) -> Any:
     Returns:
         Any: Builtin dict/list/scalar tree accepted by `json.dumps`.
     Assumptions:
-        Repository payloads are already JSON-safe; this helper only unwraps immutable containers.
+        Non-finite numeric scalars are normalized to `None` so persisted payloads stay finite and
+        JSON-safe without silently rewriting values into misleading finite sentinels.
     Raises:
         None.
     Side Effects:
@@ -1409,6 +1413,15 @@ def _normalize_json_payload_for_dumps(*, value: Any) -> Any:
         }
     if isinstance(value, (tuple, list)):
         return [_normalize_json_payload_for_dumps(value=item) for item in value]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return int(value)
+    if isinstance(value, Real):
+        normalized_numeric = float(value)
+        if not math.isfinite(normalized_numeric):
+            return None
+        return normalized_numeric
     return value
 
 
