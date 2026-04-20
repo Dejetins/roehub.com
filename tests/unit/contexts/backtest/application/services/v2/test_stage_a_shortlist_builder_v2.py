@@ -1947,7 +1947,7 @@ def test_stage_a_shortlist_builder_v2_no_risk_parity_uses_bounded_pair_first_blo
     recorded_pair_block_sizes: list[int] = []
     recorded_runtime_input_block_sizes: list[int] = []
     original_pair_batch_builder = (
-        stage_a_shortlist_builder_module.build_compact_trade_batch_for_signal_pairs_v2
+        stage_a_shortlist_builder_module._build_compact_trade_batch_for_normalized_signal_pairs_v2
     )
     original_load_chunk_runtime_inputs = (
         stage_a_shortlist_builder_module.BacktestStageAShortlistBuilderV2.load_chunk_runtime_inputs
@@ -1987,7 +1987,7 @@ def test_stage_a_shortlist_builder_v2_no_risk_parity_uses_bounded_pair_first_blo
         Side Effects:
             Appends one observed pair-block size to the in-memory log.
         """
-        recorded_pair_block_sizes.append(int(kwargs["left_signal_rows"].shape[0]))
+        recorded_pair_block_sizes.append(int(kwargs["left_signal_rows_i8"].shape[0]))
         return original_pair_batch_builder(**kwargs)
 
     def _record_load_chunk_runtime_inputs(self: Any, **kwargs: Any) -> Any:
@@ -2027,7 +2027,7 @@ def test_stage_a_shortlist_builder_v2_no_risk_parity_uses_bounded_pair_first_blo
     )
     monkeypatch.setattr(
         stage_a_shortlist_builder_module,
-        "build_compact_trade_batch_for_signal_pairs_v2",
+        "_build_compact_trade_batch_for_normalized_signal_pairs_v2",
         _record_pair_batch_builder,
     )
     monkeypatch.setattr(

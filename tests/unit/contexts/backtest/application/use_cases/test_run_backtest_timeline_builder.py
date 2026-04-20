@@ -1575,10 +1575,12 @@ def test_run_backtest_use_case_bypasses_hierarchical_builder_for_exact_no_risk_p
     assert len(hierarchical_shortlist_builder.calls) == 0
     assert len(shortlist_builder.calls) == 1
     assert response.execution_profile_mode == "exact_no_risk_parity"
-    assert response.sync_persistence_artifact is not None
+    sync_persistence_artifact = response.sync_persistence_artifact
+    assert sync_persistence_artifact is not None
+    parity_runtime_state = sync_persistence_artifact.parity_runtime_state
+    assert parity_runtime_state is not None
     assert (
-        response.sync_persistence_artifact.parity_runtime_state.deterministic_combo_ordering
-        == "stage_a_index"
+        parity_runtime_state.deterministic_combo_ordering == "stage_a_index"
     )
 
 
