@@ -863,6 +863,54 @@ def test_post_backtests_forbids_extra_fields_with_deterministic_422_payload() ->
     }
 
 
+def test_post_backtests_rejects_removed_top_trades_n_field() -> None:
+    """
+    Verify launch route rejects removed `top_trades_n` field with deterministic 422 payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public launch contract no longer accepts report-depth controls on `POST /backtests`.
+    Raises:
+        AssertionError: If removed field is accepted or validation payload drifts.
+    Side Effects:
+        None.
+    """
+    client = _build_client(use_case=_FakeRunBacktestUseCase(result=_template_mode_response()))
+
+    response = client.post(
+        "/backtests",
+        json={
+            "time_range": {
+                "start": "2026-02-16T00:00:00Z",
+                "end": "2026-02-16T01:00:00Z",
+            },
+            "template": _template_payload(),
+            "top_trades_n": 3,
+        },
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
+    )
+
+    assert response.status_code == 422
+    assert response.json() == {
+        "error": {
+            "code": "validation_error",
+            "message": "Validation failed",
+            "details": {
+                "errors": [
+                    {
+                        "path": "body.top_trades_n",
+                        "code": "extra_forbidden",
+                        "message": "Extra inputs are not permitted",
+                    }
+                ]
+            },
+        }
+    }
+
+
 def test_post_backtests_rejects_mode_conflict_with_deterministic_validation_error() -> None:
     """
     Verify route returns deterministic `validation_error` for `strategy_id xor template` conflict.

@@ -225,6 +225,84 @@ def test_backtests_post_request_rejects_public_warmup_bars_field() -> None:
         )
 
 
+def test_backtests_post_request_rejects_removed_top_trades_n_field() -> None:
+    """
+    Verify strict public request validation rejects removed `top_trades_n` input.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Public launch transport keeps `top_k` and no longer accepts report-depth knobs.
+    Raises:
+        AssertionError: If removed field is still accepted by the public DTO.
+    Side Effects:
+        None.
+    """
+    with pytest.raises(ValidationError, match="top_trades_n"):
+        BacktestsPostRequest.model_validate(
+            {
+                "time_range": {
+                    "start": datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc),
+                    "end": datetime(2026, 2, 24, 1, 0, tzinfo=timezone.utc),
+                },
+                "template": {
+                    "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                    "timeframe": "1m",
+                    "indicator_grids": [
+                        {
+                            "indicator_id": "ma.sma",
+                            "params": {"window": {"mode": "explicit", "values": [20]}},
+                        }
+                    ],
+                },
+                "top_trades_n": 3,
+            }
+        )
+
+
+def test_decode_backtest_request_payload_strips_legacy_top_trades_n_for_reads() -> None:
+    """
+    Verify persisted read compatibility strips legacy `top_trades_n` before strict decode.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Historical `request_json` rows may still contain removed report-depth knobs.
+    Raises:
+        AssertionError: If persisted decode depends on removed field or rejects legacy rows.
+    Side Effects:
+        None.
+    """
+    built = decode_backtest_request_payload(
+        payload={
+            "time_range": {
+                "start": datetime(2026, 2, 24, 0, 0, tzinfo=timezone.utc),
+                "end": datetime(2026, 2, 24, 1, 0, tzinfo=timezone.utc),
+            },
+            "template": {
+                "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
+                "timeframe": "1m",
+                "indicator_grids": [
+                    {
+                        "indicator_id": "ma.sma",
+                        "params": {"window": {"mode": "explicit", "values": [20]}},
+                    }
+                ],
+            },
+            "top_k": 10,
+            "top_trades_n": 3,
+        }
+    )
+
+    assert built.mode == "template"
+    assert built.top_k == 10
+    assert built.template is not None
+
+
 def test_decode_backtest_request_payload_strips_legacy_secondary_metric_for_reads() -> None:
     """
     Verify persisted read compatibility strips legacy `ranking.secondary_metric` before decode.
