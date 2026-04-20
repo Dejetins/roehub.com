@@ -24,6 +24,7 @@ from trading.contexts.backtest.application.services.v2 import (
     StageBEntryMappingCaseV2,
     StageBTradeExitCaseV2,
     StageBTradeListCaseV2,
+    default_execution_profiles_catalog_v2,
     execute_stage_b_golden_case_v2,
     load_backtest_runtime_acceleration_benchmark_corpus_v2,
     load_stage_b_golden_fixture_catalog_v2,
@@ -614,6 +615,164 @@ def test_stage_b_runtime_replays_exact_only_for_finalist_rows() -> None:
     )
     assert rows[0].summary_metrics_json["trade_count"] == 13.0
     assert rows[1].summary_metrics_json["trade_count"] == 11.0
+
+
+def test_stage_b_execution_mode_keeps_rg_ttr_benchmark_shape_in_process_by_default() -> None:
+    """
+    Verify benchmark-sized RG-TTR workloads keep Stage B on single-process in_process by default.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Canonical `exact_parallel` defaults keep `stage_b_workers=1` and
+        `parallel_stage_b_enabled=False`, so benchmark-sized RG-TTR workloads stay on
+        `in_process` with no process fallback threshold.
+    Raises:
+        AssertionError: If benchmark-sized Stage B starts defaulting back to process fan-out.
+    Side Effects:
+        None.
+    """
+    exact_parallel_profile = default_execution_profiles_catalog_v2().profile_for_mode(
+        mode="exact_parallel"
+    )
+    runtime_plan = SimpleNamespace(
+        stage_b_variants_total=exact_parallel_profile.launch_budget.max_stage_b_variants_total,
+        risk_variants=(
+            runtime_plan_module.BacktestRiskVariantV2(
+                risk_index=0,
+                risk_params={
+                    "tp_enabled": True,
+                    "tp_pct": 1.0,
+                    "sl_enabled": True,
+                    "sl_pct": 1.0,
+                },
+            ),
+            runtime_plan_module.BacktestRiskVariantV2(
+                risk_index=1,
+                risk_params={
+                    "tp_enabled": True,
+                    "tp_pct": 2.0,
+                    "sl_enabled": True,
+                    "sl_pct": 1.5,
+                },
+            ),
+        ),
+        execution_profile=exact_parallel_profile,
+    )
+
+    assert (
+        runtime_core_module._runtime_plan_stage_b_execution_mode_v2(  # noqa: SLF001
+            runtime_plan=cast(Any, runtime_plan)
+        )
+        == "in_process"
+    )
+    assert (
+        runtime_core_module._runtime_plan_stage_b_process_fallback_threshold_v2(  # noqa: SLF001
+            runtime_plan=cast(Any, runtime_plan)
+        )
+        == "none"
+    )
+
+
+def test_stage_b_execution_mode_honors_materialized_runtime_literals_for_rg_ttr() -> None:
+    """
+    Verify shared runtime respects materialized Stage B literals from runtime-state snapshots.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        D8 runtime-state evidence may already materialize `stage_b_execution_mode` and
+        `stage_b_process_fallback_threshold`; shared helpers must preserve those literals instead
+        of recomputing from partial duck-typed fields.
+    Raises:
+        AssertionError: If helpers ignore explicit Stage B literals on duck-typed runtime plans.
+    Side Effects:
+        None.
+    """
+    runtime_plan = SimpleNamespace(
+        stage_b_execution_mode="in_process",
+        stage_b_process_fallback_threshold="none",
+        stage_b_variants_total=1,
+        risk_variants=(
+            runtime_plan_module.BacktestRiskVariantV2(
+                risk_index=0,
+                risk_params={
+                    "tp_enabled": False,
+                    "tp_pct": None,
+                    "sl_enabled": False,
+                    "sl_pct": None,
+                },
+            ),
+        ),
+        execution_profile=None,
+    )
+
+    assert (
+        runtime_core_module._runtime_plan_stage_b_execution_mode_v2(  # noqa: SLF001
+            runtime_plan=cast(Any, runtime_plan)
+        )
+        == "in_process"
+    )
+    assert (
+        runtime_core_module._runtime_plan_stage_b_process_fallback_threshold_v2(  # noqa: SLF001
+            runtime_plan=cast(Any, runtime_plan)
+        )
+        == "none"
+    )
+
+
+def test_stage_b_execution_mode_uses_process_pool_only_for_explicit_opt_in_fallback() -> None:
+    """
+    Verify process fan-out remains fallback-only after explicit Stage B opt-in conditions.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Process pool may activate only when `parallel_stage_b_enabled` is true, worker count is
+        greater than one, and workload crosses the explicit `stage_b_variants_total` threshold.
+    Raises:
+        AssertionError: If fallback no longer requires all explicit opt-in conditions.
+    Side Effects:
+        None.
+    """
+    runtime_plan = SimpleNamespace(
+        stage_b_variants_total=12,
+        risk_variants=(
+            runtime_plan_module.BacktestRiskVariantV2(
+                risk_index=0,
+                risk_params={
+                    "tp_enabled": True,
+                    "tp_pct": 1.0,
+                    "sl_enabled": True,
+                    "sl_pct": 1.0,
+                },
+            ),
+        ),
+        execution_profile=SimpleNamespace(
+            feature_flags=SimpleNamespace(parallel_stage_b_enabled=True),
+            parallelism=SimpleNamespace(stage_b_workers=2),
+            stage_b_process_fallback=SimpleNamespace(min_stage_b_variants_total=12),
+        ),
+    )
+
+    assert (
+        runtime_core_module._runtime_plan_stage_b_execution_mode_v2(  # noqa: SLF001
+            runtime_plan=cast(Any, runtime_plan)
+        )
+        == "process_pool"
+    )
+    assert (
+        runtime_core_module._runtime_plan_stage_b_process_fallback_threshold_v2(  # noqa: SLF001
+            runtime_plan=cast(Any, runtime_plan)
+        )
+        == "stage_b_variants_total"
+    )
 
 
 def test_stage_b_golden_fixture_catalog_executes_all_cases_deterministically() -> None:

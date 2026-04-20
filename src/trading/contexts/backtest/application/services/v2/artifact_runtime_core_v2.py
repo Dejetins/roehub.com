@@ -2800,9 +2800,10 @@ def _runtime_plan_stage_b_execution_mode_v2(
         str: Canonical `stage_b_execution_mode` literal used by shared runtime branching.
     Assumptions:
         Tests may supply lightweight fakes, so the shared core first prefers the typed runtime
-        helper and otherwise reconstructs the same classification from the available attributes,
-        with `process_pool` reserved for explicit non-default opt-in profiles whose workload
-        crosses the reviewable fallback path threshold.
+        helper or an already-materialized `stage_b_execution_mode` literal, and otherwise
+        reconstructs the same classification from the available attributes, with `process_pool`
+        reserved for explicit non-default opt-in profiles whose workload crosses the reviewable
+        fallback path threshold.
     Raises:
         None.
     Side Effects:
@@ -2811,6 +2812,10 @@ def _runtime_plan_stage_b_execution_mode_v2(
     classifier = getattr(runtime_plan, "stage_b_execution_mode", None)
     if callable(classifier):
         return str(classifier())
+    if isinstance(classifier, str):
+        normalized_classifier = classifier.strip()
+        if normalized_classifier in {"bypassed_no_risk", "in_process", "process_pool"}:
+            return normalized_classifier
     if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
         return "bypassed_no_risk"
     execution_profile = getattr(runtime_plan, "execution_profile", None)
@@ -2838,7 +2843,8 @@ def _runtime_plan_stage_b_process_fallback_threshold_v2(
         str: Canonical workload-threshold literal for runtime-shape traces and benchmarks.
     Assumptions:
         Shared traces must expose not only whether the fallback path exists, but also which
-        explicit workload threshold activated it.
+        explicit workload threshold activated it, including pre-materialized runtime literals from
+        persisted snapshots and duck-typed fixtures.
     Raises:
         None.
     Side Effects:
@@ -2847,6 +2853,10 @@ def _runtime_plan_stage_b_process_fallback_threshold_v2(
     classifier = getattr(runtime_plan, "stage_b_process_fallback_threshold", None)
     if callable(classifier):
         return str(classifier())
+    if isinstance(classifier, str):
+        normalized_classifier = classifier.strip()
+        if normalized_classifier in {"none", "stage_b_variants_total"}:
+            return normalized_classifier
     if _runtime_plan_uses_no_risk_terminal_path_v2(runtime_plan=runtime_plan):
         return "none"
     execution_profile = getattr(runtime_plan, "execution_profile", None)
