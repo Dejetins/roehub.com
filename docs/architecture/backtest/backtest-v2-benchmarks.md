@@ -22,11 +22,14 @@
   - R10-03 uses this document as the canonical benchmark protocol for legacy R0 reference,
     artifact-backed v2 perf gates, and rollout evidence.
 - D10 prerequisite note:
-  - wider `hit_times/1m` TP/SL artifact grids plus grid-agnostic Stage B loader consumption are
-    treated here as delivered prerequisites for master-plan closure;
+  - `wider TP/SL artifact grids` plus `grid-agnostic Stage B loaders` are a
+    `completed prerequisite` for master-plan closure;
   - this document validates and measures that prerequisite together with
     `backtest-precompute-runner-v2.md`, `backtest-runtime-kernels-v2.md`, and the cited unit
     tests rather than reopening it as a new implementation milestone.
+  - `RG-TTR contradiction reopens blocker`: if live `RG-TTR` closure evidence contradicts widened
+    grid compatibility or grid-agnostic loader behavior, D10 prerequisite status must be reopened
+    as a blocking defect before closure.
 - Milestone A / EPIC A3 adds one additive rollout corpus on top of this baseline:
   - `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`
   - `tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json`

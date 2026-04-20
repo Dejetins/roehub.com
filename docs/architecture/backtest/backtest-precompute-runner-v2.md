@@ -6,14 +6,20 @@
 
 - Status: active canonical precompute/publish contract after R10-02 docs synchronization.
 - D10 prerequisite note:
-  - widened canonical `hit_times/1m` TP/SL grids are treated as delivered prerequisite for
-    `backtest-engine-vnext-parity-corrective-plan-v2.md`;
+  - `wider TP/SL artifact grids` plus `grid-agnostic Stage B loaders` are a
+    `completed prerequisite` for
+    `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`;
   - this document is part of the confirming evidence set for that prerequisite together with
-    `backtest-runtime-kernels-v2.md`,
-    `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py`,
-    and `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py`;
-  - if live `RG-TTR` closure later contradicts this prerequisite, that contradiction must reopen
-    a blocking defect explicitly rather than silently drifting the roadmap.
+    `docs/architecture/backtest/backtest-runtime-kernels-v2.md`,
+    `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py::test_backtest_artifact_precompute_runner_v2_builds_widened_hit_times_manifest_shapes`,
+    `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py::test_backtest_artifact_precompute_runner_v2_materializes_hit_times_and_full_validation_passes`,
+    `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py::test_target_indicator_variant_counts_match_narrowed_catalog_per_env_v2`,
+    `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py::test_slice_hit_times_to_execution_window_v2_accepts_widened_artifact_grid`,
+    `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py::test_artifact_backed_stage_b_scorer_v2_resolves_widened_grid_risk_indexes`,
+    and `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py::test_search_risk_cells_total_return_fast_v2_matches_bruteforce_exact_replay`;
+  - `RG-TTR contradiction reopens blocker`: if live `RG-TTR` closure contradicts this
+    prerequisite, the dependency must be reopened as a blocking defect explicitly rather than
+    silently drifting roadmap status.
 - Canonical runtime relationship:
   - precompute produces only artifact inputs for the active `signal_tf + 1m_risk` runtime;
   - sync launch, claimed worker, and run-scoped lazy detail consume the same published slot
