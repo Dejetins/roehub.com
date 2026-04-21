@@ -28,6 +28,12 @@ from trading.contexts.backtest.domain.value_objects import (
     ExecutionParamsV1,
     RiskParamsV1,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactSlotPinnedRuntimeContextV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.stage_a_shortlist_builder_v2 import (  # noqa: E501
+    BacktestStageAShortlistBuilderV2,
+)
 from trading.contexts.indicators.application.dto import CandleArrays, IndicatorVariantSelection
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
 from trading.contexts.indicators.application.services.grid_builder import (
@@ -44,7 +50,6 @@ from .staged_core_runner_v1 import (
     BacktestStageBTaskV1,
     BacktestStagedCoreRunnerV1,
 )
-from .v2 import ArtifactSlotPinnedRuntimeContextV2, BacktestStageAShortlistBuilderV2
 
 TOTAL_RETURN_METRIC_LITERAL = "Total Return [%]"
 MetricScorerV1 = BacktestStagedVariantMetricScorer | BacktestStagedVariantScorer
@@ -56,7 +61,7 @@ class BacktestStagedRunResultV1:
     Deterministic staged-run summary used by `RunBacktestUseCase`.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -101,7 +106,7 @@ class _StageAScoredVariant:
     Internal Stage A scored row for deterministic shortlist sorting.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -119,7 +124,7 @@ class _StageBScoredVariant:
     Internal Stage B scored row for deterministic top-K sorting.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -139,8 +144,8 @@ class _StageBTask:
     Internal Stage B scoring task payload for optional CPU-parallel execution.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - src/trading/contexts/backtest/application/ports/staged_runner.py
@@ -161,8 +166,8 @@ class _TopVariantPayloadContext:
     Internal deterministic payload context for top-ranked Stage-B variants.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -179,7 +184,7 @@ class BacktestStagedRunnerV1:
     Run deterministic staged pipeline (Stage A shortlist -> Stage B expand -> top-K).
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -396,7 +401,7 @@ class BacktestStagedRunnerV1:
         Build staged grid context without Stage A/Stage B execution.
 
         Docs:
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -485,9 +490,9 @@ class BacktestStagedRunnerV1:
         Score Stage-A variants through shared staged core runner.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -558,9 +563,9 @@ class BacktestStagedRunnerV1:
         Score Stage-B variants through shared staged core runner.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -637,8 +642,8 @@ class BacktestStagedRunnerV1:
         Iterate deterministic Stage-B scoring tasks through shared staged core helper.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
           - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
@@ -701,8 +706,8 @@ class BacktestStagedRunnerV1:
         Score one Stage-B task and return both ranked row and original task payload.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
           - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
@@ -801,8 +806,8 @@ def _stage_a_rank_key(row: _StageAScoredVariant) -> tuple[float, str]:
     Build deterministic Stage-A ranking key for sorted shortlist output.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
@@ -825,8 +830,8 @@ def _stage_b_rank_key(row: _StageBScoredVariant) -> tuple[float, str]:
     Build deterministic Stage-B ranking key for sorted top-K output.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
@@ -853,8 +858,8 @@ def _stage_a_outranks(
     Check whether Stage-A candidate is strictly better than current shortlist baseline.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
@@ -882,8 +887,8 @@ def _stage_b_outranks(
     Check whether Stage-B candidate is strictly better than current top-K baseline.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
@@ -907,8 +912,8 @@ def _descending_text_key(*, value: str) -> tuple[int, ...]:
     Encode text into a tuple comparable in reverse lexicographical order.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py

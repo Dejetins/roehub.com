@@ -2,7 +2,7 @@
 Pydantic API models and deterministic converters for backtests sync/report endpoints.
 
 Docs:
-  - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+  - docs/architecture/backtest/README.md
   - docs/architecture/api/api-errors-and-422-payload-v1.md
 """
 
@@ -66,8 +66,8 @@ class _PersistedLaunchRunMetadata:
     Strongly typed persisted launch metadata extracted from application response DTO.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - apps/api/routes/backtests.py
@@ -89,7 +89,7 @@ class BacktestExplicitAxisSpecRequest(BaseModel):
     Explicit grid axis request DTO (`mode=explicit`).
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/indicators/domain/specifications/grid_param_spec.py
@@ -107,7 +107,7 @@ class BacktestRangeAxisSpecRequest(BaseModel):
     Inclusive range grid axis request DTO (`mode=range`).
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/indicators/domain/specifications/grid_param_spec.py
@@ -133,7 +133,7 @@ class BacktestTimeRangeRequest(BaseModel):
     API payload for half-open UTC time range `[start, end)`.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/shared_kernel/primitives/time_range.py
@@ -151,7 +151,7 @@ class BacktestInstrumentIdRequest(BaseModel):
     API payload for market/symbol instrument identity tuple.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/shared_kernel/primitives/instrument_id.py
@@ -169,8 +169,8 @@ class BacktestExecutionRequest(BaseModel):
     API payload for execution runtime overrides in human percent units.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -191,8 +191,8 @@ class BacktestRiskGridRequest(BaseModel):
     API payload for Stage-B risk grid with explicit enable flags.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -214,7 +214,7 @@ class BacktestIndicatorGridRequest(BaseModel):
     API payload for one ad-hoc indicator grid block.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/indicators/domain/specifications/grid_spec.py
@@ -233,7 +233,7 @@ class BacktestTemplateRequest(BaseModel):
     API payload for ad-hoc `template` mode in `POST /backtests`.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -257,7 +257,7 @@ class BacktestSavedOverridesRequest(BaseModel):
     API payload for optional saved-mode overrides.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -278,8 +278,8 @@ class BacktestRankingRequest(BaseModel):
     API payload for optional ranking override block in sync/jobs request envelope.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -320,7 +320,7 @@ class BacktestsPostRequest(BaseModel):
     API request envelope for `POST /backtests` saved/ad-hoc modes.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - apps/api/dto/backtests.py
@@ -339,116 +339,12 @@ class BacktestsPostRequest(BaseModel):
     ranking: BacktestRankingRequest | None = None
 
 
-class BacktestIndicatorSelectionRequest(BaseModel):
-    """
-    API request payload for one explicit indicator selection in variant-report endpoint.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - src/trading/contexts/indicators/application/dto/variant_key.py
-      - apps/api/routes/backtests.py
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    indicator_id: str
-    inputs: dict[str, BacktestAxisScalar]
-    params: dict[str, BacktestAxisScalar]
-
-    @field_validator("inputs", "params", mode="before")
-    @classmethod
-    def _reject_boolean_scalars(
-        cls,
-        value: Any,
-    ) -> Any:
-        """
-        Reject boolean scalars before coercion to preserve strict variant selection contract.
-
-        Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/
-            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-        Related:
-          - apps/api/dto/backtests.py
-          - src/trading/contexts/indicators/application/dto/variant_key.py
-          - apps/api/routes/backtests.py
-
-        Args:
-            value: Raw mapping payload from request body.
-        Returns:
-            Any: Unchanged mapping payload when no boolean scalars are present.
-        Assumptions:
-            Variant-selection values must remain `int|float|str` for key semantics stability.
-        Raises:
-            ValueError: If mapping contains boolean scalar value.
-        Side Effects:
-            None.
-        """
-        if not isinstance(value, Mapping):
-            return value
-        for raw_key in value.keys():
-            scalar = value[raw_key]
-            if isinstance(scalar, bool):
-                key = str(raw_key).strip()
-                raise ValueError(f"{key} must be int, float, or string")
-        return value
-
-
-class BacktestVariantPayloadRequest(BaseModel):
-    """
-    API request payload for explicit selected variant in lazy report-load endpoint.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - src/trading/contexts/backtest/application/dto/run_backtest.py
-      - apps/api/routes/backtests.py
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    indicator_selections: list[BacktestIndicatorSelectionRequest]
-    signal_params: dict[str, dict[str, BacktestScalar]]
-    risk_params: dict[str, BacktestScalar]
-    execution_params: dict[str, BacktestScalar]
-    direction_mode: str
-    sizing_mode: str
-
-
-class BacktestsVariantReportPostRequest(BaseModel):
-    """
-    API request envelope for on-demand `POST /api/backtests/variant-report`.
-
-    Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - apps/api/routes/backtests.py
-      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    time_range: BacktestTimeRangeRequest
-    strategy_id: UUID | None = None
-    template: BacktestTemplateRequest | None = None
-    overrides: BacktestSavedOverridesRequest | None = None
-    variant: BacktestVariantPayloadRequest
-    include_trades: bool = False
-
-
 class BacktestInstrumentIdResponse(BaseModel):
     """
     API response payload for instrument identity tuple.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/shared_kernel/primitives/instrument_id.py
@@ -466,7 +362,7 @@ class BacktestMetricRowResponse(BaseModel):
     API response payload for one reporting metrics-table row.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -484,7 +380,7 @@ class BacktestTradeResponse(BaseModel):
     API response payload for one deterministic closed trade.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/domain/entities/execution_v1.py
@@ -515,8 +411,8 @@ class BacktestReportResponse(BaseModel):
     API response payload for deterministic backtest report block.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -535,7 +431,7 @@ class BacktestIndicatorSelectionResponse(BaseModel):
     API response payload for one explicit indicator selection.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/indicators/application/dto/variant_key.py
@@ -554,7 +450,7 @@ class BacktestVariantPayloadResponse(BaseModel):
     API response payload for one saveable explicit variant configuration.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -576,7 +472,7 @@ class BacktestVariantResponse(BaseModel):
     API response payload for one ranked top-K variant.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -598,8 +494,8 @@ class BacktestsPostResponse(BaseModel):
     API response payload for `POST /backtests` endpoint.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - apps/api/routes/backtests.py
@@ -634,8 +530,8 @@ def build_backtest_run_request(*, request: BacktestsPostRequest) -> RunBacktestR
     Convert API request envelope into application `RunBacktestRequest` deterministically.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - apps/api/routes/backtests.py
@@ -700,9 +596,9 @@ def decode_backtest_request_payload(*, payload: Mapping[str, Any]) -> RunBacktes
     Decode canonical persisted backtest request payload through strict API DTO contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - apps/api/wiring/modules/backtest.py
@@ -735,9 +631,9 @@ def _strip_internal_persisted_request_fields(
     Remove additive persisted-only metadata before strict public request DTO validation.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-runs-history-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - apps/api/wiring/modules/backtest.py
@@ -774,136 +670,6 @@ def _strip_internal_persisted_request_fields(
     return normalized_payload
 
 
-def build_backtest_variant_report_run_request(
-    *,
-    request: BacktestsVariantReportPostRequest,
-) -> RunBacktestRequest:
-    """
-    Convert variant-report run context into application `RunBacktestRequest`.
-
-    Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - apps/api/routes/backtests.py
-      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
-
-    Args:
-        request: Parsed variant-report API request payload.
-    Returns:
-        RunBacktestRequest: Application request DTO for timeline/ownership resolution.
-    Assumptions:
-        Mode contract stays `strategy_id xor template` and reuses sync endpoint validation.
-    Raises:
-        BacktestValidationError: If mode contract or overrides contract is violated.
-        ValueError: If primitive conversions fail.
-    Side Effects:
-        None.
-    """
-    return build_backtest_run_request(
-        request=BacktestsPostRequest(
-            time_range=request.time_range,
-            strategy_id=request.strategy_id,
-            template=request.template,
-            overrides=request.overrides,
-        )
-    )
-
-
-def build_backtest_variant_report_payload(
-    *,
-    request: BacktestVariantPayloadRequest,
-) -> BacktestVariantPayloadV1:
-    """
-    Convert explicit variant-report payload into application variant payload DTO.
-
-    Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - src/trading/contexts/backtest/application/dto/run_backtest.py
-      - apps/api/routes/backtests.py
-
-    Args:
-        request: Parsed explicit variant payload from API request.
-    Returns:
-        BacktestVariantPayloadV1: Deterministic variant payload for report build use-case.
-    Assumptions:
-        Nested mappings are normalized and key-sorted for deterministic variant identity.
-    Raises:
-        ValueError: If one scalar field violates payload invariants.
-    Side Effects:
-        None.
-    """
-    sorted_indicator_selections = sorted(
-        request.indicator_selections,
-        key=lambda item: item.indicator_id.strip().lower(),
-    )
-    return BacktestVariantPayloadV1(
-        indicator_selections=tuple(
-            IndicatorVariantSelection(
-                indicator_id=item.indicator_id,
-                inputs=_normalize_indicator_selection_mapping(
-                    values=item.inputs,
-                    field_path=f"variant.indicator_selections[{index}].inputs",
-                ),
-                params=_normalize_indicator_selection_mapping(
-                    values=item.params,
-                    field_path=f"variant.indicator_selections[{index}].params",
-                ),
-            )
-            for index, item in enumerate(sorted_indicator_selections)
-        ),
-        signal_params=_normalize_variant_signal_scalar_mapping(
-            values=request.signal_params,
-        ),
-        risk_params=_normalize_variant_scalar_mapping(
-            values=request.risk_params,
-            field_path="variant.risk_params",
-        ),
-        execution_params=_normalize_variant_scalar_mapping(
-            values=request.execution_params,
-            field_path="variant.execution_params",
-        ),
-        direction_mode=request.direction_mode,
-        sizing_mode=request.sizing_mode,
-    )
-
-
-def build_backtest_variant_report_response(
-    *,
-    report: BacktestReportV1,
-) -> BacktestReportResponse:
-    """
-    Convert application variant report DTO into strict API response payload.
-
-    Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - apps/api/routes/backtests.py
-      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
-
-    Args:
-        report: Application-layer report payload.
-    Returns:
-        BacktestReportResponse: Strict API report response.
-    Assumptions:
-        Variant-report endpoint always returns one non-null report.
-    Raises:
-        BacktestValidationError: If report payload is unexpectedly missing.
-    Side Effects:
-        None.
-    """
-    response = _build_report_response(report=report)
-    if response is None:  # pragma: no cover - guarded by type contract
-        raise BacktestValidationError("Variant report payload is required")
-    return response
-
-
 def build_backtests_post_response(
     *,
     request: BacktestsPostRequest,
@@ -915,8 +681,8 @@ def build_backtests_post_response(
     Convert application response DTO into strict API response payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - apps/api/routes/backtests.py
@@ -997,8 +763,8 @@ def _require_launch_run_metadata(
     Validate that successful `/backtests` launch response carries persisted run identity metadata.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtests.py
@@ -1045,7 +811,7 @@ def build_grid_request_hash(*, request: BacktestsPostRequest) -> str:
     Build deterministic ad-hoc grid request hash from canonical JSON payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - apps/api/routes/backtests.py
@@ -1087,8 +853,8 @@ def build_engine_params_hash(
     Build deterministic engine params hash from effective run-time settings payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - apps/api/routes/backtests.py
@@ -1136,7 +902,7 @@ def build_sha256_from_payload(*, payload: Mapping[str, Any]) -> str:
     Build deterministic SHA-256 hash from canonical JSON representation.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
@@ -1167,7 +933,7 @@ def _build_time_range(*, request: BacktestsPostRequest) -> TimeRange:
     Convert API time-range payload into shared-kernel `TimeRange` value object.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/shared_kernel/primitives/time_range.py
@@ -1195,7 +961,7 @@ def _build_template(*, request: BacktestTemplateRequest | None) -> RunBacktestTe
     Convert optional ad-hoc template payload into application `RunBacktestTemplate`.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1246,7 +1012,7 @@ def _build_saved_overrides(
     Convert optional saved-mode overrides payload into application DTO.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1284,8 +1050,8 @@ def _build_ranking_config(
     Convert optional API ranking block into deterministic application ranking config DTO.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1314,7 +1080,7 @@ def _build_indicator_grids(*, request: BacktestTemplateRequest) -> tuple[GridSpe
     Convert API indicator grid payload list into deterministic `GridSpec` tuple.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/indicators/domain/specifications/grid_spec.py
@@ -1363,7 +1129,7 @@ def _build_signal_grids(
     Convert nested API signal grids payload into deterministic nested grid specs mapping.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1412,8 +1178,8 @@ def _build_risk_grid_spec(
     Convert API risk grid payload into `BacktestRiskGridSpec` value object.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1463,8 +1229,8 @@ def _build_risk_params(
     Convert API risk payload into scalar mapping used by application fallback semantics.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1503,8 +1269,8 @@ def _build_execution_params(
     Convert API execution payload into deterministic scalar mapping.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1562,7 +1328,7 @@ def _build_grid_param_spec(
     Convert API axis payload into one deterministic `GridParamSpec` implementation.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/indicators/domain/specifications/grid_param_spec.py
@@ -1631,8 +1397,8 @@ def _build_variant_response(
     Convert one application variant preview into strict API variant response payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1671,7 +1437,7 @@ def _build_variant_payload_response(
     Convert one application variant payload into strict API payload block.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1709,7 +1475,7 @@ def _build_indicator_selection_response(
     Convert application indicator selection into strict API payload model.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/indicators/application/dto/variant_key.py
@@ -1738,7 +1504,7 @@ def _build_report_response(*, report: BacktestReportV1 | None) -> BacktestReport
     Convert optional application report payload into strict API report model.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1770,7 +1536,7 @@ def _build_metric_row_response(*, row: BacktestMetricRowV1) -> BacktestMetricRow
     Convert one application metric row into API metric row payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1798,7 +1564,7 @@ def _build_trade_responses(
     Convert optional application trades tuple into strict API trades list.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/domain/entities/execution_v1.py
@@ -1826,7 +1592,7 @@ def _build_trade_response(*, trade: TradeV1) -> BacktestTradeResponse:
     Convert one application trade entity into strict API trade payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/domain/entities/execution_v1.py
@@ -1862,150 +1628,12 @@ def _build_trade_response(*, trade: TradeV1) -> BacktestTradeResponse:
     )
 
 
-def _normalize_indicator_selection_mapping(
-    *,
-    values: Mapping[str, BacktestAxisScalar],
-    field_path: str,
-) -> dict[str, BacktestAxisScalar]:
-    """
-    Normalize explicit indicator selection scalar mapping for variant-report payload.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - src/trading/contexts/indicators/application/dto/variant_key.py
-      - apps/api/routes/backtests.py
-
-    Args:
-        values: Raw mapping with scalar input/parameter values.
-        field_path: Dot-path prefix used in deterministic validation errors.
-    Returns:
-        dict[str, BacktestAxisScalar]: Deterministic key-sorted scalar mapping.
-    Assumptions:
-        Values are explicit scalars and must not contain booleans or nulls.
-    Raises:
-        ValueError: If key is blank or scalar value type is unsupported.
-    Side Effects:
-        None.
-    """
-    normalized: dict[str, BacktestAxisScalar] = {}
-    for raw_key in sorted(values.keys(), key=lambda key: str(key).strip()):
-        key = str(raw_key).strip()
-        if not key:
-            raise ValueError(f"{field_path} keys must be non-empty")
-        raw_value = values[raw_key]
-        if raw_value is None or isinstance(raw_value, bool) or not isinstance(
-            raw_value, (int, float, str)
-        ):
-            raise ValueError(
-                f"{field_path}.{key} must be int, float, or string"
-            )
-        if isinstance(raw_value, float) and not math.isfinite(raw_value):
-            raise ValueError(
-                f"{field_path}.{key} must be finite number"
-            )
-        normalized[key] = raw_value
-    return normalized
-
-
-def _normalize_variant_scalar_mapping(
-    *,
-    values: Mapping[str, BacktestScalar],
-    field_path: str,
-) -> dict[str, BacktestScalar]:
-    """
-    Normalize scalar mapping payload for variant-report risk/execution blocks.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - src/trading/contexts/backtest/application/dto/run_backtest.py
-      - apps/api/routes/backtests.py
-
-    Args:
-        values: Raw scalar mapping payload.
-        field_path: Dot-path prefix used in deterministic validation errors.
-    Returns:
-        dict[str, BacktestScalar]: Deterministic key-sorted scalar mapping.
-    Assumptions:
-        Scalar values are JSON-compatible and finite for numeric types.
-    Raises:
-        ValueError: If key is blank or numeric scalar is non-finite.
-    Side Effects:
-        None.
-    """
-    normalized: dict[str, BacktestScalar] = {}
-    for raw_key in sorted(values.keys(), key=lambda key: str(key).strip()):
-        key = str(raw_key).strip()
-        if not key:
-            raise ValueError(f"{field_path} keys must be non-empty")
-        raw_value = values[raw_key]
-        if isinstance(raw_value, float) and not math.isfinite(raw_value):
-            raise ValueError(f"{field_path}.{key} must be finite number")
-        normalized[key] = raw_value
-    return normalized
-
-
-def _normalize_variant_signal_scalar_mapping(
-    *,
-    values: Mapping[str, Mapping[str, BacktestScalar]],
-) -> dict[str, dict[str, BacktestScalar]]:
-    """
-    Normalize nested signal scalar mapping for deterministic variant-report payloads.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-    Related:
-      - apps/api/dto/backtests.py
-      - src/trading/contexts/backtest/application/dto/run_backtest.py
-      - apps/api/routes/backtests.py
-
-    Args:
-        values: Raw nested `indicator_id -> signal_param -> scalar` payload mapping.
-    Returns:
-        dict[str, dict[str, BacktestScalar]]: Deterministic nested mapping.
-    Assumptions:
-        Indicator/parameter keys are normalized to lowercase identifiers.
-    Raises:
-        ValueError: If indicator/parameter keys are blank or numeric value is non-finite.
-    Side Effects:
-        None.
-    """
-    normalized: dict[str, dict[str, BacktestScalar]] = {}
-    for raw_indicator_id in sorted(values.keys(), key=lambda key: str(key).strip().lower()):
-        indicator_id = str(raw_indicator_id).strip().lower()
-        if not indicator_id:
-            raise ValueError("variant.signal_params indicator_id keys must be non-empty")
-        signal_params = values[raw_indicator_id]
-        normalized_params: dict[str, BacktestScalar] = {}
-        for raw_param_name in sorted(
-            signal_params.keys(),
-            key=lambda key: str(key).strip().lower(),
-        ):
-            param_name = str(raw_param_name).strip().lower()
-            if not param_name:
-                raise ValueError("variant.signal_params param keys must be non-empty")
-            raw_value = signal_params[raw_param_name]
-            if isinstance(raw_value, float) and not math.isfinite(raw_value):
-                raise ValueError(
-                    f"variant.signal_params.{indicator_id}.{param_name} must be finite number"
-                )
-            normalized_params[param_name] = raw_value
-        normalized[indicator_id] = normalized_params
-    return normalized
-
-
 def _normalize_numeric(*, value: int | float, field_path: str) -> float:
     """
     Convert numeric payload scalar to float while rejecting booleans.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -2038,7 +1666,7 @@ def _normalize_axis_numeric(*, value: int | float, field_path: str) -> int | flo
       floats (e.g. `5.0`) and fail validation.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md
     Related:
       - apps/api/dto/backtests.py
@@ -2077,7 +1705,7 @@ def _to_sorted_nested_scalar_mapping(
     Convert nested scalar mapping into deterministic sorted plain dictionary.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -2120,7 +1748,7 @@ def _to_sorted_scalar_mapping(
     Convert scalar mapping into deterministic sorted plain dictionary.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -2152,8 +1780,8 @@ def _is_pre_sorted_nested_scalar_mapping(
     Check whether nested scalar mapping already follows deterministic sorted key order.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -2192,8 +1820,8 @@ def _is_pre_sorted_scalar_mapping(
     Check whether scalar mapping already follows deterministic sorted key order.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -2230,7 +1858,7 @@ def _normalize_json_value(*, value: Any) -> Any:
     Convert arbitrary payload node into deterministic JSON-serializable value.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
@@ -2269,7 +1897,6 @@ __all__ = [
     "BacktestAxisSpecRequest",
     "BacktestExplicitAxisSpecRequest",
     "BacktestIndicatorGridRequest",
-    "BacktestIndicatorSelectionRequest",
     "BacktestIndicatorSelectionResponse",
     "BacktestInstrumentIdRequest",
     "BacktestInstrumentIdResponse",
@@ -2283,15 +1910,10 @@ __all__ = [
     "BacktestTimeRangeRequest",
     "BacktestTradeResponse",
     "BacktestVariantPayloadResponse",
-    "BacktestVariantPayloadRequest",
     "BacktestVariantResponse",
     "BacktestsPostRequest",
     "BacktestsPostResponse",
-    "BacktestsVariantReportPostRequest",
     "build_backtest_run_request",
-    "build_backtest_variant_report_payload",
-    "build_backtest_variant_report_response",
-    "build_backtest_variant_report_run_request",
     "build_backtests_post_response",
     "build_engine_params_hash",
     "build_grid_request_hash",

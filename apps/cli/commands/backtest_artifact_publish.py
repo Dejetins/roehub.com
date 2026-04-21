@@ -13,7 +13,7 @@ from apps.api.wiring.modules.indicators import (
     build_indicators_registry,
 )
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
-from trading.contexts.backtest.adapters.outbound import (
+from trading.contexts.backtest_artifacts.adapters.outbound import (
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
     PostgresBacktestJobRepository,
@@ -23,13 +23,14 @@ from trading.contexts.backtest.adapters.outbound import (
     load_backtest_artifacts_runtime_config,
     resolve_backtest_artifacts_config_path,
 )
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services import (
+    ArtifactCoordinatesV2,
     BacktestArtifactPrecomputeRunnerV2,
     BacktestArtifactSlotPublisherV2,
     BacktestSignalRulesEngineV2,
     YamlBacktestArtifactLoaderV2,
 )
-from trading.contexts.backtest.application.use_cases import (
+from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
     PublishBacktestArtifactsV2Result,
     PublishBacktestArtifactsV2UseCase,
@@ -57,7 +58,7 @@ class BacktestArtifactPublishCliArgs:
 
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/commands/backtest_artifact_publish.py
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -86,12 +87,10 @@ class BacktestArtifactPublishCliArgs:
             None.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
-        from trading.contexts.backtest.application.services import ArtifactCoordinatesV2
-
         return PublishBacktestArtifactsV2Request(
             coordinates=ArtifactCoordinatesV2(
                 exchange=self.exchange,
@@ -108,7 +107,7 @@ class BacktestArtifactPublishCli:
 
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/main/main.py
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -136,7 +135,7 @@ class BacktestArtifactPublishCli:
             Stores configuration in memory.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/apps/cli/test_backtest_artifact_publish_cli.py
         """
@@ -162,7 +161,7 @@ class BacktestArtifactPublishCli:
             Reads configs/environment, queries storage, writes artifacts, and prints one report.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
         """
@@ -223,7 +222,7 @@ class BacktestArtifactPublishCli:
             None.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -263,7 +262,7 @@ def _build_parser() -> argparse.ArgumentParser:
         None.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/main/main.py
     """
@@ -316,7 +315,7 @@ def _build_publish_use_case_v2(
         Reads configs, builds storage adapters, and warms up indicators compute.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/mac-studio-native-backend-operations.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -408,7 +407,7 @@ def _render_report_v2(
         None.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
     """

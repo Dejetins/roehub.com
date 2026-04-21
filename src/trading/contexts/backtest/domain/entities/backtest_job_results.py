@@ -18,8 +18,8 @@ class BacktestJobTopVariant:
     Persisted ranked top-variant snapshot row for one Backtest job.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_results_repository.py
@@ -46,7 +46,7 @@ class BacktestJobTopVariant:
         Validate top-variant row shape and normalize JSON payloads.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -124,7 +124,7 @@ class BacktestJobParityRetainedRowsCounter:
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
@@ -225,7 +225,7 @@ class BacktestJobParityClassification:
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
@@ -359,7 +359,7 @@ class BacktestJobParityRuntimeState:
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
@@ -624,8 +624,8 @@ class BacktestJobStageAShortlist:
     Persisted Stage-A shortlist projection used for deterministic restart/resume in worker.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_results_repository.py
@@ -799,7 +799,7 @@ class BacktestJobStageANoRiskExactRow:
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
@@ -1108,7 +1108,7 @@ def report_table_md_allowed_for_state(*, state: BacktestJobState) -> bool:
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
@@ -1135,7 +1135,7 @@ def _normalize_optional_non_negative_float(*, name: str, value: float | None) ->
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/

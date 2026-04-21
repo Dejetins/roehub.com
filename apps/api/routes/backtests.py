@@ -2,7 +2,7 @@
 Backtests API routes for summary-only launch, runtime-defaults, and compatibility detail wiring.
 
 Docs:
-  - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+  - docs/architecture/backtest/README.md
   - docs/architecture/api/api-errors-and-422-payload-v1.md
 """
 
@@ -14,15 +14,10 @@ from typing import Callable
 from fastapi import APIRouter, Depends, Request, Response
 
 from apps.api.dto import (
-    BacktestReportResponse,
     BacktestRuntimeDefaultsResponse,
     BacktestsPostRequest,
     BacktestsPostResponse,
-    BacktestsVariantReportPostRequest,
     build_backtest_run_request,
-    build_backtest_variant_report_payload,
-    build_backtest_variant_report_response,
-    build_backtest_variant_report_run_request,
     build_backtests_post_response,
 )
 from trading.contexts.backtest.application.ports import BacktestStrategyReader, CurrentUser
@@ -51,7 +46,7 @@ def build_backtests_router(
     Build backtests router for sync runs and runtime-defaults browser prefill endpoint.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - apps/api/dto/backtests.py
@@ -102,7 +97,7 @@ def build_backtests_router(
 
         Docs:
           - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - apps/api/dto/backtest_runtime_defaults.py
           - apps/api/wiring/modules/backtest.py
@@ -135,8 +130,8 @@ def build_backtests_router(
         Launch deterministic `/backtests` flow for saved/ad-hoc request envelope.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - apps/api/dto/backtests.py
           - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -188,68 +183,6 @@ def build_backtests_router(
                 strategy_snapshot=strategy_snapshot,
                 include_reports=False,
             )
-        except RoehubError:
-            raise
-        except Exception as error:  # noqa: BLE001
-            raise map_backtest_exception(error=error) from error
-
-    @router.post(
-        "/backtests/variant-report",
-        response_model=BacktestReportResponse,
-    )
-    async def post_backtests_variant_report(
-        request: BacktestsVariantReportPostRequest,
-        http_request: Request,
-        principal: CurrentUserPrincipal = Depends(current_user_dependency),
-    ) -> BacktestReportResponse:
-        """
-        Build one compatibility report via legacy `POST /api/backtests/variant-report`.
-
-        Docs:
-          - docs/architecture/backtest/
-            backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-        Related:
-          - apps/api/dto/backtests.py
-          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
-          - apps/api/common/errors.py
-
-        Args:
-            request: Parsed strict API payload with run-context and explicit variant block.
-            principal: Authenticated user principal resolved by identity dependency.
-        Returns:
-            BacktestReportResponse:
-                Deterministic report payload (`rows/table_md/trades`) for one explicit variant.
-        Assumptions:
-            Active full-detail UX should prefer the run-scoped
-            `POST /api/backtests/runs/{run_id}/variant-report` flow; this endpoint remains
-            behavior-compatible for older clients that still send the full run envelope.
-        Raises:
-            RoehubError: Deterministic mapped validation/not_found/forbidden/conflict errors.
-        Side Effects:
-            Executes one variant scoring pass and report build in application layer.
-        """
-        try:
-            use_case_request = build_backtest_variant_report_run_request(request=request)
-            variant_payload = build_backtest_variant_report_payload(request=request.variant)
-            run_control = BacktestRunControlV1(deadline_seconds=sync_deadline_seconds)
-            run_task = asyncio.create_task(
-                asyncio.to_thread(
-                    run_use_case.build_variant_report,
-                    request=use_case_request,
-                    current_user=CurrentUser(user_id=principal.user_id),
-                    variant_payload=variant_payload,
-                    include_trades=request.include_trades,
-                    run_control=run_control,
-                )
-            )
-            while not run_task.done():
-                if await http_request.is_disconnected():
-                    run_control.cancel(reason="client_disconnected")
-                await asyncio.sleep(_SYNC_DISCONNECT_POLL_SECONDS)
-            use_case_response = await run_task
-            return build_backtest_variant_report_response(report=use_case_response)
         except RoehubError:
             raise
         except Exception as error:  # noqa: BLE001

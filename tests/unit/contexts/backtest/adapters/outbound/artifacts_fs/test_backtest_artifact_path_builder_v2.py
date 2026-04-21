@@ -6,7 +6,9 @@ from pathlib import Path
 import pytest
 
 from trading.contexts.backtest.adapters.outbound import BacktestArtifactPathBuilderV2
-from trading.contexts.backtest.application.services import ArtifactCoordinatesV2
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
+)
 
 
 def test_backtest_artifact_path_builder_v2_builds_canonical_paths(tmp_path: Path) -> None:
@@ -24,7 +26,7 @@ def test_backtest_artifact_path_builder_v2_builds_canonical_paths(tmp_path: Path
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -126,7 +128,7 @@ def test_backtest_artifact_path_builder_v2_returns_byte_stable_paths(tmp_path: P
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -197,7 +199,7 @@ def test_backtest_artifact_path_builder_v2_rejects_invalid_inputs(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py

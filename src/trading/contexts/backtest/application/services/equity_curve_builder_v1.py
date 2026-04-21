@@ -17,8 +17,8 @@ class BacktestEquityCurveV1:
     Deterministic equity-curve payload aligned to Stage-B `target_slice` bar closes.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
       - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py
@@ -78,8 +78,8 @@ class BacktestEquityCurveBuilderV1:
     Build deterministic equity curve and coverage/exposure vectors from engine trades.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/execution_v1.py
       - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py

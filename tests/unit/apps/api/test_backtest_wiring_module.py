@@ -377,15 +377,9 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
         "StrategyRepositoryBacktestStrategyReader",
         _DummyStrategyReader,
     )
-    monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _DummyFactory)
     monkeypatch.setattr(
         backtest_module,
-        "CreateAndRunBacktestSyncInlineUseCase",
-        _DummyFactory,
-    )
-    monkeypatch.setattr(
-        backtest_module,
-        "LaunchBacktestRunWithAutoFallbackUseCase",
+        "LaunchBacktestGatewayUseCase",
         _DummyFactory,
     )
     monkeypatch.setattr(
@@ -418,24 +412,22 @@ def _patch_backtest_wiring_dependencies(*, monkeypatch, jobs_enabled: bool) -> N
     )
 
 
-def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypatch) -> None:
+def test_build_backtest_router_builds_gateway_launch_use_case(monkeypatch) -> None:
     """
-    Verify wiring passes sync half-guards and sync deadline into composed dependencies.
+    Verify wiring composes gateway-only launch use-case and forwards router settings.
 
     Args:
         monkeypatch: pytest monkeypatch fixture.
     Returns:
         None.
     Assumptions:
-        Jobs mode keeps full guard values; only sync route uses half budgets.
+        API process is a thin gateway and does not instantiate local compute use-cases.
     Raises:
-        AssertionError: If run use-case kwargs do not contain expected halved guard values.
+        AssertionError: If gateway/use-router kwargs are not propagated from runtime config.
     Side Effects:
         None.
     """
-    captured_run_use_case_kwargs: list[dict[str, object]] = []
-    captured_sync_inline_kwargs: dict[str, object] = {}
-    captured_auto_fallback_kwargs: dict[str, object] = {}
+    captured_gateway_kwargs: dict[str, object] = {}
     captured_backtests_router_kwargs: dict[str, object] = {}
     runtime_config = _runtime_config(
         jobs_enabled=False,
@@ -475,31 +467,10 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
         "StrategyRepositoryBacktestStrategyReader",
         _DummyStrategyReader,
     )
-    class _CaptureRunBacktestUseCase:
-        """
-        Capture run use-case constructor kwargs for guard/CPU assertions.
-        """
 
-        def __init__(self, **kwargs) -> None:
-            """
-            Store kwargs for deterministic assertions.
-
-            Args:
-                **kwargs: Constructor kwargs from wiring module.
-            Returns:
-                None.
-            Assumptions:
-                Captured kwargs are not mutated by router builder.
-            Raises:
-                None.
-            Side Effects:
-                Stores kwargs in enclosing test scope.
-            """
-            captured_run_use_case_kwargs.append(dict(kwargs))
-
-    class _CaptureCreateAndRunBacktestSyncInlineUseCase:
+    class _CaptureLaunchBacktestGatewayUseCase:
         """
-        Capture persisted sync-inline orchestrator constructor kwargs for wiring assertions.
+        Capture gateway launch constructor kwargs for wiring assertions.
         """
 
         def __init__(self, **kwargs) -> None:
@@ -517,40 +488,12 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
             Side Effects:
                 Stores kwargs in enclosing test scope.
             """
-            captured_sync_inline_kwargs.update(kwargs)
+            captured_gateway_kwargs.update(kwargs)
 
-    class _CaptureLaunchBacktestRunWithAutoFallbackUseCase:
-        """
-        Capture auto-fallback orchestrator constructor kwargs for wiring assertions.
-        """
-
-        def __init__(self, **kwargs) -> None:
-            """
-            Store kwargs for deterministic assertions.
-
-            Args:
-                **kwargs: Constructor kwargs from wiring module.
-            Returns:
-                None.
-            Assumptions:
-                Captured kwargs are not mutated by router builder.
-            Raises:
-                None.
-            Side Effects:
-                Stores kwargs in enclosing test scope.
-            """
-            captured_auto_fallback_kwargs.update(kwargs)
-
-    monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _CaptureRunBacktestUseCase)
     monkeypatch.setattr(
         backtest_module,
-        "CreateAndRunBacktestSyncInlineUseCase",
-        _CaptureCreateAndRunBacktestSyncInlineUseCase,
-    )
-    monkeypatch.setattr(
-        backtest_module,
-        "LaunchBacktestRunWithAutoFallbackUseCase",
-        _CaptureLaunchBacktestRunWithAutoFallbackUseCase,
+        "LaunchBacktestGatewayUseCase",
+        _CaptureLaunchBacktestGatewayUseCase,
     )
     monkeypatch.setattr(
         backtest_module,
@@ -581,43 +524,8 @@ def test_build_backtest_router_passes_sync_half_guards_to_run_use_case(monkeypat
     )
     assert "/backtests/ping" in _paths_from_router(router=router)
     assert "/backtests/runs/ping" in _paths_from_router(router=router)
-    assert len(captured_run_use_case_kwargs) == 2
-    assert (
-        captured_run_use_case_kwargs[0]["runtime_planner"]
-        is not captured_run_use_case_kwargs[1]["runtime_planner"]
-    )
-    assert captured_run_use_case_kwargs[0]["candle_feed"] is None
-    assert captured_run_use_case_kwargs[0]["max_variants_per_compute"] == 50
-    assert captured_run_use_case_kwargs[0]["max_compute_bytes_total"] == 500
-    assert captured_run_use_case_kwargs[0]["max_numba_threads"] == 7
-    assert captured_run_use_case_kwargs[0]["eager_top_reports_enabled"] is False
-    assert (
-        cast(
-            Any,
-            captured_run_use_case_kwargs[0]["runtime_planner"],
-        ).resolve_execution_profile().mode
-        == "exact_small"
-    )
-    assert (
-        cast(
-            Any,
-            captured_run_use_case_kwargs[0]["runtime_planner"],
-        ).resolve_execution_profile(requested_execution_profile_mode="hybrid_conservative").mode
-        == "hybrid_conservative"
-    )
-    assert captured_run_use_case_kwargs[1]["candle_feed"] is None
-    assert captured_run_use_case_kwargs[1]["max_variants_per_compute"] == 101
-    assert captured_run_use_case_kwargs[1]["max_compute_bytes_total"] == 1001
-    assert (
-        cast(
-            Any,
-            captured_run_use_case_kwargs[1]["runtime_planner"],
-        ).resolve_execution_profile().mode
-        == "exact_small"
-    )
-    assert captured_sync_inline_kwargs["backtest_runtime_config_hash"] == "f" * 64
-    assert captured_sync_inline_kwargs["engine_version"] == "signal_tf + 1m_risk"
-    assert captured_auto_fallback_kwargs["engine_version"] == "signal_tf + 1m_risk"
+    assert captured_gateway_kwargs["engine_version"] == "signal_tf + 1m_risk"
+    assert "background_create_use_case" in captured_gateway_kwargs
     assert captured_backtests_router_kwargs["sync_deadline_seconds"] == 42.5
     assert captured_backtests_router_kwargs["eager_top_reports_enabled"] is False
     assert (
@@ -796,15 +704,9 @@ def test_build_backtest_router_uses_artifact_root_from_artifact_config(monkeypat
         "StrategyRepositoryBacktestStrategyReader",
         _DummyStrategyReader,
     )
-    monkeypatch.setattr(backtest_module, "RunBacktestUseCase", _DummyFactory)
     monkeypatch.setattr(
         backtest_module,
-        "CreateAndRunBacktestSyncInlineUseCase",
-        _DummyFactory,
-    )
-    monkeypatch.setattr(
-        backtest_module,
-        "LaunchBacktestRunWithAutoFallbackUseCase",
+        "LaunchBacktestGatewayUseCase",
         _DummyFactory,
     )
     monkeypatch.setattr(

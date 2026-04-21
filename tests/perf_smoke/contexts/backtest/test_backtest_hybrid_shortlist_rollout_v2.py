@@ -9,24 +9,32 @@ from typing import Any
 import numpy as np
 
 from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunBacktestTemplate
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_backed_stage_b_scorer_v2 import (  # noqa: E501
     BacktestArtifactBackedStageBScorerV2,
-    BacktestArtifactRuntimePlanV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_core_v2 import (
     BacktestArtifactRuntimeRunnerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
+    BacktestArtifactRuntimePlanV2,
     BacktestIndicatorAxisPlanV2,
     BacktestIndicatorPlanV2,
     BacktestRiskVariantV2,
-    BacktestStageAShortlistBuilderV2,
-    HierarchicalShortlistRuntimePlanV2,
-    default_execution_profiles_catalog_v2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.benchmark_corpus_v2 import (
     load_backtest_runtime_acceleration_benchmark_corpus_v2,
 )
-from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
     ExecutionProfileShortlistConfigV2,
+    default_execution_profiles_catalog_v2,
 )
-from trading.contexts.backtest.application.services.v2.hierarchical_shortlist_builder_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.hierarchical_shortlist_builder_v2 import (  # noqa: E501
     BacktestHierarchicalShortlistBuilderV2,
+    HierarchicalShortlistRuntimePlanV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.stage_a_shortlist_builder_v2 import (  # noqa: E501
+    BacktestStageAShortlistBuilderV2,
 )
 from trading.contexts.indicators.application.dto import CandleArrays
 from trading.contexts.indicators.domain.entities import IndicatorId
@@ -52,8 +60,8 @@ class _RolloutScenarioV2:
     Deterministic synthetic rollout scenario used by hybrid shortlist perf-smoke evidence tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
@@ -71,8 +79,8 @@ class _RankedScenarioResultV2:
     Final exact-vs-hybrid ranking evidence collected for one synthetic rollout scenario.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
@@ -90,8 +98,8 @@ class _SyntheticPriceLoaderV2:
     In-memory price, mapping, and hit-times loader for hybrid rollout perf-smoke scenarios.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -103,8 +111,8 @@ class _SyntheticPriceLoaderV2:
         Initialize one deterministic loader with a monotonically rising execution timeline.
 
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
           - src/trading/contexts/backtest/application/services/v2/
@@ -180,8 +188,8 @@ class _SyntheticPriceLoaderV2:
         Return the deterministic synthetic OHLCV arrays for either request or execution access.
 
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
           - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
@@ -209,8 +217,8 @@ class _SyntheticPriceLoaderV2:
         Return deterministic request-timeframe to execution-timeframe close mappings.
 
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
           - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
@@ -239,8 +247,8 @@ class _SyntheticPriceLoaderV2:
         Return deterministic synthetic hit-times tables for the exact Stage B scorer.
 
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
           - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
@@ -266,8 +274,8 @@ class _SyntheticSignalLoaderV2:
     In-memory signal loader serving full matrices and exact-path subset rows from one scenario.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
@@ -279,8 +287,8 @@ class _SyntheticSignalLoaderV2:
         Initialize one deterministic in-memory signal-matrix catalog for a rollout scenario.
 
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
           - src/trading/contexts/backtest/application/services/v2/
@@ -315,8 +323,8 @@ class _SyntheticSignalLoaderV2:
         Return the full synthetic matrix for hybrid block scoring and record the request.
 
         Docs:
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
           - src/trading/contexts/backtest/application/services/v2/
@@ -358,8 +366,8 @@ class _SyntheticSignalLoaderV2:
         Return deterministic selected signal rows for exact Stage A and exact Stage B reuse.
 
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
           - src/trading/contexts/backtest/application/services/v2/
@@ -401,8 +409,8 @@ def test_backtest_hybrid_shortlist_rollout_meets_recall_and_overlap_gates() -> N
     Verify rollout baseline and low-activity evidence satisfy the committed recall/overlap gates.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -448,8 +456,8 @@ def test_backtest_hybrid_shortlist_rollout_exposes_high_correlation_diversity_ev
     Verify the high-correlation rollout slice retains multiple explicit direction buckets.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -493,8 +501,8 @@ def test_backtest_hybrid_shortlist_rollout_short_circuits_small_grid_and_respect
     Verify small grids short-circuit without hybrid artifact IO and memory ratio stays bounded.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -564,8 +572,8 @@ def _run_exact_and_hybrid_case(
     Execute one synthetic scenario through exact and hybrid runtime paths and collect rankings.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -672,8 +680,8 @@ def _build_exact_runtime_plan_for_scenario(
     Build one exact runtime-plan harness and its synthetic loaders for a rollout scenario.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
@@ -752,8 +760,8 @@ def _build_hybrid_runtime_plan_for_scenario(
     Build one reduced hybrid runtime plan for a synthetic rollout scenario.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
@@ -800,7 +808,7 @@ def _hybrid_execution_profile_v2(*, max_candidates: int) -> Any:
     Build one explicit opt-in `hybrid_conservative` profile fixture for rollout evidence tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
@@ -842,8 +850,8 @@ def _template_for_row_count_v2(*, row_count: int) -> RunBacktestTemplate:
     Build one deterministic single-indicator template matching the synthetic rollout harness.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -894,8 +902,8 @@ def _candles_for_signal_bars_v2(*, signal_bars: int) -> CandleArrays:
     Build deterministic dense candle arrays for the exact Stage B scorer preparation path.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -930,8 +938,8 @@ def _artifact_context_fixture() -> Any:
     Build a minimal slot-pinned runtime context fixture for the synthetic rollout harness.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -966,8 +974,8 @@ def _target_time_range_for_signal_bars_v2(*, signal_bars: int) -> TimeRange:
     Build a deterministic target window covering every synthetic request-timeframe close time.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
@@ -1002,8 +1010,8 @@ def _top_1_recall_ratio_v2(*, result: _RankedScenarioResultV2) -> float:
     Compute the top-1 recall ratio for one exact-vs-hybrid ranking comparison.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -1028,8 +1036,8 @@ def _top_k_overlap_ratio_v2(*, result: _RankedScenarioResultV2, limit: int) -> f
     Compute one deterministic top-k overlap ratio from exact and hybrid variant-key frontiers.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -1063,8 +1071,8 @@ def _baseline_rollout_scenario_v2() -> _RolloutScenarioV2:
     Build the exact-baseline rollout scenario used for top-1 recall and top-10 overlap gates.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -1110,8 +1118,8 @@ def _low_activity_rollout_scenario_v2() -> _RolloutScenarioV2:
     Build the sparse low-activity rollout scenario used for the dedicated recall gate.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -1154,8 +1162,8 @@ def _high_correlation_rollout_scenario_v2() -> _RolloutScenarioV2:
     Build a high-correlation scenario used to inspect retained hybrid diversity evidence.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -1193,8 +1201,8 @@ def _small_grid_rollout_scenario_v2() -> _RolloutScenarioV2:
     Build the tiny small-grid scenario used to prove hybrid short-circuit protection.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
       - tests/perf_smoke/contexts/backtest/fixtures/

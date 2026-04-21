@@ -39,7 +39,7 @@ class _EstimateOnlyIndicatorCompute:
     IndicatorCompute fake that materializes estimate axes directly from grid specs.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
       - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
@@ -126,8 +126,8 @@ class _DefaultsProvider:
     Defaults provider fake exposing deterministic compute/signal defaults by indicator id.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/staged_runner.py
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py

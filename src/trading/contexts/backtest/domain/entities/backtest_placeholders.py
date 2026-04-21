@@ -11,7 +11,7 @@ class BacktestPositionPlaceholder:
     Placeholder open-position projection for BKT-EPIC-01 skeleton boundaries.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_placeholders.py
@@ -51,7 +51,7 @@ class BacktestTradePlaceholder:
     Placeholder trade projection for BKT-EPIC-01 skeleton boundaries.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_placeholders.py
@@ -96,7 +96,7 @@ class BacktestResultPlaceholder:
     Placeholder result envelope for one variant in BKT-EPIC-01.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/variant_identity.py

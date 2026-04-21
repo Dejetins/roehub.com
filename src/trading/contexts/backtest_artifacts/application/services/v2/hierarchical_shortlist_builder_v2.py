@@ -1,0 +1,1631 @@
+"""Hierarchical conservative shortlist runtime for explicit `hybrid_conservative` rollout.
+
+Docs:
+  - docs/architecture/backtest/README.md
+  - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+  - docs/architecture/backtest/README.md
+"""
+
+from __future__ import annotations
+
+import math
+import time
+from dataclasses import dataclass, field
+from typing import Callable, Iterator, Literal, Sequence, cast
+
+import numpy as np
+
+from trading.contexts.backtest.application.ports import BacktestGridDefaultsProvider
+from trading.contexts.backtest.domain.value_objects import build_backtest_variant_key_v1
+from trading.contexts.indicators.application.dto import (
+    IndicatorVariantSelection,
+    build_variant_key_v1,
+)
+from trading.shared_kernel.primitives import TimeRange
+
+from .artifact_runtime_plan_v2 import (
+    BacktestArtifactRuntimePlanV2,
+    BacktestIndicatorPlanV2,
+    BacktestStageABaseVariantV2,
+    build_indicator_selection_for_variant_index_v2,
+    build_signal_params_for_variant_index_v2,
+)
+from .contracts import (
+    ArtifactSlotPinnedRuntimeContextV2,
+    BacktestArtifactLoaderV2,
+    BacktestArtifactSlotResolverV2,
+    BacktestPriceArraysLoaderV2,
+    BacktestSignalMatrixLoaderV2,
+)
+from .diversified_retention_v2 import (
+    DiversifiedRetentionDecisionV2,
+    DiversifiedRetentionV2,
+)
+from .execution_profile_v2 import (
+    ExecutionProfileV2,
+    execution_profile_uses_hierarchical_shortlist_runtime_v2,
+)
+from .family_plugins import (
+    FamilyPluginCircuitBreakerV2,
+    FamilyPluginProposalResultV2,
+    FamilyPluginRegistryStatusLiteralV2,
+    FamilyPluginRegistryV2,
+    FamilyPluginWarningV2,
+    build_default_family_plugin_registry_v2,
+    build_family_plugin_planning_context_v2,
+)
+from .generic_row_scorer_v2 import (
+    GenericRowScorePayloadV2,
+    GenericRowScorerV2,
+    GenericRowScoringInputV2,
+)
+from .price_arrays_loader import MmapPriceArraysLoaderV2
+from .signal_matrix_loader import MmapSignalMatrixLoaderV2
+from .stage_a_shortlist_builder_v2 import compute_target_slice_by_close_time_v2
+
+type HierarchicalProposalLayerSourceLiteralV2 = Literal["universal", "family_plugin"]
+
+
+def _run_scoped_loader_v2(*, loader: object) -> object:
+    """
+    Clone one artifact loader when it exposes explicit `run_scoped` ownership semantics.
+
+    Args:
+        loader: Artifact loader or test double used by the long-lived hybrid builder prototype.
+    Returns:
+        object: Fresh run-owned loader when `loader.run_scoped()` is available, otherwise the
+            original loader for compatibility with test doubles and custom wiring.
+    Assumptions:
+        Loaders without explicit `run_scoped` semantics already own an acceptable lifecycle for
+        the current caller.
+    Raises:
+        TypeError: If `run_scoped()` exists but is not callable.
+    Side Effects:
+        None.
+    """
+    run_scoped_loader = getattr(loader, "run_scoped", None)
+    if run_scoped_loader is None:
+        return loader
+    if not callable(run_scoped_loader):
+        raise TypeError("artifact loader run_scoped attribute must be callable")
+    return run_scoped_loader()
+
+
+@dataclass(frozen=True, slots=True)
+class HierarchicalShortlistRetainedRowV2:
+    """
+    One retained indicator-block row selected for hierarchical hybrid shortlist expansion.
+
+    Docs:
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+      - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+    """
+
+    indicator_id: str
+    row_index: int
+    selection: IndicatorVariantSelection
+    score_payload: GenericRowScorePayloadV2
+    retained_rank: int
+
+    def __post_init__(self) -> None:
+        """
+        Validate one retained indicator-block row payload.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Retained rows already passed deterministic scoring and retention for one indicator
+            block and therefore need only stable identity checks here.
+        Raises:
+            ValueError: If identifiers are blank or ranks/indexes are invalid.
+        Side Effects:
+            None.
+        """
+        if not self.indicator_id.strip():
+            raise ValueError("HierarchicalShortlistRetainedRowV2.indicator_id must be non-empty")
+        if self.row_index < 0:
+            raise ValueError("HierarchicalShortlistRetainedRowV2.row_index must be >= 0")
+        if self.retained_rank <= 0:
+            raise ValueError("HierarchicalShortlistRetainedRowV2.retained_rank must be > 0")
+
+
+@dataclass(frozen=True, slots=True)
+class HierarchicalShortlistBlockResultV2:
+    """
+    Audit-friendly retained rows and decisions for one indicator block.
+
+    Docs:
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+      - tests/unit/contexts/backtest/application/services/v2/
+        test_hierarchical_shortlist_builder_v2.py
+    """
+
+    indicator_id: str
+    retained_rows: tuple[HierarchicalShortlistRetainedRowV2, ...]
+    retention_decisions: tuple[DiversifiedRetentionDecisionV2, ...]
+
+    def __post_init__(self) -> None:
+        """
+        Validate one indicator-block shortlist audit payload.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Retained rows belong to one indicator block and keep deterministic rank ordering.
+        Raises:
+            ValueError: If indicator ids drift across retained rows or identities duplicate.
+        Side Effects:
+            None.
+        """
+        if not self.indicator_id.strip():
+            raise ValueError("HierarchicalShortlistBlockResultV2.indicator_id must be non-empty")
+        seen_rows: set[int] = set()
+        for retained_row in self.retained_rows:
+            if retained_row.indicator_id != self.indicator_id:
+                raise ValueError(
+                    "HierarchicalShortlistBlockResultV2 retained_rows must share indicator_id"
+                )
+            if retained_row.row_index in seen_rows:
+                raise ValueError(
+                    "HierarchicalShortlistBlockResultV2 retained_rows must not duplicate row "
+                    f"indexes for {self.indicator_id!r}"
+                )
+            seen_rows.add(retained_row.row_index)
+
+
+@dataclass(frozen=True, slots=True)
+class HierarchicalShortlistRuntimePlanV2(BacktestArtifactRuntimePlanV2):
+    """
+    Reduced runtime plan exposing only hybrid-retained Stage A survivors.
+
+    Docs:
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+      - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
+    """
+
+    source_runtime_plan: BacktestArtifactRuntimePlanV2 | None = None
+    retained_stage_a_variants: tuple[BacktestStageABaseVariantV2, ...] = ()
+    block_results: tuple[HierarchicalShortlistBlockResultV2, ...] = ()
+    retained_compute_variants_total: int = 0
+    proposal_layer_source: HierarchicalProposalLayerSourceLiteralV2 = "universal"
+    family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2 | None = None
+    family_plugin_warning: FamilyPluginWarningV2 | None = None
+    family_plugin_proposal: FamilyPluginProposalResultV2 | None = None
+
+    def __post_init__(self) -> None:
+        """
+        Validate reduced runtime-plan invariants after base plan normalization.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            The reduced plan preserves all exact Stage B contracts while shrinking only Stage A
+            enumeration space and the derived Stage B workload.
+        Raises:
+            ValueError: If retained variants are missing, unsorted, or cardinalities drift.
+        Side Effects:
+            Reuses base-plan normalization from `BacktestArtifactRuntimePlanV2.__post_init__`.
+        """
+        BacktestArtifactRuntimePlanV2.__post_init__(self)
+        if self.source_runtime_plan is None:  # type: ignore[truthy-bool]
+            raise ValueError("HierarchicalShortlistRuntimePlanV2.source_runtime_plan is required")
+        if len(self.retained_stage_a_variants) == 0:
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.retained_stage_a_variants must be non-empty"
+            )
+        if self.stage_a_variants_total != len(self.retained_stage_a_variants):
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.stage_a_variants_total must match retained "
+                "Stage A variants count"
+            )
+        if self.retained_compute_variants_total <= 0:
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.retained_compute_variants_total must be > 0"
+            )
+        if self.proposal_layer_source not in {"universal", "family_plugin"}:
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.proposal_layer_source must be "
+                "'universal' or 'family_plugin'"
+            )
+        if self.proposal_layer_source == "family_plugin" and self.family_plugin_proposal is None:
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.family_plugin_proposal is required when "
+                "proposal_layer_source='family_plugin'"
+            )
+        if self.proposal_layer_source == "universal" and self.family_plugin_proposal is not None:
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.family_plugin_proposal must be None when "
+                "proposal_layer_source='universal'"
+            )
+        if (
+            self.family_plugin_registry_status is not None
+            and self.family_plugin_registry_status
+            not in {
+                "resolved",
+                "disabled",
+                "not_applicable",
+                "missing_plugin",
+            }
+        ):
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2.family_plugin_registry_status must be one "
+                "of {'resolved', 'disabled', 'not_applicable', 'missing_plugin'} when provided"
+            )
+        previous_stage_a_index: int | None = None
+        seen_stage_a_indexes: set[int] = set()
+        for variant in self.retained_stage_a_variants:
+            if variant.stage_a_index in seen_stage_a_indexes:
+                raise ValueError(
+                    "HierarchicalShortlistRuntimePlanV2.retained_stage_a_variants must not "
+                    f"duplicate stage_a_index {variant.stage_a_index}"
+                )
+            seen_stage_a_indexes.add(variant.stage_a_index)
+            if (
+                previous_stage_a_index is not None
+                and variant.stage_a_index <= previous_stage_a_index
+            ):
+                raise ValueError(
+                    "HierarchicalShortlistRuntimePlanV2.retained_stage_a_variants must stay "
+                    "sorted by original stage_a_index"
+                )
+            previous_stage_a_index = variant.stage_a_index
+
+    def stage_a_variant_for_index(
+        self,
+        *,
+        stage_a_index: int,
+    ) -> BacktestStageABaseVariantV2:
+        """
+        Resolve one retained Stage A variant by its original exact-runtime index.
+
+        Args:
+            stage_a_index: Original exact Stage A index preserved on the retained variant payload.
+        Returns:
+            BacktestStageABaseVariantV2: Matching retained Stage A base variant.
+        Assumptions:
+            Reduced hybrid plans keep the exact Stage A index space sparse, so lookup must target
+            retained original indexes rather than `[0, retained_count)`.
+        Raises:
+            ValueError: If the requested exact Stage A index is not present in the retained set.
+        Side Effects:
+            None.
+        """
+        for retained_variant in self.retained_stage_a_variants:
+            if retained_variant.stage_a_index == stage_a_index:
+                return retained_variant
+        raise ValueError(
+            "HierarchicalShortlistRuntimePlanV2.stage_a_variant_for_index requires retained "
+            f"stage_a_index, got {stage_a_index}"
+        )
+
+    @classmethod
+    def from_source_runtime_plan(
+        cls,
+        *,
+        source_runtime_plan: BacktestArtifactRuntimePlanV2,
+        retained_stage_a_variants: tuple[BacktestStageABaseVariantV2, ...],
+        block_results: tuple[HierarchicalShortlistBlockResultV2, ...],
+        retained_compute_variants_total: int,
+        proposal_layer_source: HierarchicalProposalLayerSourceLiteralV2 = "universal",
+        family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2 | None = None,
+        family_plugin_warning: FamilyPluginWarningV2 | None = None,
+        family_plugin_proposal: FamilyPluginProposalResultV2 | None = None,
+    ) -> "HierarchicalShortlistRuntimePlanV2":
+        """
+        Build one reduced runtime plan reusing the exact-plan immutable contract surface.
+
+        Args:
+            source_runtime_plan: Original exact enumeration plan resolved by the planner.
+            retained_stage_a_variants: Reduced Stage A survivor enumeration in exact order.
+            block_results: Per-indicator shortlist debug evidence.
+            retained_compute_variants_total: Count of retained compute combinations before signal
+                expansion.
+            proposal_layer_source:
+                Whether retained variants came from the universal shortlist path or a concrete
+                family-plugin proposal layer.
+            family_plugin_registry_status:
+                Explicit registry resolution status when `hybrid_family` attempted plugin routing.
+            family_plugin_warning:
+                Optional warning payload describing `warning + universal fallback` behavior.
+            family_plugin_proposal:
+                Optional successful proposal payload emitted by the selected family plugin.
+        Returns:
+            HierarchicalShortlistRuntimePlanV2: Reduced runtime plan preserving exact Stage B
+                scorer contracts.
+        Assumptions:
+            Stage B risk expansion limit remains the original plan's shortlist envelope.
+        Raises:
+            ValueError: If the retained survivor set is empty.
+        Side Effects:
+            None.
+        """
+        if len(retained_stage_a_variants) == 0:
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2 requires non-empty retained_stage_a_variants"
+            )
+        risk_total = len(source_runtime_plan.risk_variants)
+        if risk_total <= 0:
+            raise ValueError(
+                "HierarchicalShortlistRuntimePlanV2 requires source plan risk variants"
+            )
+        original_shortlist_limit = max(
+            1,
+            source_runtime_plan.stage_b_variants_total // risk_total,
+        )
+        retained_stage_b_variants_total = (
+            min(len(retained_stage_a_variants), original_shortlist_limit) * risk_total
+        )
+        return cls(
+            indicator_plans=source_runtime_plan.indicator_plans,
+            signal_axes=source_runtime_plan.signal_axes,
+            risk_variants=source_runtime_plan.risk_variants,
+            execution_profile=source_runtime_plan.execution_profile,
+            instrument_id_literal=source_runtime_plan.instrument_id_literal,
+            timeframe_code=source_runtime_plan.timeframe_code,
+            direction_mode=source_runtime_plan.direction_mode,
+            sizing_mode=source_runtime_plan.sizing_mode,
+            execution_params=source_runtime_plan.execution_params,
+            stage_a_variants_total=len(retained_stage_a_variants),
+            stage_b_variants_total=retained_stage_b_variants_total,
+            estimated_memory_bytes=source_runtime_plan.estimated_memory_bytes,
+            indicator_estimate_calls=source_runtime_plan.indicator_estimate_calls,
+            signal_features_access=source_runtime_plan.signal_features_access,
+            source_runtime_plan=source_runtime_plan,
+            retained_stage_a_variants=retained_stage_a_variants,
+            block_results=block_results,
+            retained_compute_variants_total=retained_compute_variants_total,
+            proposal_layer_source=proposal_layer_source,
+            family_plugin_registry_status=family_plugin_registry_status,
+            family_plugin_warning=family_plugin_warning,
+            family_plugin_proposal=family_plugin_proposal,
+        )
+
+    def iter_stage_a_variants(self) -> Iterator[BacktestStageABaseVariantV2]:
+        """
+        Iterate only the retained hybrid survivor variants in original exact enumeration order.
+
+        Args:
+            None.
+        Returns:
+            Iterator[BacktestStageABaseVariantV2]: Reduced deterministic Stage A survivor stream.
+        Assumptions:
+            Stage A exact kernels still consume explicit base variants and should not know whether
+            they came from full exact enumeration or hybrid shortlist pruning.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return iter(self.retained_stage_a_variants)
+
+
+@dataclass(frozen=True, slots=True)
+class _HierarchicalBeamCandidateV2:
+    """
+    Intermediate compute-combination candidate used by deterministic beam combination.
+
+    Docs:
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/hierarchical_shortlist_builder_v2.py
+      - tests/perf_smoke/contexts/backtest/test_backtest_hybrid_shortlist_rollout_v2.py
+    """
+
+    row_indexes: tuple[int, ...]
+    indicator_selections: tuple[IndicatorVariantSelection, ...]
+    score_total: float
+    stable_identities: tuple[str, ...]
+
+    def sort_key(self) -> tuple[float, tuple[str, ...], tuple[int, ...]]:
+        """
+        Return one explicit deterministic ordering key for beam selection.
+
+        Args:
+            None.
+        Returns:
+            tuple[float, tuple[str, ...], tuple[int, ...]]: Descending-score deterministic
+                ordering key.
+        Assumptions:
+            All candidates in one beam round have the same arity and therefore compare fairly by
+            score plus explicit stable identities.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return (-self.score_total, self.stable_identities, self.row_indexes)
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestHierarchicalShortlistBuilderV2:
+    """
+    Build shared hybrid survivor runtime plans for `hybrid_conservative` and `hybrid_family`.
+
+    Docs:
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+      - docs/architecture/backtest/README.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+    """
+
+    price_arrays_loader: BacktestPriceArraysLoaderV2
+    signal_matrix_loader: BacktestSignalMatrixLoaderV2
+    defaults_provider: BacktestGridDefaultsProvider | None = None
+    row_scorer: GenericRowScorerV2 = field(default_factory=GenericRowScorerV2)
+    diversified_retention: DiversifiedRetentionV2 = field(default_factory=DiversifiedRetentionV2)
+    family_plugin_registry: FamilyPluginRegistryV2 = field(
+        default_factory=build_default_family_plugin_registry_v2
+    )
+    family_plugin_circuit_breaker_factory: Callable[[], FamilyPluginCircuitBreakerV2] = (
+        FamilyPluginCircuitBreakerV2
+    )
+    block_survivor_multiplier: int = 2
+
+    def __post_init__(self) -> None:
+        """
+        Validate constructor dependencies and deterministic shortlist tuning knobs.
+
+        Args:
+            None.
+        Returns:
+            None.
+        Assumptions:
+            Constructor wires collaborators only, keeps runtime defaults optional, and performs no
+            artifact IO.
+        Raises:
+            ValueError: If dependencies are missing or multiplier is invalid.
+        Side Effects:
+            None.
+        """
+        if self.price_arrays_loader is None:  # type: ignore[truthy-bool]
+            raise ValueError("BacktestHierarchicalShortlistBuilderV2 requires price_arrays_loader")
+        if self.signal_matrix_loader is None:  # type: ignore[truthy-bool]
+            raise ValueError("BacktestHierarchicalShortlistBuilderV2 requires signal_matrix_loader")
+        if self.family_plugin_registry is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires family_plugin_registry"
+            )
+        if self.family_plugin_circuit_breaker_factory is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires "
+                "family_plugin_circuit_breaker_factory"
+            )
+        if self.block_survivor_multiplier <= 0:
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2.block_survivor_multiplier must be > 0"
+            )
+
+    def run_scoped(self) -> BacktestHierarchicalShortlistBuilderV2:
+        """
+        Build one `run-scoped` hierarchical builder whose large artifact caches belong to one run.
+
+        Args:
+            None.
+        Returns:
+            BacktestHierarchicalShortlistBuilderV2: Fresh builder reusing the same hybrid
+                shortlist collaborators while cloning cache-owning artifact loaders when
+                available.
+        Assumptions:
+            Pure collaborators such as scorers, retention, and family-plugin registry are safe to
+            share across runs because they do not own mmap artifact caches.
+        Raises:
+            TypeError: If one injected loader exposes a non-callable `run_scoped` attribute.
+            ValueError: Propagated from constructor validation when cloned configuration drifts.
+        Side Effects:
+            None.
+        """
+        return BacktestHierarchicalShortlistBuilderV2(
+            price_arrays_loader=cast(
+                BacktestPriceArraysLoaderV2,
+                _run_scoped_loader_v2(loader=self.price_arrays_loader),
+            ),
+            signal_matrix_loader=cast(
+                BacktestSignalMatrixLoaderV2,
+                _run_scoped_loader_v2(loader=self.signal_matrix_loader),
+            ),
+            defaults_provider=self.defaults_provider,
+            row_scorer=self.row_scorer,
+            diversified_retention=self.diversified_retention,
+            family_plugin_registry=self.family_plugin_registry,
+            family_plugin_circuit_breaker_factory=self.family_plugin_circuit_breaker_factory,
+            block_survivor_multiplier=self.block_survivor_multiplier,
+        )
+
+    def build_runtime_plan(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        target_time_range: TimeRange,
+    ) -> BacktestArtifactRuntimePlanV2:
+        """
+        Build one reduced runtime plan for the live hybrid shortlist runtime path.
+
+        Docs:
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            artifact_context: Slot-pinned runtime context for strict artifact reads.
+            target_time_range: Requested trading window for row-level hybrid scoring.
+        Returns:
+            BacktestArtifactRuntimePlanV2: Original exact plan when hybrid reduction is not
+                needed, otherwise a reduced `HierarchicalShortlistRuntimePlanV2`.
+        Assumptions:
+            `hybrid_conservative` remains the universal path, while `hybrid_family` may execute a
+            proposal layer plugin and must degrade to the universal conservative path on warning
+            + universal fallback conditions.
+        Raises:
+            ValueError: If the resolved profile is not live-enabled for hierarchical shortlist
+                runtime or if artifact row-count contracts drift.
+        Side Effects:
+            Reads pinned price and signal artifacts to score universal shortlist candidates, and
+            may execute one proposal-only family plugin for `hybrid_family`.
+        """
+        profile = runtime_plan.execution_profile
+        if profile.mode == "exact_no_risk_parity":
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires explicit hybrid shortlist "
+                "runtime-enabled profile; exact_no_risk_parity must bypass hierarchical "
+                "shortlist reduction"
+            )
+        if not execution_profile_uses_hierarchical_shortlist_runtime_v2(profile=profile):
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires explicit "
+                "hybrid shortlist runtime-enabled profile"
+            )
+        if profile.mode == "hybrid_family":
+            return self._build_family_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+            )
+        return self._build_universal_runtime_plan(
+            runtime_plan=runtime_plan,
+            artifact_context=artifact_context,
+            target_time_range=target_time_range,
+        )
+
+    def _build_family_runtime_plan(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        target_time_range: TimeRange,
+    ) -> BacktestArtifactRuntimePlanV2:
+        """
+        Execute the bounded `hybrid_family` proposal layer before universal fallback.
+
+        Docs:
+          - docs/architecture/backtest/README.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/registry_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/
+            circuit_breaker_v2.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            artifact_context: Slot-pinned runtime context for universal-fallback artifact reads.
+            target_time_range: Requested trading window for row-level fallback scoring.
+        Returns:
+            BacktestArtifactRuntimePlanV2: Reduced plan carrying successful family-plugin
+                proposal metadata, or the universal conservative fallback result with explicit
+                warning/debug payloads.
+        Assumptions:
+            Family plugins remain proposal-only and must always reuse the existing universal
+            shortlist runtime plus exact Stage B scorer when they are missing, inapplicable,
+            timed out, raise, or sit behind an open circuit breaker.
+        Raises:
+            ValueError: Propagated only for invalid builder/runtime-plan invariants.
+        Side Effects:
+            May execute one proposal-only family plugin and may read artifacts for universal
+            fallback scoring.
+        """
+        planning_context = build_family_plugin_planning_context_v2(runtime_plan=runtime_plan)
+        resolution = self.family_plugin_registry.resolve(context=planning_context)
+        if resolution.status != "resolved":
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=resolution.warning,
+                force_materialized_plan=True,
+            )
+        plugin = resolution.plugin
+        if plugin is None:  # pragma: no cover
+            raise ValueError("resolved family-plugin registry entry must include plugin")
+        breaker = self.family_plugin_circuit_breaker_factory()
+        if breaker.is_open(plugin_id=plugin.metadata.plugin_id):
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=breaker.warning_for_open_breaker(
+                    plugin_id=plugin.metadata.plugin_id
+                ),
+                force_materialized_plan=True,
+            )
+        proposal_started_ns = time.perf_counter_ns()
+        try:
+            proposal = plugin.propose(context=planning_context)
+        except Exception as error:
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=breaker.record_error(
+                    plugin_id=plugin.metadata.plugin_id,
+                    error=error,
+                ),
+                force_materialized_plan=True,
+            )
+        elapsed_ms = (time.perf_counter_ns() - proposal_started_ns) / 1_000_000.0
+        if elapsed_ms > float(planning_context.plugin_budget_ms):
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=breaker.record_timeout(
+                    plugin_id=plugin.metadata.plugin_id,
+                    budget_ms=planning_context.plugin_budget_ms,
+                ),
+                force_materialized_plan=True,
+            )
+        breaker.record_success(plugin_id=plugin.metadata.plugin_id)
+        try:
+            return self._runtime_plan_from_family_plugin_proposal(
+                runtime_plan=runtime_plan,
+                proposal=proposal,
+                family_plugin_registry_status=resolution.status,
+            )
+        except ValueError as error:
+            return self._build_universal_runtime_plan(
+                runtime_plan=runtime_plan,
+                artifact_context=artifact_context,
+                target_time_range=target_time_range,
+                family_plugin_registry_status=resolution.status,
+                family_plugin_warning=breaker.record_error(
+                    plugin_id=plugin.metadata.plugin_id,
+                    error=error,
+                ),
+                force_materialized_plan=True,
+            )
+
+    def _build_universal_runtime_plan(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        target_time_range: TimeRange,
+        family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2 | None = None,
+        family_plugin_warning: FamilyPluginWarningV2 | None = None,
+        force_materialized_plan: bool = False,
+    ) -> BacktestArtifactRuntimePlanV2:
+        """
+        Build the shared universal conservative shortlist runtime plan.
+
+        Docs:
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
+          - src/trading/contexts/backtest/application/services/v2/diversified_retention_v2.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            artifact_context: Slot-pinned runtime context for strict artifact reads.
+            target_time_range: Requested trading window for row-level hybrid scoring.
+            family_plugin_registry_status:
+                Optional registry status from a preceding `hybrid_family` proposal attempt.
+            family_plugin_warning:
+                Optional warning payload describing `warning + universal fallback`.
+            force_materialized_plan:
+                When `True`, return a reduced runtime-plan wrapper even if no pruning is needed so
+                internal fallback/debug metadata remains explicit and reviewable.
+        Returns:
+            BacktestArtifactRuntimePlanV2: Original exact plan when no pruning is needed and no
+                explicit fallback metadata must be preserved, otherwise a reduced universal plan.
+        Assumptions:
+            Universal shortlist behavior remains the canonical conservative fallback for
+            `hybrid_family` and must remain unchanged for `hybrid_conservative`.
+        Raises:
+            ValueError: If artifact row-count contracts drift.
+        Side Effects:
+            Reads pinned price and signal artifacts to score candidate indicator rows.
+        """
+        signal_variants_total = _signal_variants_total_v2(runtime_plan=runtime_plan)
+        compute_variants_total = _compute_variants_total_v2(runtime_plan=runtime_plan)
+        conservative_stage_a_budget = self._conservative_stage_a_budget(
+            runtime_plan=runtime_plan,
+        )
+        target_compute_variants_total = self._target_compute_variants_total(
+            compute_variants_total=compute_variants_total,
+            signal_variants_total=signal_variants_total,
+            conservative_stage_a_budget=conservative_stage_a_budget,
+        )
+        if target_compute_variants_total >= compute_variants_total:
+            if not force_materialized_plan:
+                return runtime_plan
+            return self._runtime_plan_from_all_stage_a_variants(
+                runtime_plan=runtime_plan,
+                proposal_layer_source="universal",
+                family_plugin_registry_status=family_plugin_registry_status,
+                family_plugin_warning=family_plugin_warning,
+            )
+
+        block_survivor_budget = self._block_survivor_budget(
+            runtime_plan=runtime_plan,
+            target_compute_variants_total=target_compute_variants_total,
+        )
+        signal_target_slice = self._signal_target_slice(
+            runtime_plan=runtime_plan,
+            artifact_context=artifact_context,
+            target_time_range=target_time_range,
+        )
+        block_results = tuple(
+            self._build_block_result(
+                plan=plan,
+                timeframe_code=runtime_plan.timeframe_code,
+                profile=runtime_plan.execution_profile,
+                artifact_context=artifact_context,
+                signal_target_slice=signal_target_slice,
+                block_survivor_budget=block_survivor_budget,
+            )
+            for plan in runtime_plan.indicator_plans
+        )
+        compute_candidates = self._beam_candidates(
+            block_results=block_results,
+            target_compute_variants_total=target_compute_variants_total,
+        )
+        retained_stage_a_variants = self._retained_stage_a_variants(
+            runtime_plan=runtime_plan,
+            compute_candidates=compute_candidates,
+            signal_variants_total=signal_variants_total,
+        )
+        return HierarchicalShortlistRuntimePlanV2.from_source_runtime_plan(
+            source_runtime_plan=runtime_plan,
+            retained_stage_a_variants=retained_stage_a_variants,
+            block_results=block_results,
+            retained_compute_variants_total=len(compute_candidates),
+            proposal_layer_source="universal",
+            family_plugin_registry_status=family_plugin_registry_status,
+            family_plugin_warning=family_plugin_warning,
+        )
+
+    def _runtime_plan_from_family_plugin_proposal(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        proposal: FamilyPluginProposalResultV2,
+        family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2,
+    ) -> HierarchicalShortlistRuntimePlanV2:
+        """
+        Convert one successful family-plugin proposal into a reduced exact runtime plan.
+
+        Docs:
+          - docs/architecture/backtest/README.md
+          - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/family_plugins/contracts_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            proposal: Successful proposal-layer output from one family plugin.
+            family_plugin_registry_status: Registry status captured before plugin execution.
+        Returns:
+            HierarchicalShortlistRuntimePlanV2: Reduced exact runtime plan carrying the proposal.
+        Assumptions:
+            Family-plugin proposals remain row-shortlist-only in this milestone and therefore
+            must never bypass the shared exact Stage A/Stage B pipeline.
+        Raises:
+            ValueError: If the proposal omits `row_shortlist`.
+        Side Effects:
+            None.
+        """
+        if len(proposal.row_shortlist) == 0:
+            raise ValueError("family plugin proposal layer must emit a non-empty row_shortlist")
+        retained_stage_a_variants = tuple(
+            runtime_plan.stage_a_variant_for_index(stage_a_index=stage_a_index)
+            for stage_a_index in proposal.row_shortlist
+        )
+        retained_compute_variants_total = len(
+            {
+                stage_a_index // runtime_plan.signal_variants_total()
+                for stage_a_index in proposal.row_shortlist
+            }
+        )
+        return HierarchicalShortlistRuntimePlanV2.from_source_runtime_plan(
+            source_runtime_plan=runtime_plan,
+            retained_stage_a_variants=retained_stage_a_variants,
+            block_results=(),
+            retained_compute_variants_total=max(1, retained_compute_variants_total),
+            proposal_layer_source="family_plugin",
+            family_plugin_registry_status=family_plugin_registry_status,
+            family_plugin_proposal=proposal,
+        )
+
+    def _runtime_plan_from_all_stage_a_variants(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        proposal_layer_source: HierarchicalProposalLayerSourceLiteralV2,
+        family_plugin_registry_status: FamilyPluginRegistryStatusLiteralV2 | None = None,
+        family_plugin_warning: FamilyPluginWarningV2 | None = None,
+        family_plugin_proposal: FamilyPluginProposalResultV2 | None = None,
+    ) -> HierarchicalShortlistRuntimePlanV2:
+        """
+        Materialize a reduced-plan wrapper containing every exact Stage A variant in order.
+
+        Docs:
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
+        Related:
+          - src/trading/contexts/backtest/application/services/v2/
+            hierarchical_shortlist_builder_v2.py
+          - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
+          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+
+        Args:
+            runtime_plan: Original exact runtime plan resolved by the planner.
+            proposal_layer_source: Whether the wrapper represents universal or family-plugin flow.
+            family_plugin_registry_status:
+                Optional registry status from a preceding `hybrid_family` proposal attempt.
+            family_plugin_warning:
+                Optional warning payload describing `warning + universal fallback`.
+            family_plugin_proposal:
+                Optional successful family-plugin proposal payload.
+        Returns:
+            HierarchicalShortlistRuntimePlanV2: Wrapper carrying all exact Stage A variants plus
+                explicit proposal-layer debug metadata.
+        Assumptions:
+            This helper is used only when debug/fallback metadata must survive even though no
+            shortlist pruning was required.
+        Raises:
+            ValueError: Propagated if full exact Stage A iteration drifts from runtime-plan
+                invariants.
+        Side Effects:
+            None.
+        """
+        return HierarchicalShortlistRuntimePlanV2.from_source_runtime_plan(
+            source_runtime_plan=runtime_plan,
+            retained_stage_a_variants=tuple(runtime_plan.iter_stage_a_variants()),
+            block_results=(),
+            retained_compute_variants_total=_compute_variants_total_v2(runtime_plan=runtime_plan),
+            proposal_layer_source=proposal_layer_source,
+            family_plugin_registry_status=family_plugin_registry_status,
+            family_plugin_warning=family_plugin_warning,
+            family_plugin_proposal=family_plugin_proposal,
+        )
+
+    def _conservative_stage_a_budget(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+    ) -> int:
+        """
+        Resolve the conservative Stage A survivor budget for hybrid shortlist expansion.
+
+        Args:
+            runtime_plan: Original exact runtime plan.
+        Returns:
+            int: Conservative Stage A survivor budget used before exact Stage A scoring.
+        Assumptions:
+            Hybrid rollout should not expand beyond the original exact Stage B shortlist envelope
+            and must also honor the profile's explicit shortlist cap.
+        Raises:
+            ValueError: If risk variants are missing.
+        Side Effects:
+            None.
+        """
+        risk_total = len(runtime_plan.risk_variants)
+        if risk_total <= 0:
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires runtime_plan.risk_variants"
+            )
+        original_shortlist_limit = max(
+            1,
+            runtime_plan.stage_b_variants_total // risk_total,
+        )
+        profile_max_candidates = (
+            runtime_plan.execution_profile.shortlist_config.max_candidates
+            or runtime_plan.stage_a_variants_total
+        )
+        return min(
+            runtime_plan.stage_a_variants_total,
+            profile_max_candidates,
+            original_shortlist_limit,
+        )
+
+    def _target_compute_variants_total(
+        self,
+        *,
+        compute_variants_total: int,
+        signal_variants_total: int,
+        conservative_stage_a_budget: int,
+    ) -> int:
+        """
+        Resolve the retained compute-combination budget before signal expansion.
+
+        Args:
+            compute_variants_total: Original compute-combination total.
+            signal_variants_total: Original signal-space expansion total.
+            conservative_stage_a_budget: Conservative Stage A survivor budget.
+        Returns:
+            int: Retained compute-combination count target.
+        Assumptions:
+            Every retained compute combination expands through the existing exact signal-space
+            semantics, so at least one compute combination may be required even when the signal
+            space itself exceeds the conservative budget.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        if signal_variants_total <= 0:
+            raise ValueError("signal_variants_total must be > 0")
+        return min(
+            compute_variants_total,
+            max(1, conservative_stage_a_budget // signal_variants_total),
+        )
+
+    def _block_survivor_budget(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        target_compute_variants_total: int,
+    ) -> int:
+        """
+        Resolve the per-block retained-row budget used before beam combination.
+
+        Args:
+            runtime_plan: Original exact runtime plan.
+            target_compute_variants_total: Retained compute-combination count target.
+        Returns:
+            int: Per-indicator retained-row budget.
+        Assumptions:
+            The budget is intentionally conservative, using the mixed-radix root of the target
+            compute space with a small multiplier to preserve diversity.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        indicator_count = max(1, len(runtime_plan.indicator_plans))
+        root_budget = int(
+            math.ceil(target_compute_variants_total ** (1.0 / float(indicator_count)))
+        )
+        return max(1, root_budget * self.block_survivor_multiplier)
+
+    def _signal_target_slice(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        target_time_range: TimeRange,
+    ) -> slice:
+        """
+        Resolve the request-timeframe signal slice used for row-local hybrid scoring.
+
+        Args:
+            runtime_plan: Original exact runtime plan.
+            artifact_context: Slot-pinned runtime context for strict artifact reads.
+            target_time_range: Requested trading window.
+        Returns:
+            slice: Half-open signal-timeframe slice matching the requested trading window.
+        Assumptions:
+            Hybrid row scoring uses only the requested execution window, not the full warmup
+            artifact timeline.
+        Raises:
+            ValueError: If the underlying close-time artifact is invalid.
+        Side Effects:
+            Reads one request-timeframe price artifact for `close_time`.
+        """
+        signal_prices = self.price_arrays_loader.load_price_arrays(
+            context=artifact_context,
+            timeframe=runtime_plan.timeframe_code,
+        )
+        return compute_target_slice_by_close_time_v2(
+            close_time=signal_prices.close_time,
+            target_time_range=target_time_range,
+        )
+
+    def _build_block_result(
+        self,
+        *,
+        plan: BacktestIndicatorPlanV2,
+        timeframe_code: str,
+        profile: ExecutionProfileV2,
+        artifact_context: ArtifactSlotPinnedRuntimeContextV2,
+        signal_target_slice: slice,
+        block_survivor_budget: int,
+    ) -> HierarchicalShortlistBlockResultV2:
+        """
+        Score and retain one indicator block for later beam combination.
+
+        Args:
+            plan: One indicator plan from the original exact runtime plan.
+            timeframe_code: Request-timeframe signal artifact family literal.
+            profile: Resolved hybrid execution profile.
+            artifact_context: Slot-pinned runtime context for strict artifact reads.
+            signal_target_slice: Request-timeframe target slice used for row-local scoring.
+            block_survivor_budget: Per-indicator retained-row budget.
+        Returns:
+            HierarchicalShortlistBlockResultV2: Retained rows plus full retention audit trail.
+        Assumptions:
+            When signal artifacts materialize a fuller source catalog than the request selected,
+            planner-local indexes are remapped onto artifact rows before scoring.
+        Raises:
+            ValueError: If signal row counts drift from planner invariants and cannot be
+                reconciled through source-aware remapping.
+        Side Effects:
+            Reads one strict signal matrix from the pinned artifact slot.
+        """
+        signal_matrix = self.signal_matrix_loader.load_signal_matrix(
+            context=artifact_context,
+            timeframe=timeframe_code,
+            indicator_id=plan.indicator_id,
+        )
+        scored_rows = self._scorer_for_profile(profile=profile).score_rows(
+            rows=self._row_inputs_for_indicator_plan(
+                plan=plan,
+                signal_matrix=signal_matrix.matrix,
+                signal_target_slice=signal_target_slice,
+            )
+        )
+        retention_result = self.diversified_retention.retain_rows(
+            scored_rows=scored_rows,
+            config=profile.shortlist_config.retention,
+            max_candidates=min(block_survivor_budget, plan.variants),
+        )
+        retained_rows = tuple(
+            HierarchicalShortlistRetainedRowV2(
+                indicator_id=plan.indicator_id,
+                row_index=scored_row.row_index,
+                selection=build_indicator_selection_for_variant_index_v2(
+                    plan=plan,
+                    variant_index=scored_row.row_index,
+                ),
+                score_payload=scored_row,
+                retained_rank=retained_rank,
+            )
+            for retained_rank, scored_row in enumerate(
+                retention_result.retained_rows,
+                start=1,
+            )
+        )
+        return HierarchicalShortlistBlockResultV2(
+            indicator_id=plan.indicator_id,
+            retained_rows=retained_rows,
+            retention_decisions=retention_result.decisions,
+        )
+
+    def _scorer_for_profile(
+        self,
+        *,
+        profile: ExecutionProfileV2,
+    ) -> GenericRowScorerV2:
+        """
+        Rehydrate the universal row scorer with the profile's explicit scoring weights.
+
+        Args:
+            profile: Resolved hybrid execution profile.
+        Returns:
+            GenericRowScorerV2: Row scorer carrying profile-specific shortlist weights.
+        Assumptions:
+            Threshold literals remain owned by the builder-level scorer while weights come from the
+            resolved execution profile.
+        Raises:
+            None.
+        Side Effects:
+            None.
+        """
+        return GenericRowScorerV2(
+            scoring=profile.shortlist_config.scoring,
+            low_activity_threshold=self.row_scorer.low_activity_threshold,
+            high_activity_threshold=self.row_scorer.high_activity_threshold,
+            direction_balance_threshold=self.row_scorer.direction_balance_threshold,
+            low_transition_ratio_threshold=(self.row_scorer.low_transition_ratio_threshold),
+            high_transition_ratio_threshold=(self.row_scorer.high_transition_ratio_threshold),
+        )
+
+    def _row_inputs_for_indicator_plan(
+        self,
+        *,
+        plan: BacktestIndicatorPlanV2,
+        signal_matrix: np.ndarray,
+        signal_target_slice: slice,
+    ) -> tuple[GenericRowScoringInputV2, ...]:
+        """
+        Build deterministic row-scoring inputs for one indicator block.
+
+        Args:
+            plan: One indicator plan from the original exact runtime plan.
+            signal_matrix: Full artifact signal matrix in `(rows, time)` order.
+            signal_target_slice: Request-timeframe target slice used for row-local scoring.
+        Returns:
+            tuple[GenericRowScoringInputV2, ...]: Deterministic row-scoring inputs for the block.
+        Assumptions:
+            Returned `row_index` values stay planner-local even when the source artifact keeps a
+            fuller source catalog than the request.
+        Raises:
+            ValueError: If the target slice is empty or signal matrix shape cannot be reconciled
+                with the planner plus runtime defaults.
+        Side Effects:
+            None.
+        """
+        if signal_matrix.ndim != 2:
+            raise ValueError("Hierarchical shortlist requires 2D signal matrices")
+        if (signal_target_slice.stop or 0) <= (signal_target_slice.start or 0):
+            raise ValueError(
+                "Hierarchical shortlist requires non-empty request-timeframe signal_target_slice"
+            )
+        artifact_row_indexes = self._artifact_row_indexes_for_indicator_plan(
+            plan=plan,
+            artifact_row_count=int(signal_matrix.shape[0]),
+        )
+        return tuple(
+            GenericRowScoringInputV2(
+                indicator_id=plan.indicator_id,
+                row_index=planner_row_index,
+                signal_row=np.asarray(
+                    signal_matrix[artifact_row_index, signal_target_slice],
+                    dtype=np.int8,
+                ),
+                stable_identity=f"{plan.indicator_id}:{planner_row_index}",
+            )
+            for planner_row_index, artifact_row_index in enumerate(artifact_row_indexes)
+        )
+
+    def _artifact_row_indexes_for_indicator_plan(
+        self,
+        *,
+        plan: BacktestIndicatorPlanV2,
+        artifact_row_count: int,
+    ) -> tuple[int, ...]:
+        """
+        Resolve planner-local row indexes onto the artifact matrix row order.
+
+        Args:
+            plan: One indicator plan from the original exact runtime plan.
+            artifact_row_count: Row count published by the loaded signal artifact.
+        Returns:
+            tuple[int, ...]: Artifact row indexes aligned with planner-local variant indexes.
+        Assumptions:
+            Non-source axes in the runtime plan already match the artifact grid exactly, while the
+            source axis may expand to the full runtime-defaults catalog in artifact storage.
+        Raises:
+            ValueError: If artifact rows cannot be reconciled with the plan and runtime defaults.
+        Side Effects:
+            May consult in-memory runtime defaults for source catalog ordering.
+        """
+        if artifact_row_count == plan.variants:
+            return tuple(range(plan.variants))
+        source_axis = next((axis for axis in plan.axes if axis.name == "source"), None)
+        if source_axis is None:
+            raise ValueError(
+                "Hierarchical shortlist requires signal rows_count to match indicator plan "
+                f"variants for {plan.indicator_id!r}; got {artifact_row_count}, expected "
+                f"{plan.variants}"
+            )
+        if self.defaults_provider is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "Hierarchical shortlist requires defaults_provider to remap source-aware signal "
+                f"rows for {plan.indicator_id!r}; got artifact rows_count {artifact_row_count} "
+                f"for plan variants {plan.variants}"
+            )
+        artifact_source_values = tuple(
+            self.defaults_provider.allowed_source_values(indicator_id=plan.indicator_id)
+        )
+        if len(artifact_source_values) == 0:
+            raise ValueError(
+                "Hierarchical shortlist requires non-empty defaults_provider source catalog for "
+                f"{plan.indicator_id!r}"
+            )
+        artifact_radices = tuple(
+            len(artifact_source_values) if axis.name == "source" else len(axis.values)
+            for axis in plan.axes
+        )
+        expected_artifact_row_count = _product_v2(values=artifact_radices)
+        if expected_artifact_row_count != artifact_row_count:
+            raise ValueError(
+                "Hierarchical shortlist source-aware remap requires artifact rows_count to "
+                "match the runtime-defaults source catalog for "
+                f"{plan.indicator_id!r}; got {artifact_row_count}, expected "
+                f"{expected_artifact_row_count}"
+            )
+        return tuple(
+            self._artifact_row_index_for_selection(
+                plan=plan,
+                selection=build_indicator_selection_for_variant_index_v2(
+                    plan=plan,
+                    variant_index=planner_row_index,
+                ),
+                artifact_source_values=artifact_source_values,
+            )
+            for planner_row_index in range(plan.variants)
+        )
+
+    def _artifact_row_index_for_selection(
+        self,
+        *,
+        plan: BacktestIndicatorPlanV2,
+        selection: IndicatorVariantSelection,
+        artifact_source_values: tuple[str, ...],
+    ) -> int:
+        """
+        Encode one explicit planner selection into the artifact matrix row order.
+
+        Args:
+            plan: One indicator plan from the original exact runtime plan.
+            selection: Explicit planner-local indicator selection.
+            artifact_source_values: Ordered full source catalog published for the artifact.
+        Returns:
+            int: Zero-based artifact row index matching the explicit selection.
+        Assumptions:
+            Artifact row order preserves the planner axis order while widening only the `source`
+            axis to the full runtime-defaults catalog.
+        Raises:
+            ValueError: If one selected value is absent from the artifact axis catalog.
+        Side Effects:
+            None.
+        """
+        coordinates: list[int] = []
+        radices: list[int] = []
+        for axis in plan.axes:
+            if axis.name in selection.inputs:
+                selected_value = selection.inputs[axis.name]
+            elif axis.name in selection.params:
+                selected_value = selection.params[axis.name]
+            else:
+                raise ValueError(
+                    "Hierarchical shortlist could not resolve selection value for axis "
+                    f"{axis.name!r} in {plan.indicator_id!r}"
+                )
+            axis_values = artifact_source_values if axis.name == "source" else tuple(axis.values)
+            try:
+                coordinate = axis_values.index(selected_value)
+            except ValueError as exc:
+                raise ValueError(
+                    "Hierarchical shortlist selection value is missing from the artifact axis "
+                    f"catalog for {plan.indicator_id!r}:{axis.name!r}; got "
+                    f"{selected_value!r} not in {axis_values!r}"
+                ) from exc
+            coordinates.append(coordinate)
+            radices.append(len(axis_values))
+        return _encode_mixed_radix_v2(
+            coordinates=coordinates,
+            radices=radices,
+        )
+
+    def _beam_candidates(
+        self,
+        *,
+        block_results: tuple[HierarchicalShortlistBlockResultV2, ...],
+        target_compute_variants_total: int,
+    ) -> tuple[_HierarchicalBeamCandidateV2, ...]:
+        """
+        Combine retained block rows into bounded deterministic compute candidates.
+
+        Args:
+            block_results: Ordered retained-row payloads for every indicator block.
+            target_compute_variants_total: Retained compute-combination count target.
+        Returns:
+            tuple[_HierarchicalBeamCandidateV2, ...]: Bounded deterministic compute candidates.
+        Assumptions:
+            Beam combination is conservative and deterministic; it optimizes for explicit score
+            ordering rather than exhaustive approximate search.
+        Raises:
+            ValueError: If a block has no retained rows.
+        Side Effects:
+            None.
+        """
+        beam: tuple[_HierarchicalBeamCandidateV2, ...] = (
+            _HierarchicalBeamCandidateV2(
+                row_indexes=(),
+                indicator_selections=(),
+                score_total=0.0,
+                stable_identities=(),
+            ),
+        )
+        for block_result in block_results:
+            if len(block_result.retained_rows) == 0:
+                raise ValueError(
+                    "Hierarchical shortlist beam combination requires retained rows for every "
+                    f"indicator block, missing {block_result.indicator_id!r}"
+                )
+            expanded: list[_HierarchicalBeamCandidateV2] = []
+            for partial_candidate in beam:
+                for retained_row in block_result.retained_rows:
+                    expanded.append(
+                        _HierarchicalBeamCandidateV2(
+                            row_indexes=partial_candidate.row_indexes + (retained_row.row_index,),
+                            indicator_selections=partial_candidate.indicator_selections
+                            + (retained_row.selection,),
+                            score_total=partial_candidate.score_total
+                            + retained_row.score_payload.total_score,
+                            stable_identities=partial_candidate.stable_identities
+                            + (retained_row.score_payload.stable_identity,),
+                        )
+                    )
+            beam = tuple(
+                sorted(
+                    expanded,
+                    key=lambda candidate: candidate.sort_key(),
+                )[:target_compute_variants_total]
+            )
+        return beam
+
+    def _retained_stage_a_variants(
+        self,
+        *,
+        runtime_plan: BacktestArtifactRuntimePlanV2,
+        compute_candidates: tuple[_HierarchicalBeamCandidateV2, ...],
+        signal_variants_total: int,
+    ) -> tuple[BacktestStageABaseVariantV2, ...]:
+        """
+        Expand retained compute candidates back into exact Stage A base variants.
+
+        Args:
+            runtime_plan: Original exact runtime plan.
+            compute_candidates: Bounded retained compute candidates from beam combination.
+            signal_variants_total: Signal-space expansion total from the original plan.
+        Returns:
+            tuple[BacktestStageABaseVariantV2, ...]: Reduced exact Stage A base variants in the
+                original exact enumeration order.
+        Assumptions:
+            Exact Stage B remains the final source of truth, so hybrid pruning must preserve the
+            canonical indicator/signal/risk payload semantics on survivors.
+        Raises:
+            ValueError: If no compute candidates remain after beam combination.
+        Side Effects:
+            None.
+        """
+        if len(compute_candidates) == 0:
+            raise ValueError(
+                "BacktestHierarchicalShortlistBuilderV2 requires non-empty compute_candidates"
+            )
+        indicator_radices = tuple(plan.variants for plan in runtime_plan.indicator_plans)
+        retained_variants: list[BacktestStageABaseVariantV2] = []
+        for compute_candidate in sorted(
+            compute_candidates,
+            key=lambda candidate: (
+                _encode_mixed_radix_v2(
+                    coordinates=candidate.row_indexes,
+                    radices=indicator_radices,
+                ),
+                candidate.stable_identities,
+            ),
+        ):
+            compute_index = _encode_mixed_radix_v2(
+                coordinates=compute_candidate.row_indexes,
+                radices=indicator_radices,
+            )
+            indicator_variant_key = build_variant_key_v1(
+                instrument_id=runtime_plan.instrument_id_literal,
+                timeframe=runtime_plan.timeframe_code,
+                indicators=compute_candidate.indicator_selections,
+            )
+            for signal_index in range(signal_variants_total):
+                signal_params = build_signal_params_for_variant_index_v2(
+                    signal_axes=runtime_plan.signal_axes,
+                    variant_index=signal_index,
+                )
+                stage_a_index = (compute_index * signal_variants_total) + signal_index
+                base_variant_key = build_backtest_variant_key_v1(
+                    indicator_variant_key=indicator_variant_key,
+                    direction_mode=runtime_plan.direction_mode,
+                    sizing_mode=runtime_plan.sizing_mode,
+                    signals=signal_params,
+                    risk_params=_STAGE_A_DISABLED_RISK_PARAMS_V2,
+                    execution_params=runtime_plan.execution_params,
+                )
+                retained_variants.append(
+                    BacktestStageABaseVariantV2(
+                        stage_a_index=stage_a_index,
+                        indicator_selections=compute_candidate.indicator_selections,
+                        signal_params=signal_params,
+                        indicator_variant_key=indicator_variant_key,
+                        base_variant_key=base_variant_key,
+                    )
+                )
+        return tuple(sorted(retained_variants, key=lambda variant: variant.stage_a_index))
+
+
+def build_default_hierarchical_shortlist_builder_v2(
+    *,
+    artifact_slot_resolver: BacktestArtifactSlotResolverV2 | None,
+    defaults_provider: BacktestGridDefaultsProvider | None = None,
+) -> BacktestHierarchicalShortlistBuilderV2 | None:
+    """
+    Build the default hierarchical shortlist builder from shared artifact runtime wiring.
+
+    Docs:
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
+      - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
+
+    Args:
+        artifact_slot_resolver: Optional slot resolver already wired by runtime startup.
+        defaults_provider: Optional runtime defaults provider exposing per-indicator source order.
+    Returns:
+        BacktestHierarchicalShortlistBuilderV2 | None: Default builder when the resolver exposes
+            a shared artifact loader, otherwise `None`.
+    Assumptions:
+        Hybrid rollout wiring stays additive and should disappear entirely when artifact-backed
+        runtime wiring is unavailable.
+    Raises:
+        ValueError: Propagated from builder constructor when defaults are invalid.
+    Side Effects:
+        None.
+    """
+    if artifact_slot_resolver is None:
+        return None
+    artifact_loader = getattr(artifact_slot_resolver, "artifact_loader", None)
+    if artifact_loader is None:
+        return None
+    typed_artifact_loader = cast(BacktestArtifactLoaderV2, artifact_loader)
+    return BacktestHierarchicalShortlistBuilderV2(
+        price_arrays_loader=MmapPriceArraysLoaderV2(artifact_loader=typed_artifact_loader),
+        signal_matrix_loader=MmapSignalMatrixLoaderV2(artifact_loader=typed_artifact_loader),
+        defaults_provider=defaults_provider,
+    )
+
+
+def _compute_variants_total_v2(*, runtime_plan: BacktestArtifactRuntimePlanV2) -> int:
+    """
+    Compute the original indicator-only mixed-radix variants total.
+
+    Args:
+        runtime_plan: Original exact runtime plan.
+    Returns:
+        int: Indicator-only compute variants total.
+    Assumptions:
+        Planner already validated positive indicator variant counts.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _product_v2(tuple(plan.variants for plan in runtime_plan.indicator_plans))
+
+
+def _signal_variants_total_v2(*, runtime_plan: BacktestArtifactRuntimePlanV2) -> int:
+    """
+    Compute the original signal-space mixed-radix variants total.
+
+    Args:
+        runtime_plan: Original exact runtime plan.
+    Returns:
+        int: Signal-space variants total.
+    Assumptions:
+        Empty signal-axis sets expand to one default-only signal payload.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    return _product_v2(tuple(len(axis.values) for axis in runtime_plan.signal_axes))
+
+
+def _product_v2(values: tuple[int, ...]) -> int:
+    """
+    Multiply a tuple of deterministic positive integers with empty-tuple identity `1`.
+
+    Args:
+        values: Ordered integer factors.
+    Returns:
+        int: Product of all factors, or `1` when `values` is empty.
+    Assumptions:
+        Caller already validated factor positivity.
+    Raises:
+        None.
+    Side Effects:
+        None.
+    """
+    result = 1
+    for value in values:
+        result *= int(value)
+    return result
+
+
+def _encode_mixed_radix_v2(
+    *,
+    coordinates: Sequence[int],
+    radices: Sequence[int],
+) -> int:
+    """
+    Encode one mixed-radix coordinate tuple into a flat index.
+
+    Args:
+        coordinates: Indicator-local coordinate values in radix order.
+        radices: Positive radix sizes for each coordinate position.
+    Returns:
+        int: Deterministic flat mixed-radix index.
+    Assumptions:
+        Coordinates and radices use identical ordering and lengths.
+    Raises:
+        ValueError: If lengths drift or one coordinate is outside its radix bounds.
+    Side Effects:
+        None.
+    """
+    if len(coordinates) != len(radices):
+        raise ValueError("mixed-radix coordinates and radices must have the same length")
+    flat_index = 0
+    stride = 1
+    for coordinate, radix in zip(
+        reversed(tuple(coordinates)),
+        reversed(tuple(radices)),
+        strict=True,
+    ):
+        if radix <= 0:
+            raise ValueError("mixed-radix radices must be > 0")
+        if coordinate < 0 or coordinate >= radix:
+            raise ValueError(
+                "mixed-radix coordinate is outside radix bounds; got "
+                f"{coordinate} for radix {radix}"
+            )
+        flat_index += int(coordinate) * stride
+        stride *= int(radix)
+    return flat_index
+
+
+_STAGE_A_DISABLED_RISK_PARAMS_V2 = {
+    "sl_enabled": False,
+    "sl_pct": None,
+    "tp_enabled": False,
+    "tp_pct": None,
+}
+
+
+__all__ = [
+    "BacktestHierarchicalShortlistBuilderV2",
+    "HierarchicalShortlistBlockResultV2",
+    "HierarchicalShortlistRetainedRowV2",
+    "HierarchicalShortlistRuntimePlanV2",
+    "build_default_hierarchical_shortlist_builder_v2",
+]

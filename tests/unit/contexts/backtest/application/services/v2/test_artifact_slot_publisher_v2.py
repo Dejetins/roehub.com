@@ -16,14 +16,18 @@ from trading.contexts.backtest.adapters.outbound.config import (
     load_backtest_artifacts_runtime_config,
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository
-from trading.contexts.backtest.application.services import (
-    ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2,
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (
     ArtifactCanonicalPriceExportRequestV2,
-    ArtifactCoordinatesV2,
-    ArtifactSlotPublishErrorV2,
-    ArtifactSlotValidationSpecV2,
     BacktestArtifactPrecomputeRunnerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (
+    ArtifactSlotPublishErrorV2,
     BacktestArtifactSlotPublisherV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2,
+    ArtifactCoordinatesV2,
+    ArtifactSlotValidationSpecV2,
 )
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
@@ -33,12 +37,18 @@ class _FakeJobRepository:
     Deterministic fake repository exposing only the publish-guard pin-count query.
     """
 
-    def __init__(self, *, blocked_total: int = 0) -> None:
+    def __init__(
+        self,
+        *,
+        blocked_total: int = 0,
+        blocked_by_slot: dict[str, int] | None = None,
+    ) -> None:
         """
         Initialize fake repository with fixed inactive-slot blocking count.
 
         Args:
             blocked_total: Count returned for `count_active_for_artifact_manifest(...)`.
+            blocked_by_slot: Optional per-slot override used by focused tests.
         Returns:
             None.
         Assumptions:
@@ -49,7 +59,9 @@ class _FakeJobRepository:
             Stores last query payload for assertions.
         """
         self.blocked_total = blocked_total
+        self.blocked_by_slot = {} if blocked_by_slot is None else dict(blocked_by_slot)
         self.last_call: dict[str, object] | None = None
+        self.calls: list[dict[str, object]] = []
 
     def count_active_for_artifact_manifest(
         self,
@@ -82,6 +94,9 @@ class _FakeJobRepository:
             "artifact_slot": artifact_slot,
             "artifact_manifest_hash": artifact_manifest_hash,
         }
+        self.calls.append(self.last_call)
+        if artifact_slot in self.blocked_by_slot:
+            return self.blocked_by_slot[artifact_slot]
         return self.blocked_total
 
 
@@ -126,7 +141,7 @@ class _NeverCalledPrecomputeRunner:
             Sets `called=True` for assertions.
         Docs:
           - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -212,12 +227,17 @@ def test_backtest_artifact_slot_publisher_v2_switches_current_yaml_after_strict_
     Side Effects:
         Creates and replaces artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
     store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    previous_slot_manifest_path = store.builder.slot_manifest_path(
+        store.coordinates,
+        store.active_slot,
+    )
+    assert previous_slot_manifest_path.is_file()
     validation_spec = load_backtest_artifacts_runtime_config(
         _write_matching_artifact_runtime_config(tmp_path)
     ).to_validation_spec()
@@ -258,6 +278,58 @@ def test_backtest_artifact_slot_publisher_v2_switches_current_yaml_after_strict_
     assert len(result.validation.signal_manifests) == 1
     assert result.validation.hit_times_manifest is not None
     assert result.validation.diagnostics == ()
+    assert previous_slot_manifest_path.exists() is False
+    assert previous_slot_manifest_path.parent.exists() is False
+
+
+def test_backtest_artifact_slot_publisher_v2_skips_previous_slot_cleanup_when_slot_is_pinned(
+    tmp_path: Path,
+) -> None:
+    """
+    Verify post-publish cleanup keeps previous slot on disk when active jobs still pin it.
+
+    Args:
+        tmp_path: pytest temporary path fixture.
+    Returns:
+        None.
+    Assumptions:
+        Publish precheck targets the inactive slot, while cleanup guard checks the previous slot.
+    Raises:
+        AssertionError: If cleanup ignores active pin count on the previous slot identity.
+    Side Effects:
+        Creates and switches temporary artifact files under `tmp_path`.
+    Docs:
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+    Related:
+      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
+    """
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    previous_slot_manifest_path = store.builder.slot_manifest_path(
+        store.coordinates,
+        store.active_slot,
+    )
+    validation_spec = load_backtest_artifacts_runtime_config(
+        _write_matching_artifact_runtime_config(tmp_path)
+    ).to_validation_spec()
+    repository = _FakeJobRepository(blocked_by_slot={store.inactive_slot: 0, store.active_slot: 1})
+    publisher = BacktestArtifactSlotPublisherV2(
+        artifact_loader=store.loader,
+        current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=store.builder),
+        job_repository=cast(BacktestJobRepository, repository),
+    )
+
+    precheck = publisher.precheck_publish(store.coordinates)
+    publisher.publish(
+        precheck=precheck,
+        validation_spec=validation_spec,
+        asof_date="2026-03-26",
+    )
+
+    queried_slots = tuple(str(call["artifact_slot"]) for call in repository.calls)
+    assert queried_slots == (store.inactive_slot, store.active_slot)
+    assert previous_slot_manifest_path.is_file()
+    assert previous_slot_manifest_path.parent.is_dir()
 
 
 def test_backtest_artifact_slot_publisher_v2_blocks_publish_when_inactive_slot_is_pinned(
@@ -277,8 +349,8 @@ def test_backtest_artifact_slot_publisher_v2_blocks_publish_when_inactive_slot_i
     Side Effects:
         Creates temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -321,8 +393,8 @@ def test_backtest_artifact_slot_publisher_v2_rejects_missing_strict_artifact_fil
     Side Effects:
         Creates temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -374,7 +446,7 @@ def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_
         Creates temporary artifact files under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -415,7 +487,7 @@ def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_
         Creates temporary artifact files under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -462,7 +534,7 @@ def _prices_mappings_request_v2(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """

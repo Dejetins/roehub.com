@@ -9,41 +9,55 @@ from typing import Any, Mapping, cast
 import numpy as np
 import pytest
 
+import trading.contexts.backtest_artifacts.application.services.numba_runtime_v1 as numba_runtime_module
 from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 import (
     SyntheticArtifactStoreV2,
     build_synthetic_artifact_store_v2,
 )
 from trading.contexts.backtest.application.dto import BacktestRankingConfig
 from trading.contexts.backtest.application.services import (
-    ArtifactPinnedIdentityV2,
-    ArtifactSlotPinnedRuntimeContextV2,
-    ArtifactSlotResolverV2,
-    BacktestArtifactBackedStageBScorerV2,
-    BacktestSignalFeaturesAccessPlanV2,
     BacktestStageABaseVariant,
-    BacktestStageAShortlistBuilderV2,
-    MmapPriceArraysLoaderV2,
-    MmapSignalFeaturesLoaderV2,
-    MmapSignalMatrixLoaderV2,
-    PreparedIndicatorChunkInputsV2,
-    PreparedIndicatorRowPlanV2,
-    artifact_market_id_from_coordinates_v2,
-    compute_target_slice_by_close_time_v2,
 )
-from trading.contexts.backtest.application.services import (
-    numba_runtime_v1 as numba_runtime_module,
-)
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
+from trading.contexts.backtest_artifacts.application.services.v2 import (
     artifact_runtime_core_v2 as artifact_runtime_core_module,
 )
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
 )
-from trading.contexts.backtest.application.services.v2.generic_row_scorer_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_backed_stage_b_scorer_v2 import (  # noqa: E501
+    BacktestArtifactBackedStageBScorerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
+    BacktestSignalFeaturesAccessPlanV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_resolver import (
+    ArtifactSlotResolverV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactPinnedIdentityV2,
+    ArtifactSlotPinnedRuntimeContextV2,
+    artifact_market_id_from_coordinates_v2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.generic_row_scorer_v2 import (
     GenericRowScorerV2,
     GenericRowScoringInputV2,
 )
-from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
+from trading.contexts.backtest_artifacts.application.services.v2.price_arrays_loader import (
+    MmapPriceArraysLoaderV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_features_loader_v2 import (
+    MmapSignalFeaturesLoaderV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_matrix_loader import (
+    MmapSignalMatrixLoaderV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.stage_a_shortlist_builder_v2 import (  # noqa: E501
+    BacktestStageAShortlistBuilderV2,
+    PreparedIndicatorChunkInputsV2,
+    PreparedIndicatorRowPlanV2,
+    compute_target_slice_by_close_time_v2,
+)
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 

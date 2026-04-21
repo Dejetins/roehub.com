@@ -27,18 +27,18 @@
 Основные изученные документы:
 
 - [base_refactor_plan.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/base_refactor_plan.md)
-- [backtest-compute-notebook-algorithm-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md)
-- [backtest-signals-from-indicators-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-signals-from-indicators-v1.md)
-- [backtest-candle-timeline-rollup-warmup-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md)
-- [backtest-api-post-backtests-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-api-post-backtests-v1.md)
-- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
-- [backtest-job-runner-worker-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-worker-v1.md)
+- [backtest-compute-notebook-algorithm-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-signals-from-indicators-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-candle-timeline-rollup-warmup-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-api-post-backtests-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-job-runner-worker-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
   — historical / compatibility reference for legacy EPIC-10 wording
-- [backtest-execution-engine-close-fill-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md)
-- [backtest-bounded-context-domain-use-case-skeleton-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md)
-- [backtest-grid-builder-staged-runner-guards-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md)
-- [backtest-refactor-perf-plan-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-refactor-perf-plan-v1.md)
-- [backtest-staged-ranking-reporting-perf-optimization-plan-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md)
+- [backtest-execution-engine-close-fill-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-bounded-context-domain-use-case-skeleton-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-grid-builder-staged-runner-guards-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-refactor-perf-plan-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-staged-ranking-reporting-perf-optimization-plan-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [indicators_formula.yaml](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/indicators/indicators_formula.yaml)
 - [indicators-compute-engine-core.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/indicators/indicators-compute-engine-core.md)
 - [indicators-grid-compute-perf-optimization-plan-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/indicators/indicators-grid-compute-perf-optimization-plan-v1.md)
@@ -63,7 +63,7 @@
 
 Эти документы фиксируют baseline артефакты, которые должны существовать до начала runtime cutover:
 
-- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-v2-benchmarks.md)
+- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [web-backtest-runtime-defaults-endpoint-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md)
 
 Они не отменяют этот final plan, а делают его исполнимым на уровне benchmark protocol и frozen contract surface.
@@ -863,9 +863,9 @@ Stage B использует shortlist из Stage A и добавляет risk e
 В текущей версии документа ранее не хватало явной фиксации того, какие именно вычислительные принципы и правила SP/SL берутся из ноутбука `06_backtest_compute.ipynb`.
 
 Канонический R5-02 entrypoint для этого transfer scope теперь вынесен в
-`docs/architecture/backtest/backtest-runtime-kernels-v2.md`.
+`docs/architecture/backtest/README.md`.
 Эта секция остаётся architecture baseline summary, а детальные notebook anchors живут в
-`docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`.
+`docs/architecture/backtest/README.md`.
 
 Ниже фиксируется точный scope переноса.
 
@@ -1430,27 +1430,27 @@ Update note after R10-01 / R10-02:
 
 ### Создать
 
-- `docs/architecture/backtest/backtest-artifact-store-v2.md`
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 - `docs/runbooks/backtest-rollout-rollback.md`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 
 ### Обновить
 
 - `docs/architecture/roadmap/base_refactor_plan.md`
-- `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
-- `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
-- `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md` (historical / compatibility reference)
-- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
-- `docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md`
-- `docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md`
-- `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md` (historical / compatibility reference)
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
 - `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
 - `docs/architecture/indicators/indicators_formula.yaml`

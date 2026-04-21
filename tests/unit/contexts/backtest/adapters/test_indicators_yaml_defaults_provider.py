@@ -9,7 +9,7 @@ import pytest
 import yaml
 
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2 import (
     supported_indicator_ids_for_signal_rules_v2,
 )
 
@@ -55,8 +55,8 @@ def _indicator_defaults_payload(*, env_name: str) -> dict[str, Any]:
     Side Effects:
         Reads one repository-local YAML file from disk.
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/indicators.yaml
       - configs/prod/indicators.yaml
@@ -83,7 +83,7 @@ def _ma_defaults_sha256(*, env_name: str) -> str:
     Side Effects:
         Reads one repository-local YAML file from disk.
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - configs/dev/indicators.yaml
@@ -210,7 +210,7 @@ def test_yaml_defaults_provider_matches_v2_signal_catalog_for_all_target_envs() 
         Reads repository-local config files.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/indicators.yaml
       - configs/test/indicators.yaml
@@ -240,8 +240,8 @@ def test_target_source_capable_indicators_keep_canonical_source_catalog_in_yaml(
     Side Effects:
         Reads checked-in indicators YAML files.
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/indicators.yaml
       - configs/prod/indicators.yaml
@@ -269,7 +269,7 @@ def test_zero_axis_signal_targets_keep_missing_yaml_compute_defaults_in_all_envs
     Side Effects:
         Reads checked-in indicators YAML files.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - configs/dev/indicators.yaml
@@ -300,7 +300,7 @@ def test_ma_family_defaults_snapshot_remains_unchanged_for_all_target_envs() -> 
         Reads checked-in indicators YAML files.
     Docs:
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/indicators.yaml
       - configs/prod/indicators.yaml

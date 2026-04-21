@@ -8,8 +8,8 @@ lazy detail page для одного persisted variant.
 
 - Status: active delivered contract after R9-03 history/summary/detail rollout.
 - Depends on:
-  - `docs/architecture/backtest/backtest-runs-history-v2.md`
-  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
 - Compatibility note:
   - legacy `POST /api/backtests/variant-report` остаётся compatibility path;

@@ -20,8 +20,8 @@ class BacktestJobSnapshotCadenceV1:
     Snapshot cadence policy for Stage-B persisted top variants updates.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
@@ -103,8 +103,8 @@ class BacktestJobTopVariantCandidateV1:
     One deterministic Stage-B candidate retained in running bounded top-K buffer.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
@@ -127,7 +127,7 @@ class BacktestJobTopVariantCandidateV1:
         Validate deterministic candidate identity and normalize nested mappings.
 
         Docs:
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -201,8 +201,8 @@ class BacktestJobTopKBufferV1:
     Bounded deterministic top-K buffer for streaming Stage-B candidate scoring.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
@@ -214,8 +214,8 @@ class BacktestJobTopKBufferV1:
         Initialize bounded top-K buffer with positive capacity.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
           - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
@@ -242,8 +242,8 @@ class BacktestJobTopKBufferV1:
         Add one candidate if it belongs to current deterministic top-K frontier.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
           - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
@@ -275,8 +275,8 @@ class BacktestJobTopKBufferV1:
         Return deterministic ranked candidates snapshot from buffer.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
           - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
@@ -298,8 +298,8 @@ class BacktestJobTopKBufferV1:
         Return number of currently retained candidates.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
           - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
@@ -330,7 +330,7 @@ def build_running_snapshot_rows(
     Build persisted running snapshot rows with `report_table_md` and trades set to null.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -389,8 +389,8 @@ def build_frontier_signature(
     Build deterministic Stage-B frontier signature from ranked candidates for snapshot gating.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
@@ -428,7 +428,7 @@ def build_finalized_snapshot_rows(
     Build finalized succeeded snapshot rows in summary-only form for persisted runtime storage.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -604,8 +604,8 @@ def _candidate_heap_entry(
     Build heap entry where root is always the worst retained candidate.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
       - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
@@ -656,8 +656,8 @@ def _descending_text_key(*, value: str) -> tuple[int, ...]:
     Encode text into tuple comparable in reverse lexicographical order.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
       - tests/unit/contexts/backtest/application/services/test_job_runner_streaming_v1.py
@@ -687,7 +687,7 @@ def _sorted_summary_metrics_mapping(
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
@@ -727,7 +727,7 @@ def _resolve_best_risk_pct(
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py

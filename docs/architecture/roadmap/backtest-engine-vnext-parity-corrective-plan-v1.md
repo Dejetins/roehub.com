@@ -240,7 +240,7 @@ synthetic corpus/tests.
 - `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
 - `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
 - `src/trading/contexts/backtest/application/services/v2/notebook_parity_benchmark_corpus_v2.py`
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `docs/architecture/backtest/README.md`
 
 ### Acceptance gate
 
@@ -437,9 +437,9 @@ Current metrics serialization path that allows `Infinity` to flow into persisted
 
 ### Основные файлы
 
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
-- `docs/architecture/backtest/backtest-engine-vnext.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
 - live benchmark capture helpers under `tests/perf_smoke/contexts/backtest/`
 
@@ -484,11 +484,11 @@ Current metrics serialization path that allows `Infinity` to flow into persisted
 
 - `docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md`
 - `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md`
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
-- `docs/architecture/backtest/backtest-engine-vnext.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ## 11. Итоговое правило этого документа
 

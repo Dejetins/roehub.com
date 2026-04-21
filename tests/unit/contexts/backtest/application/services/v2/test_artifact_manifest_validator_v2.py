@@ -8,7 +8,9 @@ import yaml
 from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 import (
     build_synthetic_artifact_store_v2,
 )
-from trading.contexts.backtest.application.services import BacktestArtifactManifestValidatorV2
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+    BacktestArtifactManifestValidatorV2,
+)
 
 
 def test_backtest_artifact_manifest_validator_v2_accepts_valid_strict_slot(
@@ -28,8 +30,8 @@ def test_backtest_artifact_manifest_validator_v2_accepts_valid_strict_slot(
     Side Effects:
         Creates and reads a synthetic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -72,7 +74,7 @@ def test_backtest_artifact_manifest_validator_v2_accepts_legacy_slot_without_sig
     Side Effects:
         Creates and reads one synthetic legacy-style artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -114,8 +116,8 @@ def test_backtest_artifact_manifest_validator_v2_rejects_root_manifest_schema_dr
     Side Effects:
         Creates and mutates a synthetic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -159,8 +161,8 @@ def test_backtest_artifact_manifest_validator_v2_rejects_mapping_price_correspon
     Side Effects:
         Creates and reads a synthetic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -200,8 +202,8 @@ def test_backtest_artifact_manifest_validator_v2_orders_multiple_diagnostics_det
     Side Effects:
         Creates and reads synthetic invalid artifact trees under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -256,8 +258,8 @@ def test_backtest_artifact_manifest_validator_v2_rejects_signal_manifest_referen
     Side Effects:
         Creates and mutates a synthetic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py

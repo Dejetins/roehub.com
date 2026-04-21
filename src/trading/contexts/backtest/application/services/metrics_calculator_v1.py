@@ -54,7 +54,7 @@ class _DrawdownStatsV1:
     Internal drawdown summary used to populate reporting metrics table values.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py
       - src/trading/contexts/backtest/application/services/table_formatter_v1.py
@@ -73,7 +73,7 @@ class _TradeStatsV1:
     Internal trade-statistics payload for deterministic table metric assembly.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py
       - src/trading/contexts/backtest/domain/entities/execution_v1.py
@@ -96,7 +96,7 @@ class _RatioStatsV1:
     Internal annualized ratio payload computed from 1d-resampled equity returns.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
@@ -112,7 +112,7 @@ class BacktestMetricsCalculatorV1:
     Calculate deterministic EPIC-06 raw metrics for one Stage-B top-k variant report.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py

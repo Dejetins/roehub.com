@@ -50,7 +50,7 @@ class _EstimateOnlyIndicatorCompute:
     IndicatorCompute fake exposing deterministic estimate axes from request grid specs.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -137,8 +137,8 @@ class _InstrumentedSignalIndicatorCompute:
     IndicatorCompute fake with deterministic signal outputs and in-memory compute call counter.
 
     Docs:
-      - docs/architecture/backtest/backtest-tests-determinism-golden-perf-smoke-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -281,7 +281,7 @@ class _ConstantTieScorer:
     Staged scorer fake returning equal `Total Return [%]` values for tie-break tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/staged_runner.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -345,7 +345,7 @@ class _WindowScorer:
     Staged scorer fake ranking variants by `window` parameter value.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/staged_runner.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -393,7 +393,7 @@ class _MultiMetricScorer:
     Staged scorer fake exposing v1 configurable ranking metrics for ordering tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -461,8 +461,8 @@ class _DetailsCountingScorer:
     Staged scorer fake exposing details extension and call counters for Stage-B reuse checks.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
@@ -660,8 +660,8 @@ class _RankingContextRecordingScorer:
     Staged scorer fake recording additive ranking-context hints forwarded by the core runner.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
@@ -1118,8 +1118,8 @@ def test_staged_runner_v1_forwards_stage_ranking_context_to_metric_scorer() -> N
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -1152,7 +1152,7 @@ class _CancellingScorer:
     Deterministic scorer fake that triggers cooperative cancellation after N calls.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/run_control_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py

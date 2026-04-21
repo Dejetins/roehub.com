@@ -8,28 +8,13 @@ from uuid import UUID
 
 import pytest
 
-from trading.contexts.backtest.application.dto import (
-    BacktestMetricRowV1,
-    BacktestReportV1,
-    BacktestVariantPayloadV1,
-    RunBacktestRequest,
-    RunBacktestSavedOverrides,
-    RunBacktestTemplate,
-)
 from trading.contexts.backtest.application.ports import (
     BacktestJobListPage,
     BacktestJobListQuery,
     CurrentUser,
 )
-from trading.contexts.backtest.application.services import (
-    ArtifactPinnedIdentityV2,
-    ExecutionProfilesCatalogV2,
-    default_execution_profiles_catalog_v2,
-    load_backtest_runtime_acceleration_benchmark_corpus_v2,
-)
 from trading.contexts.backtest.application.use_cases import (
     BacktestRunProgressSnapshotBuilder,
-    BuildBacktestRunVariantReportUseCase,
     CancelBacktestRunUseCase,
     GetBacktestRunStatusUseCase,
     GetBacktestRunTopUseCase,
@@ -40,25 +25,21 @@ from trading.contexts.backtest.application.use_cases import (
 )
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
-    BacktestJobArtifactPin,
     BacktestJobExecutionMode,
     BacktestJobStageAShortlist,
     BacktestJobStageWeights,
     BacktestJobTopVariant,
 )
-from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
-from trading.contexts.indicators.application.dto import IndicatorVariantSelection
-from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import (
-    InstrumentId,
-    MarketId,
-    Symbol,
-    Timeframe,
-    TimeRange,
-    UserId,
-    UtcTimestamp,
+from trading.contexts.backtest_artifacts.application.services.v2.benchmark_corpus_v2 import (
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
+    ExecutionProfilesCatalogV2,
+    default_execution_profiles_catalog_v2,
+)
+from trading.platform.errors import RoehubError
+from trading.shared_kernel.primitives import UserId
 
 _BENCHMARK_CORPUS_PATH = (
     Path(__file__).resolve().parents[6]
@@ -376,166 +357,6 @@ class _FakeResultsRepository:
         return None
 
 
-class _FakeRequestDecoder:
-    """
-    Deterministic persisted-request decoder fake for run-scoped detail use-case tests.
-    """
-
-    def __init__(self, *, request: RunBacktestRequest) -> None:
-        """
-        Store deterministic decoded request fixture.
-
-        Args:
-            request: Decoded request DTO returned for every payload.
-        Returns:
-            None.
-        Assumptions:
-            Tests assert only that application use-case consumes canonical decoded request.
-        Raises:
-            None.
-        Side Effects:
-            Stores last payload for assertions.
-        """
-        self.request = request
-        self.last_payload: Mapping[str, object] | None = None
-
-    def decode(self, *, payload: Mapping[str, object]) -> RunBacktestRequest:
-        """
-        Return configured request DTO and record input payload.
-
-        Args:
-            payload: Persisted `request_json` mapping payload.
-        Returns:
-            RunBacktestRequest: Configured decoded request fixture.
-        Assumptions:
-            Payload validation itself is outside the scope of this fake.
-        Raises:
-            None.
-        Side Effects:
-            Stores last payload for assertions.
-        """
-        self.last_payload = payload
-        return self.request
-
-
-class _FakeRunUseCase:
-    """
-    Deterministic report-builder fake capturing reconstructed template request context.
-    """
-
-    def __init__(self, *, report: BacktestReportV1) -> None:
-        """
-        Store deterministic report fixture.
-
-        Args:
-            report: Report payload returned for every invocation.
-        Returns:
-            None.
-        Assumptions:
-            Tests verify upstream reconstruction and pinning, not real report computation.
-        Raises:
-            None.
-        Side Effects:
-            Stores last invocation kwargs for assertions.
-        """
-        self.report = report
-        self.last_requested_time_range: TimeRange | None = None
-        self.last_template: RunBacktestTemplate | None = None
-        self.last_warmup_bars: int | None = None
-        self.last_variant_payload: BacktestVariantPayloadV1 | None = None
-        self.last_include_trades: bool | None = None
-        self.last_artifact_context: object | None = None
-
-    def build_variant_report_for_template(
-        self,
-        *,
-        requested_time_range: TimeRange,
-        template: RunBacktestTemplate,
-        warmup_bars: int | None,
-        variant_payload: BacktestVariantPayloadV1,
-        include_trades: bool = False,
-        run_control=None,
-        artifact_context=None,
-        template_root_path: str = "body.template",
-        template_already_validated: bool = False,
-    ) -> BacktestReportV1:
-        """
-        Capture reconstructed request context and return deterministic report fixture.
-
-        Args:
-            requested_time_range: Original request time range.
-            template: Reconstructed effective template.
-            warmup_bars: Effective warmup override.
-            variant_payload: Explicit selected variant payload.
-            include_trades: Include-trades flag.
-            run_control: Optional cooperative cancellation handle.
-            artifact_context: Pinned artifact context object.
-            template_root_path: Validation root path literal.
-            template_already_validated: Validation short-circuit flag.
-        Returns:
-            BacktestReportV1: Configured report fixture.
-        Assumptions:
-            Fake does not execute runtime validation or compute.
-        Raises:
-            AssertionError: If route/use-case unexpectedly mutates required arguments.
-        Side Effects:
-            Stores last invocation arguments for assertions.
-        """
-        _ = run_control, template_root_path, template_already_validated
-        self.last_requested_time_range = requested_time_range
-        self.last_template = template
-        self.last_warmup_bars = warmup_bars
-        self.last_variant_payload = variant_payload
-        self.last_include_trades = include_trades
-        self.last_artifact_context = artifact_context
-        return self.report
-
-
-class _FakeArtifactSlotResolver:
-    """
-    Deterministic slot resolver fake returning one pinned artifact context marker.
-    """
-
-    def __init__(self, *, artifact_context: object) -> None:
-        """
-        Store deterministic pinned artifact context fixture.
-
-        Args:
-            artifact_context: Object returned for every resolve call.
-        Returns:
-            None.
-        Assumptions:
-            Tests assert resolver inputs separately from downstream runtime behavior.
-        Raises:
-            None.
-        Side Effects:
-            Stores last resolve arguments for assertions.
-        """
-        self.artifact_context = artifact_context
-        self.last_coordinates = None
-        self.last_pinned_identity: ArtifactPinnedIdentityV2 | None = None
-
-    def resolve_pinned_context(self, coordinates, pinned_identity: ArtifactPinnedIdentityV2):
-        """
-        Return configured artifact context and record pin metadata.
-
-        Args:
-            coordinates: Artifact coordinates derived from reconstructed template.
-            pinned_identity: Persisted immutable artifact identity.
-        Returns:
-            object: Configured artifact context marker.
-        Assumptions:
-            Fake resolver does not validate filesystem state.
-        Raises:
-            None.
-        Side Effects:
-            Stores last resolve arguments for assertions.
-        """
-        self.last_coordinates = coordinates
-        self.last_pinned_identity = pinned_identity
-        return self.artifact_context
-
-
 def test_get_status_use_case_returns_403_for_foreign_and_404_for_missing_run() -> None:
     """
     Verify owner policy returns `403` for foreign existing run and `404` for missing run.
@@ -647,8 +468,8 @@ def test_get_top_use_case_returns_persisted_rows_in_repository_order() -> None:
     Verify persisted `/top` rows are returned unchanged in `rank ASC, variant_key ASC` order.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -726,7 +547,7 @@ def test_run_progress_snapshot_builder_uses_additive_effective_profile_for_weigh
     Verify additive progress builder honors persisted additive effective profile metadata.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_history_api_v1.py
@@ -856,7 +677,7 @@ def test_run_progress_snapshot_builder_falls_back_to_catalog_default_mode() -> N
     Verify additive progress builder falls back to the configured default profile when missing.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_history_api_v1.py
@@ -1206,184 +1027,6 @@ def test_cancel_use_case_keeps_running_background_auto_visible() -> None:
     assert repository.last_cancel_call == (owner_run.job_id, owner_user_id)
 
 
-def test_build_variant_report_use_case_reconstructs_saved_run_from_persisted_snapshot() -> None:
-    """
-    Verify run-scoped detail use-case rebuilds saved-mode template from persisted run storage.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Saved-mode request_json may omit template and must be reconstructed from spec snapshot.
-    Raises:
-        AssertionError: If request reconstruction, artifact pinning, or forwarded args drift.
-    Side Effects:
-        None.
-    """
-    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
-    saved_run = _saved_run(
-        run_id=UUID("00000000-0000-0000-0000-000000000955"),
-        user_id=owner_user_id,
-    )
-    repository = _FakeJobRepository(jobs_by_id={saved_run.job_id: saved_run})
-    decoder = _FakeRequestDecoder(request=_saved_request())
-    report = BacktestReportV1(rows=(BacktestMetricRowV1(metric="Total Return [%]", value="12.00"),))
-    run_use_case = _FakeRunUseCase(report=report)
-    artifact_context = object()
-    resolver = _FakeArtifactSlotResolver(artifact_context=artifact_context)
-    use_case = BuildBacktestRunVariantReportUseCase(
-        job_repository=repository,
-        request_decoder=decoder,  # type: ignore[arg-type]
-        run_use_case=run_use_case,  # type: ignore[arg-type]
-        artifact_slot_resolver=resolver,  # type: ignore[arg-type]
-    )
-
-    result = use_case.execute(
-        run_id=saved_run.job_id,
-        current_user=CurrentUser(user_id=owner_user_id),
-        variant_payload=_variant_payload(),
-        include_trades=True,
-    )
-
-    assert result == report
-    assert decoder.last_payload == saved_run.request_json
-    assert run_use_case.last_requested_time_range == _saved_request().time_range
-    assert run_use_case.last_warmup_bars == 144
-    assert run_use_case.last_include_trades is True
-    assert run_use_case.last_artifact_context is artifact_context
-    assert run_use_case.last_template is not None
-    assert run_use_case.last_template.instrument_id == InstrumentId(
-        market_id=MarketId(1),
-        symbol=Symbol("BTCUSDT"),
-    )
-    assert run_use_case.last_template.timeframe == Timeframe("1h")
-    assert run_use_case.last_template.direction_mode == "short-only"
-    assert run_use_case.last_template.execution_params == {
-        "fee_pct": 0.1,
-        "fixed_quote": 100.0,
-        "init_cash_quote": 10000.0,
-    }
-    assert resolver.last_pinned_identity is not None
-    assert resolver.last_pinned_identity.artifact_slot == "slot_b"
-    assert resolver.last_pinned_identity.slot_generation == 11
-    assert resolver.last_pinned_identity.artifact_asof_date == "2026-03-29"
-    assert resolver.last_pinned_identity.artifact_manifest_hash == "d" * 64
-
-
-def test_build_variant_report_use_case_keeps_403_and_404_owner_policy() -> None:
-    """
-    Verify run-scoped detail use-case preserves explicit foreign/missing owner semantics.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Use-case reads storage without owner filter first, matching other runs endpoints.
-    Raises:
-        AssertionError: If `403` or `404` contract drifts.
-    Side Effects:
-        None.
-    """
-    foreign_run = _saved_run(
-        run_id=UUID("00000000-0000-0000-0000-000000000956"),
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000999"),
-    )
-    repository = _FakeJobRepository(jobs_by_id={foreign_run.job_id: foreign_run})
-    use_case = BuildBacktestRunVariantReportUseCase(
-        job_repository=repository,
-        request_decoder=_FakeRequestDecoder(request=_saved_request()),  # type: ignore[arg-type]
-        run_use_case=_FakeRunUseCase(
-            report=BacktestReportV1(
-                rows=(BacktestMetricRowV1(metric="Total Return [%]", value="12.00"),)
-            )
-        ),  # type: ignore[arg-type]
-        artifact_slot_resolver=_FakeArtifactSlotResolver(artifact_context=object()),  # type: ignore[arg-type]
-    )
-
-    with pytest.raises(RoehubError) as forbidden_error:
-        use_case.execute(
-            run_id=foreign_run.job_id,
-            current_user=CurrentUser(
-                user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
-            ),
-            variant_payload=_variant_payload(),
-        )
-    assert forbidden_error.value.code == "forbidden"
-    assert forbidden_error.value.details is not None
-    assert forbidden_error.value.details["run_id"] == str(foreign_run.job_id)
-
-    with pytest.raises(RoehubError) as not_found_error:
-        use_case.execute(
-            run_id=UUID("00000000-0000-0000-0000-000000000957"),
-            current_user=CurrentUser(
-                user_id=UserId.from_string("00000000-0000-0000-0000-000000000111")
-            ),
-            variant_payload=_variant_payload(),
-        )
-    assert not_found_error.value.code == "not_found"
-    assert not_found_error.value.details is not None
-    assert not_found_error.value.details["run_id"] == (
-        "00000000-0000-0000-0000-000000000957"
-    )
-
-
-def test_build_variant_report_use_case_rejects_missing_artifact_pin() -> None:
-    """
-    Verify run-scoped detail use-case fails deterministically when pin metadata is absent.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Lazy detail must be pinned to persisted artifact identity of original run.
-    Raises:
-        AssertionError: If missing artifact pin is silently ignored.
-    Side Effects:
-        None.
-    """
-    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000111")
-    broken_run = BacktestJob.create_queued(
-        job_id=UUID("00000000-0000-0000-0000-000000000958"),
-        user_id=owner_user_id,
-        mode="saved",
-        created_at=datetime(2026, 3, 29, 11, 55, tzinfo=timezone.utc),
-        request_json={"strategy_id": "00000000-0000-0000-0000-000000000321"},
-        request_hash="a" * 64,
-        spec_hash="b" * 64,
-        spec_payload_json=_saved_spec_payload(),
-        engine_params_hash="c" * 64,
-        backtest_runtime_config_hash="e" * 64,
-        execution_mode="sync_inline",
-        market_id=1,
-        symbol="BTCUSDT",
-        timeframe="1h",
-        requested_top_n=25,
-        ranking_primary_metric="profit_factor",
-        ranking_secondary_metric="win_rate_pct",
-    )
-    repository = _FakeJobRepository(jobs_by_id={broken_run.job_id: broken_run})
-    use_case = BuildBacktestRunVariantReportUseCase(
-        job_repository=repository,
-        request_decoder=_FakeRequestDecoder(request=_saved_request()),  # type: ignore[arg-type]
-        run_use_case=_FakeRunUseCase(
-            report=BacktestReportV1(
-                rows=(BacktestMetricRowV1(metric="Total Return [%]", value="12.00"),)
-            )
-        ),  # type: ignore[arg-type]
-        artifact_slot_resolver=_FakeArtifactSlotResolver(artifact_context=object()),  # type: ignore[arg-type]
-    )
-
-    with pytest.raises(BacktestValidationError, match="slot-pinned artifact metadata"):
-        use_case.execute(
-            run_id=broken_run.job_id,
-            current_user=CurrentUser(user_id=owner_user_id),
-            variant_payload=_variant_payload(),
-        )
-
-
 def test_list_use_case_passes_keyset_query_to_repository_for_runs() -> None:
     """
     Verify list use-case forwards state/limit/cursor into repository keyset query object.
@@ -1517,168 +1160,4 @@ def _running_run(
         changed_at=datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc),
         locked_by="worker-test-1",
         lease_expires_at=datetime(2026, 3, 29, 12, 1, tzinfo=timezone.utc),
-    )
-
-
-def _saved_run(*, run_id: UUID, user_id: UserId) -> BacktestJob:
-    """
-    Build deterministic saved-mode persisted run fixture for lazy detail use-case tests.
-
-    Args:
-        run_id: Deterministic persisted run identifier.
-        user_id: Run owner identifier.
-    Returns:
-        BacktestJob: Saved-mode persisted run snapshot fixture.
-    Assumptions:
-        `request_json` omits template and relies on `spec_payload_json + overrides`.
-    Raises:
-        ValueError: If fixture violates domain invariants.
-    Side Effects:
-        None.
-    """
-    return BacktestJob.create_queued(
-        job_id=run_id,
-        user_id=user_id,
-        mode="saved",
-        created_at=datetime(2026, 3, 29, 11, 55, tzinfo=timezone.utc),
-        request_json={
-            "time_range": {
-                "start": "2026-03-28T00:00:00+00:00",
-                "end": "2026-03-28T01:00:00+00:00",
-            },
-            "strategy_id": "00000000-0000-0000-0000-000000000321",
-            "overrides": {
-                "direction_mode": "short-only",
-                "execution": {"fee_pct": 0.1},
-            },
-            "warmup_bars": 144,
-            "top_k": 25,
-            "top_trades_n": 3,
-        },
-        request_hash="a" * 64,
-        spec_hash="b" * 64,
-        spec_payload_json=_saved_spec_payload(),
-        engine_params_hash="c" * 64,
-        backtest_runtime_config_hash="e" * 64,
-        artifact_pin=BacktestJobArtifactPin(
-            artifact_slot="slot_b",
-            artifact_slot_generation=11,
-            artifact_manifest_hash="d" * 64,
-            artifact_asof_date="2026-03-29",
-        ),
-        execution_mode="sync_inline",
-        market_id=1,
-        symbol="BTCUSDT",
-        timeframe="1h",
-        requested_top_n=25,
-        ranking_primary_metric="profit_factor",
-        ranking_secondary_metric="win_rate_pct",
-    )
-
-
-def _saved_request() -> RunBacktestRequest:
-    """
-    Build deterministic decoded saved-mode request fixture for lazy detail tests.
-
-    Args:
-        None.
-    Returns:
-        RunBacktestRequest: Saved-mode request without template payload.
-    Assumptions:
-        Decoder output mirrors canonical persisted `request_json` shape.
-    Raises:
-        ValueError: If fixture violates DTO invariants.
-    Side Effects:
-        None.
-    """
-    return RunBacktestRequest(
-        time_range=TimeRange(
-            start=UtcTimestamp(datetime(2026, 3, 28, 0, 0, tzinfo=timezone.utc)),
-            end=UtcTimestamp(datetime(2026, 3, 28, 1, 0, tzinfo=timezone.utc)),
-        ),
-        strategy_id=UUID("00000000-0000-0000-0000-000000000321"),
-        overrides=RunBacktestSavedOverrides(
-            direction_mode="short-only",
-            execution_params={"fee_pct": 0.1},
-        ),
-        warmup_bars=144,
-        top_k=25,
-    )
-
-
-def _saved_spec_payload() -> dict[str, object]:
-    """
-    Build deterministic saved strategy snapshot payload used for template reconstruction tests.
-
-    Args:
-        None.
-    Returns:
-        dict[str, object]: Minimal Strategy-spec payload compatible with saved snapshot helper.
-    Assumptions:
-        One indicator definition is sufficient for template reconstruction coverage.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
-    return {
-        "schema_version": 1,
-        "instrument_id": {"market_id": 1, "symbol": "BTCUSDT"},
-        "timeframe": "1h",
-        "indicators": [
-            {
-                "indicator_id": "ma.sma",
-                "inputs": {"source": "close"},
-                "params": {"window": 20},
-            }
-        ],
-        "signal_grids": {"ma.sma": {"cross_up": {"mode": "explicit", "values": [0.5]}}},
-        "risk": {
-            "sl_enabled": True,
-            "sl_pct": 2.0,
-            "tp_enabled": True,
-            "tp_pct": 4.0,
-        },
-        "execution": {
-            "fee_pct": 0.075,
-            "fixed_quote": 100.0,
-            "init_cash_quote": 10000.0,
-        },
-        "direction_mode": "long-short",
-        "sizing_mode": "all_in",
-    }
-
-
-def _variant_payload() -> BacktestVariantPayloadV1:
-    """
-    Build deterministic explicit selected variant payload for lazy detail tests.
-
-    Args:
-        None.
-    Returns:
-        BacktestVariantPayloadV1: One selected variant payload fixture.
-    Assumptions:
-        Variant identity keeps v1 scalar semantics unchanged.
-    Raises:
-        ValueError: If fixture violates DTO invariants.
-    Side Effects:
-        None.
-    """
-    return BacktestVariantPayloadV1(
-        indicator_selections=(
-            IndicatorVariantSelection(
-                indicator_id="ma.sma",
-                inputs={"source": "close"},
-                params={"window": 20},
-            ),
-        ),
-        signal_params={"ma.sma": {"cross_up": 0.5}},
-        risk_params={"sl_enabled": True, "sl_pct": 2.0, "tp_enabled": True, "tp_pct": 4.0},
-        execution_params={
-            "fee_pct": 0.1,
-            "fixed_quote": 100.0,
-            "init_cash_quote": 10000.0,
-        },
-        direction_mode="short-only",
-        sizing_mode="all_in",
     )

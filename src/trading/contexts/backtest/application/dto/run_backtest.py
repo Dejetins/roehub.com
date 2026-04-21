@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from importlib import import_module
 from types import MappingProxyType
 from typing import Any, Mapping
 from uuid import UUID
@@ -48,8 +49,8 @@ def normalize_backtest_ranking_metric_literal(*, metric: str, field_path: str) -
     Normalize and validate one ranking metric literal against v1 allowed contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - apps/api/dto/backtests.py
@@ -82,8 +83,8 @@ class BacktestRankingConfig:
     Ranking override payload for request/runtime contracts with deterministic normalization.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - apps/api/dto/backtests.py
@@ -134,7 +135,7 @@ class BacktestRiskGridSpec:
     Stage B risk axes specification with explicit enable flags and percent semantics.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -178,7 +179,7 @@ class RunBacktestTemplate:
     Ad-hoc backtest template payload (instrument/timeframe/indicator-grid contract).
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -262,8 +263,8 @@ class RunBacktestSavedOverrides:
     Optional saved-mode override payload applied over loaded strategy snapshot template.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/ports/strategy_reader.py
@@ -333,7 +334,7 @@ class RunBacktestRequest:
     Backtest use-case request supporting both `saved` and `template` modes.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -410,7 +411,7 @@ class BacktestMetricRowV1:
     One deterministic reporting row rendered in `|Metric|Value|` table contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/table_formatter_v1.py
@@ -453,7 +454,7 @@ class BacktestReportV1:
     Deterministic reporting payload with metric rows, markdown table, and optional trades.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/reporting_service_v1.py
@@ -500,7 +501,7 @@ class BacktestVariantPayloadV1:
     Explicit deterministic variant payload required for saveable API response contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -583,7 +584,7 @@ class BacktestVariantPreview:
     One deterministic variant preview identity returned by skeleton use-case.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
@@ -678,8 +679,8 @@ class RunBacktestSyncPersistenceArtifact:
     Internal-only sync persistence payload carrying live Stage A artifacts across `/backtests`.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -732,7 +733,7 @@ class RunBacktestResponse:
     Backtest use-case response skeleton for BKT-EPIC-01.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -824,14 +825,19 @@ class RunBacktestResponse:
                 MappingProxyType(_normalize_scalar_mapping(values=self.execution_params)),
             )
         if self.execution_profile_mode is not None:
-            from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
-                validate_execution_profile_mode_v2,
+            validate_execution_profile_mode_from_artifacts_v2 = getattr(
+                import_module(
+                    "trading.contexts.backtest_artifacts.application.services.v2."
+                    "execution_profile_v2"
+                ),
+                "validate_execution_profile_mode_v2",
             )
-
             object.__setattr__(
                 self,
                 "execution_profile_mode",
-                validate_execution_profile_mode_v2(value=self.execution_profile_mode),
+                validate_execution_profile_mode_from_artifacts_v2(
+                    value=self.execution_profile_mode
+                ),
             )
 
         variant_indexes = tuple(item.variant_index for item in self.variants)
@@ -1071,8 +1077,8 @@ def _normalize_summary_metrics_mapping(
     Normalize summary metrics into deterministic key-sorted float mapping for persisted previews.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1117,8 +1123,8 @@ def _resolve_best_risk_pct(
     Resolve persisted best-risk percentage from explicit field or variant payload risk params.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1166,8 +1172,8 @@ def _normalize_json_payload_mapping(
     Normalize JSON payload mapping into deterministic immutable-friendly structure.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1198,8 +1204,8 @@ def _normalize_json_payload_value(*, value: Any) -> Any:
     Normalize arbitrary JSON-like node into deterministic mapping/list/scalar structure.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -1232,8 +1238,8 @@ def _is_pre_sorted_indicator_selections(
     Check whether indicator selections are already sorted by `indicator_id` asc.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - apps/api/dto/backtests.py
@@ -1266,8 +1272,8 @@ def _is_pre_normalized_scalar_mapping(
     Check whether scalar mapping already matches canonical stripped key order.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - apps/api/dto/backtests.py
@@ -1307,8 +1313,8 @@ def _is_pre_normalized_nested_scalar_mapping(
     Check whether nested scalar mapping already matches lowercase sorted mapping-proxy shape.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - apps/api/dto/backtests.py

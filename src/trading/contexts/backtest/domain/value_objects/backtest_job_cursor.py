@@ -14,7 +14,7 @@ class BacktestJobListCursor:
     Keyset pagination cursor for deterministic Backtest jobs list ordering.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/

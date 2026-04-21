@@ -2,7 +2,7 @@
 Pydantic models and deterministic cursor/mapper helpers for public Backtest runs API.
 
 Docs:
-  - docs/architecture/backtest/backtest-runs-history-v2.md
+  - docs/architecture/backtest/README.md
   - docs/architecture/roadmap/base_refactor_plan.md
   - docs/architecture/api/api-errors-and-422-payload-v1.md
 """
@@ -31,7 +31,6 @@ from .backtest_jobs import (
     decode_backtest_jobs_state,
     encode_backtest_jobs_cursor,
 )
-from .backtests import BacktestVariantPayloadRequest
 
 BacktestRunsStateLiteral = BacktestJobsStateLiteral
 BacktestRunsStageLiteral = Literal["stage_a", "stage_b", "finalizing"]
@@ -49,8 +48,8 @@ class BacktestRunErrorResponse(BaseModel):
     API response model for persisted Roehub-like failed-run payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_runs.py
       - apps/api/routes/backtest_runs.py
@@ -69,7 +68,7 @@ class BacktestRunStatusResponse(BaseModel):
     API response model for one public Backtest run status/metadata snapshot.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -113,7 +112,7 @@ class BacktestRunsListItemResponse(BaseModel):
     API response model for one public Backtest history item.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -154,7 +153,7 @@ class BacktestRunsListResponse(BaseModel):
     API response model for deterministic keyset-paginated public Backtest runs history.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -173,8 +172,8 @@ class BacktestRunTopItemResponse(BaseModel):
     API response model for one public summary-only top row.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_runs.py
       - apps/api/routes/backtest_runs.py
@@ -199,7 +198,7 @@ class BacktestRunTopResponse(BaseModel):
     API response model for public Backtest run summary table payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -215,26 +214,6 @@ class BacktestRunTopResponse(BaseModel):
     items: list[BacktestRunTopItemResponse]
 
 
-class BacktestRunVariantReportPostRequest(BaseModel):
-    """
-    API request envelope for run-scoped lazy `POST /backtests/runs/{run_id}/variant-report`.
-
-    Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/roadmap/base_refactor_plan.md
-    Related:
-      - apps/api/dto/backtest_runs.py
-      - apps/api/routes/backtest_runs.py
-      - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    variant: BacktestVariantPayloadRequest
-    include_trades: bool = False
-
-
 def build_backtest_run_status_response(
     *,
     run: BacktestJob,
@@ -244,7 +223,7 @@ def build_backtest_run_status_response(
     Convert persisted-run aggregate into strict public status response payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -317,7 +296,7 @@ def build_backtest_runs_list_response(
     Build strict public history response from deterministic repository page payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -400,7 +379,7 @@ def _require_progress_snapshot(
     Read the additive progress projection for one persisted run or fail fast.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -429,7 +408,7 @@ def build_backtest_run_top_response(*, result: BacktestRunTopReadResult) -> Back
     Build strict public summary-only `/runs/{run_id}/top` response payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -472,7 +451,7 @@ def encode_backtest_runs_cursor(*, cursor: BacktestJobListCursor | None) -> str 
     Encode deterministic public runs cursor into opaque `base64url(json)` transport payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -497,7 +476,7 @@ def decode_backtest_runs_state(*, state: str | None) -> BacktestRunsStateLiteral
     Decode optional public runs `state` query value with blank-to-none compatibility.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -529,7 +508,7 @@ def decode_backtest_runs_cursor(*, cursor: str | None) -> BacktestJobListCursor 
     Decode optional public runs cursor from opaque `base64url(json)` transport payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - apps/api/dto/backtest_runs.py
@@ -562,7 +541,6 @@ __all__ = [
     "BacktestRunsListResponse",
     "BacktestRunsStageLiteral",
     "BacktestRunsStateLiteral",
-    "BacktestRunVariantReportPostRequest",
     "BacktestRunTopItemResponse",
     "BacktestRunTopResponse",
     "build_backtest_run_status_response",

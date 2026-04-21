@@ -46,8 +46,8 @@ class BacktestVariantScoreDetailsV1:
     Detailed Stage-B score payload for deterministic report assembly on top-ranked variants.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -90,8 +90,8 @@ class BacktestGridDefaultsProvider(Protocol):
     Port for resolving optional compute/signal grid defaults for backtest variants.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -137,7 +137,7 @@ class BacktestGridDefaultsProvider(Protocol):
         Return deterministic ordered catalog of backtest-supported indicator ids.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
@@ -195,8 +195,8 @@ class BacktestStagedVariantScorer(Protocol):
     (`score_variant_metric`) to avoid accidental details-path coupling.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -247,9 +247,9 @@ class BacktestStagedVariantMetricScorer(Protocol):
     Metric-only Stage A / Stage B scorer port for ranking hot paths.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
@@ -297,8 +297,8 @@ class BacktestStagedVariantScorerWithDetails(Protocol):
     Optional scorer extension exposing deterministic Stage-B details for reporting payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py

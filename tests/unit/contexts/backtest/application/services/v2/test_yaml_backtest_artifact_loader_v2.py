@@ -18,15 +18,21 @@ from trading.contexts.backtest.adapters.outbound import (
     BacktestArtifactPathBuilderV2,
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
+    YamlBacktestArtifactLoaderV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (
+    ArtifactCanonicalPriceExportRequestV2,
+    BacktestArtifactPrecomputeRunnerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (
+    BacktestArtifactSlotPublisherV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     SIGNAL_FEATURE_NAMES_V2,
-    ArtifactCanonicalPriceExportRequestV2,
     ArtifactCoordinatesV2,
-    BacktestArtifactPrecomputeRunnerV2,
-    BacktestArtifactSlotPublisherV2,
-    YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.market_data.application.dto import (
     CandleWithMeta,
@@ -51,8 +57,8 @@ class _PrecomputeCanonicalReaderForLoaderTest:
     Deterministic in-memory canonical reader used by loader integration coverage.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_yaml_backtest_artifact_loader_v2.py
@@ -192,7 +198,7 @@ class _ZeroBlockingRepositoryForLoaderTest:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -217,8 +223,8 @@ def synthetic_artifact_store_v2(tmp_path: Path) -> SyntheticArtifactStoreV2:
     Side Effects:
         Creates a temporary artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
@@ -242,8 +248,8 @@ def test_yaml_backtest_artifact_loader_v2_reads_current_and_strict_manifests(
     Side Effects:
         Reads deterministic YAML and `.npy` metadata from the synthetic artifact tree.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
@@ -362,7 +368,7 @@ def test_yaml_backtest_artifact_loader_v2_accepts_legacy_slot_without_signal_fea
     Side Effects:
         Builds one synthetic legacy-style inactive slot under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -400,8 +406,8 @@ def test_yaml_backtest_artifact_loader_v2_avoids_directory_scanning(
     Side Effects:
         Temporarily replaces scanning helpers on `Path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
@@ -481,8 +487,8 @@ def test_yaml_backtest_artifact_loader_v2_loads_all_root_listed_signal_manifests
     Side Effects:
         Temporarily replaces scanning helpers on `Path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -527,8 +533,8 @@ def test_yaml_backtest_artifact_loader_v2_loads_runner_generated_rollup_manifest
     Side Effects:
         Builds one inactive-slot artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -590,8 +596,8 @@ def test_yaml_backtest_artifact_loader_v2_rejects_invalid_pointer_shape(tmp_path
     Side Effects:
         Creates and reads one temporary invalid YAML document.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
@@ -629,8 +635,8 @@ def test_yaml_backtest_artifact_loader_v2_reads_runner_built_published_prices_ma
     Side Effects:
         Builds and publishes one inactive slot under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -740,8 +746,8 @@ def test_yaml_backtest_artifact_loader_v2_rejects_invalid_strict_pointer_fields(
     Side Effects:
         Creates and reads one temporary invalid YAML document.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
@@ -781,8 +787,8 @@ def _loader_request_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -812,8 +818,8 @@ def _build_loader_canonical_rows_v2(*, bar_count: int) -> tuple[CandleWithMeta, 
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/market_data/application/dto/candle_with_meta.py
     """
@@ -837,8 +843,8 @@ def _build_loader_canonical_row_v2(*, bar_index: int) -> CandleWithMeta:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/shared_kernel/primitives/candle.py
     """
@@ -885,8 +891,8 @@ def _forbid_directory_scan(*_args: object, **_kwargs: object) -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """

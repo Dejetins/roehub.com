@@ -10,7 +10,7 @@
 - Superseded by target-v2 UX:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
-  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 - Historical scope kept here:
   - отдельные `/backtests/jobs*` маршруты,
@@ -52,7 +52,7 @@
   - `GET /backtests/jobs/{job_id}/top?limit=`
   - `GET /backtests/jobs?state=&limit=&cursor=`
   - `POST /backtests/jobs/{job_id}/cancel`
-  См. `docs/architecture/backtest/backtest-jobs-api-v1.md`, `apps/api/routes/backtest_jobs.py`.
+  См. `docs/architecture/backtest/README.md`, `apps/api/routes/backtest_jobs.py`.
 
 - UI работает same-origin через edge/web proxy (WEB-EPIC-02): browser calls `/api/*`.
 - Web UI уже имеет:
@@ -67,7 +67,7 @@
 - Reclaim v1 = restart attempt:
   - progress может сброситься (`stage_a`, `processed_units=0`),
   - `/top` snapshot может быть временно stale (пока новый attempt не перезапишет snapshot).
-  См. `docs/architecture/backtest/backtest-job-runner-worker-v1.md`.
+  См. `docs/architecture/backtest/README.md`.
 
 ## Scope
 
@@ -115,7 +115,7 @@ Job creation происходит на `/backtests` (reuse формы WEB-EPIC-0
 - polling `GET /api/backtests/jobs/{job_id}/top?limit=...`
 - default limit: `50` (UI всегда передает limit явно)
 - `/top` возвращает только ranking summary rows (`rank`, `variant_key`, `indicator_variant_key`,
-  `variant_index`, `total_return_pct`, `payload`) и `report_context`.
+  `variant_index`, `total_return_pct`, `payload`) и `top_context`.
 - Для выбранной строки UI показывает действие `Load report` и запрашивает
   `POST /api/backtests/variant-report`.
 - Загруженный report (`rows/table_md/trades`) кэшируется в браузере по `variant_key`.
@@ -219,8 +219,8 @@ summary-only, отчёты идут через `variant-report`.
 
 Docs:
 - `docs/architecture/roadmap/milestone-6-epics-v1.md` — WEB-EPIC-06.
-- `docs/architecture/backtest/backtest-jobs-api-v1.md` — jobs endpoints contract.
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md` — stage/progress/reclaim semantics.
+- `docs/architecture/backtest/README.md` — jobs endpoints contract.
+- `docs/architecture/backtest/README.md` — stage/progress/reclaim semantics.
 - `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md` — backtests form reuse.
 
 Web:

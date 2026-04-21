@@ -32,7 +32,7 @@ class _EntryDecision:
     Internal deterministic entry decision for one bar evaluation step.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
@@ -48,7 +48,7 @@ class BacktestExecutionEngineV1:
     Deterministic close-fill execution engine v1 for one-variant backtest simulation.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -69,8 +69,8 @@ class BacktestExecutionEngineV1:
         Execute deterministic close-fill simulation on target slice and return outcome.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/execution_engine_v1.py
           - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -344,8 +344,8 @@ def _normalize_final_signal_codes(*, final_signal: np.ndarray) -> np.ndarray:
     Normalize final signal vector to contiguous compact int8 codes.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -399,8 +399,8 @@ def _entry_decision_from_signal(
     Resolve deterministic entry decision from current signal and direction/sizing settings.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
@@ -521,8 +521,8 @@ def _should_exit_by_signal(*, position: PositionV1, signal_code: np.int8) -> boo
     Decide whether current open position must be closed by signal semantics.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py

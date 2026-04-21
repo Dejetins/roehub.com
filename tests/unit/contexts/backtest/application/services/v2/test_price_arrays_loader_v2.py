@@ -11,10 +11,14 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     SyntheticArtifactStoreV2,
     build_synthetic_artifact_store_v2,
 )
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_resolver import (
+    ArtifactSlotResolverV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ArtifactPinnedIdentityV2,
     ArtifactSlotPinnedRuntimeContextV2,
-    ArtifactSlotResolverV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.price_arrays_loader import (
     MmapPriceArraysLoaderV2,
 )
 
@@ -35,8 +39,8 @@ def synthetic_artifact_store_v2(tmp_path: Path) -> SyntheticArtifactStoreV2:
     Side Effects:
         Creates a temporary artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
@@ -61,8 +65,8 @@ def test_price_arrays_loader_v2_loads_prices_mappings_and_hit_times_with_mmap(
     Side Effects:
         Memory-maps deterministic `.npy` files from the synthetic store.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
@@ -112,8 +116,8 @@ def test_price_arrays_loader_v2_rejects_price_manifest_path_drift(
     Side Effects:
         Rewrites the inactive slot root manifest under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -149,8 +153,8 @@ def test_price_arrays_loader_v2_run_scoped_loader_keeps_cache_ownership_per_run(
     Side Effects:
         Memory-maps deterministic `.npy` files from the synthetic store.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
     """
@@ -205,8 +209,8 @@ def test_price_arrays_loader_v2_rejects_mapping_bounds_drift(tmp_path: Path) -> 
     Side Effects:
         Builds one synthetic artifact tree with corrupted inactive mapping arrays.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
@@ -239,8 +243,8 @@ def test_price_arrays_loader_v2_rejects_hit_times_sentinel_drift(
     Side Effects:
         Rewrites the inactive slot hit-times manifest under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -279,8 +283,8 @@ def test_price_arrays_loader_v2_avoids_directory_scanning(
     Side Effects:
         Temporarily replaces scanning helpers on `Path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -319,8 +323,8 @@ def _inactive_context(
     Side Effects:
         Reads strict slot metadata from the synthetic store.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_resolver_v2.py
@@ -352,8 +356,8 @@ def _yaml_payload(path: Path) -> dict[str, Any]:
     Side Effects:
         Reads one UTF-8 YAML file from disk.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -380,8 +384,8 @@ def _write_yaml(path: Path, payload: dict[str, Any]) -> None:
     Side Effects:
         Rewrites one UTF-8 YAML file on disk.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -405,8 +409,8 @@ def _forbid_directory_scan(*_args: object, **_kwargs: object) -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/price_arrays_loader.py
       - tests/unit/contexts/backtest/application/services/v2/

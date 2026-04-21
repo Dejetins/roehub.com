@@ -10,7 +10,7 @@
 - Superseded by target-v2 UX:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
-  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+  - `docs/architecture/backtest/README.md`
 - Historical scope kept here:
   - manual template-mode preflight,
   - separate sync result page state without persisted history,
@@ -48,7 +48,7 @@
 - Same-origin proxy: browser вызывает JSON API по `/api/*` (WEB-EPIC-02).
 - Sync backtest API (source-of-truth): `POST /backtests`.
   Контракт request/response и deterministic ordering описаны в:
-  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+  - `docs/architecture/backtest/README.md`
   - реализация: `apps/api/routes/backtests.py`, `apps/api/dto/backtests.py`
 
 - Preflight endpoint для template-mode: `POST /indicators/estimate`.
@@ -272,10 +272,10 @@ Prefill payload переносится между страницами чере�
 
 Docs:
 - `docs/architecture/roadmap/milestone-6-epics-v1.md` — WEB-EPIC-05.
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md` — sync backtest API contract.
+- `docs/architecture/backtest/README.md` — sync backtest API contract.
 - `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md` — runtime defaults
   endpoint contract for browser prefill.
-- `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md` — guards semantics.
+- `docs/architecture/backtest/README.md` — guards semantics.
 - `docs/architecture/apps/web/web-strategy-ui-crud-builder-delete-v1.md` — strategy builder v1.
 
 API:

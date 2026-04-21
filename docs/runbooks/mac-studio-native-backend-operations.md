@@ -90,6 +90,23 @@ bash scripts/macos/reload_launchd_services.sh test
 bash scripts/macos/reload_launchd_services.sh all
 ```
 
+Monit (native service supervision):
+
+```bash
+/opt/homebrew/bin/brew services start monit
+/opt/homebrew/bin/brew services restart monit
+/opt/homebrew/bin/brew services stop monit
+```
+
+Monit проверки/управление:
+
+```bash
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc status
+/opt/homebrew/opt/monit/bin/monit -t -c /opt/homebrew/etc/monitrc
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc reload
+```
+
 `bootstrap_native_prod.sh` и `bootstrap_native_test.sh` устанавливают static launchd templates и
 рендерят per-instance `backtest-job-runner` plists из `backtest.jobs.worker_processes`.
 `reload_launchd_services.sh` сначала выгружает текущие static/worker services, затем заново
@@ -108,7 +125,7 @@ process, and `metrics endpoint` signals. Правило остаётся жес�
 - `background_auto` является canonical background mode для новых runs;
 - `background_manual_legacy` остаётся compatibility-only literal для уже persisted rows;
 - архитектурные правила и compatibility boundaries принадлежат
-  [`docs/architecture/backtest/backtest-job-runner-v2.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md),
+  [`docs/architecture/backtest/README.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md),
   а этот ранбук описывает только deploy/ops surface.
 
 Отдельно проверить worker fleet:

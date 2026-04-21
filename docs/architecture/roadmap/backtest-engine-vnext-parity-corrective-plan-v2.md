@@ -158,7 +158,7 @@ Sync launch wrapper в:
 
 Документ:
 
-- `docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md`
+- `docs/architecture/backtest/README.md`
 
 и код:
 
@@ -684,13 +684,13 @@ Current worker reuse of the same reduced-plan branch and incomplete persisted pa
 - `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
 - `tests/perf_smoke/contexts/backtest/fixtures/backtest_notebook_parity_benchmark_corpus_v1.json`
 - `src/trading/contexts/backtest/application/services/v2/notebook_parity_benchmark_corpus_v2.py`
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
-- `docs/architecture/backtest/backtest-engine-vnext.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-- `docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md`
-- `docs/architecture/backtest/backtest-adaptive-selector-v1.md`
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ### Acceptance gate
 
@@ -743,10 +743,10 @@ Current leftover public-contract ambiguity around:
 - `apps/web/dist/backtest_runs_ui.js`
 - `apps/web/dist/backtest_jobs_ui.js`
 - `apps/api/wiring/modules/backtest.py`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/README.md`
 
 ### Acceptance gate
 
@@ -794,8 +794,8 @@ Current partially closed risk-grid runtime contract spread across:
 - `src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py`
 - `configs/prod/backtest.yaml`
 - `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ### Acceptance gate
 
@@ -844,9 +844,9 @@ Current partial handling of:
 - `tests/unit/contexts/backtest/application/services/v2/test_metrics_kernel_v2.py`
 - `tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py`
 - `tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ### Acceptance gate
 
@@ -876,8 +876,8 @@ Current ambiguity inherited from the older implementation roadmap about whether:
 - explicitly fix in this master-plan that wider TP/SL artifact grids and grid-agnostic Stage B
   loaders are treated as `completed prerequisite`, not as a new unresolved epic;
 - cite the confirming authority for that prerequisite in active docs/tests:
-  - `docs/architecture/backtest/backtest-precompute-runner-v2.md`
-  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
   - `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py`
   - `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py`
 - require any contradiction discovered during `RG-TTR` closure to reopen this dependency as a
@@ -885,9 +885,9 @@ Current ambiguity inherited from the older implementation roadmap about whether:
 
 ### Основные файлы
 
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py`
 - `tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py`
 
@@ -949,15 +949,15 @@ Current ambiguity inherited from the older implementation roadmap about whether:
 - `docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md`
 - `docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md`
 - `docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md`
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
-- `docs/architecture/backtest/backtest-engine-vnext.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-- `docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md`
-- `docs/architecture/backtest/backtest-adaptive-selector-v1.md`
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 

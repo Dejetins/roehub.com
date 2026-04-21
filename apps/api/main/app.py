@@ -40,7 +40,7 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
       docs/architecture/identity/identity-2fa-totp-policy-v1.md,
       docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md,
       docs/architecture/market_data/market-data-reference-api-v1.md,
-      docs/architecture/backtest/backtest-api-post-backtests-v1.md,
+      docs/architecture/backtest/README.md,
       docs/architecture/api/api-errors-and-422-payload-v1.md,
       docs/runbooks/mac-studio-monitoring-plan.md
     Related: apps.api.routes.indicators,

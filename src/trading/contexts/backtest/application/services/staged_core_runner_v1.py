@@ -164,8 +164,8 @@ def _configure_stage_ranking_context_if_supported(
     Side Effects:
         May update scorer-local in-memory ranking hints for the current run.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -186,8 +186,8 @@ class _ResolvedRankingPlanV1:
     Pre-resolved ranking plan for one stage run to avoid repeated literal lookups in hot loops.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -208,8 +208,8 @@ class BacktestStageAScoredVariantV1:
     Deterministic scored Stage-A row shared by sync and job-runner execution paths.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -226,8 +226,8 @@ class BacktestStageBTaskV1:
     Deterministic Stage-B task payload shared by sync and job-runner execution paths.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -248,8 +248,8 @@ class BacktestStageBScoredVariantV1:
     Deterministic scored Stage-B row shared by sync and job-runner execution paths.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -270,8 +270,8 @@ class BacktestStagedCoreRunnerV1:
     Shared staged scoring core (Stage A + Stage B) for sync and job-runner flows.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
@@ -412,7 +412,7 @@ class BacktestStagedCoreRunnerV1:
         Score Stage-B variants with bounded top-K heap and optional checkpoint hooks.
 
         Docs:
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/backtest/
             backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
         Related:
@@ -482,9 +482,9 @@ class BacktestStagedCoreRunnerV1:
         Score Stage-B variants via metric-only loop and optionally score details post-ranking.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -844,8 +844,8 @@ class BacktestStagedCoreRunnerV1:
         Docs:
           - docs/architecture/backtest/
             backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -987,7 +987,7 @@ def _summary_metrics_from_ranking_metrics(*, metrics: RankingMetricsV1) -> Mappi
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
@@ -1074,7 +1074,7 @@ def _risk_pct_from_task(
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
@@ -1388,8 +1388,8 @@ def _sorted_stage_b_heap_entries(
     Materialize deterministic sorted Stage-B heap entries once for rows/tasks projections.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
@@ -1437,8 +1437,8 @@ def _stage_b_tasks_from_sorted_entries(
     Build deterministic `variant_key -> task` mapping from sorted Stage-B entries.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py

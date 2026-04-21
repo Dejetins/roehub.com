@@ -295,7 +295,7 @@ class NumbaIndicatorCompute(IndicatorCompute):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/indicators/indicators-compute-engine-core.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -330,7 +330,7 @@ class NumbaIndicatorCompute(IndicatorCompute):
         Side Effects:
             Rebuilds the internal grid builder and warmup runner for the worker-local instance.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/indicators/indicators-compute-engine-core.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py

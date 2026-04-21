@@ -9,7 +9,7 @@ class PositionV1:
     Single open position snapshot for close-fill execution engine v1.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
@@ -87,7 +87,7 @@ class TradeV1:
     Closed trade snapshot emitted by close-fill execution engine v1.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
@@ -166,7 +166,7 @@ class AccountStateV1:
     Strategy-accounting balances for sizing/profit-lock policy in engine v1.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
@@ -286,7 +286,7 @@ class ExecutionOutcomeV1:
     Deterministic close-fill engine output used for staged ranking and tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py

@@ -2,8 +2,8 @@
 Pydantic models and deterministic cursor/mapper helpers for Backtest Jobs API v1.
 
 Docs:
-  - docs/architecture/backtest/backtest-jobs-api-v1.md
-  - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+  - docs/architecture/backtest/README.md
+  - docs/architecture/backtest/README.md
   - docs/architecture/api/api-errors-and-422-payload-v1.md
 """
 
@@ -45,8 +45,8 @@ class BacktestJobErrorResponse(BaseModel):
     API response model for persisted Roehub-like failed-job payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -65,8 +65,8 @@ class BacktestJobStatusResponse(BaseModel):
     API response model for one Backtest job status/progress snapshot.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -110,8 +110,8 @@ class BacktestJobsListItemResponse(BaseModel):
     API response model for one Backtest jobs list item.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
@@ -148,8 +148,8 @@ class BacktestJobsListResponse(BaseModel):
     API response model for deterministic keyset-paginated Backtest jobs list.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/domain/value_objects/backtest_job_cursor.py
@@ -167,8 +167,8 @@ class BacktestJobTopItemResponse(BaseModel):
     API response model for one ranking-only top row in jobs `/top` endpoint.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
@@ -188,13 +188,13 @@ class BacktestJobTopItemResponse(BaseModel):
     best_sl_pct: float | None = None
 
 
-class BacktestJobVariantReportContextResponse(BaseModel):
+class BacktestJobTopContextResponse(BaseModel):
     """
-    API payload with run-context required by jobs UI lazy `variant-report` calls.
+    API payload with run-context required by jobs UI lazy detail calls.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - apps/api/routes/backtest_jobs.py
@@ -215,8 +215,8 @@ class BacktestJobTopResponse(BaseModel):
     API response model for Backtest jobs `/top` payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -227,7 +227,7 @@ class BacktestJobTopResponse(BaseModel):
 
     job_id: UUID
     state: BacktestJobsStateLiteral
-    report_context: BacktestJobVariantReportContextResponse | None = None
+    top_context: BacktestJobTopContextResponse | None = None
     items: list[BacktestJobTopItemResponse]
 
 
@@ -237,8 +237,8 @@ def build_backtest_job_status_response(*, job: BacktestJob) -> BacktestJobStatus
     Convert immutable domain job snapshot into strict status API response model.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -311,8 +311,8 @@ def build_backtest_jobs_list_response(
     Build strict list API response from deterministic repository page payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
@@ -379,9 +379,9 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
     Build ranking-only `/top` response payload with lazy-details policy.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -392,7 +392,7 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
     Returns:
         BacktestJobTopResponse: Strict `/top` response.
     Assumptions:
-        `report_table_md` and `trades` are loaded via variant-report endpoint, not `/top`.
+        Heavy detail payloads are loaded via dedicated detail APIs, not `/top`.
     Raises:
         None.
     Side Effects:
@@ -401,7 +401,7 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
     return BacktestJobTopResponse(
         job_id=result.job.job_id,
         state=result.job.state,
-        report_context=_build_backtest_job_variant_report_context(job=result.job),
+        top_context=_build_backtest_job_top_context(job=result.job),
         items=[
             BacktestJobTopItemResponse(
                 rank=row.rank,
@@ -420,16 +420,16 @@ def build_backtest_job_top_response(*, result: BacktestJobTopReadResult) -> Back
 
 
 
-def _build_backtest_job_variant_report_context(
+def _build_backtest_job_top_context(
     *,
     job: BacktestJob,
-) -> BacktestJobVariantReportContextResponse | None:
+) -> BacktestJobTopContextResponse | None:
     """
-    Build optional jobs `/top` run-context payload for lazy `variant-report` requests.
+    Build optional jobs `/top` run-context payload for lazy detail requests.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - apps/api/routes/backtest_jobs.py
@@ -438,7 +438,7 @@ def _build_backtest_job_variant_report_context(
     Args:
         job: Domain job snapshot carrying canonical `request_json`.
     Returns:
-        BacktestJobVariantReportContextResponse | None:
+        BacktestJobTopContextResponse | None:
             Parsed run-context payload, or `None` when required fields are unavailable.
     Assumptions:
         `request_json` shape follows deterministic create-job snapshot contract.
@@ -482,7 +482,7 @@ def _build_backtest_job_variant_report_context(
             overrides_payload = dict(normalized_overrides)
 
     try:
-        return BacktestJobVariantReportContextResponse(
+        return BacktestJobTopContextResponse(
             time_range=dict(_normalize_json_value(value=time_range_payload)),
             strategy_id=strategy_id_value,
             template=template_payload,
@@ -498,8 +498,8 @@ def encode_backtest_jobs_cursor(*, cursor: BacktestJobListCursor | None) -> str 
     Encode deterministic keyset cursor into opaque `base64url(json)` transport payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/domain/value_objects/backtest_job_cursor.py
@@ -534,7 +534,7 @@ def decode_backtest_jobs_state(*, state: str | None) -> BacktestJobsStateLiteral
     Decode optional jobs list `state` query value with blank-to-none compatibility behavior.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - apps/api/routes/backtest_jobs.py
@@ -580,8 +580,8 @@ def decode_backtest_jobs_cursor(*, cursor: str | None) -> BacktestJobListCursor 
     Decode opaque `base64url(json)` cursor transport payload into cursor value object.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - src/trading/contexts/backtest/domain/value_objects/backtest_job_cursor.py
@@ -627,7 +627,7 @@ def _invalid_cursor_error(*, reason: str | None = None) -> BacktestValidationErr
     Build canonical validation error for malformed Backtest jobs list cursor payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - apps/api/dto/backtest_jobs.py
@@ -666,7 +666,7 @@ def _normalize_json_value(*, value: Any) -> Any:
     Normalize arbitrary payload node into deterministic JSON-compatible structure.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtest_jobs.py
       - apps/api/dto/backtests.py
@@ -710,7 +710,7 @@ __all__ = [
     "BacktestJobsListResponse",
     "BacktestJobsStateLiteral",
     "BacktestJobTopItemResponse",
-    "BacktestJobVariantReportContextResponse",
+    "BacktestJobTopContextResponse",
     "BacktestJobTopResponse",
     "build_backtest_job_status_response",
     "build_backtest_job_top_response",

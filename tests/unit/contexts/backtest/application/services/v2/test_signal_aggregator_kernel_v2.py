@@ -5,9 +5,11 @@ from typing import Any, cast
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.services import aggregate_final_signal_rows_v2
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2 import (
     signal_aggregator_kernel as signal_aggregator_kernel_module,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_aggregator_kernel import (
+    aggregate_final_signal_rows_v2,
 )
 
 

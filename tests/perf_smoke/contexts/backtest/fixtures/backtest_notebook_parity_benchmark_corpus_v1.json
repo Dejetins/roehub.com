@@ -5,9 +5,9 @@
   "status": "active_closure_authority",
   "reference_docs": [
     "docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md",
-    "docs/architecture/backtest/backtest-v2-benchmarks.md",
-    "docs/architecture/backtest/backtest-engine-vnext.md",
-    "docs/architecture/backtest/backtest-runtime-kernels-v2.md"
+    "docs/architecture/backtest/README.md",
+    "docs/architecture/backtest/README.md",
+    "docs/architecture/backtest/README.md"
   ],
   "measurement_contract": {
     "required_fields": [

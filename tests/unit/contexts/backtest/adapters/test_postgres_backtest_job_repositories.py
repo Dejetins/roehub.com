@@ -35,7 +35,7 @@ class _FakeGateway:
     Deterministic fake SQL gateway for Backtest job Postgres repository unit tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/gateway.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -1003,8 +1003,8 @@ def test_results_repository_list_top_variants_normalizes_localized_updated_at_to
     Verify persisted top rows normalize storage-local `updated_at` to `timezone.utc`.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_results_repository.py

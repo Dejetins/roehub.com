@@ -314,12 +314,13 @@ def test_backtest_variant_detail_page_renders_required_runs_detail_hooks() -> No
     assert 'data-variant-key="variant-key-001"' in response.text
     assert "/assets/backtest_runs_ui.js" in response.text
     assert "/api/backtests/runs/{run_id}/top" in response.text
-    assert "/api/backtests/runs/{run_id}/variant-report" in response.text
     assert "/api/market-data/markets" in response.text
     assert "/strategies/new" in response.text
     assert "sessionStorage" in response.text
     assert "prefill" in response.text
-    assert "include_trades" in response.text
+    assert "Summary metrics" in response.text
+    assert "Variant payload JSON" in response.text
+    assert "/api/backtests/runs/{run_id}/variant-report" not in response.text
 
 
 def test_backtest_run_summary_page_renders_detail_and_save_hooks() -> None:
@@ -475,14 +476,14 @@ def test_backtest_job_details_page_renders_job_id_and_required_jobs_literals() -
     assert f'data-job-id="{job_id}"' in response.text
     assert "/api/backtests/jobs/" in response.text
     assert "/api/backtests/jobs/{job_id}/top" in response.text
-    assert "/api/backtests/variant-report" in response.text
     assert "/api/backtests/jobs/{job_id}/cancel" in response.text
     assert f"/backtests/runs/{job_id}" in response.text
     assert "limit=50" in response.text
-    assert "Load report" in response.text
+    assert "summary-only" in response.text
     assert "Jobs disabled by config" in response.text
     assert "sessionStorage" in response.text
     assert "prefill" in response.text
+    assert "/api/backtests/variant-report" not in response.text
 
 
 def test_strategy_builder_page_renders_required_reference_api_hooks() -> None:

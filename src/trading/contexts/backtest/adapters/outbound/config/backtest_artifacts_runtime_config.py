@@ -8,7 +8,7 @@ from typing import Any, Mapping, Sequence
 
 import yaml
 
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ALLOWED_ARTIFACT_SLOTS_V2,
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
@@ -18,12 +18,14 @@ from trading.contexts.backtest.application.services import (
     ArtifactSignalValidationSpecV2,
     ArtifactSlotValidationSpecV2,
     ordered_artifact_slots_v2,
-    supported_indicator_ids_for_signals_v1,
     validate_artifact_slot_v2,
     validate_indicator_id_v2,
     validate_mapping_timeframe_v2,
     validate_price_timeframe_v2,
     validate_signal_timeframe_v2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
+    supported_indicator_ids_for_signal_rules_v2 as supported_indicator_ids_for_signals_v1,
 )
 
 from .backtest_runtime_config import resolve_backtest_env_name
@@ -80,7 +82,7 @@ class _UniqueKeySafeLoader(yaml.SafeLoader):
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """
@@ -108,7 +110,7 @@ def _construct_unique_mapping(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """
@@ -133,8 +135,8 @@ class BacktestArtifactSignalRuntimeConfig:
     Frozen signal validation target loaded from `backtest_artifacts.validation_plan`.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest_artifacts.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -189,7 +191,7 @@ class BacktestArtifactValidationPlanRuntimeConfig:
     Frozen publish validation plan loaded from `backtest_artifacts.validation_plan`.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -295,7 +297,7 @@ class BacktestArtifactValidationPlanRuntimeConfig:
             None.
         Docs:
           - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
           - docs/runbooks/backtest-artifacts-rebuild.md
@@ -314,7 +316,7 @@ class BacktestArtifactHitTimesGridRuntimeConfig:
     Frozen hit-times grid contract loaded from `backtest_artifacts.hit_times_grid`.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -363,7 +365,7 @@ class BacktestArtifactSlotPolicyRuntimeConfig:
     Frozen slot policy loaded from `backtest_artifacts.slot_policy`.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -407,7 +409,7 @@ class BacktestArtifactPublishScheduleRuntimeConfig:
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - configs/dev/backtest_artifacts.yaml
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     """
 
     full_rebuild_hour_utc: int
@@ -448,7 +450,7 @@ class BacktestArtifactLookbackPolicyRuntimeConfig:
     Frozen lookback bounds loaded from `backtest_artifacts.lookback_policy`.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -499,7 +501,7 @@ class BacktestArtifactValidationBudgetsRuntimeConfig:
     Frozen validation budget bounds loaded from `backtest_artifacts.validation_budgets`.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -560,7 +562,7 @@ class BacktestArtifactExecutionPolicyRuntimeConfig:
     Strict execution-policy contract loaded from `backtest_artifacts.execution_policy`.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -646,8 +648,8 @@ class BacktestArtifactsRuntimeConfig:
     Strict artifact pipeline runtime config loaded from `configs/<env>/backtest_artifacts.yaml`.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest_artifacts.yaml
       - apps/api/wiring/modules/backtest.py
@@ -757,7 +759,7 @@ class BacktestArtifactsRuntimeConfig:
             None.
         Docs:
           - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
           - docs/runbooks/backtest-artifacts-rebuild.md
@@ -784,8 +786,8 @@ class BacktestArtifactsRuntimeConfig:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
-          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -823,7 +825,7 @@ def resolve_backtest_artifacts_config_path(
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest_artifacts.yaml
       - apps/api/wiring/modules/backtest.py
@@ -853,7 +855,7 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
     Load and strictly validate the artifact pipeline runtime YAML configuration.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -1095,8 +1097,8 @@ def build_backtest_artifacts_runtime_config_hash(
     Build deterministic SHA-256 hash for the canonical artifact config payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
       - configs/dev/backtest_artifacts.yaml
@@ -1197,7 +1199,7 @@ def _load_yaml_mapping(*, path: Path) -> Mapping[str, Any]:
         Reads one UTF-8 file from disk.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """
@@ -1269,8 +1271,8 @@ def _load_signal_artifacts(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest_artifacts.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -1326,7 +1328,7 @@ def _expand_all_supported_signal_artifacts() -> tuple[BacktestArtifactSignalRunt
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1529,7 +1531,7 @@ def _normalize_timeframe_sequence(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -1570,8 +1572,8 @@ def _normalize_signal_artifacts(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -1618,7 +1620,7 @@ def _normalize_positive_float_sequence(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -1658,7 +1660,7 @@ def _normalize_slot_sequence(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -1694,7 +1696,7 @@ def _validate_artifact_root_literal(*, value: str, field_path: str) -> str:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - apps/api/wiring/modules/backtest.py
@@ -1782,8 +1784,8 @@ def _normalize_json_value(*, value: Any) -> Any:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """

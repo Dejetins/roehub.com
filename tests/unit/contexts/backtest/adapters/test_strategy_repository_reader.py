@@ -20,7 +20,7 @@ class _SpecWrapper:
     Strategy spec wrapper overriding `to_json` payload for ACL adapter tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/adapters/test_strategy_repository_reader.py
       - src/trading/contexts/backtest/adapters/outbound/acl/strategy_repository_reader.py

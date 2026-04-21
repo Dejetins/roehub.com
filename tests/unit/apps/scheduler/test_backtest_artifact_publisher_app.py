@@ -18,13 +18,13 @@ from apps.scheduler.backtest_artifact_publisher.wiring.modules import (
 from apps.scheduler.backtest_artifact_publisher.wiring.modules import (
     backtest_artifact_publisher as publisher_module,
 )
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services import (
     ArtifactCoordinatesV2,
     ArtifactStageRebuildStatsCollectionV2,
     ArtifactStageRebuildStatsV2,
     ArtifactTailRebuildBarsV2,
 )
-from trading.contexts.backtest.application.use_cases import (
+from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
     PublishBacktestArtifactsV2Result,
     PublishBacktestArtifactsV2UseCase,
@@ -140,7 +140,7 @@ class _FakePublishUseCase:
     Recording publish use-case double returning pre-seeded results.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -165,7 +165,7 @@ class _FakePublishUseCase:
         Side Effects:
             Appends one request to the in-memory call log.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -193,7 +193,7 @@ def _result(*, exchange: str, market_type: str, symbol: str) -> PublishBacktestA
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -712,7 +712,7 @@ def test_run_cycle_logs_stage_rebuild_stats_for_successful_symbol(
         Executes one in-memory scheduler cycle and captures INFO logs.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
     """

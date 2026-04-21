@@ -4,28 +4,28 @@ from dataclasses import replace
 
 import pytest
 
-from trading.contexts.backtest.application.services.v2.adaptive_selector_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.adaptive_selector_v2 import (
     AdaptiveSelectorCandidateEvaluationV2,
     AdaptiveSelectorPlanningEvidenceV2,
     AdaptiveSelectorRuntimeModeLiteralV2,
     CostModelAdaptiveExecutionSelectorV2,
     default_adaptive_selector_policy_v2,
 )
-from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlannerV2,
     BacktestRiskVariantV2,
     BacktestRuntimeStageCostModelV2,
     _build_launch_budget_evidence_v2,
     _build_parity_classification_v2,
 )
-from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
     ExecutionProfileLaunchBudgetEvidenceV2,
     ExecutionProfileParityClassificationV2,
     ExecutionProfilesCatalogV2,
     default_execution_profiles_catalog_v2,
 )
-from trading.contexts.backtest.application.services.v2.family_plugins.registry_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.family_plugins.registry_v2 import (
     FamilyPluginRegistryV2,
 )
 from trading.platform.errors import RoehubError

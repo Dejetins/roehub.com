@@ -11,9 +11,6 @@ from trading.contexts.backtest.adapters.outbound.persistence.postgres.gateway im
     BacktestPostgresGateway,
 )
 from trading.contexts.backtest.application.ports import BacktestJobResultsRepository
-from trading.contexts.backtest.application.services.v2.metrics_kernel import (
-    normalize_persisted_summary_metrics_v2,
-)
 from trading.contexts.backtest.domain.entities import (
     BacktestJobStageANoRiskExactRow,
     BacktestJobStageAShortlist,
@@ -23,6 +20,9 @@ from trading.contexts.backtest.domain.entities.backtest_job_results import (
     BacktestJobParityRuntimeState,
 )
 from trading.contexts.backtest.domain.errors import BacktestStorageError
+from trading.contexts.backtest_artifacts.application.services.v2.metrics_kernel import (
+    normalize_persisted_summary_metrics_v2,
+)
 
 
 class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
@@ -30,9 +30,9 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
     Explicit SQL adapter for Backtest jobs top-k snapshots and Stage-A shortlist storage.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
@@ -98,7 +98,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         Replace full top-k snapshot using one SQL statement (delete old + insert new rows).
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -207,7 +207,7 @@ class PostgresBacktestJobResultsRepository(BacktestJobResultsRepository):
         Load persisted top variants ordered deterministically by rank and key.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -508,7 +508,7 @@ def _map_top_variant_row(*, row: Mapping[str, Any]) -> BacktestJobTopVariant:
     Map SQL row payload into immutable `BacktestJobTopVariant` entity.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -598,8 +598,8 @@ def _normalize_storage_datetime_utc(
     Normalize one storage `timestamptz` value into timezone-aware UTC datetime.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -782,7 +782,7 @@ def _parse_optional_float(*, value: Any) -> float | None:
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
       - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
@@ -816,7 +816,7 @@ def _coalesce_optional_float(*, first: float | None, second: float | None) -> fl
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -851,7 +851,7 @@ def _extract_optional_risk_pct_from_payload(
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py

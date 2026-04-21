@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.generic_row_scorer_v2 import (
     GenericRowScorerV2,
     GenericRowScoringInputV2,
     build_generic_row_signal_features_mapping_v2,

@@ -10,4 +10,4 @@
 
 Дополнительно:
 
-- migration plan: `docs/architecture/roadmap/mac-studio-native-backend-migration-plan-v1.md`
+- migration plan: `docs/runbooks/mac-studio-native-backend-operations.md`

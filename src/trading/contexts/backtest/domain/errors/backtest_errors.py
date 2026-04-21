@@ -9,7 +9,7 @@ class BacktestDomainError(ValueError):
     Base deterministic domain error for Backtest v1 bounded context.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/errors.py
       - src/trading/platform/errors/roehub_error.py
@@ -22,7 +22,7 @@ class BacktestValidationError(BacktestDomainError):
     Raised when backtest request/domain invariants violate v1 contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/errors.py
@@ -87,7 +87,7 @@ class BacktestNotFoundError(BacktestDomainError):
     Raised when requested saved strategy snapshot does not exist or is deleted.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/ports/strategy_reader.py
@@ -136,7 +136,7 @@ class BacktestForbiddenError(BacktestDomainError):
     Raised when saved strategy ownership does not match authenticated user.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -186,7 +186,7 @@ class BacktestConflictError(BacktestDomainError):
     Raised when use-case receives conflicting but syntactically valid payload/state.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -237,7 +237,7 @@ class BacktestStorageError(BacktestDomainError):
     Raised when outbound adapter cannot load deterministic saved-strategy snapshot.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/strategy_reader.py
       - src/trading/contexts/backtest/application/use_cases/errors.py
@@ -250,7 +250,7 @@ class BacktestJobTransitionError(BacktestDomainError):
     Raised when Backtest job lifecycle transition violates state-machine contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -265,7 +265,7 @@ class BacktestJobLeaseError(BacktestDomainError):
     Raised when Backtest job lease-owner invariants are violated.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py

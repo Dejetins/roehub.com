@@ -14,7 +14,10 @@ from trading.contexts.backtest.adapters.outbound.config import (
     build_backtest_artifacts_runtime_config_hash,
     load_backtest_artifacts_runtime_config,
 )
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
+    YamlBacktestArtifactLoaderV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     SIGNAL_FEATURE_NAMES_V2,
@@ -23,7 +26,6 @@ from trading.contexts.backtest.application.services import (
     ArtifactSignalValidationSpecV2,
     ArtifactSlotLiteralV2,
     ArtifactSlotValidationSpecV2,
-    YamlBacktestArtifactLoaderV2,
     inactive_artifact_slot_v2,
 )
 
@@ -34,8 +36,8 @@ class SyntheticArtifactStoreV2:
     Synthetic artifact store fixture with deterministic strict manifests and `.npy` payloads.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py
@@ -56,7 +58,7 @@ class ArtifactPrecomputeFixtureV2:
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -118,8 +120,8 @@ def build_synthetic_artifact_store_v2(
     Side Effects:
         Creates a deterministic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_yaml_backtest_artifact_loader_v2.py
@@ -291,7 +293,7 @@ def build_artifact_precompute_fixture_v2(
         Creates strict config YAML and `current.yaml` under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -427,7 +429,7 @@ def _serialize_signal_artifacts_config_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -474,7 +476,7 @@ def _runtime_settings_signal_artifacts_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -543,8 +545,8 @@ def _write_slot_payloads(
     Side Effects:
         Creates files and manifests under one slot root.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -985,8 +987,8 @@ def _price_manifest_payload(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1038,8 +1040,8 @@ def _array_metadata_payload(
     Side Effects:
         Reads the `.npy` file from disk to derive dtype and shape.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1077,8 +1079,8 @@ def _hit_times_table_payload(
     Side Effects:
         Reads the `.npy` file from disk to derive dtype and shape.
     Docs:
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1116,8 +1118,8 @@ def _level_array_metadata_payload(
     Side Effects:
         Reads the `.npy` file from disk to derive dtype and shape.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1147,8 +1149,8 @@ def _timeline_payload(*, open_time: np.ndarray, close_time: np.ndarray) -> dict[
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1176,8 +1178,8 @@ def _provenance_payload() -> dict[str, Any]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1206,8 +1208,8 @@ def _write_yaml(path: Path, payload: Mapping[str, Any]) -> None:
     Side Effects:
         Creates parent directories and writes UTF-8 YAML to disk.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1239,8 +1241,8 @@ def _write_npy_if_needed(
     Side Effects:
         Creates parent directories and writes `.npy` bytes to disk.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py
     """
@@ -1272,8 +1274,8 @@ def _slot_relative_path(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1295,8 +1297,8 @@ def _axis_order_for_shape(shape: tuple[int, ...]) -> list[str]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1328,8 +1330,8 @@ def _file_sha256_hex_v2(path: Path) -> str:
     Side Effects:
         Reads the file from disk in binary mode.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1355,8 +1357,8 @@ def _default_signal_values() -> np.ndarray:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1379,7 +1381,7 @@ def _build_signal_feature_matrix_v2(*, signal_values: np.ndarray) -> np.ndarray:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -1442,8 +1444,8 @@ def _default_mapping_open_idx() -> np.ndarray:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1465,8 +1467,8 @@ def _default_mapping_close_idx() -> np.ndarray:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1488,8 +1490,8 @@ def _default_long_tp() -> np.ndarray:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1511,8 +1513,8 @@ def _default_long_sl() -> np.ndarray:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1534,8 +1536,8 @@ def _default_short_tp() -> np.ndarray:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
@@ -1557,8 +1559,8 @@ def _default_short_sl() -> np.ndarray:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """

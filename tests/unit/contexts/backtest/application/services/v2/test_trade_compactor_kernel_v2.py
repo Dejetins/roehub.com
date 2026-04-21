@@ -5,25 +5,25 @@ import math
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.services import (
-    build_compact_trade_list_v2,
-    compute_no_risk_metrics_v2,
-    no_risk_metrics_to_ranking_payload_v2,
-)
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
+from trading.contexts.backtest_artifacts.application.services.v2 import (
     trade_compactor_kernel as trade_compactor_kernel_module,
 )
-from trading.contexts.backtest.application.services.v2.contracts import StageACompactTradeV2
-from trading.contexts.backtest.application.services.v2.signal_aggregator_kernel import (
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    StageACompactTradeV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_aggregator_kernel import (
     aggregate_signal_pairs_v2,
 )
-from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
+from trading.contexts.backtest_artifacts.application.services.v2.trade_compactor_kernel import (
     build_compact_exact_payloads_v2,
     build_compact_trade_batch_for_signal_pairs_v2,
     build_compact_trade_batch_v2,
+    build_compact_trade_list_v2,
     compute_no_risk_metrics_for_trade_batch_v2,
+    compute_no_risk_metrics_v2,
+    no_risk_metrics_to_ranking_payload_v2,
 )
-from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
 
 def test_build_compact_trade_list_v2_builds_signal_exit_and_sentinel_trades() -> None:

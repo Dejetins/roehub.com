@@ -48,8 +48,8 @@ runtime engine.
 
 - [Final Backtest Refactor Plan v2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-refactor-final-plan-v2.md)
 - [План доработки и ускорения backtest runtime v1](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md)
-- [Backtest Job Runner v2 -- claimed background worker для persisted runs](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
-- [Backtest Runs History API v2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
+- [Backtest Job Runner v2 -- claimed background worker для persisted runs](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [Backtest Runs History API v2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [Ранбук backtest job runner](/Users/daniildegtyarev/Projects/roehub.com/docs/runbooks/backtest-job-runner.md)
 
 ## 3. Ключевые решения этого roadmap
@@ -58,9 +58,9 @@ runtime engine.
 
 Canonical architecture doc для worker-а это отдельный файл:
 
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
+- `docs/architecture/backtest/README.md`
 
-`docs/architecture/backtest/backtest-job-runner-worker-v1.md` остаётся historical /
+`docs/architecture/backtest/README.md` остаётся historical /
 compatibility document и не является больше основным source of truth.
 
 ### 3.2 Canonical background launch mode
@@ -195,16 +195,16 @@ history/detail APIs
 
 Что должно быть реализовано:
 
-- создать `docs/architecture/backtest/backtest-job-runner-v2.md`;
-- обновить `docs/architecture/backtest/backtest-job-runner-worker-v1.md`;
+- создать `docs/architecture/backtest/README.md`;
+- обновить `docs/architecture/backtest/README.md`;
 - обновить ссылки в активных docs и индексах.
 
 Документы:
 
 - создать:
-  - `docs/architecture/backtest/backtest-job-runner-v2.md`
+  - `docs/architecture/backtest/README.md`
 - обновить:
-  - `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/backtest/README.md`
   - `docs/runbooks/backtest-job-runner.md`
   - `docs/architecture/README.md` через docs index generation
@@ -225,8 +225,8 @@ history/detail APIs
 Документы:
 
 - обновить:
-  - `docs/architecture/backtest/backtest-runs-history-v2.md`
-  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
   - `docs/architecture/backtest/README.md`
 
@@ -484,8 +484,8 @@ fleet как обязательную часть backtest contract.
 
 Документы:
 
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
-- `docs/architecture/backtest/backtest-adaptive-selector-v1.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 #### EPIC E2. Compatibility-only path для `background_manual_legacy`
 
@@ -507,8 +507,8 @@ fleet как обязательную часть backtest contract.
 
 Документы:
 
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 
 ### Milestone F. Runbooks, tests и docs closure
@@ -562,18 +562,18 @@ fleet как обязательную часть backtest contract.
 
 ### Создать
 
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md`
 - `infra/macos/launchd/com.roehub.backtest-job-runner.plist.template`
 - `scripts/macos/render_backtest_job_runner_launchd.py`
 
 ### Обновить
 
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md`
 - `docs/architecture/backtest/README.md`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-- `docs/architecture/backtest/backtest-adaptive-selector-v1.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 - `docs/runbooks/backtest-job-runner.md`
 - `docs/runbooks/mac-studio-native-backend-operations.md`

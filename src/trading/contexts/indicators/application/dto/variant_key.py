@@ -182,7 +182,7 @@ def _is_pre_sorted_indicator_selections(
     Check whether indicator selections are already sorted by `indicator_id` asc.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
     Related:
       - src/trading/contexts/indicators/application/dto/variant_key.py
@@ -216,7 +216,7 @@ def _is_pre_sorted_mapping(
     Check whether mapping is immutable and already sorted by key asc.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
     Related:
       - src/trading/contexts/indicators/application/dto/variant_key.py

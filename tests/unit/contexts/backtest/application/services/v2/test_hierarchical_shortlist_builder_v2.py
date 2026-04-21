@@ -9,26 +9,32 @@ from typing import Any
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlanV2,
     BacktestIndicatorAxisPlanV2,
     BacktestIndicatorPlanV2,
     BacktestRiskVariantV2,
     BacktestSignalAxisPlanV2,
-    FamilyPluginApplicabilityV2,
-    FamilyPluginCircuitBreakerV2,
-    FamilyPluginMetadataV2,
-    FamilyPluginProposalResultV2,
-    FamilyPluginRegistryV2,
-    HierarchicalShortlistRuntimePlanV2,
 )
-from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
     ExecutionProfileShortlistConfigV2,
     default_execution_profiles_catalog_v2,
 )
-from trading.contexts.backtest.application.services.v2.hierarchical_shortlist_builder_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.family_plugins.circuit_breaker_v2 import (  # noqa: E501
+    FamilyPluginCircuitBreakerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.family_plugins.contracts_v2 import (  # noqa: E501
+    FamilyPluginApplicabilityV2,
+    FamilyPluginMetadataV2,
+    FamilyPluginProposalResultV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.family_plugins.registry_v2 import (
+    FamilyPluginRegistryV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.hierarchical_shortlist_builder_v2 import (  # noqa: E501
     BacktestHierarchicalShortlistBuilderV2,
+    HierarchicalShortlistRuntimePlanV2,
 )
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
@@ -38,8 +44,8 @@ class _RecordingPriceLoader:
     Minimal artifact price-loader fake recording whether hybrid planning touches price artifacts.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -52,8 +58,8 @@ class _RecordingPriceLoader:
         Initialize one recording price-loader fake for deterministic hybrid-builder tests.
 
         Docs:
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
@@ -79,8 +85,8 @@ class _RecordingPriceLoader:
         Return deterministic request-timeframe prices and record the loader call.
 
         Docs:
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
@@ -110,8 +116,8 @@ class _RecordingPriceLoader:
         Return a deterministic identity mapping fixture for protocol completeness.
 
         Docs:
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
@@ -143,8 +149,8 @@ class _RecordingPriceLoader:
         Return an empty hit-times fixture for protocol completeness in unit tests.
 
         Docs:
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
@@ -171,8 +177,8 @@ class _RecordingSignalLoader:
     Minimal signal-loader fake exposing both full-matrix and subset-row contracts.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -185,8 +191,8 @@ class _RecordingSignalLoader:
         Initialize one deterministic in-memory signal artifact catalog.
 
         Docs:
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
@@ -222,8 +228,8 @@ class _RecordingSignalLoader:
         Return one full signal matrix for hybrid block scoring and record the request.
 
         Docs:
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -266,8 +272,8 @@ class _RecordingSignalLoader:
         Return deterministic selected signal rows for exact-path survivor expansion tests.
 
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_hierarchical_shortlist_builder_v2.py
@@ -308,7 +314,7 @@ class _StaticDefaultsProvider:
 
     Docs:
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -413,7 +419,7 @@ class _RecordingFamilyPlugin:
     Minimal proposal-only family plugin test double with optional sleep/error behavior.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
@@ -434,7 +440,7 @@ class _RecordingFamilyPlugin:
         Initialize one configurable family-plugin test double.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
@@ -475,7 +481,7 @@ class _RecordingFamilyPlugin:
         Return one configured proposal payload or trigger the requested failure behavior.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
@@ -510,8 +516,8 @@ def test_hierarchical_shortlist_builder_v2_reduces_runtime_plan_and_preserves_ex
     Verify hybrid builder prunes multi-block compute space and preserves exact Stage A ordering.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -593,8 +599,8 @@ def test_hierarchical_shortlist_builder_v2_remaps_source_subset_rows_to_full_cat
     Verify source-subset plans score planner-local rows against the full artifact source catalog.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -669,8 +675,8 @@ def test_hierarchical_shortlist_builder_v2_requires_defaults_provider_for_source
     Verify source-aware artifact remapping fails fast without runtime defaults ordering.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -728,8 +734,8 @@ def test_hierarchical_shortlist_runtime_plan_v2_resolves_sparse_stage_a_indexes(
     Verify reduced hybrid plans resolve retained Stage A variants by original sparse indexes.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -791,7 +797,7 @@ def test_hierarchical_shortlist_builder_v2_rejects_non_opt_in_profile_flags() ->
     Verify hybrid builder fails fast when the resolved profile is not live-enabled for rollout.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
@@ -851,7 +857,7 @@ def test_hierarchical_shortlist_builder_v2_uses_ma_family_plugin_for_hybrid_fami
     Verify `hybrid_family` keeps the shared runtime path but uses the MA-family proposal layer.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-ma.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
@@ -954,7 +960,7 @@ def test_hierarchical_shortlist_builder_v2_falls_back_for_mixed_family_hybrid_fa
     Verify mixed-family `hybrid_family` requests degrade to the universal conservative path.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
@@ -1031,7 +1037,7 @@ def test_hierarchical_shortlist_builder_v2_falls_back_on_family_plugin_timeout()
     Verify family-plugin timeout records warning metadata and degrades to universal fallback.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
@@ -1110,7 +1116,7 @@ def test_hierarchical_shortlist_builder_v2_falls_back_on_family_plugin_error() -
     Verify family-plugin exceptions degrade to universal fallback with explicit warning payloads.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
@@ -1188,7 +1194,7 @@ def test_hierarchical_shortlist_builder_v2_falls_back_when_family_plugin_breaker
     Verify an open family-plugin circuit breaker skips plugin execution and uses fallback.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
@@ -1265,7 +1271,7 @@ def _hybrid_family_profile_fixture(*, max_candidates: int):
     Build one explicit opt-in `hybrid_family` profile fixture for proposal-layer tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
@@ -1316,8 +1322,8 @@ def _runtime_plan_fixture(
     Build a deterministic runtime-plan fixture for hierarchical shortlist unit tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -1400,8 +1406,8 @@ def _artifact_context_fixture() -> Any:
     Build a minimal slot-pinned runtime context fixture for hybrid shortlist tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py
@@ -1432,8 +1438,8 @@ def _target_time_range_fixture() -> TimeRange:
     Build the deterministic target range covering both synthetic request-timeframe bars.
 
     Docs:
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/
         test_hierarchical_shortlist_builder_v2.py

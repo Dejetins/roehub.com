@@ -3,9 +3,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.diversified_retention_v2 import (
     DiversifiedRetentionV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     ExecutionProfileShortlistRetentionConfigV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.generic_row_scorer_v2 import (
     GenericRowScorePayloadV2,
     GenericRowScorerV2,
     GenericRowScoringInputV2,

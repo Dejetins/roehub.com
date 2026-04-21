@@ -44,8 +44,8 @@
   - `docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md`  *(этот документ)*
 
 - (Опционально позже) отдельный runbook:
-  - `docs/runbooks/market-data-ws-worker.md`
-  - `docs/runbooks/market-data-scheduler.md`
+  - `docs/runbooks/market-data-autonomous-docker.md`
+  - `docs/runbooks/market-data-autonomous-docker.md`
 
 ---
 

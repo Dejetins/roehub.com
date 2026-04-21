@@ -21,11 +21,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestStrategySnapshot,
     CurrentUser,
 )
-from trading.contexts.backtest.application.services.v2 import (
-    BacktestArtifactLoaderV2,
-    artifact_coordinates_from_market_id_v2,
-    validate_execution_profile_mode_v2,
-)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
@@ -40,6 +35,13 @@ from trading.contexts.backtest.domain.errors import (
     BacktestValidationError,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor, ExecutionParamsV1
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    BacktestArtifactLoaderV2,
+    artifact_coordinates_from_market_id_v2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
+    validate_execution_profile_mode_v2,
+)
 
 from .errors import backtest_job_forbidden, backtest_job_not_found, validation_error
 from .request_runtime_contract_v1 import (
@@ -65,8 +67,8 @@ class CreateBacktestJobCommand:
     Command payload for EPIC-11 `POST /backtests/jobs` job creation orchestration.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - apps/api/routes/backtest_jobs.py
@@ -121,8 +123,8 @@ class _ResolvedJobCreationContext:
     Internal resolved EPIC-11 create context used for deterministic snapshot/hash creation.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - apps/api/routes/backtest_jobs.py
@@ -143,8 +145,8 @@ class BacktestJobTopReadResult:
     Top-read payload for EPIC-11 `/backtests/jobs/{job_id}/top` use-case contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - apps/api/dto/backtest_jobs.py
@@ -160,9 +162,9 @@ class CreateBacktestJobUseCase:
     Create queued Backtest job with owner/quota/validation checks and canonical hashes.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/application/ports/strategy_reader.py
@@ -292,7 +294,7 @@ class CreateBacktestJobUseCase:
         Validate and persist queued Backtest job snapshot for authenticated owner.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-api-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -739,8 +741,8 @@ class GetBacktestJobStatusUseCase:
     Read one owner-scoped Backtest job status snapshot with explicit 403/404 semantics.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - apps/api/routes/backtest_jobs.py
@@ -794,8 +796,8 @@ class GetBacktestJobTopUseCase:
     Read owner job top snapshot rows with deterministic limit/state policy validation.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - apps/api/routes/backtest_jobs.py
@@ -918,8 +920,8 @@ class ListBacktestJobsUseCase:
     List owner Backtest jobs using deterministic keyset pagination contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/domain/value_objects/backtest_job_cursor.py
@@ -987,8 +989,8 @@ class CancelBacktestJobUseCase:
     Request owner job cancel and return updated idempotent status payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - apps/api/routes/backtest_jobs.py
@@ -1063,7 +1065,7 @@ def _require_owner_job(
     Read job by id and enforce explicit owner policy (`403` foreign, `404` missing).
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -1102,8 +1104,8 @@ def _template_from_snapshot(
     Convert saved strategy snapshot into run template with deterministic ownership checks.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/strategy_reader.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -1152,8 +1154,8 @@ def _apply_saved_overrides(
     Apply saved-mode overrides over base snapshot template deterministically.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -1223,8 +1225,8 @@ def _resolve_positive_override(
     Resolve optional positive integer override against runtime default.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1271,8 +1273,8 @@ def _resolve_number(
     Resolve numeric override by primary/secondary key with deterministic fallback.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -1314,7 +1316,7 @@ def _merge_scalar_mappings(
     Merge scalar mappings deterministically with update precedence and sorted keys.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -1356,7 +1358,7 @@ def _merge_signal_grids(
     Merge nested signal-grid mappings deterministically by indicator and parameter keys.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -1417,8 +1419,8 @@ def _normalize_fee_defaults(*, values: Mapping[int, float]) -> Mapping[int, floa
     Normalize fee defaults mapping to immutable deterministic `market_id -> fee_pct` payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
@@ -1488,8 +1490,8 @@ def _normalize_json_mapping(*, values: Mapping[str, Any]) -> dict[str, Any]:
     Normalize mapping payload into deterministic JSON-compatible dictionary.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - apps/api/dto/backtests.py
@@ -1522,7 +1524,7 @@ def _normalize_json_value(*, value: Any) -> Any:
     Normalize arbitrary value into deterministic JSON-compatible structure.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - apps/api/dto/backtests.py
@@ -1566,8 +1568,8 @@ def _build_sha256_from_payload(*, payload: Mapping[str, Any]) -> str:
     Build deterministic SHA-256 hash from canonical JSON representation.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - apps/api/dto/backtests.py
@@ -1600,9 +1602,9 @@ def _build_request_hash_from_request_json(*, payload: Mapping[str, Any]) -> str:
     Build canonical `request_hash` without persisted-only routing/read-model metadata.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -1660,7 +1662,7 @@ def _utc_now() -> datetime:
     Return timezone-aware UTC timestamp for deterministic job lifecycle writes.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - src/trading/contexts/backtest/domain/entities/backtest_job.py

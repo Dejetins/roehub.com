@@ -8,10 +8,12 @@ import numpy as np
 
 from trading.contexts.backtest.application.dto import BacktestRiskGridSpec, RunBacktestTemplate
 from trading.contexts.backtest.application.services import (
-    BacktestRuntimeBenchmarkSliceV2,
-    BacktestRuntimeBenchmarkSyntheticRunSpecV2,
     BacktestStagedRunnerV1,
     CloseFillBacktestStagedScorerV1,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.benchmark_corpus_v2 import (
+    BacktestRuntimeBenchmarkSliceV2,
+    BacktestRuntimeBenchmarkSyntheticRunSpecV2,
     load_backtest_runtime_acceleration_benchmark_corpus_v2,
 )
 from trading.contexts.indicators.application.dto import (
@@ -44,8 +46,8 @@ class _PerfSmokeIndicatorCompute:
     In-memory IndicatorCompute fake for staged backtest perf-smoke without external services.
 
     Docs:
-      - docs/architecture/backtest/backtest-tests-determinism-golden-perf-smoke-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py

@@ -2,7 +2,7 @@
 Backtest Jobs API routes for EPIC-11 async create/status/top/list/cancel workflow.
 
 Docs:
-  - docs/architecture/backtest/backtest-jobs-api-v1.md
+  - docs/architecture/backtest/README.md
   - docs/architecture/api/api-errors-and-422-payload-v1.md
 """
 
@@ -55,7 +55,7 @@ def build_backtest_jobs_router(
     Build EPIC-11 jobs router exposing create/status/top/list/cancel endpoints.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - apps/api/dto/backtest_jobs.py
@@ -102,8 +102,8 @@ def build_backtest_jobs_router(
         Create queued Backtest job from sync envelope with EPIC-11 validations/quota checks.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-api-v1.md
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - apps/api/dto/backtests.py
           - apps/api/dto/backtest_jobs.py
@@ -145,7 +145,7 @@ def build_backtest_jobs_router(
         Read owner job status/progress snapshot with explicit `403` vs `404` semantics.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-api-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/milestone-5-epics-v1.md
         Related:
           - apps/api/dto/backtest_jobs.py
@@ -185,8 +185,8 @@ def build_backtest_jobs_router(
         Read owner persisted ranking summary top rows with lazy-details policy.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-api-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/backtest/
             backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
         Related:
@@ -230,8 +230,8 @@ def build_backtest_jobs_router(
         List owner jobs using deterministic keyset pagination with opaque cursor transport.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-api-v1.md
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - apps/api/dto/backtest_jobs.py
           - src/trading/contexts/backtest/domain/value_objects/backtest_job_cursor.py
@@ -281,8 +281,8 @@ def build_backtest_jobs_router(
         Request owner job cancel and return idempotent updated status payload.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-api-v1.md
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - apps/api/dto/backtest_jobs.py
           - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py

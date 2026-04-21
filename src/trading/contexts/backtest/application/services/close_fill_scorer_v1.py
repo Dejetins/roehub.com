@@ -82,8 +82,8 @@ class _SignalCacheValue:
     Internal immutable cached payload for aggregated signal vector reuse.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -121,8 +121,8 @@ class _PreparedTensorPlan:
     Prepared batched indicator tensor with deterministic axis lookup metadata.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -184,8 +184,8 @@ class _PreparedGridContext:
     Prepared scorer context with batched indicator tensors for current staged run.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -203,8 +203,8 @@ class _SignalCacheKeyMemoEntry:
     Internal immutable memo entry for deterministic signal cache-key reuse by payload identity.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
@@ -223,8 +223,8 @@ class CloseFillBacktestStagedScorerV1(
     Concrete staged scorer using close-fill engine v1 and indicator signal aggregation.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
@@ -353,8 +353,8 @@ class CloseFillBacktestStagedScorerV1(
         Prepare batched indicator tensors for staged run to avoid per-variant compute calls.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/staged_runner_v1.py
           - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -451,7 +451,7 @@ class CloseFillBacktestStagedScorerV1(
         Side Effects:
             Updates in-memory per-stage ranking hints for the current scorer instance.
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/backtest/
             backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
         Related:
@@ -755,7 +755,7 @@ class CloseFillBacktestStagedScorerV1(
         Docs:
           - docs/architecture/backtest/
             backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
           - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
@@ -824,8 +824,8 @@ class CloseFillBacktestStagedScorerV1(
         Insert compact signal vector into bounded in-memory cache with LRU eviction.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
           - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -955,8 +955,8 @@ class CloseFillBacktestStagedScorerV1(
         Build final signal using prepared tensors without large intermediate dict allocations.
 
         Docs:
-          - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
           - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1206,8 +1206,8 @@ def _signal_cache_key(
     Build deterministic cache key for computed aggregated signal vector.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1240,8 +1240,8 @@ def _normalize_indicator_variant_key_for_cache(*, indicator_variant_key: str) ->
     Normalize indicator variant key with a cheap fast-path for canonical lowercase hashes.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
@@ -1273,8 +1273,8 @@ def _signal_params_json_payload(
     Convert normalized nested signal params mapping into JSON-serializable structure.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1487,8 +1487,8 @@ def _normalized_signal_params_for_scoring(
     Normalize `signal_params` with a zero-allocation fast-path for pre-normalized mappings.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -1519,8 +1519,8 @@ def _is_pre_normalized_signal_params(
     Check whether `signal_params` already match normalized lowercase mapping-proxy shape.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -1621,8 +1621,8 @@ def _requested_ranking_metric_literals_for_stage_v1(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -1676,8 +1676,8 @@ def _ranking_metrics_from_execution_payload_v1(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
@@ -1776,8 +1776,8 @@ def _max_drawdown_pct_from_equity_curve_v1(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
       - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py
@@ -1816,8 +1816,8 @@ def _bars_per_year_for_candles_v1(*, candles: CandleArrays) -> float:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/shared_kernel/primitives/timeframe.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -1856,8 +1856,8 @@ def _trade_sharpe_v1(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py

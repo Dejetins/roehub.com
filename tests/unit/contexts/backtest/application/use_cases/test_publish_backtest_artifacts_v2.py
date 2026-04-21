@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from hashlib import sha256
 from pathlib import Path
 from typing import Sequence, cast
 
@@ -19,12 +18,16 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (
     BacktestArtifactPrecomputeRunnerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (
     BacktestArtifactSlotPublisherV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
     BacktestSignalRulesEngineV2,
 )
-from trading.contexts.backtest.application.use_cases import (
+from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
     PublishBacktestArtifactsV2UseCase,
 )
@@ -40,7 +43,7 @@ class _FixedCanonicalCandleIndexReader:
     Deterministic bounds reader exposing one explicit canonical 1m coverage envelope.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -66,7 +69,7 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - canonical_candle_index_reader.py
         """
@@ -94,7 +97,7 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             Records one bounds lookup in memory for later assertions.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -123,7 +126,7 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - canonical_candle_index_reader.py
         """
@@ -153,7 +156,7 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - canonical_candle_index_reader.py
         """
@@ -183,7 +186,7 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - canonical_candle_index_reader.py
         """
@@ -198,8 +201,8 @@ class _ZeroBlockingJobRepository:
     Fake publish-guard repository that never reports active pins for inactive manifests.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py
@@ -230,7 +233,7 @@ class _ZeroBlockingJobRepository:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -245,7 +248,7 @@ class _PublishUseCaseFixtureV2:
     Deterministic bundle of shared publish use-case dependencies for one temp artifact root.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py
@@ -274,7 +277,7 @@ def test_publish_backtest_artifacts_v2_bootstraps_missing_current_pointer(
     Side Effects:
         Creates a strict bootstrap artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -326,11 +329,11 @@ def test_publish_backtest_artifacts_v2_bootstraps_missing_current_pointer(
     assert publish_fixture.index_reader.bounds_calls[0][1] == UtcTimestamp(_PUBLISH_NOW_UTC_V2)
 
 
-def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_without_mutating_active_slot(  # noqa: E501
+def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_and_recreates_pruned_slot(  # noqa: E501
     tmp_path: Path,
 ) -> None:
     """
-    Verify bootstrap followed by a second publish switches to `slot_b` and preserves `slot_a`.
+    Verify repeated publish removes previous slot and recreates it on the next publish cycle.
 
     Args:
         tmp_path: pytest temporary path fixture.
@@ -339,11 +342,11 @@ def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_without
     Assumptions:
         The second publish reuses the same shared orchestration entrypoint and strict slot rules.
     Raises:
-        AssertionError: If pointer-switch semantics or active-slot immutability regress.
+        AssertionError: If pointer switching or safe single-slot retention semantics regress.
     Side Effects:
         Creates and publishes two deterministic slots under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -360,7 +363,7 @@ def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_without
         publish_fixture.fixture.coordinates,
         "slot_a",
     )
-    slot_a_manifest_sha_before = _file_sha256_hex_v2(slot_a_manifest_path)
+    assert slot_a_manifest_path.is_file()
 
     second_result = publish_fixture.use_case.run(request)
     current_pointer = publish_fixture.fixture.loader.load_current_pointer(
@@ -377,19 +380,28 @@ def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_without
     assert second_result.publish_mode == "incremental"
     assert second_result.previous_active_slot == "slot_a"
     assert second_result.previous_slot_generation == 1
-    assert second_result.previous_manifest_sha256 == slot_a_manifest_sha_before
+    assert second_result.previous_manifest_sha256 == first_result.published_manifest_sha256
     assert second_result.published_active_slot == "slot_b"
     assert second_result.published_slot_generation == 2
     assert second_result.validation.manifest_sha256 == second_result.published_manifest_sha256
     assert current_pointer.active_slot == "slot_b"
     assert current_pointer.slot_generation == 2
-    assert _file_sha256_hex_v2(slot_a_manifest_path) == slot_a_manifest_sha_before
+    assert slot_a_manifest_path.exists() is False
+    assert slot_a_manifest_path.parent.exists() is False
     assert slot_b_signal_manifest.signal_features is not None
     assert publish_fixture.fixture.builder.slot_manifest_path(
         publish_fixture.fixture.coordinates,
         "slot_b",
     ).is_file()
-    assert len(publish_fixture.index_reader.bounds_calls) == 2
+    third_result = publish_fixture.use_case.run(request)
+
+    assert third_result.publish_mode == "incremental"
+    assert third_result.previous_active_slot == "slot_b"
+    assert third_result.previous_slot_generation == 2
+    assert third_result.published_active_slot == "slot_a"
+    assert third_result.published_slot_generation == 3
+    assert slot_a_manifest_path.is_file()
+    assert len(publish_fixture.index_reader.bounds_calls) == 3
 
 
 def test_publish_backtest_artifacts_v2_fails_fast_on_invalid_current_pointer(
@@ -409,7 +421,7 @@ def test_publish_backtest_artifacts_v2_fails_fast_on_invalid_current_pointer(
     Side Effects:
         Rewrites `current.yaml` under `tmp_path` with invalid slot metadata.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -455,7 +467,7 @@ def _build_publish_use_case_fixture_v2(*, tmp_path: Path) -> _PublishUseCaseFixt
     Side Effects:
         Creates config, pointer file, and later-stage service dependencies under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
@@ -505,26 +517,3 @@ def _build_publish_use_case_fixture_v2(*, tmp_path: Path) -> _PublishUseCaseFixt
         index_reader=index_reader,
         use_case=use_case,
     )
-
-
-def _file_sha256_hex_v2(path: Path) -> str:
-    """
-    Compute the lowercase SHA-256 hex digest for one deterministic artifact file.
-
-    Args:
-        path: Existing filesystem path to hash.
-    Returns:
-        str: Lowercase hexadecimal SHA-256 digest.
-    Assumptions:
-        Slot manifest hashes remain the canonical identity bridge for pointer assertions.
-    Raises:
-        FileNotFoundError: If the requested file does not exist.
-    Side Effects:
-        Reads file bytes from disk.
-    Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/runbooks/backtest-artifacts-rebuild.md
-    Related:
-      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
-    """
-    return sha256(path.read_bytes()).hexdigest()

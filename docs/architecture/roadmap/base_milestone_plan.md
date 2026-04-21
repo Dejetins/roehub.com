@@ -591,9 +591,9 @@ Milestone 4 ввел синхронный (small-run) API `POST /backtests`:
 Milestone 5 добавляет асинхронный путь, который масштабируется через несколько реплик воркера.
 
 Связанные документы:
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md` (sync API, hashes, trades policy)
-- `docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md` (Stage A/Stage B, guards, tie-break)
-- `docs/architecture/backtest/backtest-reporting-metrics-table-v1.md` (table_md + top_trades_n)
+- `docs/architecture/backtest/README.md` (sync API, hashes, trades policy)
+- `docs/architecture/backtest/README.md` (Stage A/Stage B, guards, tie-break)
+- `docs/architecture/backtest/README.md` (table_md + top_trades_n)
 
 ---
 

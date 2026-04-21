@@ -9,27 +9,23 @@ from uuid import UUID
 import pytest
 import yaml
 
+import trading.contexts.backtest_artifacts.application.services.numba_runtime_v1 as numba_runtime_module
 from tests.unit.contexts.backtest.application.services.v2 import (
     test_stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_testkit,
 )
-from trading.contexts.backtest.application.services import (
-    BacktestNotebookParityMeasurementV2,
-    evaluate_backtest_notebook_parity_scenario_v2,
-    load_backtest_notebook_parity_benchmark_corpus_v2,
-    read_backtest_notebook_parity_benchmark_corpus_payload_v2,
-    serialize_backtest_notebook_parity_benchmark_corpus_payload_v2,
-    serialize_backtest_notebook_parity_measurements_v2,
+from trading.contexts.backtest.domain.entities import (
+    BacktestJobStageANoRiskExactRow,
+    BacktestJobStageAShortlist,
 )
-from trading.contexts.backtest.application.services import (
-    numba_runtime_v1 as numba_runtime_module,
+from trading.contexts.backtest.domain.entities.backtest_job_results import (
+    BacktestJobParityClassification,
+    BacktestJobParityRetainedRowsCounter,
+    BacktestJobParityRuntimeState,
 )
-from trading.contexts.backtest.application.services.v2 import (
-    default_execution_profiles_catalog_v2,
-)
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,
 )
-from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestIndicatorAxisPlanV2,
     BacktestIndicatorPlanV2,
     BacktestNoRiskExactParityRuntimeCountersV2,
@@ -40,25 +36,23 @@ from trading.contexts.backtest.application.services.v2.artifact_runtime_plan_v2 
     BacktestSignalAxisPlanV2,
     runtime_plan_requires_hierarchical_shortlist_runtime_v2,
 )
-from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     ExecutionProfileParityClassificationV2,
+    default_execution_profiles_catalog_v2,
 )
-from trading.contexts.backtest.application.services.v2.generic_row_scorer_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.generic_row_scorer_v2 import (
     GenericRowScorerV2,
 )
-from trading.contexts.backtest.application.services.v2.notebook_parity_benchmark_corpus_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.notebook_parity_benchmark_corpus_v2 import (  # noqa: E501
     BacktestNotebookParityLiveHostCaptureV2,
+    BacktestNotebookParityMeasurementV2,
     build_backtest_notebook_parity_measurement_from_sync_evidence_v2,
+    evaluate_backtest_notebook_parity_scenario_v2,
+    load_backtest_notebook_parity_benchmark_corpus_v2,
+    read_backtest_notebook_parity_benchmark_corpus_payload_v2,
+    serialize_backtest_notebook_parity_benchmark_corpus_payload_v2,
     serialize_backtest_notebook_parity_live_host_captures_v2,
-)
-from trading.contexts.backtest.domain.entities import (
-    BacktestJobStageANoRiskExactRow,
-    BacktestJobStageAShortlist,
-)
-from trading.contexts.backtest.domain.entities.backtest_job_results import (
-    BacktestJobParityClassification,
-    BacktestJobParityRetainedRowsCounter,
-    BacktestJobParityRuntimeState,
+    serialize_backtest_notebook_parity_measurements_v2,
 )
 
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
@@ -70,8 +64,8 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     Verify the notebook-parity closure corpus publishes the canonical benchmark classes and rules.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
-      - docs/architecture/backtest/backtest-engine-vnext.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -97,9 +91,9 @@ def test_notebook_parity_benchmark_corpus_manifest_is_complete() -> None:
     assert corpus.status == "active_closure_authority"
     assert corpus.reference_docs == (
         "docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md",
-        "docs/architecture/backtest/backtest-v2-benchmarks.md",
-        "docs/architecture/backtest/backtest-engine-vnext.md",
-        "docs/architecture/backtest/backtest-runtime-kernels-v2.md",
+        "docs/architecture/backtest/README.md",
+        "docs/architecture/backtest/README.md",
+        "docs/architecture/backtest/README.md",
     )
     assert corpus.scenario_order == ("nr2", "rg_ttr", "rg_alt")
     assert corpus.measurement_contract.required_fields == (
@@ -242,7 +236,7 @@ def test_notebook_parity_benchmark_corpus_serialization_is_byte_stable() -> None
     Verify the committed closure corpus keeps canonical byte-stable JSON formatting.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -277,7 +271,7 @@ def test_notebook_parity_thread_budget_contract_is_aligned_with_exact_parallel_d
     Verify canonical parity fixtures and runtime profiles freeze the accepted thread budget.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
     Related:
       - configs/dev/backtest.yaml
@@ -338,8 +332,8 @@ def test_notebook_parity_measurement_serialization_is_deterministic() -> None:
     Verify runtime-shape measurement payloads serialize deterministically and include all fields.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
-      - docs/architecture/backtest/backtest-engine-vnext.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
       - src/trading/contexts/backtest/application/services/v2/
@@ -435,7 +429,7 @@ def test_notebook_parity_live_host_capture_serialization_is_deterministic() -> N
     Verify live-host capture payloads serialize deterministically for canonical closure review.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
@@ -515,7 +509,7 @@ def test_notebook_parity_closure_authority_tracks_explicit_live_host_capture() -
     Verify canonical live-host evidence flips the capture-authority readiness bits explicitly.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/
@@ -649,7 +643,7 @@ def test_stage_a_retained_frontier_memory_shape_is_observable_for_benchmarks() -
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-engine-vnext.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
@@ -710,7 +704,7 @@ def test_stage_a_streaming_exact_runtime_shape_is_observable_for_benchmarks() ->
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
@@ -754,7 +748,7 @@ def test_no_risk_parity_runtime_plan_is_first_class_and_exposes_additive_counter
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
@@ -874,7 +868,7 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_live_stage_a_chunks(
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
@@ -1006,7 +1000,7 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_pair_first_bounded_blockwi
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
@@ -1161,7 +1155,7 @@ def test_stage_a_streaming_exact_runtime_shape_bypasses_generic_row_scorer_hot_p
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
       - src/trading/contexts/backtest/application/services/v2/generic_row_scorer_v2.py
@@ -1238,7 +1232,7 @@ def test_stage_a_streaming_exact_runtime_shape_tracks_narrowed_frontier_cardinal
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
@@ -1329,7 +1323,7 @@ def test_nr2_f7d2_top_result_parity_is_blocking_for_no_risk_stage_a_pipeline() -
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_a_shortlist_builder_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_stage_a_shortlist_builder_v2.py
@@ -1437,7 +1431,7 @@ def test_stage_a_parallelism_resolution_clamps_requested_workers_to_thread_budge
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/numba_runtime_v1.py
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
@@ -1467,7 +1461,7 @@ def test_notebook_parity_comparison_helper_enforces_equal_thread_budget_and_shap
     Verify the comparison helper accepts good parity samples and rejects budget/shape regressions.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
@@ -1722,7 +1716,7 @@ def test_rg_alt_functional_baseline_guardrail_is_evaluable() -> None:
     Verify the RG-ALT functional guardrail can compare backend runs against backend baselines.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
@@ -1910,7 +1904,7 @@ def _load_notebook_parity_benchmark_corpus():
     Load the committed notebook-parity benchmark corpus used by closure perf-smoke coverage.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
@@ -2031,8 +2025,8 @@ def _build_measurement(
     Build one deterministic notebook-parity runtime-shape measurement for perf-smoke tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
-      - docs/architecture/backtest/backtest-engine-vnext.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
       - src/trading/contexts/backtest/application/services/v2/
@@ -2095,7 +2089,7 @@ def _build_live_host_capture(
     Build one deterministic live-host capture payload for canonical notebook-parity scenarios.
 
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py

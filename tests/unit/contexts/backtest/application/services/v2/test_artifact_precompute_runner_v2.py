@@ -20,34 +20,48 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
+    indicator_primary_output_series_from_tensor_v1,
+)
+from trading.contexts.backtest_artifacts.application.services.v2 import (
+    artifact_precompute_runner as artifact_precompute_runner_module,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+    BacktestArtifactManifestValidatorV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_coordinator import (  # noqa: E501
+    ArtifactPrecomputeCoordinatorV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (
+    ArtifactCanonicalPriceExportRequestV2,
+    ArtifactCanonicalPriceExportResultV2,
+    BacktestArtifactPrecomputeRunnerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (
+    ArtifactSlotPublishErrorV2,
+    BacktestArtifactSlotPublisherV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_TIMEFRAMES_V2,
     SIGNAL_FEATURE_NAMES_V2,
-    ArtifactCanonicalPriceExportRequestV2,
-    ArtifactCanonicalPriceExportResultV2,
     ArtifactCoordinatesV2,
-    ArtifactPrecomputeCoordinatorV2,
     ArtifactPrecomputeExecutionPolicyV2,
     ArtifactSignalChunkPlanningRequestV2,
     ArtifactSignalValidationSpecV2,
-    ArtifactSlotPublishErrorV2,
     ArtifactStageRebuildStatsV2,
     ArtifactTailRebuildBarsV2,
-    BacktestArtifactManifestValidatorV2,
-    BacktestArtifactPrecomputeRunnerV2,
-    BacktestArtifactSlotPublisherV2,
-    BacktestSignalRulesEngineV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_chunk_planner_v2 import (
     DeterministicSignalChunkPlannerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
+    BacktestSignalRulesEngineV2,
     SignalRuleEvaluationRequestV2,
-    supported_indicator_ids_for_signals_v1,
 )
-from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
-    indicator_primary_output_series_from_tensor_v1,
-)
-from trading.contexts.backtest.application.services.v2 import (
-    artifact_precompute_runner as artifact_precompute_runner_module,
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
+    supported_indicator_ids_for_signal_rules_v2 as supported_indicator_ids_for_signals_v1,
 )
 from trading.contexts.indicators.adapters.outbound.registry import YamlIndicatorRegistry
 from trading.contexts.indicators.application.dto import (
@@ -165,8 +179,8 @@ class _PrecomputeSignalDefaultsProvider:
     Defaults-provider wrapper overriding only compute grids for small R4-02 test matrices.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/defaults/
         indicators_yaml_defaults_provider.py
@@ -191,7 +205,7 @@ class _PrecomputeSignalDefaultsProvider:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/ports/staged_runner.py
         """
@@ -216,7 +230,7 @@ class _PrecomputeSignalDefaultsProvider:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
             indicators_yaml_defaults_provider.py
@@ -238,7 +252,7 @@ class _PrecomputeSignalDefaultsProvider:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
         """
@@ -259,7 +273,7 @@ class _PrecomputeSignalDefaultsProvider:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
         """
@@ -272,8 +286,8 @@ class _MissingComputeDefaultsProviderV2:
     Provider wrapper hiding selected compute defaults while preserving all other contracts.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/defaults/
         indicators_yaml_defaults_provider.py
@@ -298,7 +312,7 @@ class _MissingComputeDefaultsProviderV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
             indicators_yaml_defaults_provider.py
@@ -323,7 +337,7 @@ class _MissingComputeDefaultsProviderV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
             indicators_yaml_defaults_provider.py
@@ -345,7 +359,7 @@ class _MissingComputeDefaultsProviderV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
         """
@@ -366,7 +380,7 @@ class _MissingComputeDefaultsProviderV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
             indicators_yaml_defaults_provider.py
@@ -381,7 +395,7 @@ class _DeterministicSignalCompute:
 
     Docs:
       - docs/architecture/indicators/indicators-overview.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
@@ -440,7 +454,7 @@ class _DeterministicSignalCompute:
         Side Effects:
             Allocates one small in-memory tensor and records requested timeline/variant sizes.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/indicators/indicators-overview.md
         Related:
           - src/trading/contexts/indicators/application/dto/indicator_tensor.py
@@ -509,7 +523,7 @@ class _SnapshotRehydratingSignalComputeFactoryV2:
     Rehydrate deterministic test compute from a same-process worker snapshot.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -536,7 +550,7 @@ class _SnapshotRehydratingSignalComputeFactoryV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_artifact_precompute_runner_v2.py
@@ -553,7 +567,7 @@ class _ImmediateFutureV2:
     Resolved future stub used by fake spawned-worker tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
     """
@@ -575,7 +589,7 @@ class _ImmediateFutureV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_artifact_precompute_runner_v2.py
@@ -588,7 +602,7 @@ class _FakeProcessPoolExecutorV2:
     Synchronous `ProcessPoolExecutor` stub capturing worker bootstrap and submit kwargs.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -622,7 +636,7 @@ class _FakeProcessPoolExecutorV2:
         Side Effects:
             Stores the initializer and its arguments in memory.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_artifact_precompute_runner_v2.py
@@ -646,7 +660,7 @@ class _FakeProcessPoolExecutorV2:
         Side Effects:
             Captures the bootstrap payload and initializes worker-local state in-process.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_artifact_precompute_runner_v2.py
@@ -678,7 +692,7 @@ class _FakeProcessPoolExecutorV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_artifact_precompute_runner_v2.py
@@ -709,7 +723,7 @@ class _FakeProcessPoolExecutorV2:
         Side Effects:
             Appends the submitted kwargs to the shared in-memory capture list.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/contexts/backtest/application/services/v2/
             test_artifact_precompute_runner_v2.py
@@ -724,7 +738,7 @@ class _FakeCanonicalCandleReader:
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -869,7 +883,7 @@ class _ZeroBlockingRepositoryV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-artifact-store-v2.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -893,8 +907,8 @@ def _build_signal_test_defaults_provider_v2() -> _PrecomputeSignalDefaultsProvid
     Side Effects:
         Reads the repository-local prod defaults YAML.
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/adapters/outbound/defaults/
@@ -933,8 +947,8 @@ def _build_long_window_signal_test_defaults_provider_v2() -> _PrecomputeSignalDe
     Side Effects:
         Reads the repository-local prod defaults YAML.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
     """
@@ -968,7 +982,7 @@ def _signal_grid_builder_v2() -> GridBuilder:
         Reads the repository-local indicator defaults YAML.
     Docs:
       - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/indicators/adapters/outbound/registry/yaml_indicator_registry.py
       - src/trading/contexts/indicators/application/services/grid_builder.py
@@ -996,8 +1010,8 @@ def _variant_counts_for_env_v2(*, env_name: str) -> dict[str, int]:
     Side Effects:
         Reads the repository-local config file and materializes indicator grids in memory.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/indicators.yaml
       - configs/prod/indicators.yaml
@@ -1043,8 +1057,8 @@ def _candle_arrays_from_loaded_prices_v2(
     Side Effects:
         Allocates contiguous arrays for test compute.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
     """
@@ -1081,7 +1095,7 @@ def _time_axis_prefix_sha256_v2(*, array: np.ndarray, prefix_bars: int) -> str:
     Side Effects:
         Allocates one contiguous prefix slice before hashing.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
@@ -1156,7 +1170,7 @@ def _source_series_for_compute_v2(*, candles: object, source_name: str) -> np.nd
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-overview.md
     Related:
       - src/trading/contexts/indicators/application/dto/candle_arrays.py
@@ -1207,8 +1221,8 @@ def _rolling_mean_series_for_compute_v2(*, source: np.ndarray, window: int) -> n
     Side Effects:
         Allocates one output vector.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
     """
@@ -1243,7 +1257,7 @@ def test_deterministic_signal_chunk_planner_v2_uses_expected_chunk_count_and_ran
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_chunk_planner_v2.py
@@ -1303,7 +1317,7 @@ def test_build_artifact_precompute_fixture_v2_expands_all_supported_v1_signal_ta
     Side Effects:
         Writes one strict config under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
@@ -1348,7 +1362,7 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
         Creates strict artifact files under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -1548,7 +1562,7 @@ def test_backtest_artifact_precompute_runner_v2_builds_widened_hit_times_manifes
     Side Effects:
         Builds one inactive-slot export under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -1620,7 +1634,7 @@ def test_artifact_precompute_coordinator_v2_rejects_nested_timeframe_sessions_wh
     Side Effects:
         Emits in-memory coordinator logs during the context-manager lifecycle.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
@@ -1670,7 +1684,7 @@ def test_backtest_artifact_precompute_runner_v2_emits_deterministic_stage_result
     Side Effects:
         Creates strict artifact files under `tmp_path` and captures runner logs.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -1776,8 +1790,8 @@ def test_backtest_artifact_precompute_runner_v2_materializes_hit_times_and_full_
         Writes hit-times artifacts under the inactive slot in `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -1833,7 +1847,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_full_rebuild_hit_times_budg
     Side Effects:
         Writes a small strict hit-times family under the inactive slot in `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -1889,7 +1903,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_deterministic_tail_update(
         Rewrites inactive-slot arrays and manifest under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -2005,7 +2019,7 @@ def test_backtest_artifact_precompute_runner_v2_appends_mapping_tail_determinist
         Rewrites inactive-slot price and mapping arrays under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -2113,7 +2127,7 @@ def test_backtest_artifact_precompute_runner_v2_is_byte_stable_for_identical_inp
         Rewrites inactive-slot files under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -2163,8 +2177,8 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
         Writes signal artifacts under the inactive slot in `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -2394,7 +2408,7 @@ def test_backtest_artifact_precompute_runner_v2_chunked_signal_output_matches_si
     Side Effects:
         Materializes one chunked slot and one reference slot under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2500,7 +2514,7 @@ def test_backtest_artifact_precompute_runner_v2_reports_chunk_progress_and_sessi
     Side Effects:
         Materializes one chunked signal artifact under `tmp_path` and captures INFO logs.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2596,7 +2610,7 @@ def test_backtest_artifact_precompute_runner_v2_reuses_one_timeframe_price_load_
     Side Effects:
         Materializes one narrowed timeframe session under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2656,7 +2670,7 @@ def test_backtest_artifact_precompute_runner_v2_reuses_one_timeframe_price_load_
         Side Effects:
             Appends `(timeframe, location_prefix)` to the in-memory call log.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
@@ -2722,7 +2736,7 @@ def test_write_signal_matrix_in_chunks_v2_process_workers_do_not_receive_candles
     Side Effects:
         Materializes one compact signal matrix under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2882,7 +2896,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_
     Side Effects:
         Materializes strict artifacts under `tmp_path` while recording internal helper order.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2933,7 +2947,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_
         Side Effects:
             Appends one `("hit_times", "1m")` marker to the in-memory order log.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
@@ -2956,7 +2970,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_
         Side Effects:
             Appends one `("rolled_prices", timeframe)` marker to the in-memory order log.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
@@ -2979,7 +2993,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_
         Side Effects:
             Appends one `("mappings", timeframe)` marker to the in-memory order log.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
@@ -3002,7 +3016,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_
         Side Effects:
             Appends one `("signals", timeframe, indicator_id)` marker to the in-memory order log.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
@@ -3070,7 +3084,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_runtime_configured_timefram
     Side Effects:
         Materializes one narrowed inactive slot under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3136,8 +3150,8 @@ def test_backtest_artifact_precompute_runner_v2_reuses_signal_prefix_and_rebuild
         Rewrites signal artifacts under the inactive slot in `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -3238,7 +3252,7 @@ def test_backtest_artifact_precompute_runner_v2_signal_tail_rebuild_is_byte_stab
         Rewrites signal artifacts under the inactive slot in `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -3328,7 +3342,7 @@ def test_backtest_artifact_precompute_runner_v2_proves_repeated_daily_run_rewrit
     Side Effects:
         Rewrites the inactive slot twice under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3547,7 +3561,7 @@ def test_backtest_artifact_precompute_runner_v2_falls_back_to_full_hit_times_reb
     Side Effects:
         Rewrites the inactive slot under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3625,8 +3639,8 @@ def test_backtest_artifact_precompute_runner_v2_keeps_long_window_signal_tail_co
     Side Effects:
         Materializes one incremental slot and one full-reference slot under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -3792,8 +3806,8 @@ def test_backtest_artifact_precompute_runner_v2_rejects_drifted_existing_signal_
         Mutates one existing signal file in the inactive slot under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -3871,7 +3885,7 @@ def test_backtest_artifact_precompute_runner_v2_rejects_non_monotonic_source_tim
         Writes only the pointer/config fixture under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -3905,7 +3919,7 @@ def test_backtest_artifact_precompute_runner_v2_rejects_non_aligned_rollup_sourc
         Writes only the pointer/config fixture under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/shared_kernel/primitives/timeframe.py
@@ -3957,7 +3971,7 @@ def test_backtest_artifact_precompute_runner_v2_build_publish_prices_mappings_fl
         Builds and publishes one inactive slot under `tmp_path`.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -4032,7 +4046,7 @@ def test_backtest_artifact_precompute_runner_v2_full_validation_spec_still_rejec
         Builds one inactive slot under `tmp_path` without publishing it.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -4094,7 +4108,7 @@ def test_backtest_artifact_precompute_runner_v2_materializes_zero_axis_signal_ta
     Side Effects:
         Writes a small inactive-slot fixture under the pytest temp directory.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4168,7 +4182,7 @@ def test_backtest_artifact_precompute_runner_v2_keeps_fail_fast_for_axis_bearing
     Side Effects:
         Allocates a temporary inactive-slot fixture.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/indicators/domain/definitions/volatility.py
@@ -4233,8 +4247,8 @@ def _load_signal_matrix_v2(
     Side Effects:
         Reads one signal matrix from disk.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -4274,7 +4288,7 @@ def _load_signal_features_matrix_v2(
         Reads one feature matrix from disk.
     Docs:
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/signal_features_loader_v2.py
@@ -4307,7 +4321,7 @@ def _expected_signal_features_matrix_v2(*, signal_matrix: np.ndarray) -> np.ndar
         None.
     Docs:
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - tests/unit/contexts/backtest/application/services/v2/test_signal_features_loader_v2.py
@@ -4376,8 +4390,8 @@ def _read_signal_export_bytes_v2(
     Side Effects:
         Reads manifest and `.npy` files from disk.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -4427,7 +4441,7 @@ def _request_v2(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -4464,8 +4478,8 @@ def _build_canonical_rows_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/market_data/application/dto/candle_with_meta.py
     """
@@ -4503,8 +4517,8 @@ def _build_canonical_row_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/shared_kernel/primitives/candle.py
     """
@@ -4550,8 +4564,8 @@ def _instrument_id_v2() -> InstrumentId:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
     """
@@ -4580,8 +4594,8 @@ def _expected_ohlcv_matrix_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -4619,8 +4633,8 @@ def _expected_bucket_ohlcv_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -4679,8 +4693,8 @@ def _bar_ohlcv_tuple_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
     """
@@ -4710,7 +4724,7 @@ def _epoch_ms_for_minute_v2(minute: int) -> int:
         None.
     Docs:
       - docs/architecture/shared-kernel-primitives.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/shared_kernel/primitives/utc_timestamp.py
     """
@@ -4734,7 +4748,7 @@ def _pointer_lines_v2(path: Path) -> tuple[str, ...]:
     Side Effects:
         Reads one UTF-8 file from disk.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
@@ -4762,8 +4776,8 @@ def _load_price_arrays_v2(
     Side Effects:
         Reads three `.npy` files from disk.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -4799,8 +4813,8 @@ def _load_mapping_arrays_v2(
     Side Effects:
         Reads two `.npy` files from disk.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -4834,8 +4848,8 @@ def _load_hit_times_arrays_v2(
     Side Effects:
         Reads six `.npy` files from disk.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -4875,8 +4889,8 @@ def _offset_override_value_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
     """
@@ -4902,8 +4916,8 @@ def _read_export_bytes_v2(
     Side Effects:
         Reads artifact files from disk.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -4954,8 +4968,8 @@ def test_target_indicator_variant_counts_match_narrowed_catalog_per_env_v2() -> 
     Side Effects:
         Reads checked-in config files and materializes indicator grids in memory.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/indicators.yaml
       - configs/prod/indicators.yaml
@@ -4982,7 +4996,7 @@ def test_target_indicator_variant_counts_stay_within_operational_ceilings_v2() -
     Side Effects:
         Reads checked-in config files and materializes indicator grids in memory.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - configs/dev/indicators.yaml

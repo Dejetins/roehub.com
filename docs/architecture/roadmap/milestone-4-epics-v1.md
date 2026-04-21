@@ -161,7 +161,7 @@ Milestone 4 делится на 3 логических трека:
 - `src/trading/shared_kernel/primitives/timeframe.py`
 - `src/trading/contexts/indicators/application/ports/feeds/candle_feed.py`
 - `src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/market_data_candle_feed.py`
-- `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -193,7 +193,7 @@ Milestone 4 делится на 3 логических трека:
 - `configs/prod/indicators.yaml`
 - `docs/architecture/indicators/indicators_formula.yaml`
 - `docs/architecture/indicators/indicators-overview.md`
-- `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 

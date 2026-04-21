@@ -5,19 +5,19 @@
     {
       "scope_id": "stage_a_no_risk",
       "status": "active",
-      "reference_doc": "docs/architecture/backtest/backtest-signals-from-indicators-v1.md",
+      "reference_doc": "docs/architecture/backtest/README.md",
       "reference_notebook": "tests/notebook_tests/06_backtest_compute.ipynb"
     },
     {
       "scope_id": "stage_b_legacy_close_fill",
       "status": "active",
-      "reference_doc": "docs/architecture/backtest/backtest-api-post-backtests-v1.md",
+      "reference_doc": "docs/architecture/backtest/README.md",
       "reference_notebook": "tests/notebook_tests/06_backtest_compute.ipynb"
     },
     {
       "scope_id": "stage_b_signal_tf_1m_risk_reference",
       "status": "reference-only",
-      "reference_doc": "docs/architecture/backtest/backtest-runtime-kernels-v2.md",
+      "reference_doc": "docs/architecture/backtest/README.md",
       "reference_notebook": "tests/notebook_tests/06_backtest_compute.ipynb",
       "golden_fixture_manifest": "tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json",
       "closure_perf_smoke": "tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py"

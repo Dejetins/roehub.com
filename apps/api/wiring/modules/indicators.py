@@ -103,7 +103,7 @@ def build_artifact_precompute_indicators_compute(
     """
     Build a dedicated indicators compute adapter for offline artifact precompute.
 
-    Docs: docs/architecture/backtest/backtest-precompute-runner-v2.md
+    Docs: docs/architecture/backtest/README.md
 
     Args:
         environ: Process environment mapping.

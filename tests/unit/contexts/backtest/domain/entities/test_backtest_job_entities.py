@@ -617,7 +617,7 @@ def test_backtest_job_progress_percent_uses_stage_weights_and_marks_success_as_c
     Verify weighted progress percent follows stage weights and succeeded runs clamp to `100`.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/domain/entities/test_backtest_job_entities.py
@@ -660,7 +660,7 @@ def test_backtest_job_eta_seconds_requires_signal_and_estimates_from_weighted_pr
     Verify ETA returns `None` without signal and uses weighted progress once it is defensible.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/domain/entities/test_backtest_job_entities.py

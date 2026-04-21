@@ -48,7 +48,7 @@ class _IndicatorAxisPlan:
     Internal deterministic axis plan for one compute-axis of an indicator.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -66,7 +66,7 @@ class _IndicatorPlan:
     Internal deterministic compute plan for one indicator in Stage A grid.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -85,8 +85,8 @@ class _SignalAxisPlan:
     Internal deterministic signal-parameter axis plan used in Stage A grid.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -104,7 +104,7 @@ class BacktestRiskVariantV1:
     One deterministic Stage B risk variant (`sl_enabled/sl_pct/tp_enabled/tp_pct`).
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -148,8 +148,8 @@ class BacktestStageABaseVariant:
     Deterministic Stage A base variant identity before Stage B risk expansion.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_runner_v1.py
       - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
@@ -193,7 +193,7 @@ class BacktestGridBuildContextV1:
     Deterministic build context for Stage A enumeration and Stage B expansion math.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -313,7 +313,7 @@ class BacktestGridBuilderV1:
     Build deterministic backtest Stage A/Stage B grids and enforce sync guards.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py

@@ -24,7 +24,7 @@ def validate_template_runtime_contract(
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -87,8 +87,8 @@ def validate_signal_overrides_default_only(
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -286,7 +286,7 @@ def _source_axis_errors(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py

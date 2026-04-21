@@ -7,7 +7,7 @@ background worker для persisted runs.
 
 - Status: active operational runbook for canonical `backtest-job-runner` v2 service surface.
 - Canonical architecture reference:
-  - [`docs/architecture/backtest/backtest-job-runner-v2.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
+  - [`docs/architecture/backtest/README.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - Compatibility note:
   - canonical background launch mode для новых persisted runs: `execution_mode=background_auto`;
   - queued/running rows могут всё ещё иметь `execution_mode=background_manual_legacy`, но это
@@ -27,10 +27,10 @@ background worker для persisted runs.
 - поведение cancel и lease-lost
 
 Архитектурные ссылки:
-- `docs/architecture/backtest/backtest-job-runner-v2.md` (canonical)
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md` (historical / compatibility-only)
-- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
-- `docs/architecture/backtest/backtest-jobs-api-v1.md`
+- `docs/architecture/backtest/README.md` (canonical)
+- `docs/architecture/backtest/README.md` (historical / compatibility-only)
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ## 2) Обязательное окружение
 

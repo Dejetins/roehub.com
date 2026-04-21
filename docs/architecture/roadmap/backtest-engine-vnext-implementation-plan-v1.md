@@ -61,9 +61,9 @@ owner: backtest
 
 - [Final Backtest Refactor Plan v2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-refactor-final-plan-v2.md)
 - [План доработки и ускорения backtest runtime v1](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md)
-- [Backtest Runtime Kernels V2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
-- [Backtest Job Runner v2 -- claimed background worker для persisted runs](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
-- [Backtest API v1 — `POST /backtests`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-api-post-backtests-v1.md)
+- [Backtest Runtime Kernels V2](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [Backtest Job Runner v2 -- claimed background worker для persisted runs](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [Backtest API v1 — `POST /backtests`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb](/Users/daniildegtyarev/Projects/roehub.com/tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb)
 
 Historical reference only:
@@ -424,7 +424,7 @@ backtest-job-runner
 Документы:
 
 - создать:
-  - `docs/architecture/backtest/backtest-engine-vnext.md`
+  - `docs/architecture/backtest/README.md`
 
 #### EPIC A2. Re-anchor runtime docs away from `06_backtest_compute.ipynb`
 
@@ -442,8 +442,8 @@ backtest-job-runner
 Документы:
 
 - обновить:
-  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-  - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
   - при необходимости: `docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md`
 
 #### EPIC A3. Public-contract redesign vocabulary
@@ -464,7 +464,7 @@ backtest-job-runner
 Документы:
 
 - обновить:
-  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
   - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
   - `docs/runbooks/backtest-job-runner.md`
@@ -579,7 +579,7 @@ semantics.
 Документы:
 
 - обновить:
-  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
 
 ### Milestone C. Artifact dependency expansion for wider TP/SL grid
@@ -624,8 +624,8 @@ semantics.
 Документы:
 
 - обновить:
-  - `docs/architecture/backtest/backtest-precompute-runner-v2.md`
-  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
 
 #### EPIC C3. Runtime loaders must stay grid-agnostic
 
@@ -863,7 +863,7 @@ authority.
 Документы:
 
 - обновить:
-  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 
 #### EPIC G2. Remove historical top-row trades assumptions
@@ -881,7 +881,7 @@ authority.
 Документы:
 
 - обновить:
-  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md` where wording must stay aligned
 
 ### Milestone H. Cleanup, tests, docs index, prompt-ready closure
@@ -939,7 +939,7 @@ authority.
 
 Ожидаемо создать:
 
-- `docs/architecture/backtest/backtest-engine-vnext.md`
+- `docs/architecture/backtest/README.md`
 - дополнительные test/perf-smoke files for prefilter/self-check if existing coverage surface is insufficient
 
 ## 9. Какие файлы, вероятнее всего, будут существенно переписаны
@@ -958,9 +958,9 @@ authority.
 
 ## 10. Какие документы обязательно нужно будет синхронизировать
 
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 - `docs/runbooks/backtest-job-runner.md`

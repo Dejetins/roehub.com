@@ -7,18 +7,19 @@ from typing import cast
 import numpy as np
 import pytest
 
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_backed_stage_b_scorer_v2 import (  # noqa: E501
+    BacktestArtifactBackedStageBScorerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ArtifactHitTimesArraysV2,
     ArtifactHitTimesManifestDocumentV2,
-    BacktestArtifactBackedStageBScorerV2,
     StageACompactTradeV2,
-    StageBBestCellReplayCaseV2,
-    StageBHitTimesFixtureV2,
     StageBHitTimesSliceV2,
-    StageBLevelFactorsV2,
-    StageBTradeExitCaseV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.metrics_kernel import (
     compute_stage_b_metrics_v2,
-    load_stage_b_golden_fixture_catalog_v2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.risk_exit_kernel_1m import (
     replay_best_risk_cell_exact_v2,
     replay_risk_cell_exact_v2,
     resolve_risk_trade_exit_1m_v2,
@@ -26,8 +27,13 @@ from trading.contexts.backtest.application.services.v2 import (
     search_risk_cells_total_return_fast_v2,
     slice_hit_times_to_execution_window_v2,
 )
-from trading.contexts.backtest.application.services.v2.stage_b_golden_fixtures_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.stage_b_golden_fixtures_v2 import (
+    StageBBestCellReplayCaseV2,
+    StageBHitTimesFixtureV2,
+    StageBLevelFactorsV2,
+    StageBTradeExitCaseV2,
     load_stage_b_best_cell_replay_reference_case_v2,
+    load_stage_b_golden_fixture_catalog_v2,
 )
 
 _FIXTURE_PATH = Path(__file__).with_name("fixtures") / "stage_b_golden_fixtures_v2.json"
@@ -49,8 +55,8 @@ def test_resolve_risk_trade_exit_1m_v2_matches_golden_trade_exit_cases() -> None
     Side Effects:
         Reads the committed Stage B golden fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
       - tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py
@@ -102,8 +108,8 @@ def test_resolve_risk_trade_exit_1m_v2_ignores_hits_on_entry_bar() -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
       - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
@@ -156,8 +162,8 @@ def test_search_risk_cells_total_return_fast_v2_matches_bruteforce_exact_replay(
     Side Effects:
         Reads the committed Stage B golden fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
       - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
@@ -231,7 +237,7 @@ def test_run_reference_vs_fast_self_check_v2_validates_bounded_subset() -> None:
     Side Effects:
         Reads the committed Stage B golden fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
@@ -297,8 +303,8 @@ def test_slice_hit_times_to_execution_window_v2_accepts_widened_artifact_grid() 
     Side Effects:
         Allocates widened synthetic `hit_times/1m` artifact arrays in memory only.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -448,8 +454,8 @@ def test_artifact_backed_stage_b_scorer_v2_resolves_widened_grid_risk_indexes() 
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
       - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
@@ -493,8 +499,8 @@ def test_replay_best_risk_cell_exact_v2_matches_best_cell_golden_fixture() -> No
     Side Effects:
         Reads the committed Stage B golden fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
       - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
@@ -579,8 +585,8 @@ def test_resolve_risk_trade_exit_1m_v2_rejects_execution_length_drift() -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
       - src/trading/contexts/backtest/application/services/v2/risk_exit_kernel_1m.py
@@ -628,8 +634,8 @@ def _trade_exit_cases_v2() -> tuple[StageBTradeExitCaseV2, ...]:
     Side Effects:
         Reads the committed Stage B golden fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
@@ -653,8 +659,8 @@ def _best_cell_case_v2() -> StageBBestCellReplayCaseV2:
     Side Effects:
         Reads the committed Stage B golden fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
@@ -682,8 +688,8 @@ def _hit_times_slice_from_fixture_v2(
     Side Effects:
         Allocates deterministic NumPy arrays for runtime kernel inputs.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
       - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py
@@ -723,8 +729,8 @@ def _compact_trades_from_best_cell_case_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py
       - tests/unit/contexts/backtest/application/services/v2/test_risk_exit_kernel_1m_v2.py

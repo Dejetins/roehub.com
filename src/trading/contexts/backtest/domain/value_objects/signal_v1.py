@@ -11,7 +11,7 @@ class SignalV1(str, Enum):
     Discrete per-bar signal literal for backtest signal-rules v1.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -30,7 +30,7 @@ class IndicatorSignalsV1:
     Deterministic signal series emitted for one indicator.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -89,7 +89,7 @@ class AggregatedSignalsV1:
     Deterministic strategy-level aggregation payload for signals-from-indicators v1.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py

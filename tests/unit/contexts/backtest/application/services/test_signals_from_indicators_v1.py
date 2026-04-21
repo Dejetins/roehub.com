@@ -23,8 +23,10 @@ from trading.contexts.backtest.application.services import (
     list_signal_rule_registry_v1,
     supported_indicator_ids_for_signals_v1,
 )
-from trading.contexts.backtest.application.services.v2 import list_signal_rule_registry_v2
 from trading.contexts.backtest.domain.value_objects import IndicatorSignalsV1, SignalV1
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
+    list_signal_rule_registry_v2,
+)
 from trading.contexts.indicators.application.dto import CandleArrays, IndicatorTensor, TensorMeta
 from trading.contexts.indicators.domain.entities import AxisDef, IndicatorId, Layout
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
@@ -123,7 +125,7 @@ def test_signal_registry_v1_matches_v2_contract_projection() -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py

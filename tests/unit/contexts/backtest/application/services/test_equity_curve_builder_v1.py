@@ -20,8 +20,8 @@ def test_equity_curve_builder_allows_reversal_on_same_bar() -> None:
     Verify reporting supports engine-style reversal on one close bar.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
 
@@ -80,7 +80,7 @@ def test_equity_curve_builder_allows_one_bar_trade_entry_equals_exit() -> None:
     Verify builder supports entry and exit on the same bar for one trade id.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
 
@@ -126,7 +126,7 @@ def test_equity_curve_builder_rejects_true_overlap() -> None:
     Verify builder still fails fast for true overlapping trades.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
 

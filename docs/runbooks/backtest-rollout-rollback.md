@@ -17,8 +17,8 @@ runtime и как откатываться при нарушении determinist
 
 Связанные документы:
 
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 - `docs/runbooks/backtest-job-runner.md`
 

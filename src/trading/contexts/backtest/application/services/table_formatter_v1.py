@@ -44,7 +44,7 @@ class BacktestMetricsTableFormatterV1:
     Format deterministic EPIC-06 metrics into stable `rows` and markdown table payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/metrics_calculator_v1.py

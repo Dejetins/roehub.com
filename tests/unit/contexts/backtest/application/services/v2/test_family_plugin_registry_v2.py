@@ -4,15 +4,17 @@ from dataclasses import dataclass, replace
 
 import pytest
 
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlanV2,
     BacktestIndicatorAxisPlanV2,
     BacktestIndicatorPlanV2,
     BacktestRiskVariantV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
     default_execution_profiles_catalog_v2,
 )
-from trading.contexts.backtest.application.services.v2.family_plugins import (
+from trading.contexts.backtest_artifacts.application.services.v2.family_plugins import (
     FamilyAccelerationPluginV2,
     FamilyPluginApplicabilityV2,
     FamilyPluginMetadataV2,

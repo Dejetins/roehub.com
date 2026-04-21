@@ -6,11 +6,11 @@
   "status": "active",
   "reference_docs": [
     "docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md",
-    "docs/architecture/backtest/backtest-v2-benchmarks.md",
-    "docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md",
-    "docs/architecture/backtest/backtest-runs-history-v2.md",
-    "docs/architecture/backtest/backtest-adaptive-selector-v1.md",
-    "docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md"
+    "docs/architecture/backtest/README.md",
+    "docs/architecture/backtest/README.md",
+    "docs/architecture/backtest/README.md",
+    "docs/architecture/backtest/README.md",
+    "docs/architecture/backtest/README.md"
   ],
   "rollout_gates": {
     "top_1_recall": {

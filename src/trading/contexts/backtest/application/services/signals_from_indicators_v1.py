@@ -36,7 +36,7 @@ def _normalize_string_tuple(values: tuple[str, ...]) -> tuple[str, ...]:
     Normalize tuple of identifiers into deduplicated lowercase tuple.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - configs/prod/indicators.yaml
@@ -68,7 +68,7 @@ class IndicatorSignalEvaluationInputV1:
     Normalized input envelope for one indicator signal-evaluation call.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -147,7 +147,7 @@ class SignalRuleSpecV1:
     Declarative rule-family binding for one indicator id in signal-engine v1.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -209,7 +209,7 @@ def _build_signal_rule_registry_v1() -> dict[str, SignalRuleSpecV1]:
     Build indicator_id -> rule-family registry for signals-from-indicators v1.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - configs/prod/indicators.yaml
@@ -308,7 +308,7 @@ def supported_indicator_ids_for_signals_v1() -> tuple[str, ...]:
     Return deterministic ordered list of indicator ids supported by signal rules v1.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -334,7 +334,7 @@ def list_signal_rule_registry_v1() -> tuple[tuple[str, str], ...]:
     Return `(indicator_id, rule_family)` pairs for debugging and deterministic introspection.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -363,7 +363,7 @@ def signal_rule_spec_v1(*, indicator_id: str) -> SignalRuleSpecV1:
     Resolve one rule specification by indicator id.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -398,7 +398,7 @@ def expand_indicator_grids_with_signal_dependencies_v1(
     Expand compute grid list with signal-rule dependencies in deterministic order.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -451,7 +451,7 @@ def indicator_primary_output_series_from_tensor_v1(
     Extract one primary-output time series from indicator tensor for chosen variant index.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-overview.md
     Related:
       - src/trading/contexts/indicators/application/dto/indicator_tensor.py
@@ -500,7 +500,7 @@ def build_indicator_signal_inputs_from_tensors_v1(
     Build pure-evaluator inputs from compute tensors using primary output only.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-overview.md
     Related:
       - src/trading/contexts/indicators/application/ports/compute/indicator_compute.py
@@ -555,8 +555,8 @@ def encode_signal_array_v1(*, signals: np.ndarray) -> np.ndarray:
     Encode legacy signal labels into compact `np.int8` representation.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
@@ -595,8 +595,8 @@ def is_int8_c_contiguous_signal_array_v1(*, signals: np.ndarray) -> bool:
     Check whether signal array already matches canonical compact hot-path representation.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -625,8 +625,8 @@ def decode_signal_codes_v1(*, signal_codes: np.ndarray) -> np.ndarray:
     Decode compact `np.int8` signal codes into canonical `LONG|SHORT|NEUTRAL` labels.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
@@ -659,8 +659,8 @@ def evaluate_indicator_signal_encoded_v1(
     Evaluate one indicator signal series into compact `np.int8` codes.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -753,7 +753,7 @@ def evaluate_indicator_signal_v1(
     Evaluate one indicator signal series (`LONG|SHORT|NEUTRAL`) on each bar.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
@@ -789,8 +789,8 @@ def evaluate_and_aggregate_signals_encoded_v1(
     Evaluate indicator rules and return aggregated compact `np.int8` final signal series.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -835,7 +835,7 @@ def evaluate_and_aggregate_signals_v1(
     Evaluate indicator signal rules and aggregate them by v1 AND policy.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
@@ -874,8 +874,8 @@ def aggregate_indicator_signal_codes_v1(
     Aggregate compact per-indicator signal codes with v1 AND policy.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -925,7 +925,7 @@ def aggregate_indicator_signals_v1(
     Aggregate per-indicator signal series with AND policy and deterministic conflicts handling.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
@@ -987,7 +987,7 @@ def _rule_compare_price_to_output(
     Evaluate `compare_price_to_output` rule family.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-overview.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1029,7 +1029,7 @@ def _rule_threshold_band(
     Evaluate `threshold_band` rule family with deterministic orientation by threshold order.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1068,7 +1068,7 @@ def _rule_sign(*, primary_output: np.ndarray) -> np.ndarray:
     Evaluate `sign` rule family (`>0 => LONG`, `<0 => SHORT`).
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1101,7 +1101,7 @@ def _rule_delta_sign(
     Evaluate `delta_sign` with per-direction lag parameters from UI/config form.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1154,7 +1154,7 @@ def _rule_compare_volume_to_output(
     Evaluate `compare_volume_to_output` rule family.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1190,7 +1190,7 @@ def _rule_candle_body_direction(
     Evaluate `candle_body_direction` rule family.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1233,7 +1233,7 @@ def _rule_pivot_events(
     Evaluate `pivot_events` rule family using wrapper dependency outputs.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1277,7 +1277,7 @@ def _rule_threshold_centered(
     Evaluate centered-threshold rule (`center +/- abs_threshold`) for trend.vortex.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1315,7 +1315,7 @@ def _resolve_price_series_from_inputs(
     Resolve price-like source series according to indicator `inputs.source` semantics.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-overview.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1369,8 +1369,8 @@ def _compose_signal_from_masks(*, long_mask: np.ndarray, short_mask: np.ndarray)
     Compose compact signal-code series from long/short masks with conflict-neutralization.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
@@ -1406,7 +1406,7 @@ def _neutral_signal_array(*, length: int) -> np.ndarray:
     Build deterministic neutral-filled signal array.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/signal_v1.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1433,8 +1433,8 @@ def _neutral_signal_code_array(*, length: int) -> np.ndarray:
     Build deterministic compact neutral-filled signal-code array.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -1461,8 +1461,8 @@ def _signal_value_to_code_v1(*, value: object, field_name: str) -> np.int8:
     Normalize one raw signal value into canonical compact code.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
@@ -1509,8 +1509,8 @@ def _ensure_supported_signal_codes_v1(*, signal_codes: np.ndarray, field_name: s
     Validate that compact signal array contains only canonical code values.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
@@ -1549,7 +1549,7 @@ def _ensure_required_signal_params(
     Validate that all rule-required signal parameters are provided.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - configs/prod/indicators.yaml
@@ -1584,7 +1584,7 @@ def _ensure_required_dependencies(
     Validate dependency presence and shape for rule families that require extra outputs.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1629,7 +1629,7 @@ def _require_dependency_series(
     Fetch and normalize one dependency output series by id.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1665,7 +1665,7 @@ def _require_float_param(*, signal_params: Mapping[str, SignalRuleScalar], name:
     Parse one numeric signal parameter into finite float.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1704,7 +1704,7 @@ def _require_positive_abs_int_param(
     Parse signed integer period param and return positive absolute lookback.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1742,7 +1742,7 @@ def _sort_indicator_grids_deterministically(
     Sort grid list by canonical deterministic key.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/indicators/domain/specifications/grid_spec.py
@@ -1768,7 +1768,7 @@ def _clone_grid_with_indicator_id(*, grid: GridSpec, indicator_id: str) -> GridS
     Clone one GridSpec with a different indicator id while preserving axes/config payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-overview.md
     Related:
       - src/trading/contexts/indicators/domain/specifications/grid_spec.py
@@ -1800,7 +1800,7 @@ def _grid_deterministic_key(*, grid: GridSpec) -> tuple[object, ...]:
     Build deterministic hashable key for one GridSpec.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
     Related:
       - src/trading/contexts/indicators/domain/specifications/grid_spec.py
@@ -1841,7 +1841,7 @@ def _normalize_series_array(*, name: str, values: np.ndarray) -> np.ndarray:
     Normalize one 1D numeric array to contiguous float32.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-overview.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1877,7 +1877,7 @@ def _normalize_scalar_mapping(
     Normalize optional scalar mapping into deterministic key-sorted dict.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -1917,7 +1917,7 @@ def _normalize_dependency_mapping(
     Normalize dependency output mapping into key-sorted float32 arrays.
 
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-structure-normalization-compute-numba-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py

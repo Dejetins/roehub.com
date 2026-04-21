@@ -22,7 +22,7 @@ class BacktestCandleTimeline:
     Backtest candle timeline payload for BKT-EPIC-02 orchestration.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/candle_timeline_builder.py
@@ -66,8 +66,8 @@ class BacktestCandleTimelineBuilder:
     Build deterministic backtest candle timeline from dense 1m feed for BKT-EPIC-02.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/indicators/application/ports/feeds/candle_feed.py
       - src/trading/shared_kernel/primitives/timeframe.py
@@ -106,7 +106,7 @@ class BacktestCandleTimelineBuilder:
         Build backtest candles for selected timeframe with best-effort rollup policy.
 
         Docs:
-          - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/indicators/indicators-candlefeed-acl-dense-timeline-v1.md
         Related:
           - src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/
@@ -164,7 +164,7 @@ def normalize_1m_load_time_range(
     Normalize user range into minute-aligned dense `1m` load window with warmup lookback.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/shared_kernel/primitives/time_range.py
@@ -211,7 +211,7 @@ def rollup_1m_candles_best_effort(
     Roll dense `1m` candles to target timeframe using best-effort and carry-forward policies.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/shared-kernel-primitives.md
     Related:
       - src/trading/shared_kernel/primitives/timeframe.py
@@ -336,7 +336,7 @@ def compute_target_slice_by_bar_close_ts(
     Compute `[Start, End)` target slice by `bar_close_ts` semantics for backtest reporting.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/candle_timeline_builder.py
@@ -381,7 +381,7 @@ def _extract_bucket_ohlcv(
     Aggregate one bucket from dense `1m` arrays ignoring missing minutes by close-finite rule.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/indicators/application/dto/candle_arrays.py
       - src/trading/shared_kernel/primitives/timeframe.py
@@ -452,7 +452,7 @@ def _ensure_finite_derived_series(
     Enforce `no NaN` invariant for backtest derived candles.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/errors/backtest_errors.py
       - src/trading/contexts/indicators/application/dto/candle_arrays.py
@@ -489,7 +489,7 @@ def _floor_datetime_to_minute(*, dt: datetime) -> datetime:
     Floor UTC datetime to minute boundary without float rounding.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/shared_kernel/primitives/utc_timestamp.py
       - src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/
@@ -516,7 +516,7 @@ def _ceil_datetime_to_minute(*, dt: datetime) -> datetime:
     Ceil UTC datetime to minute boundary without float rounding.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/shared_kernel/primitives/utc_timestamp.py
       - src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/

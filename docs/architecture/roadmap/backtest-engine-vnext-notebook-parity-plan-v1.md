@@ -417,8 +417,8 @@ Target:
 
 Что создаём/обновляем:
 
-- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-v2-benchmarks.md)
-- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-engine-vnext.md)
+- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - этот roadmap
 
 Что реализуем в коде:
@@ -631,8 +631,8 @@ Acceptance gate:
 Что меняем:
 
 - [artifact_runtime_core_v2.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py)
-- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
-- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-engine-vnext.md)
+- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 
 Acceptance gate:
 
@@ -683,11 +683,11 @@ Acceptance gate:
 
 Что обновляем:
 
-- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-engine-vnext.md)
-- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
-- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
-- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
-- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-v2-benchmarks.md)
+- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 
 Acceptance gate:
 

@@ -9,13 +9,13 @@ from trading.contexts.backtest.adapters.outbound import (
     BacktestRuntimeConfig,
     load_backtest_runtime_config,
 )
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.adaptive_selector_v2 import (
     AdaptiveSelectorPlanningEvidenceV2,
     CostModelAdaptiveExecutionSelectorV2,
-    load_backtest_runtime_acceleration_benchmark_corpus_v2,
 )
-from trading.contexts.backtest.application.services.v2.benchmark_corpus_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.benchmark_corpus_v2 import (
     BacktestRuntimeAccelerationBenchmarkCorpusV2,
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
 )
 
 _FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"

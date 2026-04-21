@@ -5,7 +5,7 @@
   "scope_id": "stage_b_signal_tf_1m_risk_reference",
   "status": "validation-baseline",
   "semantics": "signal_tf + 1m_risk",
-  "reference_doc": "docs/architecture/backtest/backtest-runtime-kernels-v2.md",
+  "reference_doc": "docs/architecture/backtest/README.md",
   "contract_fixture": "tests/unit/contexts/backtest/application/services/v2/fixtures/stage_b_golden_fixtures_v2.json",
   "contract_fixture_sha256": "06027d02fabc13ce5281cd008b3c5215d1c26f57da62df59283529f9a66ef1b8",
   "case_order": [

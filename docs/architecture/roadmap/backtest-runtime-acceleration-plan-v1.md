@@ -48,12 +48,12 @@ owner: backtest
 
 - [base_refactor_plan.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/base_refactor_plan.md)
 - [backtest-refactor-final-plan-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-refactor-final-plan-v2.md)
-- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-engine-vnext.md)
-- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
-- [backtest-compute-notebook-algorithm-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md)
-- [backtest-precompute-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-precompute-runner-v2.md)
-- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
-- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
+- [backtest-engine-vnext.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-compute-notebook-algorithm-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-precompute-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [backtest-job-runner-v2-implementation-plan.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/roadmap/backtest-job-runner-v2-implementation-plan.md)
 
 Historical notebook reference only:
@@ -61,9 +61,9 @@ Historical notebook reference only:
 - [06_backtest_compute.ipynb](/Users/daniildegtyarev/Projects/roehub.com/tests/notebook_tests/06_backtest_compute.ipynb)
 
 Для active roadmap surface canonical worker document здесь один:
-`docs/architecture/backtest/backtest-job-runner-v2.md`.
+`docs/architecture/backtest/README.md`.
 
-`docs/architecture/backtest/backtest-job-runner-worker-v1.md` сохраняется только как
+`docs/architecture/backtest/README.md` сохраняется только как
 historical / compatibility reference для старого EPIC-10 vocabulary и не должен читаться как
 canonical worker contract.
 
@@ -242,9 +242,9 @@ POST /backtests
 
 Ожидаемые docs:
 
-- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
+- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [web-backtest-history-and-variant-detail-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md)
-- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 
 ## 6. Execution profile как явная сущность
 
@@ -318,8 +318,8 @@ class ExecutionProfile:
 
 Документы:
 
-- [backtest-api-post-backtests-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-api-post-backtests-v1.md)
-- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
+- [backtest-api-post-backtests-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 
 #### EPIC A2. Progress/ETA contract для UX
 
@@ -345,7 +345,7 @@ class ExecutionProfile:
 
 Документы:
 
-- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runs-history-v2.md)
+- [backtest-runs-history-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [web-backtest-history-and-variant-detail-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md)
 
 #### EPIC A3. Benchmark corpus и rollout gates
@@ -368,9 +368,9 @@ class ExecutionProfile:
 
 Ожидаемые файлы:
 
-- новый doc `docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md`
+- новый doc `docs/architecture/backtest/README.md`
 - новые tests/perf fixtures рядом с существующими benchmark fixtures
-- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-v2-benchmarks.md)
+- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 
 ### Зафиксированные follow-up constraints после фактического Milestone A
 
@@ -433,8 +433,8 @@ class ExecutionProfile:
 
 Куда это относится:
 
-- [backtest-runtime-acceleration-benchmarks-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md)
-- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-v2-benchmarks.md)
+- [backtest-runtime-acceleration-benchmarks-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-v2-benchmarks.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [backtest_runtime_acceleration_benchmark_corpus_v1.json](/Users/daniildegtyarev/Projects/roehub.com/tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json)
 - [backtest.yaml](/Users/daniildegtyarev/Projects/roehub.com/configs/prod/backtest.yaml)
 
@@ -465,8 +465,8 @@ class ExecutionProfile:
 
 Документы:
 
-- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
-- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-job-runner-v2.md)
+- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-job-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 
 #### EPIC B2. Better memmap locality и loader discipline
 
@@ -513,7 +513,7 @@ class ExecutionProfile:
 
 Документы:
 
-- [backtest-api-post-backtests-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-api-post-backtests-v1.md)
+- [backtest-api-post-backtests-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 - [web-backtest-runtime-defaults-endpoint-v1.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md)
 
 ### Milestone C. Warm row feature cache
@@ -549,9 +549,9 @@ signal_features/<tf>/<indicator_id>/features.f32.npy  # [V, F]
 
 Документы:
 
-- [backtest-precompute-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-precompute-runner-v2.md)
-- [backtest-artifact-store-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-artifact-store-v2.md)
-- [backtest-compute-notebook-algorithm-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md)
+- [backtest-precompute-runner-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-artifact-store-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
+- [backtest-compute-notebook-algorithm-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 
 #### EPIC C2. Runtime access to cached features
 
@@ -624,8 +624,8 @@ signal_features/<tf>/<indicator_id>/features.f32.npy  # [V, F]
 
 Документы:
 
-- новый doc `docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md`
-- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/backtest-runtime-kernels-v2.md)
+- новый doc `docs/architecture/backtest/README.md`
+- [backtest-runtime-kernels-v2.md](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md)
 
 #### EPIC D3. Rollout gates для approximate mode
 
@@ -697,7 +697,7 @@ class FamilyAccelerationPlugin(Protocol):
 
 Документы:
 
-- новый doc `docs/architecture/backtest/backtest-family-accelerators-v1.md`
+- новый doc `docs/architecture/backtest/README.md`
 
 ### Milestone F. Adaptive selector и controlled rollout
 

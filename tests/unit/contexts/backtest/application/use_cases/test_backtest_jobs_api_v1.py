@@ -15,13 +15,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestStrategySnapshot,
     CurrentUser,
 )
-from trading.contexts.backtest.application.services import (
-    ArtifactCoordinatesV2,
-    ArtifactCurrentPointerV2,
-    ArtifactPinnedIdentityV2,
-    ArtifactSlotLiteralV2,
-    BacktestArtifactLoaderV2,
-)
 from trading.contexts.backtest.application.use_cases import (
     CancelBacktestJobUseCase,
     CreateBacktestJobCommand,
@@ -40,6 +33,13 @@ from trading.contexts.backtest.domain.entities import (
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
+    ArtifactCurrentPointerV2,
+    ArtifactPinnedIdentityV2,
+    ArtifactSlotLiteralV2,
+    BacktestArtifactLoaderV2,
+)
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
 from trading.contexts.indicators.domain.specifications import ExplicitValuesSpec, GridSpec
@@ -629,8 +629,8 @@ def test_create_backtest_job_use_case_artifact_pin_converts_to_pinned_identity_v
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py

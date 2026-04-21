@@ -11,15 +11,15 @@
 
 Референсы:
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
-- `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+- `docs/architecture/backtest/README.md`
 - `tests/notebook_tests/06_backtest_compute.ipynb`
 - `tests/notebook_tests/05_hit_time_grid.ipynb`
-- `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
-- `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-- `docs/architecture/backtest/backtest-job-runner-v2.md`
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md` (historical / compatibility reference)
-- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md` (historical / compatibility reference)
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
 - `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
 - `configs/prod/indicators.yaml`
@@ -177,7 +177,7 @@ Post-R10 additive follow-up:
 **Основные документы:**
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 - `docs/architecture/roadmap/base_refactor_plan.md`
-- `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -209,7 +209,7 @@ Post-R10 additive follow-up:
 - последующие milestone могут ссылаться на измеряемый baseline.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `docs/architecture/backtest/README.md`
 - `tests/notebook_tests/06_backtest_compute.ipynb`
 - `tests/notebook_tests/05_hit_time_grid.ipynb`
 
@@ -240,7 +240,7 @@ Post-R10 additive follow-up:
 
 **Основные документы:**
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
 
 ---
@@ -250,7 +250,7 @@ Post-R10 additive follow-up:
 | EPIC | Что должно существовать после R0 |
 |---|---|
 | R0-01 | source-of-truth roadmap + final plan + explicit superseded/status markers в конфликтующих v1 docs |
-| R0-02 | `docs/architecture/backtest/backtest-v2-benchmarks.md` + deterministic benchmark/parity fixtures в `tests/perf_smoke/contexts/backtest/**` |
+| R0-02 | `docs/architecture/backtest/README.md` + deterministic benchmark/parity fixtures в `tests/perf_smoke/contexts/backtest/**` |
 | R0-03 | frozen runtime/config contract в `configs/<env>/backtest.yaml`, runtime loader, `/backtests/runtime-defaults`, unit tests |
 
 ---
@@ -328,7 +328,7 @@ Post-R10 additive follow-up:
 - `src/trading/contexts/backtest/adapters/outbound/defaults/indicators_yaml_defaults_provider.py`
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -356,7 +356,7 @@ Post-R10 additive follow-up:
 - запрещённые TF deterministic reject'ятся на backend.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
 - `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
 
@@ -399,7 +399,7 @@ Post-R10 additive follow-up:
 - `src/trading/contexts/backtest/application/services/v2/**`
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -431,7 +431,7 @@ Post-R10 additive follow-up:
 - background run имеет стабильную slot identity.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 
 ---
@@ -463,8 +463,8 @@ Post-R10 additive follow-up:
 - runtime получает fixed metadata, а не вычисляет её на месте.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-artifact-store-v2.md`
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -563,8 +563,8 @@ Post-R10 additive follow-up:
 - runtime может загружать prices нужного TF без CH и без rollup.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md`
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -589,8 +589,8 @@ Post-R10 additive follow-up:
 - runtime Stage B может перейти от request bar к `1m` за O(1).
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -642,7 +642,7 @@ Post-R10 additive follow-up:
 - любой поддержанный indicator output превращается в `{-1,0,1}` по фиксированным правилам.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/indicators/indicators_formula.yaml`
 
 ---
@@ -694,7 +694,7 @@ Post-R10 additive follow-up:
 - daily signal rebuild ограничен хвостом и валидно покрывает warmup semantics.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -715,7 +715,7 @@ Post-R10 additive follow-up:
 - source selection проходит сквозь config -> precompute -> runtime -> persisted summary rows -> detail page.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 
 ---
@@ -748,8 +748,8 @@ Post-R10 additive follow-up:
 - runtime может использовать его без дополнительной подготовки.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -776,8 +776,8 @@ Post-R10 additive follow-up:
 - docs описывают new algorithm понятно и без противоречий.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 
 ---
@@ -919,8 +919,8 @@ Post-R10 additive follow-up:
 - runtime выдаёт summary-only table top-N, пригодную для persisted storage.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -966,8 +966,8 @@ Post-R10 additive follow-up:
 - inline и background run используют одно и то же storage семейство.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 **Основные пути:**
 - `alembic/versions/*`
@@ -1009,7 +1009,7 @@ Post-R10 additive follow-up:
 - `apps/api/wiring/modules/**`
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -1041,8 +1041,8 @@ Post-R10 additive follow-up:
 - history и run retrieval API покрывают весь product flow summary-level результатов.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -1072,7 +1072,7 @@ Post-R10 additive follow-up:
 - detail flow существует отдельно от summary persistence.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
 
 ---
@@ -1103,8 +1103,8 @@ Post-R10 additive follow-up:
 - `apps/worker/backtest_job_runner/**`
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-job-runner-v2.md` — canonical worker contract
-- `docs/architecture/backtest/backtest-job-runner-worker-v1.md` — historical / compatibility context
+- `docs/architecture/backtest/README.md` — canonical worker contract
+- `docs/architecture/backtest/README.md` — historical / compatibility context
 
 ---
 
@@ -1127,7 +1127,7 @@ Post-R10 additive follow-up:
 - auto-fallback работает end-to-end и не выглядит как неявная магия.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
 
 ---
@@ -1151,7 +1151,7 @@ Post-R10 additive follow-up:
 - publish policy согласована с worker behavior.
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
+- `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 
 ---
@@ -1217,7 +1217,7 @@ Post-R10 additive follow-up:
 
 **Основные документы:**
 - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
-- `docs/architecture/backtest/backtest-runs-history-v2.md`
+- `docs/architecture/backtest/README.md`
 
 ---
 
@@ -1298,21 +1298,21 @@ Post-R10 additive follow-up:
 
 **Scope:**
 - создать:
-  - `docs/architecture/backtest/backtest-artifact-store-v2.md`
-  - `docs/architecture/backtest/backtest-precompute-runner-v2.md`
-  - `docs/architecture/backtest/backtest-runtime-kernels-v2.md`
-  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
-  - `docs/architecture/backtest/backtest-runs-history-v2.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/apps/web/web-backtest-history-and-variant-detail-v2.md`
   - `docs/runbooks/backtest-artifacts-rebuild.md`
 - обновить:
-  - `docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md`
-  - `docs/architecture/backtest/backtest-signals-from-indicators-v1.md`
-  - `docs/architecture/backtest/backtest-api-post-backtests-v1.md`
-  - `docs/architecture/backtest/backtest-job-runner-worker-v1.md` (historical / compatibility reference)
-  - `docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md`
-  - `docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md`
-  - `docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md` (historical / compatibility reference)
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
+  - `docs/architecture/backtest/README.md`
   - `docs/architecture/apps/web/web-backtest-sync-ui-preflight-save-variant-v1.md`
   - `docs/architecture/apps/web/web-backtest-jobs-ui-async-v1.md`
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
@@ -1375,7 +1375,7 @@ Post-R10 additive follow-up:
 | artifact rebuild / background troubleshooting / rollout-rollback | `docs/runbooks/backtest-artifacts-rebuild.md`, `docs/runbooks/backtest-job-runner.md`, `docs/runbooks/backtest-rollout-rollback.md` |
 
 **Основные документы:**
-- `docs/architecture/backtest/backtest-v2-benchmarks.md`
+- `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 
 ---
@@ -1424,8 +1424,8 @@ model, который follow-up code epics смогут реализовать �
 
 **Основные документы:**
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
-- `docs/architecture/backtest/backtest-precompute-runner-v2.md`
-- `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- `docs/architecture/backtest/README.md`
+- `docs/architecture/backtest/README.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 - `docs/runbooks/mac-studio-native-backend-operations.md`
 - `docs/runbooks/market-data-metrics.md`

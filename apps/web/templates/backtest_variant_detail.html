@@ -8,7 +8,6 @@
     data-variant-key="{{ variant_key }}"
     data-api-runs-path-prefix="/api/backtests/runs/"
     data-api-top-path-template="/api/backtests/runs/{run_id}/top"
-    data-api-variant-report-path-template="/api/backtests/runs/{run_id}/variant-report"
     data-api-markets-path="/api/market-data/markets"
     data-strategy-builder-path="/strategies/new"
     data-prefill-query-param="prefill"
@@ -30,9 +29,8 @@
 
     <p>
       This page resolves <code>variant_key</code> from persisted
-      <code>/api/backtests/runs/{run_id}/top</code> rows and loads one-variant detail lazily
-      through <code>POST /api/backtests/runs/{run_id}/variant-report</code> with only
-      <code>variant</code> and <code>include_trades</code>.
+      <code>/api/backtests/runs/{run_id}/top</code> rows and renders summary metrics and payload
+      without backtest detail recompute endpoints.
     </p>
 
     <div class="error-banner hidden" role="alert"></div>
@@ -43,13 +41,6 @@
       <div class="panel-heading">
         <h2>Variant identity</h2>
         <div class="inline-actions">
-          <label class="inline-checkbox" for="variant-include-trades">
-            <input id="variant-include-trades" type="checkbox" checked>
-            include_trades
-          </label>
-          <button id="variant-refresh-detail" class="button-link button-link--secondary" type="button">
-            Reload detail
-          </button>
           <button id="variant-save-strategy" class="button-link" type="button">
             Save as Strategy
           </button>
@@ -108,36 +99,17 @@
     </section>
 
     <section class="panel panel--soft">
-      <h2>Detail payload</h2>
-      <p id="variant-detail-loading" class="muted-text hidden">Loading one-variant detail...</p>
+      <h2>Summary metrics</h2>
+      <div id="variant-summary-metrics"></div>
+    </section>
 
-      <div class="detail-stack">
-        <div class="detail-card">
-          <h3>Trade equity chart</h3>
-          <div id="variant-detail-chart"></div>
-        </div>
-
-        <div class="detail-card">
-          <h3>Detailed metrics</h3>
-          <div id="variant-detail-metrics"></div>
-        </div>
-
-        <div class="detail-card">
-          <h3>table_md</h3>
-          <div id="variant-detail-markdown"></div>
-        </div>
-
-        <div class="detail-card">
-          <h3>Trades</h3>
-          <div id="variant-detail-trades"></div>
-        </div>
-      </div>
+    <section class="panel panel--soft">
+      <h2>Variant payload JSON</h2>
+      <pre id="variant-payload-json" class="json-pre"></pre>
     </section>
   </section>
 {% endblock %}
 
 {% block scripts %}
-  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/lib/marked.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <script type="module" src="/assets/backtest_runs_ui.js"></script>
 {% endblock %}

@@ -11,7 +11,7 @@
 
 Актуальные документы:
 
-- `docs/runbooks/prod-migration-linux-to-mac-studio.md`
+- `docs/runbooks/mac-studio-native-backend-operations.md`
 - `docs/runbooks/web-ui-gateway-same-origin.md`
 - `docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md`
 

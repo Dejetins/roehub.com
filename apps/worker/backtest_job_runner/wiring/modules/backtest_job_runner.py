@@ -36,12 +36,16 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobLeaseRepository,
     BacktestJobRequestDecoder,
 )
-from trading.contexts.backtest.application.services import (
-    ArtifactSlotResolverV2,
-    BacktestArtifactRuntimePlannerV2,
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
     YamlBacktestArtifactLoaderV2,
 )
-from trading.contexts.backtest.application.use_cases import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
+    BacktestArtifactRuntimePlannerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_resolver import (
+    ArtifactSlotResolverV2,
+)
+from trading.contexts.backtest_artifacts.application.use_cases import (
     BacktestJobRunReportV1,
     RunBacktestJobRunnerV1,
 )
@@ -56,8 +60,8 @@ class _ApiBacktestJobRequestDecoderV1(BacktestJobRequestDecoder):
     Decode persisted Backtest job payload using canonical API request DTO contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/dto/backtests.py
       - src/trading/contexts/backtest/application/ports/backtest_job_request_decoder.py
@@ -87,7 +91,7 @@ class BacktestJobRunnerMetrics:
     Prometheus metrics bundle for Backtest job-runner worker process.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py
       - apps/worker/backtest_job_runner/main/main.py
@@ -199,8 +203,8 @@ class BacktestJobRunnerApp:
     Runtime claim/poll loop wrapper for EPIC-10 Backtest job-runner worker process.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/worker/backtest_job_runner/main/main.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
@@ -351,7 +355,7 @@ def build_backtest_job_runner_app(
     Build fully wired Backtest job-runner worker app with fail-fast dependencies.
 
     Docs:
-      - docs/architecture/backtest/backtest-job-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py

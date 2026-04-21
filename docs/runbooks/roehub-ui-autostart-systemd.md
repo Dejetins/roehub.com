@@ -11,7 +11,7 @@
 
 Что использовать вместо этого:
 
-- основной runbook: `docs/runbooks/prod-migration-linux-to-mac-studio.md`
+- основной runbook: `docs/runbooks/mac-studio-native-backend-operations.md`
 - dev/local same-origin stack without separate gateway: `docs/runbooks/web-ui-gateway-same-origin.md`
 - production backend manifest: `infra/docker/docker-compose.backend.yml`
 - production web manifest: `infra/docker/docker-compose.web.prod.yml`

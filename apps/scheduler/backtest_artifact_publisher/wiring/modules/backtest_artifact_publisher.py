@@ -24,7 +24,7 @@ from apps.api.wiring.modules.indicators import (
     build_indicators_registry,
 )
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
-from trading.contexts.backtest.adapters.outbound import (
+from trading.contexts.backtest_artifacts.adapters.outbound import (
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
     PostgresBacktestJobRepository,
@@ -33,7 +33,7 @@ from trading.contexts.backtest.adapters.outbound import (
     build_backtest_artifacts_runtime_config_hash,
     load_backtest_artifacts_runtime_config,
 )
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services import (
     ArtifactCoordinatesV2,
     ArtifactSlotPublishErrorV2,
     ArtifactTailRebuildBarsV2,
@@ -43,7 +43,7 @@ from trading.contexts.backtest.application.services import (
     YamlBacktestArtifactLoaderV2,
     artifact_coordinates_from_market_id_v2,
 )
-from trading.contexts.backtest.application.use_cases import (
+from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
     PublishBacktestArtifactsV2UseCase,
 )
@@ -85,7 +85,7 @@ def _default_now_provider() -> datetime:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -353,7 +353,7 @@ class BacktestArtifactPublisherMetrics:
     Prometheus metric bundle for the dedicated artifact publisher scheduler service.
 
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
       - docs/runbooks/prod-dashboard-metrics-reference-ru.md
     Related:
@@ -376,7 +376,7 @@ class BacktestArtifactPublisherMetrics:
         Side Effects:
             Registers metric collectors in the selected registry.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py
@@ -434,7 +434,7 @@ class BacktestArtifactPublisherMetrics:
         Side Effects:
             Increments Prometheus counters for non-zero stage values.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -452,7 +452,7 @@ class BacktestArtifactPublisherApp:
 
     Docs:
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/main/main.py
@@ -709,7 +709,7 @@ class BacktestArtifactPublisherApp:
         Side Effects:
             Updates per-symbol counters/tail metrics and emits one final stage-level rebuild log.
         Docs:
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -777,7 +777,7 @@ def _publish_error_status(code: str) -> PublisherRunStatus:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -809,7 +809,7 @@ def _promote_run_status(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py

@@ -2,20 +2,19 @@
 Composition helpers for backtests API module.
 
 Docs:
-  - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-  - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+  - docs/architecture/backtest/README.md
+  - docs/architecture/backtest/backtest-core-refactor-prompt-pack-v1.md
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from typing import Any, Mapping
+from dataclasses import dataclass
+from typing import Mapping
 
 from fastapi import APIRouter
 
 from apps.api.dto import (
     build_backtest_runtime_defaults_response,
-    decode_backtest_request_payload,
 )
 from apps.api.routes import (
     build_backtest_jobs_router,
@@ -23,39 +22,36 @@ from apps.api.routes import (
     build_backtests_router,
 )
 from trading.contexts.backtest.adapters.outbound import (
-    BacktestArtifactPathBuilderV2,
-    BacktestArtifactsRuntimeConfig,
     PostgresBacktestJobRepository,
     PostgresBacktestJobResultsRepository,
     PsycopgBacktestPostgresGateway,
     StrategyRepositoryBacktestStrategyReader,
     YamlBacktestGridDefaultsProvider,
     build_backtest_runtime_config_hash,
-    load_backtest_artifacts_runtime_config,
     load_backtest_runtime_config,
-    resolve_backtest_artifacts_config_path,
     resolve_backtest_config_path,
-)
-from trading.contexts.backtest.application.services import (
-    ArtifactSlotResolverV2,
-    BacktestArtifactRuntimePlannerV2,
-    YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.backtest.application.use_cases import (
     BacktestRunProgressSnapshotBuilder,
-    BuildBacktestRunVariantReportUseCase,
     CancelBacktestJobUseCase,
     CancelBacktestRunUseCase,
-    CreateAndRunBacktestSyncInlineUseCase,
     CreateBacktestJobUseCase,
     GetBacktestJobStatusUseCase,
     GetBacktestJobTopUseCase,
     GetBacktestRunStatusUseCase,
     GetBacktestRunTopUseCase,
-    LaunchBacktestRunWithAutoFallbackUseCase,
+    LaunchBacktestGatewayUseCase,
     ListBacktestJobsUseCase,
     ListBacktestRunsUseCase,
-    RunBacktestUseCase,
+)
+from trading.contexts.backtest_artifacts.adapters.outbound import (
+    BacktestArtifactPathBuilderV2,
+    BacktestArtifactsRuntimeConfig,
+    load_backtest_artifacts_runtime_config,
+    resolve_backtest_artifacts_config_path,
+)
+from trading.contexts.backtest_artifacts.application.services import (
+    YamlBacktestArtifactLoaderV2,
 )
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
@@ -70,6 +66,7 @@ _ENV_NAME_KEY = "ROEHUB_ENV"
 _BACKTEST_FAIL_FAST_KEY = "BACKTEST_FAIL_FAST"
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
 _ALLOWED_ENVS = ("dev", "prod", "test")
+_BACKTEST_API_EXECUTION_BOUNDARY = "gateway_background_only"
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +75,8 @@ class BacktestRuntimeSettings:
     Runtime settings for backtests module repository fail-fast composition policy.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/backtest-core-refactor-prompt-pack-v1.md
     Related:
       - apps/api/wiring/modules/backtest.py
       - apps/api/main/app.py
@@ -111,39 +109,6 @@ class BacktestRuntimeSettings:
             )
 
 
-@dataclass(frozen=True, slots=True)
-class _ApiBacktestJobRequestDecoderV1:
-    """
-    Decode persisted `request_json` payloads through strict API DTO contract.
-
-    Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-runs-history-v2.md
-    Related:
-      - apps/api/dto/backtests.py
-      - apps/api/wiring/modules/backtest.py
-      - apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py
-    """
-
-    def decode(self, *, payload: Mapping[str, object]):
-        """
-        Convert persisted canonical request payload into application request DTO.
-
-        Args:
-            payload: Canonical JSON-compatible persisted request payload.
-        Returns:
-            RunBacktestRequest: Decoded application request DTO.
-        Assumptions:
-            Persisted `request_json` shape matches strict `POST /backtests` semantics.
-        Raises:
-            ValidationError: If persisted payload no longer matches strict DTO contract.
-            BacktestValidationError: If semantic request invariants are violated.
-        Side Effects:
-            None.
-        """
-        return decode_backtest_request_payload(payload=payload)
-
-
 def build_backtest_router(
     *,
     environ: Mapping[str, str],
@@ -154,27 +119,29 @@ def build_backtest_router(
     Build fully wired Backtest API router (`POST /backtests` + optional jobs endpoints).
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/backtest-core-refactor-prompt-pack-v1.md
     Related:
       - apps/api/routes/backtests.py
-      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
 
     Args:
         environ: Runtime environment mapping.
         current_user_dependency: Shared identity dependency resolving authenticated principal.
-        indicator_compute: Pre-warmed indicators compute adapter.
+        indicator_compute:
+            Retained compatibility dependency no longer used by the gateway-only launch path.
     Returns:
         APIRouter: Backtests router with optional EPIC-11 jobs endpoints.
     Assumptions:
+        API runtime is gateway-only in production and enqueues background compute jobs only.
         Defaults/provider/config are validated on startup (fail-fast).
     Raises:
         ValueError: If required runtime dependencies are invalid or missing.
         FileNotFoundError: If `backtest.yaml`, `backtest_artifacts.yaml`, or `indicators.yaml`
             cannot be resolved.
     Side Effects:
-        Reads runtime YAML files and configures storage/artifact-runtime adapters.
+        Reads runtime YAML files and configures storage/artifact/runtime adapters.
     """
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_backtest_router requires current_user_dependency")
@@ -195,80 +162,11 @@ def build_backtest_router(
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(environ=environ)
     strategy_repository = _build_strategy_repository(settings=runtime_settings)
     strategy_reader = StrategyRepositoryBacktestStrategyReader(repository=strategy_repository)
+    _ = indicator_compute
     artifact_loader = YamlBacktestArtifactLoaderV2(
         path_resolver=BacktestArtifactPathBuilderV2(
             root=artifact_runtime_config.artifact_root_path()
         )
-    )
-    artifact_slot_resolver = ArtifactSlotResolverV2(artifact_loader=artifact_loader)
-    sync_execution_profiles = replace(
-        runtime_config.execution_profiles,
-        available_profiles=tuple(
-            replace(
-                profile,
-                feature_flags=replace(
-                    profile.feature_flags,
-                    runtime_enabled=True,
-                    heuristic_shortlist_enabled=True,
-                ),
-            )
-            if profile.mode == "hybrid_conservative"
-            else profile
-            for profile in runtime_config.execution_profiles.available_profiles
-        ),
-    )
-    sync_adaptive_selector_policy = replace(
-        runtime_config.adaptive_selector_policy,
-        mode="active",
-    )
-    sync_runtime_planner = BacktestArtifactRuntimePlannerV2(
-        execution_profiles=sync_execution_profiles,
-        launch_budget_mode="sync_inline",
-        adaptive_selector_policy=sync_adaptive_selector_policy,
-    )
-    background_runtime_planner = BacktestArtifactRuntimePlannerV2(
-        execution_profiles=runtime_config.execution_profiles,
-        adaptive_selector_policy=runtime_config.adaptive_selector_policy,
-    )
-
-    run_use_case_base_kwargs: dict[str, Any] = dict(
-        candle_feed=None,
-        indicator_compute=indicator_compute,
-        strategy_reader=strategy_reader,
-        defaults_provider=defaults_provider,
-        warmup_bars_default=runtime_config.warmup_bars_default,
-        top_k_default=runtime_config.top_k_default,
-        preselect_default=runtime_config.preselect_default,
-        ranking_primary_metric_default=runtime_config.ranking.primary_metric_default,
-        ranking_secondary_metric_default=runtime_config.ranking.secondary_metric_default,
-        init_cash_quote_default=runtime_config.execution.init_cash_quote_default,
-        fixed_quote_default=runtime_config.execution.fixed_quote_default,
-        safe_profit_percent_default=runtime_config.execution.safe_profit_percent_default,
-        slippage_pct_default=runtime_config.execution.slippage_pct_default,
-        fee_pct_default_by_market_id=runtime_config.execution.fee_pct_default_by_market_id,
-        max_numba_threads=runtime_config.cpu.max_numba_threads,
-        eager_top_reports_enabled=runtime_config.reporting.eager_top_reports_enabled,
-        allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
-        forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
-        artifact_slot_resolver=artifact_slot_resolver,
-    )
-    sync_run_use_case = RunBacktestUseCase(
-        runtime_planner=sync_runtime_planner,
-        max_variants_per_compute=max(
-            1,
-            runtime_config.guards.max_variants_per_compute // 2,
-        ),
-        max_compute_bytes_total=max(
-            1,
-            runtime_config.guards.max_compute_bytes_total // 2,
-        ),
-        **run_use_case_base_kwargs,
-    )
-    background_preflight_use_case = RunBacktestUseCase(
-        runtime_planner=background_runtime_planner,
-        max_variants_per_compute=runtime_config.guards.max_variants_per_compute,
-        max_compute_bytes_total=runtime_config.guards.max_compute_bytes_total,
-        **run_use_case_base_kwargs,
     )
     jobs_gateway = _build_jobs_gateway(settings=runtime_settings)
     job_repository = PostgresBacktestJobRepository(gateway=jobs_gateway)
@@ -291,18 +189,11 @@ def build_backtest_router(
         allowed_request_timeframes=runtime_config.contracts.allowed_request_timeframes,
         forbidden_request_timeframes=runtime_config.contracts.forbidden_request_timeframes,
     )
-    sync_inline_run_use_case = CreateAndRunBacktestSyncInlineUseCase(
-        run_use_case=sync_run_use_case,
-        job_repository=job_repository,
-        backtest_runtime_config_hash=backtest_runtime_config_hash,
-        engine_version=runtime_config.contracts.risk_model,
-    )
-    backtests_launch_use_case = LaunchBacktestRunWithAutoFallbackUseCase(
-        sync_inline_use_case=sync_inline_run_use_case,
-        background_preflight_use_case=background_preflight_use_case,
+    backtests_launch_use_case = LaunchBacktestGatewayUseCase(
         background_create_use_case=create_use_case,
         engine_version=runtime_config.contracts.risk_model,
     )
+    _ = _BACKTEST_API_EXECUTION_BOUNDARY
     runtime_defaults_response = build_backtest_runtime_defaults_response(
         config=runtime_config,
         defaults_provider=defaults_provider,
@@ -317,7 +208,6 @@ def build_backtest_router(
     )
 
     results_repository = PostgresBacktestJobResultsRepository(gateway=jobs_gateway)
-    request_decoder = _ApiBacktestJobRequestDecoderV1()
     runs_router = build_backtest_runs_router(
         get_status_use_case=GetBacktestRunStatusUseCase(job_repository=job_repository),
         get_top_use_case=GetBacktestRunTopUseCase(
@@ -327,12 +217,6 @@ def build_backtest_router(
         ),
         list_use_case=ListBacktestRunsUseCase(job_repository=job_repository),
         cancel_use_case=CancelBacktestRunUseCase(job_repository=job_repository),
-        variant_report_use_case=BuildBacktestRunVariantReportUseCase(
-            job_repository=job_repository,
-            request_decoder=request_decoder,
-            run_use_case=sync_run_use_case,
-            artifact_slot_resolver=artifact_slot_resolver,
-        ),
         current_user_dependency=current_user_dependency,
         sync_deadline_seconds=runtime_config.sync.sync_deadline_seconds,
         run_progress_builder=BacktestRunProgressSnapshotBuilder(
@@ -368,7 +252,7 @@ def _load_backtest_artifacts_runtime_config(
     Resolve and fail-fast load strict artifact pipeline config for backtest wiring.
 
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/api/wiring/modules/backtest.py
@@ -386,7 +270,9 @@ def _load_backtest_artifacts_runtime_config(
     Side Effects:
         Reads one UTF-8 YAML file from filesystem.
     """
-    config_path = resolve_backtest_artifacts_config_path(environ=environ)
+    artifact_environ = dict(environ)
+    artifact_environ.setdefault(_ENV_NAME_KEY, _resolve_env_name(environ=environ))
+    config_path = resolve_backtest_artifacts_config_path(environ=artifact_environ)
     return load_backtest_artifacts_runtime_config(config_path)
 
 
@@ -395,7 +281,7 @@ def _resolve_backtest_runtime_settings(*, environ: Mapping[str, str]) -> Backtes
     Resolve backtests module runtime settings with environment-aware fail-fast policy.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/wiring/modules/backtest.py
       - apps/api/main/app.py
@@ -427,7 +313,7 @@ def _resolve_env_name(*, environ: Mapping[str, str]) -> str:
     Resolve normalized runtime environment name for backtests wiring.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/wiring/modules/backtest.py
       - apps/api/main/app.py
@@ -455,7 +341,7 @@ def _resolve_fail_fast(*, environ: Mapping[str, str], env_name: str) -> bool:
     Resolve backtests fail-fast mode from explicit override or environment default.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/wiring/modules/backtest.py
       - apps/api/wiring/modules/strategy.py
@@ -490,7 +376,7 @@ def _build_strategy_repository(*, settings: BacktestRuntimeSettings) -> Strategy
     Build strategy repository dependency for saved-mode strategy loading.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md
     Related:
       - apps/api/wiring/modules/backtest.py
@@ -525,8 +411,8 @@ def _build_jobs_gateway(*, settings: BacktestRuntimeSettings) -> PsycopgBacktest
     Build fail-fast Postgres gateway for Backtest Jobs API repositories.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/api/wiring/modules/backtest.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/gateway.py

@@ -17,17 +17,18 @@ from trading.contexts.backtest.application.dto import (
     BACKTEST_RANKING_SECONDARY_METRIC_DEFAULT_V1,
     normalize_backtest_ranking_metric_literal,
 )
-from trading.contexts.backtest.application.services.v2.adaptive_selector_v2 import (
+from trading.contexts.backtest.domain.entities import BacktestJobStageWeights
+from trading.contexts.backtest_artifacts.application.services.v2.adaptive_selector_v2 import (
     AdaptiveSelectorCandidatePolicyV2,
     AdaptiveSelectorPolicyV2,
     default_adaptive_selector_policy_v2,
     validate_adaptive_selector_policy_mode_v2,
 )
-from trading.contexts.backtest.application.services.v2.benchmark_corpus_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.benchmark_corpus_v2 import (
     BacktestRuntimeAccelerationBenchmarkCorpusV2,
     load_backtest_runtime_acceleration_benchmark_corpus_v2,
 )
-from trading.contexts.backtest.application.services.v2.execution_profile_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     DEFAULT_EXECUTION_PROFILE_MODE_V2,
     ExecutionProfileFeatureFlagsV2,
     ExecutionProfileLaunchBudgetV2,
@@ -43,7 +44,6 @@ from trading.contexts.backtest.application.services.v2.execution_profile_v2 impo
     validate_execution_profile_mode_v2,
     validate_execution_profile_shortlist_diversity_bucket_v2,
 )
-from trading.contexts.backtest.domain.entities import BacktestJobStageWeights
 from trading.contexts.indicators.application.services.grid_builder import (
     MAX_COMPUTE_BYTES_TOTAL_DEFAULT,
     MAX_VARIANTS_PER_COMPUTE_DEFAULT,
@@ -132,7 +132,7 @@ class BacktestExecutionRuntimeConfig:
     Runtime defaults for execution engine v1 loaded from `backtest.execution` section.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - configs/dev/backtest.yaml
@@ -204,7 +204,7 @@ class BacktestReportingRuntimeConfig:
     Runtime defaults for reporting v1 loaded from `backtest.reporting` section.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - configs/dev/backtest.yaml
@@ -245,8 +245,8 @@ class BacktestRankingRuntimeConfig:
     Runtime defaults for ranking contract loaded from `backtest.ranking` section.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest.yaml
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -412,8 +412,8 @@ class BacktestGuardsRuntimeConfig:
     Runtime guard limits for staged backtest compute loaded from `backtest.guards`.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest.yaml
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -450,7 +450,7 @@ class BacktestCpuRuntimeConfig:
     Runtime CPU settings for backtest compute loaded from `backtest.cpu`.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/indicators-numba-cache-and-threads.md
     Related:
       - configs/dev/backtest.yaml
@@ -485,8 +485,8 @@ class BacktestSyncRuntimeConfig:
     Runtime sync settings loaded from strict required `backtest.sync.*` YAML section.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest.yaml
       - apps/api/routes/backtests.py
@@ -520,7 +520,7 @@ class BacktestJobsRuntimeConfig:
     Runtime jobs settings loaded from strict required `backtest.jobs.*` YAML section.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - configs/dev/backtest.yaml
@@ -585,8 +585,8 @@ class BacktestRuntimeConfig:
     Backtest runtime config v1 loaded from `configs/<env>/backtest.yaml`.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest.yaml
       - configs/test/backtest.yaml
@@ -628,7 +628,7 @@ class BacktestRuntimeConfig:
         Validate runtime config invariants for fail-fast startup behavior.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
@@ -685,7 +685,7 @@ def resolve_backtest_config_path(
     Resolve runtime config path using env override precedence contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest.yaml
       - configs/test/backtest.yaml
@@ -719,8 +719,8 @@ def _resolve_runtime_acceleration_benchmark_corpus_path(
     Resolve the committed benchmark-corpus fixture path for startup-loaded ETA fallback metadata.
 
     Docs:
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
@@ -796,8 +796,8 @@ def load_backtest_runtime_config(path: str | Path) -> BacktestRuntimeConfig:
     Load and validate source-of-truth Backtest runtime YAML configuration.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest.yaml
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -1052,8 +1052,8 @@ def build_backtest_runtime_config_hash(*, config: BacktestRuntimeConfig) -> str:
     Build deterministic runtime hash from result-affecting Backtest runtime sections only.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
       - configs/dev/backtest.yaml
@@ -1140,7 +1140,7 @@ def resolve_backtest_env_name(*, environ: Mapping[str, str]) -> str:
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1515,8 +1515,8 @@ def _normalize_ranking_metric_sequence(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
@@ -1643,7 +1643,7 @@ def _parse_execution_profiles_catalog(
 
     Docs:
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
@@ -1861,8 +1861,8 @@ def _parse_adaptive_selector_policy(
 
     Docs:
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
-      - docs/architecture/backtest/backtest-adaptive-selector-v1.md
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_runtime_config.py
       - src/trading/contexts/backtest/application/services/v2/adaptive_selector_v2.py

@@ -9,9 +9,11 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     SyntheticArtifactStoreV2,
     build_synthetic_artifact_store_v2,
 )
-from trading.contexts.backtest.application.services import (
-    ArtifactPinnedIdentityV2,
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_resolver import (
     ArtifactSlotResolverV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactPinnedIdentityV2,
 )
 
 
@@ -31,8 +33,8 @@ def synthetic_artifact_store_v2(tmp_path: Path) -> SyntheticArtifactStoreV2:
     Side Effects:
         Creates a temporary artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py
@@ -57,8 +59,8 @@ def test_artifact_slot_resolver_v2_resolves_active_context_from_current_yaml(
     Side Effects:
         Reads strict artifact metadata from the synthetic store.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -100,7 +102,7 @@ def test_artifact_slot_resolver_v2_resolves_pinned_context_without_current_yaml(
     Side Effects:
         Reads one explicit pinned slot manifest from the synthetic store.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
@@ -145,7 +147,7 @@ def test_artifact_slot_resolver_v2_rejects_current_yaml_manifest_generation_drif
     Side Effects:
         Rewrites the synthetic `current.yaml` payload under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
@@ -182,7 +184,7 @@ def test_artifact_slot_resolver_v2_rejects_pinned_generation_drift(
     Side Effects:
         Reads strict artifact metadata from the synthetic store.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
@@ -220,8 +222,8 @@ def test_artifact_slot_resolver_v2_avoids_directory_scanning(
     Side Effects:
         Temporarily replaces scanning helpers on `Path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -264,8 +266,8 @@ def _forbid_directory_scan(*_args: object, **_kwargs: object) -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
       - tests/unit/contexts/backtest/application/services/v2/

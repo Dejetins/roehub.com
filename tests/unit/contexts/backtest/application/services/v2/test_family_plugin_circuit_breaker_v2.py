@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from trading.contexts.backtest.application.services.v2.family_plugins import (
+from trading.contexts.backtest_artifacts.application.services.v2.family_plugins import (
     FamilyPluginCircuitBreakerV2,
 )
 

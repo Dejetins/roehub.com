@@ -16,20 +16,11 @@ from trading.contexts.backtest.application.dto import (
     RunBacktestTemplate,
 )
 from trading.contexts.backtest.application.services import (
-    ArtifactCoordinatesV2,
     BacktestRiskVariantV1,
     BacktestStageABaseVariant,
 )
 from trading.contexts.backtest.application.services.staged_core_runner_v1 import (
     BacktestStageAScoredVariantV1,
-)
-from trading.contexts.backtest.application.services.v2 import (
-    artifact_runtime_core_v2 as artifact_runtime_core_module,
-)
-from trading.contexts.backtest.application.services.v2.contracts import StageANoRiskMetricsV2
-from trading.contexts.backtest.application.use_cases import RunBacktestJobRunnerV1
-from trading.contexts.backtest.application.use_cases import (
-    run_backtest_job_runner_v1 as run_backtest_job_runner_module,
 )
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
@@ -43,6 +34,17 @@ from trading.contexts.backtest.domain.entities.backtest_job_results import (
     BacktestJobParityClassification,
     BacktestJobParityRetainedRowsCounter,
     BacktestJobParityRuntimeState,
+)
+from trading.contexts.backtest_artifacts.application.services.v2 import (
+    artifact_runtime_core_v2 as artifact_runtime_core_module,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
+    StageANoRiskMetricsV2,
+)
+from trading.contexts.backtest_artifacts.application.use_cases import RunBacktestJobRunnerV1
+from trading.contexts.backtest_artifacts.application.use_cases import (
+    run_backtest_job_runner_v1 as run_backtest_job_runner_module,
 )
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
@@ -3854,8 +3856,8 @@ def test_process_claimed_job_bootstraps_pinned_slot_context_before_runtime(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
@@ -4283,8 +4285,8 @@ def test_run_backtest_job_runner_v1_prefers_artifact_backed_stage_b_scorer_when_
     Side Effects:
         Monkeypatches the local Stage B scorer factory for the duration of the test.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -4322,8 +4324,8 @@ def test_run_backtest_job_runner_v1_prefers_artifact_backed_stage_b_scorer_when_
         Side Effects:
             Appends one call payload to the in-memory log.
         Docs:
-          - docs/architecture/backtest/backtest-runtime-kernels-v2.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py
           - tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py

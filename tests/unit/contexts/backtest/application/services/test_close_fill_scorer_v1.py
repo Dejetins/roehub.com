@@ -40,7 +40,7 @@ class _FixedSeriesIndicatorCompute:
     IndicatorCompute fake returning deterministic fixed series by indicator id.
 
     Docs:
-      - docs/architecture/backtest/backtest-execution-engine-close-fill-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py

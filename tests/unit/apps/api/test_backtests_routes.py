@@ -29,7 +29,6 @@ from trading.contexts.backtest.application.dto import (
     RunBacktestResponse,
 )
 from trading.contexts.backtest.application.ports import BacktestStrategySnapshot
-from trading.contexts.backtest.domain.entities import TradeV1
 from trading.contexts.backtest.domain.errors import BacktestValidationError
 from trading.contexts.indicators.application.dto import IndicatorVariantSelection
 from trading.contexts.indicators.domain.entities import IndicatorId
@@ -50,7 +49,7 @@ class _HeaderCurrentUserDependency:
     Request dependency resolving authenticated principal from `X-User-Id` header.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/apps/api/test_backtests_routes.py
       - apps/api/routes/backtests.py
@@ -96,7 +95,7 @@ class _StaticStrategyReader:
     Minimal strategy reader fake returning one preconfigured snapshot.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/apps/api/test_backtests_routes.py
       - apps/api/routes/backtests.py
@@ -231,7 +230,7 @@ class _FakeRunBacktestUseCase:
     Minimal use-case fake returning preconfigured result or raising configured error.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/apps/api/test_backtests_routes.py
       - apps/api/routes/backtests.py
@@ -243,8 +242,6 @@ class _FakeRunBacktestUseCase:
         *,
         result: Any = None,
         error: Exception | None = None,
-        variant_report_result: BacktestReportV1 | None = None,
-        variant_report_error: Exception | None = None,
     ) -> None:
         """
         Store deterministic fake behavior for endpoint tests.
@@ -252,8 +249,6 @@ class _FakeRunBacktestUseCase:
         Args:
             result: Value returned by execute when no error is configured.
             error: Optional exception raised by execute.
-            variant_report_result: Optional payload returned by variant-report call.
-            variant_report_error: Optional exception raised by variant-report call.
         Returns:
             None.
         Assumptions:
@@ -261,12 +256,10 @@ class _FakeRunBacktestUseCase:
         Raises:
             None.
         Side Effects:
-            Stores the last execute/build-variant-report request objects for route assertions.
+            Stores the last execute request objects for route assertions.
         """
         self._result = result
         self._error = error
-        self._variant_report_result = variant_report_result
-        self._variant_report_error = variant_report_error
         self.last_execute_request = None
         self.last_execute_request_payload = None
 
@@ -294,40 +287,6 @@ class _FakeRunBacktestUseCase:
         if self._error is not None:
             raise self._error
         return self._result
-
-    def build_variant_report(
-        self,
-        *,
-        request,
-        current_user,
-        variant_payload,
-        include_trades,
-        run_control=None,
-    ) -> BacktestReportV1:
-        """
-        Return configured variant report payload or raise configured variant-report error.
-
-        Args:
-            request: Application request DTO.
-            current_user: Current user port object.
-            variant_payload: Explicit variant payload DTO.
-            include_trades: Include-trades flag from endpoint request.
-            run_control: Optional cooperative cancellation/deadline control object.
-        Returns:
-            BacktestReportV1: Configured report payload.
-        Assumptions:
-            Endpoint tests verify route wiring and DTO mapping only.
-        Raises:
-            Exception: Configured variant-report exception.
-        Side Effects:
-            None.
-        """
-        _ = request, current_user, variant_payload, include_trades, run_control
-        if self._variant_report_error is not None:
-            raise self._variant_report_error
-        if self._variant_report_result is None:
-            raise AssertionError("variant_report_result is not configured")
-        return self._variant_report_result
 
 
 def _build_client(
@@ -1489,85 +1448,30 @@ def test_post_backtests_eager_flag_does_not_break_summary_only_launch() -> None:
     assert response.json()["variants"][0]["report"] is None
 
 
-def test_post_backtests_variant_report_returns_rows_table_and_trades() -> None:
+def test_post_backtests_variant_report_endpoint_is_removed() -> None:
     """
-    Verify variant-report endpoint returns strict report payload shape for one variant.
+    Verify legacy `POST /backtests/variant-report` endpoint is no longer registered.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Endpoint payload contains explicit run-context and selected variant payload.
+        API contract keeps only summary launch and runtime-defaults endpoints in this router.
     Raises:
-        AssertionError: If status code or response shape deviates from contract.
+        AssertionError: If legacy endpoint path is still active.
     Side Effects:
         None.
     """
-    client = _build_client(
-        use_case=_FakeRunBacktestUseCase(variant_report_result=_variant_report_response())
-    )
+    client = _build_client(use_case=_FakeRunBacktestUseCase(result=_template_mode_response()))
+
     response = client.post(
         "/backtests/variant-report",
-        json=_variant_report_payload(),
+        json={},
         headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
     )
 
-    assert response.status_code == 200
-    assert response.json()["rows"] == [{"metric": "Total Return [%]", "value": "12.00"}]
-    assert response.json()["table_md"].startswith("|Metric|Value|")
-    assert response.json()["trades"] is not None
-    assert response.json()["trades"][0]["trade_id"] == 1
-
-
-def test_post_backtests_variant_report_rejects_mode_conflict() -> None:
-    """
-    Verify variant-report endpoint reuses deterministic mode-conflict validation contract.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Mode selection remains `strategy_id xor template`.
-    Raises:
-        AssertionError: If endpoint does not return deterministic validation_error payload.
-    Side Effects:
-        None.
-    """
-    payload = _variant_report_payload()
-    payload["strategy_id"] = "00000000-0000-0000-0000-000000000123"
-
-    client = _build_client(
-        use_case=_FakeRunBacktestUseCase(variant_report_result=_variant_report_response())
-    )
-    response = client.post(
-        "/backtests/variant-report",
-        json=payload,
-        headers={"x-user-id": "00000000-0000-0000-0000-000000000777"},
-    )
-
-    assert response.status_code == 422
-    assert response.json() == {
-        "error": {
-            "code": "validation_error",
-            "message": "POST /backtests requires exactly one mode: strategy_id xor template",
-            "details": {
-                "errors": [
-                    {
-                        "path": "body.strategy_id",
-                        "code": "mode_conflict",
-                        "message": "Provide exactly one of strategy_id or template",
-                    },
-                    {
-                        "path": "body.template",
-                        "code": "mode_conflict",
-                        "message": "Provide exactly one of strategy_id or template",
-                    },
-                ]
-            },
-        }
-    }
+    assert response.status_code == 404
 
 
 def _template_payload() -> dict[str, Any]:
@@ -1642,96 +1546,6 @@ def _saved_mode_payload() -> dict[str, Any]:
         },
         "strategy_id": "00000000-0000-0000-0000-000000000123",
     }
-
-
-def _variant_report_payload() -> dict[str, Any]:
-    """
-    Build deterministic valid payload for `POST /backtests/variant-report` endpoint tests.
-
-    Args:
-        None.
-    Returns:
-        dict[str, Any]: Variant-report request JSON payload.
-    Assumptions:
-        Payload uses template mode and explicit selected variant from top list.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
-    return {
-        "time_range": {
-            "start": "2026-02-16T00:00:00Z",
-            "end": "2026-02-16T01:00:00Z",
-        },
-        "template": _template_payload(),
-        "include_trades": True,
-        "variant": {
-            "indicator_selections": [
-                {
-                    "indicator_id": "ma.sma",
-                    "inputs": {"source": "close"},
-                    "params": {"window": 20},
-                }
-            ],
-            "signal_params": {"ma.sma": {"cross_up": 0.5}},
-            "risk_params": {
-                "sl_enabled": True,
-                "sl_pct": 2.0,
-                "tp_enabled": True,
-                "tp_pct": 4.0,
-            },
-            "execution_params": {
-                "init_cash_quote": 10000.0,
-                "fee_pct": 0.075,
-                "slippage_pct": 0.01,
-                "fixed_quote": 100.0,
-                "safe_profit_percent": 30.0,
-            },
-            "direction_mode": "long-short",
-            "sizing_mode": "all_in",
-        },
-    }
-
-
-def _variant_report_response() -> BacktestReportV1:
-    """
-    Build deterministic report payload fixture for variant-report endpoint tests.
-
-    Args:
-        None.
-    Returns:
-        BacktestReportV1: Report fixture with rows, markdown table, and one trade.
-    Assumptions:
-        One trade item is enough to validate strict response serialization.
-    Raises:
-        ValueError: If fixture violates domain/entity invariants.
-    Side Effects:
-        None.
-    """
-    return BacktestReportV1(
-        rows=(BacktestMetricRowV1(metric="Total Return [%]", value="12.00"),),
-        table_md="|Metric|Value|\n|---|---|\n|Total Return [%]|12.00|",
-        trades=(
-            TradeV1(
-                trade_id=1,
-                direction="long",
-                entry_bar_index=0,
-                exit_bar_index=1,
-                entry_fill_price=100.0,
-                exit_fill_price=101.0,
-                qty_base=1.0,
-                entry_quote_amount=100.0,
-                exit_quote_amount=101.0,
-                entry_fee_quote=0.0,
-                exit_fee_quote=0.0,
-                gross_pnl_quote=1.0,
-                net_pnl_quote=1.0,
-                locked_profit_quote=0.0,
-                exit_reason="signal_exit",
-            ),
-        ),
-    )
 
 
 def _variant(

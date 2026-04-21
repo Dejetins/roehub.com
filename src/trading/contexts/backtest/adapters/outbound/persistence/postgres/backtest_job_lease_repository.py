@@ -57,7 +57,7 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
     Explicit SQL adapter for Backtest jobs claim/lease/progress/finish worker operations.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py

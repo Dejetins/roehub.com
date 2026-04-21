@@ -520,7 +520,7 @@ def test_get_backtest_job_top_hides_details_for_non_succeeded_jobs() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    context = payload["report_context"]
+    context = payload["top_context"]
     assert context["strategy_id"] is None
     assert context["template"]["timeframe"] == "1m"
     assert "warmup_bars" not in context
@@ -543,7 +543,7 @@ def test_get_backtest_job_top_omits_details_even_for_succeeded_jobs() -> None:
     Returns:
         None.
     Assumptions:
-        Detailed report data is loaded through variant-report endpoint, not `/top`.
+        Detailed report data is loaded through dedicated detail APIs, not `/top`.
     Raises:
         AssertionError: If succeeded response still includes report/trades details.
     Side Effects:
@@ -563,7 +563,7 @@ def test_get_backtest_job_top_omits_details_even_for_succeeded_jobs() -> None:
 
     assert response.status_code == 200
     payload = response.json()
-    assert payload["report_context"] is not None
+    assert payload["top_context"] is not None
     item = payload["items"][0]
     assert "report_table_md" not in item
     assert "trades" not in item

@@ -690,8 +690,8 @@ def test_request_hash_ignores_internal_execution_profile_mode_across_exact_and_h
     Verify internal execution-profile routing metadata does not affect canonical request hashes.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/use_cases/test_backtest_runs_api_v1.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py

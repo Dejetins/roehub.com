@@ -3,8 +3,8 @@ Pydantic models and deterministic mapper for Backtest runtime defaults API endpo
 
 Docs:
   - configs/prod/backtest.yaml
-  - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-  - docs/architecture/backtest/backtest-jobs-api-v1.md
+  - docs/architecture/backtest/README.md
+  - docs/architecture/backtest/README.md
   - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
 """
 
@@ -22,7 +22,7 @@ class BacktestRuntimeExecutionDefaultsResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -45,7 +45,7 @@ class BacktestRuntimeJobsDefaultsResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -64,7 +64,7 @@ class BacktestRuntimeRankingDefaultsResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -125,7 +125,7 @@ class BacktestRuntimeSignalsContractResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -145,7 +145,7 @@ class BacktestRuntimeAdaptiveSelectorCandidateResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -169,7 +169,7 @@ class BacktestRuntimeAdaptiveSelectorResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-adaptive-selector-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -190,7 +190,7 @@ class BacktestRuntimeExecutionContractResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-compute-notebook-algorithm-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -339,7 +339,7 @@ class BacktestRuntimeExecutionProfileProgressWeightsResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -386,7 +386,7 @@ class BacktestRuntimeLaunchContractResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -432,8 +432,8 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py
@@ -467,8 +467,8 @@ def build_backtest_runtime_defaults_response(
 
     Docs:
       - configs/prod/backtest.yaml
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-api-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - apps/api/dto/backtest_runtime_defaults.py

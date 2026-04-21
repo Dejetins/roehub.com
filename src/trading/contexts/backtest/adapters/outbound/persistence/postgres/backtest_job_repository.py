@@ -15,9 +15,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListQuery,
     BacktestJobRepository,
 )
-from trading.contexts.backtest.application.services.v2.metrics_kernel import (
-    normalize_persisted_summary_metrics_v2,
-)
 from trading.contexts.backtest.domain.entities import (
     BacktestArtifactSlotLiteral,
     BacktestJob,
@@ -32,6 +29,9 @@ from trading.contexts.backtest.domain.entities import (
 )
 from trading.contexts.backtest.domain.errors import BacktestStorageError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
+from trading.contexts.backtest_artifacts.application.services.v2.metrics_kernel import (
+    normalize_persisted_summary_metrics_v2,
+)
 from trading.shared_kernel.primitives import UserId
 
 _BACKTEST_JOB_SELECT_COLUMNS = """
@@ -82,7 +82,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
     Explicit SQL adapter implementing Backtest job core storage repository port.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
@@ -140,7 +140,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Persist new job row and return mapped immutable aggregate snapshot.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -266,8 +266,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Persist one terminal run row, summary-only top rows, and optional shortlist atomically.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -666,7 +666,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Count active jobs pinning one previously published inactive-slot manifest identity.
 
         Docs:
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -748,7 +748,7 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
     Map SQL row payload into immutable `BacktestJob` aggregate.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -907,7 +907,7 @@ def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
     Build canonical SQL parameters mapping for one `backtest_jobs` insert statement.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -1098,9 +1098,9 @@ def _serialize_top_rows(
     Serialize summary-only top rows into canonical JSON array for one atomic SQL insert.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_repository.py
@@ -1337,7 +1337,7 @@ def _parse_execution_mode(*, value: Any) -> BacktestJobExecutionMode | None:
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
       - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py

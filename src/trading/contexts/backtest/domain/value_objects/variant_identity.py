@@ -17,7 +17,7 @@ class BacktestVariantIdentity:
     Stable backtest variant identity exposed to API/UI contracts.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -67,7 +67,7 @@ def build_backtest_variant_key_v1(
     Build deterministic backtest `variant_key` v1 from canonical JSON payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-4-epics-v1.md
     Related:
       - src/trading/contexts/indicators/application/dto/variant_key.py
@@ -157,8 +157,8 @@ def _normalize_signals_mapping(
     Normalize nested `signals` mapping with lowercase sorted indicator/param names.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py
@@ -226,8 +226,8 @@ def _is_pre_normalized_scalar_mapping(
     Check whether scalar mapping already matches normalized deterministic key order.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -267,8 +267,8 @@ def _is_pre_normalized_signals_mapping(
     Check whether nested signals mapping already matches canonical lowercase sorted shape.
 
     Docs:
-      - docs/architecture/backtest/backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/value_objects/variant_identity.py
       - src/trading/contexts/backtest/application/services/grid_builder_v1.py

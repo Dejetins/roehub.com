@@ -23,7 +23,7 @@ class BacktestJobListQuery:
     Deterministic keyset list query parameters for user-scoped Backtest jobs API reads.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -65,7 +65,7 @@ class BacktestJobListPage:
     Deterministic keyset page payload for Backtest jobs list repository contract.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -82,7 +82,7 @@ class BacktestJobRepository(Protocol):
     Backtest job core storage port for create/get/list/cancel/quota operations.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -119,8 +119,8 @@ class BacktestJobRepository(Protocol):
         Persist one terminal run row plus deterministic summary-only top rows atomically.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -261,7 +261,7 @@ class BacktestJobLeaseRepository(Protocol):
     Backtest job lease port for claim/heartbeat/progress/finish worker operations.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -390,8 +390,8 @@ class BacktestJobResultsRepository(Protocol):
     Backtest job results port for top-k snapshots and Stage-A shortlist persistence.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/

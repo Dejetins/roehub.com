@@ -17,7 +17,7 @@ plan, strict manifest validation и R6-01 runtime bootstrap boundary.
 
 Основные документы:
 
-- `docs/architecture/backtest/backtest-artifact-store-v2.md`
+- `docs/architecture/backtest/README.md`
 - `docs/architecture/roadmap/base_refactor_plan.md`
 - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 

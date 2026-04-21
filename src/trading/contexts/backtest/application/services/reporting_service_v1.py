@@ -20,7 +20,7 @@ class BacktestReportingServiceV1:
     Orchestrate deterministic EPIC-06 report assembly for one Stage-B variant outcome.
 
     Docs:
-      - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/equity_curve_builder_v1.py
@@ -104,7 +104,7 @@ class BacktestReportingServiceV1:
         Docs:
           - docs/architecture/backtest/
             backtest-staged-ranking-reporting-perf-optimization-plan-v1.md
-          - docs/architecture/backtest/backtest-reporting-metrics-table-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/ports/staged_runner.py
           - src/trading/contexts/backtest/application/use_cases/run_backtest.py

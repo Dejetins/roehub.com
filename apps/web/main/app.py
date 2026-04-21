@@ -413,8 +413,8 @@ def _register_routes(
         Returns:
             Response: HTML variant detail page or login redirect response.
         Assumptions:
-            Browser resolves row identity via `/api/backtests/runs/{run_id}/top` and loads detail
-            lazily through run-scoped `/variant-report`.
+            Browser resolves row identity and summary details via
+            `/api/backtests/runs/{run_id}/top` without report recompute endpoints.
         Raises:
             None.
         Side Effects:

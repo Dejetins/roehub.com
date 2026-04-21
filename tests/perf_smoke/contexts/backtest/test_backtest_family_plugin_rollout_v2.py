@@ -5,19 +5,21 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any
 
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlanV2,
     BacktestIndicatorAxisPlanV2,
     BacktestIndicatorPlanV2,
     BacktestRiskVariantV2,
     BacktestSignalAxisPlanV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
     ExecutionProfileShortlistConfigV2,
-    HierarchicalShortlistRuntimePlanV2,
     default_execution_profiles_catalog_v2,
 )
-from trading.contexts.backtest.application.services.v2.hierarchical_shortlist_builder_v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.hierarchical_shortlist_builder_v2 import (  # noqa: E501
     BacktestHierarchicalShortlistBuilderV2,
+    HierarchicalShortlistRuntimePlanV2,
 )
 from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 
@@ -27,7 +29,7 @@ class _FailIfCalledPriceLoader:
     Price-loader fake that fails fast if the universal artifact path is used unexpectedly.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -42,7 +44,7 @@ class _FailIfCalledPriceLoader:
         Initialize one fail-fast loader recording unexpected calls.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -69,7 +71,7 @@ class _FailIfCalledPriceLoader:
         Fail immediately because the perf-smoke success path should not load price artifacts.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -99,7 +101,7 @@ class _FailIfCalledPriceLoader:
         Fail immediately because the perf-smoke success path should not load mapping artifacts.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -129,7 +131,7 @@ class _FailIfCalledPriceLoader:
         Fail immediately because the perf-smoke success path should not load hit-times artifacts.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -159,7 +161,7 @@ class _FailIfCalledSignalLoader:
     Signal-loader fake that fails fast if universal shortlist scoring is used unexpectedly.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -174,7 +176,7 @@ class _FailIfCalledSignalLoader:
         Initialize one fail-fast loader recording unexpected calls.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -207,7 +209,7 @@ class _FailIfCalledSignalLoader:
         Fail immediately because the perf-smoke success path should not load signal matrices.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -245,7 +247,7 @@ class _FailIfCalledSignalLoader:
         Fail immediately because the perf-smoke success path should not load signal-row subsets.
 
         Docs:
-          - docs/architecture/backtest/backtest-family-accelerators-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -278,7 +280,7 @@ def test_backtest_family_plugin_rollout_v2_reduces_ma_stage_a_space_without_fall
     Verify the first MA-family plugin shrinks Stage A space without using universal fallback IO.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -373,8 +375,8 @@ def _runtime_plan_fixture(
     Build a larger pure-MA runtime-plan fixture for family-plugin perf-smoke evidence.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
@@ -423,7 +425,7 @@ def _hybrid_family_profile_fixture(*, max_candidates: int):
     Build one explicit runtime-enabled `hybrid_family` profile for perf-smoke rollout tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
@@ -466,8 +468,8 @@ def _artifact_context_fixture() -> Any:
     Build the minimal slot-pinned runtime context fixture used by perf-smoke builder tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -499,8 +501,8 @@ def _target_time_range_fixture() -> TimeRange:
     Build one deterministic request time range fixture for perf-smoke builder tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
-      - docs/architecture/backtest/backtest-hybrid-shortlist-runtime-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/test_backtest_family_plugin_rollout_v2.py
       - src/trading/contexts/backtest/application/services/v2/

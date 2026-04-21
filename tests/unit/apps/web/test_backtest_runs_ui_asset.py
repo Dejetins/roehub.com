@@ -131,28 +131,26 @@ def test_backtest_runs_ui_asset_applies_local_sort_without_top_refetch() -> None
     assert "summary_metrics_json" in source
 
 
-def test_backtest_runs_ui_asset_loads_one_variant_detail_via_run_scoped_endpoint() -> None:
+def test_backtest_runs_ui_asset_variant_detail_is_summary_only_without_report_endpoint() -> None:
     """
-    Verify shared runs asset loads variant detail through the minimal run-scoped report contract.
+    Verify shared runs asset renders variant detail from persisted summary rows only.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Detail page must reuse `/api/backtests/runs/{run_id}/variant-report` and avoid the legacy
-        full-envelope variant-report path.
+        Variant detail page no longer calls report recompute endpoints.
     Raises:
-        AssertionError: If run-scoped detail or `include_trades` literals disappear.
+        AssertionError: If removed report-endpoint literals are present in the asset.
     Side Effects:
         None.
     """
     source = _read_backtest_runs_ui_asset()
 
-    assert "apiVariantReportPathTemplate" in source
-    assert "include_trades" in source
-    assert "cloneJsonValue" in source
-    assert "state.reportCacheByKey" in source
-    assert "variant: cloneJsonValue" in source
+    assert "variant-summary-metrics" in source
+    assert "variant-payload-json" in source
+    assert "summary_metrics_json" in source
     assert "/api/backtests/variant-report" not in source
-    assert "time_range" not in source
+    assert "/api/backtests/runs/{run_id}/variant-report" not in source
+    assert "include_trades" not in source

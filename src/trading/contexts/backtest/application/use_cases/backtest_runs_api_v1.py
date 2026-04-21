@@ -7,15 +7,13 @@ from uuid import UUID, uuid4
 
 from trading.contexts.backtest.application.dto import (
     BACKTEST_RANKING_PRIMARY_METRIC_DEFAULT_V1,
-    BacktestReportV1,
     RunBacktestRequest,
     RunBacktestResponse,
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository, CurrentUser
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobTopVariantCandidateV1,
     build_finalized_snapshot_rows,
-    validate_execution_profile_mode_v2,
 )
 from trading.contexts.backtest.application.services.run_control_v1 import BacktestRunControlV1
 from trading.contexts.backtest.domain.entities import (
@@ -26,6 +24,9 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import BacktestValidationError
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
+    validate_execution_profile_mode_v2,
+)
 from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe
 
@@ -51,12 +52,12 @@ _SYNC_INLINE_REDESIGNED_EXECUTION_PROFILE_MODE = "exact_no_risk_parity"
 
 class BacktestRunsApiUseCase(Protocol):
     """
-    Structural contract for `/backtests` sync execution and lazy report API orchestration.
+    Structural contract for `/backtests` launch orchestration at the API boundary.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -72,7 +73,7 @@ class BacktestRunsApiUseCase(Protocol):
         run_control: BacktestRunControlV1 | None = None,
     ) -> RunBacktestResponse:
         """
-        Execute one sync backtest flow with optional canonical request payload snapshot.
+        Execute one `/backtests` launch flow with optional canonical request payload snapshot.
 
         Args:
             request: Parsed application request DTO.
@@ -80,42 +81,14 @@ class BacktestRunsApiUseCase(Protocol):
             request_payload: Optional strict API payload snapshot for persisted-run orchestrators.
             run_control: Optional cooperative cancellation/deadline control object.
         Returns:
-            RunBacktestResponse: Deterministic sync response DTO.
+            RunBacktestResponse: Deterministic launch response DTO.
         Assumptions:
-            Implementations may ignore `request_payload` when persistence is not required.
+            Production API wiring uses gateway-only launch and enqueues background compute only.
+            Sync execution implementations are retained for internal/test compatibility.
         Raises:
             Exception: Domain/application errors are implementation-specific.
         Side Effects:
-            May execute sync compute and optionally persist run metadata.
-        """
-        ...
-
-    def build_variant_report(
-        self,
-        *,
-        request: RunBacktestRequest,
-        current_user: CurrentUser,
-        variant_payload: Any,
-        include_trades: bool = False,
-        run_control: BacktestRunControlV1 | None = None,
-    ) -> BacktestReportV1:
-        """
-        Build one lazy single-variant report for `/backtests/variant-report`.
-
-        Args:
-            request: Parsed application request DTO.
-            current_user: Authenticated owner identity.
-            variant_payload: Explicit variant payload selected for on-demand detail generation.
-            include_trades: Include-trades flag for report generation.
-            run_control: Optional cooperative cancellation/deadline control object.
-        Returns:
-            BacktestReportV1: Deterministic report payload.
-        Assumptions:
-            Report generation reuses the same runtime semantics as sync execution.
-        Raises:
-            Exception: Domain/application errors are implementation-specific.
-        Side Effects:
-            Executes report generation logic and may perform compute IO.
+            May enqueue background jobs and/or persist run metadata.
         """
         ...
 
@@ -125,7 +98,7 @@ class BacktestRunPreflightUseCase(Protocol):
     Structural contract for deterministic staged-budget preflight without execution.
 
     Docs:
-      - docs/architecture/backtest/backtest-grid-builder-staged-runner-guards-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -165,7 +138,7 @@ class BacktestBackgroundJobCreateUseCase(Protocol):
     Structural contract for creating queued persisted runs for background execution.
 
     Docs:
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -198,12 +171,125 @@ class BacktestBackgroundJobCreateUseCase(Protocol):
         ...
 
 
-class LaunchBacktestRunWithAutoFallbackUseCase:
+class LaunchBacktestGatewayUseCase:
     """
-    Launch `POST /backtests` with deterministic `sync_inline -> background_auto` fallback.
+    Thin gateway launch use-case used by production API wiring.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
+      - docs/architecture/backtest/README.md
+    Related:
+      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
+      - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
+      - apps/api/wiring/modules/backtest.py
+    """
+
+    def __init__(
+        self,
+        *,
+        background_create_use_case: BacktestBackgroundJobCreateUseCase,
+        engine_version: str,
+        default_execution_profile_mode: str | None = None,
+    ) -> None:
+        """
+        Initialize gateway launch dependencies.
+
+        Args:
+            background_create_use_case:
+                Persisted background-run creator over unified jobs storage.
+            engine_version: Stable engine/runtime literal exposed in launch responses.
+            default_execution_profile_mode:
+                Optional explicit execution-profile mode persisted for queued launches.
+        Returns:
+            None.
+        Assumptions:
+            API process is transport-only and does not execute local backtest compute.
+        Raises:
+            ValueError: If one dependency or invariant is invalid.
+        Side Effects:
+            None.
+        """
+        if background_create_use_case is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "LaunchBacktestGatewayUseCase requires background_create_use_case"
+            )
+        normalized_engine_version = engine_version.strip()
+        if not normalized_engine_version:
+            raise ValueError("LaunchBacktestGatewayUseCase requires engine_version")
+
+        normalized_execution_profile_mode = None
+        if default_execution_profile_mode is not None:
+            normalized_execution_profile_mode = validate_execution_profile_mode_v2(
+                value=default_execution_profile_mode
+            )
+
+        self._background_create_use_case = background_create_use_case
+        self._engine_version = normalized_engine_version
+        self._default_execution_profile_mode = normalized_execution_profile_mode
+
+    def execute(
+        self,
+        *,
+        request: RunBacktestRequest,
+        current_user: CurrentUser,
+        request_payload: Mapping[str, Any] | None = None,
+        run_control: BacktestRunControlV1 | None = None,
+    ) -> RunBacktestResponse:
+        """
+        Enqueue one deterministic `background_auto` run and return launch metadata.
+
+        Args:
+            request: Parsed application request DTO.
+            current_user: Authenticated owner identity.
+            request_payload: Strict API payload snapshot used for canonical persistence.
+            run_control:
+                Optional cooperative cancellation/deadline control object, ignored by
+                gateway launch because no in-process compute is executed.
+        Returns:
+            RunBacktestResponse: Queued launch response with empty variants.
+        Assumptions:
+            Sync compute is executed only in external compute services.
+        Raises:
+            ValueError: If required inputs are missing.
+            RoehubError: Canonical validation/not_found/forbidden conflicts from create flow.
+        Side Effects:
+            Writes one queued run row into persisted storage.
+        """
+        if request is None:  # type: ignore[truthy-bool]
+            raise ValueError("LaunchBacktestGatewayUseCase.execute requires request")
+        if current_user is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "LaunchBacktestGatewayUseCase.execute requires current_user"
+            )
+        if request_payload is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "LaunchBacktestGatewayUseCase.execute requires request_payload"
+            )
+        _ = run_control
+
+        created_run = self._background_create_use_case.execute(
+            command=CreateBacktestJobCommand(
+                run_request=request,
+                request_payload=request_payload,
+                execution_mode="background_auto",
+                execution_profile_mode=self._default_execution_profile_mode,
+            ),
+            current_user=current_user,
+        )
+        return _build_background_auto_launch_response(
+            request=request,
+            created_run=created_run,
+            engine_version=self._engine_version,
+        )
+
+
+class LaunchBacktestRunWithAutoFallbackUseCase:
+    """
+    Legacy compatibility launch path with `sync_inline -> background_auto` fallback.
+
+    Docs:
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -224,7 +310,7 @@ class LaunchBacktestRunWithAutoFallbackUseCase:
         Initialize deterministic `/backtests` launch orchestration dependencies.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -280,7 +366,7 @@ class LaunchBacktestRunWithAutoFallbackUseCase:
         Launch sync-inline first, then fallback deterministically to `background_auto`.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
@@ -296,6 +382,8 @@ class LaunchBacktestRunWithAutoFallbackUseCase:
             RunBacktestResponse: Sync-inline success or explicit queued `background_auto` launch.
         Assumptions:
             Only canonical staged guard overflow errors are eligible for fallback.
+            This path is retained for internal/test compatibility and is not wired in
+            production gateway composition.
         Raises:
             RoehubError: Canonical validation/not-found/forbidden/conflict errors.
             ValueError: If required inputs are missing.
@@ -348,56 +436,14 @@ class LaunchBacktestRunWithAutoFallbackUseCase:
             engine_version=self._engine_version,
         )
 
-    def build_variant_report(
-        self,
-        *,
-        request: RunBacktestRequest,
-        current_user: CurrentUser,
-        variant_payload: Any,
-        include_trades: bool = False,
-        run_control: BacktestRunControlV1 | None = None,
-    ) -> BacktestReportV1:
-        """
-        Delegate lazy variant-report generation to the sync-inline report path.
-
-        Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/backtest-runs-history-v2.md
-        Related:
-          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
-          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
-          - apps/api/routes/backtests.py
-        Args:
-            request: Parsed application request DTO.
-            current_user: Authenticated owner identity.
-            variant_payload: Explicit variant payload selected for lazy detail/report fetch.
-            include_trades: Include-trades flag for report generation.
-            run_control: Optional cooperative cancellation/deadline control object.
-        Returns:
-            BacktestReportV1: Deterministic lazy report payload.
-        Assumptions:
-            Auto-fallback launch semantics do not change lazy detail generation contract.
-        Raises:
-            RoehubError: Propagates canonical errors from the delegated sync report path.
-        Side Effects:
-            Delegates to the existing report builder path without touching persisted storage.
-        """
-        return self._sync_inline_use_case.build_variant_report(
-            request=request,
-            current_user=current_user,
-            variant_payload=variant_payload,
-            include_trades=include_trades,
-            run_control=run_control,
-        )
-
 
 class CreateAndRunBacktestSyncInlineUseCase:
     """
-    Create-and-execute persisted sync-inline Backtest flow over the unified jobs storage family.
+    Legacy persisted sync-inline backtest flow over the unified jobs storage family.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -420,8 +466,8 @@ class CreateAndRunBacktestSyncInlineUseCase:
         Initialize sync-inline persisted-run orchestrator dependencies.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -476,9 +522,9 @@ class CreateAndRunBacktestSyncInlineUseCase:
         Execute sync run inline, then persist the terminal snapshot atomically.
 
         Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
           - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
@@ -499,6 +545,8 @@ class CreateAndRunBacktestSyncInlineUseCase:
             Internal preflight remains delegated to the existing sync `RunBacktestUseCase`, while
             the effective sync execution profile stays internal-only and excluded from request-hash
             semantics.
+            This class is retained for internal/test compatibility and is not part of
+            production gateway-only API launch wiring.
         Raises:
             BacktestValidationError: If persisted metadata cannot be built deterministically.
             RoehubError: Propagates canonical validation/not-found/forbidden failures
@@ -581,55 +629,13 @@ class CreateAndRunBacktestSyncInlineUseCase:
             engine_params_hash=persisted_run.engine_params_hash,
         )
 
-    def build_variant_report(
-        self,
-        *,
-        request: RunBacktestRequest,
-        current_user: CurrentUser,
-        variant_payload: Any,
-        include_trades: bool = False,
-        run_control: BacktestRunControlV1 | None = None,
-    ) -> BacktestReportV1:
-        """
-        Delegate lazy single-variant report generation to the existing sync use-case.
-
-        Docs:
-          - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-          - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-        Related:
-          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
-          - src/trading/contexts/backtest/application/use_cases/run_backtest.py
-          - apps/api/routes/backtests.py
-        Args:
-            request: Parsed application request DTO.
-            current_user: Authenticated owner identity.
-            variant_payload: Explicit variant payload selected for lazy detail/report fetch.
-            include_trades: Include-trades flag for report generation.
-            run_control: Optional cooperative cancellation/deadline control object.
-        Returns:
-            BacktestReportV1: Deterministic lazy report payload.
-        Assumptions:
-            Persisted sync-inline cutover does not change lazy single-variant detail semantics.
-        Raises:
-            RoehubError: Propagates canonical errors from the inner sync use-case.
-        Side Effects:
-            Delegates to the existing report builder path without touching persisted storage.
-        """
-        return self._run_use_case.build_variant_report(
-            request=request,
-            current_user=current_user,
-            variant_payload=variant_payload,
-            include_trades=include_trades,
-            run_control=run_control,
-        )
-
 
 def _is_auto_fallback_eligible_error(*, error: RoehubError) -> bool:
     """
     Classify deterministic sync launch errors eligible for `background_auto` routing.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -660,8 +666,8 @@ def _execution_profile_mode_from_error(*, error: RoehubError) -> str | None:
     Read additive effective execution-profile hint from one auto-fallback-eligible error.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -700,8 +706,8 @@ def _with_sync_inline_redesigned_engine_request_payload(
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v2.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-engine-vnext.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -737,8 +743,8 @@ def _build_background_auto_launch_response(
     Convert queued `background_auto` run snapshot into `/backtests` launch response DTO.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -853,9 +859,9 @@ def _require_persisted_execution_profile_mode(
     Read one persisted effective execution-profile mode from additive run metadata.
 
     Docs:
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
@@ -959,8 +965,8 @@ def _artifact_pin_from_response(*, response: RunBacktestResponse) -> BacktestJob
     Convert sync run artifact metadata into the immutable persisted-run pin DTO.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -1004,8 +1010,8 @@ def _build_request_json_payload(
     Build canonical persisted `request_json` payload for one completed sync-inline run.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -1067,8 +1073,8 @@ def _require_response_execution_profile_mode(*, response: RunBacktestResponse) -
     Require effective exact execution profile mode on completed sync `/backtests` responses.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-runs-history-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -1128,8 +1134,8 @@ def _build_engine_params_hash(*, response: RunBacktestResponse) -> str:
     Build deterministic engine-params hash from resolved sync execution payload.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -1171,8 +1177,8 @@ def _build_terminal_sync_inline_run(
     Build final succeeded sync-inline run aggregate snapshot for one persisted sync response.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -1256,9 +1262,9 @@ def _build_persisted_top_rows(
     Convert sync response variants into summary-only persisted top rows via shared worker mappers.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
       - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
@@ -1319,9 +1325,9 @@ def _build_terminal_sync_inline_stage_a_shortlist(
     Materialize one optional internal Stage A shortlist snapshot for atomic sync persistence.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -1403,8 +1409,8 @@ def _require_direction_mode(*, response: RunBacktestResponse) -> str:
     Require deterministic effective direction mode on the completed sync response.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1430,8 +1436,8 @@ def _require_sizing_mode(*, response: RunBacktestResponse) -> str:
     Require deterministic effective sizing mode on the completed sync response.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
       - src/trading/contexts/backtest/application/dto/run_backtest.py
@@ -1457,8 +1463,8 @@ def _sorted_execution_payload(*, response: RunBacktestResponse) -> dict[str, Any
     Require and normalize effective execution params from the completed sync response.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
@@ -1485,8 +1491,8 @@ def _utc_now() -> datetime:
     Return timezone-aware UTC timestamp for persisted sync-inline lifecycle writes.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -1508,4 +1514,6 @@ def _utc_now() -> datetime:
 __all__ = [
     "BacktestRunsApiUseCase",
     "CreateAndRunBacktestSyncInlineUseCase",
+    "LaunchBacktestGatewayUseCase",
+    "LaunchBacktestRunWithAutoFallbackUseCase",
 ]

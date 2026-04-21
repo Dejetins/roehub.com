@@ -13,7 +13,6 @@ import {
   normalizeError,
   parsePositiveInt,
   persistStrategyPrefillAndNavigate,
-  renderMarkdownToSafeHtml,
   renderPathTemplate,
   requireDataAttr,
   showPageError,
@@ -799,34 +798,23 @@ function initVariantDetailPage(pageRoot) {
   const variantKey = requireDataAttr(pageRoot, "variantKey");
   const runsPathPrefix = requireDataAttr(pageRoot, "apiRunsPathPrefix");
   const topPathTemplate = requireDataAttr(pageRoot, "apiTopPathTemplate");
-  const variantReportPathTemplate = requireDataAttr(pageRoot, "apiVariantReportPathTemplate");
   const marketsPath = requireDataAttr(pageRoot, "apiMarketsPath");
   const strategyBuilderPath = requireDataAttr(pageRoot, "strategyBuilderPath");
   const prefillQueryParam = requireDataAttr(pageRoot, "prefillQueryParam");
   const prefillStorage = requireDataAttr(pageRoot, "prefillStorage");
   const defaultTopLimit = parsePositiveInt(requireDataAttr(pageRoot, "defaultTopLimit"), 50);
 
-  const refreshButton = pageRoot.querySelector("#variant-refresh-detail");
   const saveButton = pageRoot.querySelector("#variant-save-strategy");
-  const includeTradesToggle = pageRoot.querySelector("#variant-include-trades");
-  const loadingNode = pageRoot.querySelector("#variant-detail-loading");
   const missingBanner = pageRoot.querySelector("#variant-missing-banner");
-  const metricsNode = pageRoot.querySelector("#variant-detail-metrics");
-  const markdownNode = pageRoot.querySelector("#variant-detail-markdown");
-  const chartNode = pageRoot.querySelector("#variant-detail-chart");
-  const tradesNode = pageRoot.querySelector("#variant-detail-trades");
+  const metricsNode = pageRoot.querySelector("#variant-summary-metrics");
+  const payloadNode = pageRoot.querySelector("#variant-payload-json");
   const selectedIndicatorsNode = pageRoot.querySelector("#variant-selected-indicators");
 
   if (
-    refreshButton === null
-    || saveButton === null
-    || includeTradesToggle === null
-    || loadingNode === null
+    saveButton === null
     || missingBanner === null
     || metricsNode === null
-    || markdownNode === null
-    || chartNode === null
-    || tradesNode === null
+    || payloadNode === null
     || selectedIndicatorsNode === null
   ) {
     return;
@@ -857,9 +845,6 @@ function initVariantDetailPage(pageRoot) {
     topLimit: defaultTopLimit,
     statusRequestToken: 0,
     topRequestToken: 0,
-    reportRequestToken: 0,
-    reportCacheByKey: new Map(),
-    isLoadingReport: false,
   };
 
   const statusPath = `${runsPathPrefix}${encodeURIComponent(runId)}`;
@@ -869,26 +854,12 @@ function initVariantDetailPage(pageRoot) {
     requestUrl.searchParams.set("limit", String(state.topLimit));
     return requestUrl.toString();
   };
-  const variantReportPath = renderPathTemplate(
-    variantReportPathTemplate,
-    encodeURIComponent(runId),
-  );
-
-  const setLoadingState = (isLoading) => {
-    state.isLoadingReport = isLoading;
-    loadingNode.classList.toggle("hidden", !isLoading);
-    refreshButton.disabled = isLoading;
-    includeTradesToggle.disabled = isLoading;
-    saveButton.disabled = isLoading || state.selectedRow === null;
-  };
 
   const renderMissingVariant = (message) => {
     missingBanner.textContent = message;
     missingBanner.classList.remove("hidden");
     metricsNode.innerHTML = "";
-    markdownNode.innerHTML = "";
-    chartNode.innerHTML = "";
-    tradesNode.innerHTML = "";
+    payloadNode.textContent = "";
     selectedIndicatorsNode.innerHTML = "";
     saveButton.disabled = true;
   };
@@ -896,7 +867,7 @@ function initVariantDetailPage(pageRoot) {
   const clearMissingVariant = () => {
     missingBanner.textContent = "";
     missingBanner.classList.add("hidden");
-    saveButton.disabled = state.isLoadingReport || state.selectedRow === null;
+    saveButton.disabled = state.selectedRow === null;
   };
 
   const renderStatus = (rawStatus) => {
@@ -919,6 +890,8 @@ function initVariantDetailPage(pageRoot) {
     setTextContent(fieldMap.directionMode, formatValue(payload.direction_mode));
     setTextContent(fieldMap.sizingMode, formatValue(payload.sizing_mode));
     renderSelectedIndicators(payload);
+    renderSummaryMetrics(asRecord(row.summary_metrics_json));
+    renderPayload(payload);
   };
 
   const renderSelectedIndicators = (payload) => {
@@ -951,7 +924,7 @@ function initVariantDetailPage(pageRoot) {
     if (!Array.isArray(rows) || rows.length === 0) {
       const emptyNode = document.createElement("p");
       emptyNode.className = "muted-text";
-      emptyNode.textContent = "No detail rows returned.";
+      emptyNode.textContent = "No summary metrics were persisted for this row.";
       metricsNode.appendChild(emptyNode);
       return;
     }
@@ -970,83 +943,20 @@ function initVariantDetailPage(pageRoot) {
     metricsNode.appendChild(list);
   };
 
-  const renderMarkdownTable = (tableMarkdown) => {
-    const normalized = String(tableMarkdown || "").trim();
-    markdownNode.innerHTML = "";
-    if (normalized.length === 0) {
-      const emptyNode = document.createElement("p");
-      emptyNode.className = "muted-text";
-      emptyNode.textContent = "No table_md returned.";
-      markdownNode.appendChild(emptyNode);
-      return;
-    }
-
-    const content = document.createElement("div");
-    content.className = "markdown-report";
-    content.innerHTML = renderMarkdownToSafeHtml(normalized);
-    markdownNode.appendChild(content);
+  const renderSummaryMetrics = (summaryMetrics) => {
+    const entries = Object.entries(asRecord(summaryMetrics))
+      .map(([metric, value]) => ({ metric, value }))
+      .sort((left, right) => compareStableStrings(left.metric, right.metric));
+    renderMetricRows(
+      entries.map((entry) => ({
+        metric: entry.metric,
+        value: formatValue(entry.value),
+      })),
+    );
   };
 
-  const renderTrades = (trades) => {
-    tradesNode.innerHTML = "";
-    if (!Array.isArray(trades) || trades.length === 0) {
-      const emptyNode = document.createElement("p");
-      emptyNode.className = "muted-text";
-      emptyNode.textContent = includeTradesToggle.checked
-        ? "No trades returned for this variant."
-        : "Trades disabled. Enable include_trades to inspect the trade list.";
-      tradesNode.appendChild(emptyNode);
-      return;
-    }
-
-    const tableScroll = document.createElement("div");
-    tableScroll.className = "table-scroll";
-    const table = document.createElement("table");
-    table.className = "data-table detail-trades-table";
-    table.innerHTML = [
-      "<thead>",
-      "<tr>",
-      "<th scope=\"col\">trade_id</th>",
-      "<th scope=\"col\">direction</th>",
-      "<th scope=\"col\">entry_bar_index</th>",
-      "<th scope=\"col\">exit_bar_index</th>",
-      "<th scope=\"col\">entry_fill_price</th>",
-      "<th scope=\"col\">exit_fill_price</th>",
-      "<th scope=\"col\">net_pnl_quote</th>",
-      "<th scope=\"col\">exit_reason</th>",
-      "</tr>",
-      "</thead>",
-      "<tbody></tbody>",
-    ].join("");
-    const tbody = table.querySelector("tbody");
-    trades.forEach((trade) => {
-      const record = asRecord(trade);
-      const row = document.createElement("tr");
-      row.appendChild(buildCell(formatValue(record.trade_id)));
-      row.appendChild(buildCell(formatValue(record.direction)));
-      row.appendChild(buildCell(formatValue(record.entry_bar_index)));
-      row.appendChild(buildCell(formatValue(record.exit_bar_index)));
-      row.appendChild(buildCell(formatValue(record.entry_fill_price)));
-      row.appendChild(buildCell(formatValue(record.exit_fill_price)));
-      row.appendChild(buildCell(formatValue(record.net_pnl_quote)));
-      row.appendChild(buildCell(formatValue(record.exit_reason)));
-      tbody?.appendChild(row);
-    });
-    tableScroll.appendChild(table);
-    tradesNode.appendChild(tableScroll);
-  };
-
-  const renderTradesChart = (trades) => {
-    chartNode.innerHTML = "";
-    chartNode.appendChild(buildTradesChartNode({ trades, includeTrades: includeTradesToggle.checked }));
-  };
-
-  const renderReport = (rawReport) => {
-    const report = asRecord(rawReport);
-    renderMetricRows(Array.isArray(report.rows) ? report.rows : []);
-    renderMarkdownTable(report.table_md);
-    renderTradesChart(Array.isArray(report.trades) ? report.trades : []);
-    renderTrades(Array.isArray(report.trades) ? report.trades : []);
+  const renderPayload = (payload) => {
+    payloadNode.textContent = JSON.stringify(asRecord(payload), null, 2);
   };
 
   const resolveSelectedRow = () => {
@@ -1120,52 +1030,6 @@ function initVariantDetailPage(pageRoot) {
     }
   };
 
-  const currentReportCacheKey = () => (
-    includeTradesToggle.checked ? "include_trades:true" : "include_trades:false"
-  );
-
-  const loadVariantReport = async ({ forceReload = false } = {}) => {
-    clearPageError(pageRoot);
-    if (state.selectedRow === null) {
-      renderMissingVariant(
-        `variant_key ${variantKey} was not found in persisted summary rows for run ${runId}.`,
-      );
-      return;
-    }
-
-    const cacheKey = currentReportCacheKey();
-    if (!forceReload && state.reportCacheByKey.has(cacheKey)) {
-      renderReport(state.reportCacheByKey.get(cacheKey));
-      return;
-    }
-
-    setLoadingState(true);
-    try {
-      const requestPayload = {
-        variant: cloneJsonValue(asRecord(asRecord(state.selectedRow).payload)),
-        include_trades: includeTradesToggle.checked,
-      };
-      const response = await fetch(variantReportPath, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestPayload),
-      });
-      if (!response.ok) {
-        throw await buildHttpError(response);
-      }
-
-      const payload = await response.json();
-      state.reportCacheByKey.set(cacheKey, payload);
-      renderReport(payload);
-    } catch (error) {
-      const normalized = normalizeError(error);
-      showPageError(pageRoot, normalized.message, normalized.details);
-    } finally {
-      setLoadingState(false);
-    }
-  };
-
   const saveSelectedVariant = async () => {
     clearPageError(pageRoot);
     if (state.selectedRow === null) {
@@ -1194,14 +1058,6 @@ function initVariantDetailPage(pageRoot) {
     }
   };
 
-  refreshButton.addEventListener("click", async () => {
-    await loadVariantReport({ forceReload: true });
-  });
-
-  includeTradesToggle.addEventListener("change", async () => {
-    await loadVariantReport();
-  });
-
   saveButton.addEventListener("click", async () => {
     await saveSelectedVariant();
   });
@@ -1209,13 +1065,10 @@ function initVariantDetailPage(pageRoot) {
   const bootstrap = async () => {
     clearPageError(pageRoot);
     await loadStatus();
-    const topPayload = await loadTop();
-    if (topPayload !== null && state.selectedRow !== null) {
-      await loadVariantReport();
-    }
+    await loadTop();
   };
 
-  setLoadingState(false);
+  saveButton.disabled = true;
   bootstrap();
 }
 
@@ -1443,172 +1296,4 @@ function createRunStrategyContextResolver({ marketsPath }) {
       instrument_key: `${marketCode}:${marketType}:${symbol}`,
     };
   };
-}
-
-function cloneJsonValue(value) {
-  if (Array.isArray(value)) {
-    return value.map((item) => cloneJsonValue(item));
-  }
-  if (value !== null && typeof value === "object") {
-    const record = asRecord(value);
-    const cloned = {};
-    Object.keys(record).sort(compareStableStrings).forEach((key) => {
-      cloned[key] = cloneJsonValue(record[key]);
-    });
-    return cloned;
-  }
-  return value;
-}
-
-function buildTradesChartNode({ trades, includeTrades }) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "variant-chart-shell";
-
-  if (!includeTrades) {
-    const emptyNode = document.createElement("p");
-    emptyNode.className = "muted-text";
-    emptyNode.textContent = "Chart is disabled while include_trades=false.";
-    wrapper.appendChild(emptyNode);
-    return wrapper;
-  }
-  if (!Array.isArray(trades) || trades.length === 0) {
-    const emptyNode = document.createElement("p");
-    emptyNode.className = "muted-text";
-    emptyNode.textContent = "Trade chart is unavailable because the detail payload returned no trades.";
-    wrapper.appendChild(emptyNode);
-    return wrapper;
-  }
-
-  const chartWidth = 760;
-  const chartHeight = 240;
-  const paddingX = 36;
-  const paddingY = 20;
-  const points = [{ x: 0, y: 0, tradeId: 0, exitReason: "start" }];
-  let cumulativePnl = 0;
-  let maxX = 1;
-  let minY = 0;
-  let maxY = 0;
-
-  trades.forEach((trade) => {
-    const record = asRecord(trade);
-    const exitBarIndex = Number(record.exit_bar_index || 0);
-    const netPnl = Number(record.net_pnl_quote || 0);
-    cumulativePnl += Number.isFinite(netPnl) ? netPnl : 0;
-    maxX = Math.max(maxX, exitBarIndex);
-    minY = Math.min(minY, cumulativePnl);
-    maxY = Math.max(maxY, cumulativePnl);
-    points.push({
-      x: exitBarIndex,
-      y: cumulativePnl,
-      tradeId: Number(record.trade_id || 0),
-      exitReason: String(record.exit_reason || "").trim().toLowerCase(),
-    });
-  });
-
-  const normalizeX = (value) => {
-    const width = chartWidth - (paddingX * 2);
-    return paddingX + ((value / Math.max(maxX, 1)) * width);
-  };
-  const normalizeY = (value) => {
-    const height = chartHeight - (paddingY * 2);
-    const range = Math.max(maxY - minY, 1);
-    return chartHeight - paddingY - (((value - minY) / range) * height);
-  };
-
-  const svgNamespace = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(svgNamespace, "svg");
-  svg.setAttribute("viewBox", `0 0 ${chartWidth} ${chartHeight}`);
-  svg.setAttribute("class", "variant-chart");
-  svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Trade equity chart by exit_bar_index");
-
-  const horizontalStops = [minY, (minY + maxY) / 2, maxY];
-  horizontalStops.forEach((value) => {
-    const line = document.createElementNS(svgNamespace, "line");
-    const y = normalizeY(value);
-    line.setAttribute("x1", String(paddingX));
-    line.setAttribute("x2", String(chartWidth - paddingX));
-    line.setAttribute("y1", String(y));
-    line.setAttribute("y2", String(y));
-    line.setAttribute("class", "variant-chart-grid");
-    svg.appendChild(line);
-  });
-
-  const zeroLine = document.createElementNS(svgNamespace, "line");
-  zeroLine.setAttribute("x1", String(paddingX));
-  zeroLine.setAttribute("x2", String(chartWidth - paddingX));
-  zeroLine.setAttribute("y1", String(normalizeY(0)));
-  zeroLine.setAttribute("y2", String(normalizeY(0)));
-  zeroLine.setAttribute("class", "variant-chart-zero");
-  svg.appendChild(zeroLine);
-
-  const path = document.createElementNS(svgNamespace, "polyline");
-  path.setAttribute(
-    "points",
-    points.map((point) => `${normalizeX(point.x)},${normalizeY(point.y)}`).join(" "),
-  );
-  path.setAttribute("class", "variant-chart-line");
-  svg.appendChild(path);
-
-  points.slice(1).forEach((point) => {
-    const marker = document.createElementNS(svgNamespace, "circle");
-    marker.setAttribute("cx", String(normalizeX(point.x)));
-    marker.setAttribute("cy", String(normalizeY(point.y)));
-    marker.setAttribute("r", "4");
-    marker.setAttribute("class", "variant-chart-point");
-    marker.setAttribute(
-      "data-exit-reason",
-      colorKeyForExitReason(point.exitReason),
-    );
-    const title = document.createElementNS(svgNamespace, "title");
-    title.textContent = `trade_id=${point.tradeId} exit_reason=${point.exitReason} cumulative_net=${point.y.toFixed(2)}`;
-    marker.appendChild(title);
-    svg.appendChild(marker);
-  });
-
-  wrapper.appendChild(svg);
-  wrapper.appendChild(buildExitReasonLegend(trades));
-  return wrapper;
-}
-
-function buildExitReasonLegend(trades) {
-  const legend = document.createElement("div");
-  legend.className = "variant-chart-legend";
-  const counts = new Map();
-  trades.forEach((trade) => {
-    const reason = colorKeyForExitReason(String(asRecord(trade).exit_reason || ""));
-    counts.set(reason, (counts.get(reason) || 0) + 1);
-  });
-
-  Array.from(counts.keys()).sort(compareStableStrings).forEach((reason) => {
-    const item = document.createElement("span");
-    item.className = "variant-chart-legend-item";
-    const marker = document.createElement("span");
-    marker.className = "variant-chart-legend-marker";
-    marker.dataset.exitReason = reason;
-    const label = document.createElement("span");
-    label.textContent = `${reason} (${counts.get(reason)})`;
-    item.appendChild(marker);
-    item.appendChild(label);
-    legend.appendChild(item);
-  });
-
-  return legend;
-}
-
-function colorKeyForExitReason(rawReason) {
-  const normalized = String(rawReason || "").trim().toLowerCase();
-  if (normalized === "tp") {
-    return "tp";
-  }
-  if (normalized === "sl") {
-    return "sl";
-  }
-  if (normalized === "close_on_end") {
-    return "close_on_end";
-  }
-  if (normalized === "signal_exit") {
-    return "signal_exit";
-  }
-  return normalized.length > 0 ? normalized : "other";
 }

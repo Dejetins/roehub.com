@@ -28,8 +28,8 @@ class StrategyRepositoryBacktestStrategyReader(BacktestStrategyReader):
     Backtest strategy reader ACL adapter over StrategyRepository storage port.
 
     Docs:
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
-      - docs/architecture/backtest/backtest-bounded-context-domain-use-case-skeleton-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md
     Related:
       - src/trading/contexts/backtest/application/ports/strategy_reader.py

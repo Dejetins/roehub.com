@@ -24,7 +24,7 @@ class _RecordingCandleFeed:
     Deterministic CandleFeed stub that records load calls for assertion.
 
     Docs:
-      - docs/architecture/backtest/backtest-candle-timeline-rollup-warmup-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/candle_timeline_builder.py
       - src/trading/contexts/indicators/application/ports/feeds/candle_feed.py

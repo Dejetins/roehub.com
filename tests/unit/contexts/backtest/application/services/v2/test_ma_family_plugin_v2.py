@@ -4,19 +4,23 @@ from dataclasses import replace
 
 import pytest
 
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_runtime_plan_v2 import (
     BacktestArtifactRuntimePlanV2,
     BacktestIndicatorAxisPlanV2,
     BacktestIndicatorPlanV2,
     BacktestRiskVariantV2,
     BacktestSignalAxisPlanV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
     ExecutionProfileFeatureFlagsV2,
     ExecutionProfileShortlistConfigV2,
-    build_family_plugin_planning_context_v2,
     default_execution_profiles_catalog_v2,
 )
-from trading.contexts.backtest.application.services.v2.family_plugins import (
+from trading.contexts.backtest_artifacts.application.services.v2.family_plugins import (
     MAFamilyAccelerationPluginV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.family_plugins.contracts_v2 import (  # noqa: E501
+    build_family_plugin_planning_context_v2,
 )
 
 
@@ -25,7 +29,7 @@ def test_ma_family_plugin_v2_proposes_deterministic_row_shortlist_and_proxy_scor
     Verify the first MA-family plugin emits deterministic row-shortlist plus proxy-score output.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-ma.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_ma_family_plugin_v2.py
@@ -89,7 +93,7 @@ def test_ma_family_plugin_v2_supports_vwma_without_source_axis() -> None:
     Verify canonical `ma.vwma` support stays valid even though the MA definition omits `source`.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-ma.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_ma_family_plugin_v2.py
@@ -133,7 +137,7 @@ def test_ma_family_plugin_v2_rejects_unknown_ma_indicator_ids() -> None:
     Verify applicability is anchored to canonical `ma.*` definitions rather than prefix only.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/indicators/indicators-ma.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_ma_family_plugin_v2.py
@@ -183,8 +187,8 @@ def _build_runtime_plan(
     Build a minimal runtime-plan fixture for MA-family proposal tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_ma_family_plugin_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_plan_v2.py
@@ -234,7 +238,7 @@ def _hybrid_family_profile_fixture(*, max_candidates: int):
     Build one explicit opt-in `hybrid_family` execution profile for MA plugin tests.
 
     Docs:
-      - docs/architecture/backtest/backtest-family-accelerators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_ma_family_plugin_v2.py

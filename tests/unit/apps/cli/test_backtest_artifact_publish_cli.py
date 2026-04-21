@@ -9,13 +9,13 @@ from typing import Any, Mapping, cast
 import apps.cli.commands.backtest_artifact_publish as publish_module
 import apps.cli.main.main as cli_main_module
 from apps.cli.commands.backtest_artifact_publish import BacktestArtifactPublishCli
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services import (
     ArtifactCoordinatesV2,
     ArtifactStageRebuildStatsCollectionV2,
     ArtifactStageRebuildStatsV2,
     ArtifactTailRebuildBarsV2,
 )
-from trading.contexts.backtest.application.use_cases import (
+from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
     PublishBacktestArtifactsV2Result,
     PublishBacktestArtifactsV2UseCase,
@@ -30,7 +30,7 @@ class _FakePublishUseCaseV2:
 
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/commands/backtest_artifact_publish.py
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -58,7 +58,7 @@ class _FakePublishUseCaseV2:
             Appends the request to in-memory call history.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/backtest-precompute-runner-v2.md
+          - docs/architecture/backtest/README.md
         Related:
           - apps/cli/commands/backtest_artifact_publish.py
         """
@@ -82,7 +82,7 @@ def test_backtest_artifact_publish_cli_forwards_request_and_renders_json(capsys)
         Writes one JSON payload to captured stdout.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/commands/backtest_artifact_publish.py
     """
@@ -235,7 +235,7 @@ def test_backtest_artifact_publish_cli_renders_text_stage_breakdown(capsys) -> N
         Writes one text report to captured stdout.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/commands/backtest_artifact_publish.py
     """
@@ -673,7 +673,7 @@ def _sample_publish_result_v2() -> PublishBacktestArtifactsV2Result:
         None.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/commands/backtest_artifact_publish.py
     """

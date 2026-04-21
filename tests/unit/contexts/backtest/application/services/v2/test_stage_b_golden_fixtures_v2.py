@@ -18,38 +18,42 @@ from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
 from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
     backtest_job_results_repository as job_results_repository_module,
 )
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
+from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
+from trading.contexts.backtest_artifacts.application.services.v2 import (
+    artifact_backed_stage_b_scorer_v2 as stage_b_scorer_module,
+)
+from trading.contexts.backtest_artifacts.application.services.v2 import (
+    artifact_runtime_core_v2 as runtime_core_module,
+)
+from trading.contexts.backtest_artifacts.application.services.v2 import (
+    artifact_runtime_plan_v2 as runtime_plan_module,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_backed_stage_b_scorer_v2 import (  # noqa: E501
     BacktestArtifactBackedStageBScorerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.benchmark_corpus_v2 import (
+    load_backtest_runtime_acceleration_benchmark_corpus_v2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.execution_profile_v2 import (
+    default_execution_profiles_catalog_v2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.stage_b_golden_fixtures_v2 import (
     StageBBestCellReplayCaseV2,
     StageBEntryMappingCaseV2,
     StageBTradeExitCaseV2,
     StageBTradeListCaseV2,
-    default_execution_profiles_catalog_v2,
     execute_stage_b_golden_case_v2,
-    load_backtest_runtime_acceleration_benchmark_corpus_v2,
+    load_stage_b_best_cell_replay_reference_case_v2,
     load_stage_b_golden_fixture_catalog_v2,
     map_bar_close_1m_idx_to_entry_exec_v2,
     read_stage_b_golden_fixture_payload_v2,
     serialize_stage_b_golden_fixture_payload_v2,
     validate_stage_b_golden_fixture_payload_v2,
 )
-from trading.contexts.backtest.application.services.v2 import (
-    artifact_backed_stage_b_scorer_v2 as stage_b_scorer_module,
-)
-from trading.contexts.backtest.application.services.v2 import (
-    artifact_runtime_core_v2 as runtime_core_module,
-)
-from trading.contexts.backtest.application.services.v2 import (
-    artifact_runtime_plan_v2 as runtime_plan_module,
-)
-from trading.contexts.backtest.application.services.v2.stage_b_golden_fixtures_v2 import (
-    load_stage_b_best_cell_replay_reference_case_v2,
-)
-from trading.contexts.backtest.application.services.v2.trade_compactor_kernel import (
+from trading.contexts.backtest_artifacts.application.services.v2.trade_compactor_kernel import (
     StageACompactExactPayloadV2,
 )
-from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
-from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
 
 _FIXTURE_PATH = Path(__file__).with_name("fixtures") / "stage_b_golden_fixtures_v2.json"
 _PERF_MANIFEST_PATH = (
@@ -76,7 +80,7 @@ class _FinalistOnlyStageBScorerStubV2:
 
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_stage_b_golden_fixtures_v2.py
@@ -230,7 +234,7 @@ def test_top_row_serializers_drop_non_finite_summary_metrics_before_json_persist
         Serializes one in-memory top-row payload through both repository helper paths.
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-parity-corrective-plan-v1.md
-      - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_repository.py
@@ -316,7 +320,7 @@ def test_stage_b_fast_path_stays_enabled_with_retained_exact_payload_for_total_r
         Populates one in-memory scorer cache with an empty retained payload seed.
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
@@ -416,7 +420,7 @@ def test_stage_b_details_path_keeps_exact_authority_with_retained_exact_payload(
         Replaces two scorer-module helpers for the duration of the test.
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
       - src/trading/contexts/backtest/application/services/v2/metrics_kernel.py
@@ -503,7 +507,7 @@ def test_stage_b_exact_replay_observability_is_finalist_only() -> None:
         None.
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
       - tests/perf_smoke/contexts/backtest/test_backtest_notebook_parity_perf_smoke_v1.py
@@ -536,7 +540,7 @@ def test_stage_b_runtime_replays_exact_only_for_finalist_rows() -> None:
         Exercises the shared Stage B runtime with a finalist-only scorer stub.
     Docs:
       - docs/architecture/roadmap/backtest-engine-vnext-notebook-parity-plan-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_runtime_core_v2.py
       - src/trading/contexts/backtest/application/services/v2/artifact_backed_stage_b_scorer_v2.py
@@ -808,7 +812,7 @@ def test_stage_b_golden_fixture_catalog_executes_all_cases_deterministically() -
         Reads one JSON fixture catalog from repository.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
       - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
@@ -845,7 +849,7 @@ def test_stage_b_golden_fixture_catalog_exposes_best_cell_reference_case_for_sel
     Side Effects:
         Reads one JSON fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-engine-vnext-implementation-plan-v1.md
     Related:
       - tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb
@@ -877,8 +881,8 @@ def test_stage_b_golden_fixture_catalog_serialization_is_byte_stable() -> None:
     Side Effects:
         Reads the unit fixture catalog and perf-smoke manifest from repository.
     Docs:
-      - docs/architecture/backtest/backtest-v2-benchmarks.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
       - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
@@ -907,8 +911,8 @@ def test_stage_b_golden_fixture_catalog_is_referenced_by_runtime_acceleration_co
     Side Effects:
         Reads the committed benchmark corpus and Stage B fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-acceleration-benchmarks-v1.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/
         backtest_runtime_acceleration_benchmark_corpus_v1.json
@@ -946,7 +950,7 @@ def test_validate_stage_b_golden_fixture_payload_v2_rejects_unknown_schema_versi
         Reads one JSON fixture catalog from repository.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
       - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
@@ -978,7 +982,7 @@ def test_validate_stage_b_golden_fixture_payload_v2_requires_precedence_assertio
     Side Effects:
         Reads one JSON fixture catalog from repository.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
@@ -1015,7 +1019,7 @@ def test_validate_stage_b_golden_fixture_payload_v2_rejects_missing_best_cell_me
         Reads one JSON fixture catalog from repository.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
       - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py
@@ -1056,7 +1060,7 @@ def _assert_case_result_matches_expected(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
@@ -1107,7 +1111,7 @@ def _case_by_id(*, payload: dict[str, object], case_id: str) -> dict[str, object
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-runtime-kernels-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - tests/perf_smoke/contexts/backtest/fixtures/r5_stage_b_golden_cases.json
       - src/trading/contexts/backtest/application/services/v2/stage_b_golden_fixtures_v2.py

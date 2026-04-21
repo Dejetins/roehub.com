@@ -13,13 +13,15 @@ from trading.contexts.backtest.application.services import (
     IndicatorSignalEvaluationInputV1,
     evaluate_indicator_signal_encoded_v1,
 )
-from trading.contexts.backtest.application.services.v2 import (
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     SIGNAL_CODE_LONG_V2,
     SIGNAL_CODE_NEUTRAL_V2,
     SIGNAL_CODE_SHORT_V2,
     SIGNAL_CODE_VALUE_SET_V2,
-    BacktestSignalRulesEngineV2,
     SignalRuleEvaluationRequestV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
+    BacktestSignalRulesEngineV2,
     list_signal_rule_registry_v2,
     supported_indicator_ids_for_signal_rules_v2,
 )
@@ -54,7 +56,7 @@ def _build_candles(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py
@@ -97,7 +99,7 @@ def prod_defaults_provider() -> YamlBacktestGridDefaultsProvider:
         Reads repository-local YAML config.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/adapters/outbound/defaults/
@@ -127,7 +129,7 @@ def signal_rules_engine_v2(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - configs/prod/indicators.yaml
@@ -150,8 +152,8 @@ def test_signal_rules_engine_v2_keeps_zero_axis_signal_targets_in_supported_cata
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -175,7 +177,7 @@ class _MissingCatalogIndicatorProvider:
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - src/trading/contexts/backtest/adapters/outbound/defaults/
@@ -222,7 +224,7 @@ class _MissingCatalogIndicatorProvider:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
             indicators_yaml_defaults_provider.py
@@ -269,7 +271,7 @@ class _MissingCatalogIndicatorProvider:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
             indicators_yaml_defaults_provider.py
@@ -284,7 +286,7 @@ class _MissingSignalDefaultsProvider:
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py
@@ -330,7 +332,7 @@ class _MissingSignalDefaultsProvider:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
         """
@@ -375,7 +377,7 @@ class _MissingSignalDefaultsProvider:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
             indicators_yaml_defaults_provider.py
@@ -399,7 +401,7 @@ def test_registry_matches_defaults_catalog_across_envs() -> None:
         Reads repository-local YAML config files.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - configs/dev/indicators.yaml
       - configs/test/indicators.yaml
@@ -433,7 +435,7 @@ def test_engine_startup_fails_fast_on_indicator_catalog_drift(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py
@@ -462,7 +464,7 @@ def test_engine_startup_fails_fast_on_missing_default_only_signal_params(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py
@@ -636,7 +638,7 @@ def test_rule_family_outputs_match_expected_semantics_and_v1_parity(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -684,7 +686,7 @@ def test_compare_price_rule_respects_explicit_inputs_source_axis(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - configs/prod/indicators.yaml
@@ -748,7 +750,7 @@ def test_default_only_signal_params_fill_defaults_and_allow_matching_subset(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py
@@ -812,7 +814,7 @@ def test_non_default_signal_params_are_rejected_deterministically(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py
@@ -852,7 +854,7 @@ def test_invalid_inputs_source_literal_is_rejected_against_defaults_catalog(
         None.
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/backtest-signals-from-indicators-v1.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - configs/prod/indicators.yaml

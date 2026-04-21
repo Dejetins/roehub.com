@@ -12,7 +12,7 @@ from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     current_pointer_writer as pointer_writer_module,
 )
-from trading.contexts.backtest.application.services import (
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ArtifactCoordinatesV2,
     ArtifactCurrentPointerV2,
     ArtifactSlotLiteralV2,
@@ -36,7 +36,7 @@ def test_atomic_artifact_current_pointer_writer_v2_replaces_pointer_file_atomica
     Side Effects:
         Creates and replaces temporary `current.yaml` files under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
@@ -89,7 +89,7 @@ def test_atomic_artifact_current_pointer_writer_v2_keeps_original_pointer_on_rep
     Side Effects:
         Creates temporary files and injects one failing `os.replace` stub.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
@@ -167,7 +167,7 @@ def _pointer(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py

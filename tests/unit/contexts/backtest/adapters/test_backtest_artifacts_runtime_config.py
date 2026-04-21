@@ -9,9 +9,11 @@ from trading.contexts.backtest.adapters.outbound.config import (
     load_backtest_artifacts_runtime_config,
     resolve_backtest_artifacts_config_path,
 )
-from trading.contexts.backtest.application.services import ArtifactSignalValidationSpecV2
 from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
     supported_indicator_ids_for_signals_v1,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactSignalValidationSpecV2,
 )
 
 _VALID_BACKTEST_ARTIFACTS_CONFIG = """
@@ -488,8 +490,8 @@ def test_load_backtest_artifacts_runtime_config_derives_precompute_runtime_setti
     Side Effects:
         Writes one temporary YAML file.
     Docs:
-      - docs/architecture/backtest/backtest-precompute-runner-v2.md
-      - docs/architecture/backtest/backtest-artifact-store-v2.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py

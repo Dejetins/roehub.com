@@ -10,8 +10,8 @@ class BacktestRunCancelledV1(ValueError):
     Cooperative cancellation error for sync/job staged loops.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-job-runner-worker-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -53,8 +53,8 @@ class BacktestRunControlV1:
     Thread-safe cooperative run-control primitive for staged backtest execution.
 
     Docs:
-      - docs/architecture/backtest/backtest-refactor-perf-plan-v1.md
-      - docs/architecture/backtest/backtest-api-post-backtests-v1.md
+      - docs/architecture/backtest/README.md
+      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py

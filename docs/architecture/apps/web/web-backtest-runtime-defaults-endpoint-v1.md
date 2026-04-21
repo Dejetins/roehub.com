@@ -15,13 +15,13 @@
 - Superseded by target-v2 source-of-truth:
   - `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
   - `docs/architecture/roadmap/base_refactor_plan.md`
-  - `docs/architecture/backtest/backtest-v2-benchmarks.md`
+  - `docs/architecture/backtest/README.md`
 - Historical scope kept here:
   - current browser prefill defaults already loaded on API startup,
   - legacy `top_k_*` fields required for backward compatibility.
 - A2/A3 redesign anchoring note:
   - target public vocabulary is now anchored in
-    `docs/architecture/backtest/backtest-engine-vnext.md`;
+    `docs/architecture/backtest/README.md`;
   - this endpoint document still records the current shipped defaults payload, but the target
     public surface keeps `primary_metric` and removes `secondary_metric`, `warmup_bars`, and
     `top_trades_n`;
