@@ -9,7 +9,6 @@ from uuid import UUID
 import pytest
 import yaml
 
-import trading.contexts.backtest_artifacts.application.services.numba_runtime_v1 as numba_runtime_module
 from tests.unit.contexts.backtest.application.services.v2 import (
     test_stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_testkit,
 )
@@ -21,6 +20,9 @@ from trading.contexts.backtest.domain.entities.backtest_job_results import (
     BacktestJobParityClassification,
     BacktestJobParityRetainedRowsCounter,
     BacktestJobParityRuntimeState,
+)
+from trading.contexts.backtest_artifacts.application.services import (
+    numba_runtime_v1 as numba_runtime_module,
 )
 from trading.contexts.backtest_artifacts.application.services.v2 import (
     stage_a_shortlist_builder_v2 as stage_a_shortlist_builder_module,

@@ -34,10 +34,6 @@ from trading.contexts.backtest.application.services.job_runner_streaming_v1 impo
     FrontierSignatureV1,
     build_running_snapshot_rows,
 )
-from trading.contexts.backtest_artifacts.application.services.numba_runtime_v1 import (
-    apply_backtest_numba_threads,
-    resolve_backtest_stage_a_parallelism_v1,
-)
 from trading.contexts.backtest.application.services.warmup_estimator import (
     resolve_internal_backtest_warmup_bars,
 )
@@ -56,6 +52,10 @@ from trading.contexts.backtest.domain.entities.backtest_job_results import (
     BacktestJobParityRuntimeState,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestVariantScalar
+from trading.contexts.backtest_artifacts.application.services.numba_runtime_v1 import (
+    apply_backtest_numba_threads,
+    resolve_backtest_stage_a_parallelism_v1,
+)
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_backed_stage_b_scorer_v2 import (  # noqa: E501
     build_default_artifact_backed_stage_b_scorer_v2,
 )

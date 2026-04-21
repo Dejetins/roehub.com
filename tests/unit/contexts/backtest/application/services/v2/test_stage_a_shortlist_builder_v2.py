@@ -9,7 +9,6 @@ from typing import Any, Mapping, cast
 import numpy as np
 import pytest
 
-import trading.contexts.backtest_artifacts.application.services.numba_runtime_v1 as numba_runtime_module
 from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 import (
     SyntheticArtifactStoreV2,
     build_synthetic_artifact_store_v2,
@@ -19,6 +18,9 @@ from trading.contexts.backtest.application.services import (
     BacktestStageABaseVariant,
 )
 from trading.contexts.backtest.domain.value_objects import ExecutionParamsV1
+from trading.contexts.backtest_artifacts.application.services import (
+    numba_runtime_v1 as numba_runtime_module,
+)
 from trading.contexts.backtest_artifacts.application.services.v2 import (
     artifact_runtime_core_v2 as artifact_runtime_core_module,
 )
