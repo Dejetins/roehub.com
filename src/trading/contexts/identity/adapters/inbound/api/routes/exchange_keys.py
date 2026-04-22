@@ -7,8 +7,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from trading.contexts.identity.adapters.inbound.api.deps.two_factor_enabled import (
-    RequireTwoFactorEnabledDependency,
+from trading.contexts.identity.adapters.inbound.api.deps.current_user import (
+    RequireCurrentUserDependency,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.identity.application.use_cases.create_exchange_key import (
@@ -74,16 +74,15 @@ def build_exchange_keys_router(
     create_use_case: CreateExchangeKeyUseCase,
     list_use_case: ListExchangeKeysUseCase,
     delete_use_case: DeleteExchangeKeyUseCase,
-    two_factor_dependency: RequireTwoFactorEnabledDependency,
+    current_user_dependency: RequireCurrentUserDependency,
 ) -> APIRouter:
     """
-    Build router exposing exchange keys create/list/delete endpoints with mandatory 2FA gate.
+    Build router exposing exchange keys create/list/delete endpoints for authenticated users.
 
     Docs:
       - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
-      - docs/architecture/identity/identity-2fa-totp-policy-v1.md
     Related:
-      - src/trading/contexts/identity/adapters/inbound/api/deps/two_factor_enabled.py
+      - src/trading/contexts/identity/adapters/inbound/api/deps/current_user.py
       - src/trading/contexts/identity/application/use_cases/create_exchange_key.py
       - apps/api/routes/identity.py
 
@@ -91,11 +90,11 @@ def build_exchange_keys_router(
         create_use_case: Exchange key create use-case.
         list_use_case: Exchange key list use-case.
         delete_use_case: Exchange key delete use-case.
-        two_factor_dependency: Current-user + 2FA-enabled dependency.
+        current_user_dependency: Current-user auth dependency.
     Returns:
         APIRouter: Configured exchange keys router.
     Assumptions:
-        2FA dependency raises deterministic 403 payload when policy is violated.
+        Auth dependency resolves authenticated principal or raises deterministic 401 payload.
     Raises:
         ValueError: If required dependencies are missing.
     Side Effects:
@@ -107,22 +106,22 @@ def build_exchange_keys_router(
         raise ValueError("build_exchange_keys_router requires list_use_case")
     if delete_use_case is None:  # type: ignore[truthy-bool]
         raise ValueError("build_exchange_keys_router requires delete_use_case")
-    if two_factor_dependency is None:  # type: ignore[truthy-bool]
-        raise ValueError("build_exchange_keys_router requires two_factor_dependency")
+    if current_user_dependency is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_exchange_keys_router requires current_user_dependency")
 
     router = APIRouter(tags=["identity"])
 
     @router.post("/exchange-keys", response_model=ExchangeKeyResponse, status_code=201)
     def post_exchange_key(
         request: CreateExchangeKeyRequest,
-        principal: CurrentUserPrincipal = Depends(two_factor_dependency),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> ExchangeKeyResponse:
         """
         Create one exchange key for current user with encrypted secret storage.
 
         Args:
             request: Exchange key create payload.
-            principal: Authenticated principal that already passed 2FA gate.
+            principal: Authenticated principal.
         Returns:
             ExchangeKeyResponse: API-safe created key projection.
         Assumptions:
@@ -152,13 +151,13 @@ def build_exchange_keys_router(
 
     @router.get("/exchange-keys", response_model=list[ExchangeKeyResponse])
     def get_exchange_keys(
-        principal: CurrentUserPrincipal = Depends(two_factor_dependency),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> list[ExchangeKeyResponse]:
         """
         List active exchange keys for current user in deterministic order.
 
         Args:
-            principal: Authenticated principal that already passed 2FA gate.
+            principal: Authenticated principal.
         Returns:
             list[ExchangeKeyResponse]: API-safe key projections without secret fields.
         Assumptions:
@@ -180,14 +179,14 @@ def build_exchange_keys_router(
     @router.delete("/exchange-keys/{key_id}", status_code=204, response_model=None)
     def delete_exchange_key(
         key_id: UUID,
-        principal: CurrentUserPrincipal = Depends(two_factor_dependency),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> Response:
         """
         Soft-delete one active exchange key owned by current user.
 
         Args:
             key_id: Exchange key identifier path parameter.
-            principal: Authenticated principal that already passed 2FA gate.
+            principal: Authenticated principal.
         Returns:
             Response: Empty 204 response when key is deleted.
         Assumptions:

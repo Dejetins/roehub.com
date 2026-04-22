@@ -23,9 +23,6 @@ from apps.api.wiring.modules import (
     build_strategy_router,
     is_strategy_api_enabled,
 )
-from trading.contexts.identity.adapters.inbound.api.deps import (
-    register_two_factor_required_exception_handler,
-)
 from trading.platform.config import load_indicators_compute_numba_config
 
 log = logging.getLogger(__name__)
@@ -37,7 +34,6 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
 
     Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md,
       docs/architecture/identity/identity-telegram-login-user-model-v1.md,
-      docs/architecture/identity/identity-2fa-totp-policy-v1.md,
       docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md,
       docs/architecture/market_data/market-data-reference-api-v1.md,
       docs/architecture/backtest/README.md,
@@ -78,7 +74,6 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     )
     install_metrics_middleware(app=app)
     register_api_error_handlers(app=app)
-    register_two_factor_required_exception_handler(app=app)
     app.include_router(build_operations_router())
     identity_module = build_identity_api_module(environ=effective_environ)
     app.include_router(identity_module.router)

@@ -41,11 +41,12 @@
   - `strategy.realtime_output.redis_streams.enabled`
   - `strategy.telegram.enabled`
 - Metrics port:
-  - `strategy.metrics.port`
+- `strategy.metrics.port`
 - Env overrides:
   - `ROEHUB_STRATEGY_CONFIG` (путь к YAML)
   - overrides для scalar: enable-тумблеры + metrics port
   - секреты через env: `STRATEGY_PG_DSN`, `TELEGRAM_BOT_TOKEN`, `ROEHUB_REDIS_PASSWORD`, `CH_HOST/CH_PORT/...`.
+  - `TELEGRAM_BOT_TOKEN` используется только в strategy notifier path и не участвует в API user-auth.
 
 ## Non-goals
 
@@ -145,7 +146,7 @@ Loader live-worker обязан поддерживать два режима:
 
 Каноничные env ключи (как уже используется в репозитории):
 - Postgres (strategy): `STRATEGY_PG_DSN` (см. `apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py`, `apps/api/wiring/modules/strategy.py`)
-- Telegram token: `TELEGRAM_BOT_TOKEN` (см. wiring identity и strategy)
+- Telegram token: `TELEGRAM_BOT_TOKEN` (см. strategy notifier wiring; не используется в `apps/api/wiring/modules/identity.py`)
 - Redis password: `ROEHUB_REDIS_PASSWORD` (используется в `configs/*/*.yaml`)
 - ClickHouse: `CH_HOST/CH_PORT/CH_USER/CH_PASSWORD/CH_DATABASE/CH_SECURE/CH_VERIFY` (см. `apps/cli/wiring/db/clickhouse.py`)
 
@@ -233,7 +234,5 @@ Smoke (концептуально, детально фиксируется в ru
 
 Открытые вопросы:
 
-- ID/OQ-01: Telegram login flow в v1 уже зафиксирован как **Telegram Login Widget (вариант A)**
-  в `docs/architecture/identity/identity-telegram-login-user-model-v1.md`.
-- ID/OQ-02: recovery для 2FA (backup codes) в документации v1 оставлен как вопрос на следующий milestone
-  (см. `docs/architecture/identity/identity-2fa-totp-policy-v1.md`).
+- На текущем этапе открытых вопросов по user-auth зависимости нет:
+  Keycloak является источником user-auth, а `TELEGRAM_BOT_TOKEN` остаётся только в strategy notifier scope.

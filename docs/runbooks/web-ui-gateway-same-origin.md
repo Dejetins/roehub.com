@@ -1,16 +1,18 @@
 # Web UI local same-origin (WEB-EPIC-02)
 
+Runbook для local/dev same-origin потока `apps/web -> /api/* -> api` c Keycloak OIDC и Roehub session cookies.
+
 Статус:
 
 - `gateway` удален из репозитория;
 - production same-origin делает `Caddy` на `VPS`;
-- local/dev same-origin теперь обеспечивает сам `apps/web` через встроенный `/api/*` proxy.
+- local/dev same-origin обеспечивает `apps/web` через встроенный `/api/*` proxy.
 
 ## Обязательный файл окружения
 
-Используйте локальный env-файл, эквивалентный production env:
+Используйте env, эквивалентный production:
 
-- runtime owner path на `Mac Studio`: `/Users/daniildegtyarev/.config/roehub/roehub.env`
+- runtime owner path: `/Users/daniildegtyarev/.config/roehub/roehub.env`
 - локальный dev path (пример): `./infra/docker/.env.local`
 
 Минимальные ключи для UI-профиля:
@@ -18,15 +20,21 @@
 - `POSTGRES_PASSWORD`
 - `WEB_API_BASE_URL`
 - `WEB_API_UPSTREAM_URL`
-- `TELEGRAM_BOT_TOKEN`
+- `KEYCLOAK_BASE_URL`
+- `KEYCLOAK_REALM`
+- `KEYCLOAK_CLIENT_ID`
+- `KEYCLOAK_CLIENT_SECRET`
+- `KEYCLOAK_REDIRECT_URI`
+- `KEYCLOAK_LOGOUT_REDIRECT_URI`
+- `IDENTITY_SESSION_COOKIE_NAME`
+- `IDENTITY_SESSION_IDLE_TTL_SECONDS`
+- `IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS`
 
 DSN-ключи `IDENTITY_PG_DSN`, `POSTGRES_DSN`, `STRATEGY_PG_DSN` можно не задавать:
-`docker-compose.yml` в UI-профиле собирает их в формате conninfo автоматически
-из `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`.
+`docker-compose.yml` в UI-профиле собирает их как conninfo из
+`POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`.
 
-Референс с плейсхолдерами:
-
-- `infra/docker/.env.example`
+Важно: `TELEGRAM_BOT_TOKEN` не участвует в web/API auth path.
 
 ## Запуск dev одной командой
 
@@ -53,60 +61,54 @@ curl -i http://127.0.0.1:8010/assets/site.css
 
 ## Поведение bootstrap БД
 
-`db-bootstrap` запускается перед `api` в UI-профиле и выполняет:
+`db-bootstrap` запускается перед `api` и выполняет:
 
 1. `python -m apps.migrations.bootstrap_main`
    - `IDENTITY_PG_DSN`/`POSTGRES_DSN` по умолчанию передаются как conninfo:
      `host=postgres port=5432 dbname=<POSTGRES_DB> user=<POSTGRES_USER> password=<POSTGRES_PASSWORD>`
-2. Базовую SQL-миграцию Identity в `IDENTITY_PG_DSN`:
-   - применяет `0001_identity_v1.sql`
-   - применяет `0002_identity_2fa_totp_v1.sql`
-   - применяет `0003_identity_exchange_keys_v1.sql`
-3. Защищённая миграция `0004_identity_exchange_keys_v2.sql`:
-   - пропускает, если колонки v2 уже существуют
-   - применяет только если layout v1 существует и таблица пустая
-   - завершает запуск с ошибкой, если в layout v1 уже есть строки (небезопасный путь миграции)
-4. Alembic head в `POSTGRES_DSN` через существующий runner:
+2. SQL baseline identity в `IDENTITY_PG_DSN`:
+   - `0001_identity_v1.sql`
+   - `0002_identity_2fa_totp_v1.sql` (историческая таблица, не используется как auth source)
+   - `0003_identity_exchange_keys_v1.sql`
+3. Migration `0004_identity_exchange_keys_v2.sql`.
+4. Keycloak cutover migration `0005_identity_keycloak_cutover_v1.sql`:
+   - добавляет `identity_users.keycloak_subject`
+   - создаёт `identity_sessions`
+5. Alembic head в `POSTGRES_DSN`:
    - `python -m apps.migrations.main --dsn "$POSTGRES_DSN"`
 
 Сервис одноразовый (`restart: "no"`). Если bootstrap падает, `api` не стартует.
 
-## Домен Telegram Login Widget
+## Keycloak OIDC configuration
 
-Прод:
+Для dev/prod same-origin web потока:
 
-1. Откройте `@BotFather`.
-2. Выполните `/setdomain`.
-3. Установите домен `roehub.com`.
+- `KEYCLOAK_REDIRECT_URI` должен совпадать с callback URL web (`/auth/callback`);
+- `KEYCLOAK_LOGOUT_REDIRECT_URI` должен совпадать с post-logout URL web (`/login`).
 
-Примечание:
+Примеры:
 
-- production login widget работает через `VPS` edge на `https://roehub.com`;
-- local/dev использует тот же `/api/*` browser contract, но без отдельного gateway-контейнера.
+- local/dev: `http://127.0.0.1:8010/auth/callback`, `http://127.0.0.1:8010/login`
+- prod: `https://roehub.com/auth/callback`, `https://roehub.com/login`
 
-Разработка:
+Если заданы explicit OIDC URLs (`KEYCLOAK_AUTH_URL`, `KEYCLOAK_TOKEN_URL`,
+`KEYCLOAK_END_SESSION_URL`, `KEYCLOAK_INTROSPECTION_URL`), они должны соответствовать тому же realm.
 
-1. Пробросьте `127.0.0.1:8010` через туннель (`cloudflared` или `ngrok`).
-2. Установите домен туннеля в `@BotFather /setdomain`.
-3. Откройте страницу логина через URL туннеля.
+Browser auth-cookie хранит только opaque Roehub session id:
 
-Ограничение:
+- `IDENTITY_SESSION_COOKIE_NAME` (обычно `roehub_session_id`)
+- `IDENTITY_SESSION_IDLE_TTL_SECONDS`
+- `IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS`
 
-- у одного бота может быть только один активный домен, поэтому использование production-бота
-  для dev-туннеля может сломать login widget в проде
-- рекомендация: используйте отдельного staging/dev-бота для локального тестирования через туннель
+## Примечание по маршрутизации
 
-## Диагностика: "bot domain invalid"
-
-- Убедитесь, что host в браузере точно совпадает с доменом из BotFather (без лишнего поддомена или порта).
-- Убедитесь, что страница логина открыта через `https`-URL туннеля.
-- Повторите `/setdomain` и подождите до нескольких минут, пока изменения распространятся на стороне Telegram.
-- Проверьте, что widget использует ожидаемый username бота.
-
-## Примечание по same-origin маршрутизации
-
-`apps/web` принимает browser-side `/api/*` запросы и проксирует их в upstream API без `/api` префикса:
+`apps/web` принимает browser-side `/api/*` и проксирует их в upstream API без `/api` префикса:
 
 - `/api/<path>` на web -> `/<path>` на API upstream.
 
 В production эту же семантику на публичном edge реализует `VPS Caddy`.
+
+## Связанные документы
+
+- `docs/architecture/identity/identity-keycloak-auth-model-v1.md`
+- `docs/runbooks/keycloak-local-setup-and-ops.md`

@@ -31,11 +31,13 @@ Milestone 6 добавляет браузерный UI, который рабо�
 ### Auth (фикс)
 
 - Identity остаётся в API:
-  - `POST /auth/telegram/login` (JWT HttpOnly cookie)
+  - `GET /auth/login` (redirect в Keycloak)
+  - `GET /auth/callback`
   - `POST /auth/logout`
   - `GET /auth/current-user`
-- Web login page использует Telegram Login Widget и отправляет JSON payload в `POST /api/auth/telegram/login`.
+- Web login page вызывает `GET /api/auth/login` и запускает OIDC redirect flow.
 - Protected pages (web) редиректят на `/login`, если `GET /api/auth/current-user` возвращает 401.
+- Browser auth-cookie хранит только opaque Roehub session id (`roehub_session_id`).
 - Cookie policy v1: `SameSite=lax`, `HttpOnly=true`, `Secure=true` в prod (CSRF откладываем).
 
 ### Strategy persistence + “Save variant as Strategy” (фикс)
@@ -144,7 +146,7 @@ Milestone 6 делится на 5 логических частей:
   - базовый layout (navigation, user badge, error banner),
   - HTMX partials для таблиц/форм.
 - Auth UX:
-  - `/login`: Telegram widget + JS, который делает `POST /api/auth/telegram/login` (JSON) и затем redirect.
+  - `/login`: кнопка/redirect в `GET /api/auth/login`.
   - protected pages: проверка `GET /api/auth/current-user` и redirect на `/login` при 401.
   - `/logout`: вызывает `POST /api/auth/logout` и редиректит на `/login`.
 - Internal API client:
@@ -154,7 +156,7 @@ Milestone 6 делится на 5 логических частей:
 **Non-goals:**
 
 - SPA framework.
-- UI для 2FA и exchange keys.
+- UI для Keycloak account/OTP settings и exchange keys.
 - Realtime streams UI.
 
 **DoD:**
@@ -189,7 +191,7 @@ Milestone 6 делится на 5 логических частей:
   - запустить `apps/migrations/main.py` для Alembic `upgrade head` в `POSTGRES_DSN`.
 - Runbooks:
   - запуск `web+api+gateway` в dev,
-  - настройка Telegram widget allowed domains для dev/prod.
+  - настройка Keycloak client redirect URI для dev/prod.
 
 **Non-goals:**
 

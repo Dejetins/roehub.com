@@ -10,10 +10,9 @@ class SystemIdentityClock(IdentityClock):
     SystemIdentityClock — platform реализация `IdentityClock` на системном UTC времени.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
     Related:
       - src/trading/contexts/identity/application/ports/clock.py
-      - src/trading/contexts/identity/application/use_cases/telegram_login.py
       - apps/api/wiring/modules/identity.py
     """
 

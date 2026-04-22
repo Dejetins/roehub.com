@@ -1,5 +1,8 @@
 BEGIN;
 
+-- Deprecated by Keycloak cutover. 0005_identity_keycloak_cutover_v1.sql
+-- removes local 2FA storage from final runtime path.
+
 CREATE TABLE IF NOT EXISTS identity_2fa (
     user_id UUID PRIMARY KEY REFERENCES identity_users (user_id) ON DELETE CASCADE,
     totp_secret_enc BYTEA NOT NULL,

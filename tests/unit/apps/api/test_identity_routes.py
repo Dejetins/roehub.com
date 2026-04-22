@@ -1,81 +1,87 @@
 from __future__ import annotations
 
-import hashlib
-import hmac
-from datetime import datetime, timedelta, timezone
-from typing import Mapping
+from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlparse
+from uuid import UUID
 
+import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from apps.api.routes import build_identity_router
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
-    InMemoryIdentityTwoFactorRepository,
+    InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
 )
 from trading.contexts.identity.adapters.outbound.security.current_user import (
-    JwtCookieCurrentUser,
+    RoehubSessionCurrentUser,
 )
-from trading.contexts.identity.adapters.outbound.security.jwt import Hs256JwtCodec
-from trading.contexts.identity.adapters.outbound.security.telegram import (
-    TelegramLoginWidgetPayloadValidator,
+from trading.contexts.identity.application import IdentityClock
+
+_KEYCLOAK_AUTH_URL = "https://auth.roehub.local/realms/roehub/protocol/openid-connect/auth"
+_KEYCLOAK_TOKEN_URL = "https://auth.roehub.local/realms/roehub/protocol/openid-connect/token"
+_KEYCLOAK_INTROSPECTION_URL = (
+    "https://auth.roehub.local/realms/roehub/protocol/openid-connect/token/introspect"
 )
-from trading.contexts.identity.adapters.outbound.security.two_factor import (
-    AesGcmEnvelopeTwoFactorSecretCipher,
-    PyOtpTwoFactorTotpProvider,
-)
-from trading.contexts.identity.application.ports.clock import IdentityClock
-from trading.contexts.identity.application.ports.jwt_codec import IdentityJwtClaims
-from trading.contexts.identity.application.ports.telegram_auth_payload_validator import (
-    TelegramAuthPayloadValidator,
-)
-from trading.contexts.identity.application.use_cases import (
-    SetupTwoFactorTotpUseCase,
-    TelegramLoginUseCase,
-    VerifyTwoFactorTotpUseCase,
-)
-from trading.contexts.identity.domain.value_objects import TelegramUserId
-from trading.shared_kernel.primitives import PaidLevel
+_KEYCLOAK_CLIENT_ID = "roehub-api"
+_KEYCLOAK_CLIENT_SECRET = "test-client-secret"
+_KEYCLOAK_REDIRECT_URI = "http://127.0.0.1:8010/auth/callback"
+_KEYCLOAK_LOGOUT_REDIRECT_URI = "http://127.0.0.1:8010/login"
+_SESSION_COOKIE_NAME = "roehub_session_id"
+_KEYCLOAK_SUBJECT = "keycloak-subject-1"
+_BASE_NOW = datetime(2026, 4, 22, 12, 0, tzinfo=timezone.utc)
 
 
-class _FixedClock(IdentityClock):
+class _MutableClock(IdentityClock):
     """
-    Deterministic UTC clock used by identity JWT and login tests.
+    Mutable deterministic UTC clock for identity route tests.
     """
 
     def __init__(self, *, now_value: datetime) -> None:
         """
-        Initialize fixed clock value.
+        Initialize deterministic clock with initial UTC value.
 
         Args:
-            now_value: Fixed timezone-aware UTC datetime.
+            now_value: Initial timezone-aware UTC datetime.
         Returns:
             None.
         Assumptions:
-            Datetime remains immutable through test lifecycle.
+            Tests advance time explicitly with `set_now`.
         Raises:
-            ValueError: If datetime is naive/non-UTC.
+            ValueError: If datetime is naive or non-UTC.
         Side Effects:
             None.
         """
-        offset = now_value.utcoffset()
-        if now_value.tzinfo is None or offset is None:
-            raise ValueError("_FixedClock requires timezone-aware UTC datetime")
-        if offset.total_seconds() != 0:
-            raise ValueError("_FixedClock requires timezone-aware UTC datetime")
-        self._now_value = now_value
+        self._now_value = _ensure_utc_datetime(value=now_value, field_name="now_value")
+
+    def set_now(self, *, now_value: datetime) -> None:
+        """
+        Replace deterministic clock value.
+
+        Args:
+            now_value: New timezone-aware UTC datetime.
+        Returns:
+            None.
+        Assumptions:
+            Tests control timeline for login/logout deterministically.
+        Raises:
+            ValueError: If datetime is naive or non-UTC.
+        Side Effects:
+            Mutates internal clock state.
+        """
+        self._now_value = _ensure_utc_datetime(value=now_value, field_name="now_value")
 
     def now(self) -> datetime:
         """
-        Return fixed UTC datetime.
+        Return current deterministic UTC timestamp.
 
         Args:
             None.
         Returns:
-            datetime: Fixed timestamp.
+            datetime: Current fixed UTC datetime.
         Assumptions:
-            No monotonic progression is required for these tests.
+            Time does not auto-progress during a test.
         Raises:
             None.
         Side Effects:
@@ -84,346 +90,411 @@ class _FixedClock(IdentityClock):
         return self._now_value
 
 
-class _TelegramValidatorStub(TelegramAuthPayloadValidator):
-    """
-    Validator stub returning fixed Telegram user id for API route tests.
-    """
-
-    def __init__(self, *, telegram_user_id: TelegramUserId) -> None:
-        """
-        Store fixed Telegram user id.
-
-        Args:
-            telegram_user_id: Deterministic Telegram user id.
-        Returns:
-            None.
-        Assumptions:
-            Payload validation is out of scope for these tests.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        self._telegram_user_id = telegram_user_id
-
-    def validate(self, *, payload: Mapping[str, str], now: datetime) -> TelegramUserId:
-        """
-        Return preconfigured Telegram id and ignore payload details.
-
-        Args:
-            payload: Raw request payload.
-            now: Current UTC datetime.
-        Returns:
-            TelegramUserId: Preconfigured id.
-        Assumptions:
-            Use-case normalization already ensures non-empty payload.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        _ = payload
-        _ = now
-        return self._telegram_user_id
-
-
-
-def _build_cookie_test_client() -> tuple[TestClient, str]:
-    """
-    Build test client with identity router and return one valid JWT cookie token.
-
-    Args:
-        None.
-    Returns:
-        tuple[TestClient, str]: `(client, valid_token)` pair.
-    Assumptions:
-        In-memory repository stores one active user for token subject.
-    Raises:
-        ValueError: If test dependency construction is invalid.
-    Side Effects:
-        Creates in-memory FastAPI application.
-    """
-    now = datetime(2026, 2, 14, 12, 0, 0, tzinfo=timezone.utc)
-    clock = _FixedClock(now_value=now)
-    repository = InMemoryIdentityUserRepository()
-    created_user = repository.upsert_telegram_login(
-        telegram_user_id=TelegramUserId(411001),
-        login_at=now,
-    )
-
-    jwt_codec = Hs256JwtCodec(secret_key="identity-routes-secret", clock=clock)
-    claims = IdentityJwtClaims(
-        user_id=created_user.user_id,
-        paid_level=PaidLevel.free(),
-        issued_at=now,
-        expires_at=now + timedelta(days=7),
-    )
-    valid_token = jwt_codec.encode(claims=claims)
-
-    current_user_port = JwtCookieCurrentUser(jwt_codec=jwt_codec, user_repository=repository)
-    current_user_dependency = RequireCurrentUserDependency(
-        current_user=current_user_port,
-        cookie_name="roehub_identity_jwt",
-    )
-
-    login_use_case = TelegramLoginUseCase(
-        validator=_TelegramValidatorStub(telegram_user_id=TelegramUserId(411001)),
-        user_repository=repository,
-        jwt_codec=jwt_codec,
-        clock=clock,
-        jwt_ttl_days=7,
-    )
-    two_factor_setup, two_factor_verify = _build_two_factor_use_cases(clock=clock)
-
-    app = FastAPI()
-    app.include_router(
-        build_identity_router(
-            telegram_login=login_use_case,
-            two_factor_setup=two_factor_setup,
-            two_factor_verify=two_factor_verify,
-            current_user_dependency=current_user_dependency,
-            cookie_name="roehub_identity_jwt",
-            cookie_secure=False,
-            cookie_samesite="lax",
-            cookie_path="/",
-        )
-    )
-    return TestClient(app), valid_token
-
-
-
-def _build_two_factor_use_cases(
-    *,
-    clock: IdentityClock,
-) -> tuple[SetupTwoFactorTotpUseCase, VerifyTwoFactorTotpUseCase]:
-    """
-    Build identity 2FA setup/verify use-cases for API router tests.
-
-    Args:
-        clock: Deterministic UTC clock shared with route dependencies.
-    Returns:
-        tuple[SetupTwoFactorTotpUseCase, VerifyTwoFactorTotpUseCase]: Wired 2FA use-cases.
-    Assumptions:
-        In-memory repository is sufficient for route-level behavior tests.
-    Raises:
-        ValueError: If any dependency construction is invalid.
-    Side Effects:
-        None.
-    """
-    repository = InMemoryIdentityTwoFactorRepository()
-    secret_cipher = AesGcmEnvelopeTwoFactorSecretCipher(
-        kek_b64="cm9laHViLWRldi1pZGVudGl0eS0yZmEta2V5LTAwMDE=",
-    )
-    totp_provider = PyOtpTwoFactorTotpProvider()
-    setup_use_case = SetupTwoFactorTotpUseCase(
-        repository=repository,
-        secret_cipher=secret_cipher,
-        totp_provider=totp_provider,
-        clock=clock,
-        issuer="Roehub",
-    )
-    verify_use_case = VerifyTwoFactorTotpUseCase(
-        repository=repository,
-        secret_cipher=secret_cipher,
-        totp_provider=totp_provider,
-        clock=clock,
-    )
-    return setup_use_case, verify_use_case
-
-
-def _build_signed_telegram_payload(
-    *,
-    bot_token: str,
-    user_id: int,
-    auth_date: int,
-) -> dict[str, object]:
-    """
-    Build signed Telegram login payload for integration-style login route test.
-
-    Args:
-        bot_token: Telegram bot token used for hash signing.
-        user_id: Telegram user identifier.
-    Returns:
-        dict[str, object]: JSON payload accepted by `/auth/telegram/login`.
-    Assumptions:
-        `auth_date` and use-case clock are aligned for freshness check.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
-    payload = {
-        "auth_date": str(auth_date),
-        "first_name": "Roe",
-        "id": str(user_id),
-        "username": "identity_user",
-    }
-    data_check_string = "\n".join(
-        f"{key}={value}" for key, value in sorted(payload.items(), key=lambda item: item[0])
-    )
-    secret_key = hashlib.sha256(bot_token.encode("utf-8")).digest()
-    payload_hash = hmac.new(
-        secret_key,
-        data_check_string.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-    return {
-        "id": user_id,
-        "auth_date": auth_date,
-        "hash": payload_hash,
-        "first_name": "Roe",
-        "username": "identity_user",
-    }
-
-
-
 def test_current_user_dependency_rejects_missing_cookie() -> None:
     """
-    Verify protected endpoint returns 401 when JWT cookie is missing.
+    Verify protected endpoint returns 401 when opaque session cookie is missing.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        CurrentUser dependency maps missing cookie to deterministic error code.
+        Current-user dependency is backed by local Roehub session storage.
     Raises:
         AssertionError: If endpoint does not return expected 401 payload.
     Side Effects:
         None.
     """
-    client, _ = _build_cookie_test_client()
+    client, _clock, _user_repository, _session_repository = _build_identity_test_client()
 
     response = client.get("/auth/current-user")
 
     assert response.status_code == 401
     assert response.json() == {
         "detail": {
-            "error": "missing_jwt_cookie",
-            "message": "JWT cookie is required",
+            "error": "missing_session_id",
+            "message": "Session id is required",
         }
     }
 
 
-
-def test_current_user_dependency_rejects_invalid_cookie() -> None:
+def test_current_user_dependency_rejects_unknown_session_cookie() -> None:
     """
-    Verify protected endpoint returns 401 for malformed JWT cookie value.
+    Verify protected endpoint returns 401 for unknown persisted Roehub session id.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        JWT codec reports invalid token format for malformed string.
+        Session cookie format may be valid UUID even when no local session row exists.
     Raises:
-        AssertionError: If endpoint accepts malformed token.
+        AssertionError: If endpoint accepts non-existent local session.
     Side Effects:
         None.
     """
-    client, _ = _build_cookie_test_client()
-    client.cookies.set("roehub_identity_jwt", "invalid-token")
+    client, _clock, _user_repository, _session_repository = _build_identity_test_client()
+    client.cookies.set(_SESSION_COOKIE_NAME, "00000000-0000-0000-0000-000000000001")
 
     response = client.get("/auth/current-user")
 
     assert response.status_code == 401
-    assert response.json()["detail"]["error"] == "invalid_token_format"
+    assert response.json() == {
+        "detail": {
+            "error": "session_not_found",
+            "message": "Session is not found",
+        }
+    }
 
 
-
-def test_current_user_dependency_accepts_valid_cookie() -> None:
+def test_get_auth_login_redirects_to_keycloak_and_sets_state_cookie() -> None:
     """
-    Verify protected endpoint returns stable `user_id` for valid JWT cookie.
+    Verify login endpoint redirects to Keycloak authorize URL and writes state cookies.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        In-memory user exists and token is signed with same secret.
+        Login flow uses OIDC code grant and callback state correlation.
     Raises:
-        AssertionError: If valid cookie does not authorize request.
+        AssertionError: If redirect query or state cookies are missing.
     Side Effects:
         None.
     """
-    client, valid_token = _build_cookie_test_client()
-    client.cookies.set("roehub_identity_jwt", valid_token)
+    client, _clock, _user_repository, _session_repository = _build_identity_test_client()
 
-    response = client.get("/auth/current-user")
+    response = client.get("/auth/login?next=/strategies", follow_redirects=False)
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["user_id"]
-    assert payload["paid_level"] == "free"
+    assert response.status_code == 307
+    location = response.headers["location"]
+    parsed_location = urlparse(location)
+    assert f"{parsed_location.scheme}://{parsed_location.netloc}{parsed_location.path}" == (
+        _KEYCLOAK_AUTH_URL
+    )
+    query = parse_qs(parsed_location.query)
+    assert query["client_id"] == [_KEYCLOAK_CLIENT_ID]
+    assert query["redirect_uri"] == [_KEYCLOAK_REDIRECT_URI]
+    assert query["response_type"] == ["code"]
+    assert query["scope"] == ["openid profile email"]
+    assert len(query["state"][0]) >= 16
+    assert client.cookies.get("roehub_oidc_state") == query["state"][0]
+    stored_next_cookie = client.cookies.get("roehub_oidc_next")
+    assert stored_next_cookie is not None
+    assert stored_next_cookie.strip('"') == "/strategies"
 
 
-
-def test_post_auth_telegram_login_sets_http_only_cookie() -> None:
+def test_get_auth_callback_creates_local_user_and_session_cookie() -> None:
     """
-    Verify wired login route sets HttpOnly JWT cookie and authorizes current-user endpoint.
+    Verify callback exchanges code, upserts local user, issues opaque session
+    cookie, and current-user reads Roehub DB state.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Router wiring uses in-memory repository when PG DSN is not configured.
+        Introspection may return provider claims, but Roehub DB remains paid-level source of truth.
     Raises:
-        AssertionError: If login response misses auth cookie or protected endpoint fails.
+        AssertionError: If callback fails to persist local auth state or leaks provider token.
+    Side Effects:
+        Performs deterministic mock token and introspection exchanges.
+    """
+    captured_token_form_data: dict[str, list[str]] = {}
+    captured_introspection_form_data: dict[str, list[str]] = {}
+    client, _clock, user_repository, session_repository = _build_identity_test_client(
+        oidc_http_transport=_build_oidc_transport(
+            captured_token_form_data=captured_token_form_data,
+            captured_introspection_form_data=captured_introspection_form_data,
+            introspection_paid_level="pro",
+        )
+    )
+    login_response = client.get("/auth/login?next=/strategies", follow_redirects=False)
+    assert login_response.status_code == 307
+    state = client.cookies.get("roehub_oidc_state")
+    assert state is not None
+
+    callback_response = client.get(
+        f"/auth/callback?code=test-auth-code&state={state}",
+        follow_redirects=False,
+    )
+
+    assert callback_response.status_code == 307
+    assert callback_response.headers["location"] == "/strategies"
+    assert captured_token_form_data["grant_type"] == ["authorization_code"]
+    assert captured_token_form_data["code"] == ["test-auth-code"]
+    assert captured_token_form_data["client_id"] == [_KEYCLOAK_CLIENT_ID]
+    assert captured_token_form_data["client_secret"] == [_KEYCLOAK_CLIENT_SECRET]
+    assert captured_token_form_data["redirect_uri"] == [_KEYCLOAK_REDIRECT_URI]
+    assert captured_introspection_form_data["token"] == ["oidc-access-token"]
+    assert captured_introspection_form_data["token_type_hint"] == ["access_token"]
+    assert client.cookies.get("roehub_oidc_state") is None
+    assert client.cookies.get("roehub_oidc_next") is None
+
+    session_cookie_value = client.cookies.get(_SESSION_COOKIE_NAME)
+    assert session_cookie_value is not None
+    assert session_cookie_value != "oidc-access-token"
+    parsed_session_id = UUID(session_cookie_value)
+    persisted_user = user_repository.find_by_keycloak_subject(
+        keycloak_subject=_KEYCLOAK_SUBJECT
+    )
+    assert persisted_user is not None
+    persisted_session = session_repository.find_by_session_id(session_id=parsed_session_id)
+    assert persisted_session is not None
+    assert persisted_session.user_id == persisted_user.user_id
+
+    current_user_response = client.get("/auth/current-user")
+
+    assert current_user_response.status_code == 200
+    assert current_user_response.json() == {
+        "user_id": str(persisted_user.user_id),
+        "paid_level": "free",
+    }
+
+
+def test_get_auth_callback_rejects_state_mismatch() -> None:
+    """
+    Verify callback endpoint rejects mismatched state with deterministic 401 payload.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Callback state must match one-time state cookie value from `/auth/login`.
+    Raises:
+        AssertionError: If state mismatch is not rejected.
     Side Effects:
         None.
     """
-    bot_token = "integration-bot-token"
-    now = datetime(2026, 2, 14, 14, 0, 0, tzinfo=timezone.utc)
-    clock = _FixedClock(now_value=now)
-    repository = InMemoryIdentityUserRepository()
-    validator = TelegramLoginWidgetPayloadValidator(bot_token=bot_token)
-    jwt_codec = Hs256JwtCodec(secret_key="integration-jwt-secret", clock=clock)
-    current_user_port = JwtCookieCurrentUser(jwt_codec=jwt_codec, user_repository=repository)
+    client, _clock, _user_repository, _session_repository = _build_identity_test_client()
+    login_response = client.get("/auth/login?next=/strategies", follow_redirects=False)
+    assert login_response.status_code == 307
+
+    response = client.get(
+        "/auth/callback?code=test-auth-code&state=wrong-state",
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "error": "oidc_state_mismatch",
+            "message": "OIDC state validation failed",
+        }
+    }
+
+
+def test_post_auth_logout_revokes_local_session_and_clears_auth_cookie() -> None:
+    """
+    Verify logout endpoint revokes persisted Roehub session and clears opaque session cookie.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Logout is local-session invalidation plus browser cookie cleanup.
+    Raises:
+        AssertionError: If persisted session stays active or cookie-clearing headers are missing.
+    Side Effects:
+        Performs deterministic mock token and introspection exchanges.
+    """
+    client, clock, _user_repository, session_repository = _build_identity_test_client(
+        oidc_http_transport=_build_oidc_transport()
+    )
+    login_response = client.get("/auth/login?next=/strategies", follow_redirects=False)
+    assert login_response.status_code == 307
+    state = client.cookies.get("roehub_oidc_state")
+    assert state is not None
+
+    callback_response = client.get(
+        f"/auth/callback?code=test-auth-code&state={state}",
+        follow_redirects=False,
+    )
+    assert callback_response.status_code == 307
+    session_cookie_value = client.cookies.get(_SESSION_COOKIE_NAME)
+    assert session_cookie_value is not None
+    parsed_session_id = UUID(session_cookie_value)
+
+    clock.set_now(now_value=_BASE_NOW.replace(minute=5))
+    response = client.post("/auth/logout")
+
+    assert response.status_code == 204
+    set_cookie_header = response.headers.get("set-cookie", "")
+    assert f"{_SESSION_COOKIE_NAME}=" in set_cookie_header
+    revoked_session = session_repository.find_by_session_id(session_id=parsed_session_id)
+    assert revoked_session is not None
+    assert revoked_session.revoked_at == clock.now()
+
+    client.cookies.set(_SESSION_COOKIE_NAME, session_cookie_value)
+    current_user_response = client.get("/auth/current-user")
+
+    assert current_user_response.status_code == 401
+    assert current_user_response.json() == {
+        "detail": {
+            "error": "inactive_session",
+            "message": "Session is inactive",
+        }
+    }
+
+
+def _build_identity_test_client(
+    *,
+    oidc_http_transport: httpx.BaseTransport | None = None,
+) -> tuple[
+    TestClient,
+    _MutableClock,
+    InMemoryIdentityUserRepository,
+    InMemoryIdentitySessionRepository,
+]:
+    """
+    Build test client with identity router and in-memory Roehub auth storage.
+
+    Args:
+        oidc_http_transport: Optional httpx transport override for token/introspection flow.
+    Returns:
+        tuple[
+            TestClient,
+            _MutableClock,
+            InMemoryIdentityUserRepository,
+            InMemoryIdentitySessionRepository,
+        ]:
+            FastAPI test client, mutable clock, local user repository, and
+            local session repository.
+    Assumptions:
+        Test app uses final browser auth model: opaque session cookie plus local session lookup.
+    Raises:
+        ValueError: If dependency construction is invalid.
+    Side Effects:
+        Creates in-memory FastAPI application.
+    """
+    clock = _MutableClock(now_value=_BASE_NOW)
+    user_repository = InMemoryIdentityUserRepository()
+    session_repository = InMemoryIdentitySessionRepository()
+    current_user_port = RoehubSessionCurrentUser(
+        session_repository=session_repository,
+        user_repository=user_repository,
+        clock=clock,
+    )
     current_user_dependency = RequireCurrentUserDependency(
         current_user=current_user_port,
-        cookie_name="roehub_identity_jwt",
+        cookie_name=_SESSION_COOKIE_NAME,
     )
-    login_use_case = TelegramLoginUseCase(
-        validator=validator,
-        user_repository=repository,
-        jwt_codec=jwt_codec,
-        clock=clock,
-        jwt_ttl_days=7,
-    )
-    two_factor_setup, two_factor_verify = _build_two_factor_use_cases(clock=clock)
 
     app = FastAPI()
     app.include_router(
         build_identity_router(
-            telegram_login=login_use_case,
-            two_factor_setup=two_factor_setup,
-            two_factor_verify=two_factor_verify,
+            keycloak_auth_url=_KEYCLOAK_AUTH_URL,
+            keycloak_token_url=_KEYCLOAK_TOKEN_URL,
+            keycloak_introspection_url=_KEYCLOAK_INTROSPECTION_URL,
+            keycloak_client_id=_KEYCLOAK_CLIENT_ID,
+            keycloak_client_secret=_KEYCLOAK_CLIENT_SECRET,
+            keycloak_redirect_uri=_KEYCLOAK_REDIRECT_URI,
+            keycloak_logout_redirect_uri=_KEYCLOAK_LOGOUT_REDIRECT_URI,
             current_user_dependency=current_user_dependency,
-            cookie_name="roehub_identity_jwt",
+            user_repository=user_repository,
+            session_repository=session_repository,
+            clock=clock,
+            cookie_name=_SESSION_COOKIE_NAME,
             cookie_secure=False,
+            session_idle_ttl_seconds=1800,
+            session_absolute_ttl_seconds=43200,
             cookie_samesite="lax",
             cookie_path="/",
-        ),
+            oidc_http_transport=oidc_http_transport,
+        )
     )
-    client = TestClient(app)
+    return TestClient(app), clock, user_repository, session_repository
 
-    response = client.post(
-        "/auth/telegram/login",
-        json=_build_signed_telegram_payload(
-            bot_token=bot_token,
-            user_id=5123001,
-            auth_date=int(now.timestamp()),
-        ),
-    )
 
-    assert response.status_code == 200
-    assert response.json()["paid_level"] == "free"
-    set_cookie_header = response.headers.get("set-cookie", "")
-    assert "roehub_identity_jwt=" in set_cookie_header
-    assert "HttpOnly" in set_cookie_header
+def _build_oidc_transport(
+    *,
+    captured_token_form_data: dict[str, list[str]] | None = None,
+    captured_introspection_form_data: dict[str, list[str]] | None = None,
+    introspection_paid_level: str = "free",
+) -> httpx.MockTransport:
+    """
+    Build deterministic transport handling both token exchange and introspection calls.
 
-    current_user_response = client.get("/auth/current-user")
-    assert current_user_response.status_code == 200
-    assert current_user_response.json()["user_id"]
+    Args:
+        captured_token_form_data: Optional container receiving token-exchange form fields.
+        captured_introspection_form_data: Optional container receiving introspection form fields.
+        introspection_paid_level: Paid-level claim returned by introspection payload.
+    Returns:
+        httpx.MockTransport: Transport returning deterministic OIDC responses by URL.
+    Assumptions:
+        Callback flow uses one token exchange followed by one backend introspection call.
+    Raises:
+        AssertionError: If request shape or target URL differs from expected contract.
+    Side Effects:
+        Mutates optional capture dictionaries for test assertions.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """
+        Return deterministic OIDC response based on request URL.
+
+        Args:
+            request: Outbound request sent by auth callback flow.
+        Returns:
+            httpx.Response: Deterministic token or introspection payload.
+        Assumptions:
+            Requests are URL-encoded form POSTs.
+        Raises:
+            AssertionError: If request URL/method differs from expected contract.
+        Side Effects:
+            Mutates optional capture dictionaries for assertions.
+        """
+        assert request.method == "POST"
+        if str(request.url) == _KEYCLOAK_TOKEN_URL:
+            if captured_token_form_data is not None:
+                captured_token_form_data.update(parse_qs(request.content.decode("utf-8")))
+            return httpx.Response(
+                status_code=200,
+                json={
+                    "access_token": "oidc-access-token",
+                    "expires_in": 3600,
+                    "token_type": "Bearer",
+                },
+            )
+        if str(request.url) == _KEYCLOAK_INTROSPECTION_URL:
+            if captured_introspection_form_data is not None:
+                captured_introspection_form_data.update(
+                    parse_qs(request.content.decode("utf-8"))
+                )
+            return httpx.Response(
+                status_code=200,
+                json={
+                    "active": True,
+                    "sub": _KEYCLOAK_SUBJECT,
+                    "paid_level": introspection_paid_level,
+                },
+            )
+        raise AssertionError(f"Unexpected OIDC request URL: {request.url}")
+
+    return httpx.MockTransport(handler)
+
+
+def _ensure_utc_datetime(*, value: datetime, field_name: str) -> datetime:
+    """
+    Validate timezone-aware UTC datetime and return the same value.
+
+    Args:
+        value: Datetime value to validate.
+        field_name: Field name used in deterministic error messages.
+    Returns:
+        datetime: Original validated datetime.
+    Assumptions:
+        Route tests operate only on UTC datetimes.
+    Raises:
+        ValueError: If datetime is naive or not UTC.
+    Side Effects:
+        None.
+    """
+    offset = value.utcoffset()
+    if value.tzinfo is None or offset is None:
+        raise ValueError(f"{field_name} must be timezone-aware UTC datetime")
+    if offset.total_seconds() != 0:
+        raise ValueError(f"{field_name} must be UTC datetime")
+    return value

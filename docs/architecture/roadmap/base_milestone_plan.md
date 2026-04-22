@@ -251,17 +251,17 @@ UI может спросить:
 
 ## Milestone 3 — Identity + Strategy v1 (immutable) + Live runner + Realtime + Telegram
 
-### 3A — Identity v1 (Telegram-only + 2FA + keys storage)
-**Цель:** пользователь входит только через Telegram; ключи биржи только после 2FA.
+### 3A — Identity v1 (Keycloak OIDC + Roehub sessions + keys storage)
+**Цель:** пользователь входит через Keycloak OIDC; API использует только локальную Roehub session model.
 
 **Что делаем:**
-- Telegram auth → `user_id (UUID)` + `telegram_user_id`
-- 2FA (TOTP): setup/verify/enforce
-- Exchange API keys: хранение + шифрование + гейт 2FA
+- Keycloak auth → `keycloak_subject` (`sub`) + локальный `user_id (UUID)`
+- Roehub server-side sessions (`identity_sessions`) + opaque cookie `roehub_session_id`
+- Exchange API keys: хранение + шифрование (без local 2FA gate)
 
 **DoD:**
-- Без Telegram user не существует.
-- Без 2FA ключи не добавить.
+- Без Keycloak login нельзя получить валидную Roehub session.
+- Entitlements (`paid_level`) читаются из Roehub DB.
 - Секреты не логируются.
 
 ### 3B — Strategy v1 (immutable per-user) + API
@@ -829,7 +829,7 @@ Milestone 5 добавляет асинхронный путь, который �
 - Web UI app:
   - `apps/web` (Python SSR + Jinja2 + HTMX; без React/SPA),
   - сборка статических ассетов в `apps/web/dist` (CSS/JS),
-  - UI интегрирует Telegram Login Widget (Variant A) и опирается на HttpOnly JWT cookie.
+  - UI использует Keycloak redirect flow и опирается на opaque Roehub session cookie.
 
 - Reverse proxy:
   - Nginx gateway в `infra/docker` (и/или отдельный prod конфиг),
@@ -853,7 +853,7 @@ Milestone 5 добавляет асинхронный путь, который �
 
 - Ops/runbooks:
   - runbook запуска web+api+nginx локально;
-  - runbook настройки Telegram (allowed domains) для dev/prod.
+  - runbook настройки Keycloak client redirect URI для dev/prod.
   - обеспечить применение Alembic миграций (strategy/backtest/backtest-jobs) перед стартом сервисов через migrations runner (`POSTGRES_DSN`).
 
 **DoD:**
@@ -927,7 +927,7 @@ Milestone 5 добавляет асинхронный путь, который �
 - Хранение свечей: только `canonical_candles_1m`; все TF derived через rollup.
 - Derived candles: только closed+full buckets.
 - Strategy immutable: любые изменения = новая стратегия.
-- Keys: только после 2FA; секреты всегда шифруются и не логируются.
+- Keys: требуют аутентифицированную Roehub session; секреты всегда шифруются и не логируются.
 - Best-effort Telegram/Redis publish: ошибки не ломают ingestion/runner.
 
 --- 

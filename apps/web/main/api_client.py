@@ -15,10 +15,10 @@ class WebCurrentUser:
 
     Docs:
       - docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
     Related:
       - apps/web/main/app.py
-      - src/trading/contexts/identity/adapters/inbound/api/routes/auth_telegram.py
+      - src/trading/contexts/identity/adapters/inbound/api/routes/auth_oidc.py
     """
 
     user_id: str
@@ -50,7 +50,7 @@ class CurrentUserApiClient(Protocol):
       - docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md
     Related:
       - apps/web/main/app.py
-      - src/trading/contexts/identity/adapters/inbound/api/routes/auth_telegram.py
+      - src/trading/contexts/identity/adapters/inbound/api/routes/auth_oidc.py
     """
 
     def fetch_current_user(self, *, cookie_header: str | None) -> CurrentUserApiResult:
@@ -80,7 +80,7 @@ class HttpxCurrentUserApiClient(CurrentUserApiClient):
     Related:
       - apps/web/main/settings.py
       - apps/web/main/app.py
-      - src/trading/contexts/identity/adapters/inbound/api/routes/auth_telegram.py
+      - src/trading/contexts/identity/adapters/inbound/api/routes/auth_oidc.py
     """
 
     def __init__(

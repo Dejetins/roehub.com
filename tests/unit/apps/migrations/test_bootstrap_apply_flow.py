@@ -64,7 +64,8 @@ def test_apply_identity_baseline_sql_skips_0003_and_0004_when_v2_layout_is_preex
     monkeypatch: Any,
 ) -> None:
     """
-    Verify bootstrap skips `0003` and `0004` when exchange keys table is already in v2 layout.
+    Verify bootstrap skips `0003` and `0004` when exchange keys table is already in v2 layout,
+    while still applying Keycloak cutover SQL `0005`.
 
     Args:
         monkeypatch: Pytest monkeypatch fixture.
@@ -83,6 +84,7 @@ def test_apply_identity_baseline_sql_skips_0003_and_0004_when_v2_layout_is_preex
       - apps/migrations/bootstrap.py
       - migrations/postgres/0003_identity_exchange_keys_v1.sql
       - migrations/postgres/0004_identity_exchange_keys_v2.sql
+      - migrations/postgres/0005_identity_keycloak_cutover_v1.sql
     """
     executed_scripts: list[str] = []
     inspected_layouts = iter(
@@ -122,6 +124,7 @@ def test_apply_identity_baseline_sql_skips_0003_and_0004_when_v2_layout_is_preex
     assert executed_scripts == [
         "0001_identity_v1.sql",
         "0002_identity_2fa_totp_v1.sql",
+        "0005_identity_keycloak_cutover_v1.sql",
     ]
 
 
@@ -129,7 +132,7 @@ def test_apply_identity_baseline_sql_runs_0003_and_guarded_0004_for_v1_flow(
     monkeypatch: Any,
 ) -> None:
     """
-    Verify bootstrap keeps v1 flow: apply `0003` then guarded `0004` decision path.
+    Verify bootstrap keeps v1 flow: apply `0003`, guarded `0004`, and final Keycloak cutover `0005`.
 
     Args:
         monkeypatch: Pytest monkeypatch fixture.
@@ -148,6 +151,7 @@ def test_apply_identity_baseline_sql_runs_0003_and_guarded_0004_for_v1_flow(
       - apps/migrations/bootstrap.py
       - migrations/postgres/0003_identity_exchange_keys_v1.sql
       - migrations/postgres/0004_identity_exchange_keys_v2.sql
+      - migrations/postgres/0005_identity_keycloak_cutover_v1.sql
     """
     executed_scripts: list[str] = []
     inspected_layouts = iter(
@@ -197,4 +201,5 @@ def test_apply_identity_baseline_sql_runs_0003_and_guarded_0004_for_v1_flow(
         "0002_identity_2fa_totp_v1.sql",
         "0003_identity_exchange_keys_v1.sql",
         "0004_identity_exchange_keys_v2.sql",
+        "0005_identity_keycloak_cutover_v1.sql",
     ]

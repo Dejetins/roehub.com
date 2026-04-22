@@ -1,5 +1,8 @@
 BEGIN;
 
+-- Legacy bootstrap baseline. Keycloak-native auth shape is finalized by
+-- 0005_identity_keycloak_cutover_v1.sql.
+
 CREATE TABLE IF NOT EXISTS identity_users (
     user_id UUID PRIMARY KEY,
     telegram_user_id BIGINT NOT NULL,

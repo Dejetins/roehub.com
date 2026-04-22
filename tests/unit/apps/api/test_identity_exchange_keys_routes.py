@@ -9,41 +9,36 @@ from fastapi.testclient import TestClient
 from apps.api.routes import build_identity_router
 from trading.contexts.identity.adapters.inbound.api.deps import (
     RequireCurrentUserDependency,
-    RequireTwoFactorEnabledDependency,
-    register_two_factor_required_exception_handler,
 )
 from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
     InMemoryIdentityExchangeKeysRepository,
-    InMemoryIdentityTwoFactorRepository,
+    InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
 )
-from trading.contexts.identity.adapters.outbound.policy import RepositoryTwoFactorPolicyGate
 from trading.contexts.identity.adapters.outbound.security.current_user import (
-    JwtCookieCurrentUser,
+    RoehubSessionCurrentUser,
 )
 from trading.contexts.identity.adapters.outbound.security.exchange_keys import (
     AesGcmEnvelopeExchangeKeysSecretCipher,
 )
-from trading.contexts.identity.adapters.outbound.security.jwt import Hs256JwtCodec
-from trading.contexts.identity.adapters.outbound.security.telegram import (
-    TelegramLoginWidgetPayloadValidator,
-)
-from trading.contexts.identity.adapters.outbound.security.two_factor import (
-    AesGcmEnvelopeTwoFactorSecretCipher,
-    PyOtpTwoFactorTotpProvider,
-)
 from trading.contexts.identity.application.ports.clock import IdentityClock
-from trading.contexts.identity.application.ports.jwt_codec import IdentityJwtClaims
 from trading.contexts.identity.application.use_cases import (
     CreateExchangeKeyUseCase,
     DeleteExchangeKeyUseCase,
     ListExchangeKeysUseCase,
-    SetupTwoFactorTotpUseCase,
-    TelegramLoginUseCase,
-    VerifyTwoFactorTotpUseCase,
 )
-from trading.contexts.identity.domain.value_objects import TelegramUserId
-from trading.shared_kernel.primitives import PaidLevel, UserId
+
+_KEYCLOAK_AUTH_URL = "https://auth.roehub.local/realms/roehub/protocol/openid-connect/auth"
+_KEYCLOAK_TOKEN_URL = "https://auth.roehub.local/realms/roehub/protocol/openid-connect/token"
+_KEYCLOAK_CLIENT_ID = "roehub-api"
+_KEYCLOAK_CLIENT_SECRET = "test-client-secret"
+_KEYCLOAK_REDIRECT_URI = "http://127.0.0.1:8010/auth/callback"
+_KEYCLOAK_LOGOUT_REDIRECT_URI = "http://127.0.0.1:8010/login"
+_KEYCLOAK_INTROSPECTION_URL = (
+    "https://auth.roehub.local/realms/roehub/protocol/openid-connect/token/introspect"
+)
+_SESSION_COOKIE_NAME = "roehub_session_id"
+_KEYCLOAK_SUBJECT = "keycloak-exchange-keys-user-1"
 
 
 class _MutableClock(IdentityClock):
@@ -103,22 +98,24 @@ class _MutableClock(IdentityClock):
         return self._now_value
 
 
-def test_exchange_keys_routes_require_two_factor_enabled_on_all_operations() -> None:
+def test_exchange_keys_routes_require_authenticated_user_on_all_operations() -> None:
     """
-    Verify create/list/delete exchange keys endpoints return exact 403 payload when 2FA is disabled.
+    Verify create/list/delete exchange keys endpoints return deterministic 401
+    when session cookie is missing.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        User is authenticated but repository has no enabled 2FA row.
+        Current-user dependency resolves authenticated principal from Roehub session cookie only.
     Raises:
-        AssertionError: If any endpoint bypasses 2FA gate or payload changes.
+        AssertionError: If endpoint bypasses auth guard or payload changes.
     Side Effects:
         None.
     """
-    client, _clock, _user_id, _two_factor_repository, _exchange_repository = _build_test_client()
+    client, _clock, _exchange_repository = _build_test_client()
+    client.cookies.clear()
 
     responses = [
         client.get("/exchange-keys"),
@@ -138,11 +135,42 @@ def test_exchange_keys_routes_require_two_factor_enabled_on_all_operations() -> 
     ]
 
     for response in responses:
-        assert response.status_code == 403
+        assert response.status_code == 401
         assert response.json() == {
-            "error": "two_factor_required",
-            "message": "Two-factor authentication must be enabled.",
+            "detail": {
+                "error": "missing_session_id",
+                "message": "Session id is required",
+            }
         }
+
+
+def test_exchange_keys_routes_reject_non_uuid_session_cookie_value() -> None:
+    """
+    Verify protected routes reject malformed non-UUID values in session cookie.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Browser auth cookie must contain Roehub UUID session id.
+    Raises:
+        AssertionError: If malformed cookie value is accepted as authenticated session.
+    Side Effects:
+        None.
+    """
+    client, _clock, _exchange_repository = _build_test_client()
+    client.cookies.set(_SESSION_COOKIE_NAME, "malformed-cookie-value")
+
+    response = client.get("/exchange-keys")
+
+    assert response.status_code == 401
+    assert response.json() == {
+        "detail": {
+            "error": "invalid_session_id",
+            "message": "Session id must be UUID",
+        }
+    }
 
 
 def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
@@ -154,18 +182,13 @@ def test_exchange_keys_crud_routes_hide_secrets_and_apply_soft_delete() -> None:
     Returns:
         None.
     Assumptions:
-        Authenticated user has enabled 2FA before calling exchange keys endpoints.
+        Authenticated user can operate exchange keys without local 2FA gate.
     Raises:
         AssertionError: If response shape leaks secret fields or delete semantics are broken.
     Side Effects:
         None.
     """
-    client, clock, user_id, two_factor_repository, exchange_repository = _build_test_client()
-    _enable_two_factor(
-        two_factor_repository=two_factor_repository,
-        user_id=user_id,
-        now=clock.now(),
-    )
+    client, clock, exchange_repository = _build_test_client()
 
     create_response = client.post(
         "/exchange-keys",
@@ -250,12 +273,7 @@ def test_exchange_keys_create_route_returns_deterministic_409_for_active_duplica
     Side Effects:
         None.
     """
-    client, clock, user_id, two_factor_repository, _exchange_repository = _build_test_client()
-    _enable_two_factor(
-        two_factor_repository=two_factor_repository,
-        user_id=user_id,
-        now=clock.now(),
-    )
+    client, _clock, _exchange_repository = _build_test_client()
 
     first_response = client.post(
         "/exchange-keys",
@@ -311,12 +329,7 @@ def test_exchange_keys_delete_route_returns_404_for_missing_key_id() -> None:
     Side Effects:
         None.
     """
-    client, clock, user_id, two_factor_repository, _exchange_repository = _build_test_client()
-    _enable_two_factor(
-        two_factor_repository=two_factor_repository,
-        user_id=user_id,
-        now=clock.now(),
-    )
+    client, _clock, _exchange_repository = _build_test_client()
 
     response = client.delete("/exchange-keys/00000000-0000-0000-0000-00000000beef")
     assert response.status_code == 404
@@ -346,12 +359,7 @@ def test_exchange_keys_list_route_is_deterministically_sorted() -> None:
     Side Effects:
         None.
     """
-    client, clock, user_id, two_factor_repository, _exchange_repository = _build_test_client()
-    _enable_two_factor(
-        two_factor_repository=two_factor_repository,
-        user_id=user_id,
-        now=clock.now(),
-    )
+    client, clock, _exchange_repository = _build_test_client()
 
     first_response = client.post(
         "/exchange-keys",
@@ -391,85 +399,48 @@ def test_exchange_keys_list_route_is_deterministically_sorted() -> None:
 def _build_test_client() -> tuple[
     TestClient,
     _MutableClock,
-    UserId,
-    InMemoryIdentityTwoFactorRepository,
     InMemoryIdentityExchangeKeysRepository,
 ]:
     """
-    Build TestClient with identity router, authenticated cookie, and exchange keys dependencies.
+    Build TestClient with identity router, Roehub session auth, and exchange key dependencies.
 
     Args:
         None.
     Returns:
-        tuple[TestClient, _MutableClock, UserId, InMemoryIdentityTwoFactorRepository,
-            InMemoryIdentityExchangeKeysRepository]:
-            `(client, clock, user_id, two_factor_repository, exchange_repository)` tuple.
+        tuple[TestClient, _MutableClock, InMemoryIdentityExchangeKeysRepository]:
+            `(client, clock, exchange_repository)` tuple.
     Assumptions:
-        JWT cookie is valid for one pre-created in-memory user.
+        User and session are persisted in local in-memory repositories before route calls.
     Raises:
         ValueError: If dependency wiring is invalid.
     Side Effects:
-        Creates in-memory FastAPI app and sets auth cookie on test client.
+        Creates in-memory FastAPI app and sets opaque Roehub session cookie on test client.
     """
     now = datetime(2026, 2, 15, 13, 0, 0, tzinfo=timezone.utc)
     clock = _MutableClock(now_value=now)
 
-    user_repository = InMemoryIdentityUserRepository()
-    two_factor_repository = InMemoryIdentityTwoFactorRepository()
     exchange_repository = InMemoryIdentityExchangeKeysRepository()
+    user_repository = InMemoryIdentityUserRepository()
+    session_repository = InMemoryIdentitySessionRepository()
 
-    user = user_repository.upsert_telegram_login(
-        telegram_user_id=TelegramUserId(922001),
+    user = user_repository.upsert_keycloak_login(
+        keycloak_subject=_KEYCLOAK_SUBJECT,
         login_at=now,
     )
-
-    jwt_codec = Hs256JwtCodec(secret_key="exchange-keys-routes-secret", clock=clock)
-    claims = IdentityJwtClaims(
+    session = session_repository.create_session(
         user_id=user.user_id,
-        paid_level=PaidLevel.free(),
-        issued_at=now,
-        expires_at=now + timedelta(days=7),
+        now=now,
+        idle_ttl_seconds=1800,
+        absolute_ttl_seconds=43200,
     )
-    token = jwt_codec.encode(claims=claims)
-
-    current_user_port = JwtCookieCurrentUser(
-        jwt_codec=jwt_codec,
+    current_user_port = RoehubSessionCurrentUser(
+        session_repository=session_repository,
         user_repository=user_repository,
+        clock=clock,
     )
     current_user_dependency = RequireCurrentUserDependency(
         current_user=current_user_port,
-        cookie_name="roehub_identity_jwt",
-    )
-
-    two_factor_policy_gate = RepositoryTwoFactorPolicyGate(repository=two_factor_repository)
-    two_factor_enabled_dependency = RequireTwoFactorEnabledDependency(
-        current_user_dependency=current_user_dependency,
-        policy_gate=two_factor_policy_gate,
-    )
-
-    telegram_login_use_case = TelegramLoginUseCase(
-        validator=TelegramLoginWidgetPayloadValidator(bot_token="exchange-keys-bot-token"),
-        user_repository=user_repository,
-        jwt_codec=jwt_codec,
-        clock=clock,
-        jwt_ttl_days=7,
-    )
-
-    two_factor_secret_cipher = AesGcmEnvelopeTwoFactorSecretCipher(
-        kek_b64="cm9laHViLWRldi1pZGVudGl0eS0yZmEta2V5LTAwMDE=",
-    )
-    two_factor_setup = SetupTwoFactorTotpUseCase(
-        repository=two_factor_repository,
-        secret_cipher=two_factor_secret_cipher,
-        totp_provider=PyOtpTwoFactorTotpProvider(),
-        clock=clock,
-        issuer="Roehub",
-    )
-    two_factor_verify = VerifyTwoFactorTotpUseCase(
-        repository=two_factor_repository,
-        secret_cipher=two_factor_secret_cipher,
-        totp_provider=PyOtpTwoFactorTotpProvider(),
-        clock=clock,
+        cookie_name=_SESSION_COOKIE_NAME,
     )
 
     exchange_secret_cipher = AesGcmEnvelopeExchangeKeysSecretCipher(
@@ -487,62 +458,34 @@ def _build_test_client() -> tuple[
     )
 
     app = FastAPI()
-    register_two_factor_required_exception_handler(app=app)
     app.include_router(
         build_identity_router(
-            telegram_login=telegram_login_use_case,
-            two_factor_setup=two_factor_setup,
-            two_factor_verify=two_factor_verify,
+            keycloak_auth_url=_KEYCLOAK_AUTH_URL,
+            keycloak_token_url=_KEYCLOAK_TOKEN_URL,
+            keycloak_introspection_url=_KEYCLOAK_INTROSPECTION_URL,
+            keycloak_client_id=_KEYCLOAK_CLIENT_ID,
+            keycloak_client_secret=_KEYCLOAK_CLIENT_SECRET,
+            keycloak_redirect_uri=_KEYCLOAK_REDIRECT_URI,
+            keycloak_logout_redirect_uri=_KEYCLOAK_LOGOUT_REDIRECT_URI,
             current_user_dependency=current_user_dependency,
-            cookie_name="roehub_identity_jwt",
+            user_repository=user_repository,
+            session_repository=session_repository,
+            clock=clock,
+            cookie_name=_SESSION_COOKIE_NAME,
             cookie_secure=False,
+            session_idle_ttl_seconds=1800,
+            session_absolute_ttl_seconds=43200,
             cookie_samesite="lax",
             cookie_path="/",
             create_exchange_key_use_case=create_exchange_key_use_case,
             list_exchange_keys_use_case=list_exchange_keys_use_case,
             delete_exchange_key_use_case=delete_exchange_key_use_case,
-            two_factor_enabled_dependency=two_factor_enabled_dependency,
         )
     )
 
     client = TestClient(app)
-    client.cookies.set("roehub_identity_jwt", token)
-    return client, clock, user.user_id, two_factor_repository, exchange_repository
-
-
-
-def _enable_two_factor(
-    *,
-    two_factor_repository: InMemoryIdentityTwoFactorRepository,
-    user_id: UserId,
-    now: datetime,
-) -> None:
-    """
-    Enable 2FA state in repository for target user to satisfy policy gate in tests.
-
-    Args:
-        two_factor_repository: In-memory 2FA repository instance.
-        user_id: Target identity user id.
-        now: UTC timestamp for setup/enable rows.
-    Returns:
-        None.
-    Assumptions:
-        Any non-empty encrypted secret placeholder is sufficient for gate policy tests.
-    Raises:
-        ValueError: If repository invariants reject provided timestamp.
-    Side Effects:
-        Writes and updates one 2FA repository row.
-    """
-    two_factor_repository.upsert_pending_secret(
-        user_id=user_id,
-        totp_secret_enc=b"\x01\x02\x03",
-        updated_at=now,
-    )
-    two_factor_repository.enable(
-        user_id=user_id,
-        enabled_at=now,
-        updated_at=now,
-    )
+    client.cookies.set(_SESSION_COOKIE_NAME, str(session.session_id))
+    return client, clock, exchange_repository
 
 
 

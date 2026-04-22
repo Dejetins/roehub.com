@@ -1,13 +1,14 @@
 # Milestone 3 — EPIC map (v1)
 
-Карта EPIC’ов для Milestone 3: Telegram-only регистрация + 2FA-гейтинг ключей + Strategy v1 (immutable) + live runner + realtime streams + telegram notifications.
+Карта EPIC’ов для Milestone 3: Keycloak auth + Roehub session model + Strategy v1 (immutable) + live runner + realtime streams + telegram notifications.
 
 
 ## Контекст и новые вводные (зафиксировано)
 
 ### Identity / доступ
-- Пользователь может попасть в систему **только через Telegram auth** (один раз “регистрируется” телеграмом).
-- Если пользователь хочет добавить **API keys биржи**, он **обязан включить 2FA** (TOTP).
+- Пользователь попадает в систему через Keycloak OIDC.
+- API работает на Roehub server-side session model (opaque `roehub_session_id` cookie).
+- Внешний auth key: `keycloak_subject`; внутренний ключ: `user_id`.
 - Оповещения пользователю (сигналы/вход/выход/ошибки) идут **через Telegram**.
 
 ### Strategy (immutable, per-user)
@@ -29,16 +30,16 @@
 
 ## Принцип декомпозиции Milestone 3
 Milestone 3 делится на 2 трека, которые можно делать параллельно:
-1) `identity` (Telegram login + 2FA + exchange keys)
+1) `identity` (Keycloak OIDC + Roehub sessions + exchange keys)
 2) `strategy` (PG persistence + API + live worker + realtime output + telegram notify)
 
 ---
 
 ## Порядок внедрения (боевой, без лишней магии)
 
-1) ID-EPIC-01 → Telegram auth + user bootstrap  
-2) ID-EPIC-02 → 2FA (TOTP) + enforce policy  
-3) ID-EPIC-03 → Exchange API keys (хранение, только после 2FA)  
+1) ID-EPIC-01 → Keycloak OIDC + local Roehub user bootstrap  
+2) ID-EPIC-02 → Roehub server-side session lifecycle  
+3) ID-EPIC-03 → Exchange API keys (encrypted storage + auth via current-user)  
 4) STR-EPIC-01 → Strategy domain/spec (immutable) + PG DDL + migrations runner  
 5) STR-EPIC-02 → Strategy API (CRUD+clone+run state machine) + 422 payloads  
 6) STR-EPIC-03 → Strategy live worker (Redis 1m → rollup TF) + warmup/repair(read)  
@@ -50,30 +51,29 @@ Milestone 3 делится на 2 трека, которые можно дела
 
 ## EPIC’и Milestone 3
 
-### ID-EPIC-01 — Identity v1: Telegram-only registration (login) + user model
+### ID-EPIC-01 — Identity v1: Keycloak OIDC login + local user model
 
-**Цель:** пользователь появляется в системе только через Telegram; дальше все запросы API выполняются в контексте `user_id`.
+**Цель:** пользователь логинится через Keycloak, а API работает в контексте локального `user_id`.
 
 **Scope:**
 - Новый bounded context: `src/trading/contexts/identity/*`
-- Telegram login flow (на уровне API):
-  - валидация Telegram Login Widget payload (или Bot-based handshake — выбрать один и зафиксировать)
-  - создание `user_id (UUID)` и привязка `telegram_user_id`
-  - хранение `telegram_chat_id` (если уже есть способ получить), иначе — этап 2/3
+- OIDC login flow (на уровне API):
+  - `GET /auth/login` -> redirect в Keycloak;
+  - `GET /auth/callback` -> code exchange + introspection + resolve `sub`;
+  - upsert local user по `keycloak_subject` + refresh `last_login_at`.
 - Минимальный порт `CurrentUser` для API (контекст пользователя).
 
 **Non-goals:**
 - полноценные роли/права/админка
-- OAuth провайдеры кроме Telegram
+- собственная password auth схема в Roehub
 
 **PG DDL (минимум):**
-- `identity_users(user_id uuid pk, telegram_user_id bigint unique, created_at, last_login_at, is_deleted)`
-- `identity_telegram_channels(user_id fk, chat_id bigint, is_confirmed bool, confirmed_at)`
+- `identity_users(user_id uuid pk, keycloak_subject text unique, paid_level, created_at, last_login_at, is_deleted)`
 
 **DoD:**
-- API умеет “впустить” пользователя только через Telegram auth.
+- API умеет “впустить” пользователя только через Keycloak OIDC flow.
 - В любой strategy/backtest endpoint есть стабильный `user_id` в request context.
-- Fail-fast: если секреты Telegram не заданы — сервис не стартует (кроме test/dev режимов по флагу).
+- Fail-fast: при `IDENTITY_FAIL_FAST=true` без `KEYCLOAK_*` сервис не стартует.
 
 **Paths:**
 - `src/trading/contexts/identity/domain/*`
@@ -83,26 +83,27 @@ Milestone 3 делится на 2 трека, которые можно дела
 
 ---
 
-### ID-EPIC-02 — 2FA v1 (TOTP): enable/verify + policy “keys require 2FA”
+### ID-EPIC-02 — Roehub session lifecycle v1
 
-**Цель:** включение 2FA (TOTP) и принудительный гейт для операций с ключами биржи.
+**Цель:** зафиксировать Roehub server-side session lifecycle для browser auth.
 
 **Scope:**
-- Генерация секрета TOTP, QR-данные для UI, подтверждение кодом.
-- Хранение TOTP секрета **в зашифрованном виде** (envelope encryption; ключ в env/secret manager).
-- Политика: `exchange keys` запрещены, пока `two_factor_enabled=true`.
+- таблица `identity_sessions` (idle/absolute TTL, revoke semantics);
+- opaque cookie `roehub_session_id` в браузере;
+- `/auth/logout` ревокает локальную session и очищает cookie;
+- `/auth/current-user` резолвит principal только через session repository.
 
 **Non-goals:**
-- recovery codes (можно оставить как OQ для следующего milestone)
-- device management
+- хранение raw Keycloak token в browser cookie;
+- local `/2fa/*` endpoints в Roehub API.
 
 **PG DDL:**
-- `identity_2fa(user_id pk/fk, totp_secret_enc bytea, enabled bool, enabled_at, updated_at)`
+- `identity_sessions(session_id uuid pk, user_id fk, created_at, last_seen_at, idle_expires_at, absolute_expires_at, revoked_at)`
 
 **DoD:**
-- `/2fa/setup` → отдает otpauth-uri/qr-data
-- `/2fa/verify` → включает 2FA
-- Любая операция “keys upsert” возвращает 403/422 без 2FA (единый payload).
+- `/auth/current-user` возвращает 401 без валидной session cookie;
+- `/auth/logout` делает revoke + cookie clear;
+- session TTL/revoke semantics покрыты unit tests.
 
 ---
 
@@ -118,7 +119,7 @@ Milestone 3 делится на 2 трека, которые можно дела
   - `api_key`, `api_secret`, `passphrase` (nullable, зависит от биржи)
   - `permissions` (read-only vs trade) — пока можно хранить как метаданные
 - Шифрование секретов.
-- Гейт: только при `2FA enabled`.
+- Auth: только при валидной Roehub session (`current_user_dependency`).
 
 **Non-goals:**
 - проверка ключей реальным запросом к бирже (можно как best-effort, но не обязательное)
@@ -129,7 +130,7 @@ Milestone 3 делится на 2 трека, которые можно дела
 
 **DoD:**
 - API: create/list/delete keys
-- Без 2FA — операция запрещена
+- Без session cookie — операция запрещена
 - Логи не содержат секретов (ни при каких ошибках)
 
 ---
@@ -306,5 +307,5 @@ Milestone 3 делится на 2 трека, которые можно дела
 ---
 
 ## Открытые вопросы (фиксируем, но не блокируем Milestone 3)
-- ID/OQ-01: какой Telegram flow фиксируем в v1: Login Widget vs Bot handshake?
-- ID/OQ-02: recovery для 2FA (backup codes) — в какой milestone?
+- ID/OQ-01: какая policy Keycloak OTP нужна для prod и test realm (required vs conditional)?
+- ID/OQ-02: нужна ли административная массовая ревокация `identity_sessions` по user/realm событиям?

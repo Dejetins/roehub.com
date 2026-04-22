@@ -129,8 +129,8 @@
 **Serialization**  
 - как UUID-строка (например `00000000-0000-0000-0000-000000000001`).
 
-> Примечание: `UserId` — не Telegram-specific идентификатор.  
-> `telegram_user_id` остаётся отдельным identity-атрибутом/ключом входа.
+> Примечание: `UserId` — не provider-specific идентификатор.  
+> Внешний auth key (`keycloak_subject`) остаётся отдельным identity-атрибутом bounded context `identity`.
 
 
 ---

@@ -7,7 +7,7 @@ backed by ClickHouse reference tables `market_data.ref_market` and `market_data.
 
 - Let Web UI load enabled markets and search enabled/tradable instruments without direct ClickHouse access.
 - Keep responses deterministic (stable ordering) and storage reads explicit (no ORM, no hidden FINAL).
-- Reuse existing identity auth (HttpOnly JWT cookie) via API `current_user_dependency`.
+- Reuse existing identity auth (opaque Roehub session cookie) via API `current_user_dependency`.
 
 ## Context
 

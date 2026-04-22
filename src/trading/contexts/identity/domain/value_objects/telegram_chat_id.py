@@ -13,7 +13,6 @@ class TelegramChatId:
     Related:
       - migrations/postgres/0001_identity_v1.sql
       - src/trading/contexts/identity/domain/entities/user.py
-      - src/trading/contexts/identity/domain/value_objects/telegram_user_id.py
     """
 
     value: int

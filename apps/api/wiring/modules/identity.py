@@ -2,9 +2,8 @@
 Composition helpers for identity API module.
 
 Docs:
-  - docs/architecture/identity/identity-telegram-login-user-model-v1.md
-  - docs/architecture/identity/identity-2fa-totp-policy-v1.md
-  - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+  - docs/architecture/identity/keycloak-cutover-plan-v1.md
+  - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
 """
 
 from __future__ import annotations
@@ -17,55 +16,60 @@ from fastapi import APIRouter
 from apps.api.routes import build_identity_router as build_identity_api_router
 from trading.contexts.identity.adapters.inbound.api.deps import (
     RequireCurrentUserDependency,
-    RequireTwoFactorEnabledDependency,
 )
 from trading.contexts.identity.adapters.outbound import (
     AesGcmEnvelopeExchangeKeysSecretCipher,
-    AesGcmEnvelopeTwoFactorSecretCipher,
-    Hs256JwtCodec,
     InMemoryIdentityExchangeKeysRepository,
-    InMemoryIdentityTwoFactorRepository,
+    InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
-    JwtCookieCurrentUser,
     PostgresIdentityExchangeKeysRepository,
-    PostgresIdentityTwoFactorRepository,
+    PostgresIdentitySessionRepository,
     PostgresIdentityUserRepository,
     PsycopgIdentityPostgresGateway,
-    PyOtpTwoFactorTotpProvider,
-    RepositoryTwoFactorPolicyGate,
+    RoehubSessionCurrentUser,
     SystemIdentityClock,
-    TelegramLoginWidgetPayloadValidator,
 )
 from trading.contexts.identity.application import (
     ExchangeKeysRepository,
-    TwoFactorRepository,
+    SessionRepository,
     UserRepository,
 )
 from trading.contexts.identity.application.use_cases import (
     CreateExchangeKeyUseCase,
     DeleteExchangeKeyUseCase,
     ListExchangeKeysUseCase,
-    SetupTwoFactorTotpUseCase,
-    TelegramLoginUseCase,
-    VerifyTwoFactorTotpUseCase,
 )
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _IDENTITY_FAIL_FAST_KEY = "IDENTITY_FAIL_FAST"
-_JWT_TTL_DAYS_KEY = "JWT_TTL_DAYS"
-_TELEGRAM_BOT_TOKEN_KEY = "TELEGRAM_BOT_TOKEN"
-_IDENTITY_JWT_SECRET_KEY = "IDENTITY_JWT_SECRET"
-_IDENTITY_2FA_KEK_B64_KEY = "IDENTITY_2FA_KEK_B64"
 _IDENTITY_EXCHANGE_KEYS_KEK_B64_KEY = "IDENTITY_EXCHANGE_KEYS_KEK_B64"
 _IDENTITY_PG_DSN_KEY = "IDENTITY_PG_DSN"
-_IDENTITY_COOKIE_NAME_KEY = "IDENTITY_COOKIE_NAME"
-_IDENTITY_COOKIE_PATH_KEY = "IDENTITY_COOKIE_PATH"
-_IDENTITY_COOKIE_SAMESITE_KEY = "IDENTITY_COOKIE_SAMESITE"
-_IDENTITY_COOKIE_SECURE_KEY = "IDENTITY_COOKIE_SECURE"
-_DEFAULT_DEV_IDENTITY_2FA_KEK_B64 = "cm9laHViLWRldi1pZGVudGl0eS0yZmEta2V5LTAwMDE="
+_IDENTITY_SESSION_COOKIE_NAME_KEY = "IDENTITY_SESSION_COOKIE_NAME"
+_IDENTITY_SESSION_IDLE_TTL_SECONDS_KEY = "IDENTITY_SESSION_IDLE_TTL_SECONDS"
+_IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS_KEY = "IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS"
+_KEYCLOAK_BASE_URL_KEY = "KEYCLOAK_BASE_URL"
+_KEYCLOAK_REALM_KEY = "KEYCLOAK_REALM"
+_KEYCLOAK_CLIENT_ID_KEY = "KEYCLOAK_CLIENT_ID"
+_KEYCLOAK_CLIENT_SECRET_KEY = "KEYCLOAK_CLIENT_SECRET"
+_KEYCLOAK_REDIRECT_URI_KEY = "KEYCLOAK_REDIRECT_URI"
+_KEYCLOAK_LOGOUT_REDIRECT_URI_KEY = "KEYCLOAK_LOGOUT_REDIRECT_URI"
+_KEYCLOAK_AUTH_URL_KEY = "KEYCLOAK_AUTH_URL"
+_KEYCLOAK_TOKEN_URL_KEY = "KEYCLOAK_TOKEN_URL"
+_KEYCLOAK_END_SESSION_URL_KEY = "KEYCLOAK_END_SESSION_URL"
+_KEYCLOAK_INTROSPECTION_URL_KEY = "KEYCLOAK_INTROSPECTION_URL"
 _DEFAULT_DEV_IDENTITY_EXCHANGE_KEYS_KEK_B64 = "cm9laHViLWRldi1leGNoYW5nZS1rZXkta2VrLTAwMDE="
+_DEFAULT_DEV_KEYCLOAK_BASE_URL = "http://127.0.0.1:18080"
+_DEFAULT_DEV_KEYCLOAK_REALM = "roehub"
+_DEFAULT_DEV_KEYCLOAK_CLIENT_ID = "roehub-api"
+_DEFAULT_DEV_KEYCLOAK_CLIENT_SECRET = "dev-keycloak-client-secret"
+_DEFAULT_DEV_KEYCLOAK_REDIRECT_URI = "http://127.0.0.1:8010/auth/callback"
+_DEFAULT_DEV_KEYCLOAK_LOGOUT_REDIRECT_URI = "http://127.0.0.1:8010/login"
+_DEFAULT_IDENTITY_SESSION_COOKIE_NAME = "roehub_session_id"
+_DEFAULT_IDENTITY_SESSION_IDLE_TTL_SECONDS = 1800
+_DEFAULT_IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS = 43200
+_LEGACY_AUTH_COOKIE_PATH = "/"
+_LEGACY_AUTH_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
 _ALLOWED_ENVS = ("dev", "prod", "test")
-_ALLOWED_SAMESITE = ("lax", "none", "strict")
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,9 +78,8 @@ class IdentityRuntimeSettings:
     IdentityRuntimeSettings — runtime policy for identity module wiring.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
-      - docs/architecture/identity/identity-2fa-totp-policy-v1.md
-      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
     Related:
       - apps/api/wiring/modules/identity.py
       - apps/api/main/app.py
@@ -85,16 +88,21 @@ class IdentityRuntimeSettings:
 
     env_name: str
     fail_fast: bool
-    jwt_ttl_days: int
-    telegram_bot_token: str
-    identity_jwt_secret: str
-    identity_2fa_kek_b64: str
+    keycloak_base_url: str
+    keycloak_realm: str
+    keycloak_client_id: str
+    keycloak_client_secret: str
+    keycloak_redirect_uri: str
+    keycloak_logout_redirect_uri: str
+    keycloak_auth_url: str
+    keycloak_token_url: str
+    keycloak_end_session_url: str
+    keycloak_introspection_url: str
+    identity_session_cookie_name: str
+    identity_session_idle_ttl_seconds: int
+    identity_session_absolute_ttl_seconds: int
     identity_exchange_keys_kek_b64: str
     postgres_dsn: str
-    jwt_cookie_name: str
-    jwt_cookie_secure: bool
-    jwt_cookie_samesite: Literal["lax", "strict", "none"]
-    jwt_cookie_path: str
 
     def __post_init__(self) -> None:
         """
@@ -116,27 +124,53 @@ class IdentityRuntimeSettings:
                 f"IdentityRuntimeSettings.env_name must be one of {_ALLOWED_ENVS}, "
                 f"got {self.env_name!r}"
             )
-        if self.jwt_ttl_days <= 0:
-            raise ValueError("IdentityRuntimeSettings.jwt_ttl_days must be > 0")
-        if not self.telegram_bot_token:
-            raise ValueError("IdentityRuntimeSettings.telegram_bot_token must be non-empty")
-        if not self.identity_jwt_secret:
-            raise ValueError("IdentityRuntimeSettings.identity_jwt_secret must be non-empty")
-        if not self.identity_2fa_kek_b64:
-            raise ValueError("IdentityRuntimeSettings.identity_2fa_kek_b64 must be non-empty")
+        if not self.keycloak_base_url:
+            raise ValueError("IdentityRuntimeSettings.keycloak_base_url must be non-empty")
+        if not self.keycloak_realm:
+            raise ValueError("IdentityRuntimeSettings.keycloak_realm must be non-empty")
+        if not self.keycloak_client_id:
+            raise ValueError("IdentityRuntimeSettings.keycloak_client_id must be non-empty")
+        if not self.keycloak_client_secret:
+            raise ValueError("IdentityRuntimeSettings.keycloak_client_secret must be non-empty")
+        if not self.keycloak_redirect_uri:
+            raise ValueError("IdentityRuntimeSettings.keycloak_redirect_uri must be non-empty")
+        if not self.keycloak_logout_redirect_uri:
+            raise ValueError(
+                "IdentityRuntimeSettings.keycloak_logout_redirect_uri must be non-empty"
+            )
+        if not self.keycloak_auth_url:
+            raise ValueError("IdentityRuntimeSettings.keycloak_auth_url must be non-empty")
+        if not self.keycloak_token_url:
+            raise ValueError("IdentityRuntimeSettings.keycloak_token_url must be non-empty")
+        if not self.keycloak_end_session_url:
+            raise ValueError(
+                "IdentityRuntimeSettings.keycloak_end_session_url must be non-empty"
+            )
+        if not self.keycloak_introspection_url:
+            raise ValueError(
+                "IdentityRuntimeSettings.keycloak_introspection_url must be non-empty"
+            )
+        if not self.identity_session_cookie_name:
+            raise ValueError(
+                "IdentityRuntimeSettings.identity_session_cookie_name must be non-empty"
+            )
+        if self.identity_session_idle_ttl_seconds <= 0:
+            raise ValueError(
+                "IdentityRuntimeSettings.identity_session_idle_ttl_seconds must be > 0"
+            )
+        if self.identity_session_absolute_ttl_seconds <= 0:
+            raise ValueError(
+                "IdentityRuntimeSettings.identity_session_absolute_ttl_seconds must be > 0"
+            )
+        if self.identity_session_absolute_ttl_seconds < self.identity_session_idle_ttl_seconds:
+            raise ValueError(
+                "IdentityRuntimeSettings.identity_session_absolute_ttl_seconds must be >= "
+                "identity_session_idle_ttl_seconds"
+            )
         if not self.identity_exchange_keys_kek_b64:
             raise ValueError(
                 "IdentityRuntimeSettings.identity_exchange_keys_kek_b64 must be non-empty"
             )
-        if not self.jwt_cookie_name:
-            raise ValueError("IdentityRuntimeSettings.jwt_cookie_name must be non-empty")
-        if self.jwt_cookie_samesite not in _ALLOWED_SAMESITE:
-            raise ValueError(
-                "IdentityRuntimeSettings.jwt_cookie_samesite must be one of "
-                f"{_ALLOWED_SAMESITE}, got {self.jwt_cookie_samesite!r}"
-            )
-        if not self.jwt_cookie_path:
-            raise ValueError("IdentityRuntimeSettings.jwt_cookie_path must be non-empty")
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,7 +179,7 @@ class IdentityApiModule:
     IdentityApiModule — bundled identity router and shared current-user dependency.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
     Related:
       - apps/api/wiring/modules/identity.py
       - apps/api/wiring/modules/strategy.py
@@ -156,14 +190,31 @@ class IdentityApiModule:
     current_user_dependency: RequireCurrentUserDependency
 
 
+@dataclass(frozen=True, slots=True)
+class _IdentityPersistenceBundle:
+    """
+    _IdentityPersistenceBundle groups identity repositories built from one storage policy.
+
+    Docs:
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
+    Related:
+      - apps/api/wiring/modules/identity.py
+      - src/trading/contexts/identity/adapters/outbound/persistence/postgres/
+      - src/trading/contexts/identity/adapters/outbound/persistence/in_memory/
+    """
+
+    exchange_keys_repository: ExchangeKeysRepository
+    user_repository: UserRepository
+    session_repository: SessionRepository
+
+
 def build_identity_router(*, environ: Mapping[str, str]) -> APIRouter:
     """
     Build fully wired identity router from environment settings.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
-      - docs/architecture/identity/identity-2fa-totp-policy-v1.md
-      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
+      - docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
     Related:
       - apps/api/routes/identity.py
       - trading.contexts.identity.adapters.outbound
@@ -188,7 +239,7 @@ def build_identity_api_module(*, environ: Mapping[str, str]) -> IdentityApiModul
     Build bundled identity API module with router and reusable current-user dependency.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
       - docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md
     Related:
       - apps/api/wiring/modules/identity.py
@@ -208,155 +259,91 @@ def build_identity_api_module(*, environ: Mapping[str, str]) -> IdentityApiModul
     """
     settings = _resolve_identity_runtime_settings(environ=environ)
     clock = SystemIdentityClock()
-    user_repository = _build_user_repository(settings=settings)
-    two_factor_repository = _build_two_factor_repository(settings=settings)
-    exchange_keys_repository = _build_exchange_keys_repository(settings=settings)
-
-    telegram_validator = TelegramLoginWidgetPayloadValidator(
-        bot_token=settings.telegram_bot_token,
-    )
-    jwt_codec = Hs256JwtCodec(
-        secret_key=settings.identity_jwt_secret,
-        clock=clock,
-    )
-
-    telegram_login = TelegramLoginUseCase(
-        validator=telegram_validator,
-        user_repository=user_repository,
-        jwt_codec=jwt_codec,
-        clock=clock,
-        jwt_ttl_days=settings.jwt_ttl_days,
-    )
-
-    two_factor_secret_cipher = AesGcmEnvelopeTwoFactorSecretCipher(
-        kek_b64=settings.identity_2fa_kek_b64,
-    )
-    two_factor_totp_provider = PyOtpTwoFactorTotpProvider()
-    two_factor_setup = SetupTwoFactorTotpUseCase(
-        repository=two_factor_repository,
-        secret_cipher=two_factor_secret_cipher,
-        totp_provider=two_factor_totp_provider,
-        clock=clock,
-        issuer="Roehub",
-    )
-    two_factor_verify = VerifyTwoFactorTotpUseCase(
-        repository=two_factor_repository,
-        secret_cipher=two_factor_secret_cipher,
-        totp_provider=two_factor_totp_provider,
-        clock=clock,
-    )
+    persistence = _build_identity_persistence(settings=settings)
 
     exchange_keys_secret_cipher = AesGcmEnvelopeExchangeKeysSecretCipher(
         kek_b64=settings.identity_exchange_keys_kek_b64,
     )
     create_exchange_key_use_case = CreateExchangeKeyUseCase(
-        repository=exchange_keys_repository,
+        repository=persistence.exchange_keys_repository,
         secret_cipher=exchange_keys_secret_cipher,
         clock=clock,
     )
-    list_exchange_keys_use_case = ListExchangeKeysUseCase(repository=exchange_keys_repository)
+    list_exchange_keys_use_case = ListExchangeKeysUseCase(
+        repository=persistence.exchange_keys_repository
+    )
     delete_exchange_key_use_case = DeleteExchangeKeyUseCase(
-        repository=exchange_keys_repository,
+        repository=persistence.exchange_keys_repository,
         clock=clock,
     )
 
-    current_user_port = JwtCookieCurrentUser(
-        jwt_codec=jwt_codec,
-        user_repository=user_repository,
+    current_user_port = RoehubSessionCurrentUser(
+        session_repository=persistence.session_repository,
+        user_repository=persistence.user_repository,
+        clock=clock,
     )
     current_user_dependency = RequireCurrentUserDependency(
         current_user=current_user_port,
-        cookie_name=settings.jwt_cookie_name,
-    )
-    two_factor_policy_gate = RepositoryTwoFactorPolicyGate(repository=two_factor_repository)
-    two_factor_enabled_dependency = RequireTwoFactorEnabledDependency(
-        current_user_dependency=current_user_dependency,
-        policy_gate=two_factor_policy_gate,
+        cookie_name=settings.identity_session_cookie_name,
     )
 
     return IdentityApiModule(
         router=build_identity_api_router(
-            telegram_login=telegram_login,
-            two_factor_setup=two_factor_setup,
-            two_factor_verify=two_factor_verify,
+            keycloak_auth_url=settings.keycloak_auth_url,
+            keycloak_token_url=settings.keycloak_token_url,
+            keycloak_introspection_url=settings.keycloak_introspection_url,
+            keycloak_client_id=settings.keycloak_client_id,
+            keycloak_client_secret=settings.keycloak_client_secret,
+            keycloak_redirect_uri=settings.keycloak_redirect_uri,
+            keycloak_logout_redirect_uri=settings.keycloak_logout_redirect_uri,
             current_user_dependency=current_user_dependency,
-            cookie_name=settings.jwt_cookie_name,
-            cookie_secure=settings.jwt_cookie_secure,
-            cookie_samesite=settings.jwt_cookie_samesite,
-            cookie_path=settings.jwt_cookie_path,
+            user_repository=persistence.user_repository,
+            session_repository=persistence.session_repository,
+            clock=clock,
+            cookie_name=settings.identity_session_cookie_name,
+            cookie_secure=settings.env_name == "prod",
+            session_idle_ttl_seconds=settings.identity_session_idle_ttl_seconds,
+            session_absolute_ttl_seconds=settings.identity_session_absolute_ttl_seconds,
+            cookie_samesite=_LEGACY_AUTH_COOKIE_SAMESITE,
+            cookie_path=_LEGACY_AUTH_COOKIE_PATH,
             create_exchange_key_use_case=create_exchange_key_use_case,
             list_exchange_keys_use_case=list_exchange_keys_use_case,
             delete_exchange_key_use_case=delete_exchange_key_use_case,
-            two_factor_enabled_dependency=two_factor_enabled_dependency,
         ),
         current_user_dependency=current_user_dependency,
     )
 
-
-
-def _build_user_repository(*, settings: IdentityRuntimeSettings) -> UserRepository:
+def _build_identity_persistence(*, settings: IdentityRuntimeSettings) -> _IdentityPersistenceBundle:
     """
-    Build user repository adapter based on runtime DSN availability.
+    Build identity repositories according to runtime storage policy.
 
     Args:
         settings: Resolved runtime settings.
     Returns:
-        UserRepository: Postgres or in-memory adapter.
+        _IdentityPersistenceBundle: Exchange-keys, user, and session repositories.
     Assumptions:
-        Postgres DSN is optional in dev/test and in-memory fallback is allowed.
+        Prod runtime must use persisted Postgres-backed session storage.
     Raises:
-        ValueError: If Postgres DSN is malformed for gateway construction.
+        ValueError: If prod runtime lacks Postgres DSN or gateway construction fails.
     Side Effects:
         None.
     """
     if settings.postgres_dsn:
         gateway = PsycopgIdentityPostgresGateway(dsn=settings.postgres_dsn)
-        return PostgresIdentityUserRepository(gateway=gateway)
-    return InMemoryIdentityUserRepository()
-
-
-
-def _build_two_factor_repository(*, settings: IdentityRuntimeSettings) -> TwoFactorRepository:
-    """
-    Build 2FA repository adapter based on runtime DSN availability.
-
-    Args:
-        settings: Resolved runtime settings.
-    Returns:
-        TwoFactorRepository: Postgres or in-memory adapter.
-    Assumptions:
-        Postgres DSN is optional in dev/test and in-memory fallback is allowed.
-    Raises:
-        ValueError: If Postgres DSN is malformed for gateway construction.
-    Side Effects:
-        None.
-    """
-    if settings.postgres_dsn:
-        gateway = PsycopgIdentityPostgresGateway(dsn=settings.postgres_dsn)
-        return PostgresIdentityTwoFactorRepository(gateway=gateway)
-    return InMemoryIdentityTwoFactorRepository()
-
-
-
-def _build_exchange_keys_repository(*, settings: IdentityRuntimeSettings) -> ExchangeKeysRepository:
-    """
-    Build exchange keys repository adapter based on runtime DSN availability.
-
-    Args:
-        settings: Resolved runtime settings.
-    Returns:
-        ExchangeKeysRepository: Postgres or in-memory adapter.
-    Assumptions:
-        Postgres DSN is optional in dev/test and in-memory fallback is allowed.
-    Raises:
-        ValueError: If Postgres DSN is malformed for gateway construction.
-    Side Effects:
-        None.
-    """
-    if settings.postgres_dsn:
-        gateway = PsycopgIdentityPostgresGateway(dsn=settings.postgres_dsn)
-        return PostgresIdentityExchangeKeysRepository(gateway=gateway)
-    return InMemoryIdentityExchangeKeysRepository()
+        return _IdentityPersistenceBundle(
+            exchange_keys_repository=PostgresIdentityExchangeKeysRepository(gateway=gateway),
+            user_repository=PostgresIdentityUserRepository(gateway=gateway),
+            session_repository=PostgresIdentitySessionRepository(gateway=gateway),
+        )
+    if settings.env_name == "prod":
+        raise ValueError(
+            f"{_IDENTITY_PG_DSN_KEY} must be set in prod for persisted Roehub sessions"
+        )
+    return _IdentityPersistenceBundle(
+        exchange_keys_repository=InMemoryIdentityExchangeKeysRepository(),
+        user_repository=InMemoryIdentityUserRepository(),
+        session_repository=InMemoryIdentitySessionRepository(),
+    )
 
 
 
@@ -378,28 +365,64 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
     env_name = _resolve_env_name(environ=environ)
     fail_fast = _resolve_fail_fast(environ=environ, env_name=env_name)
 
-    jwt_ttl_days = _resolve_positive_int(
-        environ=environ,
-        key=_JWT_TTL_DAYS_KEY,
-        default=7,
+    keycloak_base_url = _normalize_base_url(
+        raw_base_url=environ.get(_KEYCLOAK_BASE_URL_KEY, "").strip()
     )
-    telegram_bot_token = environ.get(_TELEGRAM_BOT_TOKEN_KEY, "").strip()
-    identity_jwt_secret = environ.get(_IDENTITY_JWT_SECRET_KEY, "").strip()
-    identity_2fa_kek_b64 = environ.get(_IDENTITY_2FA_KEK_B64_KEY, "").strip()
+    keycloak_realm = environ.get(_KEYCLOAK_REALM_KEY, "").strip()
+    keycloak_client_id = environ.get(_KEYCLOAK_CLIENT_ID_KEY, "").strip()
+    keycloak_client_secret = environ.get(_KEYCLOAK_CLIENT_SECRET_KEY, "").strip()
+    keycloak_redirect_uri = environ.get(_KEYCLOAK_REDIRECT_URI_KEY, "").strip()
+    keycloak_logout_redirect_uri = environ.get(_KEYCLOAK_LOGOUT_REDIRECT_URI_KEY, "").strip()
+    keycloak_auth_url = environ.get(_KEYCLOAK_AUTH_URL_KEY, "").strip()
+    keycloak_token_url = environ.get(_KEYCLOAK_TOKEN_URL_KEY, "").strip()
+    keycloak_end_session_url = environ.get(_KEYCLOAK_END_SESSION_URL_KEY, "").strip()
+    keycloak_introspection_url = environ.get(_KEYCLOAK_INTROSPECTION_URL_KEY, "").strip()
+    identity_session_cookie_name = environ.get(_IDENTITY_SESSION_COOKIE_NAME_KEY, "").strip()
+    identity_session_idle_ttl_seconds = _read_optional_positive_int(
+        raw_value=environ.get(_IDENTITY_SESSION_IDLE_TTL_SECONDS_KEY, "").strip(),
+        key=_IDENTITY_SESSION_IDLE_TTL_SECONDS_KEY,
+    )
+    identity_session_absolute_ttl_seconds = _read_optional_positive_int(
+        raw_value=environ.get(_IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS_KEY, "").strip(),
+        key=_IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS_KEY,
+    )
     identity_exchange_keys_kek_b64 = environ.get(_IDENTITY_EXCHANGE_KEYS_KEK_B64_KEY, "").strip()
 
     if fail_fast:
-        if not telegram_bot_token:
+        if not keycloak_base_url:
             raise ValueError(
-                f"{_TELEGRAM_BOT_TOKEN_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
+                f"{_KEYCLOAK_BASE_URL_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
             )
-        if not identity_jwt_secret:
+        if not keycloak_realm:
             raise ValueError(
-                f"{_IDENTITY_JWT_SECRET_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
+                f"{_KEYCLOAK_REALM_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
             )
-        if not identity_2fa_kek_b64:
+        if not keycloak_client_id:
             raise ValueError(
-                f"{_IDENTITY_2FA_KEK_B64_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
+                f"{_KEYCLOAK_CLIENT_ID_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
+            )
+        if not keycloak_client_secret:
+            raise ValueError(
+                f"{_KEYCLOAK_CLIENT_SECRET_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
+            )
+        if not keycloak_redirect_uri:
+            raise ValueError(
+                f"{_KEYCLOAK_REDIRECT_URI_KEY} must be set when {_IDENTITY_FAIL_FAST_KEY}=true"
+            )
+        if not keycloak_logout_redirect_uri:
+            raise ValueError(
+                f"{_KEYCLOAK_LOGOUT_REDIRECT_URI_KEY} must be set when "
+                f"{_IDENTITY_FAIL_FAST_KEY}=true"
+            )
+        if identity_session_idle_ttl_seconds is None:
+            raise ValueError(
+                f"{_IDENTITY_SESSION_IDLE_TTL_SECONDS_KEY} must be set when "
+                f"{_IDENTITY_FAIL_FAST_KEY}=true"
+            )
+        if identity_session_absolute_ttl_seconds is None:
+            raise ValueError(
+                f"{_IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS_KEY} must be set when "
+                f"{_IDENTITY_FAIL_FAST_KEY}=true"
             )
         if not identity_exchange_keys_kek_b64:
             raise ValueError(
@@ -407,32 +430,75 @@ def _resolve_identity_runtime_settings(*, environ: Mapping[str, str]) -> Identit
                 f"{_IDENTITY_FAIL_FAST_KEY}=true"
             )
 
-    effective_telegram_token = telegram_bot_token or "dev-telegram-bot-token"
-    effective_jwt_secret = identity_jwt_secret or "dev-identity-jwt-secret"
-    effective_2fa_kek_b64 = identity_2fa_kek_b64 or _DEFAULT_DEV_IDENTITY_2FA_KEK_B64
+    effective_keycloak_base_url = keycloak_base_url or _DEFAULT_DEV_KEYCLOAK_BASE_URL
+    effective_keycloak_realm = keycloak_realm or _DEFAULT_DEV_KEYCLOAK_REALM
+    effective_keycloak_client_id = keycloak_client_id or _DEFAULT_DEV_KEYCLOAK_CLIENT_ID
+    effective_keycloak_client_secret = (
+        keycloak_client_secret or _DEFAULT_DEV_KEYCLOAK_CLIENT_SECRET
+    )
+    effective_keycloak_redirect_uri = keycloak_redirect_uri or _DEFAULT_DEV_KEYCLOAK_REDIRECT_URI
+    effective_keycloak_logout_redirect_uri = (
+        keycloak_logout_redirect_uri or _DEFAULT_DEV_KEYCLOAK_LOGOUT_REDIRECT_URI
+    )
+    effective_keycloak_auth_url = keycloak_auth_url or _build_keycloak_oidc_endpoint(
+        base_url=effective_keycloak_base_url,
+        realm=effective_keycloak_realm,
+        suffix="auth",
+    )
+    effective_keycloak_token_url = keycloak_token_url or _build_keycloak_oidc_endpoint(
+        base_url=effective_keycloak_base_url,
+        realm=effective_keycloak_realm,
+        suffix="token",
+    )
+    effective_keycloak_end_session_url = (
+        keycloak_end_session_url
+        or _build_keycloak_oidc_endpoint(
+            base_url=effective_keycloak_base_url,
+            realm=effective_keycloak_realm,
+            suffix="logout",
+        )
+    )
+    effective_keycloak_introspection_url = (
+        keycloak_introspection_url
+        or _build_keycloak_oidc_endpoint(
+            base_url=effective_keycloak_base_url,
+            realm=effective_keycloak_realm,
+            suffix="token/introspect",
+        )
+    )
+    effective_identity_session_cookie_name = (
+        identity_session_cookie_name or _DEFAULT_IDENTITY_SESSION_COOKIE_NAME
+    )
+    effective_identity_session_idle_ttl_seconds = (
+        identity_session_idle_ttl_seconds or _DEFAULT_IDENTITY_SESSION_IDLE_TTL_SECONDS
+    )
+    effective_identity_session_absolute_ttl_seconds = (
+        identity_session_absolute_ttl_seconds or _DEFAULT_IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS
+    )
     effective_exchange_keys_kek_b64 = (
         identity_exchange_keys_kek_b64 or _DEFAULT_DEV_IDENTITY_EXCHANGE_KEYS_KEK_B64
     )
 
     postgres_dsn = environ.get(_IDENTITY_PG_DSN_KEY, "").strip()
-    cookie_name = environ.get(_IDENTITY_COOKIE_NAME_KEY, "roehub_identity_jwt").strip()
-    cookie_path = environ.get(_IDENTITY_COOKIE_PATH_KEY, "/").strip()
-    cookie_samesite = _resolve_cookie_samesite(environ=environ)
-    cookie_secure = _resolve_cookie_secure(environ=environ, env_name=env_name)
 
     return IdentityRuntimeSettings(
         env_name=env_name,
         fail_fast=fail_fast,
-        jwt_ttl_days=jwt_ttl_days,
-        telegram_bot_token=effective_telegram_token,
-        identity_jwt_secret=effective_jwt_secret,
-        identity_2fa_kek_b64=effective_2fa_kek_b64,
+        keycloak_base_url=effective_keycloak_base_url,
+        keycloak_realm=effective_keycloak_realm,
+        keycloak_client_id=effective_keycloak_client_id,
+        keycloak_client_secret=effective_keycloak_client_secret,
+        keycloak_redirect_uri=effective_keycloak_redirect_uri,
+        keycloak_logout_redirect_uri=effective_keycloak_logout_redirect_uri,
+        keycloak_auth_url=effective_keycloak_auth_url,
+        keycloak_token_url=effective_keycloak_token_url,
+        keycloak_end_session_url=effective_keycloak_end_session_url,
+        keycloak_introspection_url=effective_keycloak_introspection_url,
+        identity_session_cookie_name=effective_identity_session_cookie_name,
+        identity_session_idle_ttl_seconds=effective_identity_session_idle_ttl_seconds,
+        identity_session_absolute_ttl_seconds=effective_identity_session_absolute_ttl_seconds,
         identity_exchange_keys_kek_b64=effective_exchange_keys_kek_b64,
         postgres_dsn=postgres_dsn,
-        jwt_cookie_name=cookie_name,
-        jwt_cookie_secure=cookie_secure,
-        jwt_cookie_samesite=cookie_samesite,
-        jwt_cookie_path=cookie_path,
     )
 
 
@@ -485,81 +551,55 @@ def _resolve_fail_fast(*, environ: Mapping[str, str], env_name: str) -> bool:
 
 
 
-def _resolve_cookie_secure(*, environ: Mapping[str, str], env_name: str) -> bool:
+def _normalize_base_url(*, raw_base_url: str) -> str:
     """
-    Resolve cookie secure flag from env override or environment default.
+    Normalize Keycloak base URL by trimming whitespace and trailing slash.
 
     Args:
-        environ: Runtime environment mapping.
-        env_name: Normalized environment name.
+        raw_base_url: Raw base URL value from environment mapping.
     Returns:
-        bool: Effective secure flag.
+        str: Normalized base URL without trailing slash.
     Assumptions:
-        Secure defaults to true only in `prod`.
+        Empty input is allowed and returned as empty string.
     Raises:
-        ValueError: If override value is invalid.
+        None.
     Side Effects:
         None.
     """
-    raw_value = environ.get(_IDENTITY_COOKIE_SECURE_KEY, "").strip()
-    if not raw_value:
-        return env_name == "prod"
-    return _parse_bool(raw_value=raw_value, key=_IDENTITY_COOKIE_SECURE_KEY)
+    return raw_base_url.strip().rstrip("/")
 
 
 
-def _resolve_cookie_samesite(*, environ: Mapping[str, str]) -> Literal["lax", "strict", "none"]:
+def _build_keycloak_oidc_endpoint(*, base_url: str, realm: str, suffix: str) -> str:
     """
-    Resolve cookie SameSite mode with deterministic accepted values.
+    Build deterministic Keycloak OIDC endpoint URL from base/realm/suffix.
 
     Args:
-        environ: Runtime environment mapping.
+        base_url: Normalized Keycloak server base URL.
+        realm: Keycloak realm name.
+        suffix: OIDC endpoint suffix inside `protocol/openid-connect`.
     Returns:
-        Literal["lax", "strict", "none"]: Effective same-site mode.
+        str: Fully qualified endpoint URL.
     Assumptions:
-        Missing value defaults to `lax`.
+        `base_url`, `realm`, and `suffix` are non-empty normalized strings.
     Raises:
-        ValueError: If provided value is unsupported.
+        ValueError: If one of input parts is empty.
     Side Effects:
         None.
     """
-    raw_samesite = environ.get(_IDENTITY_COOKIE_SAMESITE_KEY, "lax").strip().lower()
-    if raw_samesite not in _ALLOWED_SAMESITE:
-        raise ValueError(
-            f"{_IDENTITY_COOKIE_SAMESITE_KEY} must be one of {_ALLOWED_SAMESITE}, "
-            f"got {raw_samesite!r}"
-        )
-    return raw_samesite  # type: ignore[return-value]
-
-
-
-def _resolve_positive_int(*, environ: Mapping[str, str], key: str, default: int) -> int:
-    """
-    Resolve positive integer env setting with fallback default.
-
-    Args:
-        environ: Runtime environment mapping.
-        key: Environment variable key.
-        default: Fallback integer.
-    Returns:
-        int: Positive integer value.
-    Assumptions:
-        Empty env value means default should be used.
-    Raises:
-        ValueError: If value is not parseable or non-positive.
-    Side Effects:
-        None.
-    """
-    raw_value = environ.get(key, "").strip()
-    if not raw_value:
-        return default
-    try:
-        parsed = int(raw_value)
-    except ValueError as error:
-        raise ValueError(f"{key} must be integer, got {raw_value!r}") from error
-    if parsed <= 0:
-        raise ValueError(f"{key} must be > 0, got {parsed}")
-    return parsed
+    normalized_base_url = base_url.strip().rstrip("/")
+    normalized_realm = realm.strip().strip("/")
+    normalized_suffix = suffix.strip().strip("/")
+    if not normalized_base_url:
+        raise ValueError("_build_keycloak_oidc_endpoint requires non-empty base_url")
+    if not normalized_realm:
+        raise ValueError("_build_keycloak_oidc_endpoint requires non-empty realm")
+    if not normalized_suffix:
+        raise ValueError("_build_keycloak_oidc_endpoint requires non-empty suffix")
+    return (
+        f"{normalized_base_url}/realms/{normalized_realm}/protocol/openid-connect/"
+        f"{normalized_suffix}"
+    )
 
 
 
@@ -587,3 +627,31 @@ def _parse_bool(*, raw_value: str, key: str) -> bool:
     raise ValueError(
         f"{key} must be a boolean literal (1/0/true/false/yes/no/on/off), got {raw_value!r}"
     )
+
+
+def _read_optional_positive_int(*, raw_value: str, key: str) -> int | None:
+    """
+    Parse optional positive integer env value.
+
+    Args:
+        raw_value: Raw env string value.
+        key: Env key used in deterministic error messages.
+    Returns:
+        int | None: Parsed positive integer or `None` when value is blank.
+    Assumptions:
+        Blank values mean "use resolver default" outside fail-fast environments.
+    Raises:
+        ValueError: If value is non-numeric or not strictly positive.
+    Side Effects:
+        None.
+    """
+    normalized = raw_value.strip()
+    if not normalized:
+        return None
+    try:
+        parsed_value = int(normalized)
+    except ValueError as error:
+        raise ValueError(f"{key} must be a positive integer, got {raw_value!r}") from error
+    if parsed_value <= 0:
+        raise ValueError(f"{key} must be a positive integer, got {raw_value!r}")
+    return parsed_value

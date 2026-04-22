@@ -10,6 +10,8 @@
 
 - В Strategy уже есть live-runner и realtime output в Redis Streams: `src/trading/contexts/strategy/application/services/live_runner.py`, `docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md`, `docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md`.
 - В Identity уже есть модель Telegram binding: `identity_telegram_channels(user_id, chat_id, is_confirmed, confirmed_at)` в `migrations/postgres/0001_identity_v1.sql`.
+- User-auth в API после Keycloak cutover не зависит от Telegram; `TELEGRAM_BOT_TOKEN` используется только
+  для notifier path в strategy live-runner.
 - Для STR-EPIC-05 v1 нужно:
   - best-effort отправка;
   - `log-only` адаптер в dev/test;
@@ -19,7 +21,7 @@
 ## Scope
 
 - Port `TelegramNotifier` в strategy context.
-- ACL/port в identity для резолва подтвержденного `chat_id` по `user_id`.
+- ACL/port в identity для резолва подтвержденного `chat_id` по `user_id` (это data-binding dependency, не auth dependency).
 - Notification policy:
   - какие `event_type` идут в Telegram (`signal`, `trade_open`, `trade_close`, `failed`);
   - debounce одинаковых ошибок `failed`.
@@ -151,6 +153,8 @@ V1 не использует Markdown/HTML и локализацию; форма
 ## Контракты и инварианты
 
 - `TelegramNotifier` в strategy context работает по best-effort contract и не ломает pipeline.
+- `TELEGRAM_BOT_TOKEN` применяется только в notifier adapter (`mode=telegram`) и не используется
+  в API user-auth path.
 - В Telegram маршрутизируются только `signal|trade_open|trade_close|failed`.
 - `chat_id` используется только при подтвержденном identity binding (`is_confirmed=true`).
 - При отсутствии/неподтвержденном binding происходит skip, warning log и increment метрик.

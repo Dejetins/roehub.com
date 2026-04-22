@@ -107,6 +107,11 @@ Monit проверки/управление:
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc reload
 ```
 
+Keycloak auth operations (realm/client/OTP/local setup):
+
+- `docs/runbooks/keycloak-local-setup-and-ops.md`
+- `docs/architecture/identity/identity-keycloak-auth-model-v1.md`
+
 `bootstrap_native_prod.sh` и `bootstrap_native_test.sh` устанавливают static launchd templates и
 рендерят per-instance `backtest-job-runner` plists из `backtest.jobs.worker_processes`.
 `bootstrap_native_prod.sh` дополнительно синхронизирует Monit snippets из репозитория:
@@ -561,17 +566,36 @@ launchctl list | grep -E "com.roehub\.(api|market-data|backtest-job-runner|click
 - добавьте `STRATEGY_PG_DSN`, `IDENTITY_PG_DSN`, `POSTGRES_DSN` в prod env;
 - перезагрузите `com.roehub.api`.
 
-`/auth/telegram/login` падает с `500` и в логе есть `psycopg.errors.UndefinedTable: relation "identity_users" does not exist`:
+`com.roehub.api` не стартует после включения `IDENTITY_FAIL_FAST=true` с ошибкой про `KEYCLOAK_*`:
 
-- выполните schema bootstrap: `/opt/roehub/app/.venv/bin/python -m apps.migrations.bootstrap_main`;
-- проверьте таблицы: `to_regclass('public.identity_users')`, `to_regclass('public.identity_exchange_keys')`, `to_regclass('public.alembic_version')`;
+- проверьте, что в env заданы:
+  - `KEYCLOAK_BASE_URL`
+  - `KEYCLOAK_REALM`
+  - `KEYCLOAK_CLIENT_ID`
+  - `KEYCLOAK_CLIENT_SECRET`
+  - `KEYCLOAK_REDIRECT_URI`
+  - `KEYCLOAK_LOGOUT_REDIRECT_URI`
+  - `IDENTITY_SESSION_IDLE_TTL_SECONDS`
+  - `IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS`
+- проверьте формат URI и соответствие redirect URI настройкам Keycloak client;
 - перезагрузите `com.roehub.api`.
+- Telegram notifier secret не является частью API-auth fail-fast checks и не нужен для запуска
+  `/auth/login`/`/auth/current-user` после Keycloak cutover.
 
-`/auth/telegram/login` отвечает `422` с `invalid_telegram_payload` и текстом `PostgresIdentityUserRepository cannot map user row`:
+`/auth/login` или `/auth/current-user` возвращают `5xx` после перехода на Keycloak:
 
-- обновите backend до версии с UTC-normalization в `identity` postgres repositories;
-- перезапустите `com.roehub.api`;
-- повторите login-проверку.
+- проверьте доступность Keycloak realm endpoint от API host;
+- если задана явная endpoint-конфигурация, проверьте согласованность:
+  - `KEYCLOAK_AUTH_URL`
+  - `KEYCLOAK_TOKEN_URL`
+  - `KEYCLOAK_END_SESSION_URL`
+  - `KEYCLOAK_INTROSPECTION_URL`
+- если явные endpoint не заданы, проверьте корректность derive из `KEYCLOAK_BASE_URL` + `KEYCLOAK_REALM`;
+- проверьте session policy:
+  - `IDENTITY_SESSION_COOKIE_NAME`
+  - `IDENTITY_SESSION_IDLE_TTL_SECONDS`
+  - `IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS`
+- проверьте `api.err.log` и перезагрузите `com.roehub.api`.
 
 Schema bootstrap падает с `Missing Alembic config file: /opt/roehub/app/alembic.ini`:
 

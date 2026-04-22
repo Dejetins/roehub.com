@@ -3,14 +3,15 @@
 {% block content %}
   <section class="panel">
     <h1>Logout</h1>
-    <p>Ending your session and redirecting to /login.</p>
+    <p>Ending your Roehub session and redirecting.</p>
   </section>
 
   <script>
+    const postLogoutRedirectPath = {{ post_logout_redirect_path | tojson }};
     fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
       .catch(() => null)
       .finally(() => {
-        window.location.assign('/login');
+        window.location.assign(postLogoutRedirectPath);
       });
   </script>
 {% endblock %}

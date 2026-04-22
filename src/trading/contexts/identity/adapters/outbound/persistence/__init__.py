@@ -1,12 +1,12 @@
 from .in_memory import (
     InMemoryIdentityExchangeKeysRepository,
-    InMemoryIdentityTwoFactorRepository,
+    InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
 )
 from .postgres import (
     IdentityPostgresGateway,
     PostgresIdentityExchangeKeysRepository,
-    PostgresIdentityTwoFactorRepository,
+    PostgresIdentitySessionRepository,
     PostgresIdentityUserRepository,
     PsycopgIdentityPostgresGateway,
 )
@@ -14,10 +14,10 @@ from .postgres import (
 __all__ = [
     "IdentityPostgresGateway",
     "InMemoryIdentityExchangeKeysRepository",
-    "InMemoryIdentityTwoFactorRepository",
+    "InMemoryIdentitySessionRepository",
     "InMemoryIdentityUserRepository",
     "PostgresIdentityExchangeKeysRepository",
-    "PostgresIdentityTwoFactorRepository",
+    "PostgresIdentitySessionRepository",
     "PostgresIdentityUserRepository",
     "PsycopgIdentityPostgresGateway",
 ]

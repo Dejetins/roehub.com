@@ -12,11 +12,11 @@ class CurrentUserPrincipal:
     CurrentUserPrincipal — стабильный user context для protected API endpoints.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/identity-keycloak-auth-model-v1.md
     Related:
       - src/trading/contexts/identity/adapters/inbound/api/deps/current_user.py
       - src/trading/contexts/identity/adapters/outbound/security/current_user/
-        jwt_cookie_current_user.py
+        roehub_session_current_user.py
       - apps/api/routes/identity.py
     """
 
@@ -29,12 +29,12 @@ class CurrentUserUnauthorizedError(ValueError):
     CurrentUserUnauthorizedError — детерминированная ошибка авторизации CurrentUser.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/identity-keycloak-auth-model-v1.md
     Related:
       - src/trading/contexts/identity/application/ports/current_user.py
       - src/trading/contexts/identity/adapters/inbound/api/deps/current_user.py
       - src/trading/contexts/identity/adapters/outbound/security/current_user/
-        jwt_cookie_current_user.py
+        roehub_session_current_user.py
     """
 
     def __init__(self, *, code: str, message: str) -> None:
@@ -60,29 +60,30 @@ class CurrentUserUnauthorizedError(ValueError):
 
 class CurrentUser(Protocol):
     """
-    CurrentUser — порт извлечения `CurrentUserPrincipal` из JWT cookie.
+    CurrentUser — порт извлечения `CurrentUserPrincipal` из Roehub session id.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/identity-keycloak-auth-model-v1.md
     Related:
       - src/trading/contexts/identity/application/ports/current_user.py
       - src/trading/contexts/identity/adapters/inbound/api/deps/current_user.py
       - src/trading/contexts/identity/adapters/outbound/security/current_user/
-        jwt_cookie_current_user.py
+        roehub_session_current_user.py
     """
 
-    def require(self, *, token: str | None) -> CurrentUserPrincipal:
+    def require(self, *, session_id: str | None) -> CurrentUserPrincipal:
         """
         Resolve authenticated user principal or raise unauthorized error.
 
         Args:
-            token: JWT token from HttpOnly cookie; may be missing.
+            session_id: Opaque Roehub session id from browser cookie; may be missing.
         Returns:
             CurrentUserPrincipal: Authenticated user context.
         Assumptions:
-            Token is signed by identity JWT key and not expired.
+            Session id addresses persisted Roehub session storage.
         Raises:
-            CurrentUserUnauthorizedError: If token is missing, invalid, or user is unavailable.
+            CurrentUserUnauthorizedError: If session is missing, invalid, inactive,
+                or user is unavailable.
         Side Effects:
             None.
         """

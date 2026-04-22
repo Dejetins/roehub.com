@@ -126,7 +126,7 @@ CI:
 
 ## Риски / что дальше
 
-- Unit/smoke тесты не заменяют e2e браузерные проверки (настоящий Telegram login widget,
+- Unit/smoke тесты не заменяют e2e браузерные проверки (настоящий Keycloak OIDC redirect/login,
   same-origin proxy routing, реальные cookies). В v1 это принимаемый риск.
 - Если понадобится повысить уверенность, следующий шаг — добавить Playwright smoke (login bypass
   в dev или тестовый bot) как отдельный EPIC.

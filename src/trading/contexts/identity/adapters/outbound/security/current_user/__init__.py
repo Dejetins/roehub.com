@@ -1,3 +1,5 @@
-from .jwt_cookie_current_user import JwtCookieCurrentUser
+from .roehub_session_current_user import RoehubSessionCurrentUser
 
-__all__ = ["JwtCookieCurrentUser"]
+__all__ = [
+    "RoehubSessionCurrentUser",
+]

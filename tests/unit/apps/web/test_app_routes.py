@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from types import SimpleNamespace
 
 import httpx
@@ -168,14 +167,14 @@ def test_protected_page_redirects_to_login_on_unauthorized_current_user(
 
 def test_login_page_sanitizes_external_next_parameter() -> None:
     """
-    Verify login page strips external redirect target and keeps safe fallback `/`.
+    Verify login page uses OIDC start URL with sanitized safe fallback next path.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Sanitized next path is serialized into inline JavaScript as `nextPath`.
+        Login page points browser to `/api/auth/login?next=...` for Keycloak flow.
     Raises:
         AssertionError: If external URL is preserved in rendered page.
     Side Effects:
@@ -184,20 +183,33 @@ def test_login_page_sanitizes_external_next_parameter() -> None:
     client = _build_test_client()
 
     response = client.get("/login?next=https://evil.example/path")
-    match = re.search(r'const nextPath = "([^"]+)";', response.text)
 
     assert response.status_code == 200
-    assert match is not None
-    assert match.group(1) == "/"
+    assert "/api/auth/login?next=%2F" in response.text
+    assert 'id="keycloak-login-link"' in response.text
+    assert "Continue with Keycloak" in response.text
+    assert "window.location.assign(oidcLoginUrl);" in response.text
     assert "https://evil.example/path" not in response.text
 
 
-def test_logout_page_contains_api_logout_call_and_login_redirect() -> None:
+@pytest.mark.parametrize(
+    ("path", "expected_redirect"),
+    [
+        ("/logout", "/login"),
+        ("/logout?next=/strategies", "/strategies"),
+        ("/logout?next=https://evil.example/path", "/login"),
+    ],
+)
+def test_logout_page_contains_api_logout_call_and_sanitized_redirect(
+    path: str,
+    expected_redirect: str,
+) -> None:
     """
-    Verify logout page JavaScript calls API logout endpoint and redirects to `/login`.
+    Verify logout page clears session via API call and redirects to safe target.
 
     Args:
-        None.
+        path: Requested logout path with optional redirect query.
+        expected_redirect: Expected post-logout redirect path.
     Returns:
         None.
     Assumptions:
@@ -209,11 +221,13 @@ def test_logout_page_contains_api_logout_call_and_login_redirect() -> None:
     """
     client = _build_test_client()
 
-    response = client.get("/logout")
+    response = client.get(path)
 
     assert response.status_code == 200
     assert "/api/auth/logout" in response.text
-    assert "window.location.assign('/login')" in response.text
+    assert "window.location.assign(postLogoutRedirectPath);" in response.text
+    assert f'const postLogoutRedirectPath = "{expected_redirect}";' in response.text
+    assert "https://evil.example/path" not in response.text
 
 
 def test_strategies_list_page_renders_required_strategy_ui_hooks() -> None:

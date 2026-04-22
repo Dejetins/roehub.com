@@ -9,11 +9,11 @@ class IdentityClock(Protocol):
     IdentityClock — порт источника текущего времени для identity use-cases.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
     Related:
-      - src/trading/contexts/identity/application/use_cases/telegram_login.py
+      - src/trading/contexts/identity/application/use_cases/create_exchange_key.py
+      - src/trading/contexts/identity/application/use_cases/delete_exchange_key.py
       - src/trading/contexts/identity/adapters/outbound/time/system_identity_clock.py
-      - src/trading/contexts/identity/adapters/outbound/security/jwt/hs256_jwt_codec.py
     """
 
     def now(self) -> datetime:

@@ -5,7 +5,6 @@ from uuid import uuid4
 
 from trading.contexts.identity.adapters.outbound.persistence.postgres import (
     exchange_keys_repository,
-    two_factor_repository,
     user_repository,
 )
 
@@ -18,7 +17,6 @@ def test_map_user_row_normalizes_non_utc_timestamps() -> None:
     mapped = user_repository._map_user_row(
         row={
             "user_id": str(uuid4()),
-            "telegram_user_id": 99001122,
             "paid_level": "free",
             "created_at": created_at_local,
             "last_login_at": last_login_at_local,
@@ -32,29 +30,6 @@ def test_map_user_row_normalizes_non_utc_timestamps() -> None:
     assert mapped.last_login_at is not None
     assert mapped.last_login_at.utcoffset() == timedelta(0)
     assert mapped.last_login_at == last_login_at_local.astimezone(timezone.utc)
-
-
-def test_map_two_factor_row_normalizes_non_utc_timestamps() -> None:
-    local_tz = timezone(timedelta(hours=3))
-    enabled_at_local = datetime(2026, 3, 22, 21, 10, 0, tzinfo=local_tz)
-    updated_at_local = datetime(2026, 3, 22, 21, 11, 0, tzinfo=local_tz)
-
-    mapped = two_factor_repository._map_two_factor_row(
-        row={
-            "user_id": str(uuid4()),
-            "totp_secret_enc": b"secret",
-            "enabled": True,
-            "enabled_at": enabled_at_local,
-            "updated_at": updated_at_local,
-        }
-    )
-
-    assert mapped.enabled_at is not None
-    assert mapped.enabled_at.utcoffset() == timedelta(0)
-    assert mapped.enabled_at == enabled_at_local.astimezone(timezone.utc)
-    assert mapped.updated_at.utcoffset() == timedelta(0)
-    assert mapped.updated_at == updated_at_local.astimezone(timezone.utc)
-
 
 def test_map_exchange_key_row_normalizes_non_utc_timestamps() -> None:
     local_tz = timezone(timedelta(hours=3))

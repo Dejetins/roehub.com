@@ -22,7 +22,6 @@ from apps.web.main.api_client import (
 from apps.web.main.security import sanitize_next_path
 from apps.web.main.settings import WebRuntimeSettings, resolve_web_runtime_settings
 
-_BOT_USERNAME = "RoehubAuth_bot"
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 _TEMPLATES_PATH = _PACKAGE_ROOT / "templates"
 _DIST_PATH = _PACKAGE_ROOT / "dist"
@@ -133,7 +132,7 @@ def _register_routes(
     @app.get("/login", response_class=HTMLResponse)
     def get_login_page(request: Request, next: str | None = None) -> Response:
         """
-        Render login page with Telegram Login Widget and guarded next redirect target.
+        Render login page with OIDC redirect entrypoint and guarded next target.
 
         Args:
             request: HTTP request object.
@@ -141,13 +140,14 @@ def _register_routes(
         Returns:
             Response: HTML login page response.
         Assumptions:
-            Login widget uses Telegram Variant A callback with browser-side API call.
+            API endpoint `/api/auth/login` starts Keycloak OIDC authorization flow.
         Raises:
             None.
         Side Effects:
             None.
         """
         safe_next_path = sanitize_next_path(raw_next=next)
+        login_query = urlencode({"next": safe_next_path})
         context = _build_template_context(
             request=request,
             page_path="/login",
@@ -155,36 +155,42 @@ def _register_routes(
             current_user=None,
             error_message=None,
         )
-        context["bot_username"] = _BOT_USERNAME
-        context["next_path"] = safe_next_path
+        context["oidc_login_url"] = f"/api/auth/login?{login_query}"
         return templates.TemplateResponse(request, "login.html", context=context)
 
     @app.get("/logout", response_class=HTMLResponse)
-    def get_logout_page(request: Request) -> Response:
+    def get_logout_page(request: Request, next: str | None = None) -> Response:
         """
-        Render logout page that calls API logout endpoint via browser-side JavaScript.
+        Render logout page that closes local session and redirects to safe target.
 
         Args:
             request: HTTP request object.
+            next: Optional post-logout redirect path requested by caller.
         Returns:
             Response: HTML logout page response.
         Assumptions:
-            API endpoint `/api/auth/logout` clears auth cookie.
+            API endpoint `/api/auth/logout` clears opaque Roehub auth session cookie.
         Raises:
             None.
         Side Effects:
             None.
         """
+        post_logout_redirect_path = sanitize_next_path(
+            raw_next=next,
+            default_path="/login",
+        )
+        context = _build_template_context(
+            request=request,
+            page_path="/logout",
+            page_title="Logout",
+            current_user=None,
+            error_message=None,
+        )
+        context["post_logout_redirect_path"] = post_logout_redirect_path
         return templates.TemplateResponse(
             request,
             "logout.html",
-            context=_build_template_context(
-                request=request,
-                page_path="/logout",
-                page_title="Logout",
-                current_user=None,
-                error_message=None,
-            ),
+            context=context,
         )
 
     @app.api_route(

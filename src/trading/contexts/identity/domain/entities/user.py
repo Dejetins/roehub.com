@@ -3,25 +3,22 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from trading.contexts.identity.domain.value_objects.telegram_user_id import TelegramUserId
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
 
 @dataclass(frozen=True, slots=True)
 class User:
     """
-    User — минимальная доменная модель пользователя identity v1.
+    User — минимальная доменная модель пользователя identity.
 
     Docs:
-      - docs/architecture/identity/identity-telegram-login-user-model-v1.md
+      - docs/architecture/identity/keycloak-cutover-plan-v1.md
     Related:
       - src/trading/contexts/identity/application/ports/user_repository.py
-      - src/trading/contexts/identity/application/use_cases/telegram_login.py
       - migrations/postgres/0001_identity_v1.sql
     """
 
     user_id: UserId
-    telegram_user_id: TelegramUserId
     paid_level: PaidLevel
     created_at: datetime
     last_login_at: datetime | None
@@ -50,7 +47,7 @@ class User:
 
     def reactivated(self, *, login_at: datetime) -> User:
         """
-        Return immutable copy reflecting successful Telegram login.
+        Return immutable copy reflecting successful login.
 
         Args:
             login_at: Current login timestamp in UTC.
@@ -68,14 +65,11 @@ class User:
             raise ValueError("User.reactivated login_at cannot be before created_at")
         return User(
             user_id=self.user_id,
-            telegram_user_id=self.telegram_user_id,
             paid_level=self.paid_level,
             created_at=self.created_at,
             last_login_at=login_at,
             is_deleted=False,
         )
-
-
 
 def _ensure_utc_datetime(*, name: str, value: datetime) -> None:
     """

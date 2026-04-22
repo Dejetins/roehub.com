@@ -16,6 +16,7 @@ _IDENTITY_CORE_SQL_FILES: tuple[str, ...] = (
 )
 _IDENTITY_EXCHANGE_KEYS_V1_SQL_FILE = "0003_identity_exchange_keys_v1.sql"
 _IDENTITY_EXCHANGE_KEYS_V2_SQL_FILE = "0004_identity_exchange_keys_v2.sql"
+_IDENTITY_KEYCLOAK_CUTOVER_V1_SQL_FILE = "0005_identity_keycloak_cutover_v1.sql"
 
 
 @dataclass(frozen=True, slots=True)
@@ -204,7 +205,7 @@ def run_dev_db_bootstrap(
     Returns:
         None.
     Assumptions:
-        Identity SQL files `0001..0004` are present in `migrations_dir`.
+        Identity SQL files `0001..0005` are present in `migrations_dir`.
     Raises:
         ValueError: If DSN or migrations directory values are invalid.
         RuntimeError: If identity bootstrap or Alembic upgrade fails.
@@ -220,7 +221,7 @@ def run_dev_db_bootstrap(
 
 def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """
-    Apply identity baseline SQL with v2 pre-check and guarded `0004` migration.
+    Apply identity baseline SQL with v2 pre-check and Keycloak cutover `0005`.
 
     Args:
         identity_dsn: DSN for identity Postgres schema.
@@ -242,6 +243,7 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
     Related:
       - migrations/postgres/0003_identity_exchange_keys_v1.sql
       - migrations/postgres/0004_identity_exchange_keys_v2.sql
+      - migrations/postgres/0005_identity_keycloak_cutover_v1.sql
       - apps/migrations/bootstrap.py
     """
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
@@ -256,6 +258,10 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
     v2_path = _collect_sql_paths(
         migrations_dir=migrations_dir,
         filenames=(_IDENTITY_EXCHANGE_KEYS_V2_SQL_FILE,),
+    )[0]
+    keycloak_cutover_v1_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_IDENTITY_KEYCLOAK_CUTOVER_V1_SQL_FILE,),
     )[0]
 
     with psycopg.connect(
@@ -274,24 +280,24 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
                 "Skipping identity exchange keys baseline SQL: detected v2 layout; "
                 f"skip {exchange_keys_v1_path.name} and {v2_path.name}"
             )
-            return
+        else:
+            print(f"Applying identity baseline SQL: {exchange_keys_v1_path.name}")
+            _execute_sql_script(connection=connection, sql_path=exchange_keys_v1_path)
 
-        print(f"Applying identity baseline SQL: {exchange_keys_v1_path.name}")
-        _execute_sql_script(connection=connection, sql_path=exchange_keys_v1_path)
+            layout = inspect_identity_exchange_keys_layout(connection=connection)
+            decision = decide_identity_exchange_keys_v2_action(layout=layout)
+            print(f"identity 0004 decision: {decision.action} ({decision.reason})")
+            if decision.action == "apply":
+                _execute_sql_script(connection=connection, sql_path=v2_path)
+                print(f"Applied identity SQL: {v2_path.name}")
+            elif decision.action == "skip":
+                print(f"Skipped identity SQL: {v2_path.name}")
+            else:
+                detail_suffix = f" Hint: {decision.hint}" if decision.hint else ""
+                raise RuntimeError(f"{decision.reason}.{detail_suffix}")
 
-        layout = inspect_identity_exchange_keys_layout(connection=connection)
-        decision = decide_identity_exchange_keys_v2_action(layout=layout)
-        print(f"identity 0004 decision: {decision.action} ({decision.reason})")
-        if decision.action == "apply":
-            _execute_sql_script(connection=connection, sql_path=v2_path)
-            print(f"Applied identity SQL: {v2_path.name}")
-            return
-        if decision.action == "skip":
-            print(f"Skipped identity SQL: {v2_path.name}")
-            return
-
-        detail_suffix = f" Hint: {decision.hint}" if decision.hint else ""
-        raise RuntimeError(f"{decision.reason}.{detail_suffix}")
+        print(f"Applying identity baseline SQL: {keycloak_cutover_v1_path.name}")
+        _execute_sql_script(connection=connection, sql_path=keycloak_cutover_v1_path)
 
 
 def run_alembic_upgrade_head(
