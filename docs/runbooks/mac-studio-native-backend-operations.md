@@ -17,10 +17,12 @@
 ## Paths and files
 
 - app checkout/runtime: `/opt/roehub/app`
+- keycloak runtime: `/opt/roehub/keycloak/current`
 - host config root: `/opt/roehub/config`
 - backtest artifact root: `/opt/roehub/state/backtest_artifacts/v2`
 - host binaries: `/opt/roehub/bin`, `/opt/clickhouse/clickhouse`
 - prod env: `/Users/daniildegtyarev/.config/roehub/roehub.env`
+- keycloak env: `/Users/daniildegtyarev/.config/roehub/keycloak.env`
 - test env: `/Users/daniildegtyarev/.config/roehub/roehub.test.env`
 - launch agents: `/Users/daniildegtyarev/Library/LaunchAgents`
 
@@ -52,6 +54,7 @@ Production:
 - `com.roehub.redis-exporter` (`launchd`, `127.0.0.1:9121`)
 - `com.roehub.postgres-exporter` (`launchd`, `127.0.0.1:9187`)
 - `com.roehub.tailscale-runtime` (`launchd`, periodic one-shot reconnection/check + serve sync)
+- `com.roehub.keycloak` (`launchd`, auth provider, `127.0.0.1:18080`, ready-check `127.0.0.1:19000/health/ready`)
 - `com.roehub.api` (`launchd`, `127.0.0.1:8000`)
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
@@ -105,6 +108,15 @@ Monit проверки/управление:
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc status
 /opt/homebrew/opt/monit/bin/monit -t -c /opt/homebrew/etc/monitrc
 /opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc reload
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_keycloak
+```
+
+Keycloak quick checks:
+
+```bash
+launchctl list | grep com.roehub.keycloak
+launchctl print gui/$(id -u)/com.roehub.keycloak | grep -E 'state =|pid =|last exit code ='
+curl -fsS http://127.0.0.1:19000/health/ready
 ```
 
 Keycloak auth operations (realm/client/OTP/local setup):
@@ -116,6 +128,7 @@ Keycloak auth operations (realm/client/OTP/local setup):
 рендерят per-instance `backtest-job-runner` plists из `backtest.jobs.worker_processes`.
 `bootstrap_native_prod.sh` дополнительно синхронизирует Monit snippets из репозитория:
 `infra/scripts/monit/*.monitrc` и `infra/scripts/monit/launchctl_service_control.sh`.
+В production baseline сюда входит `infra/scripts/monit/roehub-keycloak.monitrc`.
 `reload_launchd_services.sh` сначала выгружает текущие static/worker services, затем заново
 рендерит worker fleet и bootstrap-ит ровно желаемую cardinality для profile.
 

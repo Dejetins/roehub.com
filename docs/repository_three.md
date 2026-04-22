@@ -410,6 +410,7 @@
 |       `-- monit/
 |           |-- launchctl_service_control.sh*
 |           |-- roehub-backtest-artifact-publisher.monitrc
+|           |-- roehub-keycloak.monitrc
 |           `-- roehub-market-data.monitrc
 |-- migrations/
 |   |-- clickhouse/

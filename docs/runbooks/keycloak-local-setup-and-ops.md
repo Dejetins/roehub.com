@@ -7,7 +7,7 @@ Runbook для локального/стендового Keycloak, которы�
 - поднять Keycloak как OIDC provider;
 - подключить Keycloak к Postgres;
 - настроить realm/client/users/OTP policy;
-- проверить Roehub flow `/auth/login -> /auth/callback -> /auth/current-user -> /auth/logout`.
+- проверить Roehub flow `/api/auth/login -> /api/auth/callback -> /api/auth/current-user -> /api/auth/logout` (public edge).
 
 ## Предпосылки
 
@@ -83,11 +83,11 @@ export KEYCLOAK_ADMIN_PASSWORD=change-me-admin
 - `Standard flow`: ON;
 - `Valid redirect URIs`:
   - `http://127.0.0.1:8010/auth/callback`
-  - `https://roehub.com/auth/callback`
+  - `https://roehub.com/api/auth/callback`
 - `Valid post logout redirect URIs`:
   - `http://127.0.0.1:8010/login`
   - `https://roehub.com/login`
-- `Web origins`: `+` или конкретные origin по policy.
+- `Web origins`: `https://roehub.com`, `https://www.roehub.com`, `http://127.0.0.1:8010` (или stricter policy по вашей схеме).
 
 Сохраните client secret и задайте его в Roehub env (`KEYCLOAK_CLIENT_SECRET`).
 
@@ -110,61 +110,126 @@ KEYCLOAK_BASE_URL=http://127.0.0.1:18080
 KEYCLOAK_REALM=roehub
 KEYCLOAK_CLIENT_ID=roehub-api
 KEYCLOAK_CLIENT_SECRET=<client-secret>
-KEYCLOAK_REDIRECT_URI=http://127.0.0.1:8010/auth/callback
-KEYCLOAK_LOGOUT_REDIRECT_URI=http://127.0.0.1:8010/login
+
+# browser-facing URLs (public edge)
+KEYCLOAK_REDIRECT_URI=https://roehub.com/api/auth/callback
+KEYCLOAK_LOGOUT_REDIRECT_URI=https://roehub.com/login
+KEYCLOAK_AUTH_URL=https://roehub.com/realms/roehub/protocol/openid-connect/auth
+KEYCLOAK_END_SESSION_URL=https://roehub.com/realms/roehub/protocol/openid-connect/logout
+
+# backend-only URLs (API host -> local Keycloak)
+KEYCLOAK_TOKEN_URL=http://127.0.0.1:18080/realms/roehub/protocol/openid-connect/token
+KEYCLOAK_INTROSPECTION_URL=http://127.0.0.1:18080/realms/roehub/protocol/openid-connect/token/introspect
+
 IDENTITY_SESSION_COOKIE_NAME=roehub_session_id
 IDENTITY_SESSION_IDLE_TTL_SECONDS=1800
 IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS=43200
 ```
 
-## 7) Перезапустить Roehub API/Web
+## 6A) Настроить public routing для Keycloak UI
+
+На `Mac Studio` должен быть поднят `tailscale serve` endpoint для Keycloak:
+
+```bash
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve --https=18443 --bg http://127.0.0.1:18080
+/Applications/Tailscale.app/Contents/MacOS/Tailscale serve status
+```
+
+На публичном edge (`VPS Caddy`) должны быть роуты:
+
+- `/realms/*` -> `https://macstudio-daniil.tail0ebbbc.ts.net:18443`
+- `/resources/*` -> `https://macstudio-daniil.tail0ebbbc.ts.net:18443`
+
+Source of truth: `infra/caddy/Caddyfile.vps`.
+
+## 7) Перезапустить Roehub API/Web/Keycloak
 
 ```bash
 bash scripts/macos/reload_launchd_services.sh prod
+
+# если меняли env/plist Keycloak отдельно
+launchctl kickstart -k gui/$(id -u)/com.roehub.keycloak
+launchctl kickstart -k gui/$(id -u)/com.roehub.api
 ```
 
 ## 8) Smoke checks
 
 ```bash
-# login redirect
-curl -i "http://127.0.0.1:8000/auth/login?next=%2Fstrategies"
+# public login redirect
+curl -i "https://roehub.com/api/auth/login?next=%2Fstrategies"
 
-# anonymous current-user
-curl -i http://127.0.0.1:8000/auth/current-user
+# anonymous current-user (public)
+curl -i https://roehub.com/api/auth/current-user
 
-# metrics auth surface
+# public realm discovery
+curl -fsS https://roehub.com/realms/roehub/.well-known/openid-configuration | jq -r '.issuer,.authorization_endpoint'
+
+# API auth surface metrics (local)
 curl -fsS http://127.0.0.1:8000/metrics | rg 'http_requests_total\{.*path="/auth/(login|callback|logout|current-user)"'
 ```
 
 Ожидания:
 
-- `/auth/login` -> `307` на Keycloak authorize URL;
-- `/auth/current-user` без cookie -> `401`;
+- `/api/auth/login` -> `307` на `https://roehub.com/realms/...`;
+- `/api/auth/current-user` без cookie -> `401`;
 - после browser login/callback появляется cookie `roehub_session_id`;
-- `/auth/logout` ревокает сессию и удаляет cookie.
+- `/api/auth/logout` ревокает сессию и удаляет cookie.
 
 ## 9) Operation commands (Keycloak)
 
 ```bash
-# local process (если запуск вручную в shell)
-pkill -f 'kc.sh start-dev' || true
+# launchd state
+launchctl list | grep com.roehub.keycloak
+launchctl print gui/$(id -u)/com.roehub.keycloak | grep -E 'state =|pid =|last exit code ='
 
-# health endpoint
-curl -fsS http://127.0.0.1:18080/health/ready
+# restart keycloak/api pair
+launchctl kickstart -k gui/$(id -u)/com.roehub.keycloak
+launchctl kickstart -k gui/$(id -u)/com.roehub.api
+
+# management readiness endpoint
+curl -fsS http://127.0.0.1:19000/health/ready
 ```
 
-Для production используйте non-dev mode (`kc.sh start`) и отдельный launchd unit с фиксированными env/paths.
+## 10) Monit supervision (рекомендуется)
+
+Keycloak имеет смысл добавить в Monit: это auth entrypoint для web login flow, и при падении `com.roehub.keycloak` вход в систему становится недоступен.
+
+Конфиг в репозитории:
+
+- `infra/scripts/monit/roehub-keycloak.monitrc`
+
+Установка/применение:
+
+```bash
+install -m 0600 infra/scripts/monit/roehub-keycloak.monitrc /opt/homebrew/etc/monit.d/roehub-keycloak.monitrc
+/opt/homebrew/opt/monit/bin/monit -t -c /opt/homebrew/etc/monitrc
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc reload
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep roehub_keycloak
+```
+
+Проверка health policy:
+
+- process check: `matching "kc\\.sh start"`
+- endpoint check: `127.0.0.1:19000/health/ready`
+- action: restart через `launchctl_service_control.sh`.
 
 ## Troubleshooting
 
-`/auth/login` или `/auth/callback` возвращают `5xx`:
+`/api/auth/login` или `/api/auth/callback` возвращают `5xx`:
 
 - проверьте `KEYCLOAK_*` env в Roehub;
 - проверьте redirect URI в Keycloak client;
 - проверьте доступность `http://127.0.0.1:18080/realms/roehub/.well-known/openid-configuration`;
 - проверьте `api.err.log`.
 
-`/auth/current-user` всегда `401` после успешного login:
+`/api/auth/login` редиректит на localhost/непубличный адрес:
+
+- проверьте `KEYCLOAK_AUTH_URL`, `KEYCLOAK_REDIRECT_URI`, `KEYCLOAK_LOGOUT_REDIRECT_URI`;
+- проверьте публичный маршрут `https://roehub.com/realms/roehub/.well-known/openid-configuration`;
+- проверьте `tailscale serve status` на `Mac Studio` (должен быть `:18443 -> 127.0.0.1:18080`);
+- проверьте `infra/caddy/Caddyfile.vps` и deploy web edge.
+
+`/api/auth/current-user` всегда `401` после успешного login:
 
 - проверьте cookie `roehub_session_id` в браузере;
 - проверьте таблицу `identity_sessions`;

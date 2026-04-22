@@ -25,6 +25,15 @@
 - `market-data-ws-worker` (`127.0.0.1:9201/metrics`)
 - `market-data-scheduler` (`127.0.0.1:9202/metrics`)
 
+## Monit service supervision
+
+Текущий Monit baseline (control-plane process supervision):
+
+- `roehub_market_data_ws_worker`
+- `roehub_market_data_scheduler`
+- `roehub_backtest_artifact_publisher`
+- `roehub_keycloak` (`127.0.0.1:19000/health/ready`)
+
 HTTP probes:
 
 - `http://127.0.0.1:3000/api/health` (Grafana)
@@ -40,7 +49,7 @@ TCP probes:
 
 - `prometheus`, `grafana`, `postgresql@16`, `redis` — `brew services`
 - `node_exporter` — `brew services`
-- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `market-data-*` — user `launchd` services
+- `blackbox-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter`, `clickhouse`, `api`, `keycloak`, `market-data-*` — user `launchd` services
 
 ## Install and bootstrap commands
 
@@ -61,6 +70,7 @@ bash scripts/macos/reload_launchd_services.sh prod
 - `infra/scripts/monit/launchctl_service_control.sh`
 - `infra/scripts/monit/roehub-market-data.monitrc`
 - `infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc`
+- `infra/scripts/monit/roehub-keycloak.monitrc`
 - `scripts/macos/install_native_backend_prereqs.sh`
 - `scripts/macos/bootstrap_native_prod.sh`
 - `scripts/macos/reload_launchd_services.sh`
@@ -135,7 +145,7 @@ curl -fsS http://127.0.0.1:9202/metrics | rg 'scheduler_(job_|tasks_|startup_sca
 
 ```bash
 brew services list
-launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|api|market-data)'
+launchctl list | grep -E 'com.roehub.(blackbox-exporter|postgres-exporter|redis-exporter|clickhouse-exporter|clickhouse|keycloak|api|market-data)'
 curl -I http://127.0.0.1:3000
 curl -I http://127.0.0.1:9090
 curl -I http://127.0.0.1:9100
@@ -144,6 +154,8 @@ curl -I http://127.0.0.1:9116
 curl -I http://127.0.0.1:9121
 curl -I http://127.0.0.1:9187
 curl -i http://127.0.0.1:8000/auth/current-user
+curl -fsS http://127.0.0.1:19000/health/ready
+/opt/homebrew/opt/monit/bin/monit -c /opt/homebrew/etc/monitrc summary | grep -E 'roehub_(keycloak|market_data|backtest_artifact)'
 ```
 
 ## Minimum done state
@@ -154,6 +166,7 @@ Monitoring считается в рабочем состоянии, когда �
 - `probe_success` не сигнализирует массовых падений probes
 - `node-exporter`, `postgres-exporter`, `redis-exporter`, `clickhouse-exporter` отдают метрики
 - `market-data-ws-worker` и `market-data-scheduler` метрики доступны
+- Monit summary показывает `roehub_keycloak` в `Running/Accessible`
 - `Grafana` отвечает (`302` на `/` или `200` на `/api/health`)
 - API отвечает (`401` на `/auth/current-user` без cookie)
 
