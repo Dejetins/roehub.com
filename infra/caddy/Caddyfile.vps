@@ -28,6 +28,24 @@ roehub.com {
 		}
 	}
 
+	handle /realms/* {
+		reverse_proxy https://macstudio-daniil.tail0ebbbc.ts.net:18443 {
+			header_up Host macstudio-daniil.tail0ebbbc.ts.net
+			transport http {
+				tls_server_name macstudio-daniil.tail0ebbbc.ts.net
+			}
+		}
+	}
+
+	handle /resources/* {
+		reverse_proxy https://macstudio-daniil.tail0ebbbc.ts.net:18443 {
+			header_up Host macstudio-daniil.tail0ebbbc.ts.net
+			transport http {
+				tls_server_name macstudio-daniil.tail0ebbbc.ts.net
+			}
+		}
+	}
+
 	reverse_proxy 127.0.0.1:8010
 }
 
