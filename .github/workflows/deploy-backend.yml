@@ -15,6 +15,7 @@ on:
       - "uv.lock"
       - "scripts/macos/**"
       - "infra/macos/**"
+      - "infra/scripts/**"
       - "tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
@@ -66,7 +67,7 @@ jobs:
       - name: Validate repo layout for native deploy
         run: |
           set -euxo pipefail
-          for required_path in apps src configs alembic alembic.ini migrations scripts/macos infra/macos .python-version pyproject.toml uv.lock tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json; do
+          for required_path in apps src configs alembic alembic.ini migrations scripts/macos infra/macos infra/scripts/monit .python-version pyproject.toml uv.lock tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json; do
             test -e "${required_path}"
           done
 
@@ -83,10 +84,11 @@ jobs:
             rsync "${rsync_flags[@]}" migrations/ /opt/roehub/app/migrations/
             rsync "${rsync_flags[@]}" scripts/macos/ /opt/roehub/app/scripts/macos/
             rsync "${rsync_flags[@]}" infra/macos/ /opt/roehub/app/infra/macos/
+            rsync "${rsync_flags[@]}" infra/scripts/ /opt/roehub/app/infra/scripts/
           else
-            rm -rf /opt/roehub/app/apps /opt/roehub/app/src /opt/roehub/app/configs /opt/roehub/app/alembic /opt/roehub/app/migrations /opt/roehub/app/scripts/macos /opt/roehub/app/infra/macos
+            rm -rf /opt/roehub/app/apps /opt/roehub/app/src /opt/roehub/app/configs /opt/roehub/app/alembic /opt/roehub/app/migrations /opt/roehub/app/scripts/macos /opt/roehub/app/infra/macos /opt/roehub/app/infra/scripts
             mkdir -p /opt/roehub/app/scripts /opt/roehub/app/infra
-            tar -C . -cf - apps src configs alembic migrations scripts/macos infra/macos | tar -C /opt/roehub/app -xf -
+            tar -C . -cf - apps src configs alembic migrations scripts/macos infra/macos infra/scripts | tar -C /opt/roehub/app -xf -
           fi
           install -d /opt/roehub/app/tests/perf_smoke/contexts/backtest/fixtures
           install -m 0644 tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json /opt/roehub/app/tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json

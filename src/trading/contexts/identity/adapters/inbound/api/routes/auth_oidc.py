@@ -371,7 +371,10 @@ def build_auth_oidc_router(
             key=normalized_oidc_state_cookie_name,
             path=normalized_cookie_path,
         )
-        redirect_response.delete_cookie(key=normalized_oidc_next_cookie_name, path=normalized_cookie_path)
+        redirect_response.delete_cookie(
+            key=normalized_oidc_next_cookie_name,
+            path=normalized_cookie_path,
+        )
         return redirect_response
 
     @router.post("/auth/logout", status_code=204, response_model=None)

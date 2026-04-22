@@ -70,7 +70,8 @@ class RoehubSessionCurrentUser(CurrentUser):
         Assumptions:
             Session id is UUID-compatible and addresses local session persistence.
         Raises:
-            CurrentUserUnauthorizedError: If session is missing, invalid, inactive, or user is unavailable.
+            CurrentUserUnauthorizedError: If session is missing, invalid,
+                inactive, or user is unavailable.
         Side Effects:
             None.
         """
