@@ -136,7 +136,10 @@ def test_postgres_session_repository_create_session_persists_ttl_fields() -> Non
     """
     now = datetime(2026, 4, 22, 12, 0, 0, tzinfo=timezone.utc)
 
-    def fetch_one_handler(*, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+    def fetch_one_handler(
+        query: str,
+        parameters: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
         """
         Return deterministic inserted-row mapping for create-session SQL query.
 
@@ -205,7 +208,10 @@ def test_postgres_session_repository_revoke_session_persists_revoked_at() -> Non
     session_id = uuid4()
     user_id = uuid4()
 
-    def fetch_one_handler(*, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any]:
+    def fetch_one_handler(
+        query: str,
+        parameters: Mapping[str, Any],
+    ) -> Mapping[str, Any] | None:
         """
         Return deterministic updated-row mapping for revoke-session SQL query.
 
@@ -294,7 +300,7 @@ class _RecordingGateway:
         """
         self.last_query = query
         self.last_parameters = parameters
-        return self._fetch_one_handler(query=query, parameters=parameters)
+        return self._fetch_one_handler(query, parameters)
 
     def execute(self, *, query: str, parameters: Mapping[str, Any]) -> None:
         """
