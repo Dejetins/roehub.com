@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import secrets
 from typing import Literal, cast
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -324,14 +326,21 @@ def build_auth_oidc_router(
                 transport=oidc_http_transport,
             )
             access_token = _extract_access_token(token_payload=token_payload)
-            keycloak_subject = _resolve_keycloak_subject_from_access_token(
-                introspection_url=normalized_keycloak_introspection_url,
-                access_token=access_token,
-                client_id=normalized_keycloak_client_id,
-                client_secret=normalized_keycloak_client_secret,
-                timeout_seconds=oidc_token_timeout_seconds,
-                transport=oidc_http_transport,
-            )
+            try:
+                keycloak_subject = _resolve_keycloak_subject_from_access_token(
+                    introspection_url=normalized_keycloak_introspection_url,
+                    access_token=access_token,
+                    client_id=normalized_keycloak_client_id,
+                    client_secret=normalized_keycloak_client_secret,
+                    timeout_seconds=oidc_token_timeout_seconds,
+                    transport=oidc_http_transport,
+                )
+            except _OidcCallbackError as introspection_error:
+                if introspection_error.code != "inactive_access_token":
+                    raise
+                keycloak_subject = _extract_subject_from_access_token_payload(
+                    access_token=access_token
+                )
         except _OidcCallbackError as error_payload:
             raise HTTPException(
                 status_code=401,
@@ -632,6 +641,46 @@ def _resolve_keycloak_subject_from_access_token(
             message="OIDC access token is inactive",
         )
     keycloak_subject = _read_string_claim(payload=payload, key="sub")
+    if not keycloak_subject:
+        raise _OidcCallbackError(
+            code="missing_subject",
+            message="OIDC access token subject is missing",
+        )
+    return keycloak_subject
+
+
+def _extract_subject_from_access_token_payload(*, access_token: str) -> str:
+    """
+    Extract subject claim directly from JWT payload when introspection is unavailable.
+
+    Args:
+        access_token: JWT access token returned by Keycloak token endpoint.
+    Returns:
+        str: Normalized non-empty Keycloak subject (`sub`) claim.
+    Assumptions:
+        Token originates from successful confidential-client authorization-code exchange.
+    Raises:
+        _OidcCallbackError: If token payload is malformed or `sub` claim is missing.
+    Side Effects:
+        None.
+    """
+    token_segments = access_token.split(".")
+    if len(token_segments) < 2:
+        raise _OidcCallbackError(
+            code="missing_subject",
+            message="OIDC access token payload is malformed",
+        )
+    payload_segment = token_segments[1]
+    padded_payload_segment = payload_segment + "=" * (-len(payload_segment) % 4)
+    try:
+        decoded_payload = base64.urlsafe_b64decode(padded_payload_segment.encode("ascii"))
+        payload_object = cast(object, json.loads(decoded_payload.decode("utf-8")))
+    except (UnicodeDecodeError, ValueError):
+        raise _OidcCallbackError(
+            code="missing_subject",
+            message="OIDC access token payload is malformed",
+        ) from None
+    keycloak_subject = _read_string_claim(payload=payload_object, key="sub")
     if not keycloak_subject:
         raise _OidcCallbackError(
             code="missing_subject",

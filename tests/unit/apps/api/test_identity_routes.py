@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse
 from uuid import UUID
@@ -252,6 +254,61 @@ def test_get_auth_callback_creates_local_user_and_session_cookie() -> None:
     }
 
 
+def test_get_auth_callback_falls_back_to_jwt_subject_when_introspection_inactive() -> None:
+    """
+    Verify callback can resolve user subject from access-token payload when
+    introspection returns inactive token.
+
+    Args:
+        None.
+    Returns:
+        None.
+    Assumptions:
+        Access token comes from successful code exchange for confidential client.
+    Raises:
+        AssertionError: If callback does not create local session via fallback path.
+    Side Effects:
+        Performs deterministic mock token and introspection exchanges.
+    """
+    fallback_access_token = _build_jwt_with_subject(subject=_KEYCLOAK_SUBJECT)
+    client, _clock, user_repository, session_repository = _build_identity_test_client(
+        oidc_http_transport=_build_oidc_transport(
+            token_access_token=fallback_access_token,
+            introspection_active=False,
+        )
+    )
+    login_response = client.get("/auth/login?next=/strategies", follow_redirects=False)
+    assert login_response.status_code == 307
+    state = client.cookies.get("roehub_oidc_state")
+    assert state is not None
+
+    callback_response = client.get(
+        f"/auth/callback?code=test-auth-code&state={state}",
+        follow_redirects=False,
+    )
+
+    assert callback_response.status_code == 307
+    assert callback_response.headers["location"] == "/strategies"
+    session_cookie_value = client.cookies.get(_SESSION_COOKIE_NAME)
+    assert session_cookie_value is not None
+    persisted_user = user_repository.find_by_keycloak_subject(
+        keycloak_subject=_KEYCLOAK_SUBJECT
+    )
+    assert persisted_user is not None
+    persisted_session = session_repository.find_by_session_id(
+        session_id=UUID(session_cookie_value)
+    )
+    assert persisted_session is not None
+    assert persisted_session.user_id == persisted_user.user_id
+
+    current_user_response = client.get("/auth/current-user")
+    assert current_user_response.status_code == 200
+    assert current_user_response.json() == {
+        "user_id": str(persisted_user.user_id),
+        "paid_level": "free",
+    }
+
+
 def test_get_auth_callback_rejects_state_mismatch() -> None:
     """
     Verify callback endpoint rejects mismatched state with deterministic 401 payload.
@@ -413,6 +470,8 @@ def _build_oidc_transport(
     captured_token_form_data: dict[str, list[str]] | None = None,
     captured_introspection_form_data: dict[str, list[str]] | None = None,
     introspection_paid_level: str = "free",
+    token_access_token: str = "oidc-access-token",
+    introspection_active: bool = True,
 ) -> httpx.MockTransport:
     """
     Build deterministic transport handling both token exchange and introspection calls.
@@ -421,6 +480,8 @@ def _build_oidc_transport(
         captured_token_form_data: Optional container receiving token-exchange form fields.
         captured_introspection_form_data: Optional container receiving introspection form fields.
         introspection_paid_level: Paid-level claim returned by introspection payload.
+        token_access_token: Access token value returned by token endpoint.
+        introspection_active: Active-flag value returned by introspection payload.
     Returns:
         httpx.MockTransport: Transport returning deterministic OIDC responses by URL.
     Assumptions:
@@ -453,7 +514,7 @@ def _build_oidc_transport(
             return httpx.Response(
                 status_code=200,
                 json={
-                    "access_token": "oidc-access-token",
+                    "access_token": token_access_token,
                     "expires_in": 3600,
                     "token_type": "Bearer",
                 },
@@ -466,7 +527,7 @@ def _build_oidc_transport(
             return httpx.Response(
                 status_code=200,
                 json={
-                    "active": True,
+                    "active": introspection_active,
                     "sub": _KEYCLOAK_SUBJECT,
                     "paid_level": introspection_paid_level,
                 },
@@ -498,3 +559,47 @@ def _ensure_utc_datetime(*, value: datetime, field_name: str) -> datetime:
     if offset.total_seconds() != 0:
         raise ValueError(f"{field_name} must be UTC datetime")
     return value
+
+
+def _build_jwt_with_subject(*, subject: str) -> str:
+    """
+    Build deterministic unsigned JWT-like token containing one `sub` claim.
+
+    Args:
+        subject: Subject claim value to embed in payload.
+    Returns:
+        str: Compact JWT string with deterministic `alg=none` header.
+    Assumptions:
+        Test helper token is consumed only by payload parser in callback fallback.
+    Raises:
+        ValueError: If subject is empty.
+    Side Effects:
+        None.
+    """
+    normalized_subject = subject.strip()
+    if not normalized_subject:
+        raise ValueError("_build_jwt_with_subject requires non-empty subject")
+    header_segment = _encode_json_to_base64url(payload={"alg": "none", "typ": "JWT"})
+    payload_segment = _encode_json_to_base64url(payload={"sub": normalized_subject})
+    return f"{header_segment}.{payload_segment}.signature"
+
+
+def _encode_json_to_base64url(*, payload: dict[str, str]) -> str:
+    """
+    Encode compact JSON payload to URL-safe base64 without padding.
+
+    Args:
+        payload: Flat JSON object encoded into one JWT segment.
+    Returns:
+        str: URL-safe base64 token segment without trailing `=` padding.
+    Assumptions:
+        Payload is JSON-serializable and deterministic for tests.
+    Raises:
+        ValueError: If payload is empty.
+    Side Effects:
+        None.
+    """
+    if not payload:
+        raise ValueError("_encode_json_to_base64url requires non-empty payload")
+    encoded_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    return base64.urlsafe_b64encode(encoded_bytes).decode("ascii").rstrip("=")
