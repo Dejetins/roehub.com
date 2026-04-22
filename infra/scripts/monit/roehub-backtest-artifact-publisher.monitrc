@@ -1,0 +1,5 @@
+check process roehub_backtest_artifact_publisher matching "apps.scheduler.backtest_artifact_publisher.main.main"
+  start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.backtest-artifact-publisher /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.backtest-artifact-publisher.plist"
+  stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.backtest-artifact-publisher /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.backtest-artifact-publisher.plist"
+  if failed host 127.0.0.1 port 9203 protocol http request "/metrics" for 2 cycles then restart
+  if 5 restarts within 10 cycles then unmonitor

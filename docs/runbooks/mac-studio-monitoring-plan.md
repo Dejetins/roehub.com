@@ -58,6 +58,9 @@ bash scripts/macos/reload_launchd_services.sh prod
 - `infra/macos/launchd/com.roehub.postgres-exporter.plist`
 - `infra/macos/launchd/com.roehub.redis-exporter.plist`
 - `infra/macos/launchd/com.roehub.clickhouse-exporter.plist`
+- `infra/scripts/monit/launchctl_service_control.sh`
+- `infra/scripts/monit/roehub-market-data.monitrc`
+- `infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc`
 - `scripts/macos/install_native_backend_prereqs.sh`
 - `scripts/macos/bootstrap_native_prod.sh`
 - `scripts/macos/reload_launchd_services.sh`

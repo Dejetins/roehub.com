@@ -38,7 +38,7 @@ EOF
 }
 
 brew update
-brew install uv postgresql@16 redis grafana prometheus node_exporter
+brew install uv postgresql@16 redis grafana prometheus node_exporter monit
 
 ensure_writable_dir /opt/clickhouse
 ensure_writable_dir /opt/roehub/bin

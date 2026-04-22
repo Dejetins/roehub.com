@@ -109,6 +109,8 @@ Monit проверки/управление:
 
 `bootstrap_native_prod.sh` и `bootstrap_native_test.sh` устанавливают static launchd templates и
 рендерят per-instance `backtest-job-runner` plists из `backtest.jobs.worker_processes`.
+`bootstrap_native_prod.sh` дополнительно синхронизирует Monit snippets из репозитория:
+`infra/scripts/monit/*.monitrc` и `infra/scripts/monit/launchctl_service_control.sh`.
 `reload_launchd_services.sh` сначала выгружает текущие static/worker services, затем заново
 рендерит worker fleet и bootstrap-ит ровно желаемую cardinality для profile.
 

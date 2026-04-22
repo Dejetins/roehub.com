@@ -10,11 +10,15 @@ mkdir -p /opt/roehub/app /opt/roehub/bin /opt/roehub/config /opt/roehub/state/ba
 mkdir -p /opt/roehub/state/backtest_artifacts/v2
 mkdir -p /opt/roehub/clickhouse/data /opt/roehub/clickhouse/tmp /opt/roehub/clickhouse/logs /opt/roehub/clickhouse/backups /opt/roehub/clickhouse/access
 mkdir -p /Users/daniildegtyarev/.config/roehub /Users/daniildegtyarev/.local/bin /Users/daniildegtyarev/Library/Logs/roehub "$LAUNCH_AGENTS_DIR"
+mkdir -p /opt/homebrew/etc/monit.d/scripts
 
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/prometheus.prod.yml" /opt/roehub/config/prometheus.prod.yml
 install -m 0644 "$REPO_ROOT/infra/macos/blackbox/blackbox.yml" /opt/roehub/config/blackbox.yml
 install -m 0644 "$REPO_ROOT/infra/macos/clickhouse/config.xml" /opt/roehub/config/clickhouse.config.xml
 install -m 0644 "$REPO_ROOT/infra/macos/clickhouse/users.d/roehub.xml" /opt/roehub/config/clickhouse.users.roehub.xml
+install -m 0755 "$REPO_ROOT/infra/scripts/monit/launchctl_service_control.sh" /opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh
+install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-market-data.monitrc" /opt/homebrew/etc/monit.d/roehub-market-data.monitrc
+install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc" /opt/homebrew/etc/monit.d/roehub-backtest-artifact-publisher.monitrc
 
 for plist in \
   com.roehub.api.plist \
