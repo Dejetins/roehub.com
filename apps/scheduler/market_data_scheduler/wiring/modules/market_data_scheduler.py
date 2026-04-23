@@ -17,6 +17,9 @@ from trading.contexts.market_data.adapters.outbound.clients.common_http import R
 from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import (
     RestCandleIngestSource,
 )
+from trading.contexts.market_data.adapters.outbound.clients.rest_instrument_history_start_source import (  # noqa: E501
+    RestInstrumentHistoryStartSource,
+)
 from trading.contexts.market_data.adapters.outbound.clients.rest_instrument_metadata_source import (
     RestInstrumentMetadataSource,
 )
@@ -37,6 +40,9 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
 )
 from trading.contexts.market_data.application.dto import RestFillTask, WhitelistInstrumentRow
 from trading.contexts.market_data.application.ports.clock.clock import Clock
+from trading.contexts.market_data.application.ports.sources.instrument_history_start_source import (
+    InstrumentHistoryStartSource,
+)
 from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
     CanonicalCandleIndexReader,
 )
@@ -189,6 +195,7 @@ class MarketDataSchedulerApp:
     - index_reader: canonical index reader.
     - rest_fill_queue: async queue executing rest fill tasks in background.
     - backfill_planner: deterministic planner of bootstrap/historical/tail ranges.
+    - history_start_source: optional symbol-aware exchange lower-bound source.
     - rest_catchup_use_case: periodic full-history gap/tail catchup executor.
     - metrics: scheduler metrics bundle.
     - metrics_port: HTTP port for `/metrics`.
@@ -209,6 +216,7 @@ class MarketDataSchedulerApp:
         rest_catchup_use_case: RestCatchUp1mUseCase,
         metrics: MarketDataSchedulerMetrics,
         metrics_port: int,
+        history_start_source: InstrumentHistoryStartSource | None = None,
     ) -> None:
         """
         Validate and store scheduler runtime dependencies.
@@ -239,6 +247,7 @@ class MarketDataSchedulerApp:
         self._index_reader = index_reader
         self._rest_fill_queue = rest_fill_queue
         self._backfill_planner = backfill_planner
+        self._history_start_source = history_start_source
         self._rest_catchup_use_case = rest_catchup_use_case
         self._metrics = metrics
         self._metrics_port = metrics_port
@@ -695,9 +704,16 @@ class MarketDataSchedulerApp:
                 earliest = self._config.market_by_id(
                     instrument.market_id
                 ).rest.earliest_available_ts_utc
+                symbol_history_start = None
+                if self._history_start_source is not None:
+                    symbol_history_start = await asyncio.to_thread(
+                        self._history_start_source.get_history_start,
+                        instrument,
+                    )
                 return self._backfill_planner.plan_for_instrument(
                     instrument_id=instrument,
                     earliest_market_ts=earliest,
+                    symbol_history_start_ts=symbol_history_start,
                     bounds_1m=bounds,
                     now_floor=now_floor,
                 )
@@ -897,6 +913,11 @@ def build_market_data_scheduler_app(
         ingest_id=uuid4(),
     )
     metadata_source = RestInstrumentMetadataSource(cfg=config, http=RequestsHttpClient())
+    history_start_source = RestInstrumentHistoryStartSource(
+        cfg=config,
+        http=RequestsHttpClient(),
+        clock=SystemClock(),
+    )
     enrich_use_case = EnrichRefInstrumentsFromExchangeUseCase(
         instrument_reader=instrument_reader,
         metadata_source=metadata_source,
@@ -921,6 +942,7 @@ def build_market_data_scheduler_app(
         index_reader=index_reader,
         rest_fill_queue=rest_fill_queue,
         backfill_planner=backfill_planner,
+        history_start_source=history_start_source,
         rest_catchup_use_case=rest_catchup_use_case,
         metrics=MarketDataSchedulerMetrics(),
         metrics_port=metrics_port,

@@ -99,6 +99,17 @@ class _MultiInstrumentReader:
         ]
 
 
+class _HistoryStartSource:
+    def __init__(self, by_instrument: dict[tuple[int, str], UtcTimestamp | None]) -> None:
+        """Store deterministic symbol-aware history starts used by startup-scan tests."""
+        self._by_instrument = dict(by_instrument)
+
+    def get_history_start(self, instrument_id: InstrumentId) -> UtcTimestamp | None:
+        """Return configured symbol-specific lower bound when present."""
+        key = (int(instrument_id.market_id.value), str(instrument_id.symbol))
+        return self._by_instrument.get(key)
+
+
 class _BaseIndexReader:
     """Base canonical-index fake with protocol-compatible helper methods."""
 
@@ -448,6 +459,64 @@ def test_scheduler_startup_scan_tail_only_canonical_still_enqueues_historical(
         historical = next(task for task in queue.enqueued if task.reason == "historical_backfill")
         assert str(historical.time_range.start) == "2017-01-01T00:00:00.000Z"
         assert str(historical.time_range.end) == "2026-02-09T13:50:00.000Z"
+
+    asyncio.run(_scenario())
+
+
+def test_scheduler_startup_scan_skips_false_prefix_before_symbol_history_start(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """
+    Ensure startup scan does not enqueue pre-listing historical backfill.
+
+    Parameters:
+    - tmp_path: pytest temporary path fixture.
+    - monkeypatch: pytest monkeypatch fixture.
+
+    Returns:
+    - None.
+    """
+
+    async def _scenario() -> None:
+        monkeypatch.setattr(
+            "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.start_http_server",
+            lambda _port: None,
+        )
+
+        queue = _RestQueue()
+        app = MarketDataSchedulerApp(
+            config=_config(tmp_path),
+            whitelist_path=str(tmp_path / "missing.csv"),
+            seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
+            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
+            instrument_reader=_InstrumentReader(),
+            index_reader=_TailOnlyIndexReader(),
+            rest_fill_queue=cast(AsyncRestFillQueue, queue),
+            backfill_planner=SchedulerBackfillPlanner(tail_lookback_minutes=180),
+            rest_catchup_use_case=cast(RestCatchUp1mUseCase, _RestCatchUpUseCase()),
+            metrics=MarketDataSchedulerMetrics(registry=CollectorRegistry()),
+            metrics_port=9202,
+            history_start_source=_HistoryStartSource(
+                {
+                    (1, "BTCUSDT"): UtcTimestamp(
+                        datetime(2026, 2, 9, 13, 50, tzinfo=timezone.utc)
+                    )
+                }
+            ),
+        )
+        app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
+
+        whitelist = tmp_path / "missing.csv"
+        whitelist.write_text("market_id,symbol,is_enabled\n1,BTCUSDT,1\n", encoding="utf-8")
+
+        stop_event = asyncio.Event()
+        stop_event.set()
+
+        await app.run(stop_event)
+
+        assert queue.enqueued == []
 
     asyncio.run(_scenario())
 

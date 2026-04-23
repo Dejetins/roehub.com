@@ -140,15 +140,17 @@ REST fill вызывает существующий use-case `RestCatchUp1mUseCa
 - `S2` (enrich `ref_instruments` из биржевых instrument-info endpoint’ов)
 - startup scan:
   - для каждого enabled/tradable инструмента читаем canonical bounds до `now_floor`
-  - если bounds пустые: bootstrap `[earliest_available_ts_utc, now_floor)`
-  - если `canonical_min > earliest_available_ts_utc + 1m`: historical backfill
-    `[earliest_available_ts_utc, canonical_min)`
+  - если bounds пустые: bootstrap `[effective_history_start, now_floor)`
+  - если `canonical_min > effective_history_start + 1m`: historical backfill
+    `[effective_history_start, canonical_min)`
   - tail insurance: `[max(canonical_max + 1m, now_floor - tail_lookback), now_floor)`
   - все задачи enqueue в фоновой REST queue (не блокируют основной loop scheduler).
+  - `effective_history_start` для scheduler — это market earliest fallback, который может быть
+    сдвинут вперёд до symbol-specific listing/history start, если exchange его подтверждает.
 
 Периодический `S3` выполняется в две фазы:
 - phase-1 (planner queue): enqueue только `scheduler_bootstrap` и `historical_backfill`
-  для инструментов, у которых canonical пустой или начинается позже `earliest_available_ts_utc`.
+  для инструментов, у которых canonical пустой или начинается позже `effective_history_start`.
 - phase-2 (full catchup): для всех enabled/tradable инструментов запускается
   `RestCatchUp1mUseCase` (tail + full gap scan по историческому диапазону canonical),
   чтобы закрывать внутренние multi-day дыры, включая дни, где в canonical пока 0 строк.
@@ -226,15 +228,16 @@ REST fill вызывает существующий use-case `RestCatchUp1mUseCa
 
 ## Bootstrap/Historical boundary
 
-Если в canonical данных нет (`bounds_1m(..., before=now_floor) == (None, None)`) — грузим **всю доступную историю**:
-- `start = market_data.markets[*].rest.earliest_available_ts_utc`
+Если в canonical данных нет (`bounds_1m(..., before=now_floor) == (None, None)`) — scheduler грузит
+**всю подтверждённо доступную историю**:
+- `start = effective_history_start`
 - `end = now_floor`
 
 Concurrency ограничиваем: максимум 4 инструмента одновременно.
 
 Если canonical уже не пустой, но начинается позже earliest boundary:
-- `canonical_min > earliest_available_ts_utc + 1m` → историческая догрузка:
-  `[earliest_available_ts_utc, canonical_min)`.
+- `canonical_min > effective_history_start + 1m` → историческая догрузка:
+  `[effective_history_start, canonical_min)`.
 
 Это закрывает production-case, когда worker успел записать только свежий хвост, и
 `canonical` перестал быть “пустым” до запуска scheduler.
@@ -246,7 +249,7 @@ Concurrency ограничиваем: максимум 4 инструмента 
 - S1) Sync whitelist → ref_instruments (on start + периодически)
 - S2) Enrich ref_instruments (on start + раз в 6–24 часа)
 - S3) REST insurance catchup (каждый час, lookback 2–6 часов) + startup/periodic scan
-  исторических “дыр” относительно `earliest_available_ts_utc`.
+  исторических “дыр” относительно `effective_history_start`.
   В runtime это реализовано как:
   - planner enqueue (`scheduler_bootstrap`/`historical_backfill`) и
   - per-instrument `RestCatchUp1mUseCase` для tail+gap заполнения.

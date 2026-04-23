@@ -50,6 +50,7 @@ class SchedulerBackfillPlanner:
         *,
         instrument_id: InstrumentId,
         earliest_market_ts: UtcTimestamp,
+        symbol_history_start_ts: UtcTimestamp | None = None,
         bounds_1m: tuple[UtcTimestamp | None, UtcTimestamp | None],
         now_floor: UtcTimestamp,
     ) -> list[RestFillTask]:
@@ -59,6 +60,7 @@ class SchedulerBackfillPlanner:
         Parameters:
         - instrument_id: instrument identity.
         - earliest_market_ts: configured earliest available exchange minute for this market.
+        - symbol_history_start_ts: optional symbol-specific lower bound confirmed by exchange.
         - bounds_1m: canonical bounds `(min_ts_open, max_ts_open)` before `now_floor`.
         - now_floor: current minute floor in UTC, excluded from fills.
 
@@ -76,8 +78,16 @@ class SchedulerBackfillPlanner:
         - None.
         """
         earliest = UtcTimestamp(floor_to_minute_utc(earliest_market_ts.value))
+        symbol_history_start = (
+            None
+            if symbol_history_start_ts is None
+            else UtcTimestamp(floor_to_minute_utc(symbol_history_start_ts.value))
+        )
+        effective_start = earliest
+        if symbol_history_start is not None and symbol_history_start.value > earliest.value:
+            effective_start = symbol_history_start
         now_minute = UtcTimestamp(floor_to_minute_utc(now_floor.value))
-        if earliest.value >= now_minute.value:
+        if effective_start.value >= now_minute.value:
             return []
 
         first_ts, last_ts = bounds_1m
@@ -85,19 +95,19 @@ class SchedulerBackfillPlanner:
             return [
                 RestFillTask(
                     instrument_id=instrument_id,
-                    time_range=TimeRange(start=earliest, end=now_minute),
+                    time_range=TimeRange(start=effective_start, end=now_minute),
                     reason="scheduler_bootstrap",
                 )
             ]
 
         tasks: list[RestFillTask] = []
 
-        historical_threshold = earliest.value + timedelta(minutes=1)
-        if first_ts.value > historical_threshold and earliest.value < first_ts.value:
+        historical_threshold = effective_start.value + timedelta(minutes=1)
+        if first_ts.value > historical_threshold and effective_start.value < first_ts.value:
             tasks.append(
                 RestFillTask(
                     instrument_id=instrument_id,
-                    time_range=TimeRange(start=earliest, end=first_ts),
+                    time_range=TimeRange(start=effective_start, end=first_ts),
                     reason="historical_backfill",
                 )
             )

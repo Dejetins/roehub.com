@@ -40,6 +40,27 @@ def test_planner_bootstrap_when_canonical_is_empty() -> None:
     assert str(tasks[0].time_range.end) == str(now_floor)
 
 
+def test_planner_bootstrap_uses_symbol_history_start_when_present() -> None:
+    """Ensure empty canonical bootstrap starts from symbol-aware lower bound when known."""
+    planner = SchedulerBackfillPlanner(tail_lookback_minutes=180)
+    earliest = UtcTimestamp(datetime(2017, 1, 1, 0, 0, tzinfo=timezone.utc))
+    symbol_history_start = UtcTimestamp(datetime(2019, 1, 16, 10, 0, tzinfo=timezone.utc))
+    now_floor = UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc))
+
+    tasks = planner.plan_for_instrument(
+        instrument_id=_instrument(),
+        earliest_market_ts=earliest,
+        symbol_history_start_ts=symbol_history_start,
+        bounds_1m=(None, None),
+        now_floor=now_floor,
+    )
+
+    assert len(tasks) == 1
+    assert tasks[0].reason == "scheduler_bootstrap"
+    assert str(tasks[0].time_range.start) == str(symbol_history_start)
+    assert str(tasks[0].time_range.end) == str(now_floor)
+
+
 def test_planner_creates_historical_range_from_earliest_to_canonical_min() -> None:
     """Ensure historical gap before canonical min is planned as half-open range."""
     planner = SchedulerBackfillPlanner(tail_lookback_minutes=180)
@@ -147,3 +168,24 @@ def test_planner_ranges_do_not_overlap() -> None:
     assert historical.time_range.end.value <= canonical_min.value
     assert tail.time_range.start.value >= canonical_max.value + timedelta(minutes=1)
     assert historical.time_range.end.value <= tail.time_range.start.value
+
+
+def test_planner_skips_false_prefix_before_symbol_history_start() -> None:
+    """Ensure pre-listing prefix is not scheduled as historical backfill."""
+    planner = SchedulerBackfillPlanner(tail_lookback_minutes=180)
+    now_floor = UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc))
+    earliest = UtcTimestamp(datetime(2017, 1, 1, 0, 0, tzinfo=timezone.utc))
+    symbol_history_start = UtcTimestamp(datetime(2019, 1, 16, 10, 0, tzinfo=timezone.utc))
+    canonical_min = UtcTimestamp(datetime(2019, 1, 16, 10, 0, tzinfo=timezone.utc))
+    canonical_max = UtcTimestamp(datetime(2026, 2, 9, 13, 50, tzinfo=timezone.utc))
+
+    tasks = planner.plan_for_instrument(
+        instrument_id=_instrument(),
+        earliest_market_ts=earliest,
+        symbol_history_start_ts=symbol_history_start,
+        bounds_1m=(canonical_min, canonical_max),
+        now_floor=now_floor,
+    )
+
+    assert not any(task.reason == "historical_backfill" for task in tasks)
+    assert any(task.reason == "scheduler_tail" for task in tasks)

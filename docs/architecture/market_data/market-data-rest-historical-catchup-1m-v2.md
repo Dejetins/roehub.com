@@ -190,6 +190,13 @@ Gap fill выполняется автоматически, без ручных 
 - это покрывает оба класса проблем:
   - “история до canonical_min” (через planner tasks),
   - “внутренние дыры внутри canonical диапазона” (через full gap scan).
+- Для startup `scheduler_bootstrap` / `historical_backfill` используется `effective_history_start`,
+  а не слепо market-wide earliest boundary:
+  - futures: direct exchange listing metadata (`onboardDate` / `launchTime`);
+  - spot: earliest confirmed non-empty 1m kline window;
+  - fallback: `rest.earliest_available_ts_utc`, если symbol-specific bound не удалось определить.
+- Это убирает бесконечные попытки backfill'а до даты листинга пары, но не ослабляет repair
+  реальных gap'ов внутри уже существующего canonical диапазона.
 
 ### Invariants
 - Пишем только закрытые 1m (end всегда “вниз до минуты”).

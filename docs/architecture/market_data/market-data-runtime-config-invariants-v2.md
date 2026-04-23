@@ -115,9 +115,17 @@ SLO guidance:
 
 Operational semantics:
 - scheduler на старте делает startup scan по enabled/tradable инструментам:
-  - bootstrap `[earliest_available_ts_utc, now_floor)` для пустого canonical
-  - historical backfill `[earliest_available_ts_utc, canonical_min)` если canonical начинается позже earliest boundary
+  - bootstrap `[effective_history_start, now_floor)` для пустого canonical
+  - historical backfill `[effective_history_start, canonical_min)` если canonical начинается позже effective boundary
   - tail insurance `[max(canonical_max + 1m, now_floor - tail_lookback), now_floor)`.
+ - `effective_history_start` вычисляется так:
+  - сначала берём market-wide `earliest_available_ts_utc` как coarse lower bound;
+  - если exchange может подтвердить более поздний symbol-specific start, scheduler сдвигает lower bound вперёд;
+  - если symbol-specific bound не удалось получить, scheduler мягко откатывается к `earliest_available_ts_utc`.
+ - текущие exchange methods для symbol-specific start:
+  - Binance futures: `GET /fapi/v1/exchangeInfo` -> `symbols[].onboardDate`
+  - Bybit futures: `GET /v5/market/instruments-info` -> `list[].launchTime`
+  - Binance/Bybit spot: earliest non-empty window по `GET .../klines` / `GET /v5/market/kline`
 - observability startup scan:
   - `scheduler_startup_scan_instruments_total`
   - `scheduler_tasks_planned_total{reason=...}`
@@ -171,7 +179,8 @@ Guarantee:
 ## Notes
 - Конфиг читается на старте процесса (без hot reload).
 - Валидируем YAML/CSV строго и падаем быстро, чтобы не получать “тихие” частичные запуски.
-- `rest.earliest_available_ts_utc` — обязательный ключ, используется worker/scheduler для bootstrap/historical границ.
+- `rest.earliest_available_ts_utc` — обязательный ключ, используется как coarse market-wide fallback lower bound.
+- Scheduler MAY использовать более поздний symbol-specific history start, если exchange его подтвердил.
 - Для конкурентных `asyncio.to_thread(...)` путей worker/scheduler используют thread-local CH gateway
   (один ClickHouse client на поток), чтобы избежать session-конфликта concurrent queries.
 - Adapters могут логировать “observed rate limits” (из заголовков/metadata) для диагностики,
