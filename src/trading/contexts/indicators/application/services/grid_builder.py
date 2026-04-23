@@ -13,14 +13,19 @@ import math
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import ROUND_FLOOR, Decimal
+from typing import Protocol
 
 from trading.contexts.indicators.application.dto import GridSpec
 from trading.contexts.indicators.application.errors import (
     EstimateMemoryGuardExceeded,
     EstimateVariantsGuardExceeded,
 )
-from trading.contexts.indicators.application.ports.registry import IndicatorRegistry
-from trading.contexts.indicators.domain.entities import IndicatorDef, ParamDef, ParamKind
+from trading.contexts.indicators.domain.entities import (
+    IndicatorDef,
+    IndicatorId,
+    ParamDef,
+    ParamKind,
+)
 from trading.contexts.indicators.domain.errors import GridValidationError
 from trading.contexts.indicators.domain.specifications import (
     ExplicitValuesSpec,
@@ -40,6 +45,10 @@ _RESERVE_FACTOR = 0.20
 _RESERVE_FIXED_BYTES = 64 * 1024**2
 _MAX_AXIS_VALUES = 1_000_000
 _FLOAT_EPS = 1e-9
+
+
+class _IndicatorDefinitionRegistry(Protocol):
+    def get_def(self, indicator_id: IndicatorId) -> IndicatorDef: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,7 +185,7 @@ class GridBuilder:
       trading.contexts.indicators.domain.entities.param_def
     """
 
-    def __init__(self, *, registry: IndicatorRegistry) -> None:
+    def __init__(self, *, registry: _IndicatorDefinitionRegistry) -> None:
         """
         Construct service with registry dependency.
 

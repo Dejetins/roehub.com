@@ -128,7 +128,8 @@ REST catch-up и gap fill не изобретают новую “батч-ло�
 **Semantics**
 - все операции трактуют время как UTC;
 - `last_ts_open`/`first_ts_open` относятся к canonical (источник правды), без FINAL;
-- “tail” 24h может применять дедуп-аналогично `ClickHouseCanonicalCandleReader`.
+- индекс reader не обязан повторять поведение full-range `CanonicalCandleReader`,
+  потому что dedup safety в REST fill обеспечивается отдельной minute-key проверкой перед записью.
 
 
 ## Use-case: RestCatchUp1mUseCase

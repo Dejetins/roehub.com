@@ -1,7 +1,6 @@
 # R10-02 docs synchronization note:
 # - This file is the formula/source spec, not the runtime-supported product catalog by itself.
 # - Active backtest/runtime-defaults support is the intersection with `configs/prod/indicators.yaml`.
-# - Removed heavy indicators remain intentionally absent from prod defaults and stay superseded.
 # - Wrapper/reference formulas may exist here without being default-enabled in prod.
 # - `signals.v1.params` remain default-only at the backtest product boundary.
 schema_version: 1

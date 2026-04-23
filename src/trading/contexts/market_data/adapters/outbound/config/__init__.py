@@ -5,7 +5,6 @@ from .runtime_config import (
     RedisStreamsConfig,
     load_market_data_runtime_config,
 )
-from .whitelist import load_enabled_instruments_from_csv
 
 __all__ = [
     "build_instrument_key",
@@ -13,5 +12,4 @@ __all__ = [
     "MarketDataRuntimeConfig",
     "RedisStreamsConfig",
     "load_market_data_runtime_config",
-    "load_enabled_instruments_from_csv",
 ]

@@ -39,25 +39,7 @@ class _RegistryStub(IndicatorRegistry):
             if key in defs_by_id:
                 raise ValueError(f"duplicate indicator_id: {key}")
             defs_by_id[key] = definition
-        self._defs = defs
         self._defs_by_id = defs_by_id
-
-    def list_defs(self) -> tuple[IndicatorDef, ...]:
-        """
-        Return hard definitions in deterministic order.
-
-        Args:
-            None.
-        Returns:
-            tuple[IndicatorDef, ...]: Hard definitions snapshot.
-        Assumptions:
-            Snapshot is immutable for test runtime.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        return self._defs
 
     def get_def(self, indicator_id: IndicatorId) -> IndicatorDef:
         """
@@ -95,24 +77,6 @@ class _RegistryStub(IndicatorRegistry):
             None.
         """
         return ()
-
-    def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
-        """
-        Always raise because merged item resolution is not used in these tests.
-
-        Args:
-            indicator_id: Target indicator identifier.
-        Returns:
-            MergedIndicatorView: Never returns.
-        Assumptions:
-            Merged-view contract is irrelevant for estimate endpoint tests.
-        Raises:
-            UnknownIndicatorError: Always.
-        Side Effects:
-            None.
-        """
-        raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
-
 
 def _client(
     *,

@@ -27,7 +27,6 @@ from trading.contexts.backtest.application.ports import (
     BacktestStagedVariantMetricScorer,
     BacktestStagedVariantScorer,
 )
-from trading.contexts.backtest.application.services import BacktestReportingServiceV1
 from trading.contexts.backtest.application.services.job_runner_streaming_v1 import (
     BacktestJobSnapshotCadenceV1,
     BacktestJobTopVariantCandidateV1,
@@ -219,7 +218,7 @@ class RunBacktestJobRunnerV1:
         indicator_compute: IndicatorCompute,
         defaults_provider: BacktestGridDefaultsProvider | None = None,
         grid_builder: object | None = None,
-        reporting_service: BacktestReportingServiceV1 | None = None,
+        reporting_service: object | None = None,
         core_runner: object | None = None,
         stage_a_shortlist_builder: BacktestStageAShortlistBuilderV2 | None = None,
         hierarchical_shortlist_builder: BacktestHierarchicalShortlistBuilderV2 | None = None,
@@ -271,7 +270,9 @@ class RunBacktestJobRunnerV1:
             grid_builder:
                 Retained compatibility dependency. Production claimed-worker execution no longer
                 routes through `grid_builder_v1.py` after R10-01.
-            reporting_service: Optional report assembly service for finalizing step.
+            reporting_service:
+                Retained compatibility dependency. Claimed worker finalizing no longer builds
+                legacy eager reports after R10-01.
             core_runner:
                 Retained compatibility dependency. Production claimed-worker execution no longer
                 routes through `staged_core_runner_v1.py` after R10-01.
@@ -387,7 +388,7 @@ class RunBacktestJobRunnerV1:
         ranking_defaults = BacktestRankingConfig(
             primary_metric=ranking_primary_metric_default,
         )
-        _ = candle_timeline_builder, grid_builder, core_runner
+        _ = candle_timeline_builder, grid_builder, reporting_service, core_runner
         resolved_stage_a_shortlist_builder = (
             stage_a_shortlist_builder
             or build_default_stage_a_shortlist_builder_v2(
@@ -426,7 +427,6 @@ class RunBacktestJobRunnerV1:
         self._request_decoder = request_decoder
         self._indicator_compute = indicator_compute
         self._defaults_provider = defaults_provider
-        self._reporting_service = reporting_service or BacktestReportingServiceV1()
         self._shared_runtime_planner = runtime_planner
         self._runtime_runner = runtime_runner or BacktestArtifactRuntimeRunnerV2(
             batch_size_default=stage_batch_size,

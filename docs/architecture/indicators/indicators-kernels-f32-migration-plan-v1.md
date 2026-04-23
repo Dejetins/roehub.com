@@ -144,7 +144,7 @@ TO-BE:
 ### Шаг 3 - Tier B migration
 
 1. Мигрировать medium-risk kernels на mixed path.
-2. Добавить тесты на stability around zero (`macd/ppo/linreg-like outputs`, где применимо).
+2. Добавить тесты на stability around zero (`linreg-like` и другие near-zero outputs, где применимо).
 3. Зафиксировать допуски по метрикам (см. Acceptance).
 
 ### Шаг 4 - Tier C freeze + docs
@@ -213,7 +213,7 @@ python -m tools.docs.generate_docs_index --check
 
 ## Риски
 
-- "Скрытые" sign/crossover flips в near-zero зонах (`macd/ppo/linreg-like`).
+- "Скрытые" sign/crossover flips в near-zero зонах (`linreg-like` и других near-zero outputs).
 - Расхождения на длинных cumulative цепочках (`obv/ad_line`) при full f32.
 - Нестабильность variance-family при больших окнах и низкой волатильности.
 

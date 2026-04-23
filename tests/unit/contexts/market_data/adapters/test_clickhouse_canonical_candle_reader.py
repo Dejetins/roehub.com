@@ -9,14 +9,6 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canon
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, TimeRange, UtcTimestamp
 
 
-class FixedClock:
-    def __init__(self, ts: UtcTimestamp) -> None:
-        self._ts = ts
-
-    def now(self) -> UtcTimestamp:
-        return self._ts
-
-
 class StubGateway:
     def __init__(self) -> None:
         self.calls: list[tuple[str, Mapping[str, Any]]] = []
@@ -59,8 +51,6 @@ def _canonical_row(ts_open: datetime, ingested_at: datetime) -> Mapping[str, Any
 
 
 def test_reader_uses_one_final_query_for_requested_range() -> None:
-    # clock is retained for constructor compatibility but FINAL now handles historical duplicates
-    clock = FixedClock(_ts(datetime(2026, 2, 5, 12, 0, tzinfo=timezone.utc)))
     gw = StubGateway()
 
     instrument = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
@@ -83,7 +73,7 @@ def test_reader_uses_one_final_query_for_requested_range() -> None:
         ],
     ]
 
-    reader = ClickHouseCanonicalCandleReader(gateway=gw, clock=clock)
+    reader = ClickHouseCanonicalCandleReader(gateway=gw)
     out = list(reader.read_1m(instrument, tr))
 
     assert len(out) == 2
@@ -101,7 +91,6 @@ def test_reader_uses_one_final_query_for_requested_range() -> None:
 
 
 def test_reader_reads_columnar_arrays_for_precompute_fast_path() -> None:
-    clock = FixedClock(_ts(datetime(2026, 2, 5, 12, 0, tzinfo=timezone.utc)))
     gw = StubGateway()
     instrument = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
     tr = TimeRange(
@@ -131,7 +120,7 @@ def test_reader_reads_columnar_arrays_for_precompute_fast_path() -> None:
         ],
     ]
 
-    reader = ClickHouseCanonicalCandleReader(gateway=gw, clock=clock)
+    reader = ClickHouseCanonicalCandleReader(gateway=gw)
     batch = reader.read_1m_arrays(instrument, tr)
 
     assert batch.row_count() == 2

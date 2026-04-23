@@ -156,19 +156,16 @@ Candles содержат NaN дырки. Compute **не делает импут�
 - если `x[t]` NaN → `y[t]=NaN` и **state reset**
 - после reset, при следующем валидном `x[t]` стартуем заново с seed `y[t]=x[t]`
 
-**Directional state (psar/supertrend):**
+**Directional state (psar):**
 - при NaN на входах, где невозможно обновить шаг → output NaN и **direction/state reset**
 - после reset — state и direction переинициализируются “с нуля” на первом валидном фрагменте
 
 ### 6) Shift semantics (фикс v1, как в DSL)
 
-`shift(x, periods)` должен быть семантически **единым** во всём контексте (используется в TR/ADX/Ichimoku и т.д.).
+`shift(x, periods)` должен быть семантически **единым** во всём контексте (используется в TR/ADX и других shift-based kernels).
 Конкретная реализация должна соответствовать уже принятой в `_common.py` / существующих kernels.
 
 **Требование EPIC-08:** kernels Trend/Volume обязаны повторить поведение `shift` из общих primitives (не “своё”).
-
-**Ichimoku note:** по спецификации `span_a`/`span_b` используют `shift(..., periods: -displacement)`.
-Это фиксируется как “истина” для v1 и реализуется строго по `indicators_formula.yaml`.
 
 ### 7) Float32 output (фикс)
 
@@ -386,7 +383,7 @@ Grid материализуется через:
 2) совпадение numba vs numpy на фиксированном seed
 3) корректность NaN policy:
    - warmup зоны для rolling окон
-   - reset-on-NaN для stateful цепочек (ADX smoothing, psar/supertrend)
+   - reset-on-NaN для stateful цепочек (ADX smoothing, psar)
 4) dtype/output layout invariants (float32, contiguous)
 
 Предлагаемые пути:

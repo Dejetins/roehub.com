@@ -508,20 +508,10 @@
 |       |   |   |   |   `-- strategy_reader.py
 |       |   |   |   |-- services/
 |       |   |   |   |   |-- __init__.py
-|       |   |   |   |   |-- candle_timeline_builder.py
-|       |   |   |   |   |-- close_fill_scorer_v1.py
-|       |   |   |   |   |-- equity_curve_builder_v1.py
-|       |   |   |   |   |-- execution_engine_v1.py
 |       |   |   |   |   |-- grid_builder_v1.py
 |       |   |   |   |   |-- job_runner_streaming_v1.py
-|       |   |   |   |   |-- metrics_calculator_v1.py
-|       |   |   |   |   |-- numba_runtime_v1.py
-|       |   |   |   |   |-- reporting_service_v1.py
 |       |   |   |   |   |-- run_control_v1.py
 |       |   |   |   |   |-- signals_from_indicators_v1.py
-|       |   |   |   |   |-- staged_core_runner_v1.py
-|       |   |   |   |   |-- staged_runner_v1.py
-|       |   |   |   |   |-- table_formatter_v1.py
 |       |   |   |   |   `-- warmup_estimator.py
 |       |   |   |   `-- use_cases/
 |       |   |   |       |-- __init__.py
@@ -1210,18 +1200,9 @@
 |       |   |   |   |-- dto/
 |       |   |   |   |   `-- test_run_backtest_request.py
 |       |   |   |   |-- services/
-|       |   |   |   |   |-- test_candle_timeline_builder.py
-|       |   |   |   |   |-- test_close_fill_scorer_v1.py
-|       |   |   |   |   |-- test_equity_curve_builder_v1.py
-|       |   |   |   |   |-- test_execution_engine_v1.py
 |       |   |   |   |   |-- test_grid_builder_v1.py
 |       |   |   |   |   |-- test_job_runner_streaming_v1.py
-|       |   |   |   |   |-- test_metrics_calculator_v1.py
-|       |   |   |   |   |-- test_reporting_service_v1.py
-|       |   |   |   |   |-- test_reporting_table_golden_v1.py
 |       |   |   |   |   |-- test_signals_from_indicators_v1.py
-|       |   |   |   |   |-- test_staged_runner_v1.py
-|       |   |   |   |   |-- test_table_formatter_v1.py
 |       |   |   |   |   `-- v2/
 |       |   |   |   |       |-- artifact_testkit_v2.py
 |       |   |   |   |       |-- fixtures/

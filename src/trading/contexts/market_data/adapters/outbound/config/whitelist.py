@@ -22,21 +22,6 @@ class WhitelistRow:
     is_enabled: bool
 
 
-def load_enabled_instruments_from_csv(path: str | Path) -> list[InstrumentId]:
-    """
-    Load whitelist CSV and return only enabled InstrumentId.
-
-    Contract:
-    - required columns: market_id,symbol,is_enabled
-    - symbol: strip + upper (via Symbol)
-    - is_enabled: 0/1 only
-    - duplicates (market_id,symbol): last-win with warning
-    - disabled rows are excluded from returned list
-    """
-    rows = _load_whitelist_rows(path)
-    return [r.instrument_id for r in rows if r.is_enabled]
-
-
 def _load_whitelist_rows(path: str | Path) -> list[WhitelistRow]:
     p = Path(path)
     if not p.exists():
@@ -124,4 +109,3 @@ def load_whitelist_rows_from_csv(path: str | Path) -> list[WhitelistRow]:
     This function is used by EPIC 1 reference data sync (ref_instruments).
     """
     return _load_whitelist_rows(path)
-

@@ -45,24 +45,6 @@ class _RegistryStub(IndicatorRegistry):
                 raise ValueError(f"duplicate indicator_id: {key}")
             defs_by_id[key] = definition
         self._defs_by_id = defs_by_id
-        self._defs = defs
-
-    def list_defs(self) -> tuple[IndicatorDef, ...]:
-        """
-        Return stable tuple of indicator definitions.
-
-        Args:
-            None.
-        Returns:
-            tuple[IndicatorDef, ...]: Hard definitions.
-        Assumptions:
-            Snapshot is immutable for test runtime.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        return self._defs
 
     def get_def(self, indicator_id: IndicatorId) -> IndicatorDef:
         """
@@ -100,24 +82,6 @@ class _RegistryStub(IndicatorRegistry):
             None.
         """
         return ()
-
-    def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
-        """
-        Raise lookup error because merged views are not used in these tests.
-
-        Args:
-            indicator_id: Target indicator id.
-        Returns:
-            MergedIndicatorView: Never returns.
-        Assumptions:
-            Merged-view contract is irrelevant for grid-builder unit tests.
-        Raises:
-            UnknownIndicatorError: Always.
-        Side Effects:
-            None.
-        """
-        raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
-
 
 def _builder() -> GridBuilder:
     """

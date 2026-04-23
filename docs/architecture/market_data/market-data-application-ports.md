@@ -6,7 +6,7 @@
 Цель:
 - определить порты для ingestion/backfill 1m свечей из источников `ws/rest/file`;
 - записывать данные в ClickHouse через `raw_*` таблицы;
-- получать канонические 1m свечи из `market_data.canonical_candles_1m` (источник правды) с контролируемым дедупом на хвосте.
+- получать канонические 1m свечи из `market_data.canonical_candles_1m` (источник правды) детерминированно для offline/precompute чтения.
 
 Источник правды по хранению данных рынка: ClickHouse DDL, в частности:
 - `market_data.raw_binance_klines_1m`
@@ -32,22 +32,20 @@ Application-слой ingestion пишет только в `raw_*` (через п
 Порты не содержат “Binance/Bybit/Vision” в именах и не встраивают знания о протоколах/форматах.
 Конкретная биржа и формат данных — детали адаптеров и wiring (composition root).
 
-### 3) Дедуп при чтении canonical делаем только на хвосте последних 24 часов
+### 3) Canonical reader возвращает детерминированное duplicate-free чтение на всём диапазоне
 Таблица `canonical_candles_1m` использует `ReplacingMergeTree(ingested_at)`, что означает eventual dedup
 (дубликаты возможны до фоновых merge).
 
-Чтобы не использовать `FINAL/argMax` на всей истории, контракт чтения фиксирует:
-- дедуп обязателен **только** для данных, пересекающих последние 24 часа;
-- для более старых данных допускается “как есть”, так как они считаются уже смердженными
-  (или обеспечиваются операционной политикой `OPTIMIZE` на последних партициях).
+Контракт чтения фиксирует не механизм, а результат:
+- consumer получает duplicate-free canonical rows на всём запрошенном диапазоне;
+- порядок строк детерминирован (`ts_open ASC`);
+- реализация дедупа остаётся implementation detail ClickHouse-адаптера.
 
-Дедуп реализуется внутри адаптера ClickHouse (implementation detail), например через:
-- `ORDER BY ingested_at DESC LIMIT 1 BY (market_id, symbol, ts_open)` для хвоста,
-или другие эквивалентные техники без раскрытия в application-слое.
+Текущая реализация использует один `SELECT ... FINAL` по всему диапазону. Это дороже, чем selective tail dedup,
+поэтому reader остаётся ориентированным на offline/precompute workloads, а не на hot path runtime.
 
 ### 4) Clock — обязательная зависимость application-слоя
 Clock нужен для:
-- стабильного определения границы “последних 24 часов”;
 - детерминированных тестов;
 - согласованной трактовки “сейчас” внутри use-cases.
 
@@ -130,21 +128,16 @@ Canonical формируется автоматически через MV.
 `CanonicalCandleReader` — порт чтения канонических 1m свечей из `market_data.canonical_candles_1m`.
 
 **Contract**
-- `read_1m(instrument_id: InstrumentId, time_range: TimeRange, clock: Clock) -> Iterator[CandleWithMeta]`
-
-*(Примечание: clock передаётся как зависимость через конструктор реализации; в контракте показан смысл.)*
+- `read_1m(instrument_id: InstrumentId, time_range: TimeRange) -> Iterator[CandleWithMeta]`
 
 **Semantics**
 - возвращает свечи в пределах полуинтервала `[time_range.start, time_range.end)`
 - SHOULD: выдача отсортирована по `candle.ts_open` по возрастанию
 
-**Dedup rule (важно)**
-- для части диапазона, пересекающей “последние 24 часа” относительно `clock.now()`, порт гарантирует:
-  - не более одной записи на ключ `(instrument_id, candle.ts_open)`
-  - выбирается “последняя версия” по `meta.ingested_at`
-- для данных старше 24 часов допускается чтение “как есть” (без дополнительного дедупа в запросе)
-
-Дедуп реализуется внутри адаптера ClickHouse и не раскрывается потребителям.
+**Reader contract**
+- порт гарантирует duplicate-free canonical rows на всём диапазоне
+- конкретная техника дедупа (`FINAL` или эквивалент) скрыта внутри адаптера
+- reader ориентирован на deterministic offline/precompute reads, а не на hot-path live ingestion
 
 
 ## Notes for Strategy / Live Tail (future)

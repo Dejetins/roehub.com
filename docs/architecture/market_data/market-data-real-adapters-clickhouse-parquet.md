@@ -50,16 +50,15 @@ Parquet-адаптер обязан сгенерировать `instrument_key` 
 - прямых записей в canonical нет;
 - корректность mapping raw->canonical контролируется DDL/MV.
 
-### 4) Dedup в canonical reader — только на хвосте последних 24 часов (без FINAL)
+### 4) Canonical reader делает full-range deterministic read через `FINAL`
 `canonical_candles_1m` использует `ReplacingMergeTree(ingested_at)` → возможны дубликаты до merge.
 
-Чтобы избегать `FINAL/argMax` на всей истории, `CanonicalCandleReader` гарантирует дедуп
-только для части диапазона, пересекающей последние 24 часа относительно `Clock.now()`.
+Текущая реализация `CanonicalCandleReader` делает один `SELECT ... FINAL` на всём запрошенном диапазоне
+и тем самым гарантирует duplicate-free deterministic read без split на “старую” часть и “tail”.
 
-Реализация в ClickHouse адаптере выполняет selective dedup на хвосте, например:
-- `ORDER BY ingested_at DESC LIMIT 1 BY (market_id, symbol, ts_open)`.
-
-Для данных старше 24 часов допускается чтение “как есть” (без доп. дедупа в запросе).
+Следствие:
+- reader проще и предсказуемее для artifact precompute и offline bootstrap;
+- более тяжёлый `FINAL` допустим, потому что этот reader не используется в hot path WS ingestion.
 
 
 ## Реализуемые ports
@@ -163,21 +162,12 @@ Writer принимает `CandleWithMeta` и пишет в одну из raw т
 Это правило относится только к уровню адаптера raw writer и не влияет на доменные примитивы.
 
 
-## ClickHouse CanonicalCandleReader — last-24h dedup
+## ClickHouse CanonicalCandleReader — full-range `FINAL`
 
 Reader читает `market_data.canonical_candles_1m` и реализует правило:
-- “старую” часть диапазона читает обычным SELECT (без дедупа);
-- “хвост” последних 24 часов читает с дедупом без использования FINAL.
-
-Cutoff вычисляется как:
-- `cutoff = clock.now() - 24 hours`
-- далее используется пересечение `TimeRange` с `[cutoff, +inf)`.
-
-Ключ дедупа:
-- `(market_id, symbol, ts_open)`
-
-Победитель выбирается по:
-- максимальному `ingested_at` (последняя версия).
+- выполняет один `SELECT ... FINAL` для всего `TimeRange`;
+- возвращает строки, отсортированные по `ts_open`;
+- не требует `Clock` и не вычисляет отдельный tail cutoff.
 
 
 ## Testing strategy
@@ -186,7 +176,7 @@ Cutoff вычисляется как:
 - Parquet-источник: тестируем обязательные поля, фильтрацию по `InstrumentId` и `[start, end)`,
   корректное построение `InstrumentId` и генерацию `instrument_key`.
 - ClickHouse writer/reader: тестируем построение SQL и payload через `gateway` (FakeGateway),
-  включая маршрутизацию по `market_id` и last-24h dedup разрез диапазона.
+  включая маршрутизацию по `market_id` и full-range `FINAL` query для canonical reader.
 
 ### Integration tests (позже)
 - тесты с реальным ClickHouse (docker) для проверки MV и end-to-end вставки/чтения.

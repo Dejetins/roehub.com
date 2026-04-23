@@ -57,30 +57,6 @@ class PositionV1:
         if self.entry_fee_quote < 0.0:
             raise ValueError("PositionV1.entry_fee_quote must be >= 0")
 
-    def unrealized_gross_pnl_quote(self, *, close_price: float) -> float:
-        """
-        Compute gross unrealized quote PnL at provided close price.
-
-        Args:
-            close_price: Close price used for mark-to-market.
-        Returns:
-            float: Gross unrealized quote PnL without entry/exit fees.
-        Assumptions:
-            Close price is positive finite scalar.
-        Raises:
-            ValueError: If close price is non-positive.
-        Side Effects:
-            None.
-        """
-        if close_price <= 0.0:
-            raise ValueError("close_price must be > 0")
-
-        current_notional = self.qty_base * close_price
-        if self.direction == "long":
-            return current_notional - self.entry_quote_amount
-        return self.entry_quote_amount - current_notional
-
-
 @dataclass(frozen=True, slots=True)
 class TradeV1:
     """

@@ -319,7 +319,6 @@ def build_strategy_live_runner_app(
     )
     canonical_reader = ClickHouseCanonicalCandleReader(
         gateway=clickhouse_gateway,
-        clock=SystemClock(),
         database=clickhouse_settings.database,
     )
 

@@ -53,9 +53,7 @@ from trading.contexts.indicators.application.dto import (
     IndicatorTensor,
     TensorMeta,
 )
-from trading.contexts.indicators.application.dto.registry_view import MergedIndicatorView
 from trading.contexts.indicators.application.ports.compute import IndicatorCompute
-from trading.contexts.indicators.application.ports.registry import IndicatorRegistry
 from trading.contexts.indicators.application.services import GridBuilder, MaterializedAxis
 from trading.contexts.indicators.domain.entities import (
     AxisDef,
@@ -229,7 +227,7 @@ class NumbaIndicatorCompute(IndicatorCompute):
         self._defs_by_id: Mapping[str, IndicatorDef] = MappingProxyType(defs_by_id)
         self._defs: tuple[IndicatorDef, ...] = tuple(ordered_defs)
         self._grid_builder = GridBuilder(
-            registry=_DefinitionsRegistry(defs=self._defs, defs_by_id=self._defs_by_id)
+            registry=_DefinitionsRegistry(defs_by_id=self._defs_by_id)
         )
         self._config = config
         self._workspace_factor = workspace_factor
@@ -550,7 +548,7 @@ class NumbaIndicatorCompute(IndicatorCompute):
         return definition
 
 
-class _DefinitionsRegistry(IndicatorRegistry):
+class _DefinitionsRegistry:
     """
     Minimal immutable registry adapter used by `GridBuilder` inside compute engine.
 
@@ -563,7 +561,6 @@ class _DefinitionsRegistry(IndicatorRegistry):
     def __init__(
         self,
         *,
-        defs: tuple[IndicatorDef, ...],
         defs_by_id: Mapping[str, IndicatorDef],
     ) -> None:
         """
@@ -575,7 +572,6 @@ class _DefinitionsRegistry(IndicatorRegistry):
           src/trading/contexts/indicators/application/services/grid_builder.py
 
         Args:
-            defs: Stable ordered indicator definitions.
             defs_by_id: Immutable indicator lookup mapping.
         Returns:
             None.
@@ -586,30 +582,7 @@ class _DefinitionsRegistry(IndicatorRegistry):
         Side Effects:
             None.
         """
-        self._defs = defs
         self._defs_by_id = defs_by_id
-
-    def list_defs(self) -> tuple[IndicatorDef, ...]:
-        """
-        Return hard definitions tuple.
-
-        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
-        Related:
-          src/trading/contexts/indicators/application/ports/registry/indicator_registry.py,
-          src/trading/contexts/indicators/domain/definitions/__init__.py
-
-        Args:
-            None.
-        Returns:
-            tuple[IndicatorDef, ...]: Stable ordered definitions.
-        Assumptions:
-            Definitions are immutable.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        return self._defs
 
     def get_def(self, indicator_id: IndicatorId) -> IndicatorDef:
         """
@@ -635,50 +608,6 @@ class _DefinitionsRegistry(IndicatorRegistry):
         if definition is None:
             raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
         return definition
-
-    def list_merged(self) -> tuple[MergedIndicatorView, ...]:
-        """
-        Return empty merged-view tuple (not used by compute engine internals).
-
-        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
-        Related:
-          src/trading/contexts/indicators/application/ports/registry/indicator_registry.py,
-          src/trading/contexts/indicators/application/services/grid_builder.py
-
-        Args:
-            None.
-        Returns:
-            tuple[MergedIndicatorView, ...]: Empty tuple.
-        Assumptions:
-            Compute engine needs only `get_def`/`list_defs` for grid materialization.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        return ()
-
-    def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
-        """
-        Reject merged-view lookups for internal compute registry.
-
-        Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
-        Related:
-          src/trading/contexts/indicators/application/ports/registry/indicator_registry.py,
-          src/trading/contexts/indicators/domain/errors/unknown_indicator_error.py
-
-        Args:
-            indicator_id: Target indicator identifier.
-        Returns:
-            MergedIndicatorView: Never returns.
-        Assumptions:
-            Method exists only for protocol completeness.
-        Raises:
-            UnknownIndicatorError: Always for this minimal registry.
-        Side Effects:
-            None.
-        """
-        raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
 
 
 def _prepare_variant_major_values(

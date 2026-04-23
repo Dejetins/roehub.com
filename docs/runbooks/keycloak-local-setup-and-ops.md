@@ -190,6 +190,84 @@ launchctl kickstart -k gui/$(id -u)/com.roehub.api
 curl -fsS http://127.0.0.1:19000/health/ready
 ```
 
+## 9A) Agent E2E Auth Testing
+
+Да, агент может выполнить e2e login flow через:
+
+- `https://roehub.com/api/auth/login`
+- `https://roehub.com/api/auth/callback`
+- `https://roehub.com/api/auth/current-user`
+
+Условия для non-interactive agent flow:
+
+- выделенный test user;
+- у пользователя нет `requiredActions`;
+- для этого пользователя не требуется интерактивный OTP/setup шаг в Keycloak.
+
+Если включен обязательный `CONFIGURE_TOTP`/`VERIFY_PROFILE` или другой required action, headless e2e через `curl` не завершится: нужен интерактивный браузерный шаг.
+
+Пример agent smoke (public edge):
+
+```bash
+set -euo pipefail
+
+export ROEHUB_E2E_USERNAME='<test-username>'
+export ROEHUB_E2E_PASSWORD='<test-password>'
+
+tmp_dir="$(mktemp -d)"
+cookies="${tmp_dir}/cookies.txt"
+login_headers="${tmp_dir}/login_headers.txt"
+auth_page="${tmp_dir}/auth_page.html"
+callback_body="${tmp_dir}/callback_body.txt"
+
+curl -sS -c "${cookies}" -b "${cookies}" -D "${login_headers}" -o /dev/null \
+  'https://roehub.com/api/auth/login?next=%2Fstrategies'
+
+auth_url="$(awk 'BEGIN{IGNORECASE=1} /^location:/{print $2}' "${login_headers}" | tr -d '\r' | tail -n1)"
+curl -sS -c "${cookies}" -b "${cookies}" -o "${auth_page}" "${auth_url}"
+
+form_action="$(grep -o 'action=\"[^\"]*\"' "${auth_page}" | head -n1 | sed 's/action=\"//; s/\"$//')"
+form_action="${form_action//&amp;/&}"
+
+final_url="$(
+  curl -sS -L -c "${cookies}" -b "${cookies}" -o "${callback_body}" \
+    --data-urlencode "username=${ROEHUB_E2E_USERNAME}" \
+    --data-urlencode "password=${ROEHUB_E2E_PASSWORD}" \
+    --data-urlencode 'credentialId=' \
+    "${form_action}" \
+    -w '%{url_effective}'
+)"
+
+current_user_status="$(
+  curl -sS -c "${cookies}" -b "${cookies}" -o "${tmp_dir}/current_user.json" \
+    -w '%{http_code}' 'https://roehub.com/api/auth/current-user'
+)"
+
+logout_status="$(
+  curl -sS -c "${cookies}" -b "${cookies}" -o /dev/null -w '%{http_code}' \
+    -X POST 'https://roehub.com/api/auth/logout'
+)"
+
+after_logout_status="$(
+  curl -sS -c "${cookies}" -b "${cookies}" -o "${tmp_dir}/after_logout.json" \
+    -w '%{http_code}' 'https://roehub.com/api/auth/current-user'
+)"
+
+echo "final_url=${final_url}"
+echo "current_user_status=${current_user_status}"
+cat "${tmp_dir}/current_user.json"
+echo
+echo "logout_status=${logout_status}"
+echo "after_logout_status=${after_logout_status}"
+```
+
+Ожидания для успешного agent e2e:
+
+- `final_url=https://roehub.com/strategies` (или другой `next` path);
+- `current_user_status=200`;
+- `logout_status=204`;
+- `after_logout_status=401`.
+
 ## 10) Monit supervision (рекомендуется)
 
 Keycloak имеет смысл добавить в Monit: это auth entrypoint для web login flow, и при падении `com.roehub.keycloak` вход в систему становится недоступен.

@@ -650,7 +650,7 @@ Acceptance gate:
 
 Что меняем:
 
-- [numba_runtime_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/numba_runtime_v1.py)
+- [numba_runtime_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest_artifacts/application/services/numba_runtime_v1.py)
 - [execution_profile_v2.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/v2/execution_profile_v2.py)
 - [configs/prod/backtest.yaml](/Users/daniildegtyarev/Projects/roehub.com/configs/prod/backtest.yaml)
 

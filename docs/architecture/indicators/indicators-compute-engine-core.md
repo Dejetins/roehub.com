@@ -7,8 +7,6 @@
 - Status: active compute-engine reference for the cleaned indicator catalog used by backtest v2.
 - Canonical product catalog note:
   - runtime-supported backtest indicator ids come from `configs/prod/indicators.yaml`;
-  - removed heavy ids from the final plan stay intentionally absent from prod defaults and are
-    deterministically rejected upstream.
 - Compatibility note:
   - `docs/architecture/indicators/indicators_formula.yaml` may keep wrapper/reference formulas
     that are not default-enabled in prod;
@@ -140,7 +138,7 @@
 
 `kernels/_common.py` включает:
 
-- NaN utils (`is_nan`, `nan_to_zero`, `zero_to_nan`, `first_valid_index`)
+- NaN utils (`is_nan`)
 - rolling primitives (`rolling_sum_grid_f64`, `rolling_mean_grid_f64`)
 - EWMA primitive (`ewma_grid_f64`, EMA/RMA alpha switch)
 - memory helpers (`estimate_tensor_bytes`, `estimate_total_bytes`, `check_total_budget_or_raise`)

@@ -141,7 +141,7 @@ Phase 4 покрывает следующие индикаторы:
 Compute **не делает импутацию**. NaN holes из CandleFeed должны корректно “просачиваться” в outputs.
 
 **A) Windowed (rolling) индикаторы**
-Примеры: stddev/variance/hv/bbands/roc (если windowed)/cci/williams_r/stoch/stoch_rsi
+Примеры: stddev/variance/hv/roc (если windowed)/cci/williams_r/stoch
 
 * `t < window-1` → `NaN` (warmup зона)
 * если в окне есть NaN → output NaN

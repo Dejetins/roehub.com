@@ -284,8 +284,8 @@ UI получает “полный registry”:
 
 Минимально нужно уметь:
 
-* `list_all()` → merged view (hard defs + defaults)
-* `get(indicator_id)` → merged view для одного индикатора (optional)
+* `list_merged()` → merged view (hard defs + defaults)
+* `get_def(indicator_id)` → hard definition для одного индикатора
 
 ### Adapter (implementation)
 

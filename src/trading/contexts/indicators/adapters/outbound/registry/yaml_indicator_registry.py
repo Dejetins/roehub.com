@@ -79,14 +79,11 @@ class YamlIndicatorRegistry(IndicatorRegistry):
             defs=ordered_defs,
             defaults=defaults,
         )
-        merged_by_id = {item.indicator_id: item for item in merged}
 
         self._config_path = normalized_config_path
-        self._defs = ordered_defs
         self._defs_by_id: Mapping[str, IndicatorDef] = MappingProxyType(defs_by_id)
         self._defaults = defaults
         self._merged = merged
-        self._merged_by_id: Mapping[str, MergedIndicatorView] = MappingProxyType(merged_by_id)
 
     @classmethod
     def from_yaml(
@@ -113,23 +110,6 @@ class YamlIndicatorRegistry(IndicatorRegistry):
         """
         defaults = load_indicator_defaults_yaml(config_path)
         return cls(defs=defs, defaults=defaults, config_path=config_path)
-
-    def list_defs(self) -> tuple[IndicatorDef, ...]:
-        """
-        Return all hard definitions in deterministic order.
-
-        Args:
-            None.
-        Returns:
-            tuple[IndicatorDef, ...]: Sorted by `indicator_id`.
-        Assumptions:
-            Registry state is immutable after construction.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        return self._defs
 
     def get_def(self, indicator_id: IndicatorId) -> IndicatorDef:
         """
@@ -167,27 +147,6 @@ class YamlIndicatorRegistry(IndicatorRegistry):
             None.
         """
         return self._merged
-
-    def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
-        """
-        Resolve one merged registry view by id.
-
-        Args:
-            indicator_id: Target indicator identifier.
-        Returns:
-            MergedIndicatorView: Matching merged indicator representation.
-        Assumptions:
-            Merged views are indexed by normalized id.
-        Raises:
-            UnknownIndicatorError: If indicator id is not registered.
-        Side Effects:
-            None.
-        """
-        merged = self._merged_by_id.get(indicator_id.value)
-        if merged is None:
-            raise UnknownIndicatorError(f"unknown indicator_id: {indicator_id.value}")
-        return merged
-
 
 def _merge_registry_views(
     *,

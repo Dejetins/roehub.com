@@ -1,4 +1,4 @@
-from .backfill_1m_candles import Backfill1mCandles, Backfill1mCandlesUseCase
+from .backfill_1m_candles import Backfill1mCandlesUseCase
 from .enrich_ref_instruments_from_exchange import (
     EnrichRefInstrumentsFromExchangeUseCase,
     EnrichRefInstrumentsReport,
@@ -18,7 +18,6 @@ from .sync_whitelist_to_ref_instruments import (
 )
 
 __all__ = [
-    "Backfill1mCandles",
     "Backfill1mCandlesUseCase",
     "EnrichRefInstrumentsFromExchangeUseCase",
     "EnrichRefInstrumentsReport",

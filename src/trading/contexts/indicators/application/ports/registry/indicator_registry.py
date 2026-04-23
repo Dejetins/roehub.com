@@ -20,27 +20,6 @@ class IndicatorRegistry(Protocol):
       - src/trading/contexts/indicators/adapters/outbound/registry/yaml_indicator_registry.py
     """
 
-    def list_defs(self) -> tuple[IndicatorDef, ...]:
-        """
-        Return all indicator definitions available in this registry.
-
-        Docs:
-            - docs/architecture/indicators/indicators-overview.md
-            - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
-
-        Args:
-            None.
-        Returns:
-            tuple[IndicatorDef, ...]: Stable tuple of registered indicator definitions.
-        Assumptions:
-            Returned definitions are immutable and safe to reuse across requests.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        ...
-
     def get_def(self, indicator_id: IndicatorId) -> IndicatorDef:
         """
         Resolve one indicator definition by identifier.
@@ -78,27 +57,6 @@ class IndicatorRegistry(Protocol):
             Defaults are pre-validated and merged deterministically.
         Raises:
             None.
-        Side Effects:
-            None.
-        """
-        ...
-
-    def get_merged(self, indicator_id: IndicatorId) -> MergedIndicatorView:
-        """
-        Resolve one merged registry view by identifier.
-
-        Docs:
-            - docs/architecture/indicators/indicators-overview.md
-            - docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md
-
-        Args:
-            indicator_id: Indicator identifier to resolve.
-        Returns:
-            MergedIndicatorView: Matching merged definition and defaults.
-        Assumptions:
-            Indicator id namespace is unique in registry.
-        Raises:
-            UnknownIndicatorError: If indicator is not present in registry.
         Side Effects:
             None.
         """

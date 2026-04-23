@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 
 from trading.contexts.market_data.adapters.outbound.config.whitelist import (
-    load_enabled_instruments_from_csv,
+    load_whitelist_rows_from_csv,
 )
 
 
-def test_whitelist_last_win_and_filters_disabled(tmp_path: Path) -> None:
+def test_whitelist_last_win_and_preserves_disabled_rows(tmp_path: Path) -> None:
     p = tmp_path / "whitelist.csv"
     p.write_text(
         "market_id,symbol,is_enabled\n"
@@ -19,10 +19,11 @@ def test_whitelist_last_win_and_filters_disabled(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    instruments = load_enabled_instruments_from_csv(p)
-    # BTCUSDT disabled by last-win, only ETHUSDT remains
-    assert len(instruments) == 1
-    assert str(instruments[0]) == "1:ETHUSDT"
+    rows = load_whitelist_rows_from_csv(p)
+    assert [(str(row.instrument_id), row.is_enabled) for row in rows] == [
+        ("1:BTCUSDT", False),
+        ("1:ETHUSDT", True),
+    ]
 
 
 def test_whitelist_requires_columns(tmp_path: Path) -> None:
@@ -30,4 +31,4 @@ def test_whitelist_requires_columns(tmp_path: Path) -> None:
     p.write_text("a,b,c\n1,BTCUSDT,1\n", encoding="utf-8")
 
     with pytest.raises(ValueError):
-        load_enabled_instruments_from_csv(p)
+        load_whitelist_rows_from_csv(p)

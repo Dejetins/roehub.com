@@ -70,9 +70,9 @@ uv run pytest -q tests/unit/contexts/indicators/adapters/outbound/compute_numba/
 
 ## Частые ситуации
 
-- `bbands_percent_b` или `cmf` возвращают NaN на отдельных интервалах:
-  - проверьте нулевой знаменатель (`upper-lower`, `sum(volume)`).
-- `rsi`/`macd` дают длинную NaN-полосу после дырки:
+- `cmf` или `williams_r` возвращают NaN на отдельных интервалах:
+  - проверьте нулевой знаменатель (`sum(volume)`, `highest-high - lowest-low`).
+- `rsi`/`trix` дают длинную NaN-полосу после дырки:
   - это ожидаемый reset-on-NaN + повторный warmup.
 - `pivots` дают поздние значения:
   - это confirm-semantics (`left/right`), не ошибка.

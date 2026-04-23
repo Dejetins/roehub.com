@@ -19,9 +19,6 @@ from trading.contexts.backtest.application.services import (
     BacktestRiskVariantV1,
     BacktestStageABaseVariant,
 )
-from trading.contexts.backtest.application.services.staged_core_runner_v1 import (
-    BacktestStageAScoredVariantV1,
-)
 from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobArtifactPin,
@@ -115,6 +112,16 @@ class _FakeSlotPinnedContext:
     artifact_manifest_hash: str
 
 
+@dataclass(frozen=True, slots=True)
+class _StageAScoredVariant:
+    """
+    Minimal scored Stage-A row fixture for worker orchestration tests.
+    """
+
+    base_variant: BacktestStageABaseVariant
+    total_return_pct: float
+
+
 class _RecordingArtifactSlotResolver:
     """
     Fake resolver recording background bootstrap calls for slot-pinned context assertions.
@@ -188,7 +195,7 @@ class _RecordingStageAShortlistBuilder:
     def __init__(
         self,
         *,
-        rows: tuple[BacktestStageAScoredVariantV1, ...],
+        rows: tuple[_StageAScoredVariant, ...],
     ) -> None:
         """
         Initialize fake builder with fixed deterministic shortlist rows.
@@ -219,7 +226,7 @@ class _RecordingStageAShortlistBuilder:
         batch_size: int | None = None,
         cancel_checker: Any = None,
         on_checkpoint: Any = None,
-    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+    ) -> tuple[_StageAScoredVariant, ...]:
         """
         Record one Stage A build invocation and return predefined shortlist rows.
 
@@ -234,7 +241,7 @@ class _RecordingStageAShortlistBuilder:
             cancel_checker: Optional cancellation hook.
             on_checkpoint: Optional checkpoint hook.
         Returns:
-            tuple[BacktestStageAScoredVariantV1, ...]: Fixed deterministic shortlist rows.
+            tuple[_StageAScoredVariant, ...]: Fixed deterministic shortlist rows.
         Assumptions:
             Fake builder bypasses hot-loop kernels and therefore ignores hooks.
         Raises:
@@ -976,7 +983,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
         batch_size: int | None = None,
         cancel_checker: Any = None,
         on_checkpoint: Any = None,
-    ) -> tuple[BacktestStageAScoredVariantV1, ...]:
+    ) -> tuple[_StageAScoredVariant, ...]:
         """
         Build deterministic shortlist rows directly from Stage-A base variants fixture order.
 
@@ -991,7 +998,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
             cancel_checker: Optional cooperative cancellation hook.
             on_checkpoint: Optional checkpoint hook.
         Returns:
-            tuple[BacktestStageAScoredVariantV1, ...]: Deterministic shortlist rows.
+            tuple[_StageAScoredVariant, ...]: Deterministic shortlist rows.
         Assumptions:
             Tests focus on worker orchestration and do not need real Stage A kernel economics.
         Raises:
@@ -1004,7 +1011,7 @@ class _ArtifactOnlyStageAShortlistBuilder:
             cancel_checker("stage_a")
         base_variants = tuple(grid_context.iter_stage_a_variants())[:shortlist_limit]
         rows = tuple(
-            BacktestStageAScoredVariantV1(
+            _StageAScoredVariant(
                 base_variant=base_variant,
                 total_return_pct=float(index + 1),
             )
@@ -4213,7 +4220,7 @@ def test_process_claimed_job_uses_artifact_stage_a_shortlist_builder_when_availa
     )
     shortlist_builder = _RecordingStageAShortlistBuilder(
         rows=(
-            BacktestStageAScoredVariantV1(
+            _StageAScoredVariant(
                 base_variant=_build_stage_a_variants()[1],
                 total_return_pct=2.0,
             ),

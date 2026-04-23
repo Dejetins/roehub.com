@@ -603,60 +603,6 @@ def _vwap_series_f64(
     return out
 
 
-def _vwap_deviation_upper_series_f64(
-    high: np.ndarray,
-    low: np.ndarray,
-    close: np.ndarray,
-    volume: np.ndarray,
-    window: int,
-    mult: float,
-) -> np.ndarray:
-    """
-    Compute VWAP deviation primary output (`vwap_upper`) for one variant.
-
-    Args:
-        high: High-price series.
-        low: Low-price series.
-        close: Close-price series.
-        volume: Volume series.
-        window: Rolling window.
-        mult: Band multiplier.
-    Returns:
-        np.ndarray: Float64 VWAP upper-band series.
-    Assumptions:
-        Primary output in v1 is `vwap_upper`, which depends on both `window` and `mult`.
-    Raises:
-        None.
-    Side Effects:
-        Allocates intermediate vectors.
-    """
-    vwap = _vwap_series_f64(high, low, close, volume, window)
-    typical_price = _typical_price_series_f64(high, low, close)
-    t_size = high.shape[0]
-
-    diff = np.empty(t_size, dtype=np.float64)
-    for time_index in range(t_size):
-        typical_price_value = float(typical_price[time_index])
-        vwap_value = float(vwap[time_index])
-        if is_nan(typical_price_value) or is_nan(vwap_value):
-            diff[time_index] = np.nan
-        else:
-            diff[time_index] = typical_price_value - vwap_value
-
-    stdev = _rolling_std_series_f64(diff, window)
-    out = np.empty(t_size, dtype=np.float64)
-
-    for time_index in range(t_size):
-        vwap_value = float(vwap[time_index])
-        stdev_value = float(stdev[time_index])
-        if is_nan(vwap_value) or is_nan(stdev_value):
-            out[time_index] = np.nan
-        else:
-            out[time_index] = vwap_value + (mult * stdev_value)
-
-    return out
-
-
 def _cmf_variants_f64(
     high: np.ndarray,
     low: np.ndarray,
@@ -804,50 +750,6 @@ def _vwap_variants_f64(
             close,
             volume,
             int(windows[variant_index]),
-        )
-
-    return out
-
-
-def _vwap_deviation_variants_f64(
-    high: np.ndarray,
-    low: np.ndarray,
-    close: np.ndarray,
-    volume: np.ndarray,
-    windows: np.ndarray,
-    mults: np.ndarray,
-) -> np.ndarray:
-    """
-    Compute VWAP upper-band matrix for per-variant `(window, mult)` pairs.
-
-    Args:
-        high: High-price series.
-        low: Low-price series.
-        close: Close-price series.
-        volume: Volume series.
-        windows: Per-variant window vector.
-        mults: Per-variant multiplier vector.
-    Returns:
-        np.ndarray: Float64 matrix `(V, T)`.
-    Assumptions:
-        Parameter vectors are aligned by variant order in Python wrapper.
-    Raises:
-        None.
-    Side Effects:
-        Allocates one output matrix.
-    """
-    variants = windows.shape[0]
-    t_size = high.shape[0]
-    out = np.empty((variants, t_size), dtype=np.float64)
-
-    for variant_index in range(variants):
-        out[variant_index, :] = _vwap_deviation_upper_series_f64(
-            high,
-            low,
-            close,
-            volume,
-            int(windows[variant_index]),
-            float(mults[variant_index]),
         )
 
     return out

@@ -358,7 +358,6 @@ def _build_publish_use_case_v2(
         artifact_loader=artifact_loader,
         canonical_candle_reader=ClickHouseCanonicalCandleReader(
             gateway=clickhouse_gateway,
-            clock=clock,
             database=clickhouse_settings.database,
         ),
         defaults_provider=defaults_provider,

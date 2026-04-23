@@ -12,7 +12,6 @@ from trading.contexts.market_data.application.dto import (
     CandleWithMeta,
     CanonicalCandleBatch1m,
 )
-from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.contexts.market_data.application.ports.stores.canonical_candle_reader import (
     CanonicalCandleReader,
 )
@@ -39,16 +38,13 @@ class ClickHouseCanonicalCandleReader(CanonicalCandleReader):
       offline/backfill/precompute workloads.
     """
 
-    def __init__(self, gateway: ClickHouseGateway, clock: Clock, database: str = "market_data") -> None:  # noqa: E501
+    def __init__(self, gateway: ClickHouseGateway, database: str = "market_data") -> None:
         if gateway is None:  # type: ignore[truthy-bool]
             raise ValueError("ClickHouseCanonicalCandleReader requires gateway")
-        if clock is None:  # type: ignore[truthy-bool]
-            raise ValueError("ClickHouseCanonicalCandleReader requires clock")
         if not database.strip():
             raise ValueError("ClickHouseCanonicalCandleReader requires non-empty database")
 
         self._gw = gateway
-        self._clock = clock
         self._db = database.strip()
 
     def read_1m(
@@ -125,7 +121,7 @@ class ClickHouseCanonicalCandleReader(CanonicalCandleReader):
             Sequence[CandleWithMeta]: Materialized canonical rows ordered by `ts_open`.
         Assumptions:
             Historical duplicates may still exist in storage, so artifact precompute must not rely
-            on tail-only dedup.
+            on background merges to observe canonical latest state.
         Raises:
             Exception: Propagates gateway failures.
         Side Effects:

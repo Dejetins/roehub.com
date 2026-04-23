@@ -47,70 +47,6 @@ def is_nan(value: float) -> bool:
     return math.isnan(value)
 
 
-@nb.njit(cache=True)
-def nan_to_zero(value: float) -> float:
-    """
-    Convert NaN scalar into zero while preserving finite values.
-
-    Args:
-        value: Floating-point scalar.
-    Returns:
-        float: Zero for NaN; original value otherwise.
-    Assumptions:
-        Used in kernels where NaN should be neutralized for accumulation.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
-    if is_nan(value):
-        return 0.0
-    return value
-
-
-@nb.njit(cache=True)
-def zero_to_nan(value: float) -> float:
-    """
-    Convert exact zero value to NaN.
-
-    Args:
-        value: Floating-point scalar.
-    Returns:
-        float: NaN for zero; original value otherwise.
-    Assumptions:
-        Caller uses this helper only when zero is a sentinel value.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
-    if value == 0.0:
-        return np.nan
-    return value
-
-
-@nb.njit(cache=True)
-def first_valid_index(values: np.ndarray) -> int:
-    """
-    Return index of first non-NaN value or `-1` when not found.
-
-    Args:
-        values: One-dimensional float array.
-    Returns:
-        int: Index of first finite value, or `-1`.
-    Assumptions:
-        Input array is one-dimensional and numeric.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
-    for index in range(values.shape[0]):
-        if not is_nan(values[index]):
-            return index
-    return -1
-
-
 @nb.njit(parallel=True, cache=True)
 def rolling_sum_grid_f64(source: np.ndarray, windows: np.ndarray) -> np.ndarray:
     """
@@ -661,9 +597,7 @@ __all__ = [
     "estimate_total_bytes",
     "ewma_grid_f64",
     "ewma_grid_mixed_f32",
-    "first_valid_index",
     "is_nan",
-    "nan_to_zero",
     "rolling_mean_grid_f32",
     "rolling_mean_grid_f64",
     "rolling_mean_grid_mixed_f32",
@@ -672,5 +606,4 @@ __all__ = [
     "rolling_sum_grid_mixed_f32",
     "write_series_grid_time_major",
     "write_series_grid_variant_major",
-    "zero_to_nan",
 ]

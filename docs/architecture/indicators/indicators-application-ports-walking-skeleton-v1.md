@@ -105,7 +105,7 @@
 
 ### IndicatorRegistry
 Контракт:
-- `list_defs() -> tuple[IndicatorDef, ...]`
+- `list_merged() -> tuple[MergedIndicatorView, ...]`
 - `get_def(indicator_id: IndicatorId) -> IndicatorDef`
 
 Семантика ошибок:
@@ -156,14 +156,14 @@
 
 **Назначение**
 `IndicatorRegistry` — источник описаний индикаторов (library).
-Используется UI/use-cases для получения списка доступных индикаторов и их hard bounds.
+Используется UI/use-cases для получения merged-каталога доступных индикаторов и их hard bounds.
 
 **Контракт**
-- `list_defs() -> tuple[IndicatorDef, ...]`
+- `list_merged() -> tuple[MergedIndicatorView, ...]`
 - `get_def(indicator_id: IndicatorId) -> IndicatorDef`
 
 **Семантика**
-- список детерминирован и стабилен при фиксированной версии кода;
+- merged-список детерминирован и стабилен при фиксированной версии кода;
 - `get_def` выбрасывает доменную ошибку `UnknownIndicatorError`, если индикатор не существует.
 
 ---

@@ -1045,34 +1045,6 @@ def _read_string_claim(*, payload: object, key: str) -> str:
     return str(claim_value).strip()
 
 
-def _read_positive_int_claim(*, payload: object, key: str) -> int | None:
-    """
-    Read optional positive integer claim from payload.
-
-    Args:
-        payload: Parsed JSON payload.
-        key: Claim key to parse.
-    Returns:
-        int | None: Positive integer value, or `None` when absent/invalid/non-positive.
-    Assumptions:
-        Invalid or non-positive values should not fail callback flow.
-    Raises:
-        None.
-    Side Effects:
-        None.
-    """
-    claim_value = _read_claim(payload=payload, key=key)
-    if claim_value is None:
-        return None
-    try:
-        parsed_value = int(str(claim_value).strip())
-    except ValueError:
-        return None
-    if parsed_value <= 0:
-        return None
-    return parsed_value
-
-
 def _require_non_empty_query_value(*, value: str | None, code: str, message: str) -> str:
     """
     Validate query argument as non-empty string and raise deterministic callback error otherwise.

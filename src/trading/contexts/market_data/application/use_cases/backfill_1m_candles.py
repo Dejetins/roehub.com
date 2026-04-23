@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Protocol
+from typing import List
 
 from trading.contexts.market_data.application.dto import (
     Backfill1mCommand,
@@ -14,18 +14,7 @@ from trading.contexts.market_data.application.ports.sources.candle_ingest_source
 from trading.contexts.market_data.application.ports.stores.raw_kline_writer import RawKlineWriter
 
 
-class Backfill1mCandles(Protocol):
-    """
-    Контракт use-case: backfill 1m свечей.
-
-    См. docs/architecture/market_data/market-data-use-case-backfill-1m.md
-    """
-
-    def run(self, command: Backfill1mCommand) -> Backfill1mReport:
-        ...
-
-
-class Backfill1mCandlesUseCase(Backfill1mCandles):
+class Backfill1mCandlesUseCase:
     """
     Реализация use-case backfill 1m свечей.
 

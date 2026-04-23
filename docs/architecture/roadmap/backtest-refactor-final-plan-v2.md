@@ -48,12 +48,8 @@
 
 - [run_backtest.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/use_cases/run_backtest.py)
 - [run_backtest_job_runner_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/use_cases/run_backtest_job_runner_v1.py)
-- [staged_runner_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/staged_runner_v1.py)
-- [staged_core_runner_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/staged_core_runner_v1.py)
-- [close_fill_scorer_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py)
-- [execution_engine_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/execution_engine_v1.py)
 - [grid_builder_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/grid_builder_v1.py)
-- [candle_timeline_builder.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/candle_timeline_builder.py)
+- artifact-backed runtime modules в `src/trading/contexts/backtest_artifacts/application/services/v2/`
 - [indicators_yaml_defaults_provider.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/adapters/outbound/defaults/indicators_yaml_defaults_provider.py)
 - [engine.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py)
 - [market_data_candle_feed.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/market_data_candle_feed.py)
@@ -70,16 +66,17 @@
 
 ## 3. Подтверждённые наблюдения о текущей реализации
 
-### 3.1 Runtime всё ещё зависит от ClickHouse
+### 3.1 Production runtime больше не строит timeline per-request
 
-Текущий sync/jobs path строит candle timeline через:
+Текущий production path разделён так:
 
-- `RunBacktestUseCase`
-- `BacktestCandleTimelineBuilder`
-- `MarketDataCandleFeed`
-- `ClickHouseCanonicalCandleReader`
+- API launch слой работает как gateway-only transport;
+- background worker использует slot-pinned artifact runtime;
+- dense price arrays читаются из опубликованных артефактов, а не собираются в hot path из
+  ClickHouse на каждый запуск.
 
-То есть runtime всё ещё тянет dense `1m` candles из ClickHouse и делает rollup в запросе.
+То есть зависимость от ClickHouse вынесена из active launch/runtime path в precompute/publish
+pipeline.
 
 ### 3.2 Основной bottleneck уже не indicator compute
 
@@ -114,10 +111,11 @@ Backtest signal в текущем контракте — это не бинар�
 
 Проблема в том, что слишком много тяжёлой работы делается прямо в runtime.
 
-### 4.2 Дорогая execution semantics
+### 4.2 Exact replay нужно удерживать вне широкого hot path
 
-`BacktestExecutionEngineV1` работает как stateful close-fill engine с Python per-bar replay.  
-Это слишком дорого для больших variant grids.
+Любой Python-heavy per-bar replay слишком дорог для больших variant grids.  
+Он должен оставаться либо в artifact-backed finalist-only ветках, либо вне основного runtime
+пути вообще.
 
 ### 4.3 Слишком много ненужной гибкости в runtime
 
@@ -242,19 +240,7 @@ Backtest request timeframes:
 
 ### 5.6 Indicators policy
 
-Из всех систем полностью удаляются:
-
-- `momentum.stoch_rsi`
-- `trend.ichimoku`
-- `volatility.bbands`
-- `volatility.bbands_bandwidth`
-- `volatility.bbands_percent_b`
-- `momentum.macd`
-- `momentum.ppo`
-- `trend.chandelier_exit`
-- `volume.vwap_deviation`
-- `trend.keltner`
-- `trend.supertrend`
+Поддерживаемый indicator set определяется текущими hard defs и `configs/*/indicators.yaml`.
 
 Полное удаление означает:
 
@@ -594,14 +580,9 @@ published_at_utc: "2026-03-24T02:00:00Z"
 
 ## 10.2 Backtest runtime services
 
-Старые файлы, переводимые в legacy/compat слой:
-
-- [staged_runner_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/staged_runner_v1.py)
-- [staged_core_runner_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/staged_core_runner_v1.py)
-- [close_fill_scorer_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py)
-- [execution_engine_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/execution_engine_v1.py)
-- [grid_builder_v1.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/grid_builder_v1.py)
-- [candle_timeline_builder.py](/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/backtest/application/services/candle_timeline_builder.py)
+Старый runtime candle/scoring/execution слой был переведён в legacy/compat и затем удалён из
+репозитория. Из v1-служб в актуальном runtime surface остаётся только live grid/snapshot/signal
+инфраструктура и artifact-backed runtime в `backtest_artifacts`.
 
 Новые файлы/модули:
 

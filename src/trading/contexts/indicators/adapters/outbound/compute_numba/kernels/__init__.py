@@ -12,9 +12,7 @@ from ._common import (
     ewma_grid_f32,
     ewma_grid_f64,
     ewma_grid_mixed_f32,
-    first_valid_index,
     is_nan,
-    nan_to_zero,
     rolling_mean_grid_f32,
     rolling_mean_grid_f64,
     rolling_mean_grid_mixed_f32,
@@ -23,7 +21,6 @@ from ._common import (
     rolling_sum_grid_mixed_f32,
     write_series_grid_time_major,
     write_series_grid_variant_major,
-    zero_to_nan,
 )
 from .ma import compute_ma_grid_f32, is_supported_ma_indicator
 from .momentum import compute_momentum_grid_f32, is_supported_momentum_indicator
@@ -46,9 +43,7 @@ __all__ = [
     "estimate_total_bytes",
     "ewma_grid_f64",
     "ewma_grid_mixed_f32",
-    "first_valid_index",
     "is_nan",
-    "nan_to_zero",
     "rolling_mean_grid_f32",
     "rolling_mean_grid_f64",
     "rolling_mean_grid_mixed_f32",
@@ -57,7 +52,6 @@ __all__ = [
     "rolling_sum_grid_mixed_f32",
     "write_series_grid_time_major",
     "write_series_grid_variant_major",
-    "zero_to_nan",
     "compute_ma_grid_f32",
     "is_supported_ma_indicator",
     "compute_momentum_grid_f32",

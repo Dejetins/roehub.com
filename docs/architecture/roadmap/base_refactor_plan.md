@@ -63,18 +63,6 @@
 - Risk semantics фиксируются как `1m hit-time only`.
 - Signals хранятся как `int8` с кодировкой `{-1, 0, 1}`.
 - Layout signal matrices фиксируется как `[V, T_tf]`.
-- Из всех систем полностью удаляются:
-  - `momentum.stoch_rsi`
-  - `trend.ichimoku`
-  - `volatility.bbands`
-  - `volatility.bbands_bandwidth`
-  - `volatility.bbands_percent_b`
-  - `momentum.macd`
-  - `momentum.ppo`
-  - `trend.chandelier_exit`
-  - `volume.vwap_deviation`
-  - `trend.keltner`
-  - `trend.supertrend`
 - `signals.v1.params` добавляются в `configs/*/indicators.yaml`, но в initial v2 работают только как default-only.
 - `POST /backtests` становится create-and-execute persisted run endpoint.
 - Отдельный ручной `Estimate preflight` убирается из пользовательского launch flow.
@@ -1257,13 +1245,8 @@ Post-R10 additive follow-up:
 **Цель:** исключить runtime-зависимости, от которых v2 должен был избавить систему.
 
 **Scope:**
-- убрать/закрыть production path через:
-  - `candle_timeline_builder.py`
-  - `staged_runner_v1.py`
-  - `staged_core_runner_v1.py`
-  - `close_fill_scorer_v1.py`
-  - `execution_engine_v1.py`
-  - `grid_builder_v1.py`
+- убрать/закрыть production path через legacy candle/scoring/execution pipeline;
+- сохранить `grid_builder_v1.py` только как grid-expansion слой там, где он ещё нужен;
 - оставить controlled legacy fallback только на переходный период, если это явно нужно rollout'у;
 - затем удалить fallback.
 
@@ -1275,12 +1258,8 @@ Post-R10 additive follow-up:
 - v2 является единственным production path для покрытого scope.
 
 **Основные файлы:**
-- `src/trading/contexts/backtest/application/services/staged_runner_v1.py`
-- `src/trading/contexts/backtest/application/services/staged_core_runner_v1.py`
-- `src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py`
-- `src/trading/contexts/backtest/application/services/execution_engine_v1.py`
 - `src/trading/contexts/backtest/application/services/grid_builder_v1.py`
-- `src/trading/contexts/backtest/application/services/candle_timeline_builder.py`
+- artifact-backed runtime modules в `src/trading/contexts/backtest_artifacts/application/services/v2/`
 
 ---
 
