@@ -41,7 +41,6 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ClickHouseCanonicalCandleReader,
     ClickHouseConnectGateway,
 )
-from trading.platform.time.system_clock import SystemClock
 
 log = logging.getLogger(__name__)
 
@@ -331,7 +330,6 @@ def _build_publish_use_case_v2(
     pointer_writer = AtomicArtifactCurrentPointerWriterV2(path_resolver=path_builder)
     clickhouse_settings = ClickHouseSettingsLoader(environ).load()
     clickhouse_gateway = ClickHouseConnectGateway(_clickhouse_client(clickhouse_settings))
-    clock = SystemClock()
     strategy_postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     if not strategy_postgres_dsn:
         raise ValueError("STRATEGY_PG_DSN is required for backtest-artifact-publish CLI")

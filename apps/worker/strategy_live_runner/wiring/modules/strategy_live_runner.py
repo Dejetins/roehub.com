@@ -43,7 +43,6 @@ from trading.contexts.strategy.application import (
     StrategyLiveRunnerIterationReport,
     TelegramNotificationPolicy,
 )
-from trading.platform.time.system_clock import SystemClock
 
 log = logging.getLogger(__name__)
 

@@ -55,7 +55,6 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ThreadLocalClickHouseConnectGateway,
 )
 from trading.contexts.market_data.application.ports.stores import EnabledInstrumentReader
-from trading.platform.time.system_clock import SystemClock
 
 log = logging.getLogger(__name__)
 
@@ -865,7 +864,6 @@ def build_backtest_artifact_publisher_app(
     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
         client_factory=lambda: _clickhouse_client(clickhouse_settings)
     )
-    clock = SystemClock()
     strategy_postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     if not strategy_postgres_dsn:
         raise ValueError("STRATEGY_PG_DSN is required for backtest-artifact-publisher scheduler")
