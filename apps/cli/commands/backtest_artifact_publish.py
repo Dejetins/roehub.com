@@ -41,6 +41,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ClickHouseCanonicalCandleReader,
     ClickHouseConnectGateway,
 )
+from trading.platform.time.system_clock import SystemClock  # noqa: F401
 
 log = logging.getLogger(__name__)
 
