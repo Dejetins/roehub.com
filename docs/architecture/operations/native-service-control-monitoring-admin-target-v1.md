@@ -9,12 +9,14 @@
 - Публичный edge остается на VPS (`roehub.com`), backend на `Mac Studio` остается private.
 - Собственный billing-модуль не разрабатывается.
 - `Backtest artifact publisher` управляется через `Monit` поверх `launchd`.
+- Backtest-контур (`com.roehub.backtest-job-runner.*`, `com.roehub.backtest-artifact-publisher` и последующие backtest services) входит в обязательный Prometheus monitoring baseline.
 
 ## Архитектурные решения
 
 - `launchd` отвечает за запуск/перезапуск сервисов как process supervisor.
 - `Monit` отвечает за service-level контроль состояния, рестарты по health-правилам и операционные алерты.
 - `Prometheus + exporters + blackbox` отвечают за сбор метрик и probes.
+- Для backtest-контура Prometheus является обязательным системным источником правды по runtime/freshness/failure метрикам и alerting rules.
 - `Grafana` отвечает за визуализацию и дашборды.
 - `Alertmanager` отвечает за маршрутизацию алертов.
 - Доменная админка и операционные действия выполняются через FastAPI admin surface (`SQLAdmin` + явные action endpoints).
@@ -28,8 +30,8 @@
 | `com.roehub.api` | `launchd` + `Monit` process/port checks | `/metrics`, blackbox HTTP probe, API SLI | `SQLAdmin` для доменных сущностей, ops endpoints для control actions |
 | `com.roehub.market-data-ws-worker` | `launchd` + `Monit` | `:9201` (`ws_*`, `insert_*`), restart/error alerts | restart/pause/resume через admin actions |
 | `com.roehub.market-data-scheduler` | `launchd` + `Monit` | `:9202` (`scheduler_job_runs_total`, `scheduler_job_errors_total`) | trigger/reschedule job actions |
-| `com.roehub.backtest-job-runner.*` | `launchd` fleet + `Monit` per instance | `:9204+N`, queue lag/state metrics, lease health | cancel/retry/requeue/top через admin API |
-| `com.roehub.backtest-artifact-publisher` | `launchd` + `Monit` (обязательно) | process + freshness/lag check program + publish metrics | run-now/rebuild/switch-slot действия |
+| `com.roehub.backtest-job-runner.*` | `launchd` fleet + `Monit` per instance | `:9204+N` `/metrics`, queue lag/state metrics, lease health, runner failure/duration metrics, Prometheus alert rules | cancel/retry/requeue/top через admin API |
+| `com.roehub.backtest-artifact-publisher` | `launchd` + `Monit` (обязательно) | Prometheus-compatible publish/freshness/failure metrics (`/metrics` или exporter bridge для batch-режима), freshness/lag alerts | run-now/rebuild/switch-slot действия |
 | `strategy-live-runner` (target) | `launchd` + `Monit` + control-plane lease model | `:9203`, heartbeat/command lag/failure metrics | start/stop/pause/resume, kill-switch, incident actions |
 | PostgreSQL | `brew services`/`launchd` + `Monit` | `postgres-exporter` + TCP probe | `pgAdmin 4` (role/db/session ops) |
 | Redis | `brew services`/`launchd` + `Monit` | `redis-exporter` + memory/latency alerts | `redis-commander` (streams/keys ops) |
@@ -77,6 +79,19 @@
 
 ## Target picture по каждому сервису
 
+### Backtest monitoring contour
+
+- Все backtest services рассматриваются как единый production monitoring contour, а не только как process checks через `Monit`.
+- Каждый backtest service обязан публиковать Prometheus-compatible service metrics; для batch/ephemeral сценариев допустим exporter/textfile bridge, если прямой `/metrics` endpoint не подходит.
+- В `Prometheus` фиксируются отдельные scrape jobs, recording rules и alert rules для backtest-контура.
+- В `Grafana` фиксируется отдельный dashboard set по backtest execution/publishing pipeline.
+- Минимальный обязательный набор сигналов по backtest-контуру:
+  - throughput/state transitions,
+  - failure/error counters,
+  - duration histograms,
+  - freshness/lag metrics,
+  - last-success timestamp для batch-процессов.
+
 ### 1) API (`com.roehub.api`)
 
 - Запуск: `launchd`.
@@ -121,10 +136,13 @@
 - Запуск: materialized `launchd` instances из `worker_processes`.
 - Контроль: `Monit` на каждый instance (process + metrics endpoint).
 - Мониторинг:
+  - обязательный Prometheus scrape каждого instance,
   - claimed/finished/failed counters,
   - active claimed jobs,
   - duration histogram,
-  - queue lag по БД состояниям.
+  - queue lag по БД состояниям,
+  - lease/heartbeat health,
+  - alert rules на stalled runner, failure burst и queue lag saturation.
 - Админ-операции:
   - cancel/retry/requeue job,
   - quarantine noisy user job,
@@ -138,9 +156,13 @@
   - health script на freshness манифестов,
   - restart/alert policy.
 - Мониторинг:
-  - publish duration,
-  - last successful publish timestamp,
-  - artifact freshness lag.
+  - Prometheus-compatible metrics обязательны, даже если publisher работает как batch/scheduled service,
+  - `backtest_artifact_publish_runs_total`,
+  - `backtest_artifact_publish_failures_total`,
+  - `backtest_artifact_publish_duration_seconds`,
+  - `backtest_artifact_last_success_unixtime`,
+  - `backtest_artifact_freshness_lag_seconds`,
+  - alert rules на publish failures, stale artifacts и отсутствие successful publish в допустимом окне.
 - Админ-операции:
   - run-now,
   - full rebuild trigger,
@@ -190,10 +212,12 @@
 - Мониторинг:
   - self-health checks для самого monitoring stack,
   - alert delivery success,
-  - scrape failure budget.
+  - scrape failure budget,
+  - выделенные scrape/rule groups для backtest execution и artifact publishing.
 - Админ-операции:
   - alert routing/silences,
-  - dashboard ownership и release discipline через git.
+  - dashboard ownership и release discipline через git,
+  - versioned Prometheus/Grafana config для backtest monitoring baseline.
 
 ### 11) Identity (`Keycloak`)
 
@@ -230,11 +254,13 @@
 ## Поэтапное внедрение
 
 1. Зафиксировать `Monit` для всех текущих `launchd` сервисов, включая `backtest-artifact-publisher`.
-2. Закрыть внешний доступ к внутренним metrics endpoints.
-3. Включить `Alertmanager` routing для критичных алертов.
-4. Поднять `Keycloak` и интегрировать API auth/RBAC.
-5. Выбрать billing engine (`Kill Bill` как baseline, `Lago` как ускоренный вариант) и подключить subscription sync.
-6. Внедрить `strategy-control-plane` и после этого запускать live runner в production режиме.
+2. Добавить Prometheus instrumentation и scrape-конфигурацию для backtest services, включая `backtest-artifact-publisher`.
+3. Собрать отдельные Grafana dashboards и Prometheus/Alertmanager rules для backtest execution и artifact publishing.
+4. Закрыть внешний доступ к внутренним metrics endpoints.
+5. Включить `Alertmanager` routing для критичных алертов.
+6. Поднять `Keycloak` и интегрировать API auth/RBAC.
+7. Выбрать billing engine (`Kill Bill` как baseline, `Lago` как ускоренный вариант) и подключить subscription sync.
+8. Внедрить `strategy-control-plane` и после этого запускать live runner в production режиме.
 
 ## Связанные документы
 
