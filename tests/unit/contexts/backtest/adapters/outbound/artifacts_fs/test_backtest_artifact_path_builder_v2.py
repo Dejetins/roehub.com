@@ -7,6 +7,7 @@ import pytest
 
 from trading.contexts.backtest.adapters.outbound import BacktestArtifactPathBuilderV2
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    HIT_TIMES_TIMEFRAME_LITERAL_V2,
     ArtifactCoordinatesV2,
 )
 
@@ -109,7 +110,14 @@ def test_backtest_artifact_path_builder_v2_builds_canonical_paths(tmp_path: Path
     )
 
     assert builder.hit_times_manifest_path(coordinates, "slot_b") == (
-        root / "binance" / "spot" / "BTCUSDT" / "slot_b" / "hit_times" / "1m" / "manifest.yaml"
+        root
+        / "binance"
+        / "spot"
+        / "BTCUSDT"
+        / "slot_b"
+        / "hit_times"
+        / HIT_TIMES_TIMEFRAME_LITERAL_V2
+        / "manifest.yaml"
     )
 
 

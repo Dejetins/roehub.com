@@ -15,6 +15,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_r
     ArtifactSlotResolverV2,
 )
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    HIT_TIMES_TIMEFRAME_LITERAL_V2,
     ArtifactPinnedIdentityV2,
     ArtifactSlotPinnedRuntimeContextV2,
 )
@@ -52,7 +53,7 @@ def test_price_arrays_loader_v2_loads_prices_mappings_and_hit_times_with_mmap(
     synthetic_artifact_store_v2: SyntheticArtifactStoreV2,
 ) -> None:
     """
-    Verify the mmap loader opens explicit `prices/<tf>`, `mappings/<tf>`, and `hit_times/1m`.
+    Verify the mmap loader opens explicit `prices/<tf>`, `mappings/<tf>`, and `hit_times/15m`.
 
     Args:
         synthetic_artifact_store_v2: Fixture with a strict synthetic artifact tree.
@@ -93,7 +94,7 @@ def test_price_arrays_loader_v2_loads_prices_mappings_and_hit_times_with_mmap(
     assert tuple(int(value) for value in mapping_arrays.bar_open_1m_idx) == (0, 2)
     assert tuple(int(value) for value in mapping_arrays.bar_close_1m_idx) == (1, 3)
     assert hit_times_arrays.manifest.sentinel_index == 4
-    assert isinstance(hit_times_arrays.long_tp, np.memmap)
+    assert isinstance(hit_times_arrays.long_tp, np.ndarray)
     assert repeated_prices is one_minute_prices
     assert repeated_mappings is mapping_arrays
     assert repeated_hit_times is hit_times_arrays
@@ -237,7 +238,7 @@ def test_price_arrays_loader_v2_rejects_hit_times_sentinel_drift(
     Returns:
         None.
     Assumptions:
-        Runtime `hit_times/1m` loading must reject sentinel drift before Stage B uses the tables.
+        Runtime `hit_times/15m` loading must reject sentinel drift before Stage B uses the tables.
     Raises:
         AssertionError: If sentinel drift is accepted.
     Side Effects:
@@ -303,7 +304,7 @@ def test_price_arrays_loader_v2_avoids_directory_scanning(
 
     assert price_arrays.timeframe == "1m"
     assert mapping_arrays.timeframe == "15m"
-    assert hit_times_arrays.manifest.timeframe == "1m"
+    assert hit_times_arrays.manifest.timeframe == HIT_TIMES_TIMEFRAME_LITERAL_V2
 
 
 def _inactive_context(

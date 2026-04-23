@@ -377,7 +377,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         slot: str,
     ) -> ArtifactHitTimesManifestDocumentV2:
         """
-        Read the fixed `hit_times/1m/manifest.yaml` via deterministic coordinates.
+        Read the fixed `hit_times/15m/manifest.yaml` via deterministic coordinates.
 
         Args:
             coordinates: Validated artifact coordinates.
@@ -412,10 +412,10 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         slot: ArtifactSlotLiteralV2,
     ) -> ArtifactHitTimesManifestDocumentV2:
         """
-        Read one `hit_times/1m/manifest.yaml` from an explicit already-known path.
+        Read one `hit_times/15m/manifest.yaml` from an explicit already-known path.
 
         Args:
-            path: Full path to `hit_times/1m/manifest.yaml`.
+            path: Full path to `hit_times/15m/manifest.yaml`.
             slot: Explicit slot literal associated with the path.
         Returns:
             ArtifactHitTimesManifestDocumentV2: Parsed strict hit-times manifest.
@@ -641,7 +641,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         self, coordinates: ArtifactCoordinatesV2, slot: str
     ) -> Path:
         """
-        Resolve `hit_times/1m/manifest.yaml` without touching disk.
+        Resolve `hit_times/15m/manifest.yaml` without touching disk.
 
         Args:
             coordinates: Validated artifact coordinates.
@@ -668,7 +668,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         slot: str,
     ) -> ArtifactHitTimesPathsV2:
         """
-        Resolve the fixed `hit_times/1m/` artifact paths without touching disk.
+        Resolve the fixed `hit_times/15m/` artifact paths without touching disk.
 
         Args:
             coordinates: Validated artifact coordinates.
@@ -965,7 +965,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         slot: ArtifactSlotLiteralV2,
     ) -> ArtifactHitTimesManifestDocumentV2:
         """
-        Parse one strict `hit_times/1m/manifest.yaml` payload into typed DTOs.
+        Parse one strict `hit_times/15m/manifest.yaml` payload into typed DTOs.
 
         Args:
             path: Source manifest path.
@@ -1448,7 +1448,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Returns:
             ArtifactHitTimesReferenceV2: Typed hit-times reference.
         Assumptions:
-            Root manifests reference exactly one fixed `hit_times/1m/manifest.yaml`.
+            Root manifests reference exactly one fixed `hit_times/15m/manifest.yaml`.
         Raises:
             ValueError: If nested keys or values are invalid.
         Side Effects:

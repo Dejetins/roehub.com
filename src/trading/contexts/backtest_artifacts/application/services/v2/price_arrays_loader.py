@@ -1,4 +1,4 @@
-"""Explicit-path mmap loaders for prices, mappings, and `hit_times/1m` runtime artifacts."""
+"""Explicit-path mmap loaders for prices, mappings, and `hit_times/15m` runtime artifacts."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from .contracts import (
     ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2,
     ARTIFACT_PRICE_TIME_DTYPE_LITERAL_V2,
     ARTIFACT_TIME_AXIS_ORDER_V2,
+    HIT_TIMES_TIMEFRAME_LITERAL_V2,
     ArtifactArrayMetadataV2,
     ArtifactHitTimesArraysV2,
     ArtifactHitTimesManifestDocumentV2,
@@ -269,7 +270,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
         context: ArtifactSlotPinnedRuntimeContextV2,
     ) -> ArtifactHitTimesArraysV2:
         """
-        Load strict `hit_times/1m` arrays from explicit manifest-driven paths.
+        Load strict `hit_times/<tf>` arrays from explicit manifest-driven paths.
 
         Args:
             context: Shared slot-pinned context resolved at runtime start.
@@ -277,7 +278,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             ArtifactHitTimesArraysV2: Cached-or-new memory-mapped hit-times arrays and strict
                 manifest metadata.
         Assumptions:
-            Runtime must consume shipped `hit_times/1m` artifacts only by explicit manifest path
+            Runtime must consume shipped `hit_times/<tf>` artifacts only by explicit manifest path
             and fixed metadata; no recompute or directory discovery is allowed.
         Raises:
             FileNotFoundError: If hit-times manifest or one referenced `.npy` file is missing.
@@ -295,7 +296,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
         cache_key = _artifact_family_cache_key_v2(
             context=context,
             family_literal="hit_times",
-            member_literal="1m",
+            member_literal=f"runtime:{HIT_TIMES_TIMEFRAME_LITERAL_V2}",
         )
         cached = self._hit_times_cache.get(cache_key)
         if cached is not None:
@@ -318,7 +319,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             expected_dtype=ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
             expected_axis_order=ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
             expected_shape=(hit_times_manifest.tp_values.shape[0],),
-            location="hit_times/1m/tp_values",
+            location=f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/tp_values",
         )
         sl_values = _load_mmap_array(
             context=context,
@@ -327,7 +328,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             expected_dtype=ARTIFACT_HIT_TIMES_GRID_DTYPE_LITERAL_V2,
             expected_axis_order=ARTIFACT_HIT_TIMES_LEVEL_AXIS_ORDER_V2,
             expected_shape=(hit_times_manifest.sl_values.shape[0],),
-            location="hit_times/1m/sl_values",
+            location=f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/sl_values",
         )
         timeline_shape = (hit_times_manifest.timeline_bar_count,)
         long_tp = _load_mmap_array(
@@ -337,7 +338,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             expected_dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
             expected_axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
             expected_shape=(tp_values.shape[0], timeline_shape[0]),
-            location="hit_times/1m/long_tp",
+            location=f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/long_tp",
         )
         long_sl = _load_mmap_array(
             context=context,
@@ -346,7 +347,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             expected_dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
             expected_axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
             expected_shape=(sl_values.shape[0], timeline_shape[0]),
-            location="hit_times/1m/long_sl",
+            location=f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/long_sl",
         )
         short_tp = _load_mmap_array(
             context=context,
@@ -355,7 +356,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             expected_dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
             expected_axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
             expected_shape=(tp_values.shape[0], timeline_shape[0]),
-            location="hit_times/1m/short_tp",
+            location=f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/short_tp",
         )
         short_sl = _load_mmap_array(
             context=context,
@@ -364,7 +365,7 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             expected_dtype=ARTIFACT_HIT_TIMES_TABLE_DTYPE_LITERAL_V2,
             expected_axis_order=ARTIFACT_HIT_TIMES_TABLE_AXIS_ORDER_V2,
             expected_shape=(sl_values.shape[0], timeline_shape[0]),
-            location="hit_times/1m/short_sl",
+            location=f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/short_sl",
         )
         _validate_hit_times_contract(
             hit_times_manifest=hit_times_manifest,
@@ -375,14 +376,49 @@ class MmapPriceArraysLoaderV2(BacktestPriceArraysLoaderV2):
             short_tp=short_tp,
             short_sl=short_sl,
         )
+        runtime_manifest = hit_times_manifest
+        runtime_long_tp = long_tp
+        runtime_long_sl = long_sl
+        runtime_short_tp = short_tp
+        runtime_short_sl = short_sl
+        if HIT_TIMES_TIMEFRAME_LITERAL_V2 != "1m":
+            one_minute_manifest = _price_manifest_for_timeframe(context=context, timeframe="1m")
+            hit_times_mapping = self.load_mapping_arrays(
+                context=context,
+                timeframe=HIT_TIMES_TIMEFRAME_LITERAL_V2,
+            )
+            runtime_long_tp, runtime_long_sl, runtime_short_tp, runtime_short_sl = (
+                _expand_hit_times_tables_to_one_minute_timeline_v2(
+                    one_minute_bar_count=one_minute_manifest.coverage.bar_count,
+                    hit_times_bar_close_1m_idx=hit_times_mapping.bar_close_1m_idx,
+                    hit_times_sentinel_index=hit_times_manifest.sentinel_index,
+                    long_tp=long_tp,
+                    long_sl=long_sl,
+                    short_tp=short_tp,
+                    short_sl=short_sl,
+                )
+            )
+            runtime_manifest = _build_runtime_hit_times_manifest_for_one_minute_execution_v2(
+                source_manifest=hit_times_manifest,
+                one_minute_bar_count=one_minute_manifest.coverage.bar_count,
+            )
+            _validate_hit_times_contract(
+                hit_times_manifest=runtime_manifest,
+                tp_values=tp_values,
+                sl_values=sl_values,
+                long_tp=runtime_long_tp,
+                long_sl=runtime_long_sl,
+                short_tp=runtime_short_tp,
+                short_sl=runtime_short_sl,
+            )
         loaded = ArtifactHitTimesArraysV2(
-            manifest=hit_times_manifest,
+            manifest=runtime_manifest,
             tp_values=tp_values,
             sl_values=sl_values,
-            long_tp=long_tp,
-            long_sl=long_sl,
-            short_tp=short_tp,
-            short_sl=short_sl,
+            long_tp=runtime_long_tp,
+            long_sl=runtime_long_sl,
+            short_tp=runtime_short_tp,
+            short_sl=runtime_short_sl,
         )
         self._hit_times_cache[cache_key] = loaded
         return loaded
@@ -716,6 +752,158 @@ def _validate_mapping_contract(
         )
 
 
+def _build_runtime_hit_times_manifest_for_one_minute_execution_v2(
+    *,
+    source_manifest: ArtifactHitTimesManifestDocumentV2,
+    one_minute_bar_count: int,
+) -> ArtifactHitTimesManifestDocumentV2:
+    """
+    Build a runtime-local hit-times manifest aligned to `1m` execution timeline length.
+
+    Args:
+        source_manifest: Parsed on-disk hit-times manifest for `HIT_TIMES_TIMEFRAME_LITERAL_V2`.
+        one_minute_bar_count: Root `prices/1m` coverage bar count for execution kernels.
+    Returns:
+        ArtifactHitTimesManifestDocumentV2: Runtime-local manifest with execution-aligned
+            `timeline_bar_count` and `sentinel_index`.
+    Assumptions:
+        Runtime loaders may expand hit-times tables from storage timeframe to `1m` execution
+        timeline while preserving manifest identity and provenance fields.
+    Raises:
+        ValueError: If `one_minute_bar_count` is not positive.
+    Side Effects:
+        None.
+    """
+    if one_minute_bar_count <= 0:
+        raise ValueError(
+            f"one_minute_bar_count must be > 0 for runtime hit-times expansion, got "
+            f"{one_minute_bar_count!r}"
+        )
+    return ArtifactHitTimesManifestDocumentV2(
+        path=source_manifest.path,
+        raw_payload=source_manifest.raw_payload,
+        slot=source_manifest.slot,
+        schema_version=source_manifest.schema_version,
+        manifest_kind=source_manifest.manifest_kind,
+        slot_generation=source_manifest.slot_generation,
+        asof_date=source_manifest.asof_date,
+        timeframe=source_manifest.timeframe,
+        timeline_bar_count=one_minute_bar_count,
+        sentinel_index=one_minute_bar_count,
+        tp_values=source_manifest.tp_values,
+        sl_values=source_manifest.sl_values,
+        long_tp=source_manifest.long_tp,
+        long_sl=source_manifest.long_sl,
+        short_tp=source_manifest.short_tp,
+        short_sl=source_manifest.short_sl,
+        provenance=source_manifest.provenance,
+    )
+
+
+def _expand_hit_times_tables_to_one_minute_timeline_v2(
+    *,
+    one_minute_bar_count: int,
+    hit_times_bar_close_1m_idx: np.ndarray,
+    hit_times_sentinel_index: int,
+    long_tp: np.ndarray,
+    long_sl: np.ndarray,
+    short_tp: np.ndarray,
+    short_sl: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """
+    Expand stored hit-times tables from hit-times timeframe into `1m` execution coordinates.
+
+    Args:
+        one_minute_bar_count: Root `prices/1m` bar count for execution timeline.
+        hit_times_bar_close_1m_idx: `mappings/<hit_times_tf>.bar_close_1m_idx` vector.
+        hit_times_sentinel_index: Stored hit-times sentinel index (`T_hit_times`).
+        long_tp: Stored `long_tp` table shaped `[N_tp, T_hit_times]`.
+        long_sl: Stored `long_sl` table shaped `[N_sl, T_hit_times]`.
+        short_tp: Stored `short_tp` table shaped `[N_tp, T_hit_times]`.
+        short_sl: Stored `short_sl` table shaped `[N_sl, T_hit_times]`.
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+            Expanded `uint32` tables shaped `[N_level, T_1m]` with `1m` execution indexes and
+            sentinel `T_1m`.
+    Assumptions:
+        Stored hit-times tables are monotone by level in their native timeline, and mapping close
+        indexes are non-decreasing and bounded by `prices/1m`.
+    Raises:
+        ValueError: If mapping/table shapes are inconsistent or bounds are invalid.
+    Side Effects:
+        Allocates dense expanded tables in memory.
+    """
+    if one_minute_bar_count <= 0:
+        raise ValueError(f"one_minute_bar_count must be > 0, got {one_minute_bar_count!r}")
+    if hit_times_sentinel_index <= 0:
+        raise ValueError(
+            f"hit_times_sentinel_index must be > 0, got {hit_times_sentinel_index!r}"
+        )
+    mapping_close = np.asarray(hit_times_bar_close_1m_idx, dtype=np.int64)
+    if mapping_close.ndim != 1:
+        raise ValueError("hit_times_bar_close_1m_idx must be a 1D array")
+    if int(mapping_close.shape[0]) != hit_times_sentinel_index:
+        raise ValueError(
+            "hit-times mapping length must match sentinel index; got "
+            f"{mapping_close.shape[0]!r}, expected {hit_times_sentinel_index!r}"
+        )
+    if bool(np.any(mapping_close < 0)) or bool(np.any(mapping_close >= one_minute_bar_count)):
+        raise ValueError(
+            "hit-times mapping indexes must stay within prices/1m bounds "
+            f"[0, {one_minute_bar_count}); got min={int(np.min(mapping_close))!r} "
+            f"max={int(np.max(mapping_close))!r}"
+        )
+    if mapping_close.shape[0] > 1 and not np.all(mapping_close[1:] >= mapping_close[:-1]):
+        raise ValueError("hit-times mapping close indexes must be monotone non-decreasing")
+
+    entry_indexes = np.arange(one_minute_bar_count, dtype=np.int64)
+    entry_to_hit_times = np.searchsorted(mapping_close, entry_indexes, side="left")
+    entry_outside_hit_times = entry_to_hit_times >= hit_times_sentinel_index
+    safe_entry_to_hit_times = np.minimum(entry_to_hit_times, hit_times_sentinel_index - 1)
+
+    sentinel_out = np.uint32(one_minute_bar_count)
+    sentinel_in = np.uint32(hit_times_sentinel_index)
+
+    def _expand_one(table: np.ndarray, *, table_name: str) -> np.ndarray:
+        table_u32 = np.asarray(table, dtype=np.uint32)
+        if table_u32.ndim != 2:
+            raise ValueError(f"{table_name} must be a 2D table")
+        if int(table_u32.shape[1]) != hit_times_sentinel_index:
+            raise ValueError(
+                f"{table_name} width must equal hit_times_sentinel_index; got "
+                f"{table_u32.shape[1]!r}, expected {hit_times_sentinel_index!r}"
+            )
+        selected = np.take(table_u32, safe_entry_to_hit_times, axis=1)
+        expanded = np.full(selected.shape, sentinel_out, dtype=np.uint32)
+        active_column_mask = ~entry_outside_hit_times
+        if not bool(np.any(active_column_mask)):
+            return expanded
+        selected_active = selected[:, active_column_mask]
+        selected_is_sentinel = selected_active == sentinel_in
+        if bool(np.any(~selected_is_sentinel)):
+            safe_selected_active = np.minimum(
+                np.asarray(selected_active, dtype=np.int64),
+                hit_times_sentinel_index - 1,
+            )
+            mapped_close = mapping_close[safe_selected_active]
+            expanded_active = np.where(
+                selected_is_sentinel,
+                sentinel_out,
+                np.asarray(mapped_close, dtype=np.uint32),
+            )
+        else:
+            expanded_active = np.full(selected_active.shape, sentinel_out, dtype=np.uint32)
+        expanded[:, active_column_mask] = np.asarray(expanded_active, dtype=np.uint32)
+        return np.ascontiguousarray(expanded, dtype=np.uint32)
+
+    return (
+        _expand_one(long_tp, table_name="long_tp"),
+        _expand_one(long_sl, table_name="long_sl"),
+        _expand_one(short_tp, table_name="short_tp"),
+        _expand_one(short_sl, table_name="short_sl"),
+    )
+
+
 def _validate_hit_times_contract(
     *,
     hit_times_manifest: ArtifactHitTimesManifestDocumentV2,
@@ -727,10 +915,10 @@ def _validate_hit_times_contract(
     short_sl: np.ndarray,
 ) -> None:
     """
-    Reject timeline and level drift inside the strict `hit_times/1m` artifact family.
+    Reject timeline and level drift inside the strict `hit_times` artifact family.
 
     Args:
-        hit_times_manifest: Strict loaded `hit_times/1m/manifest.yaml`.
+        hit_times_manifest: Strict loaded `hit_times/<tf>/manifest.yaml`.
         tp_values: Memory-mapped TP level grid.
         sl_values: Memory-mapped SL level grid.
         long_tp: Memory-mapped `long_tp` table.
@@ -753,16 +941,17 @@ def _validate_hit_times_contract(
       - src/trading/contexts/backtest/application/services/v2/contracts.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
+    location_prefix = f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}"
     if hit_times_manifest.sentinel_index != hit_times_manifest.timeline_bar_count:
         raise ValueError(
-            "hit_times/1m sentinel_index must equal timeline_bar_count; got "
+            f"{location_prefix} sentinel_index must equal timeline_bar_count; got "
             f"{hit_times_manifest.sentinel_index!r} and "
             f"{hit_times_manifest.timeline_bar_count!r}"
         )
     if long_tp.shape[0] != tp_values.shape[0] or short_tp.shape[0] != tp_values.shape[0]:
-        raise ValueError("hit_times/1m TP table level count must match tp_values length")
+        raise ValueError(f"{location_prefix} TP table level count must match tp_values length")
     if long_sl.shape[0] != sl_values.shape[0] or short_sl.shape[0] != sl_values.shape[0]:
-        raise ValueError("hit_times/1m SL table level count must match sl_values length")
+        raise ValueError(f"{location_prefix} SL table level count must match sl_values length")
     expected_timeline_width = hit_times_manifest.timeline_bar_count
     for table_name, table in (
         ("long_tp", long_tp),
@@ -772,6 +961,6 @@ def _validate_hit_times_contract(
     ):
         if int(table.shape[1]) != expected_timeline_width:
             raise ValueError(
-                f"hit_times/1m/{table_name} width must match timeline_bar_count; got "
+                f"{location_prefix}/{table_name} width must match timeline_bar_count; got "
                 f"{table.shape[1]!r}, expected {expected_timeline_width!r}"
             )

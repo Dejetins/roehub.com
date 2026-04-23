@@ -334,7 +334,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
 
     def hit_times_manifest_path(self, coordinates: ArtifactCoordinatesV2, slot: str) -> Path:
         """
-        Resolve the fixed `hit_times/1m/manifest.yaml` path for one slot.
+        Resolve the fixed `hit_times/15m/manifest.yaml` path for one slot.
 
         Args:
             coordinates: Validated artifact coordinates.
@@ -342,7 +342,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Returns:
             Path: Deterministic hit-times manifest path.
         Assumptions:
-            R2-01 fixes hit-times layout under `hit_times/1m/`.
+            R2-01 fixes hit-times layout under `hit_times/15m/`.
         Raises:
             ValueError: If coordinates or slot are invalid.
         Side Effects:
@@ -366,7 +366,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         slot: str,
     ) -> ArtifactHitTimesPathsV2:
         """
-        Resolve explicit paths for the fixed `hit_times/1m/` artifact family.
+        Resolve explicit paths for the fixed `hit_times/15m/` artifact family.
 
         Args:
             coordinates: Validated artifact coordinates.
@@ -374,7 +374,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Returns:
             ArtifactHitTimesPathsV2: Deterministic path set for hit-times artifacts.
         Assumptions:
-            R2-03 keeps hit-times files under one fixed `hit_times/1m/` directory.
+            R2-03 keeps hit-times files under one fixed `hit_times/15m/` directory.
         Raises:
             ValueError: If coordinates or slot are invalid.
         Side Effects:

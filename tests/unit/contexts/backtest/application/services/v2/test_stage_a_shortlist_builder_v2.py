@@ -471,7 +471,7 @@ class _FlatPriceLoader:
             None.
         """
         _ = context
-        raise AssertionError("Stage A shortlist builder must not load hit_times/1m artifacts")
+        raise AssertionError("Stage A shortlist builder must not load hit_times/15m artifacts")
 
 
 class _ZeroSignalLoader:
@@ -683,7 +683,7 @@ class _ComboProxyPriceLoader:
             None.
         """
         _ = context
-        raise AssertionError("Stage A shortlist builder must not load hit_times/1m artifacts")
+        raise AssertionError("Stage A shortlist builder must not load hit_times/15m artifacts")
 
 
 @pytest.fixture()

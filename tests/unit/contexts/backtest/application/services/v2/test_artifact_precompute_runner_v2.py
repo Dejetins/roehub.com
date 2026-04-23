@@ -45,6 +45,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     ARTIFACT_SIGNAL_TIMEFRAMES_V2,
+    HIT_TIMES_TIMEFRAME_LITERAL_V2,
     SIGNAL_FEATURE_NAMES_V2,
     ArtifactCoordinatesV2,
     ArtifactPrecomputeExecutionPolicyV2,
@@ -97,6 +98,9 @@ from trading.shared_kernel.primitives import (
 _BASE_TIME_UTC = datetime(2026, 3, 26, 0, 0, tzinfo=timezone.utc)
 _FULL_BUILD_DAYS_V2 = 3
 _FULL_BUILD_MINUTES_V2 = _FULL_BUILD_DAYS_V2 * 24 * 60
+_HIT_TIMES_MINUTES_PER_BAR_V2 = int(
+    Timeframe(HIT_TIMES_TIMEFRAME_LITERAL_V2).duration().total_seconds() // 60
+)
 _CANONICAL_WIDENED_TP_LEVELS_PCT_V2 = tuple(value / 2.0 for value in range(1, 101))
 _CANONICAL_WIDENED_SL_LEVELS_PCT_V2 = tuple(value / 2.0 for value in range(1, 51))
 _TARGET_VARIANT_CEILINGS_V2 = {
@@ -115,6 +119,16 @@ _TARGET_VARIANT_CEILINGS_V2 = {
     "structure.percent_rank": 350,
     "structure.zscore": 350,
 }
+
+
+def _hit_times_bars_from_one_minute_bars_v2(one_minute_bars: int) -> int:
+    return one_minute_bars // _HIT_TIMES_MINUTES_PER_BAR_V2
+
+
+def _hit_times_tail_bars_from_one_minute_tail_v2(one_minute_tail_bars: int) -> int:
+    return (
+        one_minute_tail_bars + _HIT_TIMES_MINUTES_PER_BAR_V2 - 1
+    ) // _HIT_TIMES_MINUTES_PER_BAR_V2
 _EXPECTED_VARIANT_COUNTS_BY_ENV_V2 = {
     "dev": {
         "momentum.roc": 60,
@@ -1453,10 +1467,14 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     assert manifest.signals.supported_timeframes == ()
     assert manifest.signals.supported_indicator_ids == ()
     assert manifest.signals.manifests == ()
-    assert manifest.hit_times.manifest_path == "hit_times/1m/manifest.yaml"
+    assert (
+        manifest.hit_times.manifest_path
+        == f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/manifest.yaml"
+    )
     assert manifest.hit_times.manifest_sha256 != "0" * 64
-    assert hit_times_manifest.timeline_bar_count == _FULL_BUILD_MINUTES_V2
-    assert hit_times_manifest.sentinel_index == _FULL_BUILD_MINUTES_V2
+    expected_hit_times_bar_count = _hit_times_bars_from_one_minute_bars_v2(_FULL_BUILD_MINUTES_V2)
+    assert hit_times_manifest.timeline_bar_count == expected_hit_times_bar_count
+    assert hit_times_manifest.sentinel_index == expected_hit_times_bar_count
     assert tp_values.dtype == np.float32
     assert sl_values.dtype == np.float32
     assert long_tp.dtype == np.uint32
@@ -1467,32 +1485,32 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     assert hit_times_manifest.sl_values.shape == (expected_sl_level_count,)
     assert hit_times_manifest.long_tp.array.shape == (
         expected_tp_level_count,
-        _FULL_BUILD_MINUTES_V2,
+        expected_hit_times_bar_count,
     )
     assert hit_times_manifest.long_sl.array.shape == (
         expected_sl_level_count,
-        _FULL_BUILD_MINUTES_V2,
+        expected_hit_times_bar_count,
     )
     assert hit_times_manifest.short_tp.array.shape == (
         expected_tp_level_count,
-        _FULL_BUILD_MINUTES_V2,
+        expected_hit_times_bar_count,
     )
     assert hit_times_manifest.short_sl.array.shape == (
         expected_sl_level_count,
-        _FULL_BUILD_MINUTES_V2,
+        expected_hit_times_bar_count,
     )
     assert tp_values.shape == (expected_tp_level_count,)
     assert sl_values.shape == (expected_sl_level_count,)
-    assert long_tp.shape == (expected_tp_level_count, _FULL_BUILD_MINUTES_V2)
-    assert long_sl.shape == (expected_sl_level_count, _FULL_BUILD_MINUTES_V2)
-    assert short_tp.shape == (expected_tp_level_count, _FULL_BUILD_MINUTES_V2)
-    assert short_sl.shape == (expected_sl_level_count, _FULL_BUILD_MINUTES_V2)
+    assert long_tp.shape == (expected_tp_level_count, expected_hit_times_bar_count)
+    assert long_sl.shape == (expected_sl_level_count, expected_hit_times_bar_count)
+    assert short_tp.shape == (expected_tp_level_count, expected_hit_times_bar_count)
+    assert short_sl.shape == (expected_sl_level_count, expected_hit_times_bar_count)
     assert np.all(np.diff(tp_values) > 0)
     assert np.all(np.diff(sl_values) > 0)
-    assert np.all(long_tp <= _FULL_BUILD_MINUTES_V2)
-    assert np.all(long_sl <= _FULL_BUILD_MINUTES_V2)
-    assert np.all(short_tp <= _FULL_BUILD_MINUTES_V2)
-    assert np.all(short_sl <= _FULL_BUILD_MINUTES_V2)
+    assert np.all(long_tp <= expected_hit_times_bar_count)
+    assert np.all(long_sl <= expected_hit_times_bar_count)
+    assert np.all(short_tp <= expected_hit_times_bar_count)
+    assert np.all(short_sl <= expected_hit_times_bar_count)
     assert np.all(long_tp[1:, :] >= long_tp[:-1, :])
     assert np.all(long_sl[1:, :] >= long_sl[:-1, :])
     assert np.all(short_tp[1:, :] >= short_tp[:-1, :])
@@ -1547,7 +1565,7 @@ def test_backtest_artifact_precompute_runner_v2_builds_widened_hit_times_manifes
     tmp_path: Path,
 ) -> None:
     """
-    Verify the runner materializes the exact widened canonical `hit_times/1m` shape contract.
+    Verify the runner materializes the exact widened canonical `hit_times/15m` shape contract.
 
     Args:
         tmp_path: pytest temporary path fixture.
@@ -1608,14 +1626,15 @@ def test_backtest_artifact_precompute_runner_v2_builds_widened_hit_times_manifes
     )
     assert hit_times_manifest.tp_values.shape == (100,)
     assert hit_times_manifest.sl_values.shape == (50,)
-    assert hit_times_manifest.long_tp.array.shape == (100, _FULL_BUILD_MINUTES_V2)
-    assert hit_times_manifest.long_sl.array.shape == (50, _FULL_BUILD_MINUTES_V2)
-    assert hit_times_manifest.short_tp.array.shape == (100, _FULL_BUILD_MINUTES_V2)
-    assert hit_times_manifest.short_sl.array.shape == (50, _FULL_BUILD_MINUTES_V2)
-    assert long_tp.shape == (100, _FULL_BUILD_MINUTES_V2)
-    assert long_sl.shape == (50, _FULL_BUILD_MINUTES_V2)
-    assert short_tp.shape == (100, _FULL_BUILD_MINUTES_V2)
-    assert short_sl.shape == (50, _FULL_BUILD_MINUTES_V2)
+    expected_hit_times_bar_count = _hit_times_bars_from_one_minute_bars_v2(_FULL_BUILD_MINUTES_V2)
+    assert hit_times_manifest.long_tp.array.shape == (100, expected_hit_times_bar_count)
+    assert hit_times_manifest.long_sl.array.shape == (50, expected_hit_times_bar_count)
+    assert hit_times_manifest.short_tp.array.shape == (100, expected_hit_times_bar_count)
+    assert hit_times_manifest.short_sl.array.shape == (50, expected_hit_times_bar_count)
+    assert long_tp.shape == (100, expected_hit_times_bar_count)
+    assert long_sl.shape == (50, expected_hit_times_bar_count)
+    assert short_tp.shape == (100, expected_hit_times_bar_count)
+    assert short_sl.shape == (50, expected_hit_times_bar_count)
 
 
 def test_artifact_precompute_coordinator_v2_rejects_nested_timeframe_sessions_when_limited_to_one(
@@ -1775,7 +1794,7 @@ def test_backtest_artifact_precompute_runner_v2_materializes_hit_times_and_full_
     tmp_path: Path,
 ) -> None:
     """
-    Verify runner-built slots can pass full validation when only `hit_times/1m` is required.
+    Verify runner-built slots can pass full validation when only `hit_times/15m` is required.
 
     Args:
         tmp_path: pytest temporary path fixture.
@@ -1824,7 +1843,9 @@ def test_backtest_artifact_precompute_runner_v2_materializes_hit_times_and_full_
 
     assert result.slot == fixture.inactive_slot
     assert validation_result.hit_times_manifest is not None
-    assert validation_result.hit_times_manifest.timeline_bar_count == _FULL_BUILD_MINUTES_V2
+    assert validation_result.hit_times_manifest.timeline_bar_count == (
+        _hit_times_bars_from_one_minute_bars_v2(_FULL_BUILD_MINUTES_V2)
+    )
     assert validation_result.signal_manifests == ()
     assert validation_result.diagnostics == ()
 
@@ -1878,10 +1899,11 @@ def test_backtest_artifact_precompute_runner_v2_uses_full_rebuild_hit_times_budg
         fixture.inactive_slot,
     )
 
-    assert hit_times_manifest.timeline_bar_count == timeline_bars
+    expected_hit_times_bar_count = _hit_times_bars_from_one_minute_bars_v2(timeline_bars)
+    assert hit_times_manifest.timeline_bar_count == expected_hit_times_bar_count
     assert result.stage_rebuild_stats.hit_times == ArtifactStageRebuildStatsV2(
         reused_prefix_bars=0,
-        rewritten_tail_bars=timeline_bars,
+        rewritten_tail_bars=expected_hit_times_bar_count,
     )
 
 
@@ -2888,7 +2910,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_
     Returns:
         None.
     Assumptions:
-        The delivered pipeline keeps `hit_times/1m` in canonical scope, then interleaves
+        The delivered pipeline keeps `hit_times/15m` in canonical scope, then interleaves
         `rolled_prices -> mappings -> signals` inside each timeframe session before moving on.
     Raises:
         AssertionError: If helper execution drifts back to `all rolled prices -> all mappings ->
@@ -2934,7 +2956,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_timeframe_local_non_signal_
 
     def _record_hit_times(**kwargs):
         """
-        Record the canonical-scope `hit_times/1m` execution before delegating to the real helper.
+        Record the canonical-scope `hit_times/15m` execution before delegating to the real helper.
 
         Args:
             **kwargs: Original helper keyword arguments.
@@ -3460,9 +3482,16 @@ def test_backtest_artifact_precompute_runner_v2_proves_repeated_daily_run_rewrit
         reused_prefix_bars=286,
         rewritten_tail_bars=6,
     )
+    expected_hit_times_reused_prefix_bars = _hit_times_bars_from_one_minute_bars_v2(
+        initial_end_minute - 30
+    )
+    expected_hit_times_rewritten_tail_bars = (
+        _hit_times_bars_from_one_minute_bars_v2(updated_end_minute)
+        - expected_hit_times_reused_prefix_bars
+    )
     assert result.stage_rebuild_stats.hit_times == ArtifactStageRebuildStatsV2(
-        reused_prefix_bars=initial_end_minute - 30,
-        rewritten_tail_bars=90,
+        reused_prefix_bars=expected_hit_times_reused_prefix_bars,
+        rewritten_tail_bars=expected_hit_times_rewritten_tail_bars,
     )
     assert result.stage_rebuild_stats.mappings == ArtifactStageRebuildStatsV2(
         reused_prefix_bars=expected_mapping_reused_prefix_bars,
@@ -3472,7 +3501,7 @@ def test_backtest_artifact_precompute_runner_v2_proves_repeated_daily_run_rewrit
         prices=90,
         mappings=expected_mapping_rewritten_bars,
         signals=6,
-        hit_times=90,
+        hit_times=expected_hit_times_rewritten_tail_bars,
     )
     assert _time_axis_prefix_sha256_v2(
         array=updated_open_time,
@@ -3540,7 +3569,11 @@ def test_backtest_artifact_precompute_runner_v2_proves_repeated_daily_run_rewrit
     assert updated_open_time.shape[0] == initial_open_time.shape[0] + 60
     assert updated_one_hour_mapping_open.shape[0] == initial_one_hour_mapping_open.shape[0] + 1
     assert updated_signal_matrix.shape[1] == initial_signal_matrix.shape[1] + 4
-    assert updated_long_tp.shape[1] == initial_long_tp.shape[1] + 60
+    expected_hit_times_appended_bars = (
+        _hit_times_bars_from_one_minute_bars_v2(updated_end_minute)
+        - _hit_times_bars_from_one_minute_bars_v2(initial_end_minute)
+    )
+    assert updated_long_tp.shape[1] == initial_long_tp.shape[1] + expected_hit_times_appended_bars
     assert validation_result.diagnostics == ()
 
 
@@ -3548,7 +3581,7 @@ def test_backtest_artifact_precompute_runner_v2_falls_back_to_full_hit_times_reb
     tmp_path: Path,
 ) -> None:
     """
-    Verify `hit_times/1m` switches to deterministic full rebuild when grid reuse drifts.
+    Verify `hit_times/15m` switches to deterministic full rebuild when grid reuse drifts.
 
     Args:
         tmp_path: pytest temporary path fixture.
@@ -3615,7 +3648,7 @@ def test_backtest_artifact_precompute_runner_v2_falls_back_to_full_hit_times_reb
     )
     assert result.stage_rebuild_stats.hit_times == ArtifactStageRebuildStatsV2(
         reused_prefix_bars=0,
-        rewritten_tail_bars=_FULL_BUILD_MINUTES_V2,
+        rewritten_tail_bars=_hit_times_bars_from_one_minute_bars_v2(_FULL_BUILD_MINUTES_V2),
     )
     np.testing.assert_allclose(tp_values, np.asarray([0.01, 0.02], dtype=np.float32))
 
@@ -4834,7 +4867,7 @@ def _load_hit_times_arrays_v2(
     fixture: ArtifactPrecomputeFixtureV2,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
-    Load the materialized strict `hit_times/1m` family from the inactive slot for assertions.
+    Load the materialized strict `hit_times/15m` family from the inactive slot for assertions.
 
     Args:
         fixture: Strict precompute fixture with builder and loader.
@@ -4940,13 +4973,27 @@ def _read_export_bytes_v2(
         )
     payloads.extend(
         (
-            (slot_root / "hit_times" / "1m" / "manifest.yaml").read_bytes(),
-            (slot_root / "hit_times" / "1m" / "tp_values.f32.npy").read_bytes(),
-            (slot_root / "hit_times" / "1m" / "sl_values.f32.npy").read_bytes(),
-            (slot_root / "hit_times" / "1m" / "long_tp.u32.npy").read_bytes(),
-            (slot_root / "hit_times" / "1m" / "long_sl.u32.npy").read_bytes(),
-            (slot_root / "hit_times" / "1m" / "short_tp.u32.npy").read_bytes(),
-            (slot_root / "hit_times" / "1m" / "short_sl.u32.npy").read_bytes(),
+            (
+                slot_root / "hit_times" / HIT_TIMES_TIMEFRAME_LITERAL_V2 / "manifest.yaml"
+            ).read_bytes(),
+            (
+                slot_root / "hit_times" / HIT_TIMES_TIMEFRAME_LITERAL_V2 / "tp_values.f32.npy"
+            ).read_bytes(),
+            (
+                slot_root / "hit_times" / HIT_TIMES_TIMEFRAME_LITERAL_V2 / "sl_values.f32.npy"
+            ).read_bytes(),
+            (
+                slot_root / "hit_times" / HIT_TIMES_TIMEFRAME_LITERAL_V2 / "long_tp.u32.npy"
+            ).read_bytes(),
+            (
+                slot_root / "hit_times" / HIT_TIMES_TIMEFRAME_LITERAL_V2 / "long_sl.u32.npy"
+            ).read_bytes(),
+            (
+                slot_root / "hit_times" / HIT_TIMES_TIMEFRAME_LITERAL_V2 / "short_tp.u32.npy"
+            ).read_bytes(),
+            (
+                slot_root / "hit_times" / HIT_TIMES_TIMEFRAME_LITERAL_V2 / "short_sl.u32.npy"
+            ).read_bytes(),
         )
     )
     return tuple(payloads)

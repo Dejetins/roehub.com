@@ -292,7 +292,7 @@ def test_yaml_backtest_artifact_loader_v2_reads_current_and_strict_manifests(
     assert signal_features_manifest.rows_count == 2
     assert signal_features_manifest.features.axis_order == ("variant", "feature")
     assert signal_features_manifest.feature_names == SIGNAL_FEATURE_NAMES_V2
-    assert hit_times_manifest.timeline_bar_count == 4
+    assert hit_times_manifest.timeline_bar_count == 2
     assert hit_times_manifest.long_tp.array.axis_order == ("level", "time")
 
     explicit_root_manifest = loader.load_manifest_from_path(
@@ -332,7 +332,7 @@ def test_yaml_backtest_artifact_loader_v2_reads_current_and_strict_manifests(
     assert explicit_root_manifest.slot_generation == 5
     assert explicit_signal_manifest.indicator_id == "ma.ema"
     assert explicit_signal_features_manifest.indicator_id == "ma.ema"
-    assert explicit_hit_times_manifest.sentinel_index == 4
+    assert explicit_hit_times_manifest.sentinel_index == 2
     assert (
         hit_times_paths.long_tp
         == store.builder.hit_times_paths(

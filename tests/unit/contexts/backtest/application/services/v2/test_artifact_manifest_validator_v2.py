@@ -53,7 +53,7 @@ def test_backtest_artifact_manifest_validator_v2_accepts_valid_strict_slot(
     assert result.signal_manifests[0].indicator_id == "ma.ema"
     assert result.signal_manifests[0].signal_features is not None
     assert result.hit_times_manifest is not None
-    assert result.hit_times_manifest.timeline_bar_count == 4
+    assert result.hit_times_manifest.timeline_bar_count == 2
     assert result.diagnostics == ()
 
 
@@ -211,7 +211,7 @@ def test_backtest_artifact_manifest_validator_v2_orders_multiple_diagnostics_det
         tmp_path=tmp_path,
         inactive_signal_values=np.array([[-1, 2], [1, 0]], dtype=np.int8),
         inactive_mapping_close_idx=np.array([1, 4], dtype=np.uint32),
-        inactive_long_tp=np.array([[1, 3, 4, 4], [1, 2, 4, 4]], dtype=np.uint32),
+        inactive_long_tp=np.array([[1, 2], [0, 2]], dtype=np.uint32),
     )
     validator = BacktestArtifactManifestValidatorV2(artifact_loader=store.loader)
 

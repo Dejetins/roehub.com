@@ -20,6 +20,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ARTIFACT_PRICE_TIMEFRAMES_V2,
+    HIT_TIMES_TIMEFRAME_LITERAL_V2,
     SIGNAL_FEATURE_NAMES_V2,
     ArtifactCoordinatesV2,
     ArtifactPrecomputeRuntimeSettingsV2,
@@ -252,7 +253,7 @@ def build_artifact_precompute_fixture_v2(
             bars.
         signal_tail_bars_1m: Strict positive `signals/<tf>/<indicator_id>` tail rebuild budget
             expressed in `1m` bars.
-        hit_times_tail_bars_1m: Strict positive `hit_times/1m` tail rebuild budget in canonical
+        hit_times_tail_bars_1m: Strict positive `hit_times/15m` tail rebuild budget in canonical
             `1m` bars.
         hit_times_tp_levels_pct: Explicit TP levels in human-percent units written into
             `backtest_artifacts.hit_times_grid.tp_levels_pct`.
@@ -267,7 +268,7 @@ def build_artifact_precompute_fixture_v2(
             machine-readable literal `all_supported_v1` enabled for real R12 signal
             materialization by the runner.
         require_hit_times_manifest: Whether the generated runtime config should require real
-            `hit_times/1m/manifest.yaml` during whole-slot validation.
+            `hit_times/15m/manifest.yaml` during whole-slot validation.
         max_hit_times_cells: Strict positive upper bound for materialized hit-times table cells.
         max_hit_times_cells_full_rebuild: Optional strict positive upper bound for full-rebuild
             or bootstrap hit-times table cells. When omitted, uses `max_hit_times_cells`.
@@ -806,9 +807,9 @@ def _write_slot_payloads(
         "slot": slot,
         "slot_generation": slot_generation,
         "asof_date": asof_date,
-        "timeframe": "1m",
-        "timeline_bar_count": int(one_minute_open_time.shape[0]),
-        "sentinel_index": int(one_minute_open_time.shape[0]),
+        "timeframe": HIT_TIMES_TIMEFRAME_LITERAL_V2,
+        "timeline_bar_count": int(fifteen_minute_open_time.shape[0]),
+        "sentinel_index": int(fifteen_minute_open_time.shape[0]),
         "tp_values": _level_array_metadata_payload(
             builder=builder,
             coordinates=coordinates,
@@ -922,7 +923,7 @@ def _write_slot_payloads(
             ],
         },
         "hit_times": {
-            "timeframe": "1m",
+            "timeframe": HIT_TIMES_TIMEFRAME_LITERAL_V2,
             "manifest_path": _slot_relative_path(
                 builder,
                 coordinates,
@@ -1090,6 +1091,7 @@ def _hit_times_table_payload(
         slot=slot,
         absolute_path=absolute_path,
     )
+    payload["axis_order"] = ["level", "time"]
     payload["monotonicity"] = "non_decreasing_by_level"
     return payload
 
@@ -1484,7 +1486,7 @@ def _default_long_tp() -> np.ndarray:
     Returns:
         np.ndarray: Valid monotone `uint32` hit-times table.
     Assumptions:
-        Table values stay within the four-bar sentinel contract.
+        Table values stay within the configured sentinel contract.
     Raises:
         None.
     Side Effects:
@@ -1495,7 +1497,7 @@ def _default_long_tp() -> np.ndarray:
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
-    return np.array([[1, 2, 4, 4], [1, 3, 4, 4]], dtype=np.uint32)
+    return np.array([[1, 2], [1, 2]], dtype=np.uint32)
 
 
 def _default_long_sl() -> np.ndarray:
@@ -1507,7 +1509,7 @@ def _default_long_sl() -> np.ndarray:
     Returns:
         np.ndarray: Valid monotone `uint32` hit-times table.
     Assumptions:
-        Table values stay within the four-bar sentinel contract.
+        Table values stay within the configured sentinel contract.
     Raises:
         None.
     Side Effects:
@@ -1518,7 +1520,7 @@ def _default_long_sl() -> np.ndarray:
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
-    return np.array([[1, 2, 4, 4], [2, 3, 4, 4]], dtype=np.uint32)
+    return np.array([[1, 2], [2, 2]], dtype=np.uint32)
 
 
 def _default_short_tp() -> np.ndarray:
@@ -1530,7 +1532,7 @@ def _default_short_tp() -> np.ndarray:
     Returns:
         np.ndarray: Valid monotone `uint32` hit-times table.
     Assumptions:
-        Table values stay within the four-bar sentinel contract.
+        Table values stay within the configured sentinel contract.
     Raises:
         None.
     Side Effects:
@@ -1541,7 +1543,7 @@ def _default_short_tp() -> np.ndarray:
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
-    return np.array([[1, 2, 4, 4], [2, 3, 4, 4]], dtype=np.uint32)
+    return np.array([[1, 2], [2, 2]], dtype=np.uint32)
 
 
 def _default_short_sl() -> np.ndarray:
@@ -1553,7 +1555,7 @@ def _default_short_sl() -> np.ndarray:
     Returns:
         np.ndarray: Valid monotone `uint32` hit-times table.
     Assumptions:
-        Table values stay within the four-bar sentinel contract.
+        Table values stay within the configured sentinel contract.
     Raises:
         None.
     Side Effects:
@@ -1564,4 +1566,4 @@ def _default_short_sl() -> np.ndarray:
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py
     """
-    return np.array([[1, 2, 4, 4], [1, 3, 4, 4]], dtype=np.uint32)
+    return np.array([[1, 2], [1, 2]], dtype=np.uint32)

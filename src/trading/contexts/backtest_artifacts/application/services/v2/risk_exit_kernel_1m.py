@@ -978,7 +978,7 @@ def _normalize_hit_times_level_grid_v2(
     Returns:
         np.ndarray: Canonical one-dimensional `np.float32` level grid.
     Assumptions:
-        Shipped `hit_times/1m` artifacts publish TP/SL levels as explicit 1D arrays and Stage B
+        Shipped `hit_times/15m` artifacts publish TP/SL levels as explicit 1D arrays and Stage B
         reads grid shape from those artifact arrays instead of fixed-size literals.
     Raises:
         ValueError: If the grid is not one-dimensional or has no levels.

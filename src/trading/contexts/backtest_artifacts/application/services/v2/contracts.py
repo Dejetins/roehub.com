@@ -29,7 +29,8 @@ MAPPINGS_DIRECTORY_LITERAL_V2 = "mappings"
 HIT_TIMES_DIRECTORY_LITERAL_V2 = "hit_times"
 ARTIFACT_SLOT_A_LITERAL_V2 = "slot_a"
 ARTIFACT_SLOT_B_LITERAL_V2 = "slot_b"
-HIT_TIMES_TIMEFRAME_LITERAL_V2 = "1m"
+HIT_TIMES_TIMEFRAME_LITERAL_V2 = "15m"
+CANONICAL_PRICE_TIMEFRAME_LITERAL_V2 = "1m"
 BAR_OPEN_MAPPING_FILENAME_V2 = "bar_open_1m_idx.u32.npy"
 BAR_CLOSE_MAPPING_FILENAME_V2 = "bar_close_1m_idx.u32.npy"
 OPEN_TIME_FILENAME_V2 = "open_time.i64.npy"
@@ -891,7 +892,7 @@ def validate_hit_times_timeframe_v2(timeframe: str) -> str:
     Returns:
         str: Canonical timeframe literal.
     Assumptions:
-        R2-01 fixes hit-times manifests under `hit_times/1m/`.
+        R2-01 fixes hit-times manifests under `hit_times/15m/`.
     Raises:
         ValueError: If the timeframe differs from the fixed `1m` contract.
     Side Effects:
@@ -1192,7 +1193,7 @@ class ArtifactMappingPathsV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactHitTimesPathsV2:
     """
-    Explicit paths for the fixed `hit_times/1m/` artifact directory.
+    Explicit paths for the fixed `hit_times/15m/` artifact directory.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -1584,7 +1585,7 @@ class ArtifactSignalFeaturesReferenceV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactHitTimesReferenceV2:
     """
-    Root-manifest reference to the strict `hit_times/1m/manifest.yaml` document.
+    Root-manifest reference to the strict `hit_times/15m/manifest.yaml` document.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -2246,7 +2247,7 @@ class ArtifactSignalFeaturesManifestDocumentV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactHitTimesManifestDocumentV2:
     """
-    Parsed strict `hit_times/1m/manifest.yaml` document.
+    Parsed strict `hit_times/15m/manifest.yaml` document.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -4036,7 +4037,7 @@ class ArtifactMappingArraysV2:
 @dataclass(frozen=True, slots=True)
 class ArtifactHitTimesArraysV2:
     """
-    Memory-mapped strict `hit_times/1m` arrays reused by future runtime kernels.
+    Memory-mapped strict `hit_times/15m` arrays reused by future runtime kernels.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -4785,12 +4786,15 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             raise ValueError(
                 "ArtifactPrecomputeRuntimeSettingsV2.price_timeframes must be non-empty"
             )
-        if self.price_timeframes[0] != HIT_TIMES_TIMEFRAME_LITERAL_V2:
+        if self.price_timeframes[0] != CANONICAL_PRICE_TIMEFRAME_LITERAL_V2:
             raise ValueError(
                 "ArtifactPrecomputeRuntimeSettingsV2.price_timeframes must start with "
-                f"{HIT_TIMES_TIMEFRAME_LITERAL_V2!r}"
+                f"{CANONICAL_PRICE_TIMEFRAME_LITERAL_V2!r}"
             )
-        expected_price_timeframes = (HIT_TIMES_TIMEFRAME_LITERAL_V2, *self.mapping_timeframes)
+        expected_price_timeframes = (
+            CANONICAL_PRICE_TIMEFRAME_LITERAL_V2,
+            *self.mapping_timeframes,
+        )
         if self.price_timeframes != expected_price_timeframes:
             raise ValueError(
                 "ArtifactPrecomputeRuntimeSettingsV2.price_timeframes must equal "
@@ -4937,7 +4941,7 @@ class BacktestArtifactPathResolverV2(Protocol):
         ...
 
     def hit_times_manifest_path(self, coordinates: ArtifactCoordinatesV2, slot: str) -> Path:
-        """Resolve the fixed `hit_times/1m/manifest.yaml` path."""
+        """Resolve the fixed `hit_times/15m/manifest.yaml` path."""
         ...
 
     def hit_times_paths(
@@ -5028,7 +5032,7 @@ class BacktestArtifactLoaderV2(Protocol):
         coordinates: ArtifactCoordinatesV2,
         slot: str,
     ) -> ArtifactHitTimesManifestDocumentV2:
-        """Read the fixed `hit_times/1m/manifest.yaml` by deterministic coordinates."""
+        """Read the fixed `hit_times/15m/manifest.yaml` by deterministic coordinates."""
         ...
 
     def load_hit_times_manifest_from_path(
@@ -5037,7 +5041,7 @@ class BacktestArtifactLoaderV2(Protocol):
         *,
         slot: ArtifactSlotLiteralV2,
     ) -> ArtifactHitTimesManifestDocumentV2:
-        """Read one `hit_times/1m/manifest.yaml` document from an explicit path."""
+        """Read one `hit_times/15m/manifest.yaml` document from an explicit path."""
         ...
 
     def load_active_slot_manifest(
@@ -5096,7 +5100,7 @@ class BacktestArtifactLoaderV2(Protocol):
     def resolve_hit_times_manifest_path(
         self, coordinates: ArtifactCoordinatesV2, slot: str
     ) -> Path:
-        """Resolve the `hit_times/1m/manifest.yaml` path without touching disk."""
+        """Resolve the `hit_times/15m/manifest.yaml` path without touching disk."""
         ...
 
     def resolve_hit_times_paths(
@@ -5139,7 +5143,7 @@ class BacktestArtifactSlotResolverV2(Protocol):
 
 class BacktestPriceArraysLoaderV2(Protocol):
     """
-    Port for strict mmap-based price, mapping, and `hit_times/1m` runtime loading.
+    Port for strict mmap-based price, mapping, and `hit_times/15m` runtime loading.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -5171,7 +5175,7 @@ class BacktestPriceArraysLoaderV2(Protocol):
         *,
         context: ArtifactSlotPinnedRuntimeContextV2,
     ) -> ArtifactHitTimesArraysV2:
-        """Load or reuse strict `hit_times/1m` mmap arrays via explicit manifest-driven paths."""
+        """Load or reuse strict `hit_times/15m` mmap arrays via explicit manifest-driven paths."""
         ...
 
 

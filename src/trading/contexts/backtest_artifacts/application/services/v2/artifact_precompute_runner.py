@@ -522,7 +522,7 @@ class _SignalFeaturesArtifactBuildResultV2:
 @dataclass(frozen=True, slots=True)
 class _HitTimesArtifactBuildResultV2:
     """
-    Internal immutable output of one strict R5-01 `hit_times/1m` materialization pass.
+    Internal immutable output of one strict R5-01 `hit_times/15m` materialization pass.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -593,7 +593,7 @@ class _ExistingSignalArtifactV2:
 @dataclass(frozen=True, slots=True)
 class _ExistingHitTimesArtifactV2:
     """
-    Internal immutable snapshot of one existing inactive-slot `hit_times/1m` family.
+    Internal immutable snapshot of one existing inactive-slot `hit_times/15m` family.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -696,7 +696,7 @@ class _SignalChunkWorkerResultV2:
 @dataclass(frozen=True, slots=True)
 class _HitTimesArtifactTailPlanV2:
     """
-    Internal deterministic plan for `hit_times/1m` prefix reuse and bounded tail rebuild.
+    Internal deterministic plan for `hit_times/15m` prefix reuse and bounded tail rebuild.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -737,7 +737,7 @@ class _TimeframeSessionBuildResultV2:
 @dataclass(frozen=True, slots=True)
 class BacktestArtifactPrecomputeRunnerV2:
     """
-    Materialize canonical prices, mappings, `hit_times/1m`, and optional signal artifacts.
+    Materialize canonical prices, mappings, `hit_times/15m`, and optional signal artifacts.
 
     Docs:
       - docs/architecture/roadmap/base_refactor_plan.md
@@ -812,7 +812,7 @@ class BacktestArtifactPrecomputeRunnerV2:
         request: ArtifactCanonicalPriceExportRequestV2,
     ) -> ArtifactCanonicalPriceExportResultV2:
         """
-        Export canonical `1m`, `hit_times/1m`, and timeframe-local `rolled_prices` sessions
+        Export canonical `1m`, `hit_times/15m`, and timeframe-local `rolled_prices` sessions
         into the inactive slot.
 
         Args:
@@ -914,13 +914,16 @@ class BacktestArtifactPrecomputeRunnerV2:
                 ),
             )
 
+            hit_times_source_arrays = _resolve_hit_times_source_arrays_v2(
+                one_minute_arrays=canonical_stage_result.rollup_source_arrays,
+            )
             hit_times_budget = _resolve_hit_times_cell_budget_v2(
                 runtime_settings=self.runtime_settings,
                 force_full_rebuild=request.force_full_rebuild,
                 has_existing_slot_manifest=existing_manifest is not None,
             )
             hit_times_timeline_bar_count = int(
-                canonical_stage_result.rollup_source_arrays.open_time.shape[0]
+                hit_times_source_arrays.open_time.shape[0]
             )
             hit_times_tp_level_count = len(self.runtime_settings.hit_times_tp_levels_pct)
             hit_times_sl_level_count = len(self.runtime_settings.hit_times_sl_levels_pct)
@@ -949,7 +952,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                     request=request,
                     slot_generation=target_slot_generation,
                     runtime_settings=self.runtime_settings,
-                    one_minute_arrays=canonical_stage_result.rollup_source_arrays,
+                    hit_times_source_arrays=hit_times_source_arrays,
                     one_minute_manifest=canonical_stage_result.one_minute_manifest,
                     max_hit_times_cells=hit_times_budget,
                 ),
@@ -5583,7 +5586,7 @@ def _load_existing_hit_times_artifact_v2(
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
 ) -> _ExistingHitTimesArtifactV2 | None:
     """
-    Load an existing inactive-slot `hit_times/1m` family when it is safe to reuse.
+    Load an existing inactive-slot `hit_times/15m` family when it is safe to reuse.
 
     Args:
         artifact_loader: Explicit-path artifact loader.
@@ -5759,22 +5762,22 @@ def _load_existing_hit_times_artifact_v2(
 
 def _build_hit_times_tail_plan_v2(
     *,
-    one_minute_arrays: _CanonicalPriceArraysV2,
+    hit_times_source_arrays: _CanonicalPriceArraysV2,
     existing_hit_times_artifact: _ExistingHitTimesArtifactV2 | None,
     hit_times_tail_bars_1m: int,
 ) -> _HitTimesArtifactTailPlanV2:
     """
-    Build deterministic prefix reuse bounds for bounded `hit_times/1m` rebuilds.
+    Build deterministic prefix reuse bounds for bounded `hit_times/15m` rebuilds.
 
     Args:
-        one_minute_arrays: Fresh canonical `prices/1m` arrays for the current export request.
+        hit_times_source_arrays: Fresh source arrays for the configured hit-times timeframe.
         existing_hit_times_artifact: Existing inactive-slot hit-times family, when reusable.
         hit_times_tail_bars_1m: Configured bounded tail window in canonical `1m` bars.
     Returns:
         _HitTimesArtifactTailPlanV2: Prefix slice plus effective tail window.
     Assumptions:
         Reused prefix bars are preserved verbatim, while the tail overlap and any appended suffix
-        are rebuilt from current canonical `prices/1m`.
+        are rebuilt from current hit-times source arrays.
     Raises:
         ValueError: If the derived prefix slice indexes are inconsistent.
     Side Effects:
@@ -5785,8 +5788,13 @@ def _build_hit_times_tail_plan_v2(
     Related:
       - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
     """
-    current_bar_count = int(one_minute_arrays.open_time.shape[0])
-    effective_tail_bars = min(current_bar_count, hit_times_tail_bars_1m)
+    current_bar_count = int(hit_times_source_arrays.open_time.shape[0])
+    effective_tail_bars = min(
+        current_bar_count,
+        _convert_one_minute_tail_bars_to_hit_times_bars_v2(
+            hit_times_tail_bars_1m=hit_times_tail_bars_1m
+        ),
+    )
     if existing_hit_times_artifact is None or current_bar_count <= effective_tail_bars:
         return _HitTimesArtifactTailPlanV2(
             prefix=None,
@@ -5889,6 +5897,72 @@ def _resolve_hit_times_cell_budget_v2(
     return runtime_settings.max_hit_times_cells
 
 
+def _resolve_hit_times_source_arrays_v2(
+    *,
+    one_minute_arrays: _CanonicalPriceArraysV2,
+) -> _CanonicalPriceArraysV2:
+    """
+    Resolve source arrays for hit-times materialization from canonical `prices/1m`.
+
+    Args:
+        one_minute_arrays: Materialized canonical `prices/1m` arrays.
+    Returns:
+        _CanonicalPriceArraysV2: Source arrays aligned to `HIT_TIMES_TIMEFRAME_LITERAL_V2`.
+    Assumptions:
+        Hit-times may use either canonical `1m` directly or one rolled timeframe built from it.
+    Raises:
+        ValueError: If the configured hit-times timeframe cannot be materialized.
+    Side Effects:
+        Allocates rolled arrays when hit-times timeframe is not `1m`.
+    """
+    if HIT_TIMES_TIMEFRAME_LITERAL_V2 == _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2:
+        return one_minute_arrays
+    resolved = _rollup_price_arrays_from_one_minute_v2(
+        source_arrays=one_minute_arrays,
+        timeframe=HIT_TIMES_TIMEFRAME_LITERAL_V2,
+        allow_empty=False,
+    )
+    if resolved is None:
+        raise ValueError(
+            "configured hit-times timeframe produced no full buckets from prices/1m; "
+            f"timeframe={HIT_TIMES_TIMEFRAME_LITERAL_V2!r}"
+        )
+    return resolved
+
+
+def _convert_one_minute_tail_bars_to_hit_times_bars_v2(*, hit_times_tail_bars_1m: int) -> int:
+    """
+    Convert `hit_times_tail_bars_1m` into bars of the configured hit-times timeframe.
+
+    Args:
+        hit_times_tail_bars_1m: Tail window configured in canonical `1m` bars.
+    Returns:
+        int: Equivalent tail budget measured in `HIT_TIMES_TIMEFRAME_LITERAL_V2` bars.
+    Assumptions:
+        Tail overlap should keep at least one hit-times bar when configured budget is positive.
+    Raises:
+        ValueError: If timeframe duration conversion is invalid.
+    Side Effects:
+        None.
+    """
+    if hit_times_tail_bars_1m <= 0:
+        raise ValueError(
+            "hit_times_tail_bars_1m must be > 0; "
+            f"got {hit_times_tail_bars_1m!r}"
+        )
+    if HIT_TIMES_TIMEFRAME_LITERAL_V2 == _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2:
+        return hit_times_tail_bars_1m
+    duration_millis = _timeframe_duration_millis_v2(Timeframe(HIT_TIMES_TIMEFRAME_LITERAL_V2))
+    if duration_millis <= 0 or duration_millis % _ONE_MINUTE_MILLIS_V2 != 0:
+        raise ValueError(
+            "hit-times timeframe duration must be a positive multiple of one minute; got "
+            f"{duration_millis!r} ms for {HIT_TIMES_TIMEFRAME_LITERAL_V2!r}"
+        )
+    bars_per_hit_times_bar = duration_millis // _ONE_MINUTE_MILLIS_V2
+    converted = (hit_times_tail_bars_1m + bars_per_hit_times_bar - 1) // bars_per_hit_times_bar
+    return max(1, int(converted))
+
+
 def _materialize_hit_times_artifacts_v2(
     *,
     artifact_loader: BacktestArtifactLoaderV2,
@@ -5899,12 +5973,12 @@ def _materialize_hit_times_artifacts_v2(
     request: ArtifactCanonicalPriceExportRequestV2,
     slot_generation: int,
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
-    one_minute_arrays: _CanonicalPriceArraysV2,
+    hit_times_source_arrays: _CanonicalPriceArraysV2,
     one_minute_manifest: ArtifactPriceTimeframeManifestV2,
     max_hit_times_cells: int,
 ) -> _HitTimesArtifactBuildResultV2:
     """
-    Materialize the strict R5-01 `hit_times/1m` artifact family for the inactive slot.
+    Materialize the strict R5-01 `hit_times/15m` artifact family for the inactive slot.
 
     Args:
         artifact_loader: Explicit-path artifact loader used to resolve fixed hit-times paths.
@@ -5915,7 +5989,8 @@ def _materialize_hit_times_artifacts_v2(
         request: Explicit export request carrying slot identity and timestamps.
         slot_generation: Target inactive-slot generation assigned to the build.
         runtime_settings: Strict runtime settings carrying hit-times grids and guard budgets.
-        one_minute_arrays: Materialized artifact-backed canonical `prices/1m` arrays.
+        hit_times_source_arrays: Materialized artifact-backed source arrays for the configured
+            hit-times timeframe.
         one_minute_manifest: Fresh strict `prices/1m` manifest used for provenance hashing.
         max_hit_times_cells: Effective hit-times cell budget selected for this rebuild mode.
     Returns:
@@ -5926,7 +6001,7 @@ def _materialize_hit_times_artifacts_v2(
         ValueError: If computed tables violate the strict contract or exceed configured budgets.
         OSError: If writing arrays or manifest files fails.
     Side Effects:
-        Writes `hit_times/1m/*.npy` and `hit_times/1m/manifest.yaml` under the inactive slot.
+        Writes `hit_times/15m/*.npy` and `hit_times/15m/manifest.yaml` under the inactive slot.
     Docs:
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
@@ -5944,12 +6019,12 @@ def _materialize_hit_times_artifacts_v2(
         runtime_settings=runtime_settings,
     )
     tail_plan = _build_hit_times_tail_plan_v2(
-        one_minute_arrays=one_minute_arrays,
+        hit_times_source_arrays=hit_times_source_arrays,
         existing_hit_times_artifact=existing_hit_times_artifact,
         hit_times_tail_bars_1m=runtime_settings.hit_times_tail_bars_1m,
     )
     rebuilt_tail = materialize_hit_times_from_ohlcv_v2(
-        ohlcv=one_minute_arrays.ohlcv[tail_plan.prefix_bars :, :],
+        ohlcv=hit_times_source_arrays.ohlcv[tail_plan.prefix_bars :, :],
         tp_levels_pct=runtime_settings.hit_times_tp_levels_pct,
         sl_levels_pct=runtime_settings.hit_times_sl_levels_pct,
         max_hit_times_cells=max_hit_times_cells,
@@ -5958,7 +6033,7 @@ def _materialize_hit_times_artifacts_v2(
         prefix=tail_plan.prefix,
         rebuilt_tail=rebuilt_tail,
         prefix_bars=tail_plan.prefix_bars,
-        total_timeline_bars=int(one_minute_arrays.open_time.shape[0]),
+        total_timeline_bars=int(hit_times_source_arrays.open_time.shape[0]),
     )
     _write_hit_times_arrays_atomically_v2(
         hit_times_paths=hit_times_paths,
@@ -5972,6 +6047,7 @@ def _materialize_hit_times_artifacts_v2(
         slot_generation=slot_generation,
         runtime_settings=runtime_settings,
         one_minute_manifest=one_minute_manifest,
+        expected_timeline_bar_count=int(hit_times_source_arrays.open_time.shape[0]),
         hit_times_paths=hit_times_paths,
         arrays=hit_times_arrays,
         effective_tail_bars=tail_plan.effective_tail_bars,
@@ -6002,7 +6078,7 @@ def _write_hit_times_arrays_atomically_v2(
     arrays: HitTimesArraysV2,
 ) -> None:
     """
-    Atomically replace inactive-slot `hit_times/1m/*.npy` files with deterministic bytes.
+    Atomically replace inactive-slot `hit_times/15m/*.npy` files with deterministic bytes.
 
     Args:
         hit_times_paths: Explicit inactive-slot target paths for the hit-times family.
@@ -6038,13 +6114,14 @@ def _build_hit_times_manifest_v2(
     slot_generation: int,
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
     one_minute_manifest: ArtifactPriceTimeframeManifestV2,
+    expected_timeline_bar_count: int,
     hit_times_paths: ArtifactHitTimesPathsV2,
     arrays: HitTimesArraysV2,
     effective_tail_bars: int,
     max_hit_times_cells: int,
 ) -> ArtifactHitTimesManifestDocumentV2:
     """
-    Build the strict typed `hit_times/1m/manifest.yaml` document for freshly written arrays.
+    Build the strict typed `hit_times/15m/manifest.yaml` document for freshly written arrays.
 
     Args:
         coordinates: Artifact coordinates selecting one symbol root.
@@ -6054,6 +6131,8 @@ def _build_hit_times_manifest_v2(
         slot_generation: Target inactive-slot generation assigned to the build.
         runtime_settings: Strict runtime settings contributing config hash and hit-times grids.
         one_minute_manifest: Fresh strict `prices/1m` manifest used for provenance hashing.
+        expected_timeline_bar_count: Expected timeline width for the configured hit-times
+            timeframe.
         hit_times_paths: Fixed hit-times file paths under the inactive slot.
         arrays: Freshly written strict hit-times arrays.
         effective_tail_bars: Effective bounded `1m` tail overlap used for rebuild planning.
@@ -6062,7 +6141,8 @@ def _build_hit_times_manifest_v2(
     Assumptions:
         Hit-times files already exist on disk and are ready for `sha256` hashing.
     Raises:
-        ValueError: If timeline counts drift from `prices/1m` or one metadata field is invalid.
+        ValueError: If timeline counts drift from the configured hit-times timeframe or one
+            metadata field is invalid.
         OSError: If one written hit-times file cannot be hashed.
     Side Effects:
         Reads the freshly written hit-times files to compute manifest hashes.
@@ -6074,16 +6154,16 @@ def _build_hit_times_manifest_v2(
       - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
     """
     validated_slot = validate_artifact_slot_v2(slot)
-    timeline_bar_count = int(one_minute_manifest.coverage.bar_count)
+    timeline_bar_count = int(expected_timeline_bar_count)
     if arrays.sentinel_index != timeline_bar_count:
         raise ValueError(
-            "hit-times sentinel_index must equal prices/1m coverage.bar_count; got "
+            "hit-times sentinel_index must equal configured hit-times timeline bar_count; got "
             f"{arrays.sentinel_index!r}, expected {timeline_bar_count!r}"
         )
     table_time_count = int(arrays.long_tp.shape[1])
     if table_time_count != timeline_bar_count:
         raise ValueError(
-            "hit-times timeline must match prices/1m coverage.bar_count; got "
+            "hit-times timeline must match configured hit-times timeline bar_count; got "
             f"{table_time_count!r}, expected {timeline_bar_count!r}"
         )
 
@@ -6215,7 +6295,7 @@ def _build_hit_times_manifest_provenance_v2(
     max_hit_times_cells: int,
 ) -> ArtifactManifestProvenanceV2:
     """
-    Build deterministic provenance for one strict `hit_times/1m` manifest.
+    Build deterministic provenance for one strict `hit_times/15m` manifest.
 
     Args:
         coordinates: Artifact coordinates selecting one symbol root.
@@ -6843,7 +6923,7 @@ def _placeholder_hit_times_reference_v2() -> ArtifactHitTimesReferenceV2:
     Returns:
         ArtifactHitTimesReferenceV2: Deterministic fixed-path placeholder reference.
     Assumptions:
-        R3-01 keeps root-manifest schema strict without pretending that `hit_times/1m` already
+        R3-01 keeps root-manifest schema strict without pretending that `hit_times/15m` already
         exists; later epics must replace this placeholder with a real manifest hash.
     Raises:
         None.

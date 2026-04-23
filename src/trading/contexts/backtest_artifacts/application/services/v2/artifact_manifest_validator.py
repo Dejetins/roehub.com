@@ -21,6 +21,7 @@ from .contracts import (
     ARTIFACT_SIGNAL_FEATURE_DTYPE_LITERAL_V2,
     ARTIFACT_SIGNAL_VALUE_SET_V2,
     ARTIFACT_TIME_AXIS_ORDER_V2,
+    HIT_TIMES_TIMEFRAME_LITERAL_V2,
     SIGNAL_FEATURE_NAMES_V2,
     ArtifactArrayMetadataV2,
     ArtifactCoordinatesV2,
@@ -126,6 +127,7 @@ class BacktestArtifactManifestValidatorV2:
         price_by_timeframe = {manifest.timeframe: manifest for manifest in slot_manifest.prices}
         price_time_arrays_by_timeframe: dict[str, tuple[np.ndarray, np.ndarray]] = {}
         one_minute_bar_count: int | None = None
+        hit_times_bar_count: int | None = None
         for price_manifest in slot_manifest.prices:
             loaded_time_arrays = self._validate_price_manifest(
                 slot_root=slot_root,
@@ -137,6 +139,8 @@ class BacktestArtifactManifestValidatorV2:
                 price_time_arrays_by_timeframe[price_manifest.timeframe] = loaded_time_arrays
             if price_manifest.timeframe == "1m":
                 one_minute_bar_count = price_manifest.coverage.bar_count
+            if price_manifest.timeframe == HIT_TIMES_TIMEFRAME_LITERAL_V2:
+                hit_times_bar_count = price_manifest.coverage.bar_count
 
         for mapping_manifest in slot_manifest.mappings:
             self._validate_mapping_manifest(
@@ -191,7 +195,7 @@ class BacktestArtifactManifestValidatorV2:
                     slot_root=slot_root,
                     slot_manifest=slot_manifest,
                     hit_times_manifest=hit_times_manifest,
-                    one_minute_bar_count=one_minute_bar_count,
+                    hit_times_bar_count=hit_times_bar_count,
                     diagnostics=diagnostics,
                 )
 
@@ -1357,7 +1361,7 @@ class BacktestArtifactManifestValidatorV2:
                 ArtifactValidationDiagnosticV2(
                     code="hit_times_manifest_invalid",
                     message=str(error),
-                    location="hit_times/1m/manifest.yaml",
+                    location=f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/manifest.yaml",
                     manifest_path=hit_times_manifest_path,
                 )
             )
@@ -1371,7 +1375,7 @@ class BacktestArtifactManifestValidatorV2:
         slot_root: Path,
         slot_manifest: ArtifactManifestDocumentV2,
         hit_times_manifest: ArtifactHitTimesManifestDocumentV2,
-        one_minute_bar_count: int | None,
+        hit_times_bar_count: int | None,
         diagnostics: list[ArtifactValidationDiagnosticV2],
     ) -> None:
         """
@@ -1383,7 +1387,8 @@ class BacktestArtifactManifestValidatorV2:
             slot_root: Absolute slot-root path.
             slot_manifest: Root manifest used for cross-contract checks.
             hit_times_manifest: Parsed strict hit-times manifest.
-            one_minute_bar_count: Root `1m` timeline length when available.
+            hit_times_bar_count: Root timeline length for `HIT_TIMES_TIMEFRAME_LITERAL_V2` when
+                available.
             diagnostics: Mutable diagnostics buffer to extend.
         Returns:
             None.
@@ -1426,16 +1431,17 @@ class BacktestArtifactManifestValidatorV2:
                 )
             )
         if (
-            one_minute_bar_count is not None
-            and hit_times_manifest.timeline_bar_count != one_minute_bar_count
+            hit_times_bar_count is not None
+            and hit_times_manifest.timeline_bar_count != hit_times_bar_count
         ):
             diagnostics.append(
                 ArtifactValidationDiagnosticV2(
                     code="hit_times_timeline_bar_count_mismatch",
                     message=(
-                        "hit_times timeline_bar_count must match root 1m coverage; got "
+                        "hit_times timeline_bar_count must match root hit-times timeframe "
+                        "coverage; got "
                         f"{hit_times_manifest.timeline_bar_count!r}, expected "
-                        f"{one_minute_bar_count!r}"
+                        f"{hit_times_bar_count!r}"
                     ),
                     location="timeline_bar_count",
                     manifest_path=hit_times_manifest.path,

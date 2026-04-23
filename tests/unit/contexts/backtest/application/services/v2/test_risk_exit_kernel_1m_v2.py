@@ -289,7 +289,7 @@ def test_run_reference_vs_fast_self_check_v2_validates_bounded_subset() -> None:
 
 def test_slice_hit_times_to_execution_window_v2_accepts_widened_artifact_grid() -> None:
     """
-    Verify Stage B stays grid-agnostic when `hit_times/1m` artifacts publish wider TP/SL grids.
+    Verify Stage B stays grid-agnostic when `hit_times/15m` artifacts publish wider TP/SL grids.
 
     Args:
         None.
@@ -301,7 +301,7 @@ def test_slice_hit_times_to_execution_window_v2_accepts_widened_artifact_grid() 
     Raises:
         AssertionError: If widened artifact grids drift during local slicing or fast search.
     Side Effects:
-        Allocates widened synthetic `hit_times/1m` artifact arrays in memory only.
+        Allocates widened synthetic `hit_times/15m` artifact arrays in memory only.
     Docs:
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md

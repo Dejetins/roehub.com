@@ -347,7 +347,7 @@ Path contract by environment:
   в columnar precompute path, чтобы bootstrap был устойчив к историческим дублям в ClickHouse.
 - R12 canonical execution model for steady-state signal materialization is `timeframe-scoped
   execution`:
-  - в canonical scope materialize'ить `canonical_prices` и `hit_times/1m`;
+  - в canonical scope materialize'ить `canonical_prices` и `hit_times/15m`;
   - затем детерминированно открыть `rolled_prices` ровно для одного target timeframe;
   - открыть один `current_timeframe`;
   - materialize all mappings/signals for that timeframe;
@@ -365,7 +365,7 @@ R3-01 / R3-02 / R3-03 exception boundary:
   - `signals.supported_timeframes: []`
   - `signals.supported_indicator_ids: []`
   - `signals.manifests: []`
-  - `hit_times.manifest_path: "hit_times/1m/manifest.yaml"`
+  - `hit_times.manifest_path: "hit_times/15m/manifest.yaml"`
   - `hit_times.manifest_sha256: "0000000000000000000000000000000000000000000000000000000000000000"`
 - после R3-04 такой slot можно публиковать только через explicit prices+mappings stage spec:
   - `price_timeframes` из `backtest_artifacts.validation_plan`
@@ -400,7 +400,7 @@ R4-01 / R4-02 / R4-03 clarification:
   drift в existing manifest/data при reuse attempt обязан останавливать rebuild fail-fast;
 - R4-04 runtime `source` integration downstream уже потребляет этот artifact contract через
   runtime defaults, jobs `/top` payloads и `variant-report`;
-- R5-01 materialize'ит real `hit_times/1m`, поэтому rebuild теперь должен писать strict
+- R5-01 materialize'ит real `hit_times/15m`, поэтому rebuild теперь должен писать strict
   hit-times arrays и manifest в inactive slot по тем же deterministic paths.
 
 Steady-state rebuild policy after the first successful publish:
@@ -413,9 +413,9 @@ Steady-state rebuild policy after the first successful publish:
   `lookback_policy.signal_tail_bars_1m`;
 - если `validation_plan.signal_artifacts = all_supported_v1`, rebuild/publish обязан materialize'ить
   весь signal-capable registry для каждого symbol root, а не operator-curated subset;
-- `hit_times/1m` используют bounded reread/rewrite по
+- `hit_times/15m` используют bounded reread/rewrite по
   `lookback_policy.hit_times_tail_bars_1m`;
-- `hit_times/1m` budget выбирается по режиму:
+- `hit_times/15m` budget выбирается по режиму:
   - bootstrap / `--full-rebuild` -> `validation_budgets.max_hit_times_cells_full_rebuild`
   - steady-state incremental -> `validation_budgets.max_hit_times_cells`
 - если existing files/manifest reuse prerequisites нарушены для конкретного stage или symbol root,
@@ -431,7 +431,7 @@ Steady-state rebuild policy after the first successful publish:
 - `<slot>/signals/<tf>/<indicator_id>/signals.i8.npy`
 - `<slot>/mappings/<tf>/bar_open_1m_idx.u32.npy`
 - `<slot>/mappings/<tf>/bar_close_1m_idx.u32.npy`
-- `<slot>/hit_times/1m/manifest.yaml`
+- `<slot>/hit_times/15m/manifest.yaml`
 
 ## Шаг 4. validate whole slot
 
@@ -439,7 +439,7 @@ Steady-state rebuild policy after the first successful publish:
 
 - root `manifest.yaml` schema валиден;
 - `signals/<tf>/<indicator_id>/manifest.yaml` schema валидны;
-- `hit_times/1m/manifest.yaml` schema валиден;
+- `hit_times/15m/manifest.yaml` schema валиден;
 - все referenced `prices/*`, `signals/*`, `mappings/*`, `hit_times/*` присутствуют;
 - `sha256` совпадает с содержимым файлов;
 - `dtype`, `shape`, `axis_order` совпадают с manifest contracts;
@@ -485,7 +485,7 @@ Steady-state rebuild policy after the first successful publish:
   - `signals.manifests`
   - `signals/<tf>/<indicator_id>/signals.i8.npy`
   - `signals/<tf>/<indicator_id>/manifest.yaml`
-- `hit_times/1m` должны использовать bounded rebuild по
+- `hit_times/15m` должны использовать bounded rebuild по
   `lookback_policy.hit_times_tail_bars_1m`; если reuse невозможен, rebuild переключается в
   deterministic full rebuild для этого symbol root;
 - после R11-03 operator diagnostics обязаны читать stage-level rebuild stats из shared publish
@@ -534,7 +534,7 @@ published_at_utc: "2026-03-26T03:04:05Z"
 - `backtest_artifact_tail_rebuild_bars_total{stage}` показывает ожидаемый bounded tail profile, а
   не скрытый full rebuild без причины.
 - per-stage `reused_prefix_bars` / `rewritten_tail_bars` из publish diagnostics согласованы с этим
-  profile и объясняют, почему `hit_times/1m` или long-window `signals.i8.npy` могли перейти в
+  profile и объясняют, почему `hit_times/15m` или long-window `signals.i8.npy` могли перейти в
   full rebuild.
 
 ## R6-01 runtime bootstrap checks
@@ -553,7 +553,7 @@ published_at_utc: "2026-03-26T03:04:05Z"
   - `signals/<tf>/<indicator_id>/signals.i8.npy`
   - `mappings/<tf>/bar_open_1m_idx.u32.npy`
   - `mappings/<tf>/bar_close_1m_idx.u32.npy`
-  - `hit_times/1m/manifest.yaml`
+  - `hit_times/15m/manifest.yaml`
 - runtime не должен делать directory scanning и не должен recompute'ить `manifest_sha256` в hot
   path.
 
