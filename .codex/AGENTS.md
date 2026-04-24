@@ -331,7 +331,7 @@ For ordinary implementation tasks, the agent SHOULD target roughly:
 
 unless the task explicitly requires more.
 
-This is a guideline, not a hard limit, but exceeding it SHOULD be justified.
+This is a heuristic, not a hard limit and not a requirement to count tokens exactly. Exceeding it SHOULD be justified when it materially affects task cost or focus.
 
 ### 3.6 Broader reading in Review Mode
 Review Mode MAY exceed the default reading budget, but the agent SHOULD still:
@@ -411,6 +411,8 @@ The agent MUST NOT restructure code solely to better match the ideal repository 
 
 ## 5) Repository mental model (boundaries)
 
+Use the mental model as a hypothesis to verify against current code, not as proof that every module already follows the ideal shape.
+
 ### 5.1 Delivery vs core
 The repository is assumed to separate:
 - **delivery layer**: handlers, transport, wiring, DTOs, composition roots
@@ -438,6 +440,8 @@ Within a context, the default structure is:
 A shared kernel MAY exist for cross-cutting primitives.
 
 This is the default model, not a forced rewrite target.
+
+When applying this model, verify it through concrete signals: import direction, package boundaries, DTO/port definitions, adapter wiring, tests, and architecture docs. If current code intentionally diverges, work with the existing boundary unless correctness or contract safety requires changing it.
 
 ### 5.3 Integration boundaries
 Cross-context translation SHOULD occur via an anti-corruption layer (ACL) so foreign models do not leak into a domain.
@@ -496,6 +500,8 @@ Browser-visible behavior MUST be treated as a runtime concern, not as something 
 
 If the task affects browser-visible or runtime-rendered behavior, the agent SHOULD use an available runtime browser surface for verification.
 
+This section decides whether browser runtime verification is needed and how to keep it scoped. Section 12 covers overall verification obligations; section 15 covers how to report the evidence.
+
 Preferred surfaces depend on the current environment and prompt:
 
 - Browser plugin / in-app browser when explicitly available or requested,
@@ -541,7 +547,7 @@ Browser runtime verification MUST stay task-bounded:
 - capture only evidence useful for the task.
 
 ### 7.4 Browser verification claims
-When browser-visible behavior is in scope, the agent MUST distinguish clearly between:
+When browser-visible behavior is in scope, the agent MUST label browser claims by evidence type:
 
 - behavior observed through runtime browser verification,
 - behavior verified through tests but not browser-observed,
@@ -553,6 +559,8 @@ If a browser-visible claim is made without runtime browser verification, the age
 ---
 
 ## 8) Architectural expectations (pragmatic DDD / hexagonal)
+
+DDD / ports-and-adapters is the default design language for this repo, not a mandate to remodel unrelated working code. Prefer local consistency and contract safety over making every touched file match an ideal architecture.
 
 ### 8.1 Dependency direction (DIP)
 In Default Mode:
@@ -749,7 +757,13 @@ Changed behavior MUST receive relevant verification proportional to the boundary
 - verified hot path changed → verify performance with appropriate evidence when feasible
 - browser-visible behavior changed → use runtime browser verification when relevant and available
 
-For concrete `pytest` / `ruff` / `mypy` / `pyright` ordering, check selection, and failing-gate triage, the agent SHOULD use the global `backend-quality-gates` skill.
+For this Python repository, prefer project wrappers when running quality gates:
+
+- `uv run ruff check <target-or-.>`
+- `uv run pyright`
+- `uv run pytest -q <target-or-empty>`
+
+Use focused targets first, then broaden only when risk or repository policy requires it. For concrete check ordering, selection, and failing-gate triage, the agent SHOULD use the global `backend-quality-gates` skill.
 
 ### 12.3 Speed Mode minimum bar
 In Speed Mode, the agent MUST still provide at least one meaningful verification step or explicit manual verification instructions with expected outcomes.
