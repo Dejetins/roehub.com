@@ -177,5 +177,5 @@ def test_daily_counts_uses_distinct_minute_buckets() -> None:
     assert len(out) == 1
     assert out[0].count == 7
     assert gw.last_query is not None
-    assert "formatDateTime(ts_open, '%F', 'UTC') AS day" in gw.last_query
+    assert "formatDateTime(ts_open, '%%F', 'UTC') AS day" in gw.last_query
     assert "uniqExact(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS cnt" in gw.last_query

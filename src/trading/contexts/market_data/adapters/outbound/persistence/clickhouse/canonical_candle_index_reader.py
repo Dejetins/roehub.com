@@ -184,7 +184,7 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
         """
         q = f"""
         SELECT
-            formatDateTime(ts_open, '%F', 'UTC') AS day,
+            formatDateTime(ts_open, '%%F', 'UTC') AS day,
             uniqExact(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS cnt
         FROM {self._table()}
         WHERE market_id = %(market_id)s
