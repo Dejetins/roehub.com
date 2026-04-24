@@ -100,6 +100,7 @@ reload_profile() {
   local profile="$1"
   local -a static_services=()
   local -a existing_worker_services=()
+  local existing_worker_count=0
   local service=""
 
   case "$profile" in
@@ -118,11 +119,17 @@ reload_profile() {
   while IFS= read -r service; do
     existing_worker_services+=("$service")
   done < <(collect_worker_services "$profile")
+  existing_worker_count="${#existing_worker_services[@]}"
   echo "reloading ${profile} static services: ${#static_services[@]}"
-  echo "removing legacy ${profile} backtest-job-runner services: ${#existing_worker_services[@]}"
-  for service in "${static_services[@]}" "${existing_worker_services[@]}"; do
+  echo "removing legacy ${profile} backtest-job-runner services: ${existing_worker_count}"
+  for service in "${static_services[@]}"; do
     bootout_service "${service}" || true
   done
+  if (( existing_worker_count > 0 )); then
+    for service in "${existing_worker_services[@]}"; do
+      bootout_service "${service}" || true
+    done
+  fi
 
   for service in "${static_services[@]}"; do
     bootstrap_service "${service}"
