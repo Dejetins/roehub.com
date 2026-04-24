@@ -44,8 +44,10 @@ target/
 
 # Local workspace artifacts
 .DS_Store
-.codex/
-.codex/*
+.codex/agents/.context/
+.codex/tmp/
+.codex/sessions/
+.codex/*.local.*
 .data_load/*
 /data_load/
 /data_load/*
