@@ -37,7 +37,9 @@ def test_bounds_returns_min_max():
     dt1 = datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)
     dt2 = datetime(2026, 2, 2, 0, 0, tzinfo=timezone.utc)
 
-    gw = FakeGateway([{"first": dt1, "last": dt2}])
+    minute1 = int(dt1.timestamp() // 60)
+    minute2 = int(dt2.timestamp() // 60)
+    gw = FakeGateway([{"first_minute_key": minute1, "last_minute_key": minute2}])
     r = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
 
     inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
@@ -48,8 +50,8 @@ def test_bounds_returns_min_max():
     assert str(b[1]) == str(UtcTimestamp(dt2))
 
     assert gw.last_query is not None
-    assert "min(toStartOfMinute(ts_open))" in gw.last_query
-    assert "max(toStartOfMinute(ts_open))" in gw.last_query
+    assert "min(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+    assert "max(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
 
     assert gw.last_params is not None
     assert int(gw.last_params["market_id"]) == 1
@@ -66,7 +68,8 @@ def test_max_ts_open_lt():
     - None.
     """
     dt = datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc)
-    gw = FakeGateway([{"last": dt}])
+    minute_key = int(dt.timestamp() // 60)
+    gw = FakeGateway([{"last_minute_key": minute_key}])
     r = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
 
     inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
@@ -77,10 +80,12 @@ def test_max_ts_open_lt():
     assert str(out) == str(UtcTimestamp(dt))
 
     assert gw.last_query is not None
-    assert "max(toStartOfMinute(ts_open))" in gw.last_query
+    assert "max(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+    assert "ts_open < fromUnixTimestamp64Milli(%(before_ms)s, 'UTC')" in gw.last_query
 
     assert gw.last_params is not None
     assert int(gw.last_params["market_id"]) == 1
+    assert int(gw.last_params["before_ms"]) == int(before.value.timestamp() * 1000)
 
 
 def test_bounds_1m_applies_exclusive_before_filter() -> None:
@@ -95,7 +100,9 @@ def test_bounds_1m_applies_exclusive_before_filter() -> None:
     """
     dt1 = datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)
     dt2 = datetime(2026, 2, 1, 0, 5, tzinfo=timezone.utc)
-    gw = FakeGateway([{"first": dt1, "last": dt2}])
+    minute1 = int(dt1.timestamp() // 60)
+    minute2 = int(dt2.timestamp() // 60)
+    gw = FakeGateway([{"first_minute_key": minute1, "last_minute_key": minute2}])
     reader = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
     inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
 
@@ -107,9 +114,9 @@ def test_bounds_1m_applies_exclusive_before_filter() -> None:
     assert str(out[0]) == str(UtcTimestamp(dt1))
     assert str(out[1]) == str(UtcTimestamp(dt2))
     assert gw.last_query is not None
-    assert "ts_open < %(before)s" in gw.last_query
+    assert "ts_open < fromUnixTimestamp64Milli(%(before_ms)s, 'UTC')" in gw.last_query
     assert gw.last_params is not None
-    assert "before" in gw.last_params
+    assert "before_ms" in gw.last_params
 
 
 def test_distinct_ts_opens():
@@ -124,7 +131,9 @@ def test_distinct_ts_opens():
     """
     dt1 = datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)
     dt2 = datetime(2026, 2, 1, 0, 1, tzinfo=timezone.utc)
-    gw = FakeGateway([{"ts_open": dt1}, {"ts_open": dt2}])
+    minute1 = int(dt1.timestamp() // 60)
+    minute2 = int(dt2.timestamp() // 60)
+    gw = FakeGateway([{"minute_key": minute1}, {"minute_key": minute2}])
     r = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
 
     inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
@@ -140,7 +149,9 @@ def test_distinct_ts_opens():
 
     assert gw.last_query is not None
     assert "SELECT DISTINCT" in gw.last_query
-    assert "toStartOfMinute(ts_open) AS ts_open" in gw.last_query
+    assert "intDiv(toUnixTimestamp64Milli(ts_open), 60000) AS minute_key" in gw.last_query
+    assert "ts_open >= fromUnixTimestamp64Milli(%(start_ms)s, 'UTC')" in gw.last_query
+    assert "ts_open < fromUnixTimestamp64Milli(%(end_ms)s, 'UTC')" in gw.last_query
 
 
 def test_daily_counts_uses_distinct_minute_buckets() -> None:
@@ -166,4 +177,5 @@ def test_daily_counts_uses_distinct_minute_buckets() -> None:
     assert len(out) == 1
     assert out[0].count == 7
     assert gw.last_query is not None
-    assert "uniqExact(toStartOfMinute(ts_open)) AS cnt" in gw.last_query
+    assert "formatDateTime(ts_open, '%F', 'UTC') AS day" in gw.last_query
+    assert "uniqExact(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS cnt" in gw.last_query
