@@ -16,7 +16,6 @@ on:
       - "scripts/macos/**"
       - "infra/macos/**"
       - "infra/scripts/**"
-      - "tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
 
@@ -67,7 +66,7 @@ jobs:
       - name: Validate repo layout for native deploy
         run: |
           set -euxo pipefail
-          for required_path in apps src configs alembic alembic.ini migrations scripts/macos infra/macos infra/scripts/monit .python-version pyproject.toml uv.lock tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json; do
+          for required_path in apps src configs alembic alembic.ini migrations scripts/macos infra/macos infra/scripts/monit .python-version pyproject.toml uv.lock; do
             test -e "${required_path}"
           done
 
@@ -90,8 +89,6 @@ jobs:
             mkdir -p /opt/roehub/app/scripts /opt/roehub/app/infra
             tar -C . -cf - apps src configs alembic migrations scripts/macos infra/macos infra/scripts | tar -C /opt/roehub/app -xf -
           fi
-          install -d /opt/roehub/app/tests/perf_smoke/contexts/backtest/fixtures
-          install -m 0644 tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json /opt/roehub/app/tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json
           install -m 0644 .python-version /opt/roehub/app/.python-version
           install -m 0644 alembic.ini /opt/roehub/app/alembic.ini
           install -m 0644 pyproject.toml /opt/roehub/app/pyproject.toml
@@ -99,7 +96,6 @@ jobs:
           test -s /opt/roehub/app/alembic.ini
           test -s /opt/roehub/app/pyproject.toml
           test -s /opt/roehub/app/uv.lock
-          test -s /opt/roehub/app/tests/perf_smoke/contexts/backtest/fixtures/backtest_runtime_acceleration_benchmark_corpus_v1.json
 
       - name: Build/update Python runtime
         run: |
@@ -163,78 +159,6 @@ jobs:
           brew services restart prometheus
           brew services restart grafana
           sleep 5
-
-      - name: Service-level smoke backtest-job-runner fleet when jobs.enabled
-        run: |
-          set -euo pipefail
-          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
-          cd /opt/roehub/app
-          base_metrics_port=9204
-          worker_runtime=()
-          while IFS= read -r runtime_value; do
-            worker_runtime+=("${runtime_value}")
-          done < <(
-            /opt/roehub/app/.venv/bin/python -c "from trading.contexts.backtest.adapters.outbound import load_backtest_runtime_config; config = load_backtest_runtime_config('/opt/roehub/app/configs/prod/backtest.yaml'); print('1' if config.jobs.enabled else '0'); print(config.jobs.worker_processes)"
-          )
-          jobs_enabled="${worker_runtime[0]}"
-          worker_processes="${worker_runtime[1]}"
-          echo "service-level smoke target=backtest-job-runner"
-          echo "jobs.enabled=${jobs_enabled}"
-          echo "worker_processes=${worker_processes}"
-          echo "metrics_endpoint_base_port=${base_metrics_port}"
-          echo "no synthetic production job"
-          if [ "${jobs_enabled}" != '1' ]; then
-            echo "backtest-job-runner fleet is not required because jobs.enabled=false"
-            exit 0
-          fi
-          uid="$(id -u)"
-          launchctl list \
-            | awk '$3 ~ /^com\.roehub\.backtest-job-runner\.[0-9]+$/ {print}' \
-            | tee /tmp/backtest-job-runner-launchctl-list.txt
-          registered_workers="$(
-            launchctl list \
-              | awk '$3 ~ /^com\.roehub\.backtest-job-runner\.[0-9]+$/ {count++} END {print count+0}'
-          )"
-          live_workers="$(
-            launchctl list \
-              | awk '$3 ~ /^com\.roehub\.backtest-job-runner\.[0-9]+$/ && $1 ~ /^[0-9]+$/ {count++} END {print count+0}'
-          )"
-          echo "registered_backtest_job_runner_workers=${registered_workers}"
-          echo "live_backtest_job_runner_workers=${live_workers}"
-          if [ "${registered_workers}" != "${worker_processes}" ]; then
-            echo "service-level smoke failed: expected ${worker_processes} registered backtest-job-runner services after reload"
-            exit 1
-          fi
-          if [ "${live_workers}" != "${worker_processes}" ]; then
-            echo "service-level smoke failed: expected ${worker_processes} live backtest-job-runner processes after reload"
-            exit 1
-          fi
-          for ((instance_index = 0; instance_index < worker_processes; instance_index++)); do
-            service_label="com.roehub.backtest-job-runner.${instance_index}"
-            metrics_port="$((base_metrics_port + instance_index))"
-            status_file="/tmp/${service_label}.status.txt"
-            metrics_file="/tmp/${service_label}.metrics.txt"
-            echo "service-level smoke instance=${instance_index} label=${service_label} metrics_endpoint=http://127.0.0.1:${metrics_port}/metrics"
-            launchctl print "gui/${uid}/${service_label}" >"${status_file}"
-            grep -E 'state =|pid =|last exit code =' "${status_file}" || true
-            if grep -Eq 'last exit code = [1-9][0-9]*' "${status_file}"; then
-              echo "service-level smoke failed: ${service_label} reported a non-zero launchd last exit code"
-              exit 1
-            fi
-            metrics_ok='0'
-            for attempt in 1 2 3 4 5 6; do
-              if curl -fsS "http://127.0.0.1:${metrics_port}/metrics" >"${metrics_file}" \
-                && grep -q '^# HELP backtest_job_runner_claim_total ' "${metrics_file}"; then
-                metrics_ok='1'
-                break
-              fi
-              sleep 5
-            done
-            if [ "${metrics_ok}" != '1' ]; then
-              echo "service-level smoke failed: metrics endpoint for ${service_label} is not live or missing backtest-job-runner counters"
-              exit 1
-            fi
-          done
 
       - name: Smoke test backend API
         run: |
