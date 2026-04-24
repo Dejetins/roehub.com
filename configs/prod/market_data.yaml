@@ -34,7 +34,7 @@ market_data:
         backoff: { base_s: 0.5, max_s: 15.0, jitter_s: 0.3 }
         limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 3 }
       ws:
-        url: "wss://fstream.binance.com/stream"
+        url: "wss://fstream.binance.com/market/stream"
         ping_interval_s: 20.0
         pong_timeout_s: 10.0
         reconnect: { min_delay_s: 0.5, max_delay_s: 60.0, factor: 1.7, jitter_s: 0.3 }
