@@ -8,22 +8,12 @@
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   </head>
   <body>
-    {% set history_active = page_path == '/backtests/history' or page_path.startswith('/backtests/runs') %}
     <header class="site-header">
       <a class="brand" href="/">Roehub</a>
       <nav class="site-nav">
         <a class="{% if page_path == '/' %}active{% endif %}" href="/">Home</a>
         <a class="{% if page_path == '/strategies' %}active{% endif %}" href="/strategies">
           Strategies
-        </a>
-        <a class="{% if page_path == '/backtests' %}active{% endif %}" href="/backtests">
-          Launch
-        </a>
-        <a class="{% if history_active %}active{% endif %}" href="/backtests/history">
-          Backtest history
-        </a>
-        <a class="{% if page_path == '/backtests/jobs' %}active{% endif %}" href="/backtests/jobs">
-          Jobs alias
         </a>
         <a class="{% if page_path == '/login' %}active{% endif %}" href="/login">Login</a>
         <a class="{% if page_path == '/logout' %}active{% endif %}" href="/logout">Logout</a>

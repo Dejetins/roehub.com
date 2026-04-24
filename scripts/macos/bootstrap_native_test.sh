@@ -4,7 +4,6 @@ set -Eeuo pipefail
 PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LAUNCH_AGENTS_DIR="/Users/daniildegtyarev/Library/LaunchAgents"
-PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
 
 mkdir -p /opt/roehub/test/postgresql /opt/roehub/test/redis
 mkdir -p /opt/roehub/test/clickhouse/data /opt/roehub/test/clickhouse/tmp /opt/roehub/test/clickhouse/logs /opt/roehub/test/clickhouse/backups /opt/roehub/test/clickhouse/access
@@ -34,11 +33,5 @@ for plist in \
 do
   install -m 0644 "$REPO_ROOT/infra/macos/launchd/$plist" "$LAUNCH_AGENTS_DIR/$plist"
 done
-
-"$PYTHON_BIN" "$REPO_ROOT/scripts/macos/render_backtest_job_runner_launchd.py" \
-  --profile test \
-  --repo-root "$REPO_ROOT" \
-  --launch-agents-dir "$LAUNCH_AGENTS_DIR" \
-  --clean >/dev/null
 
 echo "test native templates installed"

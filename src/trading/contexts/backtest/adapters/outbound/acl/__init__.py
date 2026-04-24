@@ -1,5 +1,1 @@
-from .strategy_repository_reader import StrategyRepositoryBacktestStrategyReader
-
-__all__ = [
-    "StrategyRepositoryBacktestStrategyReader",
-]
+"""ACL adapters for reset backtest scope."""

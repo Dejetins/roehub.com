@@ -26,12 +26,10 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobStageAShortlist,
     BacktestJobState,
     BacktestJobTopVariant,
+    normalize_persisted_summary_metrics_v2,
 )
 from trading.contexts.backtest.domain.errors import BacktestStorageError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
-from trading.contexts.backtest_artifacts.application.services.v2.metrics_kernel import (
-    normalize_persisted_summary_metrics_v2,
-)
 from trading.shared_kernel.primitives import UserId
 
 _BACKTEST_JOB_SELECT_COLUMNS = """

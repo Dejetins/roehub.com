@@ -1,6 +1,5 @@
 from .modules import (
     bind_indicators_runtime_dependencies,
-    build_backtest_router,
     build_identity_api_module,
     build_identity_router,
     build_indicators_candle_feed,
@@ -10,7 +9,6 @@ from .modules import (
 )
 
 __all__ = [
-    "build_backtest_router",
     "build_identity_api_module",
     "build_identity_router",
     "bind_indicators_runtime_dependencies",

@@ -28,6 +28,7 @@ from .execution_v1 import (
     PositionV1,
     TradeV1,
 )
+from .summary_metrics import normalize_persisted_summary_metrics_v2
 
 __all__ = [
     "AccountStateV1",
@@ -51,5 +52,6 @@ __all__ = [
     "TradeV1",
     "is_backtest_job_state_active",
     "is_backtest_job_state_terminal",
+    "normalize_persisted_summary_metrics_v2",
     "report_table_md_allowed_for_state",
 ]

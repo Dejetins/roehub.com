@@ -9,14 +9,14 @@
 - Публичный edge остается на VPS (`roehub.com`), backend на `Mac Studio` остается private.
 - Собственный billing-модуль не разрабатывается.
 - `Backtest artifact publisher` управляется через `Monit` поверх `launchd`.
-- Backtest-контур (`com.roehub.backtest-job-runner.*`, `com.roehub.backtest-artifact-publisher` и последующие backtest services) входит в обязательный Prometheus monitoring baseline.
+- Backtest artifact publisher входит в обязательный Prometheus monitoring baseline.
 
 ## Архитектурные решения
 
 - `launchd` отвечает за запуск/перезапуск сервисов как process supervisor.
 - `Monit` отвечает за service-level контроль состояния, рестарты по health-правилам и операционные алерты.
 - `Prometheus + exporters + blackbox` отвечают за сбор метрик и probes.
-- Для backtest-контура Prometheus является обязательным системным источником правды по runtime/freshness/failure метрикам и alerting rules.
+- Для backtest artifact publisher Prometheus является обязательным системным источником правды по freshness/failure метрикам и alerting rules.
 - `Grafana` отвечает за визуализацию и дашборды.
 - `Alertmanager` отвечает за маршрутизацию алертов.
 - Доменная админка и операционные действия выполняются через FastAPI admin surface (`SQLAdmin` + явные action endpoints).
@@ -30,7 +30,6 @@
 | `com.roehub.api` | `launchd` + `Monit` process/port checks | `/metrics`, blackbox HTTP probe, API SLI | `SQLAdmin` для доменных сущностей, ops endpoints для control actions |
 | `com.roehub.market-data-ws-worker` | `launchd` + `Monit` | `:9201` (`ws_*`, `insert_*`), restart/error alerts | restart/pause/resume через admin actions |
 | `com.roehub.market-data-scheduler` | `launchd` + `Monit` | `:9202` (`scheduler_job_runs_total`, `scheduler_job_errors_total`) | trigger/reschedule job actions |
-| `com.roehub.backtest-job-runner.*` | `launchd` fleet + `Monit` per instance | `:9204+N` `/metrics`, queue lag/state metrics, lease health, runner failure/duration metrics, Prometheus alert rules | cancel/retry/requeue/top через admin API |
 | `com.roehub.backtest-artifact-publisher` | `launchd` + `Monit` (обязательно) | Prometheus-compatible publish/freshness/failure metrics (`/metrics` или exporter bridge для batch-режима), freshness/lag alerts | run-now/rebuild/switch-slot действия |
 | `strategy-live-runner` (target) | `launchd` + `Monit` + control-plane lease model | `:9203`, heartbeat/command lag/failure metrics | start/stop/pause/resume, kill-switch, incident actions |
 | PostgreSQL | `brew services`/`launchd` + `Monit` | `postgres-exporter` + TCP probe | `pgAdmin 4` (role/db/session ops) |
@@ -131,24 +130,7 @@
   - pause/resume отдельных задач,
   - error ack с reason.
 
-### 4) Backtest job runner fleet (`com.roehub.backtest-job-runner.*`)
-
-- Запуск: materialized `launchd` instances из `worker_processes`.
-- Контроль: `Monit` на каждый instance (process + metrics endpoint).
-- Мониторинг:
-  - обязательный Prometheus scrape каждого instance,
-  - claimed/finished/failed counters,
-  - active claimed jobs,
-  - duration histogram,
-  - queue lag по БД состояниям,
-  - lease/heartbeat health,
-  - alert rules на stalled runner, failure burst и queue lag saturation.
-- Админ-операции:
-  - cancel/retry/requeue job,
-  - quarantine noisy user job,
-  - временный scale fleet вверх/вниз через config+reload.
-
-### 5) Backtest artifact publisher (`com.roehub.backtest-artifact-publisher`)
+### 4) Backtest artifact publisher (`com.roehub.backtest-artifact-publisher`)
 
 - Запуск: `launchd` schedule/service.
 - Контроль: `Monit` обязателен:
@@ -266,7 +248,6 @@
 
 - `docs/runbooks/mac-studio-native-backend-operations.md`
 - `docs/runbooks/mac-studio-monitoring-plan.md`
-- `docs/runbooks/backtest-job-runner.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 - `docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md`
 - `docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md`

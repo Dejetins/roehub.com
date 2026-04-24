@@ -213,14 +213,14 @@ def test_backtest_artifacts_runtime_config_to_precompute_runtime_settings_includ
 
 def test_resolve_backtest_artifacts_config_path_precedence() -> None:
     """
-    Verify artifact config path resolution uses override env first, then env fallback.
+    Verify artifact config path resolution uses override env first, then explicit env fallback.
 
     Args:
         None.
     Returns:
         None.
     Assumptions:
-        Fallback format is `configs/<ROEHUB_ENV>/backtest_artifacts.yaml`.
+        Fallback format is `configs/<ROEHUB_ENV>/backtest_artifacts.yaml`; missing env fails fast.
     Raises:
         AssertionError: If precedence order differs from runtime contract.
     Side Effects:
@@ -237,9 +237,8 @@ def test_resolve_backtest_artifacts_config_path_precedence() -> None:
     assert resolve_backtest_artifacts_config_path(environ={"ROEHUB_ENV": "test"}) == Path(
         "configs/test/backtest_artifacts.yaml"
     )
-    assert resolve_backtest_artifacts_config_path(environ={}) == Path(
-        "configs/dev/backtest_artifacts.yaml"
-    )
+    with pytest.raises(ValueError, match="ROEHUB_ENV"):
+        resolve_backtest_artifacts_config_path(environ={})
 
 
 def test_resolve_backtest_artifacts_config_path_rejects_invalid_env_name() -> None:

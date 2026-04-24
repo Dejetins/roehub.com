@@ -2,14 +2,13 @@
 
 Этот runbook фиксирует безопасную operational-процедуру для rebuild/publish артефактов в
 `artifacts/backtest/v2` с учётом strict `current.yaml`, slot pinning, config-driven validation
-plan, strict manifest validation и R6-01 runtime bootstrap boundary.
+plan и strict manifest validation.
 
 ## Status
 
-- Status: active operational runbook for the delivered artifact-backed runtime.
+- Status: active operational runbook for trusted backtest artifact publisher/precompute.
 - Canonical scope:
-  - rebuild/publish for the same slot family consumed by sync launch, claimed worker, and
-    run-scoped lazy detail;
+  - rebuild/publish for the slot family consumed by future artifact-backed engines;
   - publish guards consider only active `background_auto` and `background_manual_legacy` rows.
 - Compatibility note:
   - this runbook documents rebuild/publish only and does not revive legacy runtime paths;
@@ -19,7 +18,6 @@ plan, strict manifest validation и R6-01 runtime bootstrap boundary.
 
 - `docs/architecture/backtest/README.md`
 - `docs/architecture/roadmap/base_refactor_plan.md`
-- `docs/architecture/roadmap/backtest-refactor-final-plan-v2.md`
 
 ## Scheduled service contract
 
@@ -537,35 +535,30 @@ published_at_utc: "2026-03-26T03:04:05Z"
   profile и объясняют, почему `hit_times/15m` или long-window `signals.i8.npy` могли перейти в
   full rebuild.
 
-## R6-01 runtime bootstrap checks
+## Artifact publish bootstrap checks
 
 После publish оператор должен исходить из одного invariants set:
 
-- sync runtime стартует только из active `current.yaml`;
-- background runtime стартует только из persisted pin metadata:
-  - `artifact_slot`
-  - `slot_generation`
-  - `artifact_asof_date`
-  - `artifact_manifest_hash`
-- оба path обязаны сходиться в один `slot-pinned context`;
-- runtime loaders читают только explicit paths из manifests:
+- active artifact pointer стартует только из active `current.yaml`;
+- publisher/precompute пишут и валидируют только explicit paths из manifests:
   - `prices/<tf>`
   - `signals/<tf>/<indicator_id>/signals.i8.npy`
   - `mappings/<tf>/bar_open_1m_idx.u32.npy`
   - `mappings/<tf>/bar_close_1m_idx.u32.npy`
   - `hit_times/15m/manifest.yaml`
-- runtime не должен делать directory scanning и не должен recompute'ить `manifest_sha256` в hot
-  path.
+- runtime-compute backtest в этой кодовой базе удален; новый engine должен читать эти артефакты
+  отдельным новым дизайном.
 
-Минимальная verification sequence после изменений в loader/context слое:
+Минимальная verification sequence после изменений в artifact loader/publish/precompute слое:
 
 ```bash
 uv run pytest -q \
-  tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_resolver_v2.py \
-  tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py \
-  tests/unit/contexts/backtest/application/services/v2/test_signal_matrix_loader_v2.py \
-  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_job_runner_v1.py \
-  tests/unit/contexts/backtest/application/use_cases/test_run_backtest_timeline_builder.py
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py \
+  tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py
 ```
 
 ## Что считается ошибкой
@@ -602,20 +595,23 @@ uv run pytest -q \
   tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py
 ```
 
-2. loaders / slot-pinned bootstrap:
+2. precompute / signal rules:
 
 ```bash
 uv run pytest -q \
-  tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_resolver_v2.py \
-  tests/unit/contexts/backtest/application/services/v2/test_price_arrays_loader_v2.py \
-  tests/unit/contexts/backtest/application/services/v2/test_signal_matrix_loader_v2.py
+  tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py \
+  tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py \
+  tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py
 ```
 
-3. perf closure smoke:
+3. CLI / scheduler wiring:
 
 ```bash
 uv run pytest -q \
-  tests/perf_smoke/contexts/backtest/test_backtest_r0_baseline_perf_smoke.py
+  tests/unit/apps/cli/test_backtest_artifact_publish_cli.py \
+  tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py \
+  tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py
 ```
 
 Ожидаемый результат:
@@ -629,11 +625,11 @@ uv run pytest -q \
 
 - любой validator diagnostic;
 - `inactive_slot_pinned`;
-- perf smoke failure;
+- precompute/publisher verification failure;
 - mismatch между `current.yaml` и root `manifest.yaml`.
 
-При любом из этих stop conditions переходить к
-`docs/runbooks/backtest-rollout-rollback.md`, а не выполнять ручные правки slot contents.
+При любом из этих stop conditions не выполнять ручные правки slot contents; исправлять
+inactive slot через штатный rebuild/publish flow.
 
 ## После изменения документации
 

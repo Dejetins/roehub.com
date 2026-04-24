@@ -33,8 +33,6 @@
   - `/login`
   - `/logout`
   - `/strategies` (protected)
-  - `/backtests` (protected)
-  - `/backtests/jobs` (protected)
 
 ### 2) Auth UX (Keycloak OIDC)
 

@@ -59,7 +59,6 @@ Production:
 - `com.roehub.market-data-ws-worker` (`launchd`, metrics `127.0.0.1:9201`)
 - `com.roehub.market-data-scheduler` (`launchd`, metrics `127.0.0.1:9202`)
 - `com.roehub.backtest-artifact-publisher` (`launchd`, metrics `127.0.0.1:9203`, daily `03:05 Europe/Moscow`)
-- `com.roehub.backtest-job-runner.<instance_index>` (`launchd`, materialized from `backtest.jobs.worker_processes`, metrics `127.0.0.1:(9204 + instance_index)`)
 
 Test:
 
@@ -73,7 +72,6 @@ Test:
 - `com.roehub.test.market-data-ws-worker` (metrics `127.0.0.1:19201`)
 - `com.roehub.test.market-data-scheduler` (metrics `127.0.0.1:19202`)
 - `com.roehub.test.backtest-artifact-publisher` (metrics `127.0.0.1:19203`, daily `03:05 Europe/Moscow`)
-- `com.roehub.test.backtest-job-runner.<instance_index>` (materialized from `backtest.jobs.worker_processes`, metrics `127.0.0.1:(19204 + instance_index)`)
 
 ## Common commands
 
@@ -124,95 +122,18 @@ Keycloak auth operations (realm/client/OTP/local setup):
 - `docs/runbooks/keycloak-local-setup-and-ops.md`
 - `docs/architecture/identity/identity-keycloak-auth-model-v1.md`
 
-`bootstrap_native_prod.sh` и `bootstrap_native_test.sh` устанавливают static launchd templates и
-рендерят per-instance `backtest-job-runner` plists из `backtest.jobs.worker_processes`.
+`bootstrap_native_prod.sh` и `bootstrap_native_test.sh` устанавливают static launchd templates.
 `bootstrap_native_prod.sh` дополнительно синхронизирует Monit snippets из репозитория:
 `infra/scripts/monit/*.monitrc` и `infra/scripts/monit/launchctl_service_control.sh`.
 В production baseline сюда входит `infra/scripts/monit/roehub-keycloak.monitrc`.
-`reload_launchd_services.sh` сначала выгружает текущие static/worker services, затем заново
-рендерит worker fleet и bootstrap-ит ровно желаемую cardinality для profile.
+`reload_launchd_services.sh` сначала выгружает текущие static services и legacy
+`backtest-job-runner` plists, затем bootstrap-ит только static services для profile.
 
 GitHub Actions workflow `deploy-backend` должен использовать этот же install/reload path:
 сначала `bash scripts/macos/bootstrap_native_prod.sh`, затем
-`bash scripts/macos/reload_launchd_services.sh prod`. Когда `backtest.jobs.enabled=true`,
-production rollout без live `backtest-job-runner` fleet и без совпадения с
-`backtest.jobs.worker_processes` считается некорректным, даже если `com.roehub.api` уже поднялся.
-Этот gate является `service-level smoke`, а не request-path smoke, и использует supervisor,
-process, and `metrics endpoint` signals. Правило остаётся жестким: `no synthetic production job`.
-
-Операционная vocabulary для claimed background path остаётся следующей:
-
-- `background_auto` является canonical background mode для новых runs;
-- `background_manual_legacy` остаётся compatibility-only literal для уже persisted rows;
-- архитектурные правила и compatibility boundaries принадлежат
-  [`docs/architecture/backtest/README.md`](/Users/daniildegtyarev/Projects/roehub.com/docs/architecture/backtest/README.md),
-  а этот ранбук описывает только deploy/ops surface.
-
-Отдельно проверить worker fleet:
-
-```bash
-launchctl list | grep backtest-job-runner
-```
-
-Ручная service-level smoke проверка после deploy:
-
-```bash
-cd /opt/roehub/app
-base_metrics_port=9204
-worker_runtime=()
-while IFS= read -r runtime_value; do
-  worker_runtime+=("${runtime_value}")
-done < <(
-  /opt/roehub/app/.venv/bin/python -c "from trading.contexts.backtest.adapters.outbound import load_backtest_runtime_config; config = load_backtest_runtime_config('/opt/roehub/app/configs/prod/backtest.yaml'); print('1' if config.jobs.enabled else '0'); print(config.jobs.worker_processes)"
-)
-jobs_enabled="${worker_runtime[0]}"
-worker_processes="${worker_runtime[1]}"
-echo "service-level smoke target=backtest-job-runner"
-echo "jobs.enabled=${jobs_enabled}"
-echo "worker_processes=${worker_processes}"
-echo "metrics_endpoint_base_port=${base_metrics_port}"
-echo "no synthetic production job"
-if [ "${jobs_enabled}" != '1' ]; then
-  echo "backtest-job-runner fleet is not required because jobs.enabled=false"
-  exit 0
-fi
-registered_workers="$(
-  launchctl list \
-    | awk '$3 ~ /^com\.roehub\.backtest-job-runner\.[0-9]+$/ {count++} END {print count+0}'
-)"
-live_workers="$(
-  launchctl list \
-    | awk '$3 ~ /^com\.roehub\.backtest-job-runner\.[0-9]+$/ && $1 ~ /^[0-9]+$/ {count++} END {print count+0}'
-)"
-echo "registered_backtest_job_runner_workers=${registered_workers}"
-echo "live_backtest_job_runner_workers=${live_workers}"
-launchctl list | grep backtest-job-runner
-test "${registered_workers}" = "${worker_processes}"
-test "${live_workers}" = "${worker_processes}"
-for ((instance_index = 0; instance_index < worker_processes; instance_index++)); do
-  launchctl print "gui/$(id -u)/com.roehub.backtest-job-runner.${instance_index}" | grep -E 'state =|pid =|last exit code ='
-  metrics_ok='0'
-  for attempt in 1 2 3 4 5 6; do
-    if curl -fsS "http://127.0.0.1:$((base_metrics_port + instance_index))/metrics" \
-      | grep -q '^# HELP backtest_job_runner_claim_total '; then
-      metrics_ok='1'
-      break
-    fi
-    sleep 5
-  done
-  test "${metrics_ok}" = '1'
-done
-```
-
-Failure interpretation:
-- `jobs.enabled=false`: worker fleet intentionally не materialize-ится и deploy не должен падать
-  только из-за отсутствия `backtest-job-runner` services;
-- install/bootstrap failure: `bootstrap_native_prod.sh` не установил launchd/materialized plists;
-- reload failure: `reload_launchd_services.sh prod` не зарегистрировал ожидаемый fleet size;
-- fleet cardinality mismatch: registered/live services не совпали с `worker_processes`, значит
-  rollout incorrect даже при живом `com.roehub.api`;
-- immediate error exit: `launchctl print` показывает `last exit code != 0` для worker service;
-- liveness/observability failure: service label есть, но нет live pid или не отвечает `metrics endpoint`;
+`bash scripts/macos/reload_launchd_services.sh prod`. Runtime compute backtest и
+`backtest-job-runner` больше не входят в production baseline; trusted backtest scope сейчас
+ограничен `backtest-artifact-publisher` и artifact precompute/publish.
 - API `401` сам по себе не заменяет worker smoke и не делает deploy green.
 
 Schema bootstrap (identity SQL + Alembic):
@@ -422,10 +343,6 @@ curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:9201/metrics | head
 curl -fsS http://127.0.0.1:9202/metrics | head
 curl -fsS http://127.0.0.1:9203/metrics | head
-for service_label in $(launchctl list | awk '$3 ~ /^com\\.roehub\\.backtest-job-runner\\.[0-9]+$/ {print $3}'); do
-  instance_index="${service_label##*.}"
-  curl -fsS "http://127.0.0.1:$((9204 + instance_index))/metrics" | grep -m1 '^# HELP backtest_job_runner_claim_total '
-done
 /opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --query "SELECT 1"
 redis-cli -h 127.0.0.1 -p 6379 PING
 set -a
@@ -450,10 +367,6 @@ curl -I http://127.0.0.1:19090
 curl -fsS http://127.0.0.1:19201/metrics | head
 curl -fsS http://127.0.0.1:19202/metrics | head
 curl -fsS http://127.0.0.1:19203/metrics | head
-for service_label in $(launchctl list | awk '$3 ~ /^com\\.roehub\\.test\\.backtest-job-runner\\.[0-9]+$/ {print $3}'); do
-  instance_index="${service_label##*.}"
-  curl -fsS "http://127.0.0.1:$((19204 + instance_index))/metrics" | grep -m1 '^# HELP backtest_job_runner_claim_total '
-done
 ```
 
 Проверка Prometheus targets после reboot:
@@ -508,7 +421,7 @@ find /opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT \( -name curre
 Проверка active launch agents:
 
 ```bash
-launchctl list | grep -E "com.roehub\.(api|market-data|backtest-job-runner|clickhouse|blackbox|test\.)"
+launchctl list | grep -E "com.roehub\.(api|market-data|clickhouse|blackbox|test\.)"
 ```
 
 ## Frequent failure modes
@@ -538,19 +451,6 @@ launchctl list | grep -E "com.roehub\.(api|market-data|backtest-job-runner|click
   `/Users/daniildegtyarev/Library/Logs/roehub/backtest-artifact-publisher.err.log`;
 - если сервис был остановлен после `03:05 Europe/Moscow`, перезапустите его до следующего окна или
   выполните ручной publish нужного symbol root.
-
-`backtest-job-runner` fleet не совпадает с `backtest.jobs.worker_processes` или один из instance быстро выходит:
-
-- если `backtest.jobs.enabled=false`, это ожидаемое состояние и fleet не обязателен;
-- проверьте `configs/prod/backtest.yaml` или `configs/test/backtest.yaml` и значение
-  `jobs.enabled` и `worker_processes`;
-- перерендирите и перезагрузите fleet: `bash scripts/macos/reload_launchd_services.sh prod`
-  или `bash scripts/macos/reload_launchd_services.sh test`;
-- проверьте `launchctl list | grep backtest-job-runner`;
-- проверьте instance-specific logs в `/Users/daniildegtyarev/Library/Logs/roehub/` с suffix
-  `.0`, `.1`, ...;
-- проверьте доступность per-instance metrics endpoint на `9204 + instance_index` для prod или
-  `19204 + instance_index` для test.
 
 `backtest-artifact-publisher` растит `backtest_artifact_publish_blocked_total{reason="inactive_slot_pinned"}`:
 

@@ -6,7 +6,6 @@ UID_VALUE="$(id -u)"
 PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LAUNCH_AGENTS_DIR="/Users/daniildegtyarev/Library/LaunchAgents"
-PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
 
 prod_services=(
   com.roehub.clickhouse.plist
@@ -52,15 +51,6 @@ collect_worker_services() {
   find "$LAUNCH_AGENTS_DIR" -maxdepth 1 -type f -name "${prefix}*.plist" -print \
     | sed "s#${LAUNCH_AGENTS_DIR}/##" \
     | LC_ALL=C sort
-}
-
-render_worker_services() {
-  local profile="$1"
-  "$PYTHON_BIN" "$REPO_ROOT/scripts/macos/render_backtest_job_runner_launchd.py" \
-    --profile "$profile" \
-    --repo-root "$REPO_ROOT" \
-    --launch-agents-dir "$LAUNCH_AGENTS_DIR" \
-    --clean
 }
 
 service_label_from_plist() {
@@ -110,7 +100,6 @@ reload_profile() {
   local profile="$1"
   local -a static_services=()
   local -a existing_worker_services=()
-  local -a worker_services=()
   local service=""
 
   case "$profile" in
@@ -130,16 +119,12 @@ reload_profile() {
     existing_worker_services+=("$service")
   done < <(collect_worker_services "$profile")
   echo "reloading ${profile} static services: ${#static_services[@]}"
-  echo "reloading ${profile} backtest-job-runner fleet (existing instances): ${#existing_worker_services[@]}"
+  echo "removing legacy ${profile} backtest-job-runner services: ${#existing_worker_services[@]}"
   for service in "${static_services[@]}" "${existing_worker_services[@]}"; do
     bootout_service "${service}" || true
   done
 
-  while IFS= read -r service; do
-    worker_services+=("$service")
-  done < <(render_worker_services "$profile")
-  echo "reloading ${profile} backtest-job-runner fleet (desired instances): ${#worker_services[@]}"
-  for service in "${static_services[@]}" "${worker_services[@]}"; do
+  for service in "${static_services[@]}"; do
     bootstrap_service "${service}"
   done
 }
@@ -158,4 +143,4 @@ case "$PROFILE" in
     ;;
 esac
 
-launchctl list | grep -E "roehub|backtest-job-runner|clickhouse|blackbox|redis-exporter|postgres-exporter|tailscale" || true
+launchctl list | grep -E "roehub|clickhouse|blackbox|redis-exporter|postgres-exporter|tailscale" || true

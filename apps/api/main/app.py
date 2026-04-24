@@ -15,7 +15,6 @@ from apps.api.monitoring import install_metrics_middleware
 from apps.api.routes import build_indicators_router, build_operations_router
 from apps.api.wiring.modules import (
     bind_indicators_runtime_dependencies,
-    build_backtest_router,
     build_identity_api_module,
     build_indicators_compute,
     build_indicators_registry,
@@ -36,7 +35,6 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
       docs/architecture/identity/identity-telegram-login-user-model-v1.md,
       docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md,
       docs/architecture/market_data/market-data-reference-api-v1.md,
-      docs/architecture/backtest/README.md,
       docs/architecture/api/api-errors-and-422-payload-v1.md,
       docs/runbooks/mac-studio-monitoring-plan.md
     Related: apps.api.routes.indicators,
@@ -58,7 +56,7 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         ValueError: If config parsing/validation fails for indicators, identity, or strategy.
     Side Effects:
         Reads indicators YAML, performs Numba warmup, and validates
-        identity/strategy/backtest runtime settings.
+        identity/strategy runtime settings.
     """
     effective_environ = os.environ if environ is None else environ
     registry = build_indicators_registry(environ=effective_environ)
@@ -86,13 +84,6 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         )
     else:
         log.info("strategy API router disabled by strategy runtime config")
-    app.include_router(
-        build_backtest_router(
-            environ=effective_environ,
-            current_user_dependency=identity_module.current_user_dependency,
-            indicator_compute=compute,
-        )
-    )
     app.include_router(
         build_market_data_reference_router(
             environ=effective_environ,

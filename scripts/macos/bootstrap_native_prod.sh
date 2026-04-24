@@ -4,7 +4,6 @@ set -Eeuo pipefail
 PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LAUNCH_AGENTS_DIR="/Users/daniildegtyarev/Library/LaunchAgents"
-PYTHON_BIN="$REPO_ROOT/.venv/bin/python"
 
 mkdir -p /opt/roehub/app /opt/roehub/bin /opt/roehub/config /opt/roehub/state/backups /opt/roehub/clickhouse
 mkdir -p /opt/roehub/state/backtest_artifacts/v2
@@ -36,17 +35,6 @@ do
   install -m 0644 "$REPO_ROOT/infra/macos/launchd/$plist" "$LAUNCH_AGENTS_DIR/$plist"
 done
 
-worker_plists=()
-while IFS= read -r worker_plist; do
-  worker_plists+=("$worker_plist")
-done < <(
-  "$PYTHON_BIN" "$REPO_ROOT/scripts/macos/render_backtest_job_runner_launchd.py" \
-    --profile prod \
-    --repo-root "$REPO_ROOT" \
-    --launch-agents-dir "$LAUNCH_AGENTS_DIR" \
-    --clean
-)
-
 cat > /opt/homebrew/etc/prometheus.args <<'EOF'
 --config.file=/opt/roehub/config/prometheus.prod.yml
 --storage.tsdb.path=/opt/homebrew/var/prometheus
@@ -56,10 +44,5 @@ EOF
 cat > /opt/homebrew/etc/node_exporter.args <<'EOF'
 --web.listen-address=127.0.0.1:9100
 EOF
-
-echo "prod backtest-job-runner fleet materialized: ${#worker_plists[@]} instance(s)"
-if ((${#worker_plists[@]} > 0)); then
-  printf 'prod backtest-job-runner service: %s\n' "${worker_plists[@]}"
-fi
 
 echo "prod native templates installed"
