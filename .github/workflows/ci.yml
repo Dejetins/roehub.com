@@ -224,11 +224,13 @@ jobs:
           - name: backtest
             target: tests/unit/contexts/backtest
           - name: indicators
-            target: tests/perf_smoke tests/unit/contexts/indicators
+            target: tests/unit/contexts/indicators
           - name: market-identity-strategy
             target: tests/unit/contexts/identity tests/unit/contexts/market_data tests/unit/contexts/strategy
     env:
       POSTGRES_DSN: postgresql://roehub:roehub@127.0.0.1:5432/roehub
+      NUMBA_NUM_THREADS: "1"
+      ROEHUB_NUMBA_NUM_THREADS: "1"
     defaults:
       run:
         shell: bash
@@ -256,6 +258,41 @@ jobs:
         run: |
           uv run pytest -q -ra ${{ matrix.target }}
 
+  perf_smoke:
+    name: perf-smoke
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      NUMBA_NUM_THREADS: "1"
+      ROEHUB_NUMBA_NUM_THREADS: "1"
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Sync venv from uv.lock (ALL groups)
+        run: |
+          uv sync --locked --all-groups
+          uv run python -V
+
+      - name: Perf smoke
+        run: |
+          uv run pytest -q -ra tests/perf_smoke
+
   test:
     name: test
     needs:
@@ -282,6 +319,7 @@ jobs:
       - static
       - migrations
       - test
+      - perf_smoke
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -291,18 +329,21 @@ jobs:
           STATIC_RESULT: ${{ needs.static.result }}
           MIGRATIONS_RESULT: ${{ needs.migrations.result }}
           TEST_RESULT: ${{ needs.test.result }}
+          PERF_SMOKE_RESULT: ${{ needs.perf_smoke.result }}
         run: |
           set -euo pipefail
           printf 'changes=%s\n' "$CHANGES_RESULT"
           printf 'static=%s\n' "$STATIC_RESULT"
           printf 'migrations=%s\n' "$MIGRATIONS_RESULT"
           printf 'test=%s\n' "$TEST_RESULT"
+          printf 'perf_smoke=%s\n' "$PERF_SMOKE_RESULT"
 
           for result in \
             "$CHANGES_RESULT" \
             "$STATIC_RESULT" \
             "$MIGRATIONS_RESULT" \
-            "$TEST_RESULT"; do
+            "$TEST_RESULT" \
+            "$PERF_SMOKE_RESULT"; do
             case "$result" in
               success|skipped)
                 ;;
