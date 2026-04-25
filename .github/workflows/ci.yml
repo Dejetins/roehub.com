@@ -223,8 +223,29 @@ jobs:
             target: tests/test_smoke.py tests/unit/apps tests/unit/infra tests/unit/platform tests/unit/shared_kernel tests/unit/tools
           - name: backtest
             target: tests/unit/contexts/backtest
-          - name: indicators
-            target: tests/unit/contexts/indicators
+          - name: indicators-engine
+            target: tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_engine.py
+          - name: indicators-kernels-a
+            target: >-
+              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_common_kernels.py
+              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_ma_kernels.py
+              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_trend_kernels.py
+          - name: indicators-kernels-b
+            target: >-
+              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_momentum_kernels.py
+              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_runtime_wiring.py
+              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_structure_kernels.py
+              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_volatility_kernels.py
+              tests/unit/contexts/indicators/adapters/outbound/compute_numba/test_volume_kernels.py
+          - name: indicators-api-domain
+            target: >-
+              tests/unit/contexts/indicators/adapters/outbound/compute_numpy
+              tests/unit/contexts/indicators/adapters/outbound/config
+              tests/unit/contexts/indicators/adapters/outbound/feeds
+              tests/unit/contexts/indicators/adapters/outbound/registry
+              tests/unit/contexts/indicators/api
+              tests/unit/contexts/indicators/application
+              tests/unit/contexts/indicators/domain
           - name: market-identity-strategy
             target: tests/unit/contexts/identity tests/unit/contexts/market_data tests/unit/contexts/strategy
     env:
