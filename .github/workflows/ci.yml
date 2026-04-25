@@ -210,11 +210,25 @@ jobs:
         run: |
           uv run python -m apps.migrations.main --dsn "$POSTGRES_DSN"
 
-  test:
-    name: test
+  test_shards:
+    name: test-shard (${{ matrix.name }})
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: apps-platform
+            target: tests/test_smoke.py tests/unit/apps tests/unit/infra tests/unit/platform tests/unit/shared_kernel tests/unit/tools
+          - name: backtest
+            target: tests/unit/contexts/backtest
+          - name: indicators
+            target: tests/perf_smoke tests/unit/contexts/indicators
+          - name: market-identity-strategy
+            target: tests/unit/contexts/identity tests/unit/contexts/market_data tests/unit/contexts/strategy
+    env:
+      POSTGRES_DSN: postgresql://roehub:roehub@127.0.0.1:5432/roehub
     defaults:
       run:
         shell: bash
@@ -240,7 +254,26 @@ jobs:
 
       - name: Tests
         run: |
-          uv run pytest -q -ra
+          uv run pytest -q -ra ${{ matrix.target }}
+
+  test:
+    name: test
+    needs:
+      - changes
+      - test_shards
+    if: always() && needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize test shards
+        env:
+          TEST_SHARDS_RESULT: ${{ needs.test_shards.result }}
+        run: |
+          set -euo pipefail
+          printf 'test_shards=%s\n' "$TEST_SHARDS_RESULT"
+          if [[ "$TEST_SHARDS_RESULT" != "success" ]]; then
+            echo "One or more test shards failed or were cancelled."
+            exit 1
+          fi
 
   ci:
     name: ci
