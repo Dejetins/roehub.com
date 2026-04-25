@@ -20,7 +20,6 @@ jobs:
     outputs:
       code: ${{ steps.filter.outputs.code }}
       docs: ${{ steps.filter.outputs.docs }}
-      perf_smoke: ${{ steps.filter.outputs.perf_smoke }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -39,7 +38,6 @@ jobs:
             {
               echo "code=true"
               echo "docs=true"
-              echo "perf_smoke=true"
             } >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -48,7 +46,6 @@ jobs:
           if [[ -z "$BASE_SHA" || "$BASE_SHA" == "$zero_sha" ]]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "docs=true" >> "$GITHUB_OUTPUT"
-            echo "perf_smoke=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -57,7 +54,6 @@ jobs:
             echo "Base commit $BASE_SHA is unavailable; running full CI."
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "docs=true" >> "$GITHUB_OUTPUT"
-            echo "perf_smoke=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -67,7 +63,6 @@ jobs:
 
           code=false
           docs=false
-          perf_smoke=false
 
           while IFS= read -r path; do
             [[ -z "$path" ]] && continue
@@ -101,20 +96,11 @@ jobs:
                 ;;
             esac
 
-            case "$path" in
-              tests/perf_smoke/*|\
-              src/trading/contexts/indicators/*|\
-              src/trading/platform/config/indicators_compute_numba.py|\
-              configs/*/indicators.yaml)
-                perf_smoke=true
-                ;;
-            esac
           done < changed-files.txt
 
           {
             echo "code=$code"
             echo "docs=$docs"
-            echo "perf_smoke=$perf_smoke"
           } >> "$GITHUB_OUTPUT"
 
   static:
@@ -229,9 +215,6 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    env:
-      NUMBA_NUM_THREADS: "1"
-      ROEHUB_NUMBA_NUM_THREADS: "1"
     defaults:
       run:
         shell: bash
@@ -257,39 +240,7 @@ jobs:
 
       - name: Tests
         run: |
-          uv run pytest -q -ra --ignore=tests/perf_smoke
-
-  perf_smoke:
-    name: perf-smoke
-    needs: changes
-    if: needs.changes.outputs.perf_smoke == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup uv
-        uses: astral-sh/setup-uv@v7
-        with:
-          version: "latest"
-          enable-cache: true
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: ".python-version"
-
-      - name: Sync venv from uv.lock (ALL groups)
-        run: |
-          uv sync --locked --all-groups
-          uv run python -V
-
-      - name: Perf smoke tests
-        run: |
-          uv run pytest -q -ra tests/perf_smoke
+          uv run pytest -q -ra
 
   ci:
     name: ci
@@ -298,7 +249,6 @@ jobs:
       - static
       - migrations
       - test
-      - perf_smoke
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -308,21 +258,18 @@ jobs:
           STATIC_RESULT: ${{ needs.static.result }}
           MIGRATIONS_RESULT: ${{ needs.migrations.result }}
           TEST_RESULT: ${{ needs.test.result }}
-          PERF_SMOKE_RESULT: ${{ needs.perf_smoke.result }}
         run: |
           set -euo pipefail
           printf 'changes=%s\n' "$CHANGES_RESULT"
           printf 'static=%s\n' "$STATIC_RESULT"
           printf 'migrations=%s\n' "$MIGRATIONS_RESULT"
           printf 'test=%s\n' "$TEST_RESULT"
-          printf 'perf-smoke=%s\n' "$PERF_SMOKE_RESULT"
 
           for result in \
             "$CHANGES_RESULT" \
             "$STATIC_RESULT" \
             "$MIGRATIONS_RESULT" \
-            "$TEST_RESULT" \
-            "$PERF_SMOKE_RESULT"; do
+            "$TEST_RESULT"; do
             case "$result" in
               success|skipped)
                 ;;
