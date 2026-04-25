@@ -5,8 +5,8 @@
 
 ## Канонические документы
 
-- `docs/architecture/backtest/deep-research-report.md` — исследовательский аудит и карта текущих проблем/рисков.
-- `docs/architecture/backtest/backtest-core-refactor-prompt-pack-v1.md` — исполняемый prompt-pack по шагам рефакторинга.
+- `docs/architecture/backtest/backtest-service-artifact-runtime-v1.md` — целевая архитектура нового artifact-backed backtest service.
+- `docs/architecture/backtest/benchmark_iterations/README.md` — рабочая папка для benchmark evidence по итерациям.
 
 ## Текущая граница доверия
 
@@ -16,8 +16,8 @@
   storage для publish guard.
 - Не доверенный legacy runtime compute удален: runtime kernels/scorers/shortlists,
   old backtest use-cases, API routes, web pages/assets и `backtest-job-runner`.
-- Новый backtest engine пока не проектируется в этой итерации. Следующий дизайн должен
-  стартовать с нуля поверх artifact publisher/precompute как входного слоя данных.
+- Новый backtest service проектируется поверх artifact publisher/precompute как входного слоя
+  данных, без восстановления legacy runtime path.
 
 ## Индексы
 

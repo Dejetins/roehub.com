@@ -1,6 +1,6 @@
 ---
 doc: agents
-version: "1.8"
+version: "1.9"
 status: active
 language: en
 applies_to:
@@ -108,6 +108,7 @@ When a task matches an available skill, the agent SHOULD use that skill for the 
 Expected global skill pack:
 
 - `architecture-review`
+- `architecture-design`
 - `root-cause-debugging`
 - `production-risk-review`
 - `contract-impact-analysis`
@@ -116,11 +117,13 @@ Expected global skill pack:
 - `numba-jit-performance`
 - `browser-qa-evidence`
 - `pre-ship-gate`
-- `playwright` or `playwright-interactive` when browser automation is needed
+- `publish-ci-deploy`
+- `playwright` when browser automation is needed
 
 Current intended routing:
 
 - architecture review, refactor analysis, docs-sync → `architecture-review`
+- new architecture, target-state design, bounded-context design, service integration design, ADR drafting, integration plus rollout design, phased migration design → `architecture-design`
 - bug fixes, regressions, failing tests, stack traces, or "worked before" reports → `root-cause-debugging`
 - branch / PR / diff review focused on production risk, scope drift, tests, contracts, data safety, trust boundaries, or release blockers → `production-risk-review`
 - contract or compatibility impact → `contract-impact-analysis`
@@ -129,6 +132,13 @@ Current intended routing:
 - Numba/JIT-specific optimization details → `numba-jit-performance`
 - browser-visible QA, screenshots, console/network checks, form/navigation testing, responsive checks, or QA reports → `browser-qa-evidence` plus an available runtime browser surface such as the Browser plugin, Playwright MCP, or the global `playwright` skill
 - ship readiness, PR handoff, release evidence, docs drift before publishing, or "is this ready?" checks → `pre-ship-gate`
+- full ship execution from local checkout through publish, CI stabilization, Mac Studio deploy, and production verification → `publish-ci-deploy`
+
+When the user asks to apply, publish, ship, or carry repository changes through Git, GitHub, CI, deploy, and verification, the agent SHOULD prefer `publish-ci-deploy` as the single orchestration skill.
+
+`publish-ci-deploy` owns the end-to-end Git/GitHub delivery lifecycle and MAY internally use narrower verification helpers such as `backend-quality-gates` or `browser-qa-evidence` without asking the user to choose among them.
+
+`pre-ship-gate` remains the review-only gate for readiness assessment when the user wants analysis or ship confidence without performing publish, merge, deploy, or verification actions.
 
 Skill routing MUST stay compact. Do not load several workflow skills preemptively. Select the narrowest skill that matches the task, and layer additional skills only when the task crosses that boundary.
 
