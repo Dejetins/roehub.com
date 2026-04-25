@@ -5,9 +5,7 @@ from .entities import (
     BacktestJobExecutionMode,
     BacktestJobMode,
     BacktestJobStage,
-    BacktestJobStageAShortlist,
     BacktestJobState,
-    BacktestJobTopVariant,
     BacktestPositionPlaceholder,
     BacktestResultPlaceholder,
     BacktestTradePlaceholder,
@@ -16,7 +14,6 @@ from .entities import (
     TradeV1,
     is_backtest_job_state_active,
     is_backtest_job_state_terminal,
-    report_table_md_allowed_for_state,
 )
 from .errors import (
     BacktestConflictError,
@@ -50,9 +47,7 @@ __all__ = [
     "BacktestJobListCursor",
     "BacktestJobMode",
     "BacktestJobStage",
-    "BacktestJobStageAShortlist",
     "BacktestJobState",
-    "BacktestJobTopVariant",
     "BacktestJobTransitionError",
     "BacktestConflictError",
     "BacktestDomainError",
@@ -75,5 +70,4 @@ __all__ = [
     "build_backtest_variant_key_v1",
     "is_backtest_job_state_active",
     "is_backtest_job_state_terminal",
-    "report_table_md_allowed_for_state",
 ]

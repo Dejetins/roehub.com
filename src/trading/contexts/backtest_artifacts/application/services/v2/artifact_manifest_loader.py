@@ -59,8 +59,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
     Loader that reads `current.yaml` and slot manifests from explicit deterministic paths.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
     """
@@ -83,8 +81,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -108,8 +104,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -173,8 +167,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -206,8 +198,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -244,8 +234,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -282,8 +270,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -319,7 +305,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -358,7 +343,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -392,8 +376,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -427,8 +409,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -458,8 +438,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads two UTF-8 YAML files from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -481,8 +459,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -504,8 +480,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -533,8 +507,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -564,8 +536,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -595,7 +565,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -630,8 +599,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -655,8 +622,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -682,8 +647,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -712,8 +675,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -803,8 +764,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -898,7 +857,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -980,8 +938,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1105,8 +1061,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1144,8 +1098,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1233,8 +1185,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1304,8 +1254,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1398,7 +1346,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -1454,8 +1401,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1495,8 +1440,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1540,8 +1483,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1593,8 +1534,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1648,8 +1587,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1697,8 +1634,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1760,8 +1695,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1811,8 +1744,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1845,8 +1776,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1878,8 +1807,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1913,8 +1840,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1948,8 +1873,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1983,8 +1906,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -2028,7 +1949,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -2072,8 +1992,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             Reads one UTF-8 YAML file from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -2102,8 +2020,6 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """

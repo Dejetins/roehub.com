@@ -29,7 +29,6 @@
   - indicator registry: `GET /api/indicators`
 
 См.:
-- `docs/architecture/roadmap/milestone-6-epics-v1.md` — WEB-EPIC-04.
 - `docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md` — базовые принципы web.
 - `docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md` — Strategy API контракт.
 - `docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md` — StrategySpec v1 инварианты.

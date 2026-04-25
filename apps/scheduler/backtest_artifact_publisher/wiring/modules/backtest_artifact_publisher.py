@@ -85,7 +85,6 @@ def _default_now_provider() -> datetime:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -108,7 +107,6 @@ def _validated_utc_datetime(value: datetime) -> datetime:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -132,7 +130,6 @@ class BacktestArtifactPublisherSchedule:
     Deterministic daily schedule anchored to `03:05 Europe/Moscow`.
 
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -158,7 +155,6 @@ class BacktestArtifactPublisherSchedule:
         Side Effects:
             Validates that the configured timezone exists.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -190,7 +186,6 @@ class BacktestArtifactPublisherSchedule:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py
@@ -222,7 +217,6 @@ class BacktestArtifactPublisherSchedule:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py
@@ -235,7 +229,6 @@ class BacktestArtifactPublisherHostLock(Protocol):
     Host-level lock contract guarding scheduler runs across concurrent processes.
 
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -256,7 +249,6 @@ class FileBacktestArtifactPublisherHostLock:
     Non-blocking advisory file lock used by the Mac Studio scheduler service.
 
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
       - docs/runbooks/mac-studio-native-backend-operations.md
     Related:
@@ -283,7 +275,6 @@ class FileBacktestArtifactPublisherHostLock:
         Side Effects:
             Creates the lock file parent directory and writes the current process id on success.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -327,7 +318,6 @@ class FileBacktestArtifactPublisherHostLock:
         Side Effects:
             Unlocks and closes the underlying file descriptor.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -353,7 +343,6 @@ class BacktestArtifactPublisherMetrics:
     Prometheus metric bundle for the dedicated artifact publisher scheduler service.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
       - docs/runbooks/prod-dashboard-metrics-reference-ru.md
     Related:
@@ -376,7 +365,6 @@ class BacktestArtifactPublisherMetrics:
         Side Effects:
             Registers metric collectors in the selected registry.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py
@@ -434,7 +422,6 @@ class BacktestArtifactPublisherMetrics:
         Side Effects:
             Increments Prometheus counters for non-zero stage values.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -451,8 +438,6 @@ class BacktestArtifactPublisherApp:
     Long-running scheduler runtime for daily backtest artifact publish on Mac Studio.
 
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/main/main.py
@@ -482,7 +467,6 @@ class BacktestArtifactPublisherApp:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/mac-studio-native-backend-operations.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -514,7 +498,6 @@ class BacktestArtifactPublisherApp:
         Side Effects:
             Starts a Prometheus `/metrics` endpoint and performs scheduled publish work.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
           - docs/runbooks/mac-studio-native-backend-operations.md
         Related:
@@ -581,7 +564,6 @@ class BacktestArtifactPublisherApp:
         Side Effects:
             Acquires the host lock, reads `market_data.ref_instruments`, and publishes artifacts.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -667,7 +649,6 @@ class BacktestArtifactPublisherApp:
         Side Effects:
             Reads the latest enabled tradable instrument snapshot from ClickHouse.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
@@ -709,7 +690,6 @@ class BacktestArtifactPublisherApp:
         Side Effects:
             Updates per-symbol counters/tail metrics and emits one final stage-level rebuild log.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -777,7 +757,6 @@ def _publish_error_status(code: str) -> PublisherRunStatus:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -809,7 +788,6 @@ def _promote_run_status(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -850,7 +828,6 @@ def build_backtest_artifact_publisher_app(
     Side Effects:
         Reads config files and initializes storage/compute adapters used by the scheduler.
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
       - docs/runbooks/mac-studio-native-backend-operations.md
     Related:

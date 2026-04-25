@@ -16,16 +16,12 @@ def upgrade() -> None:
     Add persisted-run metadata and summary-only top-row columns for R7-01 storage unification.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
-      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_repository.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
-        backtest_job_results_repository.py
     Args:
         None.
     Returns:
@@ -392,16 +388,12 @@ def downgrade() -> None:
     Remove additive persisted-run metadata and summary-only top-row columns for R7-01.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
-      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_repository.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
-        backtest_job_results_repository.py
     Args:
         None.
     Returns:

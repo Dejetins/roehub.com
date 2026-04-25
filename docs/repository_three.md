@@ -247,8 +247,6 @@
 |   |   |       `-- web-ui-tests-docs-index-v1.md
 |   |   |-- backtest/
 |   |   |   |-- README.md
-|   |   |   |-- backtest-core-refactor-prompt-pack-v1.md
-|   |   |   `-- deep-research-report.md
 |   |   |-- identity/
 |   |   |   |-- identity-2fa-totp-policy-v1.md
 |   |   |   |-- identity-exchange-keys-storage-2fa-gate-policy-v1.md
@@ -485,7 +483,6 @@
 |       |   |   |       |       |-- __init__.py
 |       |   |   |       |       |-- backtest_job_lease_repository.py
 |       |   |   |       |       |-- backtest_job_repository.py
-|       |   |   |       |       |-- backtest_job_results_repository.py
 |       |   |   |       |       `-- gateway.py
 |       |   |   |       `-- progress/
 |       |   |   |           |-- logs/

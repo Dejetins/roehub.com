@@ -43,7 +43,6 @@ class _FixedCanonicalCandleIndexReader:
     Deterministic bounds reader exposing one explicit canonical 1m coverage envelope.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -69,7 +68,6 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
         Related:
           - canonical_candle_index_reader.py
         """
@@ -97,7 +95,6 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             Records one bounds lookup in memory for later assertions.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -126,7 +123,6 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
         Related:
           - canonical_candle_index_reader.py
         """
@@ -156,7 +152,6 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
         Related:
           - canonical_candle_index_reader.py
         """
@@ -186,7 +181,6 @@ class _FixedCanonicalCandleIndexReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
         Related:
           - canonical_candle_index_reader.py
         """
@@ -201,8 +195,6 @@ class _ZeroBlockingJobRepository:
     Fake publish-guard repository that never reports active pins for inactive manifests.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py
@@ -233,7 +225,6 @@ class _ZeroBlockingJobRepository:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -248,7 +239,6 @@ class _PublishUseCaseFixtureV2:
     Deterministic bundle of shared publish use-case dependencies for one temp artifact root.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py
@@ -277,7 +267,6 @@ def test_publish_backtest_artifacts_v2_bootstraps_missing_current_pointer(
     Side Effects:
         Creates a strict bootstrap artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -346,7 +335,6 @@ def test_publish_backtest_artifacts_v2_repeated_publish_switches_pointer_and_rec
     Side Effects:
         Creates and publishes two deterministic slots under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -421,7 +409,6 @@ def test_publish_backtest_artifacts_v2_fails_fast_on_invalid_current_pointer(
     Side Effects:
         Rewrites `current.yaml` under `tmp_path` with invalid slot metadata.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -467,7 +454,6 @@ def _build_publish_use_case_fixture_v2(*, tmp_path: Path) -> _PublishUseCaseFixt
     Side Effects:
         Creates config, pointer file, and later-stage service dependencies under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py

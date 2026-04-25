@@ -10,7 +10,6 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobArtifactPin,
     BacktestJobErrorPayload,
     BacktestJobStageWeights,
-    BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.errors import (
     BacktestJobLeaseError,
@@ -320,65 +319,6 @@ def test_backtest_job_rejects_execution_profile_metadata_without_persisted_run_m
         )
 
 
-def test_backtest_job_top_variant_rejects_legacy_report_and_keeps_summary_only_fields() -> None:
-    """
-    Verify top-variant entity enforces summary-only persistence and normalizes additive fields.
-
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        R7-01 deprecates persisted report/trades payloads while retaining summary metrics and
-        best TP/SL values.
-    Raises:
-        AssertionError: If deprecated fields are still accepted or additive fields drift.
-    Side Effects:
-        None.
-    """
-    with pytest.raises(BacktestJobTransitionError, match="report_table_md must stay null"):
-        BacktestJobTopVariant(
-            job_id=UUID("00000000-0000-0000-0000-000000000952"),
-            rank=1,
-            variant_key="a" * 64,
-            indicator_variant_key="b" * 64,
-            variant_index=0,
-            total_return_pct=12.5,
-            payload_json={"variant_key": "a" * 64},
-            updated_at=datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc),
-            summary_metrics_json={"profit_factor": 1.3},
-            best_tp_pct=3.0,
-            best_sl_pct=1.5,
-            report_table_md="|Metric|Value|",
-            trades_json=None,
-        )
-
-    row = BacktestJobTopVariant(
-        job_id=UUID("00000000-0000-0000-0000-000000000953"),
-        rank=1,
-        variant_key="a" * 64,
-        indicator_variant_key="b" * 64,
-        variant_index=0,
-        total_return_pct=12.5,
-        payload_json={"variant_key": "a" * 64},
-        updated_at=datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc),
-        summary_metrics_json={"profit_factor": 1.3},
-        best_tp_pct=3.0,
-        best_sl_pct=1.5,
-        report_table_md=None,
-        trades_json=None,
-    )
-
-    assert row.summary_metrics_json == {
-        "profit_factor": 1.3,
-        "total_return_pct": 12.5,
-    }
-    assert row.best_tp_pct == 3.0
-    assert row.best_sl_pct == 1.5
-    assert row.report_table_md is None
-    assert row.trades_json is None
-
-
 def test_backtest_job_rejects_lease_fields_outside_running_state() -> None:
     """
     Verify aggregate rejects non-null lease fields when state is not `running`.
@@ -617,7 +557,6 @@ def test_backtest_job_progress_percent_uses_stage_weights_and_marks_success_as_c
     Verify weighted progress percent follows stage weights and succeeded runs clamp to `100`.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/domain/entities/test_backtest_job_entities.py
@@ -660,7 +599,6 @@ def test_backtest_job_eta_seconds_requires_signal_and_estimates_from_weighted_pr
     Verify ETA returns `None` without signal and uses weighted progress once it is defensible.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - tests/unit/contexts/backtest/domain/entities/test_backtest_job_entities.py

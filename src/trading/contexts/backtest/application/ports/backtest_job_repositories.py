@@ -9,9 +9,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJob,
     BacktestJobErrorPayload,
     BacktestJobStage,
-    BacktestJobStageAShortlist,
     BacktestJobState,
-    BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 from trading.shared_kernel.primitives import UserId
@@ -23,7 +21,6 @@ class BacktestJobListQuery:
     Deterministic keyset list query parameters for user-scoped Backtest jobs API reads.
 
     Docs:
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -65,7 +62,6 @@ class BacktestJobListPage:
     Deterministic keyset page payload for Backtest jobs list repository contract.
 
     Docs:
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -82,8 +78,6 @@ class BacktestJobRepository(Protocol):
     Backtest job core storage port for create/get/list/cancel/quota operations.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -105,45 +99,6 @@ class BacktestJobRepository(Protocol):
             ValueError: If storage write fails.
         Side Effects:
             Writes one row in `backtest_jobs` table.
-        """
-        ...
-
-    def create_with_top_variants(
-        self,
-        *,
-        job: BacktestJob,
-        top_variants: tuple[BacktestJobTopVariant, ...],
-        stage_a_shortlist: BacktestJobStageAShortlist | None = None,
-    ) -> BacktestJob:
-        """
-        Persist one terminal run row plus deterministic summary-only top rows atomically.
-
-        Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
-        Related:
-          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
-          - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
-            backtest_job_repository.py
-          - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
-        Args:
-            job: Prepared terminal persisted-run aggregate.
-            top_variants: Summary-only top rows ordered by `rank ASC, variant_key ASC`.
-            stage_a_shortlist:
-                Optional internal Stage A shortlist snapshot reused for
-                `exact_no_risk_parity` sync persistence.
-        Returns:
-            BacktestJob: Persisted immutable job row projection.
-        Assumptions:
-            Sync-inline cutover writes final state, summary-only top rows, and optional internal
-            shortlist state via the existing jobs table family.
-        Raises:
-            ValueError: If storage write fails or row mapping breaks.
-        Side Effects:
-            Writes one row in `backtest_jobs` and zero or more rows in
-            `backtest_job_top_variants`, plus at most one internal
-            `backtest_job_stage_a_shortlist` row.
         """
         ...
 
@@ -261,8 +216,6 @@ class BacktestJobLeaseRepository(Protocol):
     Backtest job lease port for claim/heartbeat/progress/finish worker operations.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/

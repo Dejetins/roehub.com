@@ -23,10 +23,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobExecutionMode,
     BacktestJobMode,
     BacktestJobStage,
-    BacktestJobStageAShortlist,
     BacktestJobState,
-    BacktestJobTopVariant,
-    normalize_persisted_summary_metrics_v2,
 )
 from trading.contexts.backtest.domain.errors import BacktestStorageError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
@@ -80,8 +77,6 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
     Explicit SQL adapter implementing Backtest job core storage repository port.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -93,8 +88,6 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         *,
         gateway: BacktestPostgresGateway,
         jobs_table: str = "backtest_jobs",
-        top_variants_table: str = "backtest_job_top_variants",
-        stage_a_shortlist_table: str = "backtest_job_stage_a_shortlist",
     ) -> None:
         """
         Initialize repository with SQL gateway and target table name.
@@ -102,8 +95,6 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Args:
             gateway: SQL gateway abstraction.
             jobs_table: Backtest jobs table name.
-            top_variants_table: Backtest job top-variants table name.
-            stage_a_shortlist_table: Backtest Stage A shortlist table name.
         Returns:
             None.
         Assumptions:
@@ -116,31 +107,16 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         if gateway is None:  # type: ignore[truthy-bool]
             raise ValueError("PostgresBacktestJobRepository requires gateway")
         normalized_table = jobs_table.strip()
-        normalized_top_variants_table = top_variants_table.strip()
-        normalized_stage_a_shortlist_table = stage_a_shortlist_table.strip()
         if not normalized_table:
             raise ValueError("PostgresBacktestJobRepository requires non-empty jobs_table")
-        if not normalized_top_variants_table:
-            raise ValueError(
-                "PostgresBacktestJobRepository requires non-empty top_variants_table"
-            )
-        if not normalized_stage_a_shortlist_table:
-            raise ValueError(
-                "PostgresBacktestJobRepository requires non-empty stage_a_shortlist_table"
-            )
         self._gateway = gateway
         self._jobs_table = normalized_table
-        self._top_variants_table = normalized_top_variants_table
-        self._stage_a_shortlist_table = normalized_stage_a_shortlist_table
 
     def create(self, *, job: BacktestJob) -> BacktestJob:
         """
         Persist new job row and return mapped immutable aggregate snapshot.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/domain/entities/backtest_job.py
           - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
@@ -251,216 +227,6 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         )
         if row is None:
             raise BacktestStorageError("PostgresBacktestJobRepository.create returned no row")
-        return _map_job_row(row=row)
-
-    def create_with_top_variants(
-        self,
-        *,
-        job: BacktestJob,
-        top_variants: tuple[BacktestJobTopVariant, ...],
-        stage_a_shortlist: BacktestJobStageAShortlist | None = None,
-    ) -> BacktestJob:
-        """
-        Persist one terminal run row, summary-only top rows, and optional shortlist atomically.
-
-        Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
-        Related:
-          - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
-          - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
-          - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
-        Args:
-            job: Prepared terminal persisted-run aggregate.
-            top_variants: Summary-only top rows ordered by `rank ASC, variant_key ASC`.
-            stage_a_shortlist:
-                Optional internal shortlist snapshot for `exact_no_risk_parity` sync runs.
-        Returns:
-            BacktestJob: Persisted immutable job snapshot.
-        Assumptions:
-            Sync-inline cutover persists only final succeeded rows and does not store detail
-            payloads in `report_table_md/trades_json`; internal shortlist persistence remains
-            additive and summary-only transport stays unchanged.
-        Raises:
-            BacktestStorageError: If SQL execution fails or row mapping breaks.
-        Side Effects:
-            Writes one row in `backtest_jobs` and zero or more rows in
-            `backtest_job_top_variants`, plus at most one row in
-            `backtest_job_stage_a_shortlist`.
-        """
-        insert_parameters = _build_job_insert_parameters(job=job)
-        insert_parameters["rows_json"] = json.dumps(
-            _serialize_top_rows(job_id=job.job_id, rows=top_variants),
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=True,
-        )
-        insert_parameters.update(
-            _build_stage_a_shortlist_insert_parameters(shortlist=stage_a_shortlist)
-        )
-        query = f"""
-        WITH inserted_job AS (
-            INSERT INTO {self._jobs_table}
-            (
-                job_id,
-                user_id,
-                mode,
-                state,
-                created_at,
-                updated_at,
-                started_at,
-                finished_at,
-                cancel_requested_at,
-                request_json,
-                request_hash,
-                spec_hash,
-                spec_payload_json,
-                engine_params_hash,
-                backtest_runtime_config_hash,
-                artifact_slot,
-                artifact_slot_generation,
-                artifact_manifest_hash,
-                artifact_asof_date,
-                execution_mode,
-                execution_profile_mode_hint,
-                effective_execution_profile_mode,
-                market_id,
-                symbol,
-                timeframe,
-                requested_top_n,
-                ranking_primary_metric,
-                ranking_secondary_metric,
-                stage,
-                processed_units,
-                total_units,
-                progress_updated_at,
-                locked_by,
-                locked_at,
-                lease_expires_at,
-                heartbeat_at,
-                attempt,
-                last_error,
-                last_error_json
-            )
-            VALUES
-            (
-                %(job_id)s,
-                %(user_id)s,
-                %(mode)s,
-                %(state)s,
-                %(created_at)s,
-                %(updated_at)s,
-                %(started_at)s,
-                %(finished_at)s,
-                %(cancel_requested_at)s,
-                %(request_json)s::jsonb,
-                %(request_hash)s,
-                %(spec_hash)s,
-                %(spec_payload_json)s::jsonb,
-                %(engine_params_hash)s,
-                %(backtest_runtime_config_hash)s,
-                %(artifact_slot)s,
-                %(artifact_slot_generation)s,
-                %(artifact_manifest_hash)s,
-                %(artifact_asof_date)s,
-                %(execution_mode)s,
-                %(execution_profile_mode_hint)s,
-                %(effective_execution_profile_mode)s,
-                %(market_id)s,
-                %(symbol)s,
-                %(timeframe)s,
-                %(requested_top_n)s,
-                %(ranking_primary_metric)s,
-                %(ranking_secondary_metric)s,
-                %(stage)s,
-                %(processed_units)s,
-                %(total_units)s,
-                %(progress_updated_at)s,
-                %(locked_by)s,
-                %(locked_at)s,
-                %(lease_expires_at)s,
-                %(heartbeat_at)s,
-                %(attempt)s,
-                %(last_error)s,
-                %(last_error_json)s::jsonb
-            )
-            RETURNING
-                {_BACKTEST_JOB_SELECT_COLUMNS}
-        ),
-        source_rows AS (
-            SELECT item
-            FROM jsonb_array_elements(%(rows_json)s::jsonb) AS item
-        ),
-        inserted_shortlist AS (
-            INSERT INTO {self._stage_a_shortlist_table}
-            (
-                job_id,
-                stage_a_indexes_json,
-                stage_a_variants_total,
-                risk_total,
-                preselect_used,
-                no_risk_exact_rows_json,
-                parity_runtime_state_json,
-                updated_at
-            )
-            SELECT
-                %(job_id)s::uuid AS job_id,
-                %(stage_a_indexes_json)s::jsonb AS stage_a_indexes_json,
-                %(stage_a_variants_total)s AS stage_a_variants_total,
-                %(risk_total)s AS risk_total,
-                %(preselect_used)s AS preselect_used,
-                %(no_risk_exact_rows_json)s::jsonb AS no_risk_exact_rows_json,
-                %(parity_runtime_state_json)s::jsonb AS parity_runtime_state_json,
-                %(updated_at)s AS updated_at
-            FROM inserted_job
-            WHERE %(stage_a_indexes_json)s::jsonb IS NOT NULL
-        ),
-        inserted_rows AS (
-            INSERT INTO {self._top_variants_table}
-            (
-                job_id,
-                rank,
-                variant_key,
-                indicator_variant_key,
-                variant_index,
-                total_return_pct,
-                payload_json,
-                summary_metrics_json,
-                best_tp_pct,
-                best_sl_pct,
-                report_table_md,
-                trades_json,
-                updated_at
-            )
-            SELECT
-                %(job_id)s::uuid AS job_id,
-                (item ->> 'rank')::INTEGER AS rank,
-                item ->> 'variant_key' AS variant_key,
-                item ->> 'indicator_variant_key' AS indicator_variant_key,
-                (item ->> 'variant_index')::INTEGER AS variant_index,
-                (item ->> 'total_return_pct')::DOUBLE PRECISION AS total_return_pct,
-                item -> 'payload_json' AS payload_json,
-                item -> 'summary_metrics_json' AS summary_metrics_json,
-                (item ->> 'best_tp_pct')::DOUBLE PRECISION AS best_tp_pct,
-                (item ->> 'best_sl_pct')::DOUBLE PRECISION AS best_sl_pct,
-                NULL::TEXT AS report_table_md,
-                NULL::JSONB AS trades_json,
-                %(updated_at)s AS updated_at
-            FROM source_rows
-            ORDER BY
-                (item ->> 'rank')::INTEGER ASC,
-                (item ->> 'variant_key') ASC
-        )
-        SELECT
-            {_BACKTEST_JOB_SELECT_COLUMNS}
-        FROM inserted_job
-        """
-        row = self._gateway.fetch_one(query=query, parameters=insert_parameters)
-        if row is None:
-            raise BacktestStorageError(
-                "PostgresBacktestJobRepository.create_with_top_variants returned no row"
-            )
         return _map_job_row(row=row)
 
     def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
@@ -664,9 +430,6 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Count active jobs pinning one previously published inactive-slot manifest identity.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/domain/entities/backtest_job.py
           - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
@@ -746,9 +509,6 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
     Map SQL row payload into immutable `BacktestJob` aggregate.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
       - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
@@ -905,9 +665,6 @@ def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
     Build canonical SQL parameters mapping for one `backtest_jobs` insert statement.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_repository.py
@@ -977,59 +734,6 @@ def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
     }
 
 
-def _build_stage_a_shortlist_insert_parameters(
-    *,
-    shortlist: BacktestJobStageAShortlist | None,
-) -> dict[str, Any]:
-    """
-    Build canonical SQL parameters for the optional sync-inline shortlist insert branch.
-
-    Args:
-        shortlist: Optional internal Stage A shortlist snapshot carried from live sync execution.
-    Returns:
-        dict[str, Any]: SQL parameters mapping consumed by the optional shortlist CTE.
-    Assumptions:
-        When shortlist is absent the terminal sync write must remain backward-compatible and skip
-        the `backtest_job_stage_a_shortlist` insert branch, while no-risk shortlist payloads must
-        carry persisted parity runtime-state literals.
-    Raises:
-        BacktestStorageError: If no-risk shortlist rows are provided without
-            `parity_runtime_state` evidence.
-    Side Effects:
-        None.
-    """
-    if shortlist is None:
-        return {
-            "stage_a_indexes_json": None,
-            "stage_a_variants_total": None,
-            "risk_total": None,
-            "preselect_used": None,
-            "no_risk_exact_rows_json": None,
-            "parity_runtime_state_json": None,
-        }
-    if shortlist.no_risk_exact_rows is not None and shortlist.parity_runtime_state is None:
-        raise BacktestStorageError(
-            "backtest_job_stage_a_shortlist requires DB-backed runtime-shape literals when "
-            "no_risk_exact_rows_json is populated"
-        )
-    return {
-        "stage_a_indexes_json": _json_dumps(payload=shortlist.to_json_array()),
-        "stage_a_variants_total": shortlist.stage_a_variants_total,
-        "risk_total": shortlist.risk_total,
-        "preselect_used": shortlist.preselect_used,
-        "no_risk_exact_rows_json": _json_dumps(
-            payload=shortlist.to_no_risk_exact_rows_json_array()
-        )
-        if shortlist.no_risk_exact_rows is not None
-        else None,
-        "parity_runtime_state_json": _json_dumps(
-            payload=shortlist.to_parity_runtime_state_json_object()
-        )
-        if shortlist.parity_runtime_state is not None
-        else None,
-    }
-
-
 def _normalize_optional_execution_profile_mode_metadata(
     *,
     value: Any,
@@ -1085,62 +789,6 @@ def _legacy_execution_profile_mode_from_request_json(
     if not normalized:
         return None
     return normalized
-
-
-def _serialize_top_rows(
-    *,
-    job_id: UUID,
-    rows: tuple[BacktestJobTopVariant, ...],
-) -> list[dict[str, Any]]:
-    """
-    Serialize summary-only top rows into canonical JSON array for one atomic SQL insert.
-
-    Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
-    Related:
-      - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
-        backtest_job_repository.py
-      - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
-      - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
-    Args:
-        job_id: Parent job identifier expected on every row.
-        rows: Summary-only top rows ordered by rank.
-    Returns:
-        list[dict[str, Any]]: Canonical JSON-serializable rows payload.
-    Assumptions:
-        Persisted sync-inline rows keep `report_table_md/trades_json` null-only.
-    Raises:
-        BacktestStorageError: If one row belongs to another job id.
-    Side Effects:
-        None.
-    """
-    serialized_rows: list[dict[str, Any]] = []
-    for row in sorted(rows, key=lambda item: (item.rank, item.variant_key)):
-        if row.job_id != job_id:
-            raise BacktestStorageError(
-                "PostgresBacktestJobRepository.create_with_top_variants "
-                "received mismatched top row job_id"
-            )
-        summary_metrics_payload = dict(row.summary_metrics_json)
-        summary_metrics_payload["total_return_pct"] = row.total_return_pct
-        serialized_rows.append(
-            {
-                "rank": row.rank,
-                "variant_key": row.variant_key,
-                "indicator_variant_key": row.indicator_variant_key,
-                "variant_index": row.variant_index,
-                "total_return_pct": row.total_return_pct,
-                "payload_json": dict(row.payload_json),
-                "summary_metrics_json": dict(
-                    normalize_persisted_summary_metrics_v2(metrics=summary_metrics_payload)
-                ),
-                "best_tp_pct": row.best_tp_pct,
-                "best_sl_pct": row.best_sl_pct,
-            }
-        )
-    return serialized_rows
 
 
 def _parse_artifact_pin(*, row: Mapping[str, Any]) -> BacktestJobArtifactPin | None:
@@ -1333,9 +981,6 @@ def _parse_execution_mode(*, value: Any) -> BacktestJobExecutionMode | None:
     Parse and validate nullable persisted-run execution mode literal.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
       - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py

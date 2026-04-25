@@ -11,12 +11,6 @@ from .backtest_job import (
     is_backtest_job_state_active,
     is_backtest_job_state_terminal,
 )
-from .backtest_job_results import (
-    BacktestJobStageANoRiskExactRow,
-    BacktestJobStageAShortlist,
-    BacktestJobTopVariant,
-    report_table_md_allowed_for_state,
-)
 from .backtest_placeholders import (
     BacktestPositionPlaceholder,
     BacktestResultPlaceholder,
@@ -40,10 +34,7 @@ __all__ = [
     "BacktestJobMode",
     "BacktestJobStage",
     "BacktestJobStageWeights",
-    "BacktestJobStageANoRiskExactRow",
-    "BacktestJobStageAShortlist",
     "BacktestJobState",
-    "BacktestJobTopVariant",
     "BacktestPositionPlaceholder",
     "BacktestResultPlaceholder",
     "BacktestTradePlaceholder",
@@ -53,5 +44,4 @@ __all__ = [
     "is_backtest_job_state_active",
     "is_backtest_job_state_terminal",
     "normalize_persisted_summary_metrics_v2",
-    "report_table_md_allowed_for_state",
 ]

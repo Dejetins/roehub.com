@@ -5,13 +5,12 @@
 ## Canonical Entry Points
 
 - `docs/architecture/README.md`
-- `docs/architecture/backtest/README.md`
-- `docs/architecture/backtest/deep-research-report.md`
-- `docs/architecture/backtest/backtest-core-refactor-prompt-pack-v1.md`
 - `docs/runbooks/backtest-artifacts-rebuild.md`
+- `tests/notebook_tests/new_engine/`
 
 ## Notes
 
-- Legacy backtest docs по старому compute-ядру удалены в рамках cleanup этапа.
-- Новая документация backtest ядра ведётся только через `deep-research-report.md` и
-  `backtest-core-refactor-prompt-pack-v1.md`.
+- Legacy backtest runtime docs removed. The next backtest service architecture must be written
+  as a new document after the notebook contract is finalized.
+- Current trusted backtest source is the artifact publisher/precompute runbook plus benchmark
+  notebooks in `tests/notebook_tests/new_engine/`.

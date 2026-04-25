@@ -11,8 +11,6 @@ class CanonicalCandleBatch1m:
     Columnar canonical `1m` candle batch for offline/precompute workloads.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py

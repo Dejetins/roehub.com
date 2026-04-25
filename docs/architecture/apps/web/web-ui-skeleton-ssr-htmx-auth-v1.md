@@ -20,7 +20,6 @@
 
 См.:
 - `docs/architecture/identity/identity-keycloak-auth-model-v1.md`
-- `docs/architecture/roadmap/milestone-6-epics-v1.md`
 
 ## Scope
 

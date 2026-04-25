@@ -39,7 +39,6 @@ class _FakeInstrumentReader:
     Deterministic enabled-instrument reader used by artifact publisher scheduler tests.
 
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -63,7 +62,6 @@ class _FakeInstrumentReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -77,7 +75,6 @@ class _FakeHostLock:
     In-memory host lock stub with configurable acquisition outcome.
 
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -103,7 +100,6 @@ class _FakeHostLock:
         Side Effects:
             Increments the in-memory acquisition counter.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -126,7 +122,6 @@ class _FakeHostLock:
         Side Effects:
             Increments the in-memory release counter.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -140,7 +135,6 @@ class _FakePublishUseCase:
     Recording publish use-case double returning pre-seeded results.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -165,7 +159,6 @@ class _FakePublishUseCase:
         Side Effects:
             Appends one request to the in-memory call log.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -193,7 +186,6 @@ def _result(*, exchange: str, market_type: str, symbol: str) -> PublishBacktestA
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -266,7 +258,6 @@ def test_schedule_next_run_after_handles_moscow_boundaries() -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -306,7 +297,6 @@ def test_schedule_does_not_trigger_twice_after_restart_within_same_minute() -> N
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -650,7 +640,6 @@ def test_run_cycle_uses_sorted_enabled_tradable_universe() -> None:
     Side Effects:
         Executes one in-memory scheduler cycle.
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -712,7 +701,6 @@ def test_run_cycle_logs_stage_rebuild_stats_for_successful_symbol(
         Executes one in-memory scheduler cycle and captures INFO logs.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/README.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
     """

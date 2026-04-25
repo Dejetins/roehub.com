@@ -1,4 +1,4 @@
-"""Deterministic `1m` hit-times compute kernels for the backtest artifact pipeline v2."""
+"""Deterministic `hit_times/15m` compute kernels for the backtest artifact pipeline v2."""
 
 from __future__ import annotations
 
@@ -16,11 +16,9 @@ from .contracts import (
 @dataclass(frozen=True, slots=True)
 class HitTimesArraysV2:
     """
-    Immutable in-memory `1m` hit-times arrays ready for strict artifact serialization.
+    Immutable in-memory `hit_times/15m` arrays ready for strict artifact serialization.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -58,8 +56,6 @@ def hit_times_table_cell_count_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -80,7 +76,7 @@ def materialize_hit_times_from_ohlcv_v2(
     max_hit_times_cells: int,
 ) -> HitTimesArraysV2:
     """
-    Build strict `1m` hit-times arrays from canonical `prices/1m.ohlcv`.
+    Build strict `hit_times/15m` arrays from canonical `prices/1m.ohlcv`.
 
     Args:
         ohlcv: Canonical `prices/1m` OHLCV matrix with shape `[T, 5]`.
@@ -97,8 +93,6 @@ def materialize_hit_times_from_ohlcv_v2(
     Side Effects:
         Allocates fresh numpy arrays and triggers Numba compilation on first use.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - tests/notebook_tests/05_hit_time_grid.ipynb
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -173,8 +167,6 @@ def merge_hit_times_prefix_with_rebuilt_tail_v2(
     Side Effects:
         Allocates fresh merged numpy arrays in memory.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -269,8 +261,6 @@ def _normalize_hit_times_ohlcv_v2(*, ohlcv: np.ndarray) -> np.ndarray:
     Side Effects:
         May allocate one contiguous `float32` copy.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -307,8 +297,6 @@ def _normalize_hit_times_level_grid_v2(
     Side Effects:
         Allocates one small contiguous `float32` array.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """
@@ -352,7 +340,6 @@ def _heap_push_min_v2(
     Side Effects:
         Mutates the heap buffers in place.
     Docs:
-      - docs/architecture/backtest/README.md
     Related:
       - tests/notebook_tests/05_hit_time_grid.ipynb
     """
@@ -392,7 +379,6 @@ def _heap_pop_min_v2(
     Side Effects:
         Mutates the heap buffers in place.
     Docs:
-      - docs/architecture/backtest/README.md
     Related:
       - tests/notebook_tests/05_hit_time_grid.ipynb
     """
@@ -451,7 +437,6 @@ def _hit_times_1level_v2(
     Side Effects:
         Mutates the provided output and heap buffers in place.
     Docs:
-      - docs/architecture/backtest/README.md
     Related:
       - tests/notebook_tests/05_hit_time_grid.ipynb
     """
@@ -508,7 +493,6 @@ def _compute_hit_times_tables_v2(
     Side Effects:
         Allocates the final tables plus per-level scratch buffers.
     Docs:
-      - docs/architecture/backtest/README.md
     Related:
       - tests/notebook_tests/05_hit_time_grid.ipynb
     """
@@ -589,8 +573,6 @@ def _validate_materialized_hit_times_v2(*, hit_times: HitTimesArraysV2) -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -655,8 +637,6 @@ def _rebase_hit_times_table_indexes_v2(
     Side Effects:
         Allocates one rebased contiguous `uint32` array.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -691,8 +671,6 @@ def _require_matching_hit_times_grids_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -718,7 +696,6 @@ def _validate_hit_times_level_grid_v2(*, values: np.ndarray, field_name: str) ->
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -760,8 +737,6 @@ def _validate_hit_times_table_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """

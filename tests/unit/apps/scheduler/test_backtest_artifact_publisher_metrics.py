@@ -32,7 +32,6 @@ class _FakeInstrumentReader:
     Fixed enabled-instrument reader used in scheduler metric tests.
 
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -56,7 +55,6 @@ class _FakeInstrumentReader:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -70,7 +68,6 @@ class _FakeHostLock:
     In-memory host lock double for scheduler metric scenarios.
 
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -95,7 +92,6 @@ class _FakeHostLock:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -117,7 +113,6 @@ class _FakeHostLock:
         Side Effects:
             Increments the in-memory release counter.
         Docs:
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -131,7 +126,6 @@ class _SequencedPublishUseCase:
     Recording publish use-case double consuming a queue of results or exceptions.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -157,7 +151,6 @@ class _SequencedPublishUseCase:
         Side Effects:
             Appends one request to the in-memory call log.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -191,7 +184,6 @@ def _successful_result(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -267,7 +259,6 @@ def test_run_cycle_records_lock_held_metrics() -> None:
     Side Effects:
         Executes one in-memory blocked scheduler cycle.
     Docs:
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -312,7 +303,6 @@ def test_run_cycle_records_validation_failed_counts_and_last_success() -> None:
     Side Effects:
         Executes one in-memory scheduler cycle with mixed symbol outcomes.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
@@ -391,7 +381,6 @@ def test_run_cycle_records_unexpected_error_status() -> None:
     Side Effects:
         Executes one in-memory failing scheduler cycle.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py

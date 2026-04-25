@@ -18,7 +18,6 @@ class DeterministicSignalChunkPlannerV2(ChunkPlannerV2):
     Production ChunkPlanner implementation for bounded artifact signal execution.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -45,7 +44,6 @@ class DeterministicSignalChunkPlannerV2(ChunkPlannerV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py

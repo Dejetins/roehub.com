@@ -489,8 +489,6 @@ def test_load_backtest_artifacts_runtime_config_derives_precompute_runtime_setti
     Side Effects:
         Writes one temporary YAML file.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py

@@ -45,7 +45,6 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
 
     Docs:
       - docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md
-      - docs/architecture/roadmap/milestone-6-epics-v1.md
     Related:
       - apps/web/main/main.py
       - apps/web/main/settings.py

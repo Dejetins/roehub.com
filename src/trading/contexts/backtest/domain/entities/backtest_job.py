@@ -63,7 +63,6 @@ class BacktestJobErrorPayload:
     RoehubError-like payload persisted in `backtest_jobs.last_error_json`.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/architecture/api/api-errors-and-422-payload-v1.md
     Related:
       - src/trading/platform/errors/roehub_error.py
@@ -143,8 +142,6 @@ class BacktestJobArtifactPin:
     Immutable artifact-slot identity pinned to one queued/running Backtest job attempt.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -219,8 +216,6 @@ class BacktestJobStageWeights:
     Deterministic `stage_a/stage_b/finalizing` weights for persisted run progress read models.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -322,8 +317,6 @@ class BacktestJob:
     Immutable Backtest job aggregate with deterministic lifecycle and lease invariants.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -373,9 +366,6 @@ class BacktestJob:
         Validate lifecycle, stage, lease, and reproducibility invariants for persisted jobs.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
           - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -702,9 +692,6 @@ class BacktestJob:
         Build initial queued job snapshot with deterministic defaults.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
           - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -820,8 +807,6 @@ class BacktestJob:
         Return the normalized completion ratio of the currently persisted stage counters.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/domain/entities/backtest_job.py
           - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
@@ -850,8 +835,6 @@ class BacktestJob:
         Project persisted run counters onto a deterministic weighted `0..100%` progress scale.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -888,8 +871,6 @@ class BacktestJob:
         Estimate remaining runtime from current-run progress only, or return `None`.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -943,8 +924,6 @@ class BacktestJob:
         Claim queued or expired-running job and assign active lease owner.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
             backtest_job_lease_repository.py
@@ -1009,8 +988,6 @@ class BacktestJob:
         Extend running job lease for the same owner.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
             backtest_job_lease_repository.py
@@ -1066,8 +1043,6 @@ class BacktestJob:
         Update running progress counters with monotonic stage progression.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
             backtest_job_lease_repository.py
@@ -1132,8 +1107,6 @@ class BacktestJob:
         Apply cancel intent according to current state (`queued` immediate, `running` deferred).
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
             backtest_job_repository.py
@@ -1197,9 +1170,6 @@ class BacktestJob:
         Transition running job to terminal state with deterministic failure payload rules.
 
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
             backtest_job_lease_repository.py
@@ -1405,9 +1375,6 @@ def _normalize_ranking_metric_literal(*, name: str, value: str) -> str:
     Normalize one persisted ranking metric literal against the fixed R6-04/R7-01 set.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/dto/run_backtest.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py

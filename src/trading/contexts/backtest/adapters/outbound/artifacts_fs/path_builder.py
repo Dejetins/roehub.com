@@ -52,8 +52,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
     Pure deterministic path builder for the R2-01 artifact store filesystem contract.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -75,8 +73,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -97,8 +93,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -119,8 +113,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -142,8 +134,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -166,8 +156,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -195,8 +183,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -236,8 +222,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -277,7 +261,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -316,8 +299,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -348,8 +329,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -380,8 +359,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -425,8 +402,6 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """

@@ -48,7 +48,6 @@ def _default_now_provider_v2() -> datetime:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -62,7 +61,6 @@ class PublishBacktestArtifactsV2Request:
     Deterministic request DTO for publishing one explicit backtest artifact symbol root.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -87,7 +85,6 @@ class PublishBacktestArtifactsV2Request:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/cli/commands/backtest_artifact_publish.py
@@ -102,7 +99,6 @@ class PublishBacktestArtifactsV2ValidationSummary:
     Machine-readable validation summary returned after one successful whole-slot validation.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -134,7 +130,6 @@ class PublishBacktestArtifactsV2ValidationSummary:
             None.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/README.md
         Related:
           - apps/cli/commands/backtest_artifact_publish.py
         """
@@ -161,7 +156,6 @@ class PublishBacktestArtifactsV2Result:
     Deterministic publish diagnostics for one completed shared orchestration run.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -209,7 +203,6 @@ class PublishBacktestArtifactsV2Result:
         Side Effects:
             Normalizes numeric counters through strict integer validation.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/cli/commands/backtest_artifact_publish.py
@@ -271,7 +264,6 @@ class PublishBacktestArtifactsV2Result:
             None.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/README.md
         Related:
           - apps/cli/commands/backtest_artifact_publish.py
         """
@@ -311,7 +303,6 @@ class PublishBacktestArtifactsV2UseCase:
     Shared publish orchestration reusable by manual CLI and a later scheduler service.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/cli/commands/backtest_artifact_publish.py
@@ -348,7 +339,6 @@ class PublishBacktestArtifactsV2UseCase:
             Reads ClickHouse bounds, writes inactive-slot artifacts, validates the slot, and
             atomically switches `current.yaml` on success.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - apps/cli/commands/backtest_artifact_publish.py
@@ -459,7 +449,6 @@ def _resolve_requested_time_range_v2(
     Side Effects:
         Reads canonical bounds from storage.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/market_data/application/ports/stores/canonical_candle_index_reader.py
@@ -496,7 +485,6 @@ def _ensure_precheck_ready_v2(*, precheck: ArtifactPublishPrecheckV2) -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -533,7 +521,6 @@ def _ensure_bootstrap_slot_roots_v2(
         Creates `<symbol-root>/slot_a` and `<symbol-root>/slot_b` when bootstrap is active.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -568,7 +555,6 @@ def _resolve_publish_mode_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/cli/commands/backtest_artifact_publish.py
@@ -603,7 +589,6 @@ def _ensure_build_publish_alignment_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -651,7 +636,6 @@ def _build_validation_summary_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -698,8 +682,6 @@ def _instrument_id_from_coordinates_v2(*, coordinates: ArtifactCoordinatesV2) ->
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -722,7 +704,6 @@ def _validated_now_utc_v2(value: datetime) -> datetime:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -751,7 +732,6 @@ def _utc_timestamp_literal_v2(value: datetime) -> str:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py

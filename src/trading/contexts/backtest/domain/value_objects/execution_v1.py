@@ -17,8 +17,6 @@ class ExecutionParamsV1:
     Immutable execution parameters for close-fill backtest engine v1.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
@@ -118,8 +116,6 @@ class RiskParamsV1:
     Immutable close-based SL/TP parameters for one backtest variant run.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_milestone_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/execution_engine_v1.py
       - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py

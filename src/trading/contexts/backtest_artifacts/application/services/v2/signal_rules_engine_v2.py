@@ -53,9 +53,6 @@ def _build_signal_rule_registry_v2() -> dict[str, SignalRuleSpecV2]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -94,8 +91,6 @@ def supported_indicator_ids_for_signal_rules_v2() -> tuple[str, ...]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - configs/prod/indicators.yaml
@@ -118,8 +113,6 @@ def list_signal_rule_registry_v2() -> tuple[tuple[str, str], ...]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
       - tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py
@@ -145,8 +138,6 @@ def signal_rule_spec_v2(*, indicator_id: str) -> SignalRuleSpecV2:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
       - configs/prod/indicators.yaml
@@ -172,9 +163,6 @@ class BacktestSignalRulesEngineV2:
     signal semantics while exposing a dedicated v2 API.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -199,8 +187,6 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/backtest/README.md
         Related:
           - configs/prod/indicators.yaml
           - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -222,8 +208,6 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
           - configs/prod/indicators.yaml
@@ -245,8 +229,6 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
           - configs/prod/indicators.yaml
@@ -275,8 +257,6 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
           - configs/prod/indicators.yaml
@@ -317,9 +297,6 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
           - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -383,9 +360,6 @@ def _validate_defaults_provider_contract_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -442,8 +416,6 @@ def _validate_allowed_source_catalog_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -476,8 +448,6 @@ def _default_inputs_source_from_defaults_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -514,8 +484,6 @@ def _materialized_source_values_from_grid_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -554,9 +522,6 @@ def _materialize_default_signal_params_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py
@@ -601,8 +566,6 @@ def _single_default_scalar_from_grid_spec_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
@@ -640,8 +603,6 @@ def _normalize_signal_scalar_v2(
     Side Effects:
         Converts NumPy scalar wrappers into Python scalars.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
       - configs/prod/indicators.yaml
@@ -677,8 +638,6 @@ def _resolve_inputs_source_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -739,9 +698,6 @@ def _resolve_signal_params_default_only_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py
       - configs/prod/indicators.yaml
@@ -797,8 +753,6 @@ def _indicator_inputs_mapping_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -828,9 +782,6 @@ def _normalize_signal_codes_v2(
     Side Effects:
         Copies the array only when dtype/layout normalization is needed.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py

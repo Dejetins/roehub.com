@@ -35,7 +35,6 @@ class ArtifactTimeframeSessionV2:
     Explicit lifecycle owner for one open target timeframe inside R12 precompute.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
@@ -64,7 +63,6 @@ class ArtifactTimeframeSessionV2:
         Side Effects:
             Freezes `opened_details` into a stable key-sorted read-only mapping.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_coordinator.py
@@ -87,7 +85,6 @@ class ArtifactTimeframeSessionV2:
         Side Effects:
             Updates coordinator session state and writes one structured log record.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -118,7 +115,6 @@ class ArtifactTimeframeSessionV2:
         Side Effects:
             Updates coordinator session state and writes one structured log record.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -142,7 +138,6 @@ class ArtifactTimeframeSessionV2:
         Side Effects:
             Replaces the in-memory finish payload for the current session.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -164,7 +159,6 @@ class ArtifactTimeframeSessionV2:
         Side Effects:
             Releases one open-session slot and writes one structured log record.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -187,7 +181,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
     Explicit owner of R12 stage order, structured progress events, and stage summaries.
 
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -229,7 +222,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Side Effects:
             None until the returned session is entered.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -264,7 +256,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Side Effects:
             Writes start/finish structured logs and appends one typed stage result.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -314,7 +305,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -342,7 +332,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Side Effects:
             Writes one INFO log record.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -387,7 +376,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Side Effects:
             Updates open-session state and writes one structured log record.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -441,7 +429,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Side Effects:
             Updates open-session state and writes one structured log record.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -483,8 +470,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Side Effects:
             Updates the in-memory last-stage cursor.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
@@ -514,7 +499,6 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Side Effects:
             Writes one INFO log record.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py

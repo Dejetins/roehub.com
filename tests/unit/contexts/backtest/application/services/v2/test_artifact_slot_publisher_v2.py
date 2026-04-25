@@ -140,8 +140,6 @@ class _NeverCalledPrecomputeRunner:
         Side Effects:
             Sets `called=True` for assertions.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -227,8 +225,6 @@ def test_backtest_artifact_slot_publisher_v2_switches_current_yaml_after_strict_
     Side Effects:
         Creates and replaces artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -299,8 +295,6 @@ def test_backtest_artifact_slot_publisher_v2_skips_previous_slot_cleanup_when_sl
     Side Effects:
         Creates and switches temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -349,8 +343,6 @@ def test_backtest_artifact_slot_publisher_v2_blocks_publish_when_inactive_slot_i
     Side Effects:
         Creates temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -393,8 +385,6 @@ def test_backtest_artifact_slot_publisher_v2_rejects_missing_strict_artifact_fil
     Side Effects:
         Creates temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -445,8 +435,6 @@ def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_
     Side Effects:
         Creates temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -486,8 +474,6 @@ def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_
     Side Effects:
         Creates temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -533,8 +519,6 @@ def _prices_mappings_request_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """

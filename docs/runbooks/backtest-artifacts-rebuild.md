@@ -16,8 +16,6 @@ plan и strict manifest validation.
 
 Основные документы:
 
-- `docs/architecture/backtest/README.md`
-- `docs/architecture/roadmap/base_refactor_plan.md`
 
 ## Scheduled service contract
 

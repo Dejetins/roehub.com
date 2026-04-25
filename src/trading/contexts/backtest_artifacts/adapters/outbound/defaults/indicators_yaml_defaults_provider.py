@@ -24,9 +24,6 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
     Backtest defaults provider loading compute and signal defaults from indicators YAML.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
       - src/trading/contexts/backtest/application/ports/staged_runner.py

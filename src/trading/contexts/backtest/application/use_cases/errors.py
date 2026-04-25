@@ -30,7 +30,6 @@ def validation_error(
 
     Docs:
       - docs/architecture/api/api-errors-and-422-payload-v1.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/domain/errors/backtest_errors.py
       - apps/api/common/errors.py
@@ -111,8 +110,6 @@ def backtest_job_not_found(*, job_id: UUID) -> RoehubError:
     Build deterministic not-found API error for Backtest job id lookup failures.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - apps/api/routes/backtest_jobs.py
@@ -141,8 +138,6 @@ def backtest_job_forbidden(*, job_id: UUID) -> RoehubError:
     Build deterministic forbidden API error for foreign Backtest job access attempts.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
       - apps/api/routes/backtest_jobs.py
@@ -171,8 +166,6 @@ def backtest_run_not_found(*, run_id: UUID) -> RoehubError:
     Build deterministic not-found API error for public Backtest run id lookups.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
       - apps/api/routes/backtest_runs.py
@@ -201,8 +194,6 @@ def backtest_run_forbidden(*, run_id: UUID) -> RoehubError:
     Build deterministic forbidden API error for foreign public Backtest run access.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
       - apps/api/routes/backtest_runs.py
@@ -255,7 +246,6 @@ def map_backtest_exception(*, error: Exception) -> RoehubError:
 
     Docs:
       - docs/architecture/api/api-errors-and-422-payload-v1.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
       - src/trading/contexts/backtest/domain/errors/backtest_errors.py

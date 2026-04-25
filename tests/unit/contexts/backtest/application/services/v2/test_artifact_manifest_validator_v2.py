@@ -30,8 +30,6 @@ def test_backtest_artifact_manifest_validator_v2_accepts_valid_strict_slot(
     Side Effects:
         Creates and reads a synthetic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -74,7 +72,6 @@ def test_backtest_artifact_manifest_validator_v2_accepts_legacy_slot_without_sig
     Side Effects:
         Creates and reads one synthetic legacy-style artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -116,8 +113,6 @@ def test_backtest_artifact_manifest_validator_v2_rejects_root_manifest_schema_dr
     Side Effects:
         Creates and mutates a synthetic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -161,8 +156,6 @@ def test_backtest_artifact_manifest_validator_v2_rejects_mapping_price_correspon
     Side Effects:
         Creates and reads a synthetic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -202,8 +195,6 @@ def test_backtest_artifact_manifest_validator_v2_orders_multiple_diagnostics_det
     Side Effects:
         Creates and reads synthetic invalid artifact trees under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
@@ -258,8 +249,6 @@ def test_backtest_artifact_manifest_validator_v2_rejects_signal_manifest_referen
     Side Effects:
         Creates and mutates a synthetic artifact tree under `tmp_path`.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
       - tests/unit/contexts/backtest/application/services/v2/artifact_testkit_v2.py

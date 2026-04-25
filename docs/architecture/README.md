@@ -4,9 +4,7 @@
 
 ## Ключевые документы
 
-- [Backtest Refactor Docs](docs/architecture/backtest/README.md)
-- [Backtest Deep Research Report](docs/architecture/backtest/deep-research-report.md)
-- [Backtest Core Refactor Prompt-Pack](docs/architecture/backtest/backtest-core-refactor-prompt-pack-v1.md)
+- [Runbook — Backtest Artifacts Rebuild / Publish](docs/runbooks/backtest-artifacts-rebuild.md)
 - [Identity Keycloak Auth Model](docs/architecture/identity/identity-keycloak-auth-model-v1.md)
 - [Indicators Architecture](docs/architecture/indicators/README.md)
 - [Market Data — Application Ports](docs/architecture/market_data/market-data-application-ports.md)
@@ -30,7 +28,6 @@
 - [Web UI -- Strategy UI v1 (CRUD + visual builder) + delete (WEB-EPIC-04)](docs/architecture/apps/web/web-strategy-ui-crud-builder-delete-v1.md) — `docs/architecture/apps/web/web-strategy-ui-crud-builder-delete-v1.md` — Документ фиксирует архитектуру WEB-EPIC-04: Strategy UI v1 поверх существующего Strategy JSON API,
 - [Web UI v1 -- SSR + HTMX skeleton + Auth UX (WEB-EPIC-01)](docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md) — `docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md` — Документ фиксирует архитектуру WEB-EPIC-01: `apps/web` как отдельный web upstream (Python SSR + Jinja2 + HTMX), который рендерит HTML, использует JSON API через `/api/...` и обеспечивает обязательный login gate.
 - [Web UI v1 -- Tests + Docs Index (WEB-EPIC-07)](docs/architecture/apps/web/web-ui-tests-docs-index-v1.md) — `docs/architecture/apps/web/web-ui-tests-docs-index-v1.md` — Документ фиксирует контракт WEB-EPIC-07: минимальный набор unit/smoke тестов для Milestone 6
-- [Backtest Refactor Docs](docs/architecture/backtest/README.md) — `docs/architecture/backtest/README.md` — Статус: runtime-compute reset. Старое runtime-ядро backtest, API/UI запуска и
 - [Identity 2FA TOTP policy v1](docs/architecture/identity/identity-2fa-totp-policy-v1.md) — `docs/architecture/identity/identity-2fa-totp-policy-v1.md` — Статус: архивный документ.
 - [Identity exchange keys storage + 2FA gate policy v1](docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md) — `docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md` — Статус: архивный документ.
 - [Identity exchange keys storage policy v2](docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md) — `docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md` — Документ фиксирует актуальный storage/API-контракт `exchange keys` после Keycloak cutover.
@@ -67,13 +64,8 @@
 - [Market Data — Use-Case: Backfill 1m Candles (Walking Skeleton v1)](docs/architecture/market_data/market-data-use-case-backfill-1m.md) — `docs/architecture/market_data/market-data-use-case-backfill-1m.md` — Этот документ фиксирует первый application use-case bounded context `market_data` для walking skeleton v1.
 - [Market Data — WS Live Ingestion Worker & Maintenance Scheduler (v1)](docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md) — `docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md` — Этот документ описывает **EPIC 3 — WS Live Ingestion Worker: close-only, <1s to raw** и сопутствующий **maintenance scheduler**.
 - [Native Service Control, Monitoring, and Admin Target (v1)](docs/architecture/operations/native-service-control-monitoring-admin-target-v1.md) — `docs/architecture/operations/native-service-control-monitoring-admin-target-v1.md` — Документ фиксирует целевую production-картину управления, контроля и мониторинга сервисов Roehub на `Mac Studio` в native-модели (без обязательного Docker runtime).
-- [Общие принципы (на весь проект)](docs/architecture/roadmap/base_milestone_plan.md) — `docs/architecture/roadmap/base_milestone_plan.md` — - Доменные и прикладные части **не знают**, Binance это или Bybit.
-- [Base Refactor Plan: Backtest Engine v2 Milestone / EPIC Map](docs/architecture/roadmap/base_refactor_plan.md) — `docs/architecture/roadmap/base_refactor_plan.md` — Этот документ не формулирует новую архитектуру с нуля.
 - [milestone 2 epics v1](docs/architecture/roadmap/milestone-2-epics-v1.md) — `docs/architecture/roadmap/milestone-2-epics-v1.md`
 - [Milestone 3 — EPIC map (v1)](docs/architecture/roadmap/milestone-3-epics-v1.md) — `docs/architecture/roadmap/milestone-3-epics-v1.md` — Карта EPIC’ов для Milestone 3: Keycloak auth + Roehub session model + Strategy v1 (immutable) + live runner + realtime streams + telegram notifications.
-- [Milestone 4 — EPIC map (v1)](docs/architecture/roadmap/milestone-4-epics-v1.md) — `docs/architecture/roadmap/milestone-4-epics-v1.md` — Карта EPIC'ов для Milestone 4: Backtest v1 (close-fill) по одному инструменту с multi-variant grid (комбинации индикаторов + диапазоны параметров), direction modes, 4 режима position sizing, close-based SL/TP, комиссии/slippage и расширенный отчёт метрик.
-- [Milestone 5 -- EPIC map (v1)](docs/architecture/roadmap/milestone-5-epics-v1.md) — `docs/architecture/roadmap/milestone-5-epics-v1.md` — Карта EPIC'ов для Milestone 5: Backtest Jobs v1.
-- [Milestone 6 -- EPIC map (v1)](docs/architecture/roadmap/milestone-6-epics-v1.md) — `docs/architecture/roadmap/milestone-6-epics-v1.md` — EPIC map для Milestone 6: Web UI v1 (Backtest + Jobs + Strategy + Auth).
 - [Shared Kernel — Primitives (Trading)](docs/architecture/shared-kernel-primitives.md) — `docs/architecture/shared-kernel-primitives.md` — Этот документ фиксирует минимальные доменные примитивы Shared Kernel и правила, которые должны быть одинаковыми во всех bounded contexts.
 - [Strategy API v1: immutable CRUD + clone + run control + identity integration (v1)](docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md) — `docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md` — Фиксирует архитектурные решения для STR-EPIC-02: доменно-очевидные правила владения стратегией, неизменяемые стратегии, клонирование, управление запусками и интеграция с identity через порт `current_user`.
 - [Strategy v1 — Immutable Spec + Storage + Runs/Events + Migrations Automation](docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md) — `docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md` — Документ фиксирует доменную модель Strategy v1 (immutable spec), хранение в Postgres (strategies/runs/events) и правила автоприменения миграций через Alembic.

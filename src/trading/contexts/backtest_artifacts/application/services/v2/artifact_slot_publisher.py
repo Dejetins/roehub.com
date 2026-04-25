@@ -52,8 +52,6 @@ def _default_now_provider_v2() -> datetime:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -65,8 +63,6 @@ class ArtifactSlotPublishErrorV2(Exception):
     Stable publish error with explicit code for R2-02 slot publish failures.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
@@ -95,8 +91,6 @@ class ArtifactSlotPublishErrorV2(Exception):
         Side Effects:
             Initializes exception state.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -111,8 +105,6 @@ class BacktestArtifactSlotPublisherV2:
     Publish orchestrator implementing `precheck -> validate -> atomic switch` for R2-02.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
@@ -139,9 +131,6 @@ class BacktestArtifactSlotPublisherV2:
         Side Effects:
             Reads `current.yaml` and, when present, the inactive slot `manifest.yaml`.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -262,8 +251,6 @@ class BacktestArtifactSlotPublisherV2:
             Reads `current.yaml`, rebuilds the inactive slot, validates the root manifest, and
             replaces `current.yaml` atomically on success.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
           - docs/runbooks/backtest-artifacts-rebuild.md
@@ -326,8 +313,6 @@ class BacktestArtifactSlotPublisherV2:
         Side Effects:
             Reads manifest files and checks required artifact files on disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -376,8 +361,6 @@ class BacktestArtifactSlotPublisherV2:
         Side Effects:
             Reads inactive slot files and atomically replaces `current.yaml`.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
         """
@@ -441,8 +424,6 @@ class BacktestArtifactSlotPublisherV2:
         Side Effects:
             May delete one previous slot directory tree from disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -498,8 +479,6 @@ class BacktestArtifactSlotPublisherV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -527,8 +506,6 @@ def _require_existing_path_v2(path: Path, label: str) -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -558,8 +535,6 @@ def _ensure_prices_mappings_publish_validation_spec_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
       - docs/runbooks/backtest-artifacts-rebuild.md
@@ -592,8 +567,6 @@ def _file_sha256_hex_v2(path: Path) -> str:
     Side Effects:
         Reads file bytes from disk.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -615,8 +588,6 @@ def _utc_now_literal_v2(value: datetime) -> str:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """

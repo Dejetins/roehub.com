@@ -24,8 +24,6 @@ def test_materialize_hit_times_from_ohlcv_v2_matches_same_bar_and_sentinel_seman
     Side Effects:
         Triggers one small in-memory materialization and Numba compilation on first use.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - tests/notebook_tests/05_hit_time_grid.ipynb
       - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
@@ -92,8 +90,6 @@ def test_materialize_hit_times_from_ohlcv_v2_shapes_follow_level_grid_counts() -
     Side Effects:
         Triggers one small in-memory materialization and Numba compilation on first use.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
     """
@@ -136,8 +132,6 @@ def test_materialize_hit_times_from_ohlcv_v2_rejects_cells_over_budget() -> None
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/hit_times_compute_v2.py
     """

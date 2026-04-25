@@ -11,15 +11,13 @@ class BacktestPostgresGateway(Protocol):
     BacktestPostgresGateway — minimal SQL gateway for Backtest jobs Postgres adapters.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_repository.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_lease_repository.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
-        backtest_job_results_repository.py
+        backtest_job_repository.py
     """
 
     def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
@@ -87,8 +85,6 @@ class PsycopgBacktestPostgresGateway(BacktestPostgresGateway):
     PsycopgBacktestPostgresGateway — psycopg3 implementation for Backtest SQL adapters.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/milestone-5-epics-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/gateway.py
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/

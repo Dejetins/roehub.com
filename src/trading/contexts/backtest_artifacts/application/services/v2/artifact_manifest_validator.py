@@ -48,8 +48,6 @@ class BacktestArtifactManifestValidatorV2:
     Strict slot validator for root, signal, and hit-times manifest contracts.
 
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -85,8 +83,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads manifests and `.npy` arrays from the inactive slot on disk.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -238,8 +234,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Appends deterministic diagnostics on contract mismatches.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -393,8 +387,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads one price artifact family from disk and appends diagnostics.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -550,8 +542,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads one mapping artifact family from disk and appends diagnostics.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -743,8 +733,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads one signal manifest file from disk and appends diagnostics on failure.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -842,8 +830,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads the signal matrix file from disk and appends diagnostics.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1075,7 +1061,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads one signal-feature manifest file from disk and appends diagnostics on failure.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -1177,7 +1162,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads the feature matrix file from disk and appends diagnostics.
         Docs:
-          - docs/architecture/backtest/README.md
           - docs/architecture/roadmap/backtest-runtime-acceleration-plan-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -1314,8 +1298,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads one hit-times manifest file from disk and appends diagnostics on failure.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -1399,8 +1381,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads hit-times arrays from disk and appends diagnostics.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1586,8 +1566,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Reads one hit-times table from disk and appends diagnostics.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1663,8 +1641,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Computes file hash, loads a `.npy` file from disk, and appends diagnostics.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1818,8 +1794,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Appends a diagnostic when monotonicity is violated.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1864,8 +1838,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Appends diagnostics when metadata diverges from actual array edges.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1933,8 +1905,6 @@ class BacktestArtifactManifestValidatorV2:
         Side Effects:
             Appends a diagnostic when monotonicity is violated.
         Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -1964,8 +1934,6 @@ def _file_sha256_hex_v2(path: Path) -> str:
     Side Effects:
         Reads the file from disk in binary mode.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -1992,8 +1960,6 @@ def _relative_slot_path_v2(slot_root: Path, artifact_path: Path) -> str:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
     """

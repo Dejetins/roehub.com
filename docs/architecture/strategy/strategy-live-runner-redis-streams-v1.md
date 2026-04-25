@@ -183,7 +183,6 @@ Live-runner:
 - `docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md` — доменная спецификация runs/events/checkpoint.
 - `docs/architecture/strategy/strategy-milestone-3-epics-v1.md` — scope по strategy milestone (обновлённые пункты warmup/timeframe).
 - `docs/architecture/roadmap/milestone-3-epics-v1.md` — roadmap STR-EPIC-03/04 границы.
-- `docs/architecture/roadmap/base_milestone_plan.md` — базовый план (warmup/runner/контракты).
 - `docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md` — API-контроль run и описание warmup как вычисляемого.
 
 ## Как проверить

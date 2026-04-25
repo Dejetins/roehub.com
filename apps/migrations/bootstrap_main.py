@@ -135,7 +135,6 @@ def main(argv: list[str] | None = None) -> int:
 
     Docs:
       - docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md
-      - docs/architecture/roadmap/milestone-6-epics-v1.md
     Related:
       - apps/migrations/bootstrap.py
       - apps/migrations/main.py

@@ -436,9 +436,7 @@
 - `docs/architecture/identity/identity-2fa-totp-policy-v1.md` (архивировать, заменить на Keycloak OTP)
 - `docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md`
 - `docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md`
-- `docs/architecture/roadmap/base_milestone_plan.md`
 - `docs/architecture/roadmap/milestone-3-epics-v1.md`
-- `docs/architecture/roadmap/milestone-6-epics-v1.md`
 - `docs/architecture/shared-kernel-primitives.md`
 - `docs/runbooks/mac-studio-monitoring-plan.md`
 - `docs/runbooks/mac-studio-native-backend-operations.md`
@@ -504,9 +502,7 @@ docs/architecture/identity/identity-2fa-totp-policy-v1.md
 docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v1.md
 docs/architecture/identity/identity-exchange-keys-storage-2fa-gate-policy-v2.md
 docs/architecture/identity/identity-telegram-login-user-model-v1.md
-docs/architecture/roadmap/base_milestone_plan.md
 docs/architecture/roadmap/milestone-3-epics-v1.md
-docs/architecture/roadmap/milestone-6-epics-v1.md
 docs/architecture/shared-kernel-primitives.md
 docs/architecture/strategy/strategy-runtime-config-v1.md
 docs/repository_three.md

@@ -58,7 +58,6 @@ class BacktestArtifactPublishCliArgs:
 
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/commands/backtest_artifact_publish.py
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -87,7 +86,6 @@ class BacktestArtifactPublishCliArgs:
             None.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -107,7 +105,6 @@ class BacktestArtifactPublishCli:
 
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/main/main.py
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -135,7 +132,6 @@ class BacktestArtifactPublishCli:
             Stores configuration in memory.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/README.md
         Related:
           - tests/unit/apps/cli/test_backtest_artifact_publish_cli.py
         """
@@ -161,7 +157,6 @@ class BacktestArtifactPublishCli:
             Reads configs/environment, queries storage, writes artifacts, and prints one report.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
         """
@@ -222,7 +217,6 @@ class BacktestArtifactPublishCli:
             None.
         Docs:
           - docs/runbooks/backtest-artifacts-rebuild.md
-          - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -262,7 +256,6 @@ def _build_parser() -> argparse.ArgumentParser:
         None.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/README.md
     Related:
       - apps/cli/main/main.py
     """
@@ -315,7 +308,6 @@ def _build_publish_use_case_v2(
         Reads configs, builds storage adapters, and warms up indicators compute.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/README.md
       - docs/runbooks/mac-studio-native-backend-operations.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
@@ -405,7 +397,6 @@ def _render_report_v2(
         None.
     Docs:
       - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/publish_backtest_artifacts_v2.py
     """
