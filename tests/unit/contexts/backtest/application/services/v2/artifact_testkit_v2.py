@@ -58,7 +58,7 @@ class ArtifactPrecomputeFixtureV2:
     Minimal R3-02 fixture with strict config, pointer file, and explicit artifact paths.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
@@ -293,7 +293,7 @@ def build_artifact_precompute_fixture_v2(
     Side Effects:
         Creates strict config YAML and `current.yaml` under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py

@@ -199,7 +199,7 @@ class _ZeroBlockingRepositoryForLoaderTest:
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """

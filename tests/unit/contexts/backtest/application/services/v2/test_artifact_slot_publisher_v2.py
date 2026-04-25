@@ -140,7 +140,7 @@ class _NeverCalledPrecomputeRunner:
         Side Effects:
             Sets `called=True` for assertions.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -445,7 +445,7 @@ def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_
     Side Effects:
         Creates temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -486,7 +486,7 @@ def test_backtest_artifact_slot_publisher_v2_build_publish_prices_mappings_slot_
     Side Effects:
         Creates temporary artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -533,7 +533,7 @@ def _prices_mappings_request_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py

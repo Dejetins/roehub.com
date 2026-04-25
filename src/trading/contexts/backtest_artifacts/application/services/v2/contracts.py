@@ -298,7 +298,7 @@ def validate_signal_rule_family_v2(value: str) -> SignalRuleFamilyLiteralV2:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
@@ -329,7 +329,7 @@ def validate_signal_input_source_v2(value: str) -> SignalSourceLiteralV2:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
@@ -364,7 +364,7 @@ def _normalize_non_empty_literal_tuple_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -385,7 +385,7 @@ class SignalRuleSpecV2:
     Explicit v2-aligned rule binding for one supported backtest indicator id.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:
@@ -417,7 +417,7 @@ class SignalRuleSpecV2:
         Side Effects:
             Normalizes identifier and tuple fields into canonical lower-case ordering.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
@@ -472,7 +472,7 @@ class SignalRuleEvaluationRequestV2:
     axis in defaults/config or in compare-price rule evaluation.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:
@@ -498,7 +498,7 @@ class SignalRuleEvaluationResultV2:
     `SHORT = -1`, and the value set `{-1,0,1}`.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:
@@ -530,7 +530,7 @@ def ordered_artifact_slots_v2() -> tuple[ArtifactSlotLiteralV2, ...]:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -582,7 +582,7 @@ def validate_artifact_coordinate_token_v2(token: str, *, field_name: str) -> str
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
     """
@@ -628,7 +628,7 @@ def validate_artifact_slot_v2(slot: str) -> ArtifactSlotLiteralV2:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -659,7 +659,7 @@ def validate_current_pointer_schema_version_v2(schema_version: int) -> int:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -691,7 +691,7 @@ def validate_current_pointer_slot_generation_v2(slot_generation: int) -> int:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -719,7 +719,7 @@ def validate_current_pointer_asof_date_v2(asof_date: str) -> str:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -751,7 +751,7 @@ def validate_current_pointer_manifest_sha256_v2(manifest_sha256: str) -> str:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -779,7 +779,7 @@ def validate_current_pointer_published_at_utc_v2(published_at_utc: str) -> str:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -894,7 +894,7 @@ def validate_hit_times_timeframe_v2(timeframe: str) -> str:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
     """
@@ -986,7 +986,7 @@ def freeze_artifact_payload_mapping_v2(payload: Mapping[str, Any]) -> Mapping[st
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
@@ -1019,7 +1019,7 @@ def artifact_coordinates_from_market_id_v2(*, market_id: int, symbol: str) -> Ar
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/market_data/application/use_cases/seed_ref_market.py
       - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -1051,7 +1051,7 @@ def artifact_market_id_from_coordinates_v2(coordinates: ArtifactCoordinatesV2) -
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/market_data/application/use_cases/seed_ref_market.py
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -1072,7 +1072,7 @@ class ArtifactCoordinatesV2:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -1098,7 +1098,7 @@ class ArtifactCoordinatesV2:
             Normalizes the stored coordinates to validated canonical literals.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
         """
@@ -2404,7 +2404,7 @@ class ArtifactSignalValidationSpecV2:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -2430,7 +2430,7 @@ class ArtifactSignalValidationSpecV2:
             Normalizes stored literals to validated canonical values.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -2445,7 +2445,7 @@ class ArtifactSlotValidationSpecV2:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -2473,7 +2473,7 @@ class ArtifactSlotValidationSpecV2:
             Replaces stored tuples with deterministic canonical ordering.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -2512,7 +2512,7 @@ class ArtifactPublishPrecheckV2:
     Docs:
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/application/ports/backtest_job_repositories.py
@@ -2592,7 +2592,7 @@ class ArtifactSlotValidationResultV2:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -2613,7 +2613,7 @@ class ArtifactPublishResultV2:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -2631,7 +2631,7 @@ class ArtifactCanonicalPriceExportRequestV2:
     Explicit request DTO for canonical `1m`-rooted price export into the inactive artifact slot.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2662,7 +2662,7 @@ class ArtifactCanonicalPriceExportRequestV2:
         Side Effects:
             Normalizes validated date and timestamp literals.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3631,7 +3631,7 @@ class ArtifactCanonicalPriceExportResultV2:
     Structured result payload for R3-02 price export into the inactive slot.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3674,7 +3674,7 @@ class ArtifactCanonicalPriceExportResultV2:
         Side Effects:
             Normalizes strict slot and date/hash literals.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3738,7 +3738,7 @@ class ArtifactPricesMappingsPublishResultV2:
     Structured R3-04 flow result for `precheck -> build inactive slot -> validate -> publish`.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3768,7 +3768,7 @@ class ArtifactPricesMappingsPublishResultV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -3839,7 +3839,7 @@ class ArtifactPinnedIdentityV2:
     Docs:
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -3898,7 +3898,7 @@ class ArtifactSlotPinnedRuntimeContextV2:
     Docs:
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -4146,7 +4146,7 @@ class StageACompactTradeV2:
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/trade_compactor_kernel.py
           - tests/unit/contexts/backtest/application/services/v2/test_trade_compactor_kernel_v2.py
@@ -4666,7 +4666,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     Minimal service-layer runtime settings required by R3-03/R4-03/R5-01 precompute orchestration.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4851,7 +4851,7 @@ def _normalize_positive_float_grid_v2(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """
@@ -4871,7 +4871,7 @@ class BacktestArtifactPathResolverV2(Protocol):
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
@@ -4954,7 +4954,7 @@ class BacktestArtifactLoaderV2(Protocol):
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
@@ -5114,7 +5114,7 @@ class BacktestArtifactSlotResolverV2(Protocol):
     Docs:
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_resolver.py
       - src/trading/contexts/backtest/application/use_cases/run_backtest.py
@@ -5303,7 +5303,7 @@ class BacktestArtifactCurrentPointerWriterV2(Protocol):
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
@@ -5335,7 +5335,7 @@ def _validate_safe_path_token_v2(token: str, *, field_name: str) -> str:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
     """
@@ -5380,7 +5380,7 @@ def _validate_allowed_literal_v2(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
     """
@@ -5413,7 +5413,7 @@ def _sorted_unique_timeframes_v2(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """
@@ -6055,7 +6055,7 @@ def _sorted_signal_validation_specs_v2(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
     """

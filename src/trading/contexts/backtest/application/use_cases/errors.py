@@ -172,7 +172,7 @@ def backtest_run_not_found(*, run_id: UUID) -> RoehubError:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
       - apps/api/routes/backtest_runs.py
@@ -202,7 +202,7 @@ def backtest_run_forbidden(*, run_id: UUID) -> RoehubError:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/use_cases/backtest_runs_history_api_v1.py
       - apps/api/routes/backtest_runs.py

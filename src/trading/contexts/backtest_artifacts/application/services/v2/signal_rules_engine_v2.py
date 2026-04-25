@@ -53,7 +53,7 @@ def _build_signal_rule_registry_v2() -> dict[str, SignalRuleSpecV2]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:
@@ -94,7 +94,7 @@ def supported_indicator_ids_for_signal_rules_v2() -> tuple[str, ...]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
@@ -118,7 +118,7 @@ def list_signal_rule_registry_v2() -> tuple[tuple[str, str], ...]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -145,7 +145,7 @@ def signal_rule_spec_v2(*, indicator_id: str) -> SignalRuleSpecV2:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -172,7 +172,7 @@ class BacktestSignalRulesEngineV2:
     signal semantics while exposing a dedicated v2 API.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:
@@ -199,7 +199,7 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - configs/prod/indicators.yaml
@@ -222,7 +222,7 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
@@ -245,7 +245,7 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -317,7 +317,7 @@ class BacktestSignalRulesEngineV2:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/architecture/backtest/README.md
         Related:
@@ -383,7 +383,7 @@ def _validate_defaults_provider_contract_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:
@@ -442,7 +442,7 @@ def _validate_allowed_source_catalog_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
@@ -476,7 +476,7 @@ def _default_inputs_source_from_defaults_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
@@ -514,7 +514,7 @@ def _materialized_source_values_from_grid_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
@@ -554,7 +554,7 @@ def _materialize_default_signal_params_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -601,7 +601,7 @@ def _single_default_scalar_from_grid_spec_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
@@ -640,7 +640,7 @@ def _normalize_signal_scalar_v2(
     Side Effects:
         Converts NumPy scalar wrappers into Python scalars.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -677,7 +677,7 @@ def _resolve_inputs_source_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - configs/prod/indicators.yaml
@@ -739,7 +739,7 @@ def _resolve_signal_params_default_only_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
@@ -797,7 +797,7 @@ def _indicator_inputs_mapping_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
@@ -828,7 +828,7 @@ def _normalize_signal_codes_v2(
     Side Effects:
         Copies the array only when dtype/layout normalization is needed.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:

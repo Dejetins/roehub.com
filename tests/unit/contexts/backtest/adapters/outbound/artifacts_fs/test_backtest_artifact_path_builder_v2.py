@@ -28,7 +28,7 @@ def test_backtest_artifact_path_builder_v2_builds_canonical_paths(tmp_path: Path
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -137,7 +137,7 @@ def test_backtest_artifact_path_builder_v2_returns_byte_stable_paths(tmp_path: P
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -208,7 +208,7 @@ def test_backtest_artifact_path_builder_v2_rejects_invalid_inputs(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
       - src/trading/contexts/backtest/application/services/v2/contracts.py

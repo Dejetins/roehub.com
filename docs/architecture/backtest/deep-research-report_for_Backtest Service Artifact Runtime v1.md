@@ -1,0 +1,183 @@
+# Архитектурное ревью backtest-service-artifact-runtime-v1
+
+## Executive Summary
+
+**Итоговое заключение.** Текущий план можно использовать только как **концептуальный draft для дальнейшей проработки**, но **не как готовую source-of-truth основу для реализации**. В его текущем виде архитектура **частично готова**, однако содержит несколько критичных контрактных расхождений с уже существующими документами, миграциями и доменной моделью репозитория. Основная проблема не в том, что направление выбрано неверно, а в том, что в репозитории одновременно живут **несколько конкурирующих архитектурных словарей**: `jobs` vs `runs`, `risk.mode` vs `execution profile`, `hit_times/15m` vs `hit_times/1m`, `human-readable variant_key` vs `SHA-256 variant_key`. Это делает реализацию рискованной: разные команды могут честно реализовать разные версии “правильной” архитектуры и при этом формально следовать документам. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn38file0L1-L1 fileciteturn41file0L1-L1
+
+**Оценка зрелости архитектуры:** **4/10**. Оценка низкая не потому, что нет хороших решений, а потому, что **контракты еще не заморожены** и часть из них уже конфликтует с кодом и roadmap-артефактами. При этом отдельные фрагменты выглядят зрелыми: строгая artifact pin-модель, summary-only persistence, benchmark discipline, явное отделение artifact publisher от runtime, dependency direction, fail-fast validation и observability-ориентация. Но до production-grade архитектурной базы не хватает канонического набора ADR/контрактов, migration/compatibility story, security/ops модели и полной синхронизации doc set. fileciteturn15file0L1-L1 fileciteturn21file0L1-L1 fileciteturn25file0L1-L1 fileciteturn37file0L1-L1
+
+**Главные выводы.**  
+Первое: главный документ описывает сильную target-идею artifact-backed runtime, но не является согласованным каноном относительно остального репозитория. Второе: публичный API и идентичность варианта сейчас описаны противоречиво, и это блокирует безопасную реализацию API, UI, storage и lazy detail. Третье: модель risk execution не заморожена — конфликт между `hit_times/15m` и `hit_times/1m` является не косметическим, а фундаментальным для kernel semantics, layout и testing. Четвертое: security, secrets, rate limiting, rollouts, backward compatibility и DR либо не описаны, либо описаны слишком поверхностно для production basis. Пятое: benchmark и reproducibility discipline — сильная сторона плана, и ее нужно сохранить. Шестое: summary-only persistence и lazy detail — правильный архитектурный выбор, уже частично подтвержденный доменной моделью и миграциями. Седьмое: до старта реализации нужно выпустить короткий набор ADR и привести документы к одному словарю. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn37file0L1-L1 fileciteturn38file0L1-L1 fileciteturn41file0L1-L1
+
+## Изученные документы и источники
+
+**Основной документ.**  
+`docs/architecture/backtest/backtest-service-artifact-runtime-v1.md` — главный объект ревью. Он задает target architecture нового artifact-backed backtest service, публичный API, runtime pipeline, lazy trades model, benchmark policy и итерационный plan внедрения. Статус документа прямо помечен как `Proposed target architecture`. fileciteturn15file0L1-L1
+
+**Связанные документы и артефакты, использованные в анализе.**
+
+| Документ / артефакт | Роль в архитектурном решении | Статус |
+|---|---|---|
+| `docs/architecture/backtest/README.md` | Фиксирует текущую “границу доверия”: trusted scope = `backtest_artifacts` publisher/precompute; legacy runtime/API/UI/job-runner объявлены выведенными из активной доверенной базы. Это ключевой контекст для оценки, что именно считается текущим фундаментом. fileciteturn25file0L1-L1 | Изучен |
+| `docs/architecture/backtest/benchmark_iterations/README.md` | Определяет benchmark evidence format, Mac Studio-only policy и сегменты измерений. Это основа acceptance/perf governance. fileciteturn21file0L1-L1 | Изучен |
+| `docs/repository_three.md` | Индекс репозитория. Использован для проверки наличия маршрутов, web templates, worker, migrations и v2 runtime modules, что важно для поиска противоречий с README. fileciteturn24file0L1-L1 | Изучен |
+| `alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py` | Показывает фактическую storage-модель persisted runs, ranking metrics, execution modes и индексы. Нужен для проверки реализуемости и совместимости плана с БД. fileciteturn37file0L1-L1 | Изучен |
+| `src/trading/contexts/backtest/domain/entities/backtest_job.py` | Показывает фактическую доменную модель job state machine, artifact pin, execution mode, execution profile metadata и progress model. Это один из главных источников противоречий с основным документом. fileciteturn38file0L1-L1 | Изучен |
+| `src/trading/contexts/backtest/domain/entities/backtest_job_results.py` | Показывает, как в коде понимаются summary rows, variant identity, parity runtime state, shortlist persistence и запрет на persisted trades/report bodies. Это ключевой файл для оценки summary-only contract и variant identity. fileciteturn41file0L1-L1 | Изучен |
+| `src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_coordinator.py` | Подтверждает, что precompute execution уже уходит в stage-oriented/R12 model с explicit timeframe sessions и structured progress logging. Полезно для оценки зрелости artifact-side и несинхронности с главным документом. fileciteturn34file0L1-L1 | Изучен |
+| `tests/notebook_tests/new_engine/01_run_322_btcusdt_1h_artifact_probe.ipynb` и `02_run_f7d2_btcusdt_15m_no_risk_probe.ipynb` | Упомянуты главным документом как baseline notebooks. Использованы как часть карты материалов, но в этом ревью они выступали прежде всего как referenced baseline, а не как отдельные executable truth docs. fileciteturn15file0L1-L1 | Учтены по роли |
+| `configs/prod/indicators.yaml` | Упомянут как runtime-validation source для indicator ids и defaults. Важен как внешний контракт для request normalization. fileciteturn15file0L1-L1 | Учтен по роли |
+
+**Дополнительные документы репозитория, использованные для контекста.**  
+Основным контекстным документом был `устаревший roadmap-документ`, потому что именно он связывает текущую инициативу с более широким планом R0–R12 и прямо объявляет другой документ источником истины. Индекс репозитория также использовался как контекстный источник для проверки того, что в кодовой базе реально присутствуют routes, templates, worker-модули, миграции и v2 service files, несмотря на narrative о runtime reset. fileciteturn17file0L1-L1 fileciteturn24file0L1-L1
+
+**Недоступные / проблемные документы.**  
+`docs/architecture/roadmap/backtest-refactor-final-plan-v2.md` упоминается как source of truth в `устаревший roadmap-документ` и присутствует в индексе репозитория, но прямой осмотр через коннектор в рамках этого ревью не состоялся. Это само по себе является проблемой документационной целостности: текущий основной документ конкурирует с неосмотренным source-of-truth документом, на который активно ссылается roadmap. fileciteturn17file0L1-L1 fileciteturn24file0L1-L1
+
+## Матрица полноты плана
+
+**Таблица 1: Матрица полноты**
+
+| Область | Статус | Оценка 1–10 | Комментарий | Что добавить |
+|---|---|---:|---|---|
+| Цели и границы решения | покрыто | 8 | Цель, scope и out-of-scope описаны явно. fileciteturn15file0L1-L1 | Нужен один canonical scope doc без конкурирующих трактовок |
+| Business context | частично покрыто | 5 | Есть привязка к сайту и публичному API, но нет бизнес-SLA, quota model, multi-tenant assumptions. fileciteturn15file0L1-L1 | Пользовательские сегменты, лимиты, SLA/SLO, product constraints |
+| Technical context | частично покрыто | 6 | Artifact-backed runtime, DDD structure и trusted scope описаны. fileciteturn15file0L1-L1 fileciteturn25file0L1-L1 | Canonical current-state vs target-state diagram |
+| Scope / out of scope | покрыто | 8 | Раздел explicit и полезный. fileciteturn15file0L1-L1 | Нужны linkable ADR references для ключевых out-of-scope решений |
+| Основные пользовательские/системные сценарии | частично покрыто | 6 | Create job, read top, read variant, lazy trades описаны; admin/operator flows почти отсутствуют. fileciteturn15file0L1-L1 | Operator, failure-retry, republish, rollback, cache-miss scenarios |
+| Runtime lifecycle | частично покрыто | 6 | Pipeline stages 0–6 есть, но не склеены с persisted state model. fileciteturn15file0L1-L1 fileciteturn38file0L1-L1 | Явное соответствие pipeline stage ↔ persisted stage/progress |
+| State management | частично покрыто | 5 | В документе job-based lifecycle есть, но доменная модель хранит другой уровень stage granularity. fileciteturn15file0L1-L1 fileciteturn38file0L1-L1 | State machine diagram и invariant table |
+| Data model / artifact model | частично покрыто | 6 | Artifact families, current pointer, manifest и pin metadata описаны, но canonical schema не заморожена в одном месте. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 | Canonical manifest schema appendix + versioning policy |
+| API contracts | частично покрыто | 4 | Есть примерные endpoints и request shapes, но они конфликтуют с roadmap vocabulary. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 | OpenAPI, idempotency, error schema, canonical naming |
+| Integration contracts | частично покрыто | 4 | Указаны loader/repository/cache adapters, но queue model, object cache, file permissions и failure contracts не завершены. fileciteturn15file0L1-L1 | Contract tables per dependency |
+| Error handling | частично покрыто | 6 | 422, runtime failure, cache failure behavior описаны. fileciteturn15file0L1-L1 | Canonical error catalog + retryability flags |
+| Retry / idempotency model | неясно | 3 | Для `POST /backtests/jobs` нет contract-level idempotency, dedupe и safe retry policy. Не найдено в изученных документах. fileciteturn15file0L1-L1 | Idempotency key, duplicate request semantics, replay rules |
+| Security model | не покрыто | 2 | Есть только ownership/authenticated routes narrative. Полной security model нет. fileciteturn15file0L1-L1 | Threat model, authn/authz, abuse controls, data isolation |
+| Access control | частично покрыто | 3 | Ownership checks упомянуты, но роли/permissions matrix отсутствует. fileciteturn15file0L1-L1 | RBAC/ABAC matrix |
+| Secrets management | не покрыто | 1 | Не найдено в изученных документах. | Где живут secrets, rotation, local/prod separation |
+| Observability | частично покрыто | 6 | Метрики хорошие; logs/traces/audit events и alerts не завершены. fileciteturn15file0L1-L1 fileciteturn21file0L1-L1 | Log schema, trace spans, audit event catalog, alert thresholds |
+| Performance requirements | частично покрыто | 7 | Benchmark gate и 90% envelope описаны хорошо. fileciteturn15file0L1-L1 fileciteturn21file0L1-L1 | Absolute SLO/budget, not only ratio-to-baseline |
+| Scalability assumptions | частично покрыто | 4 | Есть mention prefilter/guards и cache avoidance, но concurrency/top_n/cardinality ceilings не зафиксированы. fileciteturn15file0L1-L1 | Queue concurrency, max combos, multi-user load profile |
+| Resource limits | не покрыто | 2 | Нет явных memory/CPU/file-descriptor/cache size limits. | Hard limits and backpressure policy |
+| Deployment model | частично покрыто | 3 | Указаны module boundaries и Mac Studio benchmark rule, но deployment topology сервиса не описана. fileciteturn15file0L1-L1 | API/worker/cache/object-store topology, HA assumptions |
+| Configuration model | частично покрыто | 5 | Есть ссылки на runtime config defaults и artifact config, но canonical shape разбросан. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 | Single config contract appendix |
+| Backward compatibility | не покрыто | 2 | Неясно, как coexist с существующими `runs/jobs` и legacy fields. fileciteturn17file0L1-L1 fileciteturn38file0L1-L1 | Compatibility matrix and alias policy |
+| Migration strategy | не покрыто | 2 | Main doc не описывает migration path от текущих таблиц/кода к новой модели. | Stepwise migration plan with rollback points |
+| Testing strategy | частично покрыто | 5 | Benchmarks есть; полного набора unit/integration/golden/contract tests в main doc нет. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 | Test matrix by layer and by failure mode |
+| Acceptance criteria | частично покрыто | 6 | Есть benchmark exit criteria per iteration, но нет full prod-readiness criteria. fileciteturn15file0L1-L1 | Security/ops/readiness gates |
+| Rollout plan | не покрыто | 2 | Не найдено в main doc; roadmap/runbooks only indirectly cover later closure. fileciteturn17file0L1-L1 | Canary, shadow, alias cutover, rollback |
+| Operational runbooks | частично покрыто | 4 | Runbook family существует в repo index, но main doc не дает operator-ready closure. fileciteturn24file0L1-L1 | Operational pointers in canonical doc |
+| Failure modes | частично покрыто | 6 | Несколько deterministic fail cases перечислены. fileciteturn15file0L1-L1 | Broader matrix: queue, DB, cache, filesystem, stale manifests |
+| Disaster recovery | не покрыто | 1 | Не найдено в изученных документах. | Restore/publish/cache/DB recovery procedures |
+| Cost considerations | не покрыто | 1 | Не найдено в изученных документах. | Storage/cpu/cache/benchmark cost model |
+| Developer experience | частично покрыто | 5 | Module boundaries и docs index check полезны. fileciteturn15file0L1-L1 fileciteturn25file0L1-L1 | Local smoke path, fixture pack, contract tests, sample requests |
+| Maintainability | частично покрыто | 6 | Dependency direction и summary-only contract помогают, но doc drift снижает maintainability. fileciteturn15file0L1-L1 fileciteturn24file0L1-L1 | ADR set and deprecation markers |
+| Documentation quality | частично покрыто | 4 | Документы детальны, но сейчас противоречат друг другу и коду. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn25file0L1-L1 | Canonical doc set cleanup |
+
+## Противоречия, пробелы и риски
+
+**Найденные противоречия и несостыковки.**  
+Самое критичное расхождение — **публичный API vocabulary**. Главный документ делает каноническим `POST /backtests/jobs` и весь `jobs`-набор endpoints, тогда как roadmap уже описывает `POST /backtests` и `GET /backtests/runs*`, а `/backtests/jobs*` допускает как compatibility alias на более позднем этапе. В repository index одновременно существуют и `backtest_jobs.py`, и `backtest_runs.py`, что усиливает риск двойной реализации. Это **Critical**, потому что ломает API contract, UI integration, naming в DTO и storage semantics. Рекомендация: выпустить ADR “Public Backtest API Vocabulary v1” и зафиксировать один внешний contract с явным alias policy. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn24file0L1-L1
+
+Второе критичное расхождение — **risk execution model**. Главный документ фиксирует `risk.mode` и `hit_times/15m`, тогда как `устаревший roadmap-контекст` многократно закрепляет `1m` как внутреннюю базу, `1m hit-times` и execution-profile vocabulary. Доменная модель при этом все еще содержит `execution_profile_mode_hint` и `effective_execution_profile_mode`. Это **Critical**, потому что меняет storage layout, request schema, kernel behavior, mappings и golden fixtures. Рекомендация: отдельный ADR по risk execution и artifact layout, после которого обновить docs, schema, migrations и tests одновременно. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn38file0L1-L1
+
+Третье критичное расхождение — **variant identity contract**. Главный документ требует человекочитаемый `variant_key` и отдельный `variant_hash`, а фактическая доменная модель top results требует, чтобы `variant_key` и `indicator_variant_key` были 64-символьными SHA-256 hex literals. Это не naming issue, а поломка API/UI/storage boundary: UI-friendly key, DB uniqueness, cache key, lazy detail routing и persisted summary rows начинают означать разное. Рекомендация: выпустить ADR “Variant Identity”, где заморозить поля `variant_key`, `variant_hash`, `indicator_variant_key`, их уникальность и публичность. fileciteturn15file0L1-L1 fileciteturn41file0L1-L1
+
+Четвертое важное расхождение — **current-state narrative**. `README` утверждает, что legacy runtime compute, API/UI запуска и `backtest-job-runner` удалены из активной кодовой базы, но индекс репозитория показывает наличие routes, templates, worker wiring, миграций и большого количества backtest runtime файлов. Это **High**: команда не может понять, что именно считается active, deprecated, compatibility-only или untrusted. Гипотеза: часть этого кода — compatibility or residual code, но это не зафиксировано. Рекомендация: явно промаркировать active / compatibility / obsolete по файлам и docs. fileciteturn25file0L1-L1 fileciteturn24file0L1-L1
+
+Пятое расхождение — **state/progress model**. Главный документ описывает pipeline stages `0..6`, тогда как доменная модель jobs оперирует `stage_a / stage_b / finalizing` и weighted progress projection. Это **High** для observability, ETA, retries, progress bars и acceptance tests: без explicit mapping две части системы будут показывать разные истины о ходе расчета. Рекомендация: определить canonical progress contract и таблицу соответствия pipeline stage → persisted state/progress event. fileciteturn15file0L1-L1 fileciteturn38file0L1-L1
+
+Шестое расхождение — **ownership of runtime modules**. Главный документ хочет перенести runtime orchestration в bounded context `backtest`, а trusted current scope и часть развитого v2-кода сегодня живут в `backtest_artifacts`, причем precompute уже ушел в R12 stage-oriented coordinator. Это **Medium/High**: без четкого migration boundary есть риск дублирования loader/contracts logic в двух контекстах. Рекомендация: ADR “Context Ownership” — что остается в `backtest_artifacts`, что переезжает в `backtest`, что импортируется через ACL. fileciteturn15file0L1-L1 fileciteturn25file0L1-L1 fileciteturn34file0L1-L1
+
+**Найденные пробелы.**  
+В продуктовой части не хватает четкого ответа, кто именно является потребителем публичного API и какие есть budgets по длительности, стоимости и volume: нет SLO per request class, rate limits, max active jobs per user, max `top_n`, max indicator grid, поведения при перегрузке или user-visible throttling. В архитектурной части отсутствует единый канонический document set: источник истины размыт между главным документом, README, roadmap и кодом. В API-части отсутствуют OpenAPI-level responses, deterministic idempotency, compatibility aliases, pagination/ordering contract для history/top, а также окончательная форма lazy trades response. В data/storage части не завершены canonical schemas для `current.yaml`, `manifest.yaml`, cache metadata и variant identity. В runtime части не хватает formal retry semantics, cancel semantics для long-running detail/trades recompute, concurrency model для cache/build/read и explicit mapping worker/sync behavior. В security части нет threat model, permission matrix, file/object cache permission model и secret source-of-truth. В observability части нет trace model, alerting thresholds, audit events и operator dashboards linkage. В testing части нет канонической test matrix, covering API contracts, migration tests, failure injection and replay determinism. В operations части отсутствуют rollout/cutover/rollback/DR contracts внутри основного документа. В документации нет clear superseded markers и closure criteria для старых противоречивых docs. Все перечисленное требует закрытия до production, а часть — до начала реализации. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn21file0L1-L1 fileciteturn24file0L1-L1
+
+**Ошибки, слабые места и технические риски.**  
+Самый опасный риск — воспроизводимость при отсутствии immutable artifact version retention. Главный документ честно признает, что reproducibility зависит от strict historical-prefix immutability, а доменная модель уже умеет pin-ить `artifact_slot`, generation, manifest hash и as-of date. Это хороший start, но пока слишком хрупкий: стоит publisher один раз нарушить prefix immutability, и benchmark evidence, lazy trades cache и старые jobs теряют силу как audit artifact. Это **Critical** и требует contract-level ADR плюс compatibility tests на publisher side. fileciteturn15file0L1-L1 fileciteturn38file0L1-L1
+
+Вторая техническая слабость — слишком большой упор на narrative без полного executable contract. Benchmark discipline описана хорошо, но большая часть runtime state, API compatibility и migration behavior пока не оформлены как жёсткие acceptance criteria. Это проявится как “архитектура на уровне идей хорошая, но интеграция зависнет на уточнениях”. Риск особенно высок из-за уже существующих миграций и доменных объектов: команда может начать кодить по одному документу и случайно уйти в несовместимую ветку. fileciteturn15file0L1-L1 fileciteturn37file0L1-L1 fileciteturn38file0L1-L1
+
+Третья слабость — lazy trades cache design пока не production-complete. Идея “metadata в Postgres, payload в local object/file cache” разумна для защиты основной БД от раздувания, но в документе не решены вопросы HA, cache invalidation при republish, multi-instance deployment и file-level permissions. Если API будет горизонтально масштабирован, локальный cache на узле превратится в источник cache misses, несогласованности и труднообъяснимого latency variance. Это **High**. Рекомендация: либо explicit single-host assumption, либо shared object store / scoped cache abstraction с ADR. fileciteturn15file0L1-L1
+
+Четвертая слабость — неполнота security model. Для публичного API этого уровня недостаточно сказать “authenticated routes” и “ownership check”. Нужны abuse controls, rate limiting, query cost guards, file-system boundary rules, quota exhaustion behavior, auditability и secret/config separation. Иначе API может стать легким DoS surface через combinatorial requests even before correctness bugs. Это **High**. Не найдено в изученных документах. fileciteturn15file0L1-L1
+
+**Таблица 2: Риски**
+
+| Риск | Критичность | Где обнаружено | Последствие | Рекомендация |
+|---|---|---|---|---|
+| Канонический API не заморожен (`jobs` vs `runs` vs `POST /backtests`) | Critical | Main doc vs roadmap vs repo index fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn24file0L1-L1 | Несовместимые DTO, routes, UI, docs | ADR + OpenAPI + alias policy |
+| Не заморожена risk model (`hit_times/15m` vs `1m`, `risk.mode` vs `execution profile`) | Critical | Main doc vs roadmap vs domain entity fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn38file0L1-L1 | Ломается artifact layout, kernels, tests, request schema | ADR + schema + golden fixtures |
+| Variant identity конфликтует с текущей доменной моделью | Critical | Main doc vs results entity fileciteturn15file0L1-L1 fileciteturn41file0L1-L1 | Невозможность согласовать UI routing, storage и lazy detail | Freeze identity contract |
+| Reproducibility зависит от prefix immutability без historical retention | Critical | Main doc + artifact pin entity fileciteturn15file0L1-L1 fileciteturn38file0L1-L1 | Drift старых jobs, benchmark evidence invalidation | ADR + invariants + publisher tests |
+| README и фактический repo inventory расходятся | High | README vs repo index fileciteturn25file0L1-L1 fileciteturn24file0L1-L1 | Команда не понимает active vs obsolete code | Active/compatibility/superseded map |
+| Progress model не склеен с pipeline stages | High | Main doc vs job entity fileciteturn15file0L1-L1 fileciteturn38file0L1-L1 | Ломаются ETA/progress/alerts/tests | Unified progress contract |
+| Lazy trades cache не готов к HA/scale-out | High | Main doc fileciteturn15file0L1-L1 | Cache inconsistency, latency variance, ops pain | Shared cache/object store ADR |
+| Security model не завершен | High | Main doc, absence of detailed model fileciteturn15file0L1-L1 | Abuse/DoS/data isolation risks | Threat model + rate limits + authz matrix |
+| Rollout / rollback / migration не описаны | Medium | Main doc, gaps against roadmap storage evolution fileciteturn15file0L1-L1 fileciteturn37file0L1-L1 | Risky cutover, unclear fallback | Stepwise migration plan |
+| Final source-of-truth doc set не синхронизирован | Medium | README + roadmap + repo index fileciteturn17file0L1-L1 fileciteturn24file0L1-L1 fileciteturn25file0L1-L1 | Архитектурный drift и спорные реализации | Documentation closure sprint |
+
+## Сильные стороны и спорные решения
+
+**Сильные стороны плана.**  
+Во-первых, сильной является сама **смена центра тяжести на artifacts** и явное признание trusted boundary. Это архитектурно взрослая позиция: не тянуть неуправляемый legacy runtime обратно, а строить новый сервис поверх проверяемых артефактов и manifest/publisher contracts. Такой подход снижает runtime variability и облегчает reproducibility. fileciteturn15file0L1-L1 fileciteturn25file0L1-L1
+
+Во-вторых, очень хороша **summary-only persistence + lazy single-variant detail**. Это правильный баланс между UX и storage discipline. Доменная модель уже подтверждает этот выбор, жестко запрещая `report_table_md` и `trades_json` в persisted summary rows. Это надо сохранить без компромиссов. fileciteturn15file0L1-L1 fileciteturn41file0L1-L1
+
+В-третьих, план силен в части **benchmark governance**. Mac Studio-only policy, segment-level metrics, speed/memory/CPU envelope, explicit baseline notebooks и dedicated benchmark iterations folder — это редкий для внутренних документов уровень инженерной дисциплины. Это особенно ценно для системы, где performance, determinism и reproducibility являются не вторичными, а продуктово значимыми свойствами. fileciteturn15file0L1-L1 fileciteturn21file0L1-L1
+
+В-четвертых, положительно выглядит **artifact pin metadata** (`slot`, generation, manifest hash, as-of date). Это правильный минимальный набор для auditability и lazy recompute identity, даже если historical snapshots не хранятся. Кодовая доменная модель уже поддерживает этот инвариант. fileciteturn15file0L1-L1 fileciteturn38file0L1-L1
+
+В-пятых, хороша **явная dependency direction** и разделение bounded contexts. Даже если ownership между `backtest` и `backtest_artifacts` пока не финализирован, сам принцип архитектурно правильный: runtime orchestration не должен случайно расползтись обратно по publisher/precompute коду. fileciteturn15file0L1-L1
+
+**Спорные решения.**  
+Отказ от immutable artifact version retention — не ошибка сам по себе, но это спорное решение. Плюсы: проще storage, проще publish model, меньше операционных затрат. Минусы: вся reproducibility опирается на дисциплину publisher и на негласный инвариант historical prefix. Рекомендация: **не менять немедленно**, но обязательно вынести в ADR с trigger conditions, когда хранение snapshots становится обязательным. fileciteturn15file0L1-L1
+
+Использование только публичного API и для UI, и для внешних клиентов — зрелое решение, но спорное в деталях. Плюсы: один контракт, меньше drift, меньше hidden shortcuts. Минусы: соблазн засорить public API UI-specific компромиссами, если не появятся quality controls. Рекомендация: **оставить**, но зафиксировать отдельный public read/preflight/runtime-defaults contract и не допускать hidden private fields. fileciteturn15file0L1-L1
+
+Job-only model даже для быстрых запусков тоже спорный, но оправданный. Плюсы: history, cancel, progress, единый lifecycle. Минусы: лишняя сложность для коротких happy-path requests и необходимость аккуратного UX. Рекомендация: **оставить**, если будет четко описан fast-complete behavior и polling/read semantics. fileciteturn15file0L1-L1
+
+Local filesystem cache для lazy trades спорен больше всего с операционной точки зрения. Плюсы: дешево, просто, не раздувает Postgres. Минусы: multi-instance inconsistency, permissions, eviction, portability. Рекомендация: **уточнить**, а при планируемом scale-out — сменить на shared object store. fileciteturn15file0L1-L1
+
+## Этапы, backlog и заключение
+
+**Оценка этапов плана.**
+
+**Таблица 3: Оценка этапов**
+
+| Этап | Оценка 1–10 | Что хорошо | Что не хватает | Рекомендация |
+|---|---:|---|---|---|
+| Iteration 0 — docs and benchmark harness | 7 | Сильная benchmark discipline, ясный exit criterion. fileciteturn15file0L1-L1 fileciteturn21file0L1-L1 | Нет closure по canonical doc set и source-of-truth conflicts | Сделать documentation closure частью exit criteria |
+| Iteration 1 — artifact runtime load | 6 | Хорошо определены loaders, slicing, row selection. fileciteturn15file0L1-L1 | Не заморожен `hit_times` contract и ownership boundary | Freeze artifact layout and context ownership first |
+| Iteration 2 — no-risk job path | 5 | Реалистичный фокус на no-risk path и persisted top-N. fileciteturn15file0L1-L1 | API vocabulary, progress model и current storage semantics расходятся | Синхронизировать API/storage/domain contract до кода |
+| Iteration 3 — TP/SL grid path | 4 | Логично отделен от no-risk. fileciteturn15file0L1-L1 | Самая сильная неопределенность по semantics и artifacts | ADR по risk model перед реализацией |
+| Iteration 4 — lazy trades detail | 5 | Архитектурно правильное отделение detail от summary. fileciteturn15file0L1-L1 | Не описаны HA/cache invalidation/payload schema/security details | Freeze detail response + cache model |
+| Iteration 5 — UI integration | 5 | Решение “тот же публичный API” правильное. fileciteturn15file0L1-L1 | Нет окончательного public contract и read-model surface | Сначала OpenAPI/runtime-defaults/read contracts |
+
+**Приоритизированный backlog улучшений.**
+
+**Таблица 4: Backlog улучшений**
+
+| Приоритет | Рекомендация | Эффект | Сложность | Владелец | Acceptance criteria |
+|---|---|---|---|---|---|
+| P0 | Заморозить канонический публичный API (`jobs/runs/create`) | Снимает риск двойной реализации API/UI | Medium | Architecture + Backend | Один ADR, один OpenAPI, alias policy задокументирован |
+| P0 | Заморозить risk execution contract (`risk.mode`, `hit_times`, execution profile vocabulary) | Снимает главный runtime/data/layout конфликт | High | Architecture + Backend | ADR, schema examples, golden fixtures обновлены |
+| P0 | Заморозить variant identity contract | Снимает конфликт UI/storage/cache/detail routing | Medium | Architecture + Backend | Поля `variant_key/variant_hash/...` зафиксированы в docs, DTO, DB, tests |
+| P0 | Синхронизировать docs set и пометить superseded/compatibility документы | Убирает архитектурный drift | Medium | Architecture + Documentation | `README` + roadmap + main doc не противоречат друг другу; docs index check passes |
+| P0 | Связать pipeline stages с persisted state/progress model | Делает progress/ETA/tests/alerts проверяемыми | Medium | Architecture + Backend | Таблица stage mapping и contract tests существуют |
+| P0 | Описать security/access/secrets model | Убирает production blockers | Medium | Security + Architecture | Threat model, authz matrix, rate limits, secret sources утверждены |
+| P1 | Выпустить migration/compatibility/rollback plan | Делает cutover управляемым | High | Architecture + DevOps + Backend | Step-by-step migration doc with rollback points |
+| P1 | Зафиксировать lazy trades cache topology и invalidation model | Снижает ops и consistency risks | Medium | Backend + DevOps | ADR + cache key + TTL + multi-instance policy + tests |
+| P1 | Добавить complete test matrix | Закрывает correctness/reproducibility gaps | Medium | QA + Backend | Unit/integration/golden/contract/perf test matrix утвержден |
+| P1 | Добавить observability closure | Делает систему operator-ready | Medium | DevOps + Backend | Метрики, логи, traces, alerts, dashboards and audit events задокументированы |
+| P2 | Зафиксировать hard resource limits и overload behavior | Уменьшает риски деградации и DoS | Medium | Architecture + Backend | Max combos/top_n/active jobs/timeouts/quota rules документированы |
+| P2 | Добавить cost/retention model | Делает storage/cache strategy экономически проверяемой | Low | Product + DevOps | Storage/cpu/cache budgets and retention rules documented |
+| P3 | Подготовить trigger policy для immutable snapshots | Готовит систему к stricter audit/compliance future | Medium | Architecture | ADR содержит trigger conditions and migration options |
+
+**Future attention points.**  
+При росте нагрузки основное внимание нужно уделить combinatorial explosion controls, queue concurrency, cache topology и rate limiting. При росте числа runtime artifacts — manifest size, publish time, validation budgets и drift between current pointer and pinned jobs. При появлении новых типов backtests — не размывать current contract, а заводить отдельные ADR на storage layout и execution semantics. При изменении storage model — отдельно оценивать variant identity, summary-only persistence и cache invalidation. При ужесточении security/compliance — почти наверняка потребуется immutable snapshot retention или внешняя evidence store. При масштабировании команды — doc governance станет не “полезным улучшением”, а критическим control point. При усложнении CI/CD — benchmark-on-Mac-Studio policy потребует автоматизации очереди прогонов и immutable evidence publishing. При повышении требований к reproducibility/auditability — artifact pin alone уже может оказаться недостаточным. При переходе к production-grade эксплуатации — без SLO/alert/runbook/rollback closure этот план нельзя считать завершенным. fileciteturn15file0L1-L1 fileciteturn21file0L1-L1 fileciteturn34file0L1-L1
+
+**Финальное заключение.**  
+Текущий план **нельзя использовать как прямую основу для разработки без предварительной архитектурной синхронизации**. Его можно использовать как **сильный draft target design**, потому что в нем есть правильные ядровые идеи: artifacts-first, benchmark discipline, pinned artifact identity, summary-only persistence и lazy per-variant detail. Но до старта реализации должны быть выполнены условия: заморожен публичный API vocabulary, заморожена risk model, заморожена variant identity model, синхронизирован doc set, выпущены migration/rollback/security contracts и определена canonical progress model. Отдельных ADR требуют как минимум: публичный API, risk execution/artifact layout, variant identity, context ownership (`backtest` vs `backtest_artifacts`), artifact versioning/reproducibility, lazy trades cache topology. Максимальный прирост качества дадут следующие действия: закрыть P0 backlog, синхронизировать docs, принять 5–6 коротких ADR, выпустить OpenAPI + schema examples, добавить compatibility/migration matrix, сформировать test matrix и operator closure. fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn25file0L1-L1 fileciteturn37file0L1-L1 fileciteturn38file0L1-L1 fileciteturn41file0L1-L1
+
+**Список уточняющих вопросов к авторам архитектуры.**  
+Первый вопрос: какой документ сегодня является каноническим — `backtest-service-artifact-runtime-v1.md` или `backtest-refactor-final-plan-v2.md`? Второй: какой vocabulary является финальным для внешнего API — `jobs`, `runs` или гибрид с alias? Третий: что является канонической risk model — `risk.mode` или `execution profile`, и почему? Четвертый: какой layout считается финальным для hit-times — `1m` или `15m`, и какой из них используется для golden fixtures? Пятый: должен ли `variant_key` быть public-readable slug, внутренним hash или двумя отдельными полями? Шестой: является ли код, перечисленный в repo index как routes/web/worker, активным, compatibility-only или obsolete? Седьмой: где проходит граница ответственности между bounded contexts `backtest` и `backtest_artifacts`? Восьмой: какой rollout path предполагается для уже существующих таблиц и execution-mode полей, включая `background_manual_legacy`? Девятый: какой exact payload ожидается от lazy trades endpoint, включая candles/overlays/trades schema? Десятый: при каких условиях команда готова перейти от historical-prefix invariant к immutable snapshot retention? fileciteturn15file0L1-L1 fileciteturn17file0L1-L1 fileciteturn24file0L1-L1 fileciteturn38file0L1-L1 fileciteturn41file0L1-L1

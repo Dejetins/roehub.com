@@ -16,7 +16,7 @@ def upgrade() -> None:
     Add persisted-run metadata and summary-only top-row columns for R7-01 storage unification.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
     Related:
@@ -392,7 +392,7 @@ def downgrade() -> None:
     Remove additive persisted-run metadata and summary-only top-row columns for R7-01.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/backtest-jobs-storage-pg-state-machine-v1.md
     Related:

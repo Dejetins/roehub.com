@@ -299,7 +299,6 @@
 |   |   |   |-- backtest-refactor-final-plan-v2.md
 |   |   |   |-- backtest-runtime-acceleration-plan-v1.md
 |   |   |   |-- base_milestone_plan.md
-|   |   |   |-- base_refactor_plan.md
 |   |   |   |-- milestone-2-epics-v1.md
 |   |   |   |-- milestone-3-epics-v1.md
 |   |   |   |-- milestone-4-epics-v1.md

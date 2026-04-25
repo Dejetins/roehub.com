@@ -374,7 +374,7 @@ class BacktestJob:
 
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -703,7 +703,7 @@ class BacktestJob:
 
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_jobs_api_v1.py
@@ -1199,7 +1199,7 @@ class BacktestJob:
         Docs:
           - docs/architecture/backtest/README.md
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
             backtest_job_lease_repository.py
@@ -1405,7 +1405,7 @@ def _normalize_ranking_metric_literal(*, name: str, value: str) -> str:
     Normalize one persisted ranking metric literal against the fixed R6-04/R7-01 set.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:

@@ -209,7 +209,7 @@ def test_yaml_defaults_provider_matches_v2_signal_catalog_for_all_target_envs() 
     Side Effects:
         Reads repository-local config files.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - configs/dev/indicators.yaml

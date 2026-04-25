@@ -385,7 +385,7 @@ class _CanonicalPriceArraysV2:
     Internal immutable container for `open_time/close_time/ohlcv` price arrays.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -402,7 +402,7 @@ class _TimeframeMappingArraysV2:
     Internal immutable container for one `tf -> 1m` mapping artifact family.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -419,7 +419,7 @@ class _CanonicalPriceTailPlanV2:
     Internal deterministic plan describing prefix reuse and source reread bounds.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -473,7 +473,7 @@ class _SignalVariantRowV2:
     Internal immutable row descriptor for one exported signal-variant selection.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -578,7 +578,7 @@ class _ExistingSignalArtifactV2:
     Internal immutable snapshot of one existing inactive-slot signal family eligible for reuse.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -613,7 +613,7 @@ class _SignalArtifactTailPlanV2:
     Internal deterministic plan for signal prefix reuse and bounded tail rebuild.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -740,7 +740,7 @@ class BacktestArtifactPrecomputeRunnerV2:
     Materialize canonical prices, mappings, `hit_times/15m`, and optional signal artifacts.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -832,7 +832,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             Reads canonical candles through the port and atomically replaces inactive-slot price,
             mapping, hit-times, and root-manifest files.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -1732,7 +1732,7 @@ def _materialize_signal_artifact_v2(
         Writes signal files under the slot root while reusing the already loaded timeframe-session
         inputs.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:
@@ -3657,7 +3657,7 @@ def _effective_signal_tail_bars_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:
@@ -3894,7 +3894,7 @@ def _load_existing_signal_artifact_v2(
     Side Effects:
         Reads existing manifest and signal matrix from disk when the target is present.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:
@@ -4050,7 +4050,7 @@ def _build_signal_tail_plan_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4150,7 +4150,7 @@ def _merge_signal_matrices_v2(
     Side Effects:
         Allocates one contiguous merged matrix when prefix is present.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4264,7 +4264,7 @@ def _load_existing_canonical_price_arrays_v2(
     Side Effects:
         Reads existing `.npy` files from the inactive slot when `prices/1m` is present.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -4301,7 +4301,7 @@ def _build_tail_plan_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -4397,7 +4397,7 @@ def _read_canonical_price_arrays_v2(
         Reads canonical candle storage once for the requested range.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4433,7 +4433,7 @@ def _canonical_price_arrays_from_batch_v2(
     Side Effects:
         Allocates contiguous numpy arrays in memory.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py
@@ -4476,7 +4476,7 @@ def _validate_canonical_price_arrays_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -4641,7 +4641,7 @@ def _slice_canonical_price_arrays_v2(
     Side Effects:
         Allocates new contiguous array views/copies.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4680,7 +4680,7 @@ def _merge_canonical_price_arrays_v2(
     Side Effects:
         Allocates merged contiguous arrays.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -5266,7 +5266,7 @@ def _build_mapping_arrays_with_tail_update_v2(
     Side Effects:
         Allocates contiguous numpy arrays in memory.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -5380,7 +5380,7 @@ def _build_mapping_arrays_from_price_timelines_v2(
     Side Effects:
         Allocates contiguous numpy arrays in memory.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -5437,7 +5437,7 @@ def _slice_mapping_arrays_v2(
         Allocates contiguous numpy arrays.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
     """
@@ -5473,7 +5473,7 @@ def _merge_mapping_arrays_v2(
     Side Effects:
         Allocates contiguous numpy arrays.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -6522,7 +6522,7 @@ def _validate_mapping_arrays_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
@@ -6574,7 +6574,7 @@ def _build_rolled_price_arrays_with_tail_update_v2(
     Side Effects:
         Allocates contiguous numpy arrays in memory.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/shared_kernel/primitives/timeframe.py
@@ -6656,7 +6656,7 @@ def _rollup_price_arrays_from_one_minute_v2(
     Side Effects:
         Allocates contiguous numpy arrays in memory.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/shared_kernel/primitives/timeframe.py
@@ -6816,7 +6816,7 @@ def _merge_rolled_price_arrays_v2(
     Side Effects:
         Allocates merged contiguous arrays.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -6857,7 +6857,7 @@ def _build_root_manifest_scaffold_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - docs/architecture/backtest/README.md
@@ -6902,7 +6902,7 @@ def _empty_signal_catalog_v2() -> ArtifactSignalCatalogV2:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -6930,7 +6930,7 @@ def _placeholder_hit_times_reference_v2() -> ArtifactHitTimesReferenceV2:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - docs/architecture/backtest/README.md
@@ -7271,7 +7271,7 @@ def _build_root_manifest_provenance_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -7331,7 +7331,7 @@ def _build_inputs_sha256_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py

@@ -308,7 +308,7 @@ def _normalize_hit_times_level_grid_v2(
         Allocates one small contiguous `float32` array.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """

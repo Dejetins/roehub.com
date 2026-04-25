@@ -139,7 +139,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
 
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -266,7 +266,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         Docs:
           - docs/architecture/backtest/README.md
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/use_cases/backtest_runs_api_v1.py
           - src/trading/contexts/backtest/domain/entities/backtest_job_results.py
@@ -665,7 +665,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
 
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -747,7 +747,7 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - src/trading/contexts/backtest/domain/entities/backtest_job.py
@@ -906,7 +906,7 @@ def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
@@ -1333,7 +1333,7 @@ def _parse_execution_mode(*, value: Any) -> BacktestJobExecutionMode | None:
     Parse and validate nullable persisted-run execution mode literal.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:

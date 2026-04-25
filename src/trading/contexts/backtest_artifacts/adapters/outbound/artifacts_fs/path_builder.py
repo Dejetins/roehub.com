@@ -53,7 +53,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -76,7 +76,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -98,7 +98,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
@@ -120,7 +120,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -143,7 +143,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -167,7 +167,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -349,7 +349,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
@@ -426,7 +426,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """

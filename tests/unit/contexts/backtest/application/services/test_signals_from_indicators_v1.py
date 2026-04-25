@@ -126,7 +126,7 @@ def test_signal_registry_v1_matches_v2_contract_projection() -> None:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/signals_from_indicators_v1.py
       - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py

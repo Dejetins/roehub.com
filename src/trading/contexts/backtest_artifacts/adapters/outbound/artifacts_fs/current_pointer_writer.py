@@ -22,7 +22,7 @@ class AtomicArtifactCurrentPointerWriterV2(BacktestArtifactCurrentPointerWriterV
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -52,7 +52,7 @@ class AtomicArtifactCurrentPointerWriterV2(BacktestArtifactCurrentPointerWriterV
             Creates or replaces `current.yaml` under the resolved artifact symbol root.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -104,7 +104,7 @@ def _serialize_current_pointer_v2(pointer: ArtifactCurrentPointerV2) -> str:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py

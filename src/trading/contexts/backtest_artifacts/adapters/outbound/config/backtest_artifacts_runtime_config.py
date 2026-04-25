@@ -108,7 +108,7 @@ class _UniqueKeySafeLoader(yaml.SafeLoader):
     YAML safe loader variant that rejects duplicate mapping keys fail-fast.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -136,7 +136,7 @@ def _construct_unique_mapping(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -323,7 +323,7 @@ class BacktestArtifactValidationPlanRuntimeConfig:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -344,7 +344,7 @@ class BacktestArtifactHitTimesGridRuntimeConfig:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - configs/dev/backtest_artifacts.yaml
       - docs/runbooks/backtest-artifacts-rebuild.md
@@ -393,7 +393,7 @@ class BacktestArtifactSlotPolicyRuntimeConfig:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - configs/dev/backtest_artifacts.yaml
       - src/trading/contexts/backtest/application/services/v2/contracts.py
@@ -432,7 +432,7 @@ class BacktestArtifactPublishScheduleRuntimeConfig:
     Frozen publish schedule contract loaded from `backtest_artifacts.publish_schedule`.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -478,7 +478,7 @@ class BacktestArtifactLookbackPolicyRuntimeConfig:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - configs/dev/backtest_artifacts.yaml
       - docs/runbooks/backtest-artifacts-rebuild.md
@@ -529,7 +529,7 @@ class BacktestArtifactValidationBudgetsRuntimeConfig:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - configs/dev/backtest_artifacts.yaml
       - docs/runbooks/backtest-artifacts-rebuild.md
@@ -785,7 +785,7 @@ class BacktestArtifactsRuntimeConfig:
         Side Effects:
             None.
         Docs:
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/backtest/README.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
@@ -851,7 +851,7 @@ def resolve_backtest_artifacts_config_path(
     Resolve artifact runtime config path using explicit override-first precedence.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - configs/dev/backtest_artifacts.yaml
@@ -1225,7 +1225,7 @@ def _load_yaml_mapping(*, path: Path) -> Mapping[str, Any]:
     Side Effects:
         Reads one UTF-8 file from disk.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1261,7 +1261,7 @@ def _require_exact_keys(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1386,7 +1386,7 @@ def _require_mapping(*, value: Any, field_path: str) -> Mapping[str, Any]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1412,7 +1412,7 @@ def _require_str(*, value: Any, field_path: str) -> str:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1438,7 +1438,7 @@ def _require_int(*, value: Any, field_path: str) -> int:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1464,7 +1464,7 @@ def _require_bool(*, value: Any, field_path: str) -> bool:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1490,7 +1490,7 @@ def _require_str_sequence(*, value: Any, field_path: str) -> tuple[str, ...]:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1519,7 +1519,7 @@ def _require_numeric_sequence(*, value: Any, field_path: str) -> tuple[float, ..
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1559,7 +1559,7 @@ def _normalize_timeframe_sequence(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -1648,7 +1648,7 @@ def _normalize_positive_float_sequence(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - configs/dev/backtest_artifacts.yaml
     """
@@ -1688,7 +1688,7 @@ def _normalize_slot_sequence(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
     """
@@ -1724,7 +1724,7 @@ def _validate_artifact_root_literal(*, value: str, field_path: str) -> str:
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - apps/api/wiring/modules/backtest.py
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
@@ -1754,7 +1754,7 @@ def _require_positive_int(*, value: int, field_path: str) -> None:
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
@@ -1787,7 +1787,7 @@ def _require_int_range(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py

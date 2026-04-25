@@ -12,7 +12,7 @@ class CanonicalCandleBatch1m:
 
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py

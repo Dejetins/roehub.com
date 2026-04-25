@@ -47,7 +47,7 @@ class BacktestJobTopVariant:
 
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
         Related:
           - src/trading/contexts/backtest/application/services/job_runner_streaming_v1.py
@@ -1106,7 +1106,7 @@ def report_table_md_allowed_for_state(*, state: BacktestJobState) -> bool:
     Check legacy `report_table_md` compatibility policy for one job state.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:
@@ -1133,7 +1133,7 @@ def _normalize_optional_non_negative_float(*, name: str, value: float | None) ->
     Normalize one optional non-negative percentage field used by summary-only persisted rows.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
       - docs/architecture/backtest/README.md
     Related:

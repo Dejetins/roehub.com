@@ -164,7 +164,7 @@ class BacktestGridDefaultsProvider(Protocol):
 
         Docs:
           - docs/architecture/apps/web/web-backtest-runtime-defaults-endpoint-v1.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/adapters/outbound/defaults/
             indicators_yaml_defaults_provider.py

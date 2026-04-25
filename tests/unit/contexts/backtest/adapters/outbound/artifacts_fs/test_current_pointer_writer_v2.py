@@ -37,7 +37,7 @@ def test_atomic_artifact_current_pointer_writer_v2_replaces_pointer_file_atomica
         Creates and replaces temporary `current.yaml` files under `tmp_path`.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
     """
@@ -90,7 +90,7 @@ def test_atomic_artifact_current_pointer_writer_v2_keeps_original_pointer_on_rep
         Creates temporary files and injects one failing `os.replace` stub.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
     """
@@ -168,7 +168,7 @@ def _pointer(
         None.
     Docs:
       - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
     Related:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
     """

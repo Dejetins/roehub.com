@@ -751,7 +751,7 @@ class _FakeCanonicalCandleReader:
     Deterministic in-memory canonical candle reader for R3-01 precompute tests.
 
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py
@@ -898,7 +898,7 @@ class _ZeroBlockingRepositoryV2:
             None.
         Docs:
           - docs/architecture/backtest/README.md
-          - docs/architecture/roadmap/base_refactor_plan.md
+          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
@@ -1375,7 +1375,7 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     Side Effects:
         Creates strict artifact files under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -1808,7 +1808,7 @@ def test_backtest_artifact_precompute_runner_v2_materializes_hit_times_and_full_
     Side Effects:
         Writes hit-times artifacts under the inactive slot in `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:
@@ -1924,7 +1924,7 @@ def test_backtest_artifact_precompute_runner_v2_uses_deterministic_tail_update(
     Side Effects:
         Rewrites inactive-slot arrays and manifest under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2040,7 +2040,7 @@ def test_backtest_artifact_precompute_runner_v2_appends_mapping_tail_determinist
     Side Effects:
         Rewrites inactive-slot price and mapping arrays under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2148,7 +2148,7 @@ def test_backtest_artifact_precompute_runner_v2_is_byte_stable_for_identical_inp
     Side Effects:
         Rewrites inactive-slot files under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -2198,7 +2198,7 @@ def test_backtest_artifact_precompute_runner_v2_materializes_signal_artifacts_an
     Side Effects:
         Writes signal artifacts under the inactive slot in `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:
@@ -3171,7 +3171,7 @@ def test_backtest_artifact_precompute_runner_v2_reuses_signal_prefix_and_rebuild
     Side Effects:
         Rewrites signal artifacts under the inactive slot in `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:
@@ -3273,7 +3273,7 @@ def test_backtest_artifact_precompute_runner_v2_signal_tail_rebuild_is_byte_stab
     Side Effects:
         Rewrites signal artifacts under the inactive slot in `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3838,7 +3838,7 @@ def test_backtest_artifact_precompute_runner_v2_rejects_drifted_existing_signal_
     Side Effects:
         Mutates one existing signal file in the inactive slot under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
       - docs/architecture/backtest/README.md
     Related:
@@ -3917,7 +3917,7 @@ def test_backtest_artifact_precompute_runner_v2_rejects_non_monotonic_source_tim
     Side Effects:
         Writes only the pointer/config fixture under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -3951,7 +3951,7 @@ def test_backtest_artifact_precompute_runner_v2_rejects_non_aligned_rollup_sourc
     Side Effects:
         Writes only the pointer/config fixture under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4003,7 +4003,7 @@ def test_backtest_artifact_precompute_runner_v2_build_publish_prices_mappings_fl
     Side Effects:
         Builds and publishes one inactive slot under `tmp_path`.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4078,7 +4078,7 @@ def test_backtest_artifact_precompute_runner_v2_full_validation_spec_still_rejec
     Side Effects:
         Builds one inactive slot under `tmp_path` without publishing it.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
@@ -4473,7 +4473,7 @@ def _request_v2(
     Side Effects:
         None.
     Docs:
-      - docs/architecture/roadmap/base_refactor_plan.md
+      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
       - docs/architecture/backtest/README.md
     Related:
       - src/trading/contexts/backtest/application/services/v2/contracts.py
