@@ -14,7 +14,172 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      docs: ${{ steps.filter.outputs.docs }}
+      perf_smoke: ${{ steps.filter.outputs.perf_smoke }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Classify changed paths
+        id: filter
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before || '' }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            {
+              echo "code=true"
+              echo "docs=true"
+              echo "perf_smoke=true"
+            } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          zero_sha="0000000000000000000000000000000000000000"
+          if [[ -z "$BASE_SHA" || "$BASE_SHA" == "$zero_sha" ]]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+            echo "perf_smoke=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch --no-tags --depth=2 origin "$BASE_SHA" || true
+          if ! git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            echo "Base commit $BASE_SHA is unavailable; running full CI."
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+            echo "perf_smoke=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git diff --name-only "$BASE_SHA" HEAD > changed-files.txt
+          echo "Changed files:"
+          sed 's/^/  /' changed-files.txt
+
+          code=false
+          docs=false
+          perf_smoke=false
+
+          while IFS= read -r path; do
+            [[ -z "$path" ]] && continue
+
+            case "$path" in
+              .github/workflows/*|\
+              .python-version|\
+              pyproject.toml|\
+              uv.lock|\
+              alembic.ini|\
+              pyrightconfig.json|\
+              Dockerfile.api|\
+              apps/*|\
+              src/*|\
+              tests/*|\
+              tools/*|\
+              configs/*|\
+              alembic/*|\
+              migrations/*)
+                code=true
+                ;;
+            esac
+
+            case "$path" in
+              README.md|\
+              AGENTS.md|\
+              .codex/AGENTS.md|\
+              .codex/promt_template.md|\
+              docs/*)
+                docs=true
+                ;;
+            esac
+
+            case "$path" in
+              tests/perf_smoke/*|\
+              src/trading/contexts/indicators/*|\
+              src/trading/platform/config/indicators_compute_numba.py|\
+              configs/*/indicators.yaml)
+                perf_smoke=true
+                ;;
+            esac
+          done < changed-files.txt
+
+          {
+            echo "code=$code"
+            echo "docs=$docs"
+            echo "perf_smoke=$perf_smoke"
+          } >> "$GITHUB_OUTPUT"
+
+  static:
+    name: static
+    needs: changes
+    if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Setup uv
+        if: needs.changes.outputs.code == 'true'
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Assert lockfiles exist
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          set -euxo pipefail
+          test -f pyproject.toml || (echo "pyproject.toml not found in repo root" && exit 1)
+          test -f uv.lock || (echo "uv.lock not found. Run locally: uv lock && git add uv.lock" && exit 1)
+          test -f .python-version || (echo ".python-version not found. Run locally: uv python pin 3.12" && exit 1)
+          echo ".python-version=$(cat .python-version)"
+
+      - name: Sync venv from uv.lock (ALL groups)
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          uv sync --locked --all-groups
+          uv run python -V
+
+      - name: Lint
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          uv run ruff check .
+
+      - name: Type check
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          uv run pyright
+
+      - name: Docs index drift check
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          uv run python -m tools.docs.generate_docs_index --check
+
+      - name: Docs index drift check (docs-only)
+        if: needs.changes.outputs.code != 'true' && needs.changes.outputs.docs == 'true'
+        run: |
+          python -m tools.docs.generate_docs_index --check
+
+  migrations:
+    name: migrations
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     env:
       POSTGRES_DSN: postgresql://roehub:roehub@127.0.0.1:5432/roehub
@@ -32,11 +197,9 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
-
     defaults:
       run:
         shell: bash
-
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -46,14 +209,6 @@ jobs:
         with:
           version: "latest"
           enable-cache: true
-
-      - name: Assert lockfiles exist
-        run: |
-          set -euxo pipefail
-          test -f pyproject.toml || (echo "pyproject.toml not found in repo root" && exit 1)
-          test -f uv.lock || (echo "uv.lock not found. Run locally: uv lock && git add uv.lock" && exit 1)
-          test -f .python-version || (echo ".python-version not found. Run locally: uv python pin 3.12" && exit 1)
-          echo ".python-version=$(cat .python-version)"
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -69,18 +224,108 @@ jobs:
         run: |
           uv run python -m apps.migrations.main --dsn "$POSTGRES_DSN"
 
-      - name: Lint
-        run: |
-          uv run ruff check .
+  test:
+    name: test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
 
-      - name: Type check
-        run: |
-          uv run pyright
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
 
-      - name: Docs index drift check
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Sync venv from uv.lock (ALL groups)
         run: |
-          uv run python -m tools.docs.generate_docs_index --check
+          uv sync --locked --all-groups
+          uv run python -V
 
       - name: Tests
         run: |
-          uv run pytest -q -ra
+          uv run pytest -q -ra --ignore=tests/perf_smoke
+
+  perf_smoke:
+    name: perf-smoke
+    needs: changes
+    if: needs.changes.outputs.perf_smoke == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Sync venv from uv.lock (ALL groups)
+        run: |
+          uv sync --locked --all-groups
+          uv run python -V
+
+      - name: Perf smoke tests
+        run: |
+          uv run pytest -q -ra tests/perf_smoke
+
+  ci:
+    name: ci
+    needs:
+      - changes
+      - static
+      - migrations
+      - test
+      - perf_smoke
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize CI result
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          STATIC_RESULT: ${{ needs.static.result }}
+          MIGRATIONS_RESULT: ${{ needs.migrations.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          PERF_SMOKE_RESULT: ${{ needs.perf_smoke.result }}
+        run: |
+          set -euo pipefail
+          printf 'changes=%s\n' "$CHANGES_RESULT"
+          printf 'static=%s\n' "$STATIC_RESULT"
+          printf 'migrations=%s\n' "$MIGRATIONS_RESULT"
+          printf 'test=%s\n' "$TEST_RESULT"
+          printf 'perf-smoke=%s\n' "$PERF_SMOKE_RESULT"
+
+          for result in \
+            "$CHANGES_RESULT" \
+            "$STATIC_RESULT" \
+            "$MIGRATIONS_RESULT" \
+            "$TEST_RESULT" \
+            "$PERF_SMOKE_RESULT"; do
+            case "$result" in
+              success|skipped)
+                ;;
+              *)
+                echo "CI dependency failed or was cancelled: $result"
+                exit 1
+                ;;
+            esac
+          done
