@@ -229,6 +229,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
+    env:
+      NUMBA_NUM_THREADS: "1"
+      ROEHUB_NUMBA_NUM_THREADS: "1"
     defaults:
       run:
         shell: bash
