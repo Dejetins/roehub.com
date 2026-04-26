@@ -1,0 +1,2757 @@
+{
+  "artifact_manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+  "artifact_root": "/opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT/slot_a",
+  "backend_registry": {
+    "event_segments_2_no_risk": {
+      "arity": [
+        2
+      ],
+      "default": true,
+      "description": "Specialized 2-indicator event-compressed no-risk exact backend.",
+      "risk_mode": "none"
+    },
+    "event_segments_n_no_risk": {
+      "arity": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "default": "arity != 2",
+      "description": "Generic event-compressed no-risk exact backend for arity 1 and 3..10.",
+      "risk_mode": "none"
+    },
+    "event_segments_n_tp_sl_15m_grid": {
+      "arity": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7
+      ],
+      "default": true,
+      "description": "Generic event-compressed TP/SL backend backed by hit_times/15m.",
+      "risk_mode": "tp_sl_grid"
+    },
+    "streaming_2_no_risk": {
+      "arity": [
+        2
+      ],
+      "default": false,
+      "description": "Specialized 2-indicator streaming fallback for parity/perf comparison.",
+      "risk_mode": "none"
+    }
+  },
+  "hit_times_manifest_hash": "2366cc2f5a44ccc7faf716ed65a4f37bcbb91150471eec177d7f633a615dbaba",
+  "request": {
+    "coordinates": {
+      "exchange": "binance",
+      "market_type": "spot",
+      "symbol": "BTCUSDT"
+    },
+    "execution": {
+      "close_on_end": true,
+      "direction_mode": "unanimous_consensus",
+      "fee_rate": 0.00075,
+      "initial_cash_quote": 10000.0,
+      "profit_lock": {
+        "enabled": false,
+        "safe_profit_percent": 30.0
+      },
+      "sizing": {
+        "fixed_quote": 100.0,
+        "mode": "all_in"
+      },
+      "slippage_rate": 0.0001
+    },
+    "indicators": [
+      {
+        "indicator_id": "ma.dema",
+        "sources": [
+          "close"
+        ],
+        "window_range": [
+          5,
+          200
+        ]
+      },
+      {
+        "indicator_id": "ma.hma",
+        "sources": [
+          "close"
+        ],
+        "window_range": [
+          5,
+          200
+        ]
+      },
+      {
+        "indicator_id": "ma.ema",
+        "sources": [
+          "close"
+        ],
+        "window_range": [
+          5,
+          200
+        ]
+      },
+      {
+        "indicator_id": "ma.sma",
+        "sources": [
+          "close"
+        ],
+        "window_range": [
+          5,
+          200
+        ]
+      },
+      {
+        "indicator_id": "ma.wma",
+        "sources": [
+          "close"
+        ],
+        "window_range": [
+          5,
+          200
+        ]
+      },
+      {
+        "indicator_id": "ma.rma",
+        "sources": [
+          "close"
+        ],
+        "window_range": [
+          5,
+          200
+        ]
+      },
+      {
+        "indicator_id": "ma.zlema",
+        "sources": [
+          "close"
+        ],
+        "window_range": [
+          5,
+          200
+        ]
+      }
+    ],
+    "period": {
+      "end": "2026-04-11 20:08:00+00:00",
+      "semantics": "[start, end)",
+      "start": "2020-01-11 20:08:00+00:00"
+    },
+    "risk": {
+      "mode": "none"
+    },
+    "sort_metric": "total_return_pct",
+    "timeframe": "15m",
+    "top_n": 100
+  },
+  "request_hash": "58c80c1996b71dc585b931b1570bd43f6b32bd4d6890897a0c9b8f62591fe27f",
+  "rows_per_indicator": 2,
+  "runs": [
+    {
+      "cartesian_combinations": 2,
+      "combo_chunks_processed": 1,
+      "exact_backend": {
+        "arity": 1,
+        "implementation": "event_segments_n_no_risk",
+        "indicator_ids": [
+          "ma.dema"
+        ],
+        "mode": "no_risk",
+        "name": "event_segments_1_no_risk",
+        "requires_segments": true
+      },
+      "exact_candidates_evaluated": 2,
+      "exact_engine": "event_segments_1_no_risk",
+      "filtered_pool_sizes": {
+        "ma.dema": 2
+      },
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "indicator_pool_schema": [
+        "indicator_id",
+        "row_ids",
+        "trade_T",
+        "eval_T",
+        "segments",
+        "row_score",
+        "nonzero",
+        "change_count",
+        "metadata"
+      ],
+      "numba_warmup_s": 3.1086777919999804,
+      "result_hash": "dd4554992992353eba5bb3fbba65abfb2f7582790232c3402ab0229e5dc791ff",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 470.875,
+        "process_cpu_percent_equivalent": 105.00427217365058,
+        "process_cpu_time_s": 0.13706286399999978,
+        "rss_delta_mb": 3.0,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.13053074999970704
+      },
+      "self_check": {
+        "checked": 2,
+        "exact_backend": "event_segments_1_no_risk",
+        "max_abs_exact_backend_ret_diff": 0.0,
+        "passed": true,
+        "return_tolerance": 0.0001,
+        "trade_count_equal": true
+      },
+      "service_warmup_s": 3.1086777919999804,
+      "timers": {
+        "build_exact_context": 0.00014116600004854263,
+        "build_proxy_context": 7.079997885739431e-07,
+        "combo_iteration": 2.3500000224885298e-05,
+        "exact_scoring": 0.002355250000164233,
+        "heap_update": 2.45829996856628e-05,
+        "numba_warmup": 3.1086777919999804,
+        "prepare_pools": 0.001411707999977807,
+        "proxy_filter": 9.169998520519584e-07,
+        "self_check": 0.12303112500012503,
+        "service_warmup": 3.1086777919999804,
+        "top_result_proxy_fill": 0.0034419160001561977,
+        "total": 0.1304457920000459,
+        "total_without_warmup": 0.1304457920000459
+      },
+      "top_results": [
+        {
+          "avg_trade_exec_bars": 43.08378708162221,
+          "avg_trade_ret_pct": -0.17362533790980403,
+          "confirm_count": 218907,
+          "exposure_pct": 72.31068174105833,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 100.0,
+          "profit_factor": 0.3207225253445192,
+          "proxy_score": -249.1140594482422,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -29.408355637374164,
+          "total_return_pct": -100.0,
+          "trade_count": 76217,
+          "win_rate_pct": 19.688520933649972
+        },
+        {
+          "avg_trade_exec_bars": 39.66656197528478,
+          "avg_trade_ret_pct": -0.17380278431304091,
+          "confirm_count": 218906,
+          "exposure_pct": 72.31068174105833,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "max_drawdown_pct": 100.0,
+          "profit_factor": 0.3032019911551515,
+          "proxy_score": -249.47352600097656,
+          "return_over_max_drawdown": -1.0,
+          "sharpe_trades": -31.85804522619394,
+          "total_return_pct": -100.0,
+          "trade_count": 82783,
+          "win_rate_pct": 19.79271106386577
+        }
+      ]
+    },
+    {
+      "cartesian_combinations": 2,
+      "combo_chunks_processed": 1,
+      "exact_candidates_evaluated": 2,
+      "exact_engine": "event_segments_1_tp_sl_15m_grid",
+      "filtered_pool_sizes": {
+        "ma.dema": 2
+      },
+      "indicator_ids": [
+        "ma.dema"
+      ],
+      "numba_warmup_s": 11.086040624999896,
+      "result_hash": "47d2f25cd7af887b1fc0381f895f73941828b42562b095695ffb2bb314655ed5",
+      "risk_cells_per_combo": 2209,
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 695.4375,
+        "process_cpu_percent_equivalent": 100.67588490062165,
+        "process_cpu_time_s": 1.884108831999999,
+        "rss_delta_mb": 0.0,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 1.871459916999811
+      },
+      "self_check": {
+        "best_cell_equal": true,
+        "checked": 2,
+        "max_abs_tp_sl_ret_diff": 0.0,
+        "passed": true,
+        "return_tolerance": 5e-05,
+        "trade_count_equal": true,
+        "valid_tp_sl_indexes": true
+      },
+      "service_warmup_s": 11.086040624999896,
+      "sl_levels": 47,
+      "timers": {
+        "build_exact_context": 9.904099988489179e-05,
+        "build_proxy_context": 0.0,
+        "combo_iteration": 1.316700036113616e-05,
+        "exact_scoring": 0.005416957999841543,
+        "heap_update": 1.2833000255341176e-05,
+        "load_hit_times": 0.028220959000009316,
+        "numba_warmup": 11.086040624999896,
+        "prepare_pools": 0.0016934590003074845,
+        "proxy_filter": 0.0,
+        "self_check": 1.8640086250002241,
+        "service_warmup": 11.086040624999896,
+        "top_result_proxy_fill": 0.0,
+        "total_without_warmup": 1.871459916999811,
+        "tp_sl_exact_scoring": 0.005416957999841543,
+        "tp_sl_grid_validation": 0.0026233749999846623
+      },
+      "top_results": [
+        {
+          "best_sl_pct": 11.0,
+          "best_tp_pct": 7.500000476837158,
+          "total_return_pct": -100.0,
+          "trade_count": 82783
+        },
+        {
+          "best_sl_pct": 11.0,
+          "best_tp_pct": 7.0,
+          "total_return_pct": -100.0,
+          "trade_count": 76217
+        }
+      ],
+      "tp_levels": 47
+    },
+    {
+      "cartesian_combinations": 4,
+      "combo_chunks_processed": 1,
+      "exact_backend": {
+        "arity": 2,
+        "implementation": "event_segments_2_no_risk",
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma"
+        ],
+        "mode": "no_risk",
+        "name": "event_segments_2_no_risk",
+        "requires_segments": true
+      },
+      "exact_candidates_evaluated": 4,
+      "exact_engine": "event_segments_2_no_risk",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.hma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "indicator_pool_schema": [
+        "indicator_id",
+        "row_ids",
+        "trade_T",
+        "eval_T",
+        "segments",
+        "row_score",
+        "nonzero",
+        "change_count",
+        "metadata"
+      ],
+      "numba_warmup_s": 2.3826654999998027,
+      "result_hash": "f14a8bedbe2c2a3b2aaf63e5bb0931bb5ac811504477444f25f56f172971a7cc",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 722.75,
+        "process_cpu_percent_equivalent": 103.25021705188719,
+        "process_cpu_time_s": 0.12191660799999582,
+        "rss_delta_mb": 2.15625,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.11807879100024365
+      },
+      "self_check": {
+        "checked": 2,
+        "exact_backend": "event_segments_2_no_risk",
+        "max_abs_exact_backend_ret_diff": 3.410605131648481e-13,
+        "passed": true,
+        "return_tolerance": 0.0001,
+        "trade_count_equal": true
+      },
+      "service_warmup_s": 2.3826654999998027,
+      "timers": {
+        "build_exact_context": 0.0,
+        "build_proxy_context": 5.830002010043245e-07,
+        "combo_iteration": 9.417000001121778e-06,
+        "exact_scoring": 0.000371999999970285,
+        "heap_update": 2.0916999801556813e-05,
+        "numba_warmup": 2.3826654999998027,
+        "prepare_pools": 0.002190833999975439,
+        "proxy_filter": 7.91999809734989e-07,
+        "self_check": 0.1130019170000196,
+        "service_warmup": 2.3826654999998027,
+        "top_result_proxy_fill": 0.0024259169999822916,
+        "total": 0.11803599999984726,
+        "total_without_warmup": 0.11803599999984726
+      },
+      "top_results": [
+        {
+          "avg_trade_exec_bars": 34205.072916666664,
+          "avg_trade_ret_pct": 6.849285248735294,
+          "confirm_count": 109474,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 31.08430699522445,
+          "profit_factor": 2.321540712134171,
+          "proxy_score": -123.17253875732422,
+          "return_over_max_drawdown": 14.41009526259963,
+          "sharpe_trades": 0.3243359118335366,
+          "total_return_pct": 447.9278249730763,
+          "trade_count": 96,
+          "win_rate_pct": 29.166666666666664
+        },
+        {
+          "avg_trade_exec_bars": 30978.179245283016,
+          "avg_trade_ret_pct": 6.171599207183378,
+          "confirm_count": 109443,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 33.35129347977374,
+          "profit_factor": 2.224518135562532,
+          "proxy_score": -123.31817626953125,
+          "return_over_max_drawdown": 12.890165761063662,
+          "sharpe_trades": 0.3225292828509722,
+          "total_return_pct": 429.90370130016515,
+          "trade_count": 106,
+          "win_rate_pct": 27.358490566037734
+        },
+        {
+          "avg_trade_exec_bars": 16096.504901960785,
+          "avg_trade_ret_pct": 3.0522659237223158,
+          "confirm_count": 109497,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "max_drawdown_pct": 51.82513148152263,
+          "profit_factor": 1.4528205551696045,
+          "proxy_score": -123.68236541748047,
+          "return_over_max_drawdown": 5.442399854663755,
+          "sharpe_trades": 0.3061029913229307,
+          "total_return_pct": 282.05308804296874,
+          "trade_count": 204,
+          "win_rate_pct": 24.019607843137255
+        },
+        {
+          "avg_trade_exec_bars": 14402.13596491228,
+          "avg_trade_ret_pct": 2.7053982684502103,
+          "confirm_count": 109360,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "max_drawdown_pct": 70.7278079444566,
+          "profit_factor": 1.1493899880362974,
+          "proxy_score": -123.70563507080078,
+          "return_over_max_drawdown": 1.9270371658178151,
+          "sharpe_trades": 0.2959761135920523,
+          "total_return_pct": 136.2951145657924,
+          "trade_count": 228,
+          "win_rate_pct": 25.0
+        }
+      ]
+    },
+    {
+      "cartesian_combinations": 4,
+      "combo_chunks_processed": 1,
+      "exact_candidates_evaluated": 4,
+      "exact_engine": "event_segments_2_tp_sl_15m_grid",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.hma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma"
+      ],
+      "numba_warmup_s": 0.06290508300025976,
+      "result_hash": "e29264b72ea05711c5964742c22479ed2996a40113f778e761898efe06a3ad56",
+      "risk_cells_per_combo": 2209,
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 729.09375,
+        "process_cpu_percent_equivalent": 107.12140431713641,
+        "process_cpu_time_s": 0.12437536000000193,
+        "rss_delta_mb": 0.46875,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.116106917000252
+      },
+      "self_check": {
+        "best_cell_equal": true,
+        "checked": 2,
+        "max_abs_tp_sl_ret_diff": 4.759779339558179e-07,
+        "passed": true,
+        "return_tolerance": 5e-05,
+        "trade_count_equal": true,
+        "valid_tp_sl_indexes": true
+      },
+      "service_warmup_s": 0.06290508300025976,
+      "sl_levels": 47,
+      "timers": {
+        "build_exact_context": 0.00017058299999916926,
+        "build_proxy_context": 0.0,
+        "combo_iteration": 1.3000000308238668e-05,
+        "exact_scoring": 0.0016660000001138542,
+        "heap_update": 5.874999715160811e-06,
+        "load_hit_times": 0.028220959000009316,
+        "numba_warmup": 0.06290508300025976,
+        "prepare_pools": 0.0020957080000698625,
+        "proxy_filter": 0.0,
+        "self_check": 0.11207258300009926,
+        "service_warmup": 0.06290508300025976,
+        "top_result_proxy_fill": 0.0,
+        "total_without_warmup": 0.116106917000252,
+        "tp_sl_exact_scoring": 0.0016660000001138542,
+        "tp_sl_grid_validation": 0.0026233749999846623
+      },
+      "top_results": [
+        {
+          "best_sl_pct": 10.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 15.053810179233551,
+          "trade_count": 228
+        },
+        {
+          "best_sl_pct": 3.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 2.0070211961865425,
+          "trade_count": 96
+        },
+        {
+          "best_sl_pct": 3.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": -1.1473435908555984,
+          "trade_count": 106
+        },
+        {
+          "best_sl_pct": 4.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": -3.7884365767240524,
+          "trade_count": 204
+        }
+      ],
+      "tp_levels": 47
+    },
+    {
+      "cartesian_combinations": 8,
+      "combo_chunks_processed": 1,
+      "exact_backend": {
+        "arity": 3,
+        "implementation": "event_segments_n_no_risk",
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema"
+        ],
+        "mode": "no_risk",
+        "name": "event_segments_3_no_risk",
+        "requires_segments": true
+      },
+      "exact_candidates_evaluated": 8,
+      "exact_engine": "event_segments_3_no_risk",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "indicator_pool_schema": [
+        "indicator_id",
+        "row_ids",
+        "trade_T",
+        "eval_T",
+        "segments",
+        "row_score",
+        "nonzero",
+        "change_count",
+        "metadata"
+      ],
+      "numba_warmup_s": 0.10006595799995921,
+      "result_hash": "7afbfa5c28fde8238df982f24b17bc68fdec0075530486e46fa7bbeb0a9b9e70",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 730.890625,
+        "process_cpu_percent_equivalent": 140.54060231546933,
+        "process_cpu_time_s": 0.2053683520000007,
+        "rss_delta_mb": 0.90625,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.1461274170001161
+      },
+      "self_check": {
+        "checked": 2,
+        "exact_backend": "event_segments_3_no_risk",
+        "max_abs_exact_backend_ret_diff": 8.526512829121202e-13,
+        "passed": true,
+        "return_tolerance": 0.0001,
+        "trade_count_equal": true
+      },
+      "service_warmup_s": 0.10006595799995921,
+      "timers": {
+        "build_exact_context": 0.0002424999997856503,
+        "build_proxy_context": 2.499996298865881e-07,
+        "combo_iteration": 1.5625000287400326e-05,
+        "exact_scoring": 0.008144708000145329,
+        "heap_update": 2.7083000077254837e-05,
+        "numba_warmup": 0.10006595799995921,
+        "prepare_pools": 0.003316249999897991,
+        "proxy_filter": 7.500002539018169e-07,
+        "self_check": 0.12232929199990394,
+        "service_warmup": 0.10006595799995921,
+        "top_result_proxy_fill": 0.011651792000066052,
+        "total": 0.14573854199989,
+        "total_without_warmup": 0.14573854199989
+      },
+      "top_results": [
+        {
+          "avg_trade_exec_bars": 45606.76388888888,
+          "avg_trade_ret_pct": 9.121065300515696,
+          "confirm_count": 79489,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 31.5320429164909,
+          "profit_factor": 2.4494348493385933,
+          "proxy_score": -90.32166290283203,
+          "return_over_max_drawdown": 14.070383613465452,
+          "sharpe_trades": 0.3244436627775269,
+          "total_return_pct": 443.66793995128296,
+          "trade_count": 72,
+          "win_rate_pct": 23.61111111111111
+        },
+        {
+          "avg_trade_exec_bars": 46909.81428571428,
+          "avg_trade_ret_pct": 9.379572111438344,
+          "confirm_count": 82654,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 31.63135267241447,
+          "profit_factor": 2.4514583729691264,
+          "proxy_score": -93.63584899902344,
+          "return_over_max_drawdown": 14.001278356258874,
+          "sharpe_trades": 0.32442892239249177,
+          "total_return_pct": 442.879373551468,
+          "trade_count": 70,
+          "win_rate_pct": 24.285714285714285
+        },
+        {
+          "avg_trade_exec_bars": 42098.55128205128,
+          "avg_trade_ret_pct": 8.39008831265516,
+          "confirm_count": 82947,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 33.14415316755658,
+          "profit_factor": 2.3665148560481577,
+          "proxy_score": -94.51808166503906,
+          "return_over_max_drawdown": 13.014534788050687,
+          "sharpe_trades": 0.3231422840473633,
+          "total_return_pct": 431.3557344196455,
+          "trade_count": 78,
+          "win_rate_pct": 24.358974358974358
+        },
+        {
+          "avg_trade_exec_bars": 43206.40789473684,
+          "avg_trade_ret_pct": 8.608954539644623,
+          "confirm_count": 86105,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 33.24070747357991,
+          "profit_factor": 2.3683575677609494,
+          "proxy_score": -97.85494995117188,
+          "return_over_max_drawdown": 12.95364553028941,
+          "sharpe_trades": 0.3231184703058391,
+          "total_return_pct": 430.5883417887962,
+          "trade_count": 76,
+          "win_rate_pct": 25.0
+        },
+        {
+          "avg_trade_exec_bars": 25653.8046875,
+          "avg_trade_ret_pct": 4.943783570189696,
+          "confirm_count": 81945,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "max_drawdown_pct": 46.887517862736395,
+          "profit_factor": 1.5980371902441177,
+          "proxy_score": -93.60565185546875,
+          "return_over_max_drawdown": 6.850673324853458,
+          "sharpe_trades": 0.3114648192853981,
+          "total_return_pct": 321.21106789083825,
+          "trade_count": 128,
+          "win_rate_pct": 21.875
+        }
+      ]
+    },
+    {
+      "cartesian_combinations": 8,
+      "combo_chunks_processed": 1,
+      "exact_candidates_evaluated": 8,
+      "exact_engine": "event_segments_3_tp_sl_15m_grid",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema"
+      ],
+      "numba_warmup_s": 0.0724023330003547,
+      "result_hash": "93ac3d3aa1461db52c845478fc2fcb2aca9b6c7c1a90f61fb309ef4324485302",
+      "risk_cells_per_combo": 2209,
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 735.0625,
+        "process_cpu_percent_equivalent": 146.05436315162984,
+        "process_cpu_time_s": 0.1975081600000017,
+        "rss_delta_mb": 2.53125,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.13522920900004465
+      },
+      "self_check": {
+        "best_cell_equal": true,
+        "checked": 2,
+        "max_abs_tp_sl_ret_diff": 5.872554920127726e-07,
+        "passed": true,
+        "return_tolerance": 5e-05,
+        "trade_count_equal": true,
+        "valid_tp_sl_indexes": true
+      },
+      "service_warmup_s": 0.0724023330003547,
+      "sl_levels": 47,
+      "timers": {
+        "build_exact_context": 0.00030275000017354614,
+        "build_proxy_context": 0.0,
+        "combo_iteration": 1.4833000477665337e-05,
+        "exact_scoring": 0.00857333399972049,
+        "heap_update": 8.916000297176652e-06,
+        "load_hit_times": 0.028220959000009316,
+        "numba_warmup": 0.0724023330003547,
+        "prepare_pools": 0.0031787499997335544,
+        "proxy_filter": 0.0,
+        "self_check": 0.12302379099992322,
+        "service_warmup": 0.0724023330003547,
+        "top_result_proxy_fill": 0.0,
+        "total_without_warmup": 0.13522920900004465,
+        "tp_sl_exact_scoring": 0.00857333399972049,
+        "tp_sl_grid_validation": 0.0026233749999846623
+      },
+      "top_results": [
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 10.118418186903,
+          "trade_count": 128
+        },
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 9.745928645133972,
+          "trade_count": 134
+        },
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 3.576738014817238,
+          "trade_count": 142
+        },
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 3.550918772816658,
+          "trade_count": 148
+        },
+        {
+          "best_sl_pct": 3.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 0.7354044355452061,
+          "trade_count": 72
+        }
+      ],
+      "tp_levels": 47
+    },
+    {
+      "cartesian_combinations": 16,
+      "combo_chunks_processed": 1,
+      "exact_backend": {
+        "arity": 4,
+        "implementation": "event_segments_n_no_risk",
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma"
+        ],
+        "mode": "no_risk",
+        "name": "event_segments_4_no_risk",
+        "requires_segments": true
+      },
+      "exact_candidates_evaluated": 16,
+      "exact_engine": "event_segments_4_no_risk",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2,
+        "ma.sma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "indicator_pool_schema": [
+        "indicator_id",
+        "row_ids",
+        "trade_T",
+        "eval_T",
+        "segments",
+        "row_score",
+        "nonzero",
+        "change_count",
+        "metadata"
+      ],
+      "numba_warmup_s": 0.10914199999979246,
+      "result_hash": "1f3892aba8019eabf1e926cd529cb6eebdab09828bb57efa246920086bf5f828",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 738.109375,
+        "process_cpu_percent_equivalent": 207.76012009654022,
+        "process_cpu_time_s": 0.3540486079999994,
+        "rss_delta_mb": 0.015625,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.1704122080000161
+      },
+      "self_check": {
+        "checked": 2,
+        "exact_backend": "event_segments_4_no_risk",
+        "max_abs_exact_backend_ret_diff": 1.0231815394945443e-12,
+        "passed": true,
+        "return_tolerance": 0.0001,
+        "trade_count_equal": true
+      },
+      "service_warmup_s": 0.10914199999979246,
+      "timers": {
+        "build_exact_context": 0.00034341699983997387,
+        "build_proxy_context": 3.3400010579498485e-07,
+        "combo_iteration": 1.9209000129194465e-05,
+        "exact_scoring": 0.01844237500017698,
+        "heap_update": 5.208399988987367e-05,
+        "numba_warmup": 0.10914199999979246,
+        "prepare_pools": 0.004609541999798239,
+        "proxy_filter": 6.66000232740771e-07,
+        "self_check": 0.13220962499963207,
+        "service_warmup": 0.10914199999979246,
+        "top_result_proxy_fill": 0.014607707999857666,
+        "total": 0.1702935839998645,
+        "total_without_warmup": 0.1702935839998645
+      },
+      "top_results": [
+        {
+          "avg_trade_exec_bars": 51307.609375,
+          "avg_trade_ret_pct": 10.297853303809115,
+          "confirm_count": 76816,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 29.793188663059198,
+          "profit_factor": 2.567264466237232,
+          "proxy_score": -87.2071533203125,
+          "return_over_max_drawdown": 15.355028619113938,
+          "sharpe_trades": 0.3258859552665331,
+          "total_return_pct": 457.4752645759349,
+          "trade_count": 64,
+          "win_rate_pct": 25.0
+        },
+        {
+          "avg_trade_exec_bars": 51307.609375,
+          "avg_trade_ret_pct": 10.295140618135234,
+          "confirm_count": 80464,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 29.915583218461506,
+          "profit_factor": 2.559134845967547,
+          "proxy_score": -91.01721954345703,
+          "return_over_max_drawdown": 15.259719010784227,
+          "sharpe_trades": 0.3257988194449167,
+          "total_return_pct": 456.50339395745465,
+          "trade_count": 64,
+          "win_rate_pct": 25.0
+        },
+        {
+          "avg_trade_exec_bars": 46909.81428571428,
+          "avg_trade_ret_pct": 9.378836594069616,
+          "confirm_count": 78916,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 31.620799791297056,
+          "profit_factor": 2.4627174490860075,
+          "proxy_score": -89.71190643310547,
+          "return_over_max_drawdown": 14.024408578035358,
+          "sharpe_trades": 0.324412246573543,
+          "total_return_pct": 443.46301583740507,
+          "trade_count": 70,
+          "win_rate_pct": 25.71428571428571
+        },
+        {
+          "avg_trade_exec_bars": 46909.81428571428,
+          "avg_trade_ret_pct": 9.376356424310634,
+          "confirm_count": 82556,
+          "exposure_pct": 72.31002111151801,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 31.740008193572375,
+          "profit_factor": 2.455366647561109,
+          "proxy_score": -93.53241729736328,
+          "return_over_max_drawdown": 13.941885921275519,
+          "sharpe_trades": 0.32432528450158804,
+          "total_return_pct": 442.51557337513634,
+          "trade_count": 70,
+          "win_rate_pct": 25.71428571428571
+        },
+        {
+          "avg_trade_exec_bars": 46909.171428571426,
+          "avg_trade_ret_pct": 9.218536494875304,
+          "confirm_count": 81404,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "max_drawdown_pct": 31.63135267241444,
+          "profit_factor": 2.4467309400870874,
+          "proxy_score": -92.2074203491211,
+          "return_over_max_drawdown": 13.75723217848028,
+          "sharpe_trades": 0.32412595636982927,
+          "total_return_pct": 435.1598628337981,
+          "trade_count": 70,
+          "win_rate_pct": 24.285714285714285
+        }
+      ]
+    },
+    {
+      "cartesian_combinations": 16,
+      "combo_chunks_processed": 1,
+      "exact_candidates_evaluated": 16,
+      "exact_engine": "event_segments_4_tp_sl_15m_grid",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2,
+        "ma.sma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma"
+      ],
+      "numba_warmup_s": 0.08847279100018568,
+      "result_hash": "4314829fca4794451e51441028fde295e4122e2e0bbd6084584929f3da486983",
+      "risk_cells_per_combo": 2209,
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 743.25,
+        "process_cpu_percent_equivalent": 191.04791988335168,
+        "process_cpu_time_s": 0.2965742719999973,
+        "rss_delta_mb": 5.078125,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.15523554099991088
+      },
+      "self_check": {
+        "best_cell_equal": true,
+        "checked": 2,
+        "max_abs_tp_sl_ret_diff": 4.3590189013897884e-07,
+        "passed": true,
+        "return_tolerance": 5e-05,
+        "trade_count_equal": true,
+        "valid_tp_sl_indexes": true
+      },
+      "service_warmup_s": 0.08847279100018568,
+      "sl_levels": 47,
+      "timers": {
+        "build_exact_context": 0.00036416600005395594,
+        "build_proxy_context": 0.0,
+        "combo_iteration": 1.39579997266992e-05,
+        "exact_scoring": 0.01563833299996986,
+        "heap_update": 1.5666999843233498e-05,
+        "load_hit_times": 0.028220959000009316,
+        "numba_warmup": 0.08847279100018568,
+        "prepare_pools": 0.004464667000320333,
+        "proxy_filter": 0.0,
+        "self_check": 0.13466458299990336,
+        "service_warmup": 0.08847279100018568,
+        "top_result_proxy_fill": 0.0,
+        "total_without_warmup": 0.15523554099991088,
+        "tp_sl_exact_scoring": 0.01563833299996986,
+        "tp_sl_grid_validation": 0.0026233749999846623
+      },
+      "top_results": [
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 19.057530164718628,
+          "trade_count": 118
+        },
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 17.61060059070587,
+          "trade_count": 124
+        },
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 16.181740164756775,
+          "trade_count": 128
+        },
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 15.3920978307724,
+          "trade_count": 120
+        },
+        {
+          "best_sl_pct": 4.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 15.204435586929321,
+          "trade_count": 116
+        }
+      ],
+      "tp_levels": 47
+    },
+    {
+      "cartesian_combinations": 32,
+      "combo_chunks_processed": 1,
+      "exact_backend": {
+        "arity": 5,
+        "implementation": "event_segments_n_no_risk",
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma"
+        ],
+        "mode": "no_risk",
+        "name": "event_segments_5_no_risk",
+        "requires_segments": true
+      },
+      "exact_candidates_evaluated": 32,
+      "exact_engine": "event_segments_5_no_risk",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2,
+        "ma.sma": 2,
+        "ma.wma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "indicator_pool_schema": [
+        "indicator_id",
+        "row_ids",
+        "trade_T",
+        "eval_T",
+        "segments",
+        "row_score",
+        "nonzero",
+        "change_count",
+        "metadata"
+      ],
+      "numba_warmup_s": 0.11390875000006417,
+      "result_hash": "71a748bfd81bc8c88420346c737fa26689a82077f16b41c8ee5dbd6f76a4dc43",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 744.734375,
+        "process_cpu_percent_equivalent": 214.28074594447315,
+        "process_cpu_time_s": 0.3798021759999983,
+        "rss_delta_mb": 0.0,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.17724512499989942
+      },
+      "self_check": {
+        "checked": 2,
+        "exact_backend": "event_segments_5_no_risk",
+        "max_abs_exact_backend_ret_diff": 2.1316282072803006e-14,
+        "passed": true,
+        "return_tolerance": 0.0001,
+        "trade_count_equal": true
+      },
+      "service_warmup_s": 0.11390875000006417,
+      "timers": {
+        "build_exact_context": 0.00043083299988211365,
+        "build_proxy_context": 3.7500012695090845e-07,
+        "combo_iteration": 2.4667000161571195e-05,
+        "exact_scoring": 0.022723416999724577,
+        "heap_update": 8.791600021140766e-05,
+        "numba_warmup": 0.11390875000006417,
+        "prepare_pools": 0.00512166700036687,
+        "proxy_filter": 8.329998308909126e-07,
+        "self_check": 0.13477337499989517,
+        "service_warmup": 0.11390875000006417,
+        "top_result_proxy_fill": 0.013947333000032813,
+        "total": 0.1771208749996731,
+        "total_without_warmup": 0.1771208749996731
+      },
+      "top_results": [
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.78057157838153,
+          "confirm_count": 33958,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 20.85213762249257,
+          "profit_factor": 4.206924133889551,
+          "proxy_score": -38.88092803955078,
+          "return_over_max_drawdown": 26.12216695288881,
+          "sharpe_trades": 0.36137333687032935,
+          "total_return_pct": 544.7030202993649,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.78057157838153,
+          "confirm_count": 34375,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 20.85213762249257,
+          "profit_factor": 4.206924133889551,
+          "proxy_score": -39.24976348876953,
+          "return_over_max_drawdown": 26.12216695288881,
+          "sharpe_trades": 0.36137333687032935,
+          "total_return_pct": 544.7030202993649,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.78057157838153,
+          "confirm_count": 32404,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 20.85213762249257,
+          "profit_factor": 4.206924133889551,
+          "proxy_score": -37.0298957824707,
+          "return_over_max_drawdown": 26.12216695288881,
+          "sharpe_trades": 0.36137333687032935,
+          "total_return_pct": 544.7030202993649,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.78057157838153,
+          "confirm_count": 32905,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 20.85213762249257,
+          "profit_factor": 4.206924133889551,
+          "proxy_score": -37.50424575805664,
+          "return_over_max_drawdown": 26.12216695288881,
+          "sharpe_trades": 0.36137333687032935,
+          "total_return_pct": 544.7030202993649,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.65979515137784,
+          "confirm_count": 34855,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 21.429442924897327,
+          "profit_factor": 4.093590361386891,
+          "proxy_score": -39.77155303955078,
+          "return_over_max_drawdown": 25.19900082761961,
+          "sharpe_trades": 0.3609047368148887,
+          "total_return_pct": 540.0005499999149,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        }
+      ]
+    },
+    {
+      "cartesian_combinations": 32,
+      "combo_chunks_processed": 1,
+      "exact_candidates_evaluated": 32,
+      "exact_engine": "event_segments_5_tp_sl_15m_grid",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2,
+        "ma.sma": 2,
+        "ma.wma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma"
+      ],
+      "numba_warmup_s": 0.09206825000001118,
+      "result_hash": "0e7c73da948baa8d6c9e8113de3c0d95235de0d90b8de9181d184928198255ee",
+      "risk_cells_per_combo": 2209,
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 762.359375,
+        "process_cpu_percent_equivalent": 205.84502432076667,
+        "process_cpu_time_s": 0.3259449599999975,
+        "rss_delta_mb": 14.375,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.1583448330002284
+      },
+      "self_check": {
+        "best_cell_equal": true,
+        "checked": 2,
+        "max_abs_tp_sl_ret_diff": 4.5753312694074566e-08,
+        "passed": true,
+        "return_tolerance": 5e-05,
+        "trade_count_equal": true,
+        "valid_tp_sl_indexes": true
+      },
+      "service_warmup_s": 0.09206825000001118,
+      "sl_levels": 47,
+      "timers": {
+        "build_exact_context": 0.0006471249998867279,
+        "build_proxy_context": 0.0,
+        "combo_iteration": 3.045799940082361e-05,
+        "exact_scoring": 0.020750915999997233,
+        "heap_update": 3.0666999919048976e-05,
+        "load_hit_times": 0.028220959000009316,
+        "numba_warmup": 0.09206825000001118,
+        "prepare_pools": 0.005104082999878301,
+        "proxy_filter": 0.0,
+        "self_check": 0.1316612079999686,
+        "service_warmup": 0.09206825000001118,
+        "top_result_proxy_fill": 0.0,
+        "total_without_warmup": 0.1583448330002284,
+        "tp_sl_exact_scoring": 0.020750915999997233,
+        "tp_sl_grid_validation": 0.0026233749999846623
+      },
+      "top_results": [
+        {
+          "best_sl_pct": 11.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 58.86207818984985,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 11.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 58.86207818984985,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 11.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 58.86207818984985,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 11.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 58.86207818984985,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 11.5,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 57.70532488822937,
+          "trade_count": 6
+        }
+      ],
+      "tp_levels": 47
+    },
+    {
+      "cartesian_combinations": 64,
+      "combo_chunks_processed": 1,
+      "exact_backend": {
+        "arity": 6,
+        "implementation": "event_segments_n_no_risk",
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma"
+        ],
+        "mode": "no_risk",
+        "name": "event_segments_6_no_risk",
+        "requires_segments": true
+      },
+      "exact_candidates_evaluated": 64,
+      "exact_engine": "event_segments_6_no_risk",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2,
+        "ma.rma": 2,
+        "ma.sma": 2,
+        "ma.wma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "indicator_pool_schema": [
+        "indicator_id",
+        "row_ids",
+        "trade_T",
+        "eval_T",
+        "segments",
+        "row_score",
+        "nonzero",
+        "change_count",
+        "metadata"
+      ],
+      "numba_warmup_s": 0.1208711660001427,
+      "result_hash": "e97abb98661421a677608cc71d4f243fa31dcf038446992afa428a4f96a1ac8b",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 762.8125,
+        "process_cpu_percent_equivalent": 238.81198360252517,
+        "process_cpu_time_s": 0.4410674239999999,
+        "rss_delta_mb": 0.0,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.18469233300038468
+      },
+      "self_check": {
+        "checked": 2,
+        "exact_backend": "event_segments_6_no_risk",
+        "max_abs_exact_backend_ret_diff": 1.5631940186722204e-13,
+        "passed": true,
+        "return_tolerance": 0.0001,
+        "trade_count_equal": true
+      },
+      "service_warmup_s": 0.1208711660001427,
+      "timers": {
+        "build_exact_context": 0.0004254999998920539,
+        "build_proxy_context": 7.91999809734989e-07,
+        "combo_iteration": 5.054199982623686e-05,
+        "exact_scoring": 0.027721791000203666,
+        "heap_update": 0.00018979199967361637,
+        "numba_warmup": 0.1208711660001427,
+        "prepare_pools": 0.006246749999718304,
+        "proxy_filter": 1.165999947261298e-06,
+        "self_check": 0.1342974169997433,
+        "service_warmup": 0.1208711660001427,
+        "top_result_proxy_fill": 0.015260624999882566,
+        "total": 0.18421037500002058,
+        "total_without_warmup": 0.18421037500002058
+      },
+      "top_results": [
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 29517,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -33.98665237426758,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 31009,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -35.64204025268555,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 29732,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -34.190242767333984,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 31225,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -35.85400390625,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 29523,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -33.993690490722656,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        }
+      ]
+    },
+    {
+      "cartesian_combinations": 64,
+      "combo_chunks_processed": 1,
+      "exact_candidates_evaluated": 64,
+      "exact_engine": "event_segments_6_tp_sl_15m_grid",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2,
+        "ma.rma": 2,
+        "ma.sma": 2,
+        "ma.wma": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma"
+      ],
+      "numba_warmup_s": 0.10418233399968813,
+      "result_hash": "a36ad3ba47910cb147fa6e90bf4057ff9eba30f0ee0d3622380a9b3cf177c7b9",
+      "risk_cells_per_combo": 2209,
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 780.03125,
+        "process_cpu_percent_equivalent": 257.6132790144727,
+        "process_cpu_time_s": 0.433474271999998,
+        "rss_delta_mb": 13.40625,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.16826549999996132
+      },
+      "self_check": {
+        "best_cell_equal": true,
+        "checked": 2,
+        "max_abs_tp_sl_ret_diff": 1.133860887403415e-07,
+        "passed": true,
+        "return_tolerance": 5e-05,
+        "trade_count_equal": true,
+        "valid_tp_sl_indexes": true
+      },
+      "service_warmup_s": 0.10418233399968813,
+      "sl_levels": 47,
+      "timers": {
+        "build_exact_context": 0.0006899160002831195,
+        "build_proxy_context": 0.0,
+        "combo_iteration": 5.341599990060786e-05,
+        "exact_scoring": 0.02716091599995707,
+        "heap_update": 4.4625000100495527e-05,
+        "load_hit_times": 0.028220959000009316,
+        "numba_warmup": 0.10418233399968813,
+        "prepare_pools": 0.006193667000388814,
+        "proxy_filter": 0.0,
+        "self_check": 0.13398554200011858,
+        "service_warmup": 0.10418233399968813,
+        "top_result_proxy_fill": 0.0,
+        "total_without_warmup": 0.16826549999996132,
+        "tp_sl_exact_scoring": 0.02716091599995707,
+        "tp_sl_grid_validation": 0.0026233749999846623
+      },
+      "top_results": [
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        }
+      ],
+      "tp_levels": 47
+    },
+    {
+      "cartesian_combinations": 128,
+      "combo_chunks_processed": 1,
+      "exact_backend": {
+        "arity": 7,
+        "implementation": "event_segments_n_no_risk",
+        "indicator_ids": [
+          "ma.dema",
+          "ma.hma",
+          "ma.ema",
+          "ma.sma",
+          "ma.wma",
+          "ma.rma",
+          "ma.zlema"
+        ],
+        "mode": "no_risk",
+        "name": "event_segments_7_no_risk",
+        "requires_segments": true
+      },
+      "exact_candidates_evaluated": 128,
+      "exact_engine": "event_segments_7_no_risk",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2,
+        "ma.rma": 2,
+        "ma.sma": 2,
+        "ma.wma": 2,
+        "ma.zlema": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "indicator_pool_schema": [
+        "indicator_id",
+        "row_ids",
+        "trade_T",
+        "eval_T",
+        "segments",
+        "row_score",
+        "nonzero",
+        "change_count",
+        "metadata"
+      ],
+      "numba_warmup_s": 0.16980899999998655,
+      "result_hash": "c9ad58a1972a3e05954d9da35f5e1e69ca962e7127c831d29803ef739b84ceb7",
+      "risk_mode": "none",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 780.484375,
+        "process_cpu_percent_equivalent": 415.62386564574643,
+        "process_cpu_time_s": 0.9586431999999974,
+        "rss_delta_mb": 0.0,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.2306516250000641
+      },
+      "self_check": {
+        "checked": 2,
+        "exact_backend": "event_segments_7_no_risk",
+        "max_abs_exact_backend_ret_diff": 0.0,
+        "passed": true,
+        "return_tolerance": 0.0001,
+        "trade_count_equal": true
+      },
+      "service_warmup_s": 0.16980899999998655,
+      "timers": {
+        "build_exact_context": 0.0008811669999886362,
+        "build_proxy_context": 4.5900014811195433e-07,
+        "combo_iteration": 9.087499984161695e-05,
+        "exact_scoring": 0.06894591599984778,
+        "heap_update": 0.00036200000022290624,
+        "numba_warmup": 0.16980899999998655,
+        "prepare_pools": 0.007860208999773022,
+        "proxy_filter": 3.3749997783161234e-06,
+        "self_check": 0.13474779099988154,
+        "service_warmup": 0.16980899999998655,
+        "top_result_proxy_fill": 0.01737924999997631,
+        "total": 0.23028608300000997,
+        "total_without_warmup": 0.23028608300000997
+      },
+      "top_results": [
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 26169,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.zlema": {
+            "indicator_id": "ma.zlema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -30.28225326538086,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 21773,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.zlema": {
+            "indicator_id": "ma.zlema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -25.392879486083984,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 27360,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.zlema": {
+            "indicator_id": "ma.zlema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -31.64837646484375,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 22859,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.zlema": {
+            "indicator_id": "ma.zlema",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -26.63728904724121,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        },
+        {
+          "avg_trade_exec_bars": 547273.6666666666,
+          "avg_trade_ret_pct": 110.34494600618639,
+          "confirm_count": 26382,
+          "exposure_pct": 72.30903016720754,
+          "ma.dema": {
+            "indicator_id": "ma.dema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.ema": {
+            "indicator_id": "ma.ema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.hma": {
+            "indicator_id": "ma.hma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.rma": {
+            "indicator_id": "ma.rma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.sma": {
+            "indicator_id": "ma.sma",
+            "row_id": 0,
+            "source": "close",
+            "window": 5
+          },
+          "ma.wma": {
+            "indicator_id": "ma.wma",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "ma.zlema": {
+            "indicator_id": "ma.zlema",
+            "row_id": 1,
+            "source": "close",
+            "window": 6
+          },
+          "max_drawdown_pct": 22.89905188241667,
+          "profit_factor": 3.8308730622427962,
+          "proxy_score": -30.49246597290039,
+          "return_over_max_drawdown": 23.059023433975888,
+          "sharpe_trades": 0.35968573640780255,
+          "total_return_pct": 528.0297739724757,
+          "trade_count": 6,
+          "win_rate_pct": 33.33333333333333
+        }
+      ]
+    },
+    {
+      "cartesian_combinations": 128,
+      "combo_chunks_processed": 1,
+      "exact_candidates_evaluated": 128,
+      "exact_engine": "event_segments_7_tp_sl_15m_grid",
+      "filtered_pool_sizes": {
+        "ma.dema": 2,
+        "ma.ema": 2,
+        "ma.hma": 2,
+        "ma.rma": 2,
+        "ma.sma": 2,
+        "ma.wma": 2,
+        "ma.zlema": 2
+      },
+      "indicator_ids": [
+        "ma.dema",
+        "ma.hma",
+        "ma.ema",
+        "ma.sma",
+        "ma.wma",
+        "ma.rma",
+        "ma.zlema"
+      ],
+      "numba_warmup_s": 0.1514717500003826,
+      "result_hash": "a36ad3ba47910cb147fa6e90bf4057ff9eba30f0ee0d3622380a9b3cf177c7b9",
+      "risk_cells_per_combo": 2209,
+      "risk_mode": "tp_sl_grid",
+      "runtime_metrics": {
+        "numba_threads": 12,
+        "peak_rss_mb": 793.546875,
+        "process_cpu_percent_equivalent": 441.0004420388348,
+        "process_cpu_time_s": 0.9721498239999988,
+        "rss_delta_mb": 13.0625,
+        "thread_count": 13,
+        "thread_count_start": 13,
+        "wall_time_s": 0.22044191600025442
+      },
+      "self_check": {
+        "best_cell_equal": true,
+        "checked": 2,
+        "max_abs_tp_sl_ret_diff": 1.133860887403415e-07,
+        "passed": true,
+        "return_tolerance": 5e-05,
+        "trade_count_equal": true,
+        "valid_tp_sl_indexes": true
+      },
+      "service_warmup_s": 0.1514717500003826,
+      "sl_levels": 47,
+      "timers": {
+        "build_exact_context": 0.0008629169997220743,
+        "build_proxy_context": 0.0,
+        "combo_iteration": 0.0001000419997581048,
+        "exact_scoring": 0.07096316700017269,
+        "heap_update": 8.291700032714289e-05,
+        "load_hit_times": 0.028220959000009316,
+        "numba_warmup": 0.1514717500003826,
+        "prepare_pools": 0.00780037499998798,
+        "proxy_filter": 0.0,
+        "self_check": 0.14048858300020584,
+        "service_warmup": 0.1514717500003826,
+        "top_result_proxy_fill": 0.0,
+        "total_without_warmup": 0.22044191600025442,
+        "tp_sl_exact_scoring": 0.07096316700017269,
+        "tp_sl_grid_validation": 0.0026233749999846623
+      },
+      "top_results": [
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        },
+        {
+          "best_sl_pct": 12.0,
+          "best_tp_pct": 25.0,
+          "total_return_pct": 54.44154739379883,
+          "trade_count": 6
+        }
+      ],
+      "tp_levels": 47
+    }
+  ],
+  "sizing_smoke": [
+    {
+      "compiled_parity": {
+        "return_diff_pct": 0.0,
+        "trade_count_equal": true
+      },
+      "ending_equity": 23629.51145657924,
+      "passed": true,
+      "profit_lock": false,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 0.0,
+      "sizing": {
+        "mode": "all_in"
+      },
+      "total_return_pct": 136.29511456579237,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": {
+        "return_diff_pct": 0.0,
+        "trade_count_equal": true
+      },
+      "ending_equity": 42515.49918261675,
+      "passed": true,
+      "profit_lock": true,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 28177.4323019782,
+      "sizing": {
+        "mode": "all_in"
+      },
+      "total_return_pct": 325.15499182616753,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": {
+        "return_diff_pct": 0.0,
+        "trade_count_equal": true
+      },
+      "ending_equity": 10616.830805206473,
+      "passed": true,
+      "profit_lock": false,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 0.0,
+      "sizing": {
+        "fixed_quote": 100.0,
+        "mode": "fixed_quote"
+      },
+      "total_return_pct": 6.1683080520647415,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": {
+        "return_diff_pct": 0.0,
+        "trade_count_equal": true
+      },
+      "ending_equity": 10616.830805206473,
+      "passed": true,
+      "profit_lock": true,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 233.02787370908425,
+      "sizing": {
+        "fixed_quote": 100.0,
+        "mode": "fixed_quote"
+      },
+      "total_return_pct": 6.1683080520647415,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": null,
+      "ending_equity": 15563.012340364976,
+      "passed": true,
+      "profit_lock": false,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 0.0,
+      "sizing": {
+        "mode": "fixed_equity_pct",
+        "pct": 10.0
+      },
+      "total_return_pct": 55.63012340364977,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": null,
+      "ending_equity": 15563.012340364967,
+      "passed": true,
+      "profit_lock": true,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 2460.4183328008116,
+      "sizing": {
+        "mode": "fixed_equity_pct",
+        "pct": 10.0
+      },
+      "total_return_pct": 55.63012340364968,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": null,
+      "ending_equity": 15563.012340364976,
+      "passed": true,
+      "profit_lock": false,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 0.0,
+      "sizing": {
+        "min_quote": 50.0,
+        "mode": "fixed_equity_pct_min_quote",
+        "pct": 10.0
+      },
+      "total_return_pct": 55.63012340364977,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": null,
+      "ending_equity": 15563.012340364967,
+      "passed": true,
+      "profit_lock": true,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 2460.4183328008116,
+      "sizing": {
+        "min_quote": 50.0,
+        "mode": "fixed_equity_pct_min_quote",
+        "pct": 10.0
+      },
+      "total_return_pct": 55.63012340364968,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": null,
+      "ending_equity": 13084.154026033233,
+      "passed": true,
+      "profit_lock": false,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 0.0,
+      "sizing": {
+        "max_quote": 500.0,
+        "mode": "fixed_equity_pct_max_quote",
+        "pct": 10.0
+      },
+      "total_return_pct": 30.841540260332323,
+      "trade_count": 228
+    },
+    {
+      "compiled_parity": null,
+      "ending_equity": 13084.154026033235,
+      "passed": true,
+      "profit_lock": true,
+      "reference_scorer": "python_sizing_smoke",
+      "safe_quote": 1165.1393685454223,
+      "sizing": {
+        "max_quote": 500.0,
+        "mode": "fixed_equity_pct_max_quote",
+        "pct": 10.0
+      },
+      "total_return_pct": 30.841540260332344,
+      "trade_count": 228
+    }
+  ]
+}
