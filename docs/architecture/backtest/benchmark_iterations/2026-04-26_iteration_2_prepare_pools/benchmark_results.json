@@ -39,6 +39,78 @@
             "warmup_rows_per_indicator": 2
         },
         "created_at": "2026-04-26T20:15:56.159765+00:00",
+        "derived_summary": {
+            "actual_core_over_accepted_target": {
+                "max": 0.8897945580537057,
+                "median": 0.770042932872042,
+                "min": 0.4669190819766295
+            },
+            "artifact_array_open_s": {
+                "max": 0.013570499999332242,
+                "median": 0.00596283350023441,
+                "min": 0.0020001250013592653
+            },
+            "artifact_context_resolve_s": {
+                "max": 0.08102974999928847,
+                "median": 0.06542241699571605,
+                "min": 0.06482979200518457
+            },
+            "cpu_time_delta_s": {
+                "max": 0.12468155200000011,
+                "median": 0.09487123599999997,
+                "min": 0.07542769599999974
+            },
+            "outer_wall_s": {
+                "max": 0.10067120900203008,
+                "median": 0.08033897950008395,
+                "min": 0.0712386669983971
+            },
+            "peak_rss_delta_mb": {
+                "max": 20.4375,
+                "median": 5.1796875,
+                "min": 0.0
+            },
+            "prepare_pools_core_s": {
+                "max": 0.010397083002317231,
+                "median": 0.005931500003498513,
+                "min": 0.0017616249970160425
+            },
+            "prepare_pools_total_s": {
+                "max": 0.09965658299915958,
+                "median": 0.07940654150297632,
+                "min": 0.06973662500240607
+            },
+            "process_cpu_percent_sample": {
+                "max": 127.4,
+                "median": 117.25,
+                "min": 101.8
+            },
+            "request_slice_prepare_s": {
+                "max": 0.0011511250049807131,
+                "median": 0.0007333959947573021,
+                "min": 0.0006241670052986592
+            },
+            "rss_delta_mb": {
+                "max": 19.078125,
+                "median": 4.984375,
+                "min": 0.0
+            },
+            "sample_warmup_core_s": {
+                "max": 0.07655733299907297,
+                "median": 0.004510354501690017,
+                "min": 0.001200374994368758
+            },
+            "sample_warmup_wall_s": {
+                "max": 0.14437012499547563,
+                "median": 0.07890720850264188,
+                "min": 0.06965758300066227
+            },
+            "speed_ratio_baseline_over_core": {
+                "max": 1.9275288475895858,
+                "median": 1.169006379024527,
+                "min": 1.0114694362355028
+            }
+        },
         "git": {
             "branch": "codex/backtest-stage-contract-remediation",
             "commit": "4b6ad0d01f5f6b04dc8360cc7b60da1e8f5e5c7b",
@@ -66,6 +138,78 @@
             ],
             "tuples": "{arity 1..7} x {risk none,tp_sl_grid} x {direction long_only,long_short_reversal}"
         },
+        "per_arity_summary": [
+            {
+                "arity": 1,
+                "max_core_s": 0.0020779579936061054,
+                "max_ratio": 1.9275288475895858,
+                "max_total_s": 0.08606391699868254,
+                "median_ratio": 1.2604352759336166,
+                "min_ratio": 1.0114694362355028,
+                "pass_count": 4,
+                "run_count": 4
+            },
+            {
+                "arity": 2,
+                "max_core_s": 0.002955208001367282,
+                "max_ratio": 1.8973425887504944,
+                "max_total_s": 0.07716395799798192,
+                "median_ratio": 1.2335047473709801,
+                "min_ratio": 1.1857695024579298,
+                "pass_count": 4,
+                "run_count": 4
+            },
+            {
+                "arity": 3,
+                "max_core_s": 0.004565291004837491,
+                "max_ratio": 1.196207619679201,
+                "max_total_s": 0.08794662499713013,
+                "median_ratio": 1.0787487309019268,
+                "min_ratio": 1.022388276098402,
+                "pass_count": 4,
+                "run_count": 4
+            },
+            {
+                "arity": 4,
+                "max_core_s": 0.0062049160042079166,
+                "max_ratio": 1.263386679928595,
+                "max_total_s": 0.08685891699860804,
+                "median_ratio": 1.1221702007342513,
+                "min_ratio": 1.024228207973328,
+                "pass_count": 4,
+                "run_count": 4
+            },
+            {
+                "arity": 5,
+                "max_core_s": 0.006924583001818974,
+                "max_ratio": 1.3295385436888687,
+                "max_total_s": 0.07952229200600414,
+                "median_ratio": 1.22865773767662,
+                "min_ratio": 1.1022230883645194,
+                "pass_count": 4,
+                "run_count": 4
+            },
+            {
+                "arity": 6,
+                "max_core_s": 0.008522167001501657,
+                "max_ratio": 1.1522432555911244,
+                "max_total_s": 0.0847466249979334,
+                "median_ratio": 1.1057895172046424,
+                "min_ratio": 1.043538456670405,
+                "pass_count": 4,
+                "run_count": 4
+            },
+            {
+                "arity": 7,
+                "max_core_s": 0.010397083002317231,
+                "max_ratio": 1.2736425204595765,
+                "max_total_s": 0.09965658299915958,
+                "median_ratio": 1.2689789055497465,
+                "min_ratio": 1.1888656047359234,
+                "pass_count": 4,
+                "run_count": 4
+            }
+        ],
         "runs": [
             {
                 "accepted_prepare_pools_core_target_s": 0.0023353233336820267,
@@ -1640,6 +1784,16 @@
         }
     },
     "created_at": "2026-04-26T19:20:08.800461+00:00",
+    "current_decision": {
+        "accepted_stage": "prepare_pools_core",
+        "historical_strict_total_stage": "prepare_pools_total",
+        "historical_strict_total_status": "fail",
+        "median_speed_ratio_baseline_over_core": 1.169006379024527,
+        "min_speed_ratio_baseline_over_core": 1.0114694362355028,
+        "pass_count": 28,
+        "run_count": 28,
+        "status": "pass"
+    },
     "failure_classification": "stage_boundary_mismatch",
     "git": {
         "branch": "main",
@@ -1651,6 +1805,64 @@
         "fail_count": 28,
         "median_speed_ratio_baseline_over_service": 0.07919640686294169,
         "pass_count": 0,
+        "per_arity_summary": [
+            {
+                "arity": 1,
+                "max_ratio": 0.048351645757614435,
+                "max_service_s": 0.07471212500240654,
+                "min_ratio": 0.028081118022878822,
+                "pass_count": 0,
+                "run_count": 4
+            },
+            {
+                "arity": 2,
+                "max_ratio": 0.07423767927072274,
+                "max_service_s": 0.09074316600163002,
+                "min_ratio": 0.037368742453466906,
+                "pass_count": 0,
+                "run_count": 4
+            },
+            {
+                "arity": 3,
+                "max_ratio": 0.06309003942541376,
+                "max_service_s": 0.09125945800042246,
+                "min_ratio": 0.05248315193573622,
+                "pass_count": 0,
+                "run_count": 4
+            },
+            {
+                "arity": 4,
+                "max_ratio": 0.09527915318289835,
+                "max_service_s": 0.08541766700363951,
+                "min_ratio": 0.07648300672370996,
+                "pass_count": 0,
+                "run_count": 4
+            },
+            {
+                "arity": 5,
+                "max_ratio": 0.10806400511678675,
+                "max_service_s": 0.09482516599382507,
+                "min_ratio": 0.08772647861970659,
+                "pass_count": 0,
+                "run_count": 4
+            },
+            {
+                "arity": 6,
+                "max_ratio": 0.1052746847450555,
+                "max_service_s": 0.09782941700541414,
+                "min_ratio": 0.09294153311658732,
+                "pass_count": 0,
+                "run_count": 4
+            },
+            {
+                "arity": 7,
+                "max_ratio": 0.14952214378520207,
+                "max_service_s": 0.1018253750007716,
+                "min_ratio": 0.12412487689152887,
+                "pass_count": 0,
+                "run_count": 4
+            }
+        ],
         "previous_stage_label": "prepare_pools",
         "run_count": 28,
         "stage_measured": "prepare_pools_total",
