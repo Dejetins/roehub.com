@@ -1,0 +1,330 @@
+{
+  "artifact_context": {
+    "artifact_asof_date": "2026-04-26",
+    "artifact_config": "configs/prod/backtest_artifacts.yaml",
+    "artifact_config_hash": "ad236389c1db26bf62a47f07cb585e678869901a6970bf60c991a463ff79d1d5",
+    "artifact_manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+    "artifact_root": "/opt/roehub/state/backtest_artifacts/v2",
+    "artifact_slot": "slot_a",
+    "artifact_slot_generation": 3,
+    "hit_times_manifest_hash": "2366cc2f5a44ccc7faf716ed65a4f37bcbb91150471eec177d7f633a615dbaba",
+    "published_at_utc": "2026-04-26T01:40:23Z"
+  },
+  "benchmark_name": "iteration_1_request_normalization_artifact_context",
+  "benchmark_policy": {
+    "host_observed": "Mac Studio",
+    "host_required": "Mac Studio",
+    "production_90_percent_matrix": "not_applicable_to_iteration_1_shell_no_scoring",
+    "stage_gate": "Iteration 1 request normalization/preflight smoke and artifact current/root resolution timing"
+  },
+  "canonical_baseline": {
+    "artifact_manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+    "hit_times_manifest_hash": "2366cc2f5a44ccc7faf716ed65a4f37bcbb91150471eec177d7f633a615dbaba",
+    "path": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+    "request_hash": "22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1",
+    "runs": 28
+  },
+  "created_at_utc": "2026-04-26T20:57:55Z",
+  "failure_evidence": {
+    "invalid_indicator": {
+      "error_code": "backtest.invalid_request",
+      "issues": [
+        {
+          "code": "unknown_indicator",
+          "message": "Unsupported indicator_id: ma.nope",
+          "path": "indicators.0.indicator_id"
+        }
+      ],
+      "status": "passed"
+    },
+    "invalid_source": {
+      "error_code": "backtest.invalid_request",
+      "issues": [
+        {
+          "code": "invalid_source",
+          "message": "Unsupported source 'not_a_source' for indicator_id ma.dema",
+          "path": "indicators.0.sources.0"
+        }
+      ],
+      "status": "passed"
+    },
+    "invalid_window": {
+      "error_code": "backtest.invalid_request",
+      "issues": [
+        {
+          "code": "invalid_window",
+          "message": "window range contains values outside configured catalog: (201, 202, 203, 204, 205)",
+          "path": "indicators.0.window"
+        }
+      ],
+      "status": "passed"
+    },
+    "request_too_expensive": {
+      "error_code": "backtest.request_too_expensive",
+      "issues": [
+        {
+          "code": "max_indicator_rows",
+          "message": "indicator rows must be <= 1000",
+          "path": "indicators"
+        }
+      ],
+      "status": "passed"
+    }
+  },
+  "host": {
+    "hardware": {
+      "chip": "Apple M2 Max",
+      "cores": "12 (8 performance and 4 efficiency)",
+      "memory": "64 GB",
+      "model_identifier": "Mac14,13",
+      "model_name": "Mac Studio"
+    },
+    "hostname": "MacStudioDaniil",
+    "machine": "arm64",
+    "platform": "macOS-15.7.5-arm64-arm-64bit"
+  },
+  "preflight_result": {
+    "cost_estimate": {
+      "candidate_combinations": 6,
+      "cost_class": "small",
+      "indicator_rows": 6,
+      "tp_sl_cells": 0
+    },
+    "errors": [],
+    "normalized_request": {
+      "coordinates": {
+        "exchange": "binance",
+        "market_type": "spot",
+        "symbol": "BTCUSDT"
+      },
+      "execution": {
+        "close_on_end": true,
+        "direction_mode": "long_short_reversal",
+        "fee_rate": 0.00075,
+        "initial_cash_quote": 10000.0,
+        "profit_lock": {
+          "enabled": false
+        },
+        "sizing": {
+          "equity_pct": 10.0,
+          "mode": "fixed_equity_pct"
+        },
+        "slippage_rate": 0.0001
+      },
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 5,
+            "step": 1,
+            "stop": 10
+          }
+        }
+      ],
+      "ranking": {
+        "direction": "desc",
+        "primary_metric": "total_return_pct"
+      },
+      "risk": {
+        "mode": "none"
+      },
+      "time_range": {
+        "end": "2026-04-11T20:08:00Z",
+        "start": "2020-01-11T20:08:00Z"
+      },
+      "timeframe": "15m",
+      "top_n": 100
+    },
+    "request_hash": "21592bfd156191344a2e7500196a5e41a1b2a7aee28847d588a6ac2581258418",
+    "result_config_hash": "d4ae1799e9498d81d132eb12aa80c9476358a60e3da5652651db50b553fdb9a9",
+    "warnings": []
+  },
+  "quality_gates": {
+    "docs_index_check": {
+      "result": "OK: docs/architecture/README.md is up-to-date"
+    },
+    "git_diff_check": {
+      "result": "passed"
+    },
+    "pyright": {
+      "result": "0 errors, 0 warnings, 0 informations"
+    },
+    "ruff": {
+      "result": "All checks passed!"
+    },
+    "targeted_iteration_1_tests": {
+      "cmd": "/opt/homebrew/bin/uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py tests/unit/contexts/backtest/adapters/outbound/artifacts_fs/test_artifact_context_resolver.py tests/unit/apps/api/test_backtests_routes.py",
+      "result": "22 passed in 1.30s"
+    },
+    "tests_unit_apps_api_backtests_routes": {
+      "cmd": "/opt/homebrew/bin/uv run pytest -q tests/unit/apps/api/test_backtests_routes.py",
+      "result": "4 passed in 0.55s"
+    },
+    "tests_unit_contexts_backtest": {
+      "cmd": "/opt/homebrew/bin/uv run pytest -q tests/unit/contexts/backtest",
+      "result": "178 passed in 25.84s"
+    }
+  },
+  "request_fixture": {
+    "coordinates": {
+      "exchange": "binance",
+      "market_type": "spot",
+      "symbol": "BTCUSDT"
+    },
+    "execution": {
+      "close_on_end": true,
+      "direction_mode": "long_short_reversal",
+      "fee_rate": 0.00075,
+      "initial_cash_quote": 10000.0,
+      "profit_lock": {
+        "enabled": false
+      },
+      "sizing": {
+        "equity_pct": 10.0,
+        "mode": "fixed_equity_pct"
+      },
+      "slippage_rate": 0.0001
+    },
+    "indicators": [
+      {
+        "indicator_id": "ma.dema",
+        "sources": [
+          "close"
+        ],
+        "window": {
+          "start": 5,
+          "step": 1,
+          "stop": 10
+        }
+      }
+    ],
+    "ranking": {
+      "direction": "desc",
+      "primary_metric": "total_return_pct"
+    },
+    "risk": {
+      "mode": "none"
+    },
+    "time_range": {
+      "end": "2026-04-11T20:08:00Z",
+      "start": "2020-01-11T20:08:00Z"
+    },
+    "timeframe": "15m",
+    "top_n": 100
+  },
+  "request_hash_parity": {
+    "expected_canonical_request_hash": "22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1",
+    "observed_preflight_request_hash": "21592bfd156191344a2e7500196a5e41a1b2a7aee28847d588a6ac2581258418",
+    "reason": "canonical notebook fixture uses notebook request schema and full seven-indicator window_range workload; Iteration 1 preflight smoke uses a guardrail-valid public API fixture before Iteration 2 row prefilter semantics",
+    "status": "not_applicable"
+  },
+  "runtime": {
+    "load_average": [
+      2.248046875,
+      2.11572265625,
+      2.0341796875
+    ],
+    "numba_threads": 12,
+    "rss_bytes_at_start": 108150784,
+    "thread_count": 13
+  },
+  "schema_version": 1,
+  "segments": [
+    {
+      "cpu_seconds_total": 0.02781800000000001,
+      "iterations": 200,
+      "load_average_after": [
+        2.02392578125,
+        2.06103515625,
+        2.013671875
+      ],
+      "load_average_before": [
+        2.02392578125,
+        2.06103515625,
+        2.013671875
+      ],
+      "process_cpu_percent_estimate": 100.0388064835993,
+      "rss_bytes_after": 96878592,
+      "rss_bytes_before": 96878592,
+      "rss_bytes_delta": 0,
+      "segment": "request_normalization_preflight_without_artifact_io",
+      "thread_count_after": 1,
+      "wall_ms": {
+        "max": 0.172792,
+        "mean": 0.138928045,
+        "median": 0.137041,
+        "min": 0.13625,
+        "p95": 0.146208,
+        "total": 27.807209
+      }
+    },
+    {
+      "cpu_seconds_total": 13.603606000000001,
+      "iterations": 200,
+      "load_average_after": [
+        2.39892578125,
+        2.13916015625,
+        2.04150390625
+      ],
+      "load_average_before": [
+        2.02392578125,
+        2.06103515625,
+        2.013671875
+      ],
+      "process_cpu_percent_estimate": 99.99912737869563,
+      "rss_bytes_after": 107347968,
+      "rss_bytes_before": 96878592,
+      "rss_bytes_delta": 10469376,
+      "segment": "artifact_context_resolve_current_root_hit_times_manifest",
+      "thread_count_after": 1,
+      "wall_ms": {
+        "max": 77.091458,
+        "mean": 68.01833868,
+        "median": 66.672729,
+        "min": 66.179458,
+        "p95": 73.963333,
+        "total": 13603.724709
+      }
+    },
+    {
+      "cpu_seconds_total": 13.638024,
+      "iterations": 200,
+      "load_average_after": [
+        2.248046875,
+        2.11572265625,
+        2.0341796875
+      ],
+      "load_average_before": [
+        2.39892578125,
+        2.13916015625,
+        2.04150390625
+      ],
+      "process_cpu_percent_estimate": 99.99983838593936,
+      "rss_bytes_after": 107397120,
+      "rss_bytes_before": 107347968,
+      "rss_bytes_delta": 49152,
+      "segment": "preflight_total_with_artifact_context",
+      "thread_count_after": 1,
+      "wall_ms": {
+        "max": 77.609959,
+        "mean": 68.18996876,
+        "median": 66.828104,
+        "min": 66.2165,
+        "p95": 74.136583,
+        "total": 13638.046041
+      }
+    }
+  ],
+  "source_manifest": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.md",
+  "status": "pass",
+  "version": {
+    "branch": "main",
+    "commit": "13128b29bbfef916b26ab50d66a654e8efd2f115",
+    "git_status_short": "",
+    "python": "3.12.13",
+    "uv": "uv 0.10.11 (Homebrew 2026-03-16)"
+  }
+}
