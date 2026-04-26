@@ -76,6 +76,7 @@ The generated executor prompt MUST use the following front-matter keys when appl
 - `style_references`
 - `hard_requirements`
 - `task_toggles`
+- `skill_routing`
 - `target_envs`
 - `required_literals`
 - `non_goals`
@@ -121,13 +122,14 @@ You MUST revise before output if any of the following are true:
 3. Output contains `# Required reading (do first)`.
 4. Output does not contain `context_sources`.
 5. Output does not contain `expected_primary_touches`.
-6. Output does not contain `# Context acquisition protocol`.
-7. Output does not contain `# Reading manifest`.
-8. Output does not contain explicit reading stop conditions.
-9. Output does not contain an explicit reading budget.
-10. Output duplicates the same file set in multiple sections without a semantic reason.
-11. Output lists more than 4 task entrypoints for a normal implementation task.
-12. Output uses previous prompts as a formatting scaffold.
+6. Output does not contain `skill_routing`.
+7. Output does not contain `# Context acquisition protocol`.
+8. Output does not contain `# Reading manifest`.
+9. Output does not contain explicit reading stop conditions.
+10. Output does not contain an explicit reading budget.
+11. Output duplicates the same file set in multiple sections without a semantic reason.
+12. Output lists more than 4 task entrypoints for a normal implementation task.
+13. Output uses previous prompts as a formatting scaffold.
 
 Layered context policy (mandatory, token-efficient)
 - Never generate a broad flat “read all these files first” list unless the task is explicitly a documentation audit or full-architecture review.
@@ -174,6 +176,36 @@ Rules:
 - `conditional_bundles` should group files by concern, not by arbitrary type.
 - `consult_if_needed` should hold broader docs or adjacent areas that are not needed up front.
 - Use concise reasons. Keep `why` and `read_when` ideally <= 14 words.
+
+Skill routing schema (mandatory)
+`skill_routing` MUST use this shape:
+
+skill_routing:
+  - skill: <exact skill frontmatter name>
+    use_when: <condition that triggers this skill>
+    timing: <before implementation | during investigation | during verification | before ship | if blocker>
+    reason: <boundary this skill owns>
+
+Rules:
+- Use exact skill names from `.codex/AGENTS.md` or the active global skill pack.
+- Prefer one primary workflow skill and add others only for real boundary crossings.
+- State when the executor should use each skill; do not instruct eager-loading all skill bodies.
+- If a skill is unavailable, instruct the executor to state the limitation and use the nearest task-bounded equivalent.
+- Do not route to `prompt-manager` unless the executor's task is prompt creation, prompt migration, prompt audit, or skill-routing prompt design.
+
+Current Roehub skill routing to encode when relevant:
+- architecture review, refactor analysis, migration review, docs-sync -> `architecture-review`
+- new architecture, bounded-context design, service integration design, ADR, phased migration -> `architecture-design`
+- bugs, regressions, failing tests, stack traces, or "worked before" reports -> `root-cause-debugging`
+- branch / PR / diff review focused on production risk -> `production-risk-review`
+- contract or compatibility impact -> `contract-impact-analysis`
+- backend tests, lint, type checks, failing gate triage -> `backend-quality-gates`
+- backend performance claims, profiling, benchmarks, hot-path work -> `backend-performance-evidence`
+- Numba/JIT-specific work, including `@njit`, `prange`, `fastmath`, ufunc/gufunc, typing, and threading diagnostics -> `numba`
+- browser-visible QA, screenshots, console/network checks, forms, navigation, responsive checks, QA reports -> `browser-qa-evidence` plus Browser plugin, Playwright MCP, or `playwright`
+- ship readiness, PR handoff, release evidence, docs drift before publishing, or "is this ready?" checks -> `pre-ship-gate`
+- full Roehub Git/GitHub/CI/deploy/post-deploy verification -> `publish-ci-deploy`
+- prompt creation, prompt rewrite, prompt migration, prompt audit, executor-prompt design -> `prompt-manager`
 
 Executor context acquisition policy (mandatory)
 The prompt you generate MUST explicitly instruct the executor to read context in this order and stop early once sufficient:
@@ -330,6 +362,7 @@ Defaults when values are missing
 - `expected_primary_touches`: infer the smallest realistic set of core files.
 - `possible_secondary_touches`: omit only when the secondary blast radius is truly negligible.
 - `state`: if no previous iteration exists, set `initial_iteration`.
+- `skill_routing`: infer from `.codex/AGENTS.md`; include exact skill names, trigger conditions, and workflow timing.
 - For browser-visible tasks, default to including runtime browser verification requirements unless the user explicitly restricts the task to static analysis.
 
 Hard requirements to encode in generated prompts
@@ -340,6 +373,7 @@ Hard requirements to encode in generated prompts
 - Code style should align with `src/trading/contexts/market_data/application/ports/stores` unless the user specifies a more relevant style anchor.
 - If new `.md` files are added or changed, require `python -m tools.docs.generate_docs_index`.
 - Reading must be bounded and layered; no eager-loading of all listed docs.
+- Skill routing must be compact and conditional, with exact skill names and workflow timing.
 - The executor prompt must preserve existing public contracts unless the user explicitly requests a contract change.
 - For browser-visible tasks, the executor prompt must require runtime browser verification when available and relevant.
 
@@ -400,35 +434,37 @@ Schema checks
 3. Did I avoid `# Required reading (do first)` entirely?
 4. Did I include `context_sources`?
 5. Did I include `expected_primary_touches`?
-6. Did I include `possible_secondary_touches` when needed?
-7. Did I include `# Context acquisition protocol`?
-8. Did I include `# Reading manifest`?
+6. Did I include `skill_routing`?
+7. Did I include exact skill names, trigger conditions, and workflow timing?
+8. Did I include `possible_secondary_touches` when needed?
+9. Did I include `# Context acquisition protocol`?
+10. Did I include `# Reading manifest`?
 
 Context-discipline checks
-9. Did I separate `always_read`, `task_entrypoints`, `conditional_bundles`, and `consult_if_needed`?
-10. Did I keep task entrypoints to 2-4 for a normal implementation task?
-11. Did I include explicit reading budget?
-12. Did I include explicit stop conditions?
-13. Did I forbid eager-loading all listed documents?
+11. Did I separate `always_read`, `task_entrypoints`, `conditional_bundles`, and `consult_if_needed`?
+12. Did I keep task entrypoints to 2-4 for a normal implementation task?
+13. Did I include explicit reading budget?
+14. Did I include explicit stop conditions?
+15. Did I forbid eager-loading all listed documents?
 
 Compression checks
-14. Did I avoid duplicating the same file set across sections?
-15. Did I avoid using old prompts as formatting scaffolds?
-16. Did I keep primary touches small and realistic?
-17. Did I keep secondary touches additive and lower-confidence?
+16. Did I avoid duplicating the same file set across sections?
+17. Did I avoid using old prompts as formatting scaffolds?
+18. Did I keep primary touches small and realistic?
+19. Did I keep secondary touches additive and lower-confidence?
 
 Delivery checks
-18. Are Must / Should / Nice-to-have clear?
-19. Are non-goals explicit?
-20. Are acceptance criteria measurable?
-21. Are quality gates appropriate to the task?
+20. Are Must / Should / Nice-to-have clear?
+21. Are non-goals explicit?
+22. Are acceptance criteria measurable?
+23. Are quality gates appropriate to the task?
 
 Browser verification checks
-22. Is this task browser-visible or web/UI-relevant?
-23. If yes, did I explicitly require runtime browser verification?
-24. If yes, did I include a concrete browser/runtime verification target?
-25. If yes, did I distinguish browser runtime verification from static reasoning and tests?
-26. If no, did I avoid unnecessary browser automation mention?
+24. Is this task browser-visible or web/UI-relevant?
+25. If yes, did I explicitly require runtime browser verification?
+26. If yes, did I include a concrete browser/runtime verification target?
+27. If yes, did I distinguish browser runtime verification from static reasoning and tests?
+28. If no, did I avoid unnecessary browser automation mention?
 
 If any answer is “no”, you MUST revise before output.
 

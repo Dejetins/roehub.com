@@ -114,11 +114,12 @@ Expected global skill pack:
 - `contract-impact-analysis`
 - `backend-quality-gates`
 - `backend-performance-evidence`
-- `numba-jit-performance`
+- `numba`
 - `browser-qa-evidence`
 - `pre-ship-gate`
 - `publish-ci-deploy`
 - `playwright` when browser automation is needed
+- `prompt-manager`
 
 Current intended routing:
 
@@ -129,10 +130,11 @@ Current intended routing:
 - contract or compatibility impact → `contract-impact-analysis`
 - backend tests, lint, type checks, failing gate triage → `backend-quality-gates`
 - backend performance claims, profiling, benchmarks, hot-path work → `backend-performance-evidence`
-- Numba/JIT-specific optimization details → `numba-jit-performance`
+- Numba/JIT-specific optimization details, including `@njit`, `prange`, `fastmath`, ufunc/gufunc, typing, and threading diagnostics → `numba`
 - browser-visible QA, screenshots, console/network checks, form/navigation testing, responsive checks, or QA reports → `browser-qa-evidence` plus an available runtime browser surface such as the Browser plugin, Playwright MCP, or the global `playwright` skill
 - ship readiness, PR handoff, release evidence, docs drift before publishing, or "is this ready?" checks → `pre-ship-gate`
 - full ship execution from local checkout through publish, CI stabilization, Mac Studio deploy, and production verification → `publish-ci-deploy`
+- prompt creation, prompt rewrite, prompt migration, prompt audit, executor-prompt design, or skill-routing instructions inside prompts → `prompt-manager`
 
 When the user asks to apply, publish, ship, or carry repository changes through Git, GitHub, CI, deploy, and verification, the agent SHOULD prefer `publish-ci-deploy` as the single orchestration skill.
 
@@ -141,6 +143,8 @@ When the user asks to apply, publish, ship, or carry repository changes through 
 `pre-ship-gate` remains the review-only gate for readiness assessment when the user wants analysis or ship confidence without performing publish, merge, deploy, or verification actions.
 
 Skill routing MUST stay compact. Do not load several workflow skills preemptively. Select the narrowest skill that matches the task, and layer additional skills only when the task crosses that boundary.
+
+When generating executor prompts, the agent SHOULD use `prompt-manager` and SHOULD encode task-specific skill routing inside the generated prompt: which exact skill to use, when in the workflow to use it, and what boundary it owns. Generated prompts MUST NOT instruct executors to preload all available skills.
 
 If an expected skill or browser surface is unavailable, the agent SHOULD use the nearest task-bounded equivalent and state the limitation.
 

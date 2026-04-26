@@ -6,6 +6,8 @@
 ## Канонические документы
 
 - `docs/architecture/backtest/backtest-service-artifact-runtime-v1.md` — каноническая целевая архитектура нового artifact-backed backtest service.
+- `docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md` — русская версия канонической целевой архитектуры.
+- `docs/architecture/backtest/backtest-service-implementation-prompt-pack-iteration-0-1.md` — executable prompt pack для Iteration 0/1 реализации.
 - `docs/architecture/backtest/benchmark_iterations/README.md` — рабочая папка для benchmark evidence по итерациям.
 
 ## Текущая граница доверия

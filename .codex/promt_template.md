@@ -62,6 +62,12 @@ task_toggles:
   <toggle_key_2>: true
   <toggle_key_3>: true
 
+skill_routing:
+  - skill: <skill_name>
+    use_when: "<condition that triggers this skill>"
+    timing: "<before implementation|during investigation|during verification|before ship|if blocker>"
+    reason: "<why this skill owns that boundary>"
+
 target_envs:
   - <env_1>
   - <env_2>
@@ -225,6 +231,10 @@ Read with this intent:
 Do not convert this manifest into a broad mandatory reading list.
 
 # Work plan (agent should follow)
+
+Skill routing for this task:
+
+- `<skill_name>`: use <timing> when <condition>; owns <boundary>. Do not preload if the condition does not apply.
 
 1. <step_1>
 2. <step_2>
