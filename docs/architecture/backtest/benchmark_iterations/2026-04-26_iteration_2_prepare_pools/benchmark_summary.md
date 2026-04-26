@@ -7,15 +7,17 @@ signal row extraction, row prefilter, compressed signal segments, and
 ## Status
 
 - Historical strict-total acceptance: fail.
-- Corrected `prepare_pools_core` acceptance: pending Mac Studio rerun.
+- Corrected `prepare_pools_core` acceptance: pass.
 - Host: `MacStudioDaniil` (`Mac Studio` acceptance host).
 - Recorded at UTC: `2026-04-26T19:20:08.800461+00:00`.
+- Corrected benchmark recorded at UTC: `2026-04-26T20:21:47.358835+00:00`.
 - Canonical target:
   `docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json`.
 
 ## Decision
 
-- Status: fail.
+- Historical status: fail.
+- Corrected status: pass.
 - Reason: strict service-level `prepare_pools` folded service overhead into the
   notebook-compatible stage and compared non-equivalent scopes.
 - Historical pass rule was:
@@ -58,6 +60,26 @@ Compatibility aliases remain in evidence:
 `artifact_array_mmap_load -> artifact_array_open`, and
 `time_range_slice -> request_slice_prepare`.
 
+## Corrected Benchmark
+
+The corrected Mac Studio run compares canonical notebook `prepare_pools` with
+service `prepare_pools_core`. It uses per-tuple sample warmup on two rows per
+indicator before the measured six-row run, matching the canonical policy.
+
+| Metric | Value |
+|---|---:|
+| Corrected status | `pass` |
+| Pass count | `28 / 28` |
+| Min speed ratio baseline/core | `1.0114694362355028` |
+| Median speed ratio baseline/core | `1.169006379024527` |
+| Max speed ratio baseline/core | `1.9275288475895858` |
+| Max core over accepted target | `0.8897945580537057` |
+| Max `prepare_pools_core` s | `0.010397083002317231` |
+| Max `prepare_pools_total` s | `0.09965658299915958` |
+| Max `artifact_context_resolve` s | `0.08102974999928847` |
+| Max `artifact_array_open` s | `0.013570499999332242` |
+| Max `request_slice_prepare` s | `0.0011511250049807131` |
+
 ## Summary
 
 | Metric | Value |
@@ -86,6 +108,8 @@ Compatibility aliases remain in evidence:
 
 - Git branch: `main`.
 - Git commit: `853395183ab80eb43019364a76c3d4174119565b`.
+- Corrected benchmark commit:
+  `4b6ad0d01f5f6b04dc8360cc7b60da1e8f5e5c7b`.
 - Request fixture hash from canonical baseline:
   `22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1`.
 - Artifact manifest hash:
@@ -106,8 +130,9 @@ Compatibility aliases remain in evidence:
 
 ## Next Gate
 
-- Do not treat Iteration 2 as benchmark-accepted yet.
-- Run a corrected Mac Studio benchmark that reports `prepare_pools_core`,
-  `artifact_context_resolve`, `artifact_array_open`, `request_slice_prepare`,
-  and `prepare_pools_total`.
-- Acceptance is based on `prepare_pools_core` only.
+- Iteration 2 corrected stage-boundary benchmark is accepted for
+  `prepare_pools_core`.
+- Preserve the historical strict-total failure as evidence that
+  `prepare_pools_total` must not be compared directly to canonical notebook
+  `prepare_pools`.
+- Iteration 3 may proceed only against the corrected stage contract.
