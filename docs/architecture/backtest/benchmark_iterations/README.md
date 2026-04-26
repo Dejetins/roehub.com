@@ -38,6 +38,39 @@ checks можно записывать как developer evidence, но не ка
 v1 records. Такие имена допустимы только в historical notes, если они явно
 помечены как superseded.
 
+## Правило сопоставимости stage
+
+Benchmark stage можно сравнивать с canonical notebook target только если
+измеряется тот же участок алгоритма. Если service stage включает дополнительную
+production-подготовку, ее нужно вынести в отдельные service-only overhead
+segments и не смешивать с notebook-compatible timing.
+
+Для Iteration 2 canonical notebook `prepare_pools` соответствует service
+`prepare_pools_core`:
+
+- signal row selection/extraction;
+- row prefilter;
+- compressed segment build;
+- подготовка pool metadata, если она входит в notebook-equivalent pool build.
+
+Следующие части не входят в canonical notebook `prepare_pools` target и должны
+измеряться отдельно:
+
+- `artifact_context_resolve`: current pointer, slot manifest identity, manifest
+  hash validation, typed artifact context;
+- `artifact_array_open`: opening `.npy` arrays через
+  `np.load(..., mmap_mode="r")` и manifest-backed dtype/shape validation;
+- `request_slice_prepare`: `[start, end)` 15m slicing, returns, execution
+  mapping derivation;
+- `prepare_pools_total`: aggregate service telemetry, not a direct notebook
+  ratio target.
+
+Правило `canonical_notebook_stage_s / service_stage_s >= 0.9` применяется к
+notebook-compatible stage, например к `prepare_pools_core`. Service-only
+overhead должен иметь отдельные absolute budgets или regression comparison
+against previous accepted service baseline. Нельзя проваливать
+notebook-compatible gate из-за overhead, которого нет в notebook timer.
+
 ## Имя файла
 
 Формат для одиночной Markdown-записи:
@@ -122,7 +155,7 @@ Canonical notebook-compatible stages:
 total_without_warmup
 load_hit_times              risk-on only
 tp_sl_grid_validation       risk-on only
-prepare_pools
+prepare_pools_core          notebook prepare_pools equivalent
 build_exact_context
 build_proxy_context
 combo_iteration
@@ -139,7 +172,7 @@ top_result_proxy_fill
 | total_without_warmup | yes | | | | | | | | |
 | load_hit_times | `risk.mode=tp_sl_grid` | | | | | | | | |
 | tp_sl_grid_validation | `risk.mode=tp_sl_grid` | | | | | | | | |
-| prepare_pools | yes | | | | | | | | |
+| prepare_pools_core | yes | | | | | | | | |
 | build_exact_context | yes | | | | | | | | |
 | build_proxy_context | yes | | | | | | | | |
 | combo_iteration | yes | | | | | | | | |
@@ -158,6 +191,10 @@ comparison against the previous service run.
 
 | Segment | Service wall s | Absolute budget s | Peak RSS | CPU evidence | Pass |
 |---|---:|---:|---:|---|---|
+| artifact_context_resolve | | | | | |
+| artifact_array_open | | | | | |
+| request_slice_prepare | | | | | |
+| prepare_pools_total | | | | | |
 | persist_top_n_io | | | | | |
 | lazy_trades_compute | | | | | |
 | lazy_trades_cache_hit | | | | | |

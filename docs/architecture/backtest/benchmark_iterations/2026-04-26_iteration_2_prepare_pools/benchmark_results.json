@@ -1,40 +1,2960 @@
 {
-  "acceptance_status": "pending_macstudio",
-  "artifact_manifest_hash": "b7a2970e8bb8f240c92ef55b3926467f642ad8d25f625f731496d13c092d51eb",
-  "benchmark_stage": "prepare_pools",
-  "canonical_target_source": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
-  "fixture": "synthetic_unit_fixture_non_acceptance",
-  "host": "Mac",
-  "is_mac_studio_acceptance_host": false,
-  "notes": [
-    "Local synthetic smoke is developer evidence only.",
-    "Mac Studio canonical arity 1..7 benchmark is required for acceptance."
-  ],
-  "numba_threads": 11,
-  "peak_rss_mb": 157.328125,
-  "platform": "macOS-15.7.4-arm64-arm-64bit",
-  "prepare_pools_ratio_vs_canonical_target": null,
-  "prepare_pools_timing": {
-    "stage_name": "prepare_pools",
-    "subsegments": {
-      "artifact_array_mmap_load": 0.006055750011000782,
-      "artifact_manifest_load": 0.0033002079580910504,
-      "row_prefilter": 0.48249816696625203,
-      "segment_build": 0.241826250043232,
-      "signal_row_selection": 0.00008920795517042279,
-      "time_range_slice": 0.0003587499959394336
+    "acceptance_host": "Mac Studio",
+    "acceptance_host_required": "Mac Studio",
+    "artifact": {
+        "artifact_asof_date": "2026-04-26",
+        "hit_times_manifest_hash": "2366cc2f5a44ccc7faf716ed65a4f37bcbb91150471eec177d7f633a615dbaba",
+        "manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+        "published_at_utc": "2026-04-26T01:40:23Z",
+        "root": "/opt/roehub/state/backtest_artifacts/v2",
+        "slot": "slot_a",
+        "slot_generation": 3
     },
-    "wall_time_s": 0.734178124985192
-  },
-  "prepared_pool_sizes": {
-    "ma.ema": 2
-  },
-  "process_cpu_percent_equivalent": 93.13624997128422,
-  "process_cpu_time_s": 0.683835064,
-  "recorded_at_utc": "2026-04-26T17:54:33Z",
-  "request_hash": "99577549d04783838e3c325657b601a0830c36280417533d413420b952aecce2",
-  "row_metadata_order_hash": "45876855a2852ec2e3a2a023aaa1890e8b9dc25ef7aae0fde06414195dc0127b",
-  "rss_delta_mb": 58.578125,
-  "thread_count": 12,
-  "wall_time_s": 0.7342308330116794
+    "baseline": {
+        "artifact_manifest_hash": "a76ccba27c8fabb3d5a6ad14c7d8f121839a5e22c107d038223261159367b259",
+        "artifact_root": "/opt/roehub/state/backtest_artifacts/v2/binance/spot/BTCUSDT/slot_a",
+        "path": "docs/architecture/backtest/benchmark_iterations/2026-04-26_engine_test_btcusdt_15m/benchmark_results.json",
+        "request_hash": "22d1a64757a3461507481fabea6d1434de1997f3fd063a180b289a524692c9f1",
+        "rows_per_indicator": 6
+    },
+    "corrected_stage_contract": {
+        "aggregate_service_telemetry_stage": "prepare_pools_total",
+        "canonical_notebook_timer": "prepare_pools",
+        "compatibility_aliases": {
+            "artifact_array_mmap_load": "artifact_array_open",
+            "artifact_manifest_load": "artifact_context_resolve",
+            "time_range_slice": "request_slice_prepare"
+        },
+        "note": "Previous strict-total failed evidence is preserved; corrected acceptance requires a fresh Mac Studio core benchmark.",
+        "notebook_compatible_service_stage": "prepare_pools_core",
+        "pass_rule": "canonical_notebook_prepare_pools_s / prepare_pools_core_s >= 0.9",
+        "service_overhead_stages": [
+            "artifact_context_resolve",
+            "artifact_array_open",
+            "request_slice_prepare"
+        ],
+        "status": "pending_macstudio_rerun"
+    },
+    "created_at": "2026-04-26T19:20:08.800461+00:00",
+    "failure_classification": "stage_boundary_mismatch",
+    "git": {
+        "branch": "main",
+        "commit": "853395183ab80eb43019364a76c3d4174119565b",
+        "dirty_status_short": []
+    },
+    "historical_strict_total_result": {
+        "classification": "failed because service overhead was compared with canonical notebook prepare_pools",
+        "fail_count": 28,
+        "median_speed_ratio_baseline_over_service": 0.07919640686294169,
+        "pass_count": 0,
+        "previous_stage_label": "prepare_pools",
+        "run_count": 28,
+        "stage_measured": "prepare_pools_total",
+        "status": "fail"
+    },
+    "host": {
+        "hostname": "MacStudioDaniil",
+        "machine": "arm64",
+        "platform": "macOS-15.7.5-arm64-arm-64bit",
+        "processor": "arm",
+        "python": "3.12.13"
+    },
+    "methodology": {
+        "arrays": "prices, signals, mappings loaded through np.load(..., mmap_mode=\"r\") by service adapter",
+        "comparison": "canonical notebook prepare_pools timer; pass if baseline/service >= 0.9 for every tuple",
+        "row_prefilter_top_fraction": 1.0,
+        "stage": "prepare_pools",
+        "tuples": "{arity 1..7} x {risk none,tp_sl_grid} x {direction long_only,long_short_reversal}"
+    },
+    "runs": [
+        {
+            "accepted_service_prepare_pools_target_s": 0.0023353233336820267,
+            "actual_over_accepted_target": 30.810686880082134,
+            "arity": 1,
+            "backend": "event_segments_1_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.002101791000313824,
+            "cpu_time_delta_s": 0.07660851600000004,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.0721871249988908,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 16629760,
+            "peak_rss_end_bytes": 163020800,
+            "peak_rss_start_bytes": 146391040,
+            "pool_count": 1,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 106.1,
+            "request_hash": "6fa47d1134a134c18a23602862e97ca976b62c5e7e0430865d68c820ac847872",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "54371a5fe5a3e695780f73bc6d89c6fd9243f026706be7f22d2954e70b760d20",
+            "rss_delta_bytes": 16629760,
+            "rss_end_bytes": 155189248,
+            "rss_start_bytes": 138559488,
+            "service_prepare_pools_s": 0.0719529159978265,
+            "speed_ratio_baseline_over_service": 0.029210643810145424,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.002177166003093589,
+                "artifact_manifest_load": 0.06635670799732907,
+                "row_prefilter": 0.0007005000006756745,
+                "segment_build": 0.0014569580016541295,
+                "signal_row_selection": 0.0002901249972637743,
+                "time_range_slice": 0.0009257499987143092
+            },
+            "target_gap_s": 0.06961759266414447,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.002331111111036282,
+            "actual_over_accepted_target": 32.05000596011646,
+            "arity": 1,
+            "backend": "event_segments_1_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.0020979999999326537,
+            "cpu_time_delta_s": 0.07926942000000001,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07493083399458556,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 14221312,
+            "peak_rss_end_bytes": 177242112,
+            "peak_rss_start_bytes": 163020800,
+            "pool_count": 1,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 105.8,
+            "request_hash": "35a1011365457fc77de3e4dd44fe212446a4235559882059f66df82ab6d5cdd0",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "54371a5fe5a3e695780f73bc6d89c6fd9243f026706be7f22d2954e70b760d20",
+            "rss_delta_bytes": 14188544,
+            "rss_end_bytes": 169410560,
+            "rss_start_bytes": 155222016,
+            "service_prepare_pools_s": 0.07471212500240654,
+            "speed_ratio_baseline_over_service": 0.028081118022878822,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.002175583998905495,
+                "artifact_manifest_load": 0.06922116599889705,
+                "row_prefilter": 0.0006568750031874515,
+                "segment_build": 0.0014134999946691096,
+                "signal_row_selection": 0.0002962500002468005,
+                "time_range_slice": 0.000908750000235159
+            },
+            "target_gap_s": 0.07238101389137025,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.003767731110807896,
+            "actual_over_accepted_target": 24.084299896383104,
+            "arity": 2,
+            "backend": "event_segments_2_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.0033909579997271067,
+            "cpu_time_delta_s": 0.09332075199999992,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.09103354099352146,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 15990784,
+            "peak_rss_end_bytes": 193232896,
+            "peak_rss_start_bytes": 177242112,
+            "pool_count": 2,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 102.5,
+            "request_hash": "a29d38dd75bf6bd0470b6c3bc3dad2dffd9800b047dea21d6819d56f80d47a81",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "3f4a93691e5b634f078f87800b8f66aedf230afd28c3e7b80c9bccbef789ee15",
+            "rss_delta_bytes": 14565376,
+            "rss_end_bytes": 183975936,
+            "rss_start_bytes": 169410560,
+            "service_prepare_pools_s": 0.09074316600163002,
+            "speed_ratio_baseline_over_service": 0.037368742453466906,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.0075014169997302815,
+                "artifact_manifest_load": 0.07845129199995426,
+                "row_prefilter": 0.0011344589947839268,
+                "segment_build": 0.0020241670063114725,
+                "signal_row_selection": 0.0005717919993912801,
+                "time_range_slice": 0.0010155419950024225
+            },
+            "target_gap_s": 0.08697543489082211,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.006230046666233748,
+            "actual_over_accepted_target": 12.123223797419202,
+            "arity": 2,
+            "backend": "event_segments_2_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.005607041999610374,
+            "cpu_time_delta_s": 0.08247072399999997,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07597441699908813,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 7176192,
+            "peak_rss_end_bytes": 200409088,
+            "peak_rss_start_bytes": 193232896,
+            "pool_count": 2,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 108.5,
+            "request_hash": "afa2e520991ef340fdefd5769509a0d8c70020479992a72e15eff9309a1261e2",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "3f4a93691e5b634f078f87800b8f66aedf230afd28c3e7b80c9bccbef789ee15",
+            "rss_delta_bytes": 7176192,
+            "rss_end_bytes": 191152128,
+            "rss_start_bytes": 183975936,
+            "service_prepare_pools_s": 0.07552825000311714,
+            "speed_ratio_baseline_over_service": 0.07423767927072274,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.0032595000011497177,
+                "artifact_manifest_load": 0.06782237500010524,
+                "row_prefilter": 0.0010988750000251457,
+                "segment_build": 0.0019955419993493706,
+                "signal_row_selection": 0.0005716659943573177,
+                "time_range_slice": 0.0007492080039810389
+            },
+            "target_gap_s": 0.06929820333688338,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.005186111111470382,
+            "actual_over_accepted_target": 15.17283342042298,
+            "arity": 3,
+            "backend": "event_segments_3_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.0046675000003233436,
+            "cpu_time_delta_s": 0.089440008,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07919050000054995,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 12550144,
+            "peak_rss_end_bytes": 212959232,
+            "peak_rss_start_bytes": 200409088,
+            "pool_count": 3,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 112.9,
+            "request_hash": "011c537fa88c176f04b2f8e8befdc53bfdea691caa1bf2a3d88bda59c078c603",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "0b58cb9eafe983c9a33f82c100ef8a56c2d37cf88d524201f4d40f94ffce3be3",
+            "rss_delta_bytes": 11124736,
+            "rss_end_bytes": 202276864,
+            "rss_start_bytes": 191152128,
+            "service_prepare_pools_s": 0.07868799999414477,
+            "speed_ratio_baseline_over_service": 0.05931654128546481,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.004422333993716165,
+                "artifact_manifest_load": 0.0675876250024885,
+                "row_prefilter": 0.0016343329989467748,
+                "segment_build": 0.003191083000274375,
+                "signal_row_selection": 0.0008017500003916211,
+                "time_range_slice": 0.0010032500067609362
+            },
+            "target_gap_s": 0.0735018888826744,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.005329861111628513,
+            "actual_over_accepted_target": 14.265326320868718,
+            "arity": 3,
+            "backend": "event_segments_3_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.004796875000465661,
+            "cpu_time_delta_s": 0.08633359199999999,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07651579200319247,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 16007168,
+            "peak_rss_end_bytes": 228966400,
+            "peak_rss_start_bytes": 212959232,
+            "pool_count": 3,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 112.8,
+            "request_hash": "f280113fbf11c250a0a16125f2ae074b702489d0c0d8669b08fb0bd023417c35",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "0b58cb9eafe983c9a33f82c100ef8a56c2d37cf88d524201f4d40f94ffce3be3",
+            "rss_delta_bytes": 16007168,
+            "rss_end_bytes": 218284032,
+            "rss_start_bytes": 202276864,
+            "service_prepare_pools_s": 0.07603220800228883,
+            "speed_ratio_baseline_over_service": 0.06309003942541376,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.004353999996965285,
+                "artifact_manifest_load": 0.06534791699959897,
+                "row_prefilter": 0.0017425830010324717,
+                "segment_build": 0.003094459003477823,
+                "signal_row_selection": 0.0007080409995978698,
+                "time_range_slice": 0.000735666006221436
+            },
+            "target_gap_s": 0.07070234689066031,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.008635833333351507,
+            "actual_over_accepted_target": 9.445927780994815,
+            "arity": 4,
+            "backend": "event_segments_4_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.007772250000016356,
+            "cpu_time_delta_s": 0.09565308000000004,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.08206325000355719,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 10485760,
+            "peak_rss_end_bytes": 239452160,
+            "peak_rss_start_bytes": 228966400,
+            "pool_count": 4,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 116.5,
+            "request_hash": "17dd2ea27417a5dad6476afb08f71db41a0d21aaa92ba17e2f794aa8a86a9c25",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "7a03c41aad5cda91add9c2aede498bd037e892f2a19f5865b47a5f9f0e1b4f37",
+            "rss_delta_bytes": 9060352,
+            "rss_end_bytes": 227344384,
+            "rss_start_bytes": 218284032,
+            "service_prepare_pools_s": 0.08157345799554605,
+            "speed_ratio_baseline_over_service": 0.09527915318289835,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.005599584001174662,
+                "artifact_manifest_load": 0.06780579199403292,
+                "row_prefilter": 0.001986457995371893,
+                "segment_build": 0.004225832999509294,
+                "signal_row_selection": 0.001050250000844244,
+                "time_range_slice": 0.0008619159998488612
+            },
+            "target_gap_s": 0.07293762466219454,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.0070613888884609975,
+            "actual_over_accepted_target": 11.48128707781032,
+            "arity": 4,
+            "backend": "event_segments_4_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.006355249999614898,
+            "cpu_time_delta_s": 0.0953338640000001,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.0816255409954465,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 8028160,
+            "peak_rss_end_bytes": 247480320,
+            "peak_rss_start_bytes": 239452160,
+            "pool_count": 4,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 116.8,
+            "request_hash": "515aa7d48b36d13bd55fee72f34715f5a382b3ad67c2903f65f75a5ab3804748",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "7a03c41aad5cda91add9c2aede498bd037e892f2a19f5865b47a5f9f0e1b4f37",
+            "rss_delta_bytes": 8028160,
+            "rss_end_bytes": 235372544,
+            "rss_start_bytes": 227344384,
+            "service_prepare_pools_s": 0.08107383299648063,
+            "speed_ratio_baseline_over_service": 0.07838842404170993,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.005488999995577615,
+                "artifact_manifest_load": 0.0672919999997248,
+                "row_prefilter": 0.002053374999377411,
+                "segment_build": 0.004139875003602356,
+                "signal_row_selection": 0.0011398330025258474,
+                "time_range_slice": 0.0009024999963003211
+            },
+            "target_gap_s": 0.07401244410801963,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.010229444444323436,
+            "actual_over_accepted_target": 9.26982560098323,
+            "arity": 5,
+            "backend": "event_segments_5_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.009206499999891093,
+            "cpu_time_delta_s": 0.11157733600000001,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.09573741700296523,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 19464192,
+            "peak_rss_end_bytes": 266944512,
+            "peak_rss_start_bytes": 247480320,
+            "pool_count": 5,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 116.5,
+            "request_hash": "ef22c534c5c074f59123971e9687e856d9412c82013f8720e321592ace7d6e8f",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "2951fa4b16cc3c6908e233a69d2472f2338d1ca3cebc7308e5dcf3fe978440f8",
+            "rss_delta_bytes": 18038784,
+            "rss_end_bytes": 253411328,
+            "rss_start_bytes": 235372544,
+            "service_prepare_pools_s": 0.09482516599382507,
+            "speed_ratio_baseline_over_service": 0.09708920520624886,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.006753790999937337,
+                "artifact_manifest_load": 0.07838150000316091,
+                "row_prefilter": 0.002583749999757856,
+                "segment_build": 0.004801957999006845,
+                "signal_row_selection": 0.0013083340018056333,
+                "time_range_slice": 0.0009358329989481717
+            },
+            "target_gap_s": 0.08459572154950162,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.009829166666450975,
+            "actual_over_accepted_target": 8.32839759203218,
+            "arity": 5,
+            "backend": "event_segments_5_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.008846249999805877,
+            "cpu_time_delta_s": 0.09870591999999986,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.08301462499366608,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 18350080,
+            "peak_rss_end_bytes": 285294592,
+            "peak_rss_start_bytes": 266944512,
+            "pool_count": 5,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 118.9,
+            "request_hash": "a591fb774ba5f08ae19d44c012937ac97e03723d1ee1020e681e531e14668721",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "2951fa4b16cc3c6908e233a69d2472f2338d1ca3cebc7308e5dcf3fe978440f8",
+            "rss_delta_bytes": 18350080,
+            "rss_end_bytes": 271761408,
+            "rss_start_bytes": 253411328,
+            "service_prepare_pools_s": 0.08186120799655328,
+            "speed_ratio_baseline_over_service": 0.10806400511678675,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.006720499994116835,
+                "artifact_manifest_load": 0.06575687500298955,
+                "row_prefilter": 0.0026510839961702004,
+                "segment_build": 0.004746832993987482,
+                "signal_row_selection": 0.0011698330054059625,
+                "time_range_slice": 0.0007637090020580217
+            },
+            "target_gap_s": 0.0720320413301023,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.00988134333359388,
+            "actual_over_accepted_target": 9.67489072783816,
+            "arity": 6,
+            "backend": "event_segments_6_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.008893209000234492,
+            "cpu_time_delta_s": 0.10825880799999985,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma",
+                "ma.rma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.09665724999649683,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 19595264,
+            "peak_rss_end_bytes": 304889856,
+            "peak_rss_start_bytes": 285294592,
+            "pool_count": 6,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.rma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 112.0,
+            "request_hash": "7ce7f45e3bfe11f7f7e91b2554f81527cff420c40e83fe1cd497def4266bce1b",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "ef9077f45b1e839dd76321c2df8c6ced81e28df29ecec14b7c9268761e9ea4d1",
+            "rss_delta_bytes": 18169856,
+            "rss_end_bytes": 289931264,
+            "rss_start_bytes": 271761408,
+            "service_prepare_pools_s": 0.09560091699677287,
+            "speed_ratio_baseline_over_service": 0.0930243064565447,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.01628333400003612,
+                "artifact_manifest_load": 0.06767716600006679,
+                "row_prefilter": 0.0031508329993812367,
+                "segment_build": 0.006145166997157503,
+                "signal_row_selection": 0.00137012499908451,
+                "time_range_slice": 0.0009108340018428862
+            },
+            "target_gap_s": 0.08571957366317899,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.01082287111178933,
+            "actual_over_accepted_target": 8.549063834097787,
+            "arity": 6,
+            "backend": "event_segments_6_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.009740584000610397,
+            "cpu_time_delta_s": 0.10799983999999997,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma",
+                "ma.rma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.09363908299565082,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 8011776,
+            "peak_rss_end_bytes": 312901632,
+            "peak_rss_start_bytes": 304889856,
+            "pool_count": 6,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.rma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 115.3,
+            "request_hash": "105c9e4207ded775a4a0dc45ba6fc53c7399e9b987e9f596d46dc451864ec250",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "ef9077f45b1e839dd76321c2df8c6ced81e28df29ecec14b7c9268761e9ea4d1",
+            "rss_delta_bytes": 8011776,
+            "rss_end_bytes": 297943040,
+            "rss_start_bytes": 289931264,
+            "service_prepare_pools_s": 0.09252541600289987,
+            "speed_ratio_baseline_over_service": 0.1052746847450555,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.012869500002125278,
+                "artifact_manifest_load": 0.06793437500164146,
+                "row_prefilter": 0.003532124996127095,
+                "segment_build": 0.005532041002879851,
+                "signal_row_selection": 0.00170116699882783,
+                "time_range_slice": 0.0008882920010364614
+            },
+            "target_gap_s": 0.08170254489111055,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.014713518889443044,
+            "actual_over_accepted_target": 6.019175335613877,
+            "arity": 7,
+            "backend": "event_segments_7_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.013242167000498739,
+            "cpu_time_delta_s": 0.11329927999999986,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma",
+                "ma.rma",
+                "ma.zlema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.08956820799357956,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 21069824,
+            "peak_rss_end_bytes": 333971456,
+            "peak_rss_start_bytes": 312901632,
+            "pool_count": 7,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.rma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.zlema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 126.5,
+            "request_hash": "e46b777c59f2afa6cfadd8f31bdbd676b15b639694b8a9bed7ab2df06fc3fd3b",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "e178d2f4fa29902742383fb739a49dac1d8377de6118df17f2e0b269dc497ab3",
+            "rss_delta_bytes": 19644416,
+            "rss_end_bytes": 317587456,
+            "rss_start_bytes": 297943040,
+            "service_prepare_pools_s": 0.08856324999942444,
+            "speed_ratio_baseline_over_service": 0.14952214378520207,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.008868999997503124,
+                "artifact_manifest_load": 0.06607037499634316,
+                "row_prefilter": 0.0035465830005705357,
+                "segment_build": 0.0075850419962080196,
+                "signal_row_selection": 0.0016057079992606305,
+                "time_range_slice": 0.0008247500009019859
+            },
+            "target_gap_s": 0.0738497311099814,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.014487869999963246,
+            "actual_over_accepted_target": 7.028319207794515,
+            "arity": 7,
+            "backend": "event_segments_7_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.013039082999966922,
+            "cpu_time_delta_s": 0.12686707199999997,
+            "direction_mode": "long_only",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma",
+                "ma.rma",
+                "ma.zlema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.10319708400493255,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 4161536,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 333971456,
+            "pool_count": 7,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.rma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.zlema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 122.9,
+            "request_hash": "3754b6c7fa4186665add2431fd95f33075168afa19b81eba6b15ef1b6677e180",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "e178d2f4fa29902742383fb739a49dac1d8377de6118df17f2e0b269dc497ab3",
+            "rss_delta_bytes": 4161536,
+            "rss_end_bytes": 321748992,
+            "rss_start_bytes": 317587456,
+            "service_prepare_pools_s": 0.1018253750007716,
+            "speed_ratio_baseline_over_service": 0.12805337569214076,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.009024083003168926,
+                "artifact_manifest_load": 0.07891937499516644,
+                "row_prefilter": 0.0036141669988865033,
+                "segment_build": 0.007492500000807922,
+                "signal_row_selection": 0.0017271249962504953,
+                "time_range_slice": 0.0009825419983826578
+            },
+            "target_gap_s": 0.08733750500080835,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.002912407777936702,
+            "actual_over_accepted_target": 24.004122132262644,
+            "arity": 1,
+            "backend": "event_segments_1_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.002621167000143032,
+            "cpu_time_delta_s": 0.07583710399999999,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07129987500229618,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 1,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 106.3,
+            "request_hash": "3561b83027d86c8600c9bb34d9c63cf3c390fcd89ecf89aa7c7e497da115f5b2",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "54371a5fe5a3e695780f73bc6d89c6fd9243f026706be7f22d2954e70b760d20",
+            "rss_delta_bytes": 32768,
+            "rss_end_bytes": 321781760,
+            "rss_start_bytes": 321748992,
+            "service_prepare_pools_s": 0.06990979200054426,
+            "speed_ratio_baseline_over_service": 0.037493560274397986,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.002026874994044192,
+                "artifact_manifest_load": 0.06508108300477033,
+                "row_prefilter": 0.0005504580039996654,
+                "segment_build": 0.0012341670008026995,
+                "signal_row_selection": 0.0002275829974678345,
+                "time_range_slice": 0.000756417000957299
+            },
+            "target_gap_s": 0.06699738422260755,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.003772870000425933,
+            "actual_over_accepted_target": 18.613637362245683,
+            "arity": 1,
+            "backend": "event_segments_1_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.00339558300038334,
+            "cpu_time_delta_s": 0.07460452800000006,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07040416699601337,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 1,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 106.0,
+            "request_hash": "42325cc25315d4951c32943f814ce2c370e8f08e8d6c6e83c5cc6b4b4eb47290",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "54371a5fe5a3e695780f73bc6d89c6fd9243f026706be7f22d2954e70b760d20",
+            "rss_delta_bytes": 0,
+            "rss_end_bytes": 321781760,
+            "rss_start_bytes": 321781760,
+            "service_prepare_pools_s": 0.07022683400282403,
+            "speed_ratio_baseline_over_service": 0.048351645757614435,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.0020279579985071905,
+                "artifact_manifest_load": 0.0654372080025496,
+                "row_prefilter": 0.0004942079976899549,
+                "segment_build": 0.0013152499959687702,
+                "signal_row_selection": 0.000225499999942258,
+                "time_range_slice": 0.0006980839971220121
+            },
+            "target_gap_s": 0.0664539640023981,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.003909628888626078,
+            "actual_over_accepted_target": 18.549778525431847,
+            "arity": 2,
+            "backend": "event_segments_2_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.0035186659997634706,
+            "cpu_time_delta_s": 0.07984000000000013,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07348558399826288,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 2,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 108.6,
+            "request_hash": "9aeee4524cb438a4085e6d91e301935bd5b3dccc2a19dcabf767164274cdfe7c",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "3f4a93691e5b634f078f87800b8f66aedf230afd28c3e7b80c9bccbef789ee15",
+            "rss_delta_bytes": 32768,
+            "rss_end_bytes": 321814528,
+            "rss_start_bytes": 321781760,
+            "service_prepare_pools_s": 0.07252275000064401,
+            "speed_ratio_baseline_over_service": 0.04851809948922544,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.0031542920041829348,
+                "artifact_manifest_load": 0.06534445799479727,
+                "row_prefilter": 0.0009566250009811483,
+                "segment_build": 0.0018638330002431758,
+                "signal_row_selection": 0.00047812500270083547,
+                "time_range_slice": 0.0006849589990451932
+            },
+            "target_gap_s": 0.06861312111201794,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.0035413888882531966,
+            "actual_over_accepted_target": 21.275986449375015,
+            "arity": 2,
+            "backend": "event_segments_2_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.003187249999427877,
+            "cpu_time_delta_s": 0.08232934399999986,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07614287499745842,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 2,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 108.1,
+            "request_hash": "115c03d5d805ebb062b10d7e86f7af838f7269af7c3795ba256cf9428398991e",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "3f4a93691e5b634f078f87800b8f66aedf230afd28c3e7b80c9bccbef789ee15",
+            "rss_delta_bytes": 0,
+            "rss_end_bytes": 321814528,
+            "rss_start_bytes": 321814528,
+            "service_prepare_pools_s": 0.07534654199844226,
+            "speed_ratio_baseline_over_service": 0.04230121137468752,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.003311041000415571,
+                "artifact_manifest_load": 0.06736150000506314,
+                "row_prefilter": 0.0010663329958333634,
+                "segment_build": 0.002154333997168578,
+                "signal_row_selection": 0.0005362919982871972,
+                "time_range_slice": 0.0008754579976084642
+            },
+            "target_gap_s": 0.07180515311018906,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.005601296666605372,
+            "actual_over_accepted_target": 14.465132775132473,
+            "arity": 3,
+            "backend": "event_segments_3_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.005041166999944835,
+            "cpu_time_delta_s": 0.08634585600000008,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.08157620800193399,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 3,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 105.8,
+            "request_hash": "ed720260617fbca051ad6e0c6f728767bdbd81deca0d3b074c395370296fff8c",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "0b58cb9eafe983c9a33f82c100ef8a56c2d37cf88d524201f4d40f94ffce3be3",
+            "rss_delta_bytes": 0,
+            "rss_end_bytes": 321814528,
+            "rss_start_bytes": 321814528,
+            "service_prepare_pools_s": 0.08102349999535363,
+            "speed_ratio_baseline_over_service": 0.06221857856342821,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.009670916995673906,
+                "artifact_manifest_load": 0.06536408299871255,
+                "row_prefilter": 0.0016039170004660264,
+                "segment_build": 0.002961166996101383,
+                "signal_row_selection": 0.0007450830016750842,
+                "time_range_slice": 0.0006380830018315464
+            },
+            "target_gap_s": 0.07542220332874826,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.005321759999787901,
+            "actual_over_accepted_target": 17.14836031765048,
+            "arity": 3,
+            "backend": "event_segments_3_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.0047895839998091105,
+            "cpu_time_delta_s": 0.10191235200000012,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.0919010840007104,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 3,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 110.9,
+            "request_hash": "590916e891c400175edf1bcc25c0ae863a976f1e2ee4564e50ac23f620511a93",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "0b58cb9eafe983c9a33f82c100ef8a56c2d37cf88d524201f4d40f94ffce3be3",
+            "rss_delta_bytes": 0,
+            "rss_end_bytes": 321814528,
+            "rss_start_bytes": 321814528,
+            "service_prepare_pools_s": 0.09125945800042246,
+            "speed_ratio_baseline_over_service": 0.05248315193573622,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.004488833998038899,
+                "artifact_manifest_load": 0.08014445899607381,
+                "row_prefilter": 0.0015783749986439943,
+                "segment_build": 0.0030228329997044057,
+                "signal_row_selection": 0.000938750003115274,
+                "time_range_slice": 0.001036791996739339
+            },
+            "target_gap_s": 0.08593769800063455,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.006980786666746199,
+            "actual_over_accepted_target": 11.249382734533112,
+            "arity": 4,
+            "backend": "event_segments_4_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.00628270800007158,
+            "cpu_time_delta_s": 0.09289687999999974,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.07921583300048951,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 4,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 117.2,
+            "request_hash": "a3dfc8c97bc65d3eda884fbf374db0870fe110f4626e4458aa90352ba08fbde1",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "7a03c41aad5cda91add9c2aede498bd037e892f2a19f5865b47a5f9f0e1b4f37",
+            "rss_delta_bytes": 16384,
+            "rss_end_bytes": 321830912,
+            "rss_start_bytes": 321814528,
+            "service_prepare_pools_s": 0.07852954100235365,
+            "speed_ratio_baseline_over_service": 0.08000438968417346,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.0053955420007696375,
+                "artifact_manifest_load": 0.06542312500096159,
+                "row_prefilter": 0.0019294590019853786,
+                "segment_build": 0.004098749996046536,
+                "signal_row_selection": 0.0008820420043775812,
+                "time_range_slice": 0.0007612919944222085
+            },
+            "target_gap_s": 0.07154875433560745,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.0072588888886255315,
+            "actual_over_accepted_target": 11.76731980806133,
+            "arity": 4,
+            "backend": "event_segments_4_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.006532999999762978,
+            "cpu_time_delta_s": 0.09494547199999992,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.08610579199739732,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 4,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 110.2,
+            "request_hash": "1683476eb816dbf14781d8cce4e5fe6a74c30ea20b7eebb7180bf22061cfcc10",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "7a03c41aad5cda91add9c2aede498bd037e892f2a19f5865b47a5f9f0e1b4f37",
+            "rss_delta_bytes": 16384,
+            "rss_end_bytes": 321847296,
+            "rss_start_bytes": 321830912,
+            "service_prepare_pools_s": 0.08541766700363951,
+            "speed_ratio_baseline_over_service": 0.07648300672370996,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.010156917000131216,
+                "artifact_manifest_load": 0.06718995799747063,
+                "row_prefilter": 0.0020884580007987097,
+                "segment_build": 0.004019542000605725,
+                "signal_row_selection": 0.001098749999073334,
+                "time_range_slice": 0.000817166997876484
+            },
+            "target_gap_s": 0.07815877811501398,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.00857861111095796,
+            "actual_over_accepted_target": 9.52007253189472,
+            "arity": 5,
+            "backend": "event_segments_5_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.007720749999862164,
+            "cpu_time_delta_s": 0.09833923200000003,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.08249591699859593,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 5,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 119.2,
+            "request_hash": "d452730684c7c54c531a75cd777567bb3a1ee46e803030fbf0dcb013b92e32b8",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "2951fa4b16cc3c6908e233a69d2472f2338d1ca3cebc7308e5dcf3fe978440f8",
+            "rss_delta_bytes": 65536,
+            "rss_end_bytes": 321912832,
+            "rss_start_bytes": 321847296,
+            "service_prepare_pools_s": 0.08166899999923771,
+            "speed_ratio_baseline_over_service": 0.0945370948577089,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.007001915997534525,
+                "artifact_manifest_load": 0.06590595799934817,
+                "row_prefilter": 0.0024034160014707595,
+                "segment_build": 0.004410958994412795,
+                "signal_row_selection": 0.0011349580017849803,
+                "time_range_slice": 0.0007587910004076548
+            },
+            "target_gap_s": 0.07309038888827975,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.008321018888940065,
+            "actual_over_accepted_target": 10.259160223465608,
+            "arity": 5,
+            "backend": "event_segments_5_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.007488917000046058,
+            "cpu_time_delta_s": 0.09729225599999997,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.08627079200232401,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 338132992,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 5,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 112.8,
+            "request_hash": "c311086efb1235d45af4a22154985af55fe4300170bc6f89aac8d6777348f028",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "2951fa4b16cc3c6908e233a69d2472f2338d1ca3cebc7308e5dcf3fe978440f8",
+            "rss_delta_bytes": 2015232,
+            "rss_end_bytes": 323928064,
+            "rss_start_bytes": 321912832,
+            "service_prepare_pools_s": 0.0853666660041199,
+            "speed_ratio_baseline_over_service": 0.08772647861970659,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.011155416999827139,
+                "artifact_manifest_load": 0.06521608299954096,
+                "row_prefilter": 0.0026434169994900003,
+                "segment_build": 0.00468570800148882,
+                "signal_row_selection": 0.001048375001118984,
+                "time_range_slice": 0.0005728329997509718
+            },
+            "target_gap_s": 0.07704564711517985,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.010102684444872365,
+            "actual_over_accepted_target": 9.683507144981414,
+            "arity": 6,
+            "backend": "event_segments_6_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.009092416000385128,
+            "cpu_time_delta_s": 0.11853950400000035,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma",
+                "ma.rma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.09946954200131586,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 4259840,
+            "peak_rss_end_bytes": 342392832,
+            "peak_rss_start_bytes": 338132992,
+            "pool_count": 6,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.rma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 119.1,
+            "request_hash": "b976a1ebef50384e1a1bcda78d2d02cc74d1cf213bab8442ae0a715973803637",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "ef9077f45b1e839dd76321c2df8c6ced81e28df29ecec14b7c9268761e9ea4d1",
+            "rss_delta_bytes": 3506176,
+            "rss_end_bytes": 327434240,
+            "rss_start_bytes": 323928064,
+            "service_prepare_pools_s": 0.09782941700541414,
+            "speed_ratio_baseline_over_service": 0.09294153311658732,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.007749083997623529,
+                "artifact_manifest_load": 0.07884000000194646,
+                "row_prefilter": 0.0028795420003007166,
+                "segment_build": 0.006076416997530032,
+                "signal_row_selection": 0.0013879170001018792,
+                "time_range_slice": 0.0008344579982804134
+            },
+            "target_gap_s": 0.08772673256054178,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.009710787777900501,
+            "actual_over_accepted_target": 8.59238991747685,
+            "arity": 6,
+            "backend": "event_segments_6_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.008739709000110452,
+            "cpu_time_delta_s": 0.10314275200000031,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma",
+                "ma.rma"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.08410358300170628,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 342392832,
+            "peak_rss_start_bytes": 342392832,
+            "pool_count": 6,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.rma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 122.6,
+            "request_hash": "15cf6b06157b2472de5dc239cc1654fb759f0235b1501ece8637c0348907cf25",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "ef9077f45b1e839dd76321c2df8c6ced81e28df29ecec14b7c9268761e9ea4d1",
+            "rss_delta_bytes": 0,
+            "rss_end_bytes": 327434240,
+            "rss_start_bytes": 327434240,
+            "service_prepare_pools_s": 0.0834388749935897,
+            "speed_ratio_baseline_over_service": 0.10474384992345463,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.007535750002716668,
+                "artifact_manifest_load": 0.06539583300036611,
+                "row_prefilter": 0.0030496669933199883,
+                "segment_build": 0.005340584000805393,
+                "signal_row_selection": 0.0012820420015486889,
+                "time_range_slice": 0.0007797090001986362
+            },
+            "target_gap_s": 0.0737280872156892,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.013956203333186245,
+            "actual_over_accepted_target": 6.531844501356057,
+            "arity": 7,
+            "backend": "event_segments_7_no_risk",
+            "canonical_notebook_prepare_pools_s": 0.01256058299986762,
+            "cpu_time_delta_s": 0.1114349920000001,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma",
+                "ma.rma",
+                "ma.zlema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.09206299999641487,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 10338304,
+            "peak_rss_end_bytes": 352731136,
+            "peak_rss_start_bytes": 342392832,
+            "pool_count": 7,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.rma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.zlema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 121.0,
+            "request_hash": "1c2efb160deb484d5288ee4d37e703bfa0c6a752e93c70945f38f9b2329fe01a",
+            "risk_mode": "none",
+            "row_metadata_order_hash": "e178d2f4fa29902742383fb739a49dac1d8377de6118df17f2e0b269dc497ab3",
+            "rss_delta_bytes": 8912896,
+            "rss_end_bytes": 336347136,
+            "rss_start_bytes": 327434240,
+            "service_prepare_pools_s": 0.09115975000167964,
+            "speed_ratio_baseline_over_service": 0.13778650116565905,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.012933124999108259,
+                "artifact_manifest_load": 0.0650614170008339,
+                "row_prefilter": 0.0035297919966978952,
+                "segment_build": 0.007343707999098115,
+                "signal_row_selection": 0.0015448750054929405,
+                "time_range_slice": 0.0006895830010762438
+            },
+            "target_gap_s": 0.0772035466684934,
+            "thread_count": 13,
+            "trade_T": 218913
+        },
+        {
+            "accepted_service_prepare_pools_target_s": 0.013151111111761161,
+            "actual_over_accepted_target": 7.250762478391003,
+            "arity": 7,
+            "backend": "event_segments_7_tp_sl_15m_grid",
+            "canonical_notebook_prepare_pools_s": 0.011836000000585045,
+            "cpu_time_delta_s": 0.11198744000000022,
+            "direction_mode": "long_short_reversal",
+            "eval_T": 218912,
+            "indicator_ids": [
+                "ma.dema",
+                "ma.hma",
+                "ma.ema",
+                "ma.sma",
+                "ma.wma",
+                "ma.rma",
+                "ma.zlema"
+            ],
+            "numba_thread_count": 12,
+            "outer_wall_s": 0.09659295799792744,
+            "passed_90pct_threshold": false,
+            "peak_rss_delta_bytes": 0,
+            "peak_rss_end_bytes": 352731136,
+            "peak_rss_start_bytes": 352731136,
+            "pool_count": 7,
+            "pool_summaries": [
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.dema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.hma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.ema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.sma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.wma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.rma",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                },
+                {
+                    "eval_T": 218912,
+                    "filtered_rows": 6,
+                    "indicator_id": "ma.zlema",
+                    "segments": 6,
+                    "selected_rows": 6,
+                    "signal_matrix_contiguous": true,
+                    "signal_matrix_dtype": "int8",
+                    "signal_matrix_shape": [
+                        6,
+                        218913
+                    ],
+                    "trade_T": 218913
+                }
+            ],
+            "process_cpu_percent_sample": 115.9,
+            "request_hash": "4fc79e146e89ba430494d46e9784bdb07a9e1822378d10ff2b9dba32d749d059",
+            "risk_mode": "tp_sl_grid",
+            "row_metadata_order_hash": "e178d2f4fa29902742383fb739a49dac1d8377de6118df17f2e0b269dc497ab3",
+            "rss_delta_bytes": 0,
+            "rss_end_bytes": 336347136,
+            "rss_start_bytes": 336347136,
+            "service_prepare_pools_s": 0.09535558299830882,
+            "speed_ratio_baseline_over_service": 0.12412487689152887,
+            "subsegments_s": {
+                "artifact_array_mmap_load": 0.017368958004226442,
+                "artifact_manifest_load": 0.06557183299446478,
+                "row_prefilter": 0.0033714169985614717,
+                "segment_build": 0.007047500002954621,
+                "signal_row_selection": 0.0012799169999198057,
+                "time_range_slice": 0.0006518750014947727
+            },
+            "target_gap_s": 0.08220447188654766,
+            "thread_count": 13,
+            "trade_T": 218913
+        }
+    ],
+    "schema_version": "backtest_iteration_2_prepare_pools_benchmark_v1",
+    "status": "fail",
+    "summary": {
+        "fail_count": 28,
+        "max_outer_wall_s": 0.10319708400493255,
+        "max_peak_rss_delta_bytes": 21069824,
+        "max_rss_delta_bytes": 19644416,
+        "max_service_prepare_pools_s": 0.1018253750007716,
+        "max_speed_ratio_baseline_over_service": 0.14952214378520207,
+        "median_speed_ratio_baseline_over_service": 0.07919640686294169,
+        "min_speed_ratio_baseline_over_service": 0.028081118022878822,
+        "pass_count": 0,
+        "run_count": 28
+    },
+    "target_policy": {
+        "accepted_service_time_formula": "accepted_prepare_pools_core_target_s = canonical_notebook_prepare_pools_s / 0.9",
+        "actual_over_target_formula": "actual_over_accepted_core_target = prepare_pools_core_s / accepted_prepare_pools_core_target_s; <= 1.0 passes",
+        "pass_rule": "canonical_notebook_prepare_pools_s / prepare_pools_core_s >= 0.9",
+        "stage": "prepare_pools_core",
+        "target_interpretation": "prepare_pools_core may be at most 1.111111x slower than the canonical notebook prepare_pools timer for each tuple.",
+        "threshold_speed_ratio_baseline_over_service": 0.9
+    },
+    "target_summary": {
+        "accepted_service_prepare_pools_target_s": {
+            "max": 0.014713518889443044,
+            "median": 0.007160138888543265,
+            "min": 0.002331111111036282
+        },
+        "actual_over_accepted_target": {
+            "max": 32.05000596011646,
+            "median": 11.365334906171716,
+            "min": 6.019175335613877
+        },
+        "actual_service_prepare_pools_s": {
+            "max": 0.1018253750007716,
+            "median": 0.0817651039978955,
+            "min": 0.06990979200054426
+        },
+        "canonical_notebook_prepare_pools_s": {
+            "max": 0.013242167000498739,
+            "median": 0.006444124999688938,
+            "min": 0.0020979999999326537
+        },
+        "plain_english": "Current strict service-level prepare_pools is 6.019x to 32.050x slower than the maximum accepted service time, with median 11.365x over target."
+    },
+    "warmup": {
+        "cpu_time_delta_s": 0.15029842400000004,
+        "request_hash": "6fa47d1134a134c18a23602862e97ca976b62c5e7e0430865d68c820ac847872",
+        "row_metadata_order_hash": "54371a5fe5a3e695780f73bc6d89c6fd9243f026706be7f22d2954e70b760d20",
+        "rss_delta_bytes": 40648704,
+        "service_prepare_pools_s": 0.1506305840011919,
+        "subsegments_s": {
+            "artifact_array_mmap_load": 0.007210666997707449,
+            "artifact_manifest_load": 0.06489645799592836,
+            "row_prefilter": 0.07395987500058254,
+            "segment_build": 0.0033229999971808866,
+            "signal_row_selection": 0.0002837080028257333,
+            "time_range_slice": 0.0009057910065166652
+        },
+        "wall_s": 0.15083254099590704
+    }
 }
